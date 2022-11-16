@@ -311,9 +311,14 @@ func (c *criService) containerSpec(
 		targetPid = status.Pid
 	}
 
+	uids, gids, err := parseUsernsIDs(nsOpts.GetUsernsOptions())
+	if err != nil {
+		return nil, fmt.Errorf("user namespace configuration: %w", err)
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid),
+		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
 		customopts.WithSupplementalGroups(supplementalGroups),
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),

@@ -804,6 +804,113 @@ func TestPidNamespace(t *testing.T) {
 	}
 }
 
+func TestUserNamespace(t *testing.T) {
+	testID := "test-id"
+	testPid := uint32(1234)
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	idMap := runtime.IDMapping{
+		HostId:      1000,
+		ContainerId: 1000,
+		Length:      10,
+	}
+	expIDMap := runtimespec.LinuxIDMapping{
+		HostID:      1000,
+		ContainerID: 1000,
+		Size:        10,
+	}
+	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+	for desc, test := range map[string]struct {
+		userNS        *runtime.UserNamespace
+		expNS         *runtimespec.LinuxNamespace
+		expNotNS      *runtimespec.LinuxNamespace // Does NOT contain this namespace
+		expUIDMapping []runtimespec.LinuxIDMapping
+		expGIDMapping []runtimespec.LinuxIDMapping
+		err           bool
+	}{
+		"node namespace mode": {
+			userNS: &runtime.UserNamespace{Mode: runtime.NamespaceMode_NODE},
+			// Expect userns to NOT be present.
+			expNotNS: &runtimespec.LinuxNamespace{
+				Type: runtimespec.UserNamespace,
+				Path: opts.GetUserNamespace(testPid),
+			},
+		},
+		"node namespace mode with mappings": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_NODE,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			err: true,
+		},
+		"container namespace mode": {
+			userNS: &runtime.UserNamespace{Mode: runtime.NamespaceMode_CONTAINER},
+			err:    true,
+		},
+		"target namespace mode": {
+			userNS: &runtime.UserNamespace{Mode: runtime.NamespaceMode_TARGET},
+			err:    true,
+		},
+		"unknown namespace mode": {
+			userNS: &runtime.UserNamespace{Mode: runtime.NamespaceMode(100)},
+			err:    true,
+		},
+		"pod namespace mode": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			expNS: &runtimespec.LinuxNamespace{
+				Type: runtimespec.UserNamespace,
+				Path: opts.GetUserNamespace(testPid),
+			},
+			expUIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
+			expGIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
+		},
+		"pod namespace mode with several mappings": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap, &idMap},
+				Gids: []*runtime.IDMapping{&idMap, &idMap},
+			},
+			err: true,
+		},
+		"pod namespace mode with uneven mappings": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap, &idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			err: true,
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: test.userNS}
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+
+			if test.err {
+				assert.Error(t, err)
+				assert.Nil(t, spec)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, spec.Linux.UIDMappings, test.expUIDMapping)
+			assert.Equal(t, spec.Linux.GIDMappings, test.expGIDMapping)
+
+			if test.expNS != nil {
+				assert.Contains(t, spec.Linux.Namespaces, *test.expNS)
+			}
+			if test.expNotNS != nil {
+				assert.NotContains(t, spec.Linux.Namespaces, *test.expNotNS)
+			}
+		})
+	}
+}
+
 func TestNoDefaultRunMount(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
