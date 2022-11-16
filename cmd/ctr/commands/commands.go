@@ -70,7 +70,7 @@ var (
 		cli.StringFlag{
 			Name: "hosts-dir",
 			// compatible with "/etc/docker/certs.d"
-			Usage: "Custom hosts configuration directory",
+			Usage: "custom hosts configuration directory",
 		},
 		cli.StringFlag{
 			Name:  "tlscacert",
