@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
@@ -210,6 +211,10 @@ func (t *task) Pid() uint32 {
 }
 
 func (t *task) Start(ctx context.Context) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Start",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	r, err := t.client.TaskService().Start(ctx, &tasks.StartRequest{
 		ContainerID: t.id,
 	})
@@ -220,17 +225,28 @@ func (t *task) Start(ctx context.Context) error {
 		}
 		return errdefs.FromGRPC(err)
 	}
+	span.SetAttributes(tracing.Attribute("task.pid", r.Pid))
 	t.pid = r.Pid
 	return nil
 }
 
 func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Kill",
+		tracing.WithAttribute("task.id", t.ID()),
+		tracing.WithAttribute("task.pid", int(t.Pid())),
+	)
+	defer span.End()
 	var i KillInfo
 	for _, o := range opts {
 		if err := o(ctx, &i); err != nil {
 			return err
 		}
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("task.exec.id", i.ExecID),
+		tracing.Attribute("task.exec.killall", i.All),
+	)
 	_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
 		Signal:      uint32(s),
 		ContainerID: t.id,
@@ -244,6 +260,10 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 }
 
 func (t *task) Pause(ctx context.Context) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Pause",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	_, err := t.client.TaskService().Pause(ctx, &tasks.PauseTaskRequest{
 		ContainerID: t.id,
 	})
@@ -251,6 +271,10 @@ func (t *task) Pause(ctx context.Context) error {
 }
 
 func (t *task) Resume(ctx context.Context) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Resume",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	_, err := t.client.TaskService().Resume(ctx, &tasks.ResumeTaskRequest{
 		ContainerID: t.id,
 	})
@@ -264,10 +288,14 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		return Status{}, errdefs.FromGRPC(err)
 	}
+	status := ProcessStatus(strings.ToLower(r.Process.Status.String()))
+	exitStatus := r.Process.ExitStatus
+	exitTime := protobuf.FromTimestamp(r.Process.ExitedAt)
+
 	return Status{
-		Status:     ProcessStatus(strings.ToLower(r.Process.Status.String())),
-		ExitStatus: r.Process.ExitStatus,
-		ExitTime:   protobuf.FromTimestamp(r.Process.ExitedAt),
+		Status:     status,
+		ExitStatus: exitStatus,
+		ExitTime:   exitTime,
 	}, nil
 }
 
@@ -275,6 +303,10 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	c := make(chan ExitStatus, 1)
 	go func() {
 		defer close(c)
+		ctx, span := tracing.StartSpan(ctx, "task.Wait",
+			tracing.WithAttribute("task.id", t.ID()),
+		)
+		defer span.End()
 		r, err := t.client.TaskService().Wait(ctx, &tasks.WaitRequest{
 			ContainerID: t.id,
 		})
@@ -297,6 +329,10 @@ func (t *task) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 // it returns the exit status of the task and any errors that were encountered
 // during cleanup
 func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStatus, error) {
+	ctx, span := tracing.StartSpan(ctx, "task.Delete",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	for _, o := range opts {
 		if err := o(ctx, t); err != nil {
 			return nil, err
@@ -306,6 +342,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	if err != nil && errdefs.IsNotFound(err) {
 		return nil, err
 	}
+
 	switch status.Status {
 	case Stopped, Unknown, "":
 	case Created:
@@ -350,9 +387,14 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 }
 
 func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
+	ctx, span := tracing.StartSpan(ctx, "task.Exec",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	if id == "" {
 		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
+	span.SetAttributes(tracing.Attribute("task.exec.id", id))
 	i, err := ioCreate(id)
 	if err != nil {
 		return nil, err
@@ -408,6 +450,10 @@ func (t *task) Pids(ctx context.Context) ([]ProcessInfo, error) {
 }
 
 func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
+	ctx, span := tracing.StartSpan(ctx, "task.CloseIO",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	r := &tasks.CloseIORequest{
 		ContainerID: t.id,
 	}
@@ -416,6 +462,7 @@ func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 		o(&i)
 	}
 	r.Stdin = i.Stdin
+
 	_, err := t.client.TaskService().CloseIO(ctx, r)
 	return errdefs.FromGRPC(err)
 }
@@ -425,6 +472,10 @@ func (t *task) IO() cio.IO {
 }
 
 func (t *task) Resize(ctx context.Context, w, h uint32) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Resize",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	_, err := t.client.TaskService().ResizePty(ctx, &tasks.ResizePtyRequest{
 		ContainerID: t.id,
 		Width:       w,
@@ -538,6 +589,10 @@ type UpdateTaskInfo struct {
 type UpdateTaskOpts func(context.Context, *Client, *UpdateTaskInfo) error
 
 func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
+	ctx, span := tracing.StartSpan(ctx, "task.Update",
+		tracing.WithAttribute("task.id", t.ID()),
+	)
+	defer span.End()
 	request := &tasks.UpdateTaskRequest{
 		ContainerID: t.id,
 	}
