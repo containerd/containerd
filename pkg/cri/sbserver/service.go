@@ -27,14 +27,12 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	sandboxapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/containerd/containerd/sandbox/proxy"
 	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
@@ -191,7 +189,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 
 	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
 	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
-	c.sandboxControllers[criconfig.ModeShim] = proxy.NewSandboxController(sandboxapi.NewControllerClient(client.Conn()))
+	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
 
 	return c, nil
 }

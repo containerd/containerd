@@ -86,7 +86,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(config, sandboxInfo.Runtime.Name)
+	ociRuntime, err := c.getSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
@@ -263,6 +263,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 		SandboxID: id,
 		Pid:       task.Pid(),
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
+		Labels:    labels,
 	}
 
 	return resp, nil

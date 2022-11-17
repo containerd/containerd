@@ -86,10 +86,29 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	sandboxInfo := sb.Sandbox{
-		ID: id,
-		// TODO: runtime handler can be an empty string, should use default one and enable back validation of this field in metadata store.
-		Runtime: sb.RuntimeOpts{Name: r.GetRuntimeHandler()},
+	var (
+		err         error
+		sandboxInfo = sb.Sandbox{ID: id}
+	)
+
+	ociRuntime, err := c.getSandboxRuntime(config, r.GetRuntimeHandler())
+	if err != nil {
+		return nil, fmt.Errorf("unable to get OCI runtime for sandbox %q: %w", id, err)
+	}
+
+	sandboxInfo.Runtime.Name = ociRuntime.Type
+
+	// Retrieve runtime options
+	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate sandbox runtime options: %w", err)
+	}
+
+	if runtimeOpts != nil {
+		sandboxInfo.Runtime.Options, err = typeurl.MarshalAny(runtimeOpts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal runtime options: %w", err)
+		}
 	}
 
 	// Save sandbox name
@@ -127,11 +146,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	var (
-		podNetwork = true
-		err        error
-	)
-
+	podNetwork := true
 	if goruntime.GOOS != "windows" &&
 		config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
 		// Pod network is not needed on linux with host network.
@@ -140,6 +155,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if goruntime.GOOS == "windows" &&
 		config.GetWindows().GetSecurityContext().GetHostProcess() {
 		// Windows HostProcess pods can only run on the host network
+		podNetwork = false
+	}
+
+	// No CNI on darwin yet
+	if goruntime.GOOS == "darwin" {
 		podNetwork = false
 	}
 
