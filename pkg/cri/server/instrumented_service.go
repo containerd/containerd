@@ -1667,6 +1667,40 @@ func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s
 	return errdefs.ToGRPC(err)
 }
 
+func (in *instrumentedService) ListMetricDescriptors(ctx context.Context, r *runtime.ListMetricDescriptorsRequest) (res *runtime.ListMetricDescriptorsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("ListMetricDescriptors failed, error")
+		} else {
+			log.G(ctx).Debug("ListMetricDescriptors returns successfully")
+		}
+	}()
+
+	res, err = in.c.ListMetricDescriptors(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (res *runtime.ListPodSandboxMetricsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("ListPodSandboxMetrics failed, error")
+		} else {
+			log.G(ctx).Debug("ListPodSandboxMetrics returns successfully")
+		}
+	}()
+
+	res, err = in.c.ListPodSandboxMetrics(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}
+
 func alphaReqToV1Req(
 	alphar interface{ Marshal() ([]byte, error) },
 	v1r interface{ Unmarshal(_ []byte) error },

@@ -1459,6 +1459,22 @@ func (sc *serverConn) processFrame(f Frame) error {
 		sc.sawFirstSettings = true
 	}
 
+	// Discard frames for streams initiated after the identified last
+	// stream sent in a GOAWAY, or all frames after sending an error.
+	// We still need to return connection-level flow control for DATA frames.
+	// RFC 9113 Section 6.8.
+	if sc.inGoAway && (sc.goAwayCode != ErrCodeNo || f.Header().StreamID > sc.maxClientStreamID) {
+
+		if f, ok := f.(*DataFrame); ok {
+			if sc.inflow.available() < int32(f.Length) {
+				return sc.countError("data_flow", streamError(f.Header().StreamID, ErrCodeFlowControl))
+			}
+			sc.inflow.take(int32(f.Length))
+			sc.sendWindowUpdate(nil) // conn-level
+		}
+		return nil
+	}
+
 	switch f := f.(type) {
 	case *SettingsFrame:
 		return sc.processSettings(f)
@@ -1500,9 +1516,6 @@ func (sc *serverConn) processPing(f *PingFrame) error {
 		// respond with a connection error (Section 5.4.1) of type
 		// PROTOCOL_ERROR."
 		return sc.countError("ping_on_stream", ConnectionError(ErrCodeProtocol))
-	}
-	if sc.inGoAway && sc.goAwayCode != ErrCodeNo {
-		return nil
 	}
 	sc.writeFrame(FrameWriteRequest{write: writePingAck{f}})
 	return nil
@@ -1686,16 +1699,6 @@ func (sc *serverConn) processSettingInitialWindowSize(val uint32) error {
 func (sc *serverConn) processData(f *DataFrame) error {
 	sc.serveG.check()
 	id := f.Header().StreamID
-	if sc.inGoAway && (sc.goAwayCode != ErrCodeNo || id > sc.maxClientStreamID) {
-		// Discard all DATA frames if the GOAWAY is due to an
-		// error, or:
-		//
-		// Section 6.8: After sending a GOAWAY frame, the sender
-		// can discard frames for streams initiated by the
-		// receiver with identifiers higher than the identified
-		// last stream.
-		return nil
-	}
 
 	data := f.Data()
 	state, st := sc.state(id)
@@ -1847,10 +1850,6 @@ func (st *stream) onWriteTimeout() {
 func (sc *serverConn) processHeaders(f *MetaHeadersFrame) error {
 	sc.serveG.check()
 	id := f.StreamID
-	if sc.inGoAway {
-		// Ignore.
-		return nil
-	}
 	// http://tools.ietf.org/html/rfc7540#section-5.1.1
 	// Streams initiated by a client MUST use odd-numbered stream
 	// identifiers. [...] An endpoint that receives an unexpected
@@ -2021,9 +2020,6 @@ func (sc *serverConn) checkPriority(streamID uint32, p PriorityParam) error {
 }
 
 func (sc *serverConn) processPriority(f *PriorityFrame) error {
-	if sc.inGoAway {
-		return nil
-	}
 	if err := sc.checkPriority(f.StreamID, f.PriorityParam); err != nil {
 		return err
 	}
@@ -2336,13 +2332,13 @@ func (sc *serverConn) sendWindowUpdate(st *stream) {
 
 	var n int32
 	if st == nil {
-		if avail, windowSize := sc.inflow.available(), sc.srv.initialConnRecvWindowSize(); avail > windowSize/2 {
+		if avail, windowSize := sc.inflow.n, sc.srv.initialConnRecvWindowSize(); avail > windowSize/2 {
 			return
 		} else {
 			n = windowSize - avail
 		}
 	} else {
-		if avail, windowSize := st.inflow.available(), sc.srv.initialStreamRecvWindowSize(); avail > windowSize/2 {
+		if avail, windowSize := st.inflow.n, sc.srv.initialStreamRecvWindowSize(); avail > windowSize/2 {
 			return
 		} else {
 			n = windowSize - avail
@@ -2358,7 +2354,7 @@ func (sc *serverConn) sendWindowUpdate(st *stream) {
 		sc.sendWindowUpdate32(st, maxUint31)
 		n -= maxUint31
 	}
-	sc.sendWindowUpdate32(st, int32(n))
+	sc.sendWindowUpdate32(st, n)
 }
 
 // st may be nil for conn-level
