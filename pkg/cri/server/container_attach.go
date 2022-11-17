@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/tracing"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -31,10 +32,12 @@ import (
 
 // Attach prepares a streaming endpoint to attach to a running container, and returns the address.
 func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*runtime.AttachResponse, error) {
+	span := tracing.SpanFromContext(ctx)
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container in store: %w", err)
 	}
+	span.SetAttributes(tracing.Attribute("container.id", cntr.ID))
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {
 		return nil, fmt.Errorf("container is in %s state", criContainerStateToString(state))

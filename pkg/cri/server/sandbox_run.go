@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tracing"
 )
 
 func init() {
@@ -56,6 +57,7 @@ func init() {
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Sandbox config %+v", config)
 
@@ -66,6 +68,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.New("sandbox config must include metadata")
 	}
 	name := makeSandboxName(metadata)
+
+	span.SetAttributes(
+		tracing.Attribute("sandbox.id", id),
+		tracing.Attribute("sandbox.name", name),
+	)
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
 
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
@@ -272,6 +279,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		//
 		// To simplify this, in the future, we should just remove this case (podNetwork &&
 		// !userNsEnabled) and just keep the other case (podNetwork && userNsEnabled).
+		span.AddEvent("setup pod network")
 		netStart := time.Now()
 
 		// If it is not in host network namespace then create a namespace and set the sandbox
@@ -459,6 +467,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
+
+		span.AddEvent("finished pod network setup",
+			tracing.Attribute("pod.network.setup.duration", time.Since(netStart).String()),
+		)
 	}
 
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
@@ -487,6 +499,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
 	}
+
+	span.AddEvent("Successfully started sandbox container",
+		tracing.Attribute("sandbox.status.pid", int(task.Pid())),
+		tracing.Attribute("sandbox.status.createdAt", info.CreatedAt.Format(time.RFC3339)),
+	)
 
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
