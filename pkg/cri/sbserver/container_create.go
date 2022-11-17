@@ -57,6 +57,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 	sandboxID := sandbox.ID
+
+	// TODO: Add PID endpoint to Controller interface.
 	s, err := sandbox.Container.Task(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
@@ -104,11 +106,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	start := time.Now()
-	// Run container using the same runtime with sandbox.
-	sandboxInfo, err := sandbox.Container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox %q info: %w", sandboxID, err)
-	}
 
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(id)
@@ -236,16 +233,18 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
 
-	runtimeOptions, err := getRuntimeOptions(sandboxInfo)
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get runtime options: %w", err)
+		return nil, fmt.Errorf("unable to get sandbox %q metdata: %w", sandboxID, err)
 	}
 
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(sandboxInfo.Runtime.Name, runtimeOptions),
+		containerd.WithRuntime(sandboxInfo.Runtime.Name, sandboxInfo.Runtime.Options),
 		containerd.WithContainerLabels(containerLabels),
-		containerd.WithContainerExtension(containerMetadataExtension, &meta))
+		containerd.WithContainerExtension(containerMetadataExtension, &meta),
+	)
+
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)
