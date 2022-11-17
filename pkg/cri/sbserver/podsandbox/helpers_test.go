@@ -22,21 +22,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
-	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/typeurl"
-
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -156,112 +146,6 @@ func TestParseImageReferences(t *testing.T) {
 	tags, digests := parseImageReferences(refs)
 	assert.Equal(t, expectedTags, tags)
 	assert.Equal(t, expectedDigests, digests)
-}
-
-func TestGenerateRuntimeOptions(t *testing.T) {
-	nilOpts := `
-systemd_cgroup = true
-[containerd]
-  no_pivot = true
-  default_runtime_name = "default"
-[containerd.runtimes.legacy]
-  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
-[containerd.runtimes.runc]
-  runtime_type = "` + plugin.RuntimeRuncV1 + `"
-[containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
-`
-	nonNilOpts := `
-systemd_cgroup = true
-[containerd]
-  no_pivot = true
-  default_runtime_name = "default"
-[containerd.runtimes.legacy]
-  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
-[containerd.runtimes.legacy.options]
-  Runtime = "legacy"
-  RuntimeRoot = "/legacy"
-[containerd.runtimes.runc]
-  runtime_type = "` + plugin.RuntimeRuncV1 + `"
-[containerd.runtimes.runc.options]
-  BinaryName = "runc"
-  Root = "/runc"
-  NoNewKeyring = true
-[containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
-[containerd.runtimes.runcv2.options]
-  BinaryName = "runc"
-  Root = "/runcv2"
-  NoNewKeyring = true
-`
-	var nilOptsConfig, nonNilOptsConfig criconfig.Config
-	tree, err := toml.Load(nilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nilOptsConfig)
-	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 3)
-
-	tree, err = toml.Load(nonNilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nonNilOptsConfig)
-	require.NoError(t, err)
-	require.Len(t, nonNilOptsConfig.Runtimes, 3)
-
-	for desc, test := range map[string]struct {
-		r               criconfig.Runtime
-		c               criconfig.Config
-		expectedOptions interface{}
-	}{
-		"when options is nil, should return nil option for io.containerd.runc.v1": {
-			r:               nilOptsConfig.Runtimes["runc"],
-			c:               nilOptsConfig,
-			expectedOptions: nil,
-		},
-		"when options is nil, should return nil option for io.containerd.runc.v2": {
-			r:               nilOptsConfig.Runtimes["runcv2"],
-			c:               nilOptsConfig,
-			expectedOptions: nil,
-		},
-		"when options is nil, should use legacy fields for legacy runtime": {
-			r: nilOptsConfig.Runtimes["legacy"],
-			c: nilOptsConfig,
-			expectedOptions: &runctypes.RuncOptions{
-				SystemdCgroup: true,
-			},
-		},
-		"when options is not nil, should be able to decode for io.containerd.runc.v1": {
-			r: nonNilOptsConfig.Runtimes["runc"],
-			c: nonNilOptsConfig,
-			expectedOptions: &runcoptions.Options{
-				BinaryName:   "runc",
-				Root:         "/runc",
-				NoNewKeyring: true,
-			},
-		},
-		"when options is not nil, should be able to decode for io.containerd.runc.v2": {
-			r: nonNilOptsConfig.Runtimes["runcv2"],
-			c: nonNilOptsConfig,
-			expectedOptions: &runcoptions.Options{
-				BinaryName:   "runc",
-				Root:         "/runcv2",
-				NoNewKeyring: true,
-			},
-		},
-		"when options is not nil, should be able to decode for legacy runtime": {
-			r: nonNilOptsConfig.Runtimes["legacy"],
-			c: nonNilOptsConfig,
-			expectedOptions: &runctypes.RuncOptions{
-				Runtime:     "legacy",
-				RuntimeRoot: "/legacy",
-			},
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			opts, err := generateRuntimeOptions(test.r, test.c)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedOptions, opts)
-		})
-	}
 }
 
 func TestEnvDeduplication(t *testing.T) {
@@ -470,14 +354,4 @@ func TestEnsureRemoveAllWithFile(t *testing.T) {
 	if err := ensureRemoveAll(context.Background(), tmp.Name()); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func TestGetRuntimeOptions(t *testing.T) {
-	_, err := getRuntimeOptions(containers.Container{})
-	require.NoError(t, err)
-
-	var pbany *types.Any               // This is nil.
-	var typeurlAny typeurl.Any = pbany // This is typed nil.
-	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
-	require.NoError(t, err)
 }
