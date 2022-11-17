@@ -40,9 +40,13 @@ sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 `containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
 need to satisfy these dependencies in your system:
 
-* CentOS/Fedora: `yum install btrfs-progs-devel`
+* CentOS 7 / Fedora: `yum install btrfs-progs-devel`
+  * Note with CentOS 9: [Btrfs has been deprecated](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/storage_administration_guide/ch-btrfs) in RHEL / CentOS 7.4, and removed in RHEL/CentOS 9 .
+    Please see the [release notes](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/7.4_release_notes/chap-red_hat_enterprise_linux-7.4_release_notes-deprecated_functionality_in_rhel7#idm139789147351408) for additional information on deprecated features.
 * Debian/Ubuntu: `apt-get install btrfs-progs libbtrfs-dev`
   * Debian(before Buster)/Ubuntu(before 19.10): `apt-get install btrfs-tools`
+* For unsupported [Btrfs](https://en.wikipedia.org/wiki/Btrfs) system:
+  * Use the `no_btrfs` build tag to build without btrfs support.
 
 At this point you are ready to build `containerd` yourself!
 
