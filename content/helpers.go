@@ -25,10 +25,16 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 )
+
+// maxResets is the no.of times the Copy() method can tolerate a reset of the body
+const maxResets = 5
+
+var ErrReset = errors.New("writer has been reset")
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
@@ -80,7 +86,7 @@ func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc o
 			return errors.Wrap(err, "failed to open writer")
 		}
 
-		return nil // all ready present
+		return nil // already present
 	}
 	defer cw.Close()
 
@@ -131,35 +137,63 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 // the size or digest is unknown, these values may be empty.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
-func Copy(ctx context.Context, cw Writer, r io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
+func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
 	ws, err := cw.Status()
 	if err != nil {
 		return errors.Wrap(err, "failed to get status")
 	}
-
+	r := or
 	if ws.Offset > 0 {
-		r, err = seekReader(r, ws.Offset, size)
+		r, err = seekReader(or, ws.Offset, size)
 		if err != nil {
 			return errors.Wrapf(err, "unable to resume write to %v", ws.Ref)
 		}
 	}
 
-	copied, err := copyWithBuffer(cw, r)
-	if err != nil {
-		return errors.Wrap(err, "failed to copy")
-	}
-	if size != 0 && copied < size-ws.Offset {
-		// Short writes would return its own error, this indicates a read failure
-		return errors.Wrapf(io.ErrUnexpectedEOF, "failed to read expected number of bytes")
-	}
-
-	if err := cw.Commit(ctx, size, expected, opts...); err != nil {
-		if !errdefs.IsAlreadyExists(err) {
-			return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
+	for i := 0; i < maxResets; i++ {
+		if i >= 1 {
+			log.G(ctx).WithField("digest", expected).Debugf("retrying copy due to reset")
 		}
+		copied, err := copyWithBuffer(cw, r)
+		if errors.Is(err, ErrReset) {
+			ws, err := cw.Status()
+			if err != nil {
+				return errors.Wrap(err, "failed to get status")
+			}
+			r, err = seekReader(or, ws.Offset, size)
+			if err != nil {
+				return errors.Wrapf(err, "unable to resume write to %v", ws.Ref)
+			}
+			continue
+		}
+		if err != nil {
+			return errors.Wrap(err, "failed to copy")
+		}
+		if size != 0 && copied < size-ws.Offset {
+			// Short writes would return its own error, this indicates a read failure
+			errors.Wrapf(io.ErrUnexpectedEOF, "failed to read expected number of bytes")
+		}
+		if err := cw.Commit(ctx, size, expected, opts...); err != nil {
+			if errors.Is(err, ErrReset) {
+				ws, err := cw.Status()
+				if err != nil {
+					return errors.Wrap(err, "failed to get status: %w")
+				}
+				r, err = seekReader(or, ws.Offset, size)
+				if err != nil {
+					return errors.Wrapf(err, "unable to resume write to %v", ws.Ref)
+				}
+				continue
+			}
+			if !errdefs.IsAlreadyExists(err) {
+				return errors.Wrapf(err, "failed commit on ref %q", ws.Ref)
+			}
+		}
+		return nil
 	}
 
-	return nil
+	log.G(ctx).WithField("digest", expected).Errorf("failed to copy after %d retries", maxResets)
+	return errors.Errorf("failed to copy after %d retries", maxResets)
 }
 
 // CopyReaderAt copies to a writer from a given reader at for the given
