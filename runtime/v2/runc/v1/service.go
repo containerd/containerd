@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
@@ -204,7 +204,7 @@ func (s *service) StartShim(ctx context.Context, opts shim.StartOpts) (_ string,
 			}
 			if opts, ok := v.(*options.Options); ok {
 				if opts.ShimCgroup != "" {
-					cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
+					cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
 					if err != nil {
 						return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 					}
@@ -318,7 +318,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	}
 	switch r.ExecID {
 	case "":
-		if cg, ok := container.Cgroup().(cgroups.Cgroup); ok {
+		if cg, ok := container.Cgroup().(cgroup1.Cgroup); ok {
 			if err := s.ep.Add(container.ID, cg); err != nil {
 				logrus.WithError(err).Error("add cg to OOM monitor")
 			}
@@ -604,14 +604,14 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	if cgx == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
-	cg, ok := cgx.(cgroups.Cgroup)
+	cg, ok := cgx.(cgroup1.Cgroup)
 	if !ok {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotImplemented, "cgroup v2 not implemented for Stats")
 	}
 	if cg == nil {
 		return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
 	}
-	stats, err := cg.Stat(cgroups.IgnoreNotExist)
+	stats, err := cg.Stat(cgroup1.IgnoreNotExist)
 	if err != nil {
 		return nil, err
 	}

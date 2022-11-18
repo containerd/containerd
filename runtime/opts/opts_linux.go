@@ -19,23 +19,24 @@ package opts
 import (
 	"context"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	cgroup1 "github.com/containerd/cgroups/v3/cgroup1"
+	cgroup2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/namespaces"
 )
 
 // WithNamespaceCgroupDeletion removes the cgroup directory that was created for the namespace
 func WithNamespaceCgroupDeletion(ctx context.Context, i *namespaces.DeleteInfo) error {
 	if cgroups.Mode() == cgroups.Unified {
-		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", i.Name)
+		cg, err := cgroup2.Load(i.Name)
 		if err != nil {
 			return err
 		}
 		return cg.Delete()
 	}
-	cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(i.Name))
+	cg, err := cgroup1.Load(cgroup1.StaticPath(i.Name))
 	if err != nil {
-		if err == cgroups.ErrCgroupDeleted {
+		if err == cgroup1.ErrCgroupDeleted {
 			return nil
 		}
 		return err

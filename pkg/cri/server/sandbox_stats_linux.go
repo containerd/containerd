@@ -24,8 +24,9 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 
 	"github.com/vishvananda/netlink"
 
@@ -151,7 +152,7 @@ func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
 
 	var statsx interface{}
 	if cgroups.Mode() == cgroups.Unified {
-		cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", cgroupPath)
+		cg, err := cgroupsv2.Load(cgroupPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox cgroup: %v: %w", cgroupPath, err)
 		}
@@ -162,11 +163,11 @@ func metricsForSandbox(sandbox sandboxstore.Sandbox) (interface{}, error) {
 		statsx = stats
 
 	} else {
-		control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
+		control, err := cgroup1.Load(cgroup1.StaticPath(cgroupPath))
 		if err != nil {
 			return nil, fmt.Errorf("failed to load sandbox cgroup %v: %w", cgroupPath, err)
 		}
-		stats, err := control.Stat(cgroups.IgnoreNotExist)
+		stats, err := control.Stat(cgroup1.IgnoreNotExist)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get stats for cgroup %v: %w", cgroupPath, err)
 		}

@@ -26,8 +26,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/images"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -73,7 +74,7 @@ func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		cgroup2, err := cgroupsv2.Load(groupPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -83,11 +84,11 @@ func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		}
 		return stat.Memory.SwapLimit
 	}
-	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
+	cgroup, err := cgroup1.Load(cgroup1.PidPath(int(task.Pid())))
 	if err != nil {
 		t.Fatal(err)
 	}
-	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
+	stat, err := cgroup.Stat(cgroup1.IgnoreNotExist)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +101,7 @@ func getCgroupMemoryLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cgroup2, err := cgroupsv2.LoadManager("/sys/fs/cgroup", groupPath)
+		cgroup2, err := cgroupsv2.Load(groupPath)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,11 +112,11 @@ func getCgroupMemoryLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		return stat.Memory.UsageLimit
 	}
 
-	cgroup, err := cgroups.Load(cgroups.V1, cgroups.PidPath(int(task.Pid())))
+	cgroup, err := cgroup1.Load(cgroup1.PidPath(int(task.Pid())))
 	if err != nil {
 		t.Fatal(err)
 	}
-	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
+	stat, err := cgroup.Stat(cgroup1.IgnoreNotExist)
 	if err != nil {
 		t.Fatal(err)
 	}

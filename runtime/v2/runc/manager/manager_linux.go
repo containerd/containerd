@@ -27,8 +27,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -212,7 +213,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 			if opts, ok := v.(*options.Options); ok {
 				if opts.ShimCgroup != "" {
 					if cgroups.Mode() == cgroups.Unified {
-						cg, err := cgroupsv2.LoadManager("/sys/fs/cgroup", opts.ShimCgroup)
+						cg, err := cgroupsv2.Load(opts.ShimCgroup)
 						if err != nil {
 							return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 						}
@@ -220,7 +221,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 							return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 						}
 					} else {
-						cg, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(opts.ShimCgroup))
+						cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
 						if err != nil {
 							return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 						}

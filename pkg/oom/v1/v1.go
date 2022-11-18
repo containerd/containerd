@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/cgroups"
+	"github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
@@ -58,7 +58,7 @@ type epoller struct {
 
 type item struct {
 	id string
-	cg cgroups.Cgroup
+	cg cgroup1.Cgroup
 }
 
 // Close the epoll fd
@@ -91,7 +91,7 @@ func (e *epoller) Run(ctx context.Context) {
 
 // Add cgroups.Cgroup to the epoll monitor
 func (e *epoller) Add(id string, cgx interface{}) error {
-	cg, ok := cgx.(cgroups.Cgroup)
+	cg, ok := cgx.(cgroup1.Cgroup)
 	if !ok {
 		return fmt.Errorf("expected cgroups.Cgroup, got: %T", cgx)
 	}
@@ -121,7 +121,7 @@ func (e *epoller) process(ctx context.Context, fd uintptr) {
 		return
 	}
 	e.mu.Unlock()
-	if i.cg.State() == cgroups.Deleted {
+	if i.cg.State() == cgroup1.Deleted {
 		e.mu.Lock()
 		delete(e.set, fd)
 		e.mu.Unlock()

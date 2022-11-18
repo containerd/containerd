@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
-	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
+	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 // indirect
 	github.com/containerd/containerd v1.6.2 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
@@ -19,7 +19,10 @@ require (
 	golang.org/x/sys v0.1.0
 )
 
-require github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8
+require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8
+	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
+)
 
 require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b // indirect

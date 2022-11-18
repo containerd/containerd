@@ -25,8 +25,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/cgroups"
-	cgroupsv2 "github.com/containerd/cgroups/v2"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/api/events"
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
@@ -168,7 +169,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	switch r.ExecID {
 	case "":
 		switch cg := container.Cgroup().(type) {
-		case cgroups.Cgroup:
+		case cgroup1.Cgroup:
 			if err := s.ep.Add(container.ID, cg); err != nil {
 				logrus.WithError(err).Error("add cg to OOM monitor")
 			}
@@ -483,8 +484,8 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	}
 	var statsx interface{}
 	switch cg := cgx.(type) {
-	case cgroups.Cgroup:
-		stats, err := cg.Stat(cgroups.IgnoreNotExist)
+	case cgroup1.Cgroup:
+		stats, err := cg.Stat(cgroup1.IgnoreNotExist)
 		if err != nil {
 			return nil, err
 		}
