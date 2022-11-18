@@ -22,9 +22,9 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/containerd/tracing"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
@@ -1665,6 +1665,40 @@ func (in *instrumentedService) GetContainerEvents(r *runtime.GetEventsRequest, s
 
 	err = in.c.GetContainerEvents(r, s)
 	return errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) ListMetricDescriptors(ctx context.Context, r *runtime.ListMetricDescriptorsRequest) (res *runtime.ListMetricDescriptorsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("ListMetricDescriptors failed, error")
+		} else {
+			log.G(ctx).Debug("ListMetricDescriptors returns successfully")
+		}
+	}()
+
+	res, err = in.c.ListMetricDescriptors(ctx, r)
+	return res, errdefs.ToGRPC(err)
+}
+
+func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (res *runtime.ListPodSandboxMetricsResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("ListPodSandboxMetrics failed, error")
+		} else {
+			log.G(ctx).Debug("ListPodSandboxMetrics returns successfully")
+		}
+	}()
+
+	res, err = in.c.ListPodSandboxMetrics(ctx, r)
+	return res, errdefs.ToGRPC(err)
 }
 
 func alphaReqToV1Req(
