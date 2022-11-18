@@ -56,10 +56,14 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 
 	n, err = rd.Read(p)
 	hrs.offset += int64(n)
+
+	if errdefs.IsCanceled(err) || errdefs.IsDeadlineExceeded(err) {
+		return
+	}
 	if n > 0 || err == nil {
 		hrs.errsWithNoProgress = 0
 	}
-	if err == io.ErrUnexpectedEOF {
+	if err != nil && err != io.EOF {
 		// connection closed unexpectedly. try reconnecting.
 		if n == 0 {
 			hrs.errsWithNoProgress++
