@@ -298,7 +298,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 
 	if !o.asyncRemove {
 		var removals []string
-		removals, err = o.getCleanupDirectories(ctx, t)
+		removals, err = o.getCleanupDirectories(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get directories for removal: %w", err)
 		}
@@ -369,10 +369,10 @@ func (o *snapshotter) cleanupDirectories(ctx context.Context) ([]string, error) 
 	}
 
 	defer t.Rollback()
-	return o.getCleanupDirectories(ctx, t)
+	return o.getCleanupDirectories(ctx)
 }
 
-func (o *snapshotter) getCleanupDirectories(ctx context.Context, t storage.Transactor) ([]string, error) {
+func (o *snapshotter) getCleanupDirectories(ctx context.Context) ([]string, error) {
 	ids, err := storage.IDMap(ctx)
 	if err != nil {
 		return nil, err
@@ -395,7 +395,6 @@ func (o *snapshotter) getCleanupDirectories(ctx context.Context, t storage.Trans
 		if _, ok := ids[d]; ok {
 			continue
 		}
-
 		cleanup = append(cleanup, filepath.Join(snapshotDir, d))
 	}
 
