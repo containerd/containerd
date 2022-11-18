@@ -175,6 +175,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeSandbox),
 		customopts.WithAnnotation(annotations.SandboxID, id),
 		customopts.WithAnnotation(annotations.SandboxNamespace, config.GetMetadata().GetNamespace()),
+		customopts.WithAnnotation(annotations.SandboxUID, config.GetMetadata().GetUid()),
 		customopts.WithAnnotation(annotations.SandboxName, config.GetMetadata().GetName()),
 		customopts.WithAnnotation(annotations.SandboxLogDir, config.GetLogDirectory()),
 	)
