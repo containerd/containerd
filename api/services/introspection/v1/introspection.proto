@@ -100,4 +100,6 @@ message PluginsResponse {
 
 message ServerResponse {
 	string uuid = 1;
+	uint64 pid = 2;
+	uint64 pidns = 3; // PID namespace, such as 4026531836
 }

@@ -20,6 +20,7 @@ import (
 	context "context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
@@ -105,8 +106,18 @@ func (l *Local) Server(ctx context.Context, _ *ptypes.Empty, _ ...grpc.CallOptio
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+	pid := os.Getpid()
+	var pidns uint64
+	if runtime.GOOS == "linux" {
+		pidns, err = statPIDNS(pid)
+		if err != nil {
+			return nil, errdefs.ToGRPC(err)
+		}
+	}
 	return &api.ServerResponse{
-		UUID: u,
+		UUID:  u,
+		Pid:   uint64(pid),
+		Pidns: pidns,
 	}, nil
 }
 
