@@ -18,20 +18,44 @@ package tracing
 
 import (
 	"context"
+	"net/http"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
-// StartSan starts child span in a context.
-func StartSpan(ctx context.Context, opName string, opts ...trace.SpanStartOption) (context.Context, *Span) {
+// StartConfig defines configuration for a new span object.
+type StartConfig struct {
+	spanOpts []trace.SpanStartOption
+}
+
+type SpanOpt func(config *StartConfig)
+
+// WithHTTPRequest marks span as a HTTP request operation from client to server.
+// It'll append attributes from the HTTP request object and mark it with `SpanKindClient` type.
+func WithHTTPRequest(request *http.Request) SpanOpt {
+	return func(config *StartConfig) {
+		config.spanOpts = append(config.spanOpts,
+			trace.WithSpanKind(trace.SpanKindClient),                                      // A client making a request to a server
+			trace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(request)...), // Add HTTP attributes
+		)
+	}
+}
+
+// StartSpan starts child span in a context.
+func StartSpan(ctx context.Context, opName string, opts ...SpanOpt) (context.Context, *Span) {
+	config := StartConfig{}
+	for _, fn := range opts {
+		fn(&config)
+	}
 	tracer := otel.Tracer("")
 	if parent := trace.SpanFromContext(ctx); parent != nil && parent.SpanContext().IsValid() {
 		tracer = parent.TracerProvider().Tracer("")
 	}
-	ctx, span := tracer.Start(ctx, opName, opts...)
+	ctx, span := tracer.Start(ctx, opName, config.spanOpts...)
 	return ctx, &Span{otelSpan: span}
 }
 
@@ -59,7 +83,7 @@ func (s *Span) AddEvent(name string, options ...trace.EventOption) {
 	s.otelSpan.AddEvent(name, options...)
 }
 
-// SetSpanStatus sets the status of the current span.
+// SetStatus sets the status of the current span.
 // If an error is encountered, it records the error and sets span status to Error.
 func (s *Span) SetStatus(err error) {
 	if err != nil {
@@ -83,4 +107,10 @@ func Name(names ...string) string {
 // Attribute takes a key value pair and returns attribute.KeyValue type.
 func Attribute(k string, v interface{}) attribute.KeyValue {
 	return any(k, v)
+}
+
+// HTTPStatusCodeAttributes generates attributes of the HTTP namespace as specified by the OpenTelemetry
+// specification for a span.
+func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
+	return semconv.HTTPAttributesFromHTTPStatusCode(code)
 }
