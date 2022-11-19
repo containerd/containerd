@@ -456,9 +456,6 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		stat := st.Sys().(*syscall.Stat_t)
 
 		if err := os.Lchown(filepath.Join(td, "fs"), int(stat.Uid), int(stat.Gid)); err != nil {
-			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
-			}
 			return nil, fmt.Errorf("failed to chown: %w", err)
 		}
 	}
