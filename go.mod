@@ -49,7 +49,7 @@ require (
 	github.com/opencontainers/selinux v1.10.1
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.11.1
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
