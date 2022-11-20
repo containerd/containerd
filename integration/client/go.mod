@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
 	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
 )
 

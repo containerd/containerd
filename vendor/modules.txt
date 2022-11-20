@@ -1,7 +1,7 @@
 # cloud.google.com/go/compute/metadata v0.2.1
 ## explicit; go 1.19
-# github.com/AdaLogics/go-fuzz-headers v0.0.0-20221103172237-443f56ff4ba8
-## explicit; go 1.13
+# github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
+## explicit; go 1.18
 github.com/AdaLogics/go-fuzz-headers
 # github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b
 ## explicit; go 1.18
