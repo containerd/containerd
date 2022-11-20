@@ -128,7 +128,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v3
-      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
+      - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
   # Make sure binaries compile with other platforms
