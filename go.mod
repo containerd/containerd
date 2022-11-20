@@ -29,7 +29,7 @@ require (
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.4.0
 	github.com/emicklei/go-restful/v3 v3.8.0
-	github.com/fsnotify/fsnotify v1.5.1
+	github.com/fsnotify/fsnotify v1.6.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
