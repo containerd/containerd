@@ -489,7 +489,11 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		kernelversion.KernelVersion{Kernel: 4, Major: 8}); err == nil {
 		if ok {
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
-				Names:  []string{"ptrace"},
+				Names: []string{
+					"process_vm_read",
+					"process_vm_write",
+					"ptrace",
+				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
