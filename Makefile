@@ -143,6 +143,9 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= $(TESTFLAGS_RACE) $(EXTRA_TESTFLAGS)
 TESTFLAGS_PARALLEL ?= 8
 
+# Flags passed to `go test -bench` for constant run count benchmarks
+BENCHFLAGS_COUNT ?= -count=10 -benchtime=1x
+
 # Use this to replace `go test` with, for instance, `gotestsum`
 GOTEST ?= $(GO) test
 
@@ -253,7 +256,7 @@ benchmark-integration-benchmark: ## run non-averaged integration benchmarks test
 	@$(MAKE) --no-print-directory _benchmark-integration-benchmark
 
 _benchmark-integration-benchmark:
-	@cd "${ROOTDIR}/integration/benchmark" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -count=10 -benchtime=1x -test.root
+	@cd "${ROOTDIR}/integration/benchmark" && $(GO) test ${TESTFLAGS} ${BENCHFLAGS_COUNT} -bench . -run NEVERMATCH -test.root
 
 FORCE:
 
