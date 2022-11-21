@@ -234,25 +234,25 @@ bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/cni-bridge-fp
 
-benchmark:
+benchmark: ## run non-integration benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(MAKE) --no-print-directory _benchmark
 
-_benchmark: ## run non-integration benchmarks tests
+_benchmark:
 	@$(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH ./... -test.root
 
-benchmark-integration-client:
+benchmark-integration-client: ## run client integration benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(MAKE) --no-print-directory _benchmark-integration-client
 
-_benchmark-integration-client: ## run client integration benchmarks tests
+_benchmark-integration-client:
 	@cd "${ROOTDIR}/integration/client" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -test.root
 
-benchmark-integration-benchmark:
+benchmark-integration-benchmark: ## run non-averaged integration benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(MAKE) --no-print-directory _benchmark-integration-benchmark
 
-_benchmark-integration-benchmark: ## run non-averaged integration benchmarks tests
+_benchmark-integration-benchmark:
 	@cd "${ROOTDIR}/integration/benchmark" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -count=10 -benchtime=1x -test.root
 
 FORCE:
