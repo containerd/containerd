@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 var (
@@ -21,6 +22,7 @@ var (
 
 // Called once to set up and tear down for all the benchmarks in this file
 func TestMain(m *testing.M) {
+	// testutil.RequiresRootM() // FIXME does not respect -test.root flag
 	// setup steps prior to all test runs
 	client, err := testClient(nil, address)
 	if err != nil {
@@ -44,6 +46,7 @@ func TestMain(m *testing.M) {
 }
 
 func BenchmarkContainerLifecycle(b *testing.B) {
+	testutil.RequiresRoot(b)
 	client, err := testClient(b, address)
 	if err != nil {
 		b.Fatalf("Error new client : %s\n", err)

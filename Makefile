@@ -214,9 +214,6 @@ integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
 
-bench-integration: ## benchmarks 
-	@cd "${ROOTDIR}integration/benchmark" && rm -rf bin/ && $(GO) build -o bin/benchmarkTests main.go && ./bin/benchmarkTests $(COMMIT)
-
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
 	@echo "$(WHALE) $@"
@@ -237,9 +234,26 @@ bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/cni-bridge-fp
 
-benchmark: ## run benchmarks tests
+benchmark:
 	@echo "$(WHALE) $@"
-	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark -test.root
+	@$(MAKE) --no-print-directory _benchmark
+
+_benchmark: ## run non-integration benchmarks tests
+	@$(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH ./...
+
+benchmark-integration-client:
+	@echo "$(WHALE) $@"
+	@$(MAKE) --no-print-directory _benchmark-integration-client
+
+_benchmark-integration-client: ## run client integration benchmarks tests
+	@cd "${ROOTDIR}/integration/client" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -test.root
+
+benchmark-integration-benchmark:
+	@echo "$(WHALE) $@"
+	@$(MAKE) --no-print-directory _benchmark-integration-benchmark
+
+_benchmark-integration-benchmark: ## run non-averaged integration benchmarks tests
+	@cd "${ROOTDIR}/integration/benchmark" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -count=10 -benchtime=1x -test.root
 
 FORCE:
 
