@@ -78,6 +78,9 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
 		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-ns")
 
+		assert.Contains(t, spec.Annotations, annotations.SandboxUID)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxUID], "test-uid")
+
 		assert.Contains(t, spec.Annotations, annotations.SandboxName)
 		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-name")
 
