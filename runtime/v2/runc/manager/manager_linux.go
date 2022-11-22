@@ -70,7 +70,7 @@ type manager struct {
 	name string
 }
 
-func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, containerdTTRPCAddress string, debug bool) (*exec.Cmd, error) {
+func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddress string, debug bool) (*exec.Cmd, error) {
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (m manager) Name() string {
 }
 
 func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ string, retErr error) {
-	cmd, err := newCommand(ctx, id, opts.ContainerdBinary, opts.Address, opts.TTRPCAddress, opts.Debug)
+	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
 	if err != nil {
 		return "", err
 	}
