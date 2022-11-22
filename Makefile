@@ -242,7 +242,7 @@ benchmark: ## run non-integration benchmarks tests
 	@$(MAKE) --no-print-directory _benchmark
 
 _benchmark:
-	@$(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH ./... -test.root
+	@$(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH ./...
 
 benchmark-integration-client: ## run client integration benchmarks tests
 	@echo "$(WHALE) $@"
