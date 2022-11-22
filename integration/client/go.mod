@@ -25,7 +25,7 @@ require (
 )
 
 require (
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b // indirect
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318 // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
@@ -57,11 +57,11 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.opentelemetry.io/otel v1.11.1 // indirect
 	go.opentelemetry.io/otel/trace v1.11.1 // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.1.1-0.20221027164007-c63010009c80 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/tools v0.1.13-0.20221007141809-02bef08ac854 // indirect
 	google.golang.org/genproto v0.0.0-20221107162902-2d387536bcdd // indirect
 	google.golang.org/grpc v1.50.1 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

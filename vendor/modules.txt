@@ -3,9 +3,9 @@
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
 ## explicit; go 1.18
 github.com/AdaLogics/go-fuzz-headers
-# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20220912195655-e1f97a00006b
+# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318
 ## explicit; go 1.18
-github.com/AdamKorcz/go-118-fuzz-build/utils
+github.com/AdamKorcz/go-118-fuzz-build/testing
 # github.com/Microsoft/go-winio v0.6.0
 ## explicit; go 1.17
 github.com/Microsoft/go-winio
@@ -480,7 +480,7 @@ go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
-# golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
+# golang.org/x/crypto v0.1.0
 ## explicit; go 1.17
 golang.org/x/crypto/cast5
 golang.org/x/crypto/ed25519
@@ -491,7 +491,7 @@ golang.org/x/crypto/openpgp/errors
 golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
-# golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4
+# golang.org/x/mod v0.6.0
 ## explicit; go 1.17
 golang.org/x/mod/semver
 # golang.org/x/net v0.1.1-0.20221027164007-c63010009c80
@@ -538,7 +538,7 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.1.12
+# golang.org/x/tools v0.1.13-0.20221007141809-02bef08ac854
 ## explicit; go 1.18
 golang.org/x/tools/cmd/stringer
 golang.org/x/tools/go/gcexportdata
