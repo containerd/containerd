@@ -84,7 +84,9 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   deny /sys/kernel/security/** rwklx,
 
 {{if ge .Version 208095}}
-  ptrace (trace,read) peer={{.Name}},
+  # allow processes within the container to trace each other,
+  # provided all other LSM and yama setting allow it.
+  ptrace (trace,tracedby,read,readby) peer={{.Name}},
 {{end}}
 }
 `
