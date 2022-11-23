@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
@@ -84,8 +85,23 @@ func New(
 var _ sandbox.Controller = (*Controller)(nil)
 
 func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("an error occurred while trying to find sandbox %q: %w",
+			sandboxID, err)
+	}
+	status := sandbox.Status.Get()
+	resp := &api.ControllerStatusResponse{
+		ID:         sandboxID,
+		Pid:        status.Pid,
+		State:      status.State.String(),
+		ExitStatus: status.ExitStatus,
+		Extra:      nil,
+	}
+	if !status.ExitedAt.IsZero() {
+		resp.ExitedAt = protobuf.ToTimestamp(status.ExitedAt)
+	}
+	return resp, nil
 }
 
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
@@ -123,7 +139,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-ch
 
 			sb, err := c.sandboxStore.Get(id)
 			if err == nil {
-				if err := handleSandboxExit(dctx, sb); err != nil {
+				if err := handleSandboxExit(dctx, sb, &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}); err != nil {
 					return err
 				}
 				return nil
@@ -144,7 +160,8 @@ func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-ch
 }
 
 // handleSandboxExit handles TaskExit event for sandbox.
-func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox) error {
+// TODO https://github.com/containerd/containerd/issues/7548
+func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
@@ -163,6 +180,8 @@ func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox) error {
 	sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
+		status.ExitStatus = e.ExitStatus
+		status.ExitedAt = e.ExitedAt.AsTime()
 		return status, nil
 	})
 	// Using channel to propagate the information of sandbox stop
