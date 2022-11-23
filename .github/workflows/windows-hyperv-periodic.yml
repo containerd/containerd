@@ -55,7 +55,7 @@ jobs:
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022-hyperv/"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install required packages
         run: |
@@ -186,7 +186,7 @@ jobs:
             set -o pipefail
             make integration | tee ${{ env.VM_INTEGRATION_LOGFILE }}
           EOF
-          echo '::set-output name=SUCCEEDED::1'
+          echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
       - name: PrepareRepoList
         run: |
@@ -248,7 +248,7 @@ jobs:
              set -o pipefail
              make cri-integration | tee ${{ env.VM_CRI_INTEGRATION_LOGFILE }}
            EOF
-           echo '::set-output name=SUCCEEDED::1'
+           echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
       - name: GetCritestRepo
         run: |
@@ -277,7 +277,7 @@ jobs:
             set -o pipefail
             c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
           EOF
-          echo '::set-output name=SUCCEEDED::1'
+          echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
       - name: PullLogsFromWinNode
         run: |
@@ -300,8 +300,8 @@ jobs:
       - name: AssignGcpCreds
         id: AssignGcpCreds
         run: |
-          echo '::set-output name=GCP_SERVICE_ACCOUNT::${{ secrets.GCP_SERVICE_ACCOUNT }}'
-          echo '::set-output name=GCP_WORKLOAD_IDENTITY_PROVIDER::${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}'
+          echo 'GCP_SERVICE_ACCOUNT=${{ secrets.GCP_SERVICE_ACCOUNT }}' >> $GITHUB_OUTPUT
+          echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
 
       - name: AuthGcp
         uses: google-github-actions/auth@v0
@@ -311,7 +311,7 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        uses: google-github-actions/upload-cloud-storage@v0.10.4
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ github.workspace }}/latest-build.txt
@@ -319,7 +319,7 @@ jobs:
           parent: false
 
       - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@v0.8.0
+        uses: google-github-actions/upload-cloud-storage@v0.10.4
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ env.LOGS_DIR }}
@@ -327,7 +327,7 @@ jobs:
           parent: false
 
       - name: Check all CI stages succeeded
-        uses: actions/github-script@v3
+        uses: actions/github-script@v6
         with:
           script: |
             const stepResults = {
