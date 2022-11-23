@@ -20,6 +20,7 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,6 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/failpoint"
 	"github.com/containerd/typeurl"
@@ -101,9 +103,6 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 // failed to rollback shim by shim.Delete API.
 func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
-		t.Skip()
-	}
-	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		t.Skip()
 	}
 
@@ -177,9 +176,6 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
-	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
-		t.Skip()
-	}
 
 	testCase := func(restart bool) func(*testing.T) {
 		return func(t *testing.T) {
@@ -243,9 +239,6 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip()
 	}
-	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
-		t.Skip()
-	}
 
 	t.Log("Init PodSandboxConfig with specific key")
 	sbName := t.Name()
@@ -301,31 +294,63 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	assert.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
 	assert.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
 
-	t.Log("Get sandbox info")
-	_, info, err := SandboxInfo(sb.Id)
-	require.NoError(t, err)
-	require.False(t, info.NetNSClosed)
-
-	var netNS string
-	for _, n := range info.RuntimeSpec.Linux.Namespaces {
-		if n.Type == runtimespec.NetworkNamespace {
-			netNS = n.Path
+	switch os.Getenv("ENABLE_CRI_SANDBOXES") {
+	case "":
+		// non-sbserver
+		t.Log("Get sandbox info (non-sbserver)")
+		_, info, err := SandboxInfo(sb.Id)
+		require.NoError(t, err)
+		require.False(t, info.NetNSClosed)
+		var netNS string
+		for _, n := range info.RuntimeSpec.Linux.Namespaces {
+			if n.Type == runtimespec.NetworkNamespace {
+				netNS = n.Path
+			}
 		}
-	}
-	assert.NotEmpty(t, netNS, "network namespace should be set")
+		assert.NotEmpty(t, netNS, "network namespace should be set")
 
-	t.Log("Get sandbox container")
-	c, err := GetContainer(sb.Id)
-	require.NoError(t, err)
-	any, ok := c.Extensions["io.cri-containerd.sandbox.metadata"]
-	require.True(t, ok, "sandbox metadata should exist in extension")
-	i, err := typeurl.UnmarshalAny(any)
-	require.NoError(t, err)
-	require.IsType(t, &sandbox.Metadata{}, i)
-	metadata, ok := i.(*sandbox.Metadata)
-	require.True(t, ok)
-	assert.NotEmpty(t, metadata.NetNSPath)
-	assert.Equal(t, netNS, metadata.NetNSPath, "network namespace path should be the same in runtime spec and sandbox metadata")
+		t.Log("Get sandbox container")
+		c, err := GetContainer(sb.Id)
+		require.NoError(t, err)
+		any, ok := c.Extensions["io.cri-containerd.sandbox.metadata"]
+		require.True(t, ok, "sandbox metadata should exist in extension")
+		i, err := typeurl.UnmarshalAny(any)
+		require.NoError(t, err)
+		require.IsType(t, &sandbox.Metadata{}, i)
+		metadata, ok := i.(*sandbox.Metadata)
+		require.True(t, ok)
+		assert.Equal(t, netNS, metadata.NetNSPath, "network namespace path should be the same in runtime spec and sandbox metadata")
+	default:
+		// sbserver
+		t.Log("Get sandbox info (sbserver)")
+		_, info, err := sbserverSandboxInfo(sb.Id)
+		require.NoError(t, err)
+		require.False(t, info.NetNSClosed)
+
+		assert.NotEmpty(t, info.Metadata.NetNSPath, "network namespace should be set")
+	}
+
+}
+
+// sbserverSandboxInfo gets sandbox info.
+func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *sbserver.SandboxInfo, error) {
+	client, err := RawRuntimeClient()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
+	}
+	resp, err := client.PodSandboxStatus(context.Background(), &criapiv1.PodSandboxStatusRequest{
+		PodSandboxId: id,
+		Verbose:      true,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
+	}
+	status := resp.GetStatus()
+	var info sbserver.SandboxInfo
+	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
+	}
+	return status, &info, nil
 }
 
 func ensureCNIAddRunning(t *testing.T, sbName string) error {

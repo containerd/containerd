@@ -63,6 +63,8 @@ const (
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// runtimeRunhcsV1 is the runtime type for runhcs.
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
+	// MetadataKey is the key used for storing metadata in the sandbox extensions
+	MetadataKey = "metadata"
 )
 
 const (

@@ -49,11 +49,13 @@ func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.Control
 	}
 
 	// Delete sandbox container.
-	if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete sandbox container %q: %w", sandboxID, err)
+	if sandbox.Container != nil {
+		if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to delete sandbox container %q: %w", sandboxID, err)
+			}
+			log.G(ctx).Tracef("Sandbox controller Delete called for sandbox container %q that does not exist", sandboxID)
 		}
-		log.G(ctx).Tracef("Sandbox controller Delete called for sandbox container %q that does not exist", sandboxID)
 	}
 
 	return &api.ControllerDeleteResponse{}, nil

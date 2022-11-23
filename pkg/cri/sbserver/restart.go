@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
 	"golang.org/x/sync/errgroup"
@@ -80,6 +81,28 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 	if err := eg.Wait(); err != nil {
 		return err
+	}
+
+	// Recover sandboxes in the new SandboxStore
+	storedSandboxes, err := c.client.SandboxStore().List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list sandboxes from API: %w", err)
+	}
+	for _, sbx := range storedSandboxes {
+		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
+			continue
+		}
+		metadata := sandboxstore.Metadata{}
+		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		if err != nil {
+			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
+		}
+		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: sandboxstore.StateUnknown})
+		// Load network namespace.
+		sb.NetNS = getNetNS(&metadata)
+		if err := c.sandboxStore.Add(sb); err != nil {
+			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
+		}
 	}
 
 	// Recover all containers.
@@ -427,20 +450,24 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 	sandbox.Container = cntr
 
 	// Load network namespace.
-	if goruntime.GOOS != "windows" &&
-		meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
-		// Don't need to load netns for host network sandbox.
-		return sandbox, nil
-	}
-	if goruntime.GOOS == "windows" && meta.Config.GetWindows().GetSecurityContext().GetHostProcess() {
-		return sandbox, nil
-	}
-	sandbox.NetNS = netns.LoadNetNS(meta.NetNSPath)
+	sandbox.NetNS = getNetNS(meta)
 
 	// It doesn't matter whether task is running or not. If it is running, sandbox
 	// status will be `READY`; if it is not running, sandbox status will be `NOT_READY`,
 	// kubelet will stop the sandbox which will properly cleanup everything.
 	return sandbox, nil
+}
+
+func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
+	if goruntime.GOOS != "windows" &&
+		meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
+		// Don't need to load netns for host network sandbox.
+		return nil
+	}
+	if goruntime.GOOS == "windows" && meta.Config.GetWindows().GetSecurityContext().GetHostProcess() {
+		return nil
+	}
+	return netns.LoadNetNS(meta.NetNSPath)
 }
 
 // loadImages loads images from containerd.
