@@ -23,7 +23,7 @@ require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318 // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
-	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 // indirect
+	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect

@@ -87,7 +87,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
-	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 // indirect
+	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/containers/ocicrypt v1.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
