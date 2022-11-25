@@ -3,14 +3,14 @@ module github.com/containerd/containerd/integration/client
 go 1.18
 
 require (
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
-	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 // indirect
+	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
 	github.com/containerd/containerd v1.6.2 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
@@ -20,14 +20,10 @@ require (
 )
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
-	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
-)
-
-require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318 // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
+	github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
@@ -39,6 +35,7 @@ require (
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
