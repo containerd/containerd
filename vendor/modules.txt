@@ -91,7 +91,7 @@ github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs v1.0.0
 ## explicit; go 1.15
 github.com/containerd/btrfs
-# github.com/containerd/cgroups v1.0.5-0.20220816231112-7083cd60b721
+# github.com/containerd/cgroups v1.0.4
 ## explicit; go 1.17
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
