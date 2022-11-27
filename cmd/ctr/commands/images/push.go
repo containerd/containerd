@@ -247,7 +247,7 @@ func (j *pushjobs) status() []content.StatusInfo {
 
 		status, err := j.tracker.GetStatus(name)
 		if err != nil {
-			si.Status = "waiting"
+			si.Status = content.StatusWaiting
 		} else {
 			si.Offset = status.Offset
 			si.Total = status.Total
@@ -255,12 +255,12 @@ func (j *pushjobs) status() []content.StatusInfo {
 			si.UpdatedAt = status.UpdatedAt
 			if status.Offset >= status.Total {
 				if status.UploadUUID == "" {
-					si.Status = "done"
+					si.Status = content.StatusDone
 				} else {
-					si.Status = "committing"
+					si.Status = content.StatusCommitting
 				}
 			} else {
-				si.Status = "uploading"
+				si.Status = content.StatusUploading
 			}
 		}
 		statuses = append(statuses, si)
