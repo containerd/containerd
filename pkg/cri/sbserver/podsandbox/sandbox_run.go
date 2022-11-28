@@ -86,7 +86,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(config, sandboxInfo.Runtime.Name)
+	ociRuntime, err := c.getSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
@@ -131,11 +131,6 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
 
-	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate runtime options: %w", err)
-	}
-
 	snapshotterOpt := snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))
 	opts := []containerd.NewContainerOpts{
 		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
@@ -143,7 +138,8 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(sandboxMetadataExtension, &metadata),
-		containerd.WithRuntime(ociRuntime.Type, runtimeOpts)}
+		containerd.WithRuntime(ociRuntime.Type, sandboxInfo.Runtime.Options),
+	}
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
@@ -263,6 +259,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 		SandboxID: id,
 		Pid:       task.Pid(),
 		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
+		Labels:    labels,
 	}
 
 	return resp, nil

@@ -33,18 +33,11 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
-	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/pelletier/go-toml"
 )
 
 const (
@@ -61,8 +54,6 @@ const (
 	containerKindSandbox = "sandbox"
 	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
-	// runtimeRunhcsV1 is the runtime type for runhcs.
-	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 	// MetadataKey is the key used for storing metadata in the sandbox extensions
 	MetadataKey = "metadata"
 )
@@ -168,59 +159,6 @@ func parseImageReferences(refs []string) ([]string, []string) {
 		}
 	}
 	return tags, digests
-}
-
-// generateRuntimeOptions generates runtime options from cri plugin config.
-func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{}, error) {
-	if r.Options == nil {
-		if r.Type != plugin.RuntimeLinuxV1 {
-			return nil, nil
-		}
-		// This is a legacy config, generate runctypes.RuncOptions.
-		return &runctypes.RuncOptions{
-			Runtime:       r.Engine,
-			RuntimeRoot:   r.Root,
-			SystemdCgroup: c.SystemdCgroup,
-		}, nil
-	}
-	optionsTree, err := toml.TreeFromMap(r.Options)
-	if err != nil {
-		return nil, err
-	}
-	options := getRuntimeOptionsType(r.Type)
-	if err := optionsTree.Unmarshal(options); err != nil {
-		return nil, err
-	}
-	return options, nil
-}
-
-// getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
-	switch t {
-	case plugin.RuntimeRuncV1:
-		fallthrough
-	case plugin.RuntimeRuncV2:
-		return &runcoptions.Options{}
-	case plugin.RuntimeLinuxV1:
-		return &runctypes.RuncOptions{}
-	case runtimeRunhcsV1:
-		return &runhcsoptions.Options{}
-	default:
-		return &runtimeoptions.Options{}
-	}
-}
-
-// getRuntimeOptions get runtime options from container metadata.
-func getRuntimeOptions(c containers.Container) (interface{}, error) {
-	from := c.Runtime.Options
-	if from == nil || from.GetValue() == nil {
-		return nil, nil
-	}
-	opts, err := typeurl.UnmarshalAny(from)
-	if err != nil {
-		return nil, err
-	}
-	return opts, nil
 }
 
 // getPassthroughAnnotations filters requested pod annotations by comparing

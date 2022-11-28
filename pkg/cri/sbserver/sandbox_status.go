@@ -45,12 +45,13 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
-		info, err := sandbox.Container.Info(ctx)
+		sandboxInfo, err := c.client.SandboxStore().Get(ctx, r.GetPodSandboxId())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get CreatedAt for sandbox container in %q state: %w", status.State, err)
+			return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", r.GetPodSandboxId(), err)
 		}
-		status.CreatedAt = info.CreatedAt.UnixNano()
+		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
 	}
+
 	if !r.GetVerbose() {
 		return &runtime.PodSandboxStatusResponse{Status: status}, nil
 	}
@@ -76,7 +77,12 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 		// responsible for reporting the IP.
 		return "", nil, nil
 	}
+
 	if goruntime.GOOS == "windows" && config.GetWindows().GetSecurityContext().GetHostProcess() {
+		return "", nil, nil
+	}
+
+	if goruntime.GOOS == "darwin" {
 		return "", nil, nil
 	}
 

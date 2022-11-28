@@ -112,6 +112,7 @@ func (c *controllerLocal) Create(ctx context.Context, in *api.ControllerCreateRe
 		Rootfs:     in.Rootfs,
 		Options:    in.Options,
 	}); err != nil {
+		// TODO: Delete sandbox shim here.
 		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
 	}
 
