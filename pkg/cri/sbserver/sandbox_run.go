@@ -257,12 +257,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
+
 	// TODO: get rid of this. sandbox object should no longer have Container field.
-	container, err := c.client.LoadContainer(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
+	if ociRuntime.SandboxMode == string(criconfig.ModePodSandbox) {
+		container, err := c.client.LoadContainer(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
+		}
+		sandbox.Container = container
 	}
-	sandbox.Container = container
 
 	labels := resp.GetLabels()
 	if labels == nil {

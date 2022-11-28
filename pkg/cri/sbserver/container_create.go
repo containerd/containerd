@@ -252,6 +252,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerd.WithContainerExtension(containerMetadataExtension, &meta),
 	)
 
+	// When using sandboxed shims, containerd's runtime needs to know which sandbox shim instance to use.
+	if ociRuntime.SandboxMode == string(criconfig.ModeShim) {
+		opts = append(opts, containerd.WithSandbox(sandboxID))
+	}
+
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
 		return nil, fmt.Errorf("failed to create containerd container: %w", err)
