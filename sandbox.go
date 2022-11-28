@@ -165,7 +165,7 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController().Status(ctx, id)
+	status, err := c.SandboxController().Status(ctx, id, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
 	}

@@ -194,12 +194,11 @@ func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRe
 	}
 
 	return &api.ControllerStatusResponse{
-		ID:         resp.ID,
-		Pid:        resp.Pid,
-		State:      resp.State,
-		ExitStatus: resp.ExitStatus,
-		ExitedAt:   resp.ExitedAt,
-		Extra:      resp.Extra,
+		ID:       resp.ID,
+		Pid:      resp.Pid,
+		State:    resp.State,
+		ExitedAt: resp.ExitedAt,
+		Extra:    resp.Extra,
 	}, nil
 }
 

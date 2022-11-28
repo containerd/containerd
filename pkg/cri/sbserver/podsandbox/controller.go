@@ -84,7 +84,7 @@ func New(
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
+func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (*api.ControllerStatusResponse, error) {
 	sandbox, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred while trying to find sandbox %q: %w",
@@ -92,11 +92,10 @@ func (c *Controller) Status(ctx context.Context, sandboxID string) (*api.Control
 	}
 	status := sandbox.Status.Get()
 	resp := &api.ControllerStatusResponse{
-		ID:         sandboxID,
-		Pid:        status.Pid,
-		State:      status.State.String(),
-		ExitStatus: status.ExitStatus,
-		Extra:      nil,
+		ID:    sandboxID,
+		Pid:   status.Pid,
+		State: status.State.String(),
+		Extra: nil,
 	}
 	if !status.ExitedAt.IsZero() {
 		resp.ExitedAt = protobuf.ToTimestamp(status.ExitedAt)

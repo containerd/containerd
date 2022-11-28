@@ -81,8 +81,8 @@ func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (*
 	return resp, nil
 }
 
-func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string) (*api.ControllerStatusResponse, error) {
-	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, verbose bool) (*api.ControllerStatusResponse, error) {
+	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID, Verbose: verbose})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}

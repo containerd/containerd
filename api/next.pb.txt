@@ -974,6 +974,13 @@ file {
       type: TYPE_STRING
       json_name: "sandboxId"
     }
+    field {
+      name: "verbose"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "verbose"
+    }
   }
   message_type {
     name: "SandboxStatusResponse"
@@ -999,15 +1006,24 @@ file {
       json_name: "state"
     }
     field {
-      name: "exit_status"
+      name: "info"
       number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.runtime.sandbox.v1.SandboxStatusResponse.InfoEntry"
+      json_name: "info"
+    }
+    field {
+      name: "created_at"
+      number: 5
       label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "exitStatus"
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "createdAt"
     }
     field {
       name: "exited_at"
-      number: 5
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
@@ -1015,11 +1031,31 @@ file {
     }
     field {
       name: "extra"
-      number: 6
+      number: 7
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "extra"
+    }
+    nested_type {
+      name: "InfoEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
@@ -4317,6 +4353,13 @@ file {
       type: TYPE_STRING
       json_name: "sandboxId"
     }
+    field {
+      name: "verbose"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "verbose"
+    }
   }
   message_type {
     name: "ControllerStatusResponse"
@@ -4342,15 +4385,24 @@ file {
       json_name: "state"
     }
     field {
-      name: "exit_status"
+      name: "info"
       number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.sandbox.v1.ControllerStatusResponse.InfoEntry"
+      json_name: "info"
+    }
+    field {
+      name: "created_at"
+      number: 5
       label: LABEL_OPTIONAL
-      type: TYPE_UINT32
-      json_name: "exitStatus"
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "createdAt"
     }
     field {
       name: "exited_at"
-      number: 5
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
@@ -4358,11 +4410,31 @@ file {
     }
     field {
       name: "extra"
-      number: 6
+      number: 7
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "extra"
+    }
+    nested_type {
+      name: "InfoEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
     }
   }
   message_type {
