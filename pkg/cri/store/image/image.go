@@ -19,6 +19,7 @@ package image
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -84,6 +85,14 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 		if err != nil {
 			return fmt.Errorf("get image info from containerd: %w", err)
 		}
+	}
+	// parsing ref consistently for refCache, including adding `docker.io/library` prefix
+	if !strings.HasPrefix(ref, "sha256:") {
+		namedRef, err := docker.ParseDockerRef(ref)
+		if err != nil {
+			return fmt.Errorf("failed to parse image reference %q: %w", ref, err)
+		}
+		ref = namedRef.String()
 	}
 	return s.update(ref, img)
 }
