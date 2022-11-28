@@ -296,17 +296,20 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
 	go func() {
 		resp, err := controller.Wait(context.Background(), id)
-		if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-			e := &eventtypes.TaskExit{
-				ContainerID: id,
-				ID:          id,
-				// Pid is not used
-				Pid:        0,
-				ExitStatus: resp.ExitStatus,
-				ExitedAt:   resp.ExitedAt,
-			}
-			c.eventMonitor.backOff.enBackOff(id, e)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to wait for sandbox controller, skipping exit event")
+			return
 		}
+
+		e := &eventtypes.TaskExit{
+			ContainerID: id,
+			ID:          id,
+			// Pid is not used
+			Pid:        0,
+			ExitStatus: resp.ExitStatus,
+			ExitedAt:   resp.ExitedAt,
+		}
+		c.eventMonitor.backOff.enBackOff(id, e)
 	}()
 
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
