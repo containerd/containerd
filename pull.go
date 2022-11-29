@@ -70,7 +70,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
-		tracing.Attribute("max.concurrent.upload.layers", pullCtx.MaxConcurrentUploadedLayers),
 		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
 	)
 
@@ -109,7 +108,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 			ApplyOpts:      uconfig.ApplyOpts,
 		}
 		uopts := []unpack.UnpackerOpt{unpack.WithUnpackPlatform(platform)}
-		if pullCtx.MaxConcurrentUploadedLayers > 0 {
+		if pullCtx.MaxConcurrentDownloads > 0 {
 			uopts = append(uopts, unpack.WithLimiter(semaphore.NewWeighted(int64(pullCtx.MaxConcurrentDownloads))))
 		}
 		if uconfig.DuplicationSuppressor != nil {
