@@ -489,7 +489,11 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 		if spec.Windows.Resources.CPU != nil {
 			if spec.Windows.Resources.CPU.Shares != nil {
 				status.Resources.Windows.CpuShares = int64(*spec.Windows.Resources.CPU.Shares)
+			}
+			if spec.Windows.Resources.CPU.Count != nil {
 				status.Resources.Windows.CpuCount = int64(*spec.Windows.Resources.CPU.Count)
+			}
+			if spec.Windows.Resources.CPU.Maximum != nil {
 				status.Resources.Windows.CpuMaximum = int64(*spec.Windows.Resources.CPU.Maximum)
 			}
 		}
