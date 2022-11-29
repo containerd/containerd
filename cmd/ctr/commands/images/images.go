@@ -47,6 +47,7 @@ var Command = cli.Command{
 		unmountCommand,
 		pullCommand,
 		pushCommand,
+		pruneCommand,
 		removeCommand,
 		tagCommand,
 		setLabelsCommand,
@@ -353,5 +354,75 @@ var removeCommand = cli.Command{
 		}
 
 		return exitErr
+	},
+}
+
+var pruneCommand = cli.Command{
+	Name:  "prune",
+	Usage: "remove unused images",
+	Flags: []cli.Flag{
+		cli.BoolFlag{
+			Name:  "all", // TODO: add more filters
+			Usage: "remove all unused images, not just dangling ones (if all is not specified no images will be pruned)",
+		},
+	},
+	// adapted from `nerdctl`:
+	// https://github.com/containerd/nerdctl/blob/272dc9c29fc1434839d3ec63194d7efa24d7c0ef/cmd/nerdctl/image_prune.go#L86
+	Action: func(context *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+
+		all := context.Bool("all")
+		if !all {
+			log.G(ctx).Warn("No images pruned. `image prune` requires --all to be specified.")
+			// NOP
+			return nil
+		}
+
+		var (
+			imageStore     = client.ImageService()
+			containerStore = client.ContainerService()
+		)
+		imageList, err := imageStore.List(ctx)
+		if err != nil {
+			return err
+		}
+		containerList, err := containerStore.List(ctx)
+		if err != nil {
+			return err
+		}
+		usedImages := make(map[string]struct{})
+		for _, container := range containerList {
+			usedImages[container.Image] = struct{}{}
+		}
+
+		var removedImages []string
+		for _, image := range imageList {
+			if _, ok := usedImages[image.Name]; ok {
+				continue
+			}
+			removedImages = append(removedImages, image.Name)
+		}
+
+		var delOpts []images.DeleteOpt
+		for i, imageName := range removedImages {
+			// Delete the last image reference synchronously to trigger garbage collection.
+			// This is best effort. It is possible that the image reference is deleted by
+			// someone else before this point.
+			if i == len(removedImages)-1 {
+				delOpts = []images.DeleteOpt{images.SynchronousDelete()}
+			}
+			if err := imageStore.Delete(ctx, imageName, delOpts...); err != nil {
+				if !errdefs.IsNotFound(err) {
+					log.G(ctx).WithError(err).Warnf("failed to delete image %s", imageName)
+				}
+				continue
+			}
+			log.G(ctx).Infof("deleted image: %s\n", imageName)
+		}
+		return nil
 	},
 }
