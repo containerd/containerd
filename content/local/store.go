@@ -462,8 +462,9 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 	var lockErr error
+	key := s.ingestRoot(wOpts.Ref)
 	for count := uint64(0); count < 10; count++ {
-		if err := tryLock(wOpts.Ref); err != nil {
+		if err := tryLock(key); err != nil {
 			if !errdefs.IsUnavailable(err) {
 				return nil, err
 			}
@@ -480,9 +481,9 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 		return nil, lockErr
 	}
 
-	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
+	w, err := s.writer(ctx, wOpts.Ref, key, wOpts.Desc.Size, wOpts.Desc.Digest)
 	if err != nil {
-		unlock(wOpts.Ref)
+		unlock(key)
 		return nil, err
 	}
 
@@ -520,7 +521,7 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 
 // writer provides the main implementation of the Writer method. The caller
 // must hold the lock correctly and release on error if there is a problem.
-func (s *store) writer(ctx context.Context, ref string, total int64, expected digest.Digest) (content.Writer, error) {
+func (s *store) writer(ctx context.Context, ref, key string, total int64, expected digest.Digest) (content.Writer, error) {
 	// TODO(stevvooe): Need to actually store expected here. We have
 	// code in the service that shouldn't be dealing with this.
 	if expected != "" {
@@ -599,6 +600,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		s:         s,
 		fp:        fp,
 		ref:       ref,
+		key:       key,
 		path:      path,
 		offset:    offset,
 		total:     total,

@@ -38,6 +38,7 @@ type writer struct {
 	fp        *os.File // opened data file
 	path      string   // path to writer dir
 	ref       string   // ref key
+	key       string   // key to lock on
 	offset    int64
 	total     int64
 	digester  digest.Digester
@@ -76,7 +77,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Ensure even on error the writer is fully closed
-	defer unlock(w.ref)
+	defer unlock(w.key)
 
 	var base content.Info
 	for _, opt := range opts {
@@ -188,7 +189,7 @@ func (w *writer) Close() (err error) {
 		err = w.fp.Close()
 		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
-		unlock(w.ref)
+		unlock(w.key)
 		return
 	}
 
