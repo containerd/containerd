@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
@@ -80,6 +81,9 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 		if err := opt(&config); err != nil {
 			return ocispec.Descriptor{}, err
 		}
+	}
+	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
+		config.SourceDateEpoch = tm
 	}
 	var sourceDateEpoch *timestamppb.Timestamp
 	if config.SourceDateEpoch != nil {

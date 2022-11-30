@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/epoch"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -63,6 +64,9 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 		if err := opt(&config); err != nil {
 			return emptyDesc, err
 		}
+	}
+	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
+		config.SourceDateEpoch = tm
 	}
 
 	var writeDiffOpts []archive.WriteDiffOpt
