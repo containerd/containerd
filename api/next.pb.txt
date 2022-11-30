@@ -3214,6 +3214,14 @@ file {
       type_name: ".containerd.services.images.v1.Image"
       json_name: "image"
     }
+    field {
+      name: "source_date_epoch"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "sourceDateEpoch"
+    }
   }
   message_type {
     name: "CreateImageResponse"
@@ -3243,6 +3251,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.FieldMask"
       json_name: "updateMask"
+    }
+    field {
+      name: "source_date_epoch"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "sourceDateEpoch"
     }
   }
   message_type {
