@@ -136,7 +136,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 
 				sb, err := em.c.sandboxStore.Get(e.ID)
 				if err == nil {
-					if err := handleSandboxExit(dctx, e, sb); err != nil {
+					if err := handleSandboxExit(dctx, e, sb, em.c); err != nil {
 						return err
 					}
 					return nil
@@ -187,7 +187,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 
 				cntr, err := em.c.containerStore.Get(e.ID)
 				if err == nil {
-					if err := handleContainerExit(dctx, e, cntr); err != nil {
+					if err := handleContainerExit(dctx, e, cntr, em.c); err != nil {
 						return err
 					}
 					return nil
@@ -313,7 +313,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		// Use ID instead of ContainerID to rule out TaskExit event for exec.
 		cntr, err := em.c.containerStore.Get(e.ID)
 		if err == nil {
-			if err := handleContainerExit(ctx, e, cntr); err != nil {
+			if err := handleContainerExit(ctx, e, cntr, em.c); err != nil {
 				return fmt.Errorf("failed to handle container TaskExit event: %w", err)
 			}
 			return nil
@@ -322,7 +322,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		sb, err := em.c.sandboxStore.Get(e.ID)
 		if err == nil {
-			if err := handleSandboxExit(ctx, e, sb); err != nil {
+			if err := handleSandboxExit(ctx, e, sb, em.c); err != nil {
 				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
 			}
 			return nil
@@ -362,7 +362,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 }
 
 // handleContainerExit handles TaskExit event for container.
-func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container) error {
+func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container, c *criService) error {
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
@@ -384,7 +384,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 		}
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, WithNRISandboxDelete(cntr.SandboxID), containerd.WithProcessKill); err != nil {
+		if _, err = task.Delete(ctx, c.nri.WithContainerExit(&cntr), containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop container: %w", err)
 			}
@@ -415,7 +415,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 }
 
 // handleSandboxExit handles TaskExit event for sandbox.
-func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox) error {
+func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService) error {
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
@@ -424,7 +424,7 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 		}
 	} else {
 		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+		if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}

@@ -47,6 +47,18 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		return nil, err
 	}
 
+	if c.nri.isEnabled() {
+		sandbox, err := c.sandboxStore.Get(container.SandboxID)
+		if err != nil {
+			err = c.nri.stopContainer(ctx, nil, &container)
+		} else {
+			err = c.nri.stopContainer(ctx, &sandbox, &container)
+		}
+		if err != nil {
+			log.G(ctx).WithError(err).Error("NRI failed to stop container")
+		}
+	}
+
 	i, err := container.Container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get container info: %w", err)
@@ -78,7 +90,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		}
 		// Don't return for unknown state, some cleanup needs to be done.
 		if state == runtime.ContainerState_CONTAINER_UNKNOWN {
-			return cleanupUnknownContainer(ctx, id, container)
+			return c.cleanupUnknownContainer(ctx, id, container)
 		}
 		return nil
 	}
@@ -93,7 +105,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to wait for task for %q: %w", id, err)
 			}
-			return cleanupUnknownContainer(ctx, id, container)
+			return c.cleanupUnknownContainer(ctx, id, container)
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
@@ -196,7 +208,7 @@ func (c *criService) waitContainerStop(ctx context.Context, container containers
 }
 
 // cleanupUnknownContainer cleanup stopped container in unknown state.
-func cleanupUnknownContainer(ctx context.Context, id string, cntr containerstore.Container) error {
+func (c *criService) cleanupUnknownContainer(ctx context.Context, id string, cntr containerstore.Container) error {
 	// Reuse handleContainerExit to do the cleanup.
 	return handleContainerExit(ctx, &eventtypes.TaskExit{
 		ContainerID: id,
@@ -204,5 +216,5 @@ func cleanupUnknownContainer(ctx context.Context, id string, cntr containerstore
 		Pid:         0,
 		ExitStatus:  unknownExitCode,
 		ExitedAt:    protobuf.ToTimestamp(time.Now()),
-	}, cntr)
+	}, cntr, c)
 }

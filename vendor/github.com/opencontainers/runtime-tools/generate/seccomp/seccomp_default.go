@@ -151,6 +151,9 @@ func DefaultProfile(rs *specs.Spec) *rspec.LinuxSeccomp {
 				"io_submit",
 				"ipc",
 				"kill",
+				"landlock_add_rule",
+				"landlock_create_ruleset",
+				"landlock_restrict_self",
 				"lchown",
 				"lchown32",
 				"lgetxattr",
@@ -303,6 +306,7 @@ func DefaultProfile(rs *specs.Spec) *rspec.LinuxSeccomp {
 				"stat64",
 				"statfs",
 				"statfs64",
+				"statx",
 				"symlink",
 				"symlinkat",
 				"sync",
@@ -353,11 +357,23 @@ func DefaultProfile(rs *specs.Spec) *rspec.LinuxSeccomp {
 					Value: 0x0,
 					Op:    rspec.OpEqualTo,
 				},
+			},
+		},
+		{
+			Names:  []string{"personality"},
+			Action: rspec.ActAllow,
+			Args: []rspec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0x0008,
 					Op:    rspec.OpEqualTo,
 				},
+			},
+		},
+		{
+			Names:  []string{"personality"},
+			Action: rspec.ActAllow,
+			Args: []rspec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0xffffffff,
@@ -512,7 +528,7 @@ func DefaultProfile(rs *specs.Spec) *rspec.LinuxSeccomp {
 				Args: []rspec.LinuxSeccompArg{
 					{
 						Index:    sysCloneFlagsIndex,
-						Value:    CloneNewNS | CloneNewUTS | CloneNewIPC | CloneNewUser | CloneNewPID | CloneNewNet,
+						Value:    CloneNewNS | CloneNewUTS | CloneNewIPC | CloneNewUser | CloneNewPID | CloneNewNet | CloneNewCgroup,
 						ValueTwo: 0,
 						Op:       rspec.OpMaskedEqual,
 					},
@@ -566,6 +582,20 @@ func DefaultProfile(rs *specs.Spec) *rspec.LinuxSeccomp {
 			},
 		}...)
 		/* Flags parameter of the clone syscall is the 2nd on s390 */
+		syscalls = append(syscalls, []rspec.LinuxSyscall{
+			{
+				Names:  []string{"clone"},
+				Action: rspec.ActAllow,
+				Args: []rspec.LinuxSeccompArg{
+					{
+						Index:    1,
+						Value:    2080505856,
+						ValueTwo: 0,
+						Op:       rspec.OpMaskedEqual,
+					},
+				},
+			},
+		}...)
 	}
 
 	return &rspec.LinuxSeccomp{
