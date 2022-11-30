@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
@@ -142,14 +141,7 @@ var diffCommand = cli.Command{
 			diff.WithReference(context.String("ref")),
 			diff.WithLabels(labels),
 		}
-
-		ep, err := epoch.SourceDateEpoch()
-		if err != nil {
-			return err
-		}
-		if ep != nil {
-			opts = append(opts, diff.WithSourceDateEpoch(ep))
-		}
+		// SOURCE_DATE_EPOCH is propagated via the ctx, so no need to specify diff.WithSourceDateEpoch here
 
 		if idB == "" {
 			desc, err = rootfs.CreateDiff(ctx, idA, snapshotter, client.DiffService(), opts...)

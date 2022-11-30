@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/continuity/fs"
 )
@@ -80,6 +81,10 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 			return fmt.Errorf("failed to apply option: %w", err)
 		}
 	}
+	if tm := epoch.FromContext(ctx); tm != nil && options.SourceDateEpoch == nil {
+		options.SourceDateEpoch = tm
+	}
+
 	if options.writeDiffFunc == nil {
 		options.writeDiffFunc = writeDiffNaive
 	}
