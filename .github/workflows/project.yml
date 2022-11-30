@@ -1,0 +1,18 @@
+name: Add pull requests to review project
+
+on:
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  add-to-project:
+    name: Add Pull Request to project
+    runs-on: ubuntu-latest
+    permissions:
+      repository-projects: write
+    steps:
+      - uses: actions/add-to-project@v0.4.0
+        with:
+          project-url: https://github.com/orgs/containerd/projects/5
+          github-token: ${{ secrets.GHA_ADD_TO_PROJECT }}
