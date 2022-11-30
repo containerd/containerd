@@ -22,12 +22,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/containerd/containerd/log"
 	"io"
 	"math"
 	"net"
 	"os"
 	"time"
+
+	"github.com/containerd/containerd/log"
 
 	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
