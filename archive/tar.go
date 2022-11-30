@@ -97,7 +97,9 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, o WriteDiffOptions) error {
 	var opts []ChangeWriterOpt
 	if o.SourceDateEpoch != nil {
-		opts = append(opts, WithWhiteoutTime(*o.SourceDateEpoch))
+		opts = append(opts,
+			WithModTimeUpperBound(*o.SourceDateEpoch),
+			WithWhiteoutTime(*o.SourceDateEpoch))
 	}
 	cw := NewChangeWriter(w, b, opts...)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
@@ -493,16 +495,24 @@ func mkparent(ctx context.Context, path, root string, parents []string) error {
 // See also https://github.com/opencontainers/image-spec/blob/main/layer.md for details
 // about OCI layers
 type ChangeWriter struct {
-	tw        *tar.Writer
-	source    string
-	whiteoutT time.Time
-	inodeSrc  map[uint64]string
-	inodeRefs map[uint64][]string
-	addedDirs map[string]struct{}
+	tw                *tar.Writer
+	source            string
+	modTimeUpperBound *time.Time
+	whiteoutT         time.Time
+	inodeSrc          map[uint64]string
+	inodeRefs         map[uint64][]string
+	addedDirs         map[string]struct{}
 }
 
 // ChangeWriterOpt can be specified in NewChangeWriter.
 type ChangeWriterOpt func(cw *ChangeWriter)
+
+// WithModTimeUpperBound sets the mod time upper bound.
+func WithModTimeUpperBound(tm time.Time) ChangeWriterOpt {
+	return func(cw *ChangeWriter) {
+		cw.modTimeUpperBound = &tm
+	}
+}
 
 // WithWhiteoutTime sets the whiteout timestamp.
 func WithWhiteoutTime(tm time.Time) ChangeWriterOpt {
@@ -579,6 +589,9 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 
 		// truncate timestamp for compatibility. without PAX stdlib rounds timestamps instead
 		hdr.Format = tar.FormatPAX
+		if cw.modTimeUpperBound != nil && hdr.ModTime.After(*cw.modTimeUpperBound) {
+			hdr.ModTime = *cw.modTimeUpperBound
+		}
 		hdr.ModTime = hdr.ModTime.Truncate(time.Second)
 		hdr.AccessTime = time.Time{}
 		hdr.ChangeTime = time.Time{}

@@ -91,7 +91,10 @@ type WriteDiffOptions struct {
 
 	writeDiffFunc func(context.Context, io.Writer, string, string, WriteDiffOptions) error
 
-	// SourceDateEpoch specifies the timestamp used for whiteouts to provide control for reproducibility.
+	// SourceDateEpoch specifies the following timestamps to provide control for reproducibility.
+	//   - The upper bound timestamp of the diff contents
+	//   - The timestamp of the whiteouts
+	//
 	// See also https://reproducible-builds.org/docs/source-date-epoch/ .
 	SourceDateEpoch *time.Time
 }
