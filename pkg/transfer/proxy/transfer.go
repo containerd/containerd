@@ -31,21 +31,21 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-type proxyTransferer struct {
+type proxyTransferrer struct {
 	client        transferapi.TransferClient
 	streamCreator streaming.StreamCreator
 }
 
-// NewTransferer returns a new transferr which communicates over a GRPC
+// NewTransferrer returns a new transferr which communicates over a GRPC
 // connection using the containerd transfer API
-func NewTransferer(client transferapi.TransferClient, sc streaming.StreamCreator) transfer.Transferer {
-	return &proxyTransferer{
+func NewTransferrer(client transferapi.TransferClient, sc streaming.StreamCreator) transfer.Transferrer {
+	return &proxyTransferrer{
 		client:        client,
 		streamCreator: sc,
 	}
 }
 
-func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
+func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
 	o := &transfer.Config{}
 	for _, opt := range opts {
 		opt(o)
@@ -108,7 +108,7 @@ func (p *proxyTransferer) Transfer(ctx context.Context, src interface{}, dst int
 	_, err = p.client.Transfer(ctx, req)
 	return err
 }
-func (p *proxyTransferer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
+func (p *proxyTransferrer) marshalAny(ctx context.Context, i interface{}) (typeurl.Any, error) {
 	switch m := i.(type) {
 	case streamMarshaler:
 		return m.MarshalAny(ctx, p.streamCreator)

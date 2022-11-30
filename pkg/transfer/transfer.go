@@ -26,7 +26,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type Transferer interface {
+type Transferrer interface {
 	Transfer(ctx context.Context, source interface{}, destination interface{}, opts ...Opt) error
 }
 

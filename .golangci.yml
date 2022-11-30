@@ -41,10 +41,6 @@ linters-settings:
       - G306
       - G402
       - G404
-  misspell:
-    ignore-words:
-      - transferer
-      - transferers
 
 run:
   timeout: 8m

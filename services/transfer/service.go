@@ -48,7 +48,7 @@ func init() {
 }
 
 type service struct {
-	transferers   []transfer.Transferer
+	transferrers  []transfer.Transferrer
 	streamManager streaming.StreamManager
 	transferapi.UnimplementedTransferServer
 }
@@ -60,20 +60,20 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	// TODO: how to determine order?
-	t := make([]transfer.Transferer, 0, len(plugins))
+	t := make([]transfer.Transferrer, 0, len(plugins))
 	for _, p := range plugins {
 		i, err := p.Instance()
 		if err != nil {
 			return nil, err
 		}
-		t = append(t, i.(transfer.Transferer))
+		t = append(t, i.(transfer.Transferrer))
 	}
 	sp, err := ic.GetByID(plugin.StreamingPlugin, "manager")
 	if err != nil {
 		return nil, err
 	}
 	return &service{
-		transferers:   t,
+		transferrers:  t,
 		streamManager: sp.(streaming.StreamManager),
 	}, nil
 }
@@ -123,7 +123,7 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	for _, t := range s.transferers {
+	for _, t := range s.transferrers {
 		if err := t.Transfer(ctx, src, dst, transferOpts...); err == nil {
 			return &ptypes.Empty{}, nil
 		} else if !errdefs.IsNotImplemented(err) {

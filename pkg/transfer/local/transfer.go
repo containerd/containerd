@@ -49,7 +49,7 @@ type localTransferService struct {
 	//  - Platform -> snapshotter defaults?
 }
 
-func NewTransferService(lm leases.Manager, cs content.Store, is images.Store) transfer.Transferer {
+func NewTransferService(lm leases.Manager, cs content.Store, is images.Store) transfer.Transferrer {
 	return &localTransferService{
 		leases:  lm,
 		content: cs,
