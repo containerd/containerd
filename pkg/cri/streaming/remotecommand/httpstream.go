@@ -48,7 +48,6 @@ import (
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
-	"k8s.io/client-go/tools/remotecommand"
 
 	"k8s.io/klog/v2"
 )
@@ -95,7 +94,6 @@ type context struct {
 	stderrStream io.WriteCloser
 	writeStatus  func(status *apierrors.StatusError) error
 	resizeStream io.ReadCloser
-	resizeChan   chan remotecommand.TerminalSize
 	tty          bool
 }
 
@@ -128,11 +126,6 @@ func createStreams(req *http.Request, w http.ResponseWriter, opts *Options, supp
 	}
 	if !ok {
 		return nil, false
-	}
-
-	if ctx.resizeStream != nil {
-		ctx.resizeChan = make(chan remotecommand.TerminalSize)
-		go handleResizeEvents(ctx.resizeStream, ctx.resizeChan)
 	}
 
 	return ctx, true
@@ -424,20 +417,6 @@ WaitForStreams:
 
 // supportsTerminalResizing returns false because v1ProtocolHandler doesn't support it.
 func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
-
-func handleResizeEvents(stream io.Reader, channel chan<- remotecommand.TerminalSize) {
-	defer runtime.HandleCrash()
-	defer close(channel)
-
-	decoder := json.NewDecoder(stream)
-	for {
-		size := remotecommand.TerminalSize{}
-		if err := decoder.Decode(&size); err != nil {
-			break
-		}
-		channel <- size
-	}
-}
 
 func v1WriteStatusFunc(stream io.Writer) func(status *apierrors.StatusError) error {
 	return func(status *apierrors.StatusError) error {

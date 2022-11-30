@@ -43,7 +43,7 @@ func (c *criService) Attach(ctx context.Context, r *runtime.AttachRequest) (*run
 }
 
 func (c *criService) attachContainer(ctx context.Context, id string, stdin io.Reader, stdout, stderr io.WriteCloser,
-	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	tty bool, resize io.Reader) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Get container from our container store.

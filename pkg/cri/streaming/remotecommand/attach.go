@@ -42,14 +42,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/remotecommand"
 )
 
 // Attacher knows how to attach to a running container in a pod.
 type Attacher interface {
 	// AttachContainer attaches to the running container in the pod, copying data between in/out/err
 	// and the container's stdin/stdout/stderr.
-	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize io.Reader) error
 }
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required
@@ -62,7 +61,7 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 	}
 	defer ctx.conn.Close()
 
-	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
+	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeStream)
 	if err != nil {
 		err = fmt.Errorf("error attaching to container: %v", err)
 		runtime.HandleError(err)

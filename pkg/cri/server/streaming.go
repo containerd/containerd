@@ -19,8 +19,10 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/containerd/containerd/log"
 	"io"
 	"math"
 	"net"
@@ -127,7 +129,7 @@ func newStreamRuntime(c *criService) streaming.Runtime {
 // Exec executes a command inside the container. exec.ExitError is returned if the command
 // returns non-zero exit code.
 func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
-	tty bool, resize <-chan remotecommand.TerminalSize) error {
+	tty bool, resize io.Reader) error {
 	exitCode, err := s.c.execInContainer(ctrdutil.NamespacedContext(), containerID, execOptions{
 		cmd:    cmd,
 		stdin:  stdin,
@@ -149,7 +151,7 @@ func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, 
 }
 
 func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
-	resize <-chan remotecommand.TerminalSize) error {
+	resize io.Reader) error {
 	return s.c.attachContainer(ctrdutil.NamespacedContext(), containerID, in, out, err, tty, resize)
 }
 
@@ -161,29 +163,30 @@ func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.R
 	return s.c.portForward(ctx, podSandboxID, port, stream)
 }
 
-// handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
-// remotecommand.TerminalSize received from the channel.
-func handleResizing(ctx context.Context, resize <-chan remotecommand.TerminalSize, resizeFunc func(size remotecommand.TerminalSize)) {
+// handleResizing spawns a goroutine that processes the resize stream, calling resizeFunc for each
+// remotecommand.TerminalSize received from it.
+func handleResizing(ctx context.Context, resize io.Reader, resizeFunc func(size remotecommand.TerminalSize)) {
 	if resize == nil {
 		return
 	}
 
 	go func() {
 		defer runtime.HandleCrash()
+		decoder := json.NewDecoder(resize)
 
-		for {
-			select {
-			case <-ctx.Done():
+		for ctx.Err() == nil {
+			size := remotecommand.TerminalSize{}
+			err := decoder.Decode(&size)
+			if err != nil {
+				if err != io.EOF {
+					log.G(ctx).WithError(err).Error("Failed to read the console resize channel")
+				}
 				return
-			case size, ok := <-resize:
-				if !ok {
-					return
-				}
-				if size.Height < 1 || size.Width < 1 {
-					continue
-				}
-				resizeFunc(size)
 			}
+			if size.Height < 1 || size.Width < 1 {
+				continue
+			}
+			resizeFunc(size)
 		}
 	}()
 }

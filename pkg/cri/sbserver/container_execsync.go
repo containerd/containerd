@@ -107,7 +107,7 @@ type execOptions struct {
 	stdout  io.WriteCloser
 	stderr  io.WriteCloser
 	tty     bool
-	resize  <-chan remotecommand.TerminalSize
+	resize  io.Reader
 	timeout time.Duration
 }
 
