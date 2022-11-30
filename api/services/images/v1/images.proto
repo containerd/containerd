@@ -89,6 +89,8 @@ message GetImageResponse {
 
 message CreateImageRequest {
 	Image image = 1;
+
+	google.protobuf.Timestamp source_date_epoch = 2;
 }
 
 message CreateImageResponse {
@@ -104,6 +106,8 @@ message UpdateImageRequest {
 	// UpdateMask specifies which fields to perform the update on. If empty,
 	// the operation applies to all fields.
 	google.protobuf.FieldMask update_mask = 2;
+
+	google.protobuf.Timestamp source_date_epoch = 3;
 }
 
 message UpdateImageResponse {

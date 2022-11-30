@@ -23,10 +23,12 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type remoteImages struct {
@@ -63,9 +65,13 @@ func (s *remoteImages) List(ctx context.Context, filters ...string) ([]images.Im
 }
 
 func (s *remoteImages) Create(ctx context.Context, image images.Image) (images.Image, error) {
-	created, err := s.client.Create(ctx, &imagesapi.CreateImageRequest{
+	req := &imagesapi.CreateImageRequest{
 		Image: imageToProto(&image),
-	})
+	}
+	if tm := epoch.FromContext(ctx); tm != nil {
+		req.SourceDateEpoch = timestamppb.New(*tm)
+	}
+	created, err := s.client.Create(ctx, req)
 	if err != nil {
 		return images.Image{}, errdefs.FromGRPC(err)
 	}
@@ -80,11 +86,14 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpath
 			Paths: fieldpaths,
 		}
 	}
-
-	updated, err := s.client.Update(ctx, &imagesapi.UpdateImageRequest{
+	req := &imagesapi.UpdateImageRequest{
 		Image:      imageToProto(&image),
 		UpdateMask: updateMask,
-	})
+	}
+	if tm := epoch.FromContext(ctx); tm != nil {
+		req.SourceDateEpoch = timestamppb.New(*tm)
+	}
+	updated, err := s.client.Update(ctx, req)
 	if err != nil {
 		return images.Image{}, errdefs.FromGRPC(err)
 	}
