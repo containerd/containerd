@@ -205,7 +205,7 @@ func (p *plugin) start(name, version string) error {
 			return fmt.Errorf("failed to register plugin: %w", err)
 		}
 	case <-p.closeC:
-		return fmt.Errorf("failed to register plugin, connection closed: %w", err)
+		return fmt.Errorf("failed to register plugin, connection closed")
 	case <-time.After(pluginRegistrationTimeout):
 		p.close()
 		p.stop()

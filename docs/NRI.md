@@ -108,12 +108,11 @@ For more details about pre-registered and externally launched plugins
 
 You can verify that NRI integration is properly enabled and functional by
 configuring containerd and NRI as described above, taking the NRI
-logger plugin either from the NRI repository or
-[this fork](https://github.com/klihub/nri/tree/pr/proto/draft/plugins/logger)
+logger plugin from the [NRI repository](https://github.com/containerd/nri/tree/main/plugins/logger)
 on github, compiling it and starting it up.
 
 ```bash
-git clone https://github.com/klihub/nri
+git clone https://github.com/containerd/nri
 cd nri
 git checkout pr/proto/draft
 make
@@ -128,12 +127,11 @@ events printed by the logger.
 ## NRI Compatibility With v0.1.0 Plugins
 
 You can enable backward compatibility with NRI v0.1.0 plugins using the
-[v010-adapter plugin](https://github.com/klihub/nri/tree/pr/proto/draft/plugins/v010-adapter).
+[v010-adapter plugin](https://github.com/containerd/nri/tree/main/plugins/v010-adapter).
 
 ```bash
-git clone https://github.com/klihub/nri
+git clone https://github.com/containerd/nri
 cd nri
-git checkout pr/proto/draft
 make
 sudo cp build/bin/v010-adapter /usr/local/bin
 sudo mkdir -p /opt/nri/plugins
