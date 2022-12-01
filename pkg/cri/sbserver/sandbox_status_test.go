@@ -88,29 +88,25 @@ func TestPodSandboxStatus(t *testing.T) {
 		RuntimeHandler: "test-runtime-handler",
 	}
 	for desc, test := range map[string]struct {
-		state         sandboxstore.State
+		state         string
 		expectedState runtime.PodSandboxState
 	}{
 		"sandbox state ready": {
-			state:         sandboxstore.StateReady,
+			state:         sandboxstore.StateReady.String(),
 			expectedState: runtime.PodSandboxState_SANDBOX_READY,
 		},
 		"sandbox state not ready": {
-			state:         sandboxstore.StateNotReady,
+			state:         sandboxstore.StateNotReady.String(),
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 		"sandbox state unknown": {
-			state:         sandboxstore.StateUnknown,
+			state:         sandboxstore.StateUnknown.String(),
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			status := sandboxstore.Status{
-				CreatedAt: createdAt,
-				State:     test.state,
-			}
 			expected.State = test.expectedState
-			got := toCRISandboxStatus(metadata, status, ip, additionalIPs)
+			got := toCRISandboxStatus(metadata, test.state, createdAt, ip, additionalIPs)
 			assert.Equal(t, expected, got)
 		})
 	}

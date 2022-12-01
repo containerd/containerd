@@ -36,7 +36,7 @@ type Controller interface {
 	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)
 	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
 	// gather metadata about current sandbox state (status, uptime, resource use, etc).
-	Status(ctx context.Context, sandboxID string) (*sandbox.ControllerStatusResponse, error)
+	Status(ctx context.Context, sandboxID string, verbose bool) (*sandbox.ControllerStatusResponse, error)
 	// Delete deletes and cleans all tasks and sandbox instance.
 	Delete(ctx context.Context, sandboxID string) (*sandbox.ControllerDeleteResponse, error)
 }

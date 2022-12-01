@@ -37,7 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/failpoint"
 	"github.com/containerd/typeurl"
@@ -333,7 +333,7 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 }
 
 // sbserverSandboxInfo gets sandbox info.
-func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *sbserver.SandboxInfo, error) {
+func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *podsandbox.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -346,7 +346,7 @@ func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *sbserver.Sandb
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info sbserver.SandboxInfo
+	var info podsandbox.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}

@@ -56,14 +56,21 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
-	sandboxID := sandbox.ID
 
-	// TODO: Add PID endpoint to Controller interface.
-	s, err := sandbox.Container.Task(ctx, nil)
+	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
-	sandboxPid := s.Pid()
+
+	statusResponse, err := controller.Status(ctx, sandbox.ID, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get controller status: %w", err)
+	}
+
+	var (
+		sandboxID  = statusResponse.GetID()
+		sandboxPid = statusResponse.GetPid()
+	)
 
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
@@ -244,6 +251,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta),
 	)
+
+	// When using sandboxed shims, containerd's runtime needs to know which sandbox shim instance to use.
+	if ociRuntime.SandboxMode == string(criconfig.ModeShim) {
+		opts = append(opts, containerd.WithSandbox(sandboxID))
+	}
 
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {

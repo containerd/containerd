@@ -18,17 +18,12 @@ package sbserver
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	goruntime "runtime"
-
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/go-cni"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"time"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
@@ -42,7 +37,18 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
 	}
-	status := toCRISandboxStatus(sandbox.Metadata, sandbox.Status.Get(), ip, additionalIPs)
+
+	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+
+	statusResponse, err := controller.Status(ctx, r.GetPodSandboxId(), r.GetVerbose())
+	if err != nil {
+		return nil, fmt.Errorf("failed to query controller status: %w", err)
+	}
+
+	status := toCRISandboxStatus(sandbox.Metadata, statusResponse.State, statusResponse.GetCreatedAt().AsTime(), ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
 		sandboxInfo, err := c.client.SandboxStore().Get(ctx, r.GetPodSandboxId())
@@ -52,19 +58,9 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
 	}
 
-	if !r.GetVerbose() {
-		return &runtime.PodSandboxStatusResponse{Status: status}, nil
-	}
-
-	// Generate verbose information.
-	info, err := toCRISandboxInfo(ctx, sandbox)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get verbose sandbox container info: %w", err)
-	}
-
 	return &runtime.PodSandboxStatusResponse{
 		Status: status,
-		Info:   info,
+		Info:   statusResponse.GetInfo(),
 	}, nil
 }
 
@@ -96,11 +92,11 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
-func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, ip string, additionalIPs []string) *runtime.PodSandboxStatus {
+func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt time.Time, ip string, additionalIPs []string) *runtime.PodSandboxStatus {
 	// Set sandbox state to NOTREADY by default.
 	state := runtime.PodSandboxState_SANDBOX_NOTREADY
-	if status.State == sandboxstore.StateReady {
-		state = runtime.PodSandboxState_SANDBOX_READY
+	if value, ok := runtime.PodSandboxState_value[status]; ok {
+		state = runtime.PodSandboxState(value)
 	}
 	nsOpts := meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	var ips []*runtime.PodIP
@@ -111,7 +107,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, 
 		Id:        meta.ID,
 		Metadata:  meta.Config.GetMetadata(),
 		State:     state,
-		CreatedAt: status.CreatedAt.UnixNano(),
+		CreatedAt: createdAt.UnixNano(),
 		Network: &runtime.PodSandboxNetworkStatus{
 			Ip:            ip,
 			AdditionalIps: ips,
@@ -129,106 +125,4 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status sandboxstore.Status, 
 		Annotations:    meta.Config.GetAnnotations(),
 		RuntimeHandler: meta.RuntimeHandler,
 	}
-}
-
-// SandboxInfo is extra information for sandbox.
-// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
-type SandboxInfo struct {
-	Pid         uint32 `json:"pid"`
-	Status      string `json:"processStatus"`
-	NetNSClosed bool   `json:"netNamespaceClosed"`
-	Image       string `json:"image"`
-	SnapshotKey string `json:"snapshotKey"`
-	Snapshotter string `json:"snapshotter"`
-	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
-	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
-	// in https://github.com/containerd/cri/issues/1064).
-	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
-	RuntimeType    string                    `json:"runtimeType"`
-	RuntimeOptions interface{}               `json:"runtimeOptions"`
-	Config         *runtime.PodSandboxConfig `json:"config"`
-	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
-	RuntimeSpec *runtimespec.Spec      `json:"runtimeSpec"`
-	CNIResult   *cni.Result            `json:"cniResult"`
-	Metadata    *sandboxstore.Metadata `json:"sandboxMetadata"`
-}
-
-// toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
-func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	si := &SandboxInfo{
-		Pid:            sandbox.Status.Get().Pid,
-		Config:         sandbox.Config,
-		RuntimeHandler: sandbox.RuntimeHandler,
-		CNIResult:      sandbox.CNIResult,
-	}
-
-	if sandbox.Container != nil {
-		container := sandbox.Container
-		task, err := container.Task(ctx, nil)
-		if err != nil && !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
-		}
-
-		var processStatus containerd.ProcessStatus
-		if task != nil {
-			if taskStatus, err := task.Status(ctx); err != nil {
-				if !errdefs.IsNotFound(err) {
-					return nil, fmt.Errorf("failed to get task status: %w", err)
-				}
-				processStatus = containerd.Unknown
-			} else {
-				processStatus = taskStatus.Status
-			}
-		}
-		si.Status = string(processStatus)
-
-		spec, err := container.Spec(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get sandbox container runtime spec: %w", err)
-		}
-		si.RuntimeSpec = spec
-
-		ctrInfo, err := container.Info(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
-		}
-		// Do not use config.SandboxImage because the configuration might
-		// be changed during restart. It may not reflect the actual image
-		// used by the sandbox container.
-		si.Image = ctrInfo.Image
-		si.SnapshotKey = ctrInfo.SnapshotKey
-		si.Snapshotter = ctrInfo.Snapshotter
-
-		runtimeOptions, err := getRuntimeOptions(ctrInfo)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get runtime options: %w", err)
-		}
-		si.RuntimeType = ctrInfo.Runtime.Name
-		si.RuntimeOptions = runtimeOptions
-	}
-
-	if si.Status == "" {
-		// If processStatus is empty, it means that the task is deleted. Apply "deleted"
-		// status which does not exist in containerd.
-		si.Status = "deleted"
-	}
-
-	if sandbox.NetNS != nil {
-		// Add network closed information if sandbox is not using host network.
-		closed, err := sandbox.NetNS.Closed()
-		if err != nil {
-			return nil, fmt.Errorf("failed to check network namespace closed: %w", err)
-		}
-		si.NetNSClosed = closed
-	}
-
-	si.Metadata = &sandbox.Metadata
-
-	infoBytes, err := json.Marshal(si)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal info %v: %w", si, err)
-	}
-	return map[string]string{
-		"info": string(infoBytes),
-	}, nil
 }

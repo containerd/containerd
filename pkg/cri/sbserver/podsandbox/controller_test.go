@@ -78,12 +78,11 @@ func Test_Status(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := controller.Status(context.Background(), sandboxID)
+	s, err := controller.Status(context.Background(), sandboxID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, s.Pid, pid)
-	assert.Equal(t, s.ExitStatus, exitStatus)
 	assert.Equal(t, s.ExitedAt, protobuf.ToTimestamp(exitedAt))
 	assert.Equal(t, s.State, sandboxstore.StateReady.String())
 }
