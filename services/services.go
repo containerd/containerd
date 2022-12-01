@@ -37,4 +37,6 @@ const (
 	SandboxStoreService = "sandbox-store-service"
 	// SandboxControllerService is the id of Sandbox's controller service
 	SandboxControllerService = "sandbox-controller-service"
+	// Streaming service is the id of the streaming service
+	StreamingService = "streaming-service"
 )

@@ -4973,6 +4973,35 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/streaming/v1/streaming.proto"
+  package: "containerd.services.streaming.v1"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "StreamInit"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  service {
+    name: "Streaming"
+    method {
+      name: "Stream"
+      input_type: ".google.protobuf.Any"
+      output_type: ".google.protobuf.Any"
+      client_streaming: true
+      server_streaming: true
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/streaming/v1;streaming"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/metrics.proto"
   package: "containerd.types"
   dependency: "google/protobuf/any.proto"
@@ -5654,6 +5683,61 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/transfer/v1/transfer.proto"
+  package: "containerd.services.transfer.v1"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/empty.proto"
+  message_type {
+    name: "TransferRequest"
+    field {
+      name: "source"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "source"
+    }
+    field {
+      name: "destination"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "destination"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.transfer.v1.TransferOptions"
+      json_name: "options"
+    }
+  }
+  message_type {
+    name: "TransferOptions"
+    field {
+      name: "progress_stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "progressStream"
+    }
+  }
+  service {
+    name: "Transfer"
+    method {
+      name: "Transfer"
+      input_type: ".containerd.services.transfer.v1.TransferRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/transfer/v1;transfer"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/services/ttrpc/events/v1/events.proto"
   package: "containerd.services.events.ttrpc.v1"
   dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
@@ -5751,6 +5835,393 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/version/v1;version"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/imagestore.proto"
+  package: "containerd.types.transfer"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  message_type {
+    name: "ImageStore"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "labels"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.ImageStore.LabelsEntry"
+      json_name: "labels"
+    }
+    field {
+      name: "platforms"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platforms"
+    }
+    field {
+      name: "all_metadata"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "allMetadata"
+    }
+    field {
+      name: "manifest_limit"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "manifestLimit"
+    }
+    field {
+      name: "prefix"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "prefix"
+    }
+    field {
+      name: "check_prefix"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "checkPrefix"
+    }
+    field {
+      name: "digest_refs"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "digestRefs"
+    }
+    field {
+      name: "always_digest"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "alwaysDigest"
+    }
+    field {
+      name: "unpacks"
+      number: 10
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.UnpackConfiguration"
+      json_name: "unpacks"
+    }
+    nested_type {
+      name: "LabelsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "UnpackConfiguration"
+    field {
+      name: "platform"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
+    field {
+      name: "snapshotter"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "snapshotter"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/importexport.proto"
+  package: "containerd.types.transfer"
+  message_type {
+    name: "ImageImportStream"
+    field {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+    field {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
+    field {
+      name: "force_compress"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "forceCompress"
+    }
+  }
+  message_type {
+    name: "ImageExportStream"
+    field {
+      name: "stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stream"
+    }
+    field {
+      name: "media_type"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "mediaType"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/progress.proto"
+  package: "containerd.types.transfer"
+  message_type {
+    name: "Progress"
+    field {
+      name: "event"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "event"
+    }
+    field {
+      name: "name"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "parents"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "parents"
+    }
+    field {
+      name: "progress"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "progress"
+    }
+    field {
+      name: "total"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "total"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/registry.proto"
+  package: "containerd.types.transfer"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "OCIRegistry"
+    field {
+      name: "reference"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reference"
+    }
+    field {
+      name: "resolver"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.RegistryResolver"
+      json_name: "resolver"
+    }
+  }
+  message_type {
+    name: "RegistryResolver"
+    field {
+      name: "auth_stream"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "authStream"
+    }
+    field {
+      name: "headers"
+      number: 2
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.RegistryResolver.HeadersEntry"
+      json_name: "headers"
+    }
+    nested_type {
+      name: "HeadersEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "AuthRequest"
+    field {
+      name: "host"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "host"
+    }
+    field {
+      name: "reference"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reference"
+    }
+    field {
+      name: "wwwauthenticate"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "wwwauthenticate"
+    }
+  }
+  message_type {
+    name: "AuthResponse"
+    field {
+      name: "authType"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.types.transfer.AuthType"
+      json_name: "authType"
+    }
+    field {
+      name: "secret"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "secret"
+    }
+    field {
+      name: "username"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "username"
+    }
+    field {
+      name: "expire_at"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "expireAt"
+    }
+  }
+  enum_type {
+    name: "AuthType"
+    value {
+      name: "NONE"
+      number: 0
+    }
+    value {
+      name: "CREDENTIALS"
+      number: 1
+    }
+    value {
+      name: "REFRESH"
+      number: 2
+    }
+    value {
+      name: "HEADER"
+      number: 3
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/transfer/streaming.proto"
+  package: "containerd.types.transfer"
+  message_type {
+    name: "Data"
+    field {
+      name: "data"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_BYTES
+      json_name: "data"
+    }
+  }
+  message_type {
+    name: "WindowUpdate"
+    field {
+      name: "update"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_INT32
+      json_name: "update"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }

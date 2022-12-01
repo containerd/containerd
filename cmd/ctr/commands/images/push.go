@@ -32,6 +32,8 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -68,6 +70,9 @@ var pushCommand = cli.Command{
 	}, cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "set the max concurrent uploaded layers for each push",
+	}, cli.BoolTFlag{
+		Name:  "local",
+		Usage: "push content from local client rather than using transfer service",
 	}, cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "allow pushing blobs that are marked as non-distributable",
@@ -88,6 +93,24 @@ var pushCommand = cli.Command{
 			return err
 		}
 		defer cancel()
+
+		if !context.BoolT("local") {
+			ch, err := commands.NewStaticCredentials(ctx, context, ref)
+			if err != nil {
+				return err
+			}
+
+			if local == "" {
+				local = ref
+			}
+			reg := image.NewOCIRegistry(ref, nil, ch)
+			is := image.NewStore(local)
+
+			pf, done := ProgressHandler(ctx, os.Stdout)
+			defer done()
+
+			return client.Transfer(ctx, is, reg, transfer.WithProgress(pf))
+		}
 
 		if manifest := context.String("manifest"); manifest != "" {
 			desc.Digest, err = digest.Parse(manifest)

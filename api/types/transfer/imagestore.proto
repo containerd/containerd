@@ -1,0 +1,58 @@
+/*
+	Copyright The containerd Authors.
+
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+
+		http://www.apache.org/licenses/LICENSE-2.0
+
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+*/
+
+syntax = "proto3";
+
+package containerd.types.transfer;
+
+import "github.com/containerd/containerd/api/types/platform.proto";
+
+option go_package = "github.com/containerd/containerd/api/types/transfer";
+
+message ImageStore {
+	string name = 1;
+	map<string, string> labels = 2;
+
+	// Content filters
+
+	repeated types.Platform platforms = 3;
+	bool all_metadata = 4;
+	uint32 manifest_limit = 5;
+
+	// Import naming
+
+	// prefix is the intended image name prefix for imported images
+	string prefix = 6;
+	// check_prefix only stores images with the prefix
+	bool check_prefix = 7;
+	// digest_refs adds digest references for images using prefix
+	bool digest_refs = 8;
+	// always_digest includes a digest image even when a non-digest image is stored
+	bool always_digest = 9;
+
+	// Unpack Configuration, multiple allowed
+
+	repeated UnpackConfiguration unpacks = 10;
+}
+
+message UnpackConfiguration {
+	// platform is the platform to unpack for, used for resolving manifest and snapshotter
+	// if not provided
+	types.Platform platform = 1;
+
+	// snapshotter to unpack to, if not provided default for platform shoudl be used
+	string snapshotter = 2;
+}
