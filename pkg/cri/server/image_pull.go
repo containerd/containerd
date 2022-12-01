@@ -156,6 +156,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to image verification plugin: %w", err)
 		}
+		defer conn.Close()
 		client := imageverifier.NewImageVerifierClient(ttrpc.NewClient(conn))
 		resolver = NewVerifyingResolver(resolver, client)
 	}
