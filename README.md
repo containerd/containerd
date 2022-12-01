@@ -328,7 +328,7 @@ A third party security audit was performed by Cure53 in 4Q2018; the [full report
 
 ### Reporting security issues
 
-__If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
+Please follow the instructions at [containerd/project](https://github.com/containerd/project/blob/main/SECURITY.md#reporting-a-vulnerability)
 
 ## Licenses
 
