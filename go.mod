@@ -17,8 +17,6 @@ require (
 	github.com/containerd/go-cni v1.1.6
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028
-	// We need an NRI with the updated interface. We use a replace to
-	// divert it until the corresponding PR lands in the NRI repo.
 	github.com/containerd/nri v0.2.0
 	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
@@ -142,8 +140,4 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace (
-	// Temporarily divert repo for updated/extended NRI.
-	github.com/containerd/nri => github.com/klihub/nri v0.0.0-20221122201439-2b09b4ad5cf3
-	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
-)
+replace github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809

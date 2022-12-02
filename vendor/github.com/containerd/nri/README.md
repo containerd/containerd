@@ -1,5 +1,12 @@
 ## Node Resource Interface, Revisited
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/nri)](https://pkg.go.dev/github.com/containerd/nri)
+[![Build Status](https://github.com/containerd/nri/workflows/CI/badge.svg)](https://github.com/containerd/nri/actions?query=workflow%3ACI)
+[![codecov](https://codecov.io/gh/containerd/nri/branch/main/graph/badge.svg)](https://codecov.io/gh/containerd/nri)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/nri)](https://goreportcard.com/report/github.com/containerd/nri)
+
+*This project is currently in DRAFT status*
+
 ### Goal
 
 NRI allows plugging domain- or vendor-specific custom logic into OCI-

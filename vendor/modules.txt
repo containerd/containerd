@@ -126,7 +126,7 @@ github.com/containerd/go-runc
 ## explicit; go 1.16
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
-# github.com/containerd/nri v0.2.0 => github.com/klihub/nri v0.0.0-20221122201439-2b09b4ad5cf3
+# github.com/containerd/nri v0.2.0
 ## explicit; go 1.18
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation
@@ -790,5 +790,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 # sigs.k8s.io/yaml v1.3.0
 ## explicit; go 1.12
 sigs.k8s.io/yaml
-# github.com/containerd/nri => github.com/klihub/nri v0.0.0-20221122201439-2b09b4ad5cf3
 # github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809

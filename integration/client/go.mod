@@ -73,7 +73,7 @@ require (
 replace (
 	github.com/containerd/containerd => ../../
 
-	// Temporarily divert repo for updated/extended NRI.
-	github.com/containerd/nri => github.com/klihub/nri v0.0.0-20221122201439-2b09b4ad5cf3
+	// ATM the runtime-tools commit we need are beyond the latest tag.
+	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
 )
