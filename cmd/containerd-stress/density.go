@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -47,6 +48,15 @@ var densityCommand = cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
+		var (
+			pids  []uint32
+			count = cliContext.Int("count")
+		)
+
+		if count < 1 {
+			return errors.New("count cannot be less than one")
+		}
+
 		config := config{
 			Address:     cliContext.GlobalString("address"),
 			Duration:    cliContext.GlobalDuration("duration"),
@@ -76,10 +86,6 @@ var densityCommand = cli.Command{
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)
 
-		var (
-			pids  []uint32
-			count = cliContext.Int("count")
-		)
 	loop:
 		for i := 0; i < count+1; i++ {
 			select {
