@@ -102,8 +102,12 @@ type serviceStream struct {
 	cc chan struct{}
 }
 
-func (ss *serviceStream) Send(a typeurl.Any) error {
-	return errdefs.FromGRPC(ss.s.Send(protobuf.FromAny(a)))
+func (ss *serviceStream) Send(a typeurl.Any) (err error) {
+	err = errdefs.FromGRPC(ss.s.Send(protobuf.FromAny(a)))
+	if !errors.Is(err, io.EOF) {
+		err = errdefs.FromGRPC(err)
+	}
+	return
 }
 
 func (ss *serviceStream) Recv() (a typeurl.Any, err error) {
