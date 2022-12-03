@@ -19,19 +19,36 @@ USAGE:
    containerd [global options] command [command options] [arguments...]
 
 VERSION:
-   v1.0.0-alpha3-36-ge9b86af
+   v1.7.0-beta.0
+
+DESCRIPTION:
+
+containerd is a high performance container runtime whose daemon can be started
+by using this command. If none of the *config*, *publish*, *oci-hook*, or *help* commands
+are specified, the default action of the **containerd** command is to start the
+containerd daemon in the foreground.
+
+
+A default configuration is used if no TOML configuration is specified or located
+at the default file location. The *containerd config* command can be used to
+generate the default configuration for containerd. The output of that command
+can be used and modified as necessary as a custom configuration.
 
 COMMANDS:
-     config   information on the containerd config
-     help, h  Shows a list of commands or help for one command
+   config    information on the containerd config
+   publish   binary to publish events to containerd
+   oci-hook  provides a base for OCI runtime hooks to allow arguments to be injected.
+   help, h   Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
    --config value, -c value     path to the configuration file (default: "/etc/containerd/config.toml")
-   --log-level value, -l value  set the logging level [debug, info, warn, error, fatal, panic]
+   --log-level value, -l value  set the logging level [trace, debug, info, warn, error, fatal, panic]
    --address value, -a value    address for containerd's GRPC server
    --root value                 containerd root directory
+   --state value                containerd state directory
    --help, -h                   show help
    --version, -v                print the version
+
 ```
 
 While a few daemon level options can be set from CLI flags the majority of containerd's configuration is kept in the configuration file.
