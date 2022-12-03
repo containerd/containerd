@@ -164,7 +164,10 @@ one of three ways:
 2. Open a PR with cherry-picked change from main.
 3. Open a PR with a ported fix.
 
-__If you are reporting a security issue, please reach out discreetly at security@containerd.io__.
+__If you are reporting a security issue:__
+
+Please follow the instructions at [containerd/project](https://github.com/containerd/project/blob/main/SECURITY.md#reporting-a-vulnerability)
+
 Remember that backported PRs must follow the versioning guidelines from this document.
 
 Any release that is "active" can accept backports. Opening a backport PR is
