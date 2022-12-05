@@ -18,9 +18,12 @@ package containerd
 
 import (
 	"context"
+	"errors"
+	"io"
 
 	streamingapi "github.com/containerd/containerd/api/services/streaming/v1"
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/proxy"
@@ -56,11 +59,17 @@ func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Strea
 	}
 	err = stream.Send(protobuf.FromAny(a))
 	if err != nil {
+		if !errors.Is(err, io.EOF) {
+			err = errdefs.FromGRPC(err)
+		}
 		return nil, err
 	}
 
 	// Receive an ack that stream is init and ready
 	if _, err = stream.Recv(); err != nil {
+		if !errors.Is(err, io.EOF) {
+			err = errdefs.FromGRPC(err)
+		}
 		return nil, err
 	}
 
@@ -73,12 +82,20 @@ type clientStream struct {
 	s streamingapi.Streaming_StreamClient
 }
 
-func (cs *clientStream) Send(a typeurl.Any) error {
-	return cs.s.Send(protobuf.FromAny(a))
+func (cs *clientStream) Send(a typeurl.Any) (err error) {
+	err = cs.s.Send(protobuf.FromAny(a))
+	if !errors.Is(err, io.EOF) {
+		err = errdefs.FromGRPC(err)
+	}
+	return
 }
 
-func (cs *clientStream) Recv() (typeurl.Any, error) {
-	return cs.s.Recv()
+func (cs *clientStream) Recv() (a typeurl.Any, err error) {
+	a, err = cs.s.Recv()
+	if !errors.Is(err, io.EOF) {
+		err = errdefs.FromGRPC(err)
+	}
+	return
 }
 
 func (cs *clientStream) Close() error {

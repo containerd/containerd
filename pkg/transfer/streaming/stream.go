@@ -157,14 +157,14 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 				// check window update error after recv, stream may be complete
 				if werr = stream.Send(any); werr == nil {
 					window += windowSize
-				} else if werr == io.EOF {
+				} else if errors.Is(werr, io.EOF) {
 					// TODO: Why does send return EOF here
 					werr = nil
 				}
 			}
 			any, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					err = nil
 				} else {
 					err = fmt.Errorf("received failed: %w", err)
