@@ -490,8 +490,8 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		if ok {
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names: []string{
-					"process_vm_read",
-					"process_vm_write",
+					"process_vm_readv",
+					"process_vm_writev",
 					"ptrace",
 				},
 				Action: specs.ActAllow,
