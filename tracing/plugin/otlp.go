@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/tracing"
@@ -63,7 +64,26 @@ func init() {
 		Requires: []plugin.Type{plugin.TracingProcessorPlugin},
 		Config:   &TraceConfig{ServiceName: "containerd", TraceSamplingRatio: 1.0},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return newTracer(ic)
+			//get TracingProcessorPlugin which is a dependency
+			plugins, err := ic.GetByType(plugin.TracingProcessorPlugin)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
+			}
+			procs := make([]sdktrace.SpanProcessor, 0, len(plugins))
+			for id, pctx := range plugins {
+				p, err := pctx.Instance()
+				if err != nil {
+					if plugin.IsSkipPlugin(err) {
+						log.G(ic.Context).WithError(err).Infof("skipping tracing processor initialization (no tracing plugin)")
+					} else {
+						log.G(ic.Context).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
+					}
+					continue
+				}
+				proc := p.(sdktrace.SpanProcessor)
+				procs = append(procs, proc)
+			}
+			return newTracer(ic.Context, ic.Config.(*TraceConfig), procs)
 		},
 	})
 
@@ -105,7 +125,7 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 	if cfg.Protocol == "http/protobuf" || cfg.Protocol == "" {
 		u, err := url.Parse(cfg.Endpoint)
 		if err != nil {
-			return nil, fmt.Errorf("OpenTelemetry endpoint %q is invalid: %w", cfg.Endpoint, err)
+			return nil, fmt.Errorf("OpenTelemetry endpoint %q %w : %v", cfg.Endpoint, errdefs.ErrInvalidArgument, err)
 		}
 		opts := []otlptracehttp.Option{
 			otlptracehttp.WithEndpoint(u.Host),
@@ -124,7 +144,7 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 		return otlptracegrpc.New(ctx, opts...)
 	} else {
 		// Other protocols such as "http/json" are not supported.
-		return nil, fmt.Errorf("OpenTelemetry protocol %q is not supported", cfg.Protocol)
+		return nil, fmt.Errorf("OpenTelemetry protocol %q : %w", cfg.Protocol, errdefs.ErrNotImplemented)
 	}
 }
 
@@ -132,9 +152,7 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 // its sampling ratio and returns io.Closer.
 //
 // Note that this function sets process-wide tracing configuration.
-func newTracer(ic *plugin.InitContext) (io.Closer, error) {
-	ctx := ic.Context
-	config := ic.Config.(*TraceConfig)
+func newTracer(ctx context.Context, config *TraceConfig, procs []sdktrace.SpanProcessor) (io.Closer, error) {
 
 	res, err := resource.New(ctx,
 		resource.WithHost(),
@@ -154,25 +172,8 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		sdktrace.WithResource(res),
 	}
 
-	ls, err := ic.GetByType(plugin.TracingProcessorPlugin)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tracing processors: %w", err)
-	}
-
-	procs := make([]sdktrace.SpanProcessor, 0, len(ls))
-	for id, pctx := range ls {
-		p, err := pctx.Instance()
-		if err != nil {
-			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithError(err).Infof("skipping tracing processor initialization (no tracing plugin)")
-			} else {
-				log.G(ctx).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
-			}
-			continue
-		}
-		proc := p.(sdktrace.SpanProcessor)
+	for _, proc := range procs {
 		opts = append(opts, sdktrace.WithSpanProcessor(proc))
-		procs = append(procs, proc)
 	}
 
 	provider := sdktrace.NewTracerProvider(opts...)
@@ -189,6 +190,7 @@ func newTracer(ic *plugin.InitContext) (io.Closer, error) {
 		}
 		return nil
 	}}, nil
+
 }
 
 // Returns a composite TestMap propagator
