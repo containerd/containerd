@@ -32,6 +32,7 @@ func hostPaths(root, host string) (hosts []string) {
 
 	hosts = append(hosts,
 		filepath.Join(root, host),
+		filepath.Join(root, hostDirectory(hostSuffix(host))),
 		filepath.Join(root, "_default"),
 	)
 

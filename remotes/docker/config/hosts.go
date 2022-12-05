@@ -263,6 +263,53 @@ func hostDirectory(host string) string {
 	return host
 }
 
+// hostSuffix converts "docker.io" to ".docker.io" or "test.docker.io" to ".docker.io" or "localhost" to ".localhost"
+//
+// In addition, special care is taken for two letter TLD's, which are referred to as country-code TLD's (ccTLD)
+// Only ccTLD domain registrars can register second-hierarchy TLD's such as (.co.uk or .ac.uk).
+// Conveniently, this also includes most registries that use ".io", so the ccTLD ".io" is given special treatment.
+// This means that any registry with ".io" is allowed to treat their second-level domain as a second-level hierarchy TLD.
+// For example, "myregistry.test.docker.io" would be converted to ".test.docker.io". But still maintain their second-level domain as a
+// true second-level domain, i.e. "test.docker.io" would be converted to ".docker.io".
+func hostSuffix(host string) string {
+	idx := strings.LastIndex(host, ".")
+
+	if idx < 0 {
+		return "." + host
+	}
+
+	tenantIdx := strings.LastIndex(host[:idx], ".")
+
+	// All 2 letter TLD's are country-code TLD's
+	// Only country-code domain registrars allow for second-level hierarchy TLD's, ex. ".co.uk"
+	tld := host[idx:]
+	portIdx := strings.LastIndex(tld, ":")
+
+	if portIdx > 0 {
+		tld = tld[:portIdx]
+	}
+
+	if tenantIdx > 0 && len(tld) == 3 {
+		secondLevelDomainIdx := strings.LastIndex(host[:idx][:tenantIdx], ".")
+
+		if secondLevelDomainIdx > 0 {
+			// This is a country-code TLD and is likely using a second-level hierarchy TLD
+			return host[:idx][:tenantIdx][secondLevelDomainIdx:] + host[:idx][tenantIdx:] + host[idx:]
+		}
+
+		// .io is a special-case country-code TLD used by pretty much every registry vendor, docker.io, quay.io, azurecr.io, ghcr.io, gcr.io, etc
+		// ECR, follows this pattern, {aws_account_id}.dkr.ecr.{region}.amazonaws.com, which will be handled by the normal logic
+		// In the sovereign-cloud case, .us and .cn are special-cases as well for registries that support these TLDs
+		if tld == ".io" || tld == ".us" || tld == ".cn" {
+			return host[:idx][tenantIdx:] + host[idx:]
+		}
+	} else if tenantIdx > 0 {
+		return host[:idx][tenantIdx:] + host[idx:]
+	}
+
+	return "." + host
+}
+
 func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 	b, err := os.ReadFile(filepath.Join(hostsDir, "hosts.toml"))
 	if err != nil && !os.IsNotExist(err) {

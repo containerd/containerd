@@ -17,26 +17,13 @@
 package config
 
 import (
-	"crypto/x509"
-	"path/filepath"
-	"strings"
+	"testing"
 )
 
-func hostPaths(root, host string) (hosts []string) {
-	ch := hostDirectory(host)
-	if ch != host {
-		hosts = append(hosts, filepath.Join(root, strings.Replace(ch, ":", "", -1)))
+func compareLists(t *testing.T, result, expected []string) {
+	for i := 0; i < len(expected); i++ {
+		if result[i] != expected[i] {
+			t.Errorf("Unexpected host path result [%s] != [%s]", result[i], expected[i])
+		}
 	}
-
-	hosts = append(hosts,
-		filepath.Join(root, strings.Replace(host, ":", "", -1)),
-		filepath.Join(root, strings.Replace(hostDirectory(hostSuffix(host)), ":", "", -1)),
-		filepath.Join(root, "_default"),
-	)
-
-	return
-}
-
-func rootSystemPool() (*x509.CertPool, error) {
-	return x509.NewCertPool(), nil
 }
