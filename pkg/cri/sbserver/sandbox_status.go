@@ -43,7 +43,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
-	statusResponse, err := controller.Status(ctx, r.GetPodSandboxId(), r.GetVerbose())
+	statusResponse, err := controller.Status(ctx, sandbox.ID, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to query controller status: %w", err)
 	}
