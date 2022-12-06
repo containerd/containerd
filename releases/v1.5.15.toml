@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.14"
+
+pre_release = false
+
+preface = """\
+The fifteenth patch release for containerd 1.5 includes various fixes including a
+fix for a long time issue with CNI resource leakage.
+
+### Notable Updates
+
+* **Fix CNI leaks by changing pod network setup order in CRI plugin** ([#7464](https://github.com/containerd/containerd/pull/7464))
+* **Fix request retry on push** ([#7479](https://github.com/containerd/containerd/pull/7479))
+* **Fix lease labels unexpectedly overwriting expiration** ([#7746](https://github.com/containerd/containerd/pull/7746))
+
+See the changelog for complete list of changes"""
