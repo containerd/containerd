@@ -197,7 +197,10 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 //
 // Base handlers can be provided which will be called before any push specific
 // handlers.
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Store, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
+//
+// If the passed in content.Provider is also a content.Manager then this will
+// also annotate the distribution sources in the manager.
+func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
 
 	var m sync.Mutex
 	manifestStack := []ocispec.Descriptor{}
@@ -219,13 +222,14 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 
 	platformFilterhandler := images.FilterPlatforms(images.ChildrenHandler(store), platform)
 
-	annotateHandler := annotateDistributionSourceHandler(platformFilterhandler, store)
+	var handler images.Handler
+	if m, ok := store.(content.Manager); ok {
+		annotateHandler := annotateDistributionSourceHandler(platformFilterhandler, m)
+		handler = images.Handlers(annotateHandler, filterHandler, pushHandler)
+	} else {
+		handler = images.Handlers(platformFilterhandler, filterHandler, pushHandler)
+	}
 
-	var handler images.Handler = images.Handlers(
-		annotateHandler,
-		filterHandler,
-		pushHandler,
-	)
 	if wrapper != nil {
 		handler = wrapper(handler)
 	}
