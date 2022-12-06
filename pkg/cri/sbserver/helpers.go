@@ -348,6 +348,16 @@ func generateRuntimeOptions(r criconfig.Runtime, c criconfig.Config) (interface{
 	if err := optionsTree.Unmarshal(options); err != nil {
 		return nil, err
 	}
+
+	// For generic configuration, if no config path specified (preserving old behavior), pass
+	// the whole TOML configuration section to the runtime.
+	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
+		runtimeOpts.ConfigBody, err = optionsTree.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %v", r.Type, err)
+		}
+	}
+
 	return options, nil
 }
 
