@@ -1,5 +1,4 @@
 //go:build go1.17 && !windows && !darwin
-// +build go1.17,!windows,!darwin
 
 /*
    Copyright The containerd Authors.
