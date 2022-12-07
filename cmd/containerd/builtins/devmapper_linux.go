@@ -1,5 +1,4 @@
 //go:build !no_devmapper
-// +build !no_devmapper
 
 /*
    Copyright The containerd Authors.
