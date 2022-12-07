@@ -817,19 +817,11 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 	return restorePath, nil
 }
 
-// checkRuntime returns true if the current runtime matches the expected
-// runtime. Providing various parts of the runtime schema will match those
-// parts of the expected runtime
-func checkRuntime(current, expected string) bool {
-	cp := strings.Split(current, ".")
-	l := len(cp)
-	for i, p := range strings.Split(expected, ".") {
-		if i > l {
-			return false
-		}
-		if p != cp[i] {
-			return false
-		}
+// checkRuntime returns true if the current runtime matches the expected prefix.
+// It is a copy of [github.com/containerd/containerd.CheckRuntime].
+func checkRuntime(current, prefix string) bool {
+	if current == "" || prefix == "" {
+		return false
 	}
-	return true
+	return current == prefix || strings.HasPrefix(current, strings.TrimSuffix(prefix, ".")+".")
 }
