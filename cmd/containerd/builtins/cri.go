@@ -1,3 +1,5 @@
+//go:build !no_cri
+
 /*
    Copyright The containerd Authors.
 
@@ -14,26 +16,8 @@
    limitations under the License.
 */
 
-package main
+package builtins
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/containerd/containerd/cmd/containerd/command"
-	"github.com/containerd/containerd/pkg/seed"
-
-	_ "github.com/containerd/containerd/cmd/containerd/builtins"
+	_ "github.com/containerd/containerd/pkg/cri"
 )
-
-func init() {
-	seed.WithTimeAndRand()
-}
-
-func main() {
-	app := command.App()
-	if err := app.Run(os.Args); err != nil {
-		fmt.Fprintf(os.Stderr, "containerd: %s\n", err)
-		os.Exit(1)
-	}
-}
