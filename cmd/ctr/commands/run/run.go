@@ -42,27 +42,11 @@ var Command = cli.Command{
 			Usage: "remove the container after running",
 		},
 		cli.BoolFlag{
-			Name:  "null-io",
-			Usage: "send all IO to /dev/null",
-		},
-		cli.StringFlag{
-			Name:  "log-uri",
-			Usage: "log uri",
-		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution",
-		},
-		cli.StringFlag{
-			Name:  "fifo-dir",
-			Usage: "directory used for storing IO FIFOs",
-		},
-		cli.BoolFlag{
 			Name:  "cni",
 			Usage: "enable cni networking for the container",
 		},
-	}, append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
-		commands.ContainerFlags...)...),
+	}, append(append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+		commands.ContainerFlags...), commands.TaskFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error

@@ -34,13 +34,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var platformStartFlags = []cli.Flag{
-	cli.BoolFlag{
-		Name:  "no-pivot",
-		Usage: "disable use of pivot-root (linux only)",
-	},
-}
-
 // HandleConsoleResize resizes the console
 func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console

@@ -153,10 +153,6 @@ var (
 			Name:  "with-ns",
 			Usage: "specify existing Linux namespaces to join at container runtime (format '<nstype>:<path>')",
 		},
-		cli.StringFlag{
-			Name:  "pid-file",
-			Usage: "file path to write the task's pid",
-		},
 		cli.IntSliceFlag{
 			Name:  "gpus",
 			Usage: "add gpus to the container",
@@ -220,6 +216,30 @@ var (
 		cli.StringFlag{
 			Name:  "platform",
 			Usage: "run image for specific platform",
+		},
+	}
+
+	// TaskFlags are cli flags specifying task options
+	TaskFlags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "pid-file",
+			Usage: "file path to write the task's pid",
+		},
+		cli.BoolFlag{
+			Name:  "null-io",
+			Usage: "send all IO to /dev/null",
+		},
+		cli.StringFlag{
+			Name:  "log-uri",
+			Usage: "log uri",
+		},
+		cli.BoolFlag{
+			Name:  "detach,d",
+			Usage: "detach from the task after it has started execution",
+		},
+		cli.StringFlag{
+			Name:  "fifo-dir",
+			Usage: "directory used for storing IO FIFOs",
 		},
 	}
 )

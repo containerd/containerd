@@ -31,28 +31,7 @@ var startCommand = cli.Command{
 	Name:      "start",
 	Usage:     "start a container that has been created",
 	ArgsUsage: "CONTAINER",
-	Flags: append(platformStartFlags, []cli.Flag{
-		cli.BoolFlag{
-			Name:  "null-io",
-			Usage: "send all IO to /dev/null",
-		},
-		cli.StringFlag{
-			Name:  "log-uri",
-			Usage: "log uri",
-		},
-		cli.StringFlag{
-			Name:  "fifo-dir",
-			Usage: "directory used for storing IO FIFOs",
-		},
-		cli.StringFlag{
-			Name:  "pid-file",
-			Usage: "file path to write the task's pid",
-		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution",
-		},
-	}...),
+	Flags:     commands.TaskFlags,
 	Action: func(context *cli.Context) error {
 		var (
 			err    error

@@ -83,5 +83,13 @@ func init() {
 		cli.StringFlag{
 			Name:  "gidmap",
 			Usage: "run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
-		})
+		},
+	)
+
+	TaskFlags = append(TaskFlags,
+		cli.BoolFlag{
+			Name:  "no-pivot",
+			Usage: "disable use of pivot-root (linux only)",
+		},
+	)
 }

@@ -29,8 +29,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var platformStartFlags = []cli.Flag{}
-
 // HandleConsoleResize resizes the console
 func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console
