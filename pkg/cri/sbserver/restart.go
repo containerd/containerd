@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl"
@@ -92,14 +93,39 @@ func (c *criService) recover(ctx context.Context) error {
 		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
 			continue
 		}
+
 		metadata := sandboxstore.Metadata{}
 		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
 		}
-		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: sandboxstore.StateUnknown})
+
+		var (
+			state      = sandboxstore.StateUnknown
+			controller = c.sandboxControllers[criconfig.ModeShim]
+		)
+
+		status, err := controller.Status(ctx, sbx.ID, false)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to recover sandbox state")
+			if errdefs.IsNotFound(err) {
+				state = sandboxstore.StateNotReady
+			}
+		} else {
+			if code, ok := runtime.PodSandboxState_value[status.State]; ok {
+				if code == int32(runtime.PodSandboxState_SANDBOX_READY) {
+					state = sandboxstore.StateReady
+				} else if code == int32(runtime.PodSandboxState_SANDBOX_NOTREADY) {
+					state = sandboxstore.StateNotReady
+				}
+			}
+		}
+
+		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
+
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
+
 		if err := c.sandboxStore.Add(sb); err != nil {
 			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
 		}
@@ -465,6 +491,9 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 		return nil
 	}
 	if goruntime.GOOS == "windows" && meta.Config.GetWindows().GetSecurityContext().GetHostProcess() {
+		return nil
+	}
+	if goruntime.GOOS == "darwin" {
 		return nil
 	}
 	return netns.LoadNetNS(meta.NetNSPath)

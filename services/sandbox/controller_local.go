@@ -156,7 +156,7 @@ func (c *controllerLocal) Stop(ctx context.Context, in *api.ControllerStopReques
 
 func (c *controllerLocal) Delete(ctx context.Context, in *api.ControllerDeleteRequest, opts ...grpc.CallOption) (*api.ControllerDeleteResponse, error) {
 	if err := c.shims.Delete(ctx, in.SandboxID); err != nil {
-		return nil, fmt.Errorf("failed to delete sandbox shim: %w", err)
+		return nil, errdefs.ToGRPC(fmt.Errorf("failed to delete sandbox shim: %w", err))
 	}
 
 	return &api.ControllerDeleteResponse{}, nil
@@ -185,7 +185,7 @@ func (c *controllerLocal) Wait(ctx context.Context, in *api.ControllerWaitReques
 func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRequest, opts ...grpc.CallOption) (*api.ControllerStatusResponse, error) {
 	svc, err := c.getSandbox(ctx, in.SandboxID)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.ToGRPC(err)
 	}
 
 	resp, err := svc.SandboxStatus(ctx, &runtimeAPI.SandboxStatusRequest{SandboxID: in.SandboxID})
