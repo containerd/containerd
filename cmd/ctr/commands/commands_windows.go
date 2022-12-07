@@ -33,8 +33,13 @@ func init() {
 		cli.Uint64Flag{
 			Name:  "cpu-max",
 			Usage: "The number of processor cycles threads in a container can use per 10,000 cycles. Set to a percentage times 100. Between 1 and 10,000",
-		}, cli.StringSliceFlag{
+		},
+		cli.StringSliceFlag{
 			Name:  "device",
 			Usage: "identifier of a device to add to the container  (e.g. class://5B45201D-F2F2-4F3B-85BB-30FF1F953599)",
+		},
+		cli.BoolFlag{
+			Name:  "isolated",
+			Usage: "run the container with vm isolation",
 		})
 }
