@@ -24,33 +24,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
 )
-
-func getNewTaskOpts(context *cli.Context) []containerd.NewTaskOpts {
-	var (
-		tOpts []containerd.NewTaskOpts
-	)
-	if context.Bool("no-pivot") {
-		tOpts = append(tOpts, containerd.WithNoPivotRoot)
-	}
-	if uidmap := context.String("uidmap"); uidmap != "" {
-		uidMap, err := parseIDMapping(uidmap)
-		if err != nil {
-			logrus.WithError(err).Warn("unable to parse uidmap; defaulting to uid 0 IO ownership")
-		}
-		tOpts = append(tOpts, containerd.WithUIDOwner(uidMap.HostID))
-	}
-	if gidmap := context.String("gidmap"); gidmap != "" {
-		gidMap, err := parseIDMapping(gidmap)
-		if err != nil {
-			logrus.WithError(err).Warn("unable to parse gidmap; defaulting to gid 0 IO ownership")
-		}
-		tOpts = append(tOpts, containerd.WithGIDOwner(gidMap.HostID))
-	}
-	return tOpts
-}
 
 func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
 	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil

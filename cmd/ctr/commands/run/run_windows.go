@@ -20,12 +20,7 @@ import (
 	gocontext "context"
 
 	"github.com/containerd/containerd"
-	"github.com/urfave/cli"
 )
-
-func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
-	return nil
-}
 
 func getNetNSPath(ctx gocontext.Context, t containerd.Task) (string, error) {
 	s, err := t.Spec(ctx)

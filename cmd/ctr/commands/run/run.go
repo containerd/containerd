@@ -102,7 +102,7 @@ var Command = cli.Command{
 			}
 		}
 
-		opts := getNewTaskOpts(context)
+		opts := tasks.GetNewTaskOpts(context)
 		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), con, context.Bool("null-io"), context.String("log-uri"), ioOpts, opts...)
 		if err != nil {
