@@ -234,6 +234,13 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 
 	EnsureImageExists(t, pauseImage)
 
+	expectedSwapLimit := func(memoryLimit int64) *int64 {
+		if cgroups.Mode() == cgroups.Unified {
+			memoryLimit = 0
+		}
+		return &memoryLimit
+	}
+
 	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(
 		"container",
@@ -251,6 +258,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err := container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 200*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(200*1024*1024))
 
 	t.Log("Update container memory limit after created")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -262,6 +270,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 400*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(400*1024*1024))
 
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
@@ -274,6 +283,8 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	stat, err := cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(400*1024*1024), stat.Memory.Usage.Limit)
+	swapLimit := getCgroupSwapLimitForTask(t, task)
+	assert.Equal(t, uint64(400*1024*1024), swapLimit)
 
 	t.Log("Update container memory limit after started")
 	err = runtimeService.UpdateContainerResources(cn, &runtime.LinuxContainerResources{
@@ -285,11 +296,14 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	spec, err = container.Spec(context.Background())
 	require.NoError(t, err)
 	checkMemoryLimit(t, spec, 800*1024*1024)
+	checkMemorySwapLimit(t, spec, expectedSwapLimit(800*1024*1024))
 
 	t.Log("Check memory limit in cgroup")
 	stat, err = cgroup.Stat(cgroups.IgnoreNotExist)
 	require.NoError(t, err)
 	assert.Equal(t, uint64(800*1024*1024), stat.Memory.Usage.Limit)
+	swapLimit = getCgroupSwapLimitForTask(t, task)
+	assert.Equal(t, uint64(800*1024*1024), swapLimit)
 }
 
 func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
