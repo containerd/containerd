@@ -448,6 +448,10 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		}
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
+			// swap/memory limit should be equal to prevent container from swapping by default
+			if swapLimit == 0 {
+				s.Linux.Resources.Memory.Swap = &limit
+			}
 		}
 		if swapLimit != 0 {
 			s.Linux.Resources.Memory.Swap = &swapLimit
