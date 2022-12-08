@@ -26,7 +26,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/hashicorp/go-multierror"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -102,6 +104,51 @@ func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (con
 	ctx = context.WithValue(ctx, transactionKey{}, tx)
 
 	return ctx, tx, nil
+}
+
+// TransactionCallback represents a callback to be invoked while under a metastore transaction.
+type TransactionCallback func(ctx context.Context) error
+
+// WithTransaction is a convenience method to run a function `fn` while holding a meta store transaction.
+// If the callback `fn` returns an error or the transaction is not writable, the database transaction will be discarded.
+func (ms *MetaStore) WithTransaction(ctx context.Context, writable bool, fn TransactionCallback) error {
+	ctx, trans, err := ms.TransactionContext(ctx, writable)
+	if err != nil {
+		return err
+	}
+
+	var result *multierror.Error
+	err = fn(ctx)
+	if err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	// Always rollback if transaction is not writable
+	if err != nil || !writable {
+		if terr := trans.Rollback(); terr != nil {
+			log.G(ctx).WithError(terr).Error("failed to rollback transaction")
+
+			result = multierror.Append(result, fmt.Errorf("rollback failed: %w", terr))
+		}
+	} else {
+		if terr := trans.Commit(); terr != nil {
+			log.G(ctx).WithError(terr).Error("failed to commit transaction")
+
+			result = multierror.Append(result, fmt.Errorf("commit failed: %w", terr))
+		}
+	}
+
+	if err := result.ErrorOrNil(); err != nil {
+		log.G(ctx).WithError(err).Debug("snapshotter error")
+
+		// Unwrap if just one error
+		if len(result.Errors) == 1 {
+			return result.Errors[0]
+		}
+		return err
+	}
+
+	return nil
 }
 
 // Close closes the metastore and any underlying database connections
