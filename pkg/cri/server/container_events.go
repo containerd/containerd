@@ -24,8 +24,6 @@ func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.R
 	// TODO (https://github.com/containerd/containerd/issues/7318):
 	// replace with a real implementation that broadcasts containerEventsChan
 	// to all subscribers.
-	// TODO (https://github.com/containerd/containerd/issues/7658): Add Sandbox
-	// server support.
 	for event := range c.containerEventsChan {
 		if err := s.Send(&event); err != nil {
 			return err

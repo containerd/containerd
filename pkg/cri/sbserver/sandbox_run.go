@@ -286,6 +286,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
 
+	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
+	// Note that this has to be done after sandboxStore.Add() because we need to get
+	// SandboxStatus from the store and include it in the event.
+	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
+
 	// start the monitor after adding sandbox into the store, this ensures
 	// that sandbox is in the store, when event monitor receives the TaskExit event.
 	//
@@ -305,6 +310,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			c.eventMonitor.backOff.enBackOff(id, e)
 		}
 	}()
+
+	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
+	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 

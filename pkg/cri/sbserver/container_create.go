@@ -283,6 +283,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to add container %q into store: %w", id, err)
 	}
 
+	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
+
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)
 
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
