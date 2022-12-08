@@ -92,6 +92,10 @@ func outputConfig(cfg *srvconfig.Config) error {
 	return err
 }
 
+func defaultConfig() *srvconfig.Config {
+	return platformAgnosticDefaultConfig()
+}
+
 var configCommand = cli.Command{
 	Name:  "config",
 	Usage: "information on the containerd config",
