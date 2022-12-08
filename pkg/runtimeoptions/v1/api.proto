@@ -11,4 +11,7 @@ message Options {
 	// ConfigPath specifies the filesystem location of the config file
 	// used by the runtime.
 	string config_path = 2;
+	// Blob specifies an in-memory TOML blob passed from containerd's configuration section
+	// for this runtime. This will be used if config_path is not specified.
+	bytes config_body = 3;
 }
