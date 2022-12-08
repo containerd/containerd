@@ -233,3 +233,211 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
+
+func TestLoadConfigDropIns(t *testing.T) {
+	data1 := `
+version = 2
+root = "/var/lib/containerd"
+state = "/run/containerd/state-main"
+`
+
+	data2 := `
+disabled_plugins = ["io.containerd.v1.xyz"]
+state = "/run/containerd/state-2"
+`
+	data3 := `
+state = "/run/containerd/state-3"
+`
+	data4 := `
+state = "/run/containerd/state-4"
+`
+
+	tempDir := t.TempDir()
+	err := os.MkdirAll(filepath.Join(tempDir, "config.d"), 0755)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "config.d", "80-data2.toml"), []byte(data2), 0600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "config.d", "90-data3.toml"), []byte(data3), 0600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "config.d", "10-data4.toml"), []byte(data4), 0600)
+	assert.NoError(t, err)
+
+	var out Config
+	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, out.Version)
+	assert.Equal(t, "/var/lib/containerd", out.Root)
+	assert.Equal(t, "/run/containerd/state-3", out.State)
+	assert.Equal(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
+}
+
+func TestLoadConfigWithImportsAndDropIns(t *testing.T) {
+	data1 := `
+version = 2
+root = "/var/lib/containerd"
+imports = ["data2.toml"]
+`
+
+	data2 := `
+disabled_plugins = ["io.containerd.v1.xyz"]
+`
+
+	data3 := `
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  snapshotter = "overlayfs"
+`
+
+	tempDir := t.TempDir()
+	err := os.MkdirAll(filepath.Join(tempDir, "config.d"), 0755)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
+	assert.NoError(t, err)
+
+	err = os.WriteFile(filepath.Join(tempDir, "config.d", "data3.toml"), []byte(data3), 0600)
+	assert.NoError(t, err)
+
+	var out Config
+	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, out.Version)
+	assert.Equal(t, "/var/lib/containerd", out.Root)
+	assert.Equal(t, []string{"io.containerd.v1.xyz"}, out.DisabledPlugins)
+
+	assert.Equal(t, 1, len(out.Plugins))
+	tree, ok := out.Plugins["io.containerd.grpc.v1.cri"]
+	assert.Equal(t, true, ok)
+
+	assert.Equal(t, true, tree.Has("containerd.snapshotter"))
+	assert.Equal(t, "overlayfs", tree.Get("containerd.snapshotter"))
+}
+
+func TestLoadConfigWithImportsAndDropInsAndCircularReference(t *testing.T) {
+	type file struct {
+		data     string
+		fileName string
+	}
+
+	tempDir := t.TempDir()
+	err := os.MkdirAll(filepath.Join(tempDir, "config.d"), 0755)
+	assert.NoError(t, err)
+
+	files := []file{
+		{
+			fileName: filepath.Join(tempDir, "config.toml"),
+			data: `
+version = 2
+root = "/var/lib/containerd"
+state = "/run/containerd/state-main"
+imports = ["import-2.toml", "import-1.toml"]
+`,
+		},
+		{
+			fileName: filepath.Join(tempDir, "import-1.toml"),
+			data: `
+state = "/run/containerd/state-import-1"
+`,
+		},
+		{
+			fileName: filepath.Join(tempDir, "import-2.toml"),
+			data: `
+state = "/run/containerd/state-import-2"
+`,
+		},
+		{
+			fileName: filepath.Join(tempDir, "config.d", "dropin-1.toml"),
+			data: `
+state = "/run/containerd/state-dropin-1"
+imports = ["../import-2.toml"]
+`,
+		},
+	}
+
+	importedFiles := make([]string, 0)
+	for i := range files {
+		err = os.WriteFile(files[i].fileName, []byte(files[i].data), 0600)
+		assert.NoError(t, err)
+		importedFiles = append(importedFiles, files[i].fileName)
+	}
+
+	var out Config
+	err = LoadConfig(filepath.Join(tempDir, "config.toml"), &out)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 2, out.Version)
+	assert.Equal(t, "/var/lib/containerd", out.Root)
+	assert.Equal(t, "/run/containerd/state-dropin-1", out.State)
+
+	sort.Strings(out.Imports)
+	sort.Strings(importedFiles)
+	assert.Equal(t, importedFiles, out.Imports)
+}
+
+func TestResolveDropIns(t *testing.T) {
+
+	type file struct {
+		fileName string
+		data     string
+		isDropIn bool
+	}
+
+	tempDir := t.TempDir()
+	err := os.MkdirAll(filepath.Join(tempDir, "config.d"), 0755)
+	assert.NoError(t, err)
+
+	files := []file{
+		{
+			fileName: filepath.Join(tempDir, "config.toml"),
+			isDropIn: true,
+			data: `
+root = "/var/lib/containerd-1"
+`,
+		},
+		{
+			fileName: filepath.Join(tempDir, "config.d", "10-plugin.toml"),
+			isDropIn: true,
+			data: `
+root = "/var/lib/containerd-2"
+`,
+		},
+		{
+			fileName: filepath.Join(tempDir, "config.d", "20-plugin.toml.bak"),
+			isDropIn: false,
+			data: `
+root = "/var/lib/containerd-3"
+`,
+		}, {
+			fileName: filepath.Join(tempDir, "config.d", "30-plugin.txt"),
+			isDropIn: false,
+			data: `
+root = "/var/lib/containerd-4"
+`,
+		}}
+
+	for i := range files {
+		err = os.WriteFile(files[i].fileName, []byte(files[i].data), 0600)
+		assert.NoError(t, err)
+	}
+
+	var out Config
+	err = LoadConfig(filepath.Join(tempDir, "config.toml"), &out)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "/var/lib/containerd-2", out.Root)
+	sort.Strings(out.Imports)
+	assert.Equal(t, []string{
+		filepath.Join(tempDir, "config.d", "10-plugin.toml"),
+		filepath.Join(tempDir, "config.toml"),
+	}, out.Imports)
+}

@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/imdario/mergo"
@@ -195,6 +196,16 @@ func LoadConfig(path string, out *Config) error {
 		pending = []string{path}
 	)
 
+	// dropin configs are under config.d which in the same directory
+	// with the main config file.
+	dropIns, err := resolveDropIns(path)
+	if err != nil {
+		return err
+	}
+
+	// flag used to control wether inject dropin configs into imports
+	mainLoop := true
+
 	for len(pending) > 0 {
 		path, pending = pending[0], pending[1:]
 
@@ -217,6 +228,13 @@ func LoadConfig(path string, out *Config) error {
 			return err
 		}
 
+		if mainLoop {
+			mainLoop = false
+			// not care about that one file will in the both the `imports` and `dropIns`
+			// the `loaded` map will ensure that the file will not be loaded twice
+			imports = append(imports, dropIns...)
+		}
+
 		loaded[path] = true
 		pending = append(pending, imports...)
 	}
@@ -227,7 +245,7 @@ func LoadConfig(path string, out *Config) error {
 		out.Imports = append(out.Imports, path)
 	}
 
-	err := out.ValidateV2()
+	err = out.ValidateV2()
 	if err != nil {
 		return fmt.Errorf("failed to load TOML from %s: %w", path, err)
 	}
@@ -248,6 +266,25 @@ func loadConfigFile(path string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+// resolveDropIns resolves dropins at the same directory
+// to absolute paths list ordered by the file name, for example:
+//
+//	/path/to/config.d/10-plugin1.toml
+//	/path/to/config.d/20-plugin2.toml
+func resolveDropIns(parent string) ([]string, error) {
+	configDir := filepath.Dir(parent)
+	dropInDir := filepath.Join(configDir, "config.d")
+
+	files, err := filepath.Glob(filepath.Join(dropInDir, "*.toml"))
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Strings(files)
+
+	return files, nil
 }
 
 // resolveImports resolves import strings list to absolute paths list:
