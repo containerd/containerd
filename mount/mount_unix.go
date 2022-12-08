@@ -1,5 +1,4 @@
 //go:build darwin || openbsd
-// +build darwin openbsd
 
 /*
    Copyright The containerd Authors.

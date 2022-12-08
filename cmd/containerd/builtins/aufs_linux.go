@@ -1,5 +1,4 @@
 //go:build !no_aufs
-// +build !no_aufs
 
 /*
    Copyright The containerd Authors.

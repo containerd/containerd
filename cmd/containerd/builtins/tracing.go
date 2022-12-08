@@ -1,5 +1,4 @@
 //go:build !no_tracing
-// +build !no_tracing
 
 /*
    Copyright The containerd Authors.

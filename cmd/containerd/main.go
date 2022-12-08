@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/pkg/seed"
 
 	_ "github.com/containerd/containerd/cmd/containerd/builtins"
-	_ "github.com/containerd/containerd/pkg/cri"
 )
 
 func init() {

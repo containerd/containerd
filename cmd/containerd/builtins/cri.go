@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !no_cri
 
 /*
    Copyright The containerd Authors.
@@ -16,15 +16,8 @@
    limitations under the License.
 */
 
-package platforms
+package builtins
 
 import (
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	_ "github.com/containerd/containerd/pkg/cri"
 )
-
-// NewMatcher returns the default Matcher for containerd
-func newDefaultMatcher(platform specs.Platform) Matcher {
-	return &matcher{
-		Platform: Normalize(platform),
-	}
-}
