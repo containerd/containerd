@@ -23,7 +23,8 @@ task:
     HOME: /root
     matrix:
       BOX: fedora/37-cloud-base
-      BOX: rockylinux/8
+      # v7.0.0 does not boot. v6.0.0 was not released.
+      BOX: rockylinux/8@5.0.0
   install_libvirt_vagrant_script: |
     apt-get update
     apt-get install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
