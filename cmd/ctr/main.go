@@ -17,10 +17,12 @@
 package main
 
 import (
+	"crypto"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/cmd/ctr/app"
+	"github.com/containerd/containerd/pkg/hasher"
 	"github.com/containerd/containerd/pkg/seed"
 	"github.com/urfave/cli"
 )
@@ -29,6 +31,7 @@ var pluginCmds = []cli.Command{}
 
 func init() {
 	seed.WithTimeAndRand()
+	crypto.RegisterHash(crypto.SHA256, hasher.NewSHA256)
 }
 
 func main() {
