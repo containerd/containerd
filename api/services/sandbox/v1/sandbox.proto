@@ -90,7 +90,7 @@ service Controller {
 	rpc Stop(ControllerStopRequest) returns (ControllerStopResponse);
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
-	rpc Delete(ControllerDeleteRequest) returns (ControllerDeleteResponse);
+	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
 }
 
 message ControllerCreateRequest {
@@ -145,8 +145,8 @@ message ControllerStatusResponse {
 	google.protobuf.Any extra = 7;
 }
 
-message ControllerDeleteRequest {
+message ControllerShutdownRequest {
 	string sandbox_id = 1;
 }
 
-message ControllerDeleteResponse {}
+message ControllerShutdownResponse {}
