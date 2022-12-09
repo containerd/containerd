@@ -30,7 +30,7 @@ import (
 
 const (
 	drainContainerEventChannelTimeout = 2 * time.Second
-	readContainerEventChannelTimeout  = 500 * time.Millisecond
+	readContainerEventChannelTimeout  = 10 * time.Second
 )
 
 func TestContainerEvents(t *testing.T) {
