@@ -47,6 +47,9 @@ service Sandbox {
 
 	// PingSandbox is a lightweight API call to check whether sandbox alive.
 	rpc PingSandbox(PingRequest) returns (PingResponse);
+
+	// ShutdownSandbox must shutdown shim instance.
+	rpc ShutdownSandbox(ShutdownSandboxRequest) returns (ShutdownSandboxResponse);
 }
 
 message CreateSandboxRequest {
@@ -111,3 +114,9 @@ message PingRequest {
 }
 
 message PingResponse {}
+
+message ShutdownSandboxRequest {
+	string sandbox_id = 1;
+}
+
+message ShutdownSandboxResponse {}
