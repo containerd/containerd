@@ -296,6 +296,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err := c.containerStore.Add(container); err != nil {
 		return nil, fmt.Errorf("failed to add container %q into store: %w", id, err)
 	}
+	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
 
 	if c.nri.isEnabled() {
 		err = c.nri.postCreateContainer(ctx, &sandbox, &container)

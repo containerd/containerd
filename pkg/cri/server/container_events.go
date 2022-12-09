@@ -17,11 +17,17 @@
 package server
 
 import (
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetContainerEvents not implemented")
+	// TODO (https://github.com/containerd/containerd/issues/7318):
+	// replace with a real implementation that broadcasts containerEventsChan
+	// to all subscribers.
+	for event := range c.containerEventsChan {
+		if err := s.Send(&event); err != nil {
+			return err
+		}
+	}
+	return nil
 }

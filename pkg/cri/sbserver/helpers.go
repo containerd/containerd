@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -517,4 +518,68 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 		// TODO: Figure out how to get RootfsSizeInBytes
 	}
 	return status
+}
+
+func (c *criService) generateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
+	podSandboxStatus, err := c.getPodSandboxStatus(ctx, sandboxID)
+	if err != nil {
+		// TODO(https://github.com/containerd/containerd/issues/7785):
+		// Do not skip events with nil PodSandboxStatus.
+		logrus.Errorf("Failed to get podSandbox status for container event for sandboxID %q: %v. Skipping sending the event.", sandboxID, err)
+		return
+	}
+	containerStatuses, err := c.getContainerStatuses(ctx, sandboxID)
+	if err != nil {
+		logrus.Errorf("Failed to get container statuses for container event for sandboxID %q: %v", sandboxID, err)
+	}
+
+	event := runtime.ContainerEventResponse{
+		ContainerId:        containerID,
+		ContainerEventType: eventType,
+		CreatedAt:          time.Now().UnixNano(),
+		PodSandboxStatus:   podSandboxStatus,
+		ContainersStatuses: containerStatuses,
+	}
+
+	// TODO(ruiwen-zhao): write events to a cache, storage, or increase the size of the channel
+	select {
+	case c.containerEventsChan <- event:
+	default:
+		logrus.Debugf("containerEventsChan is full, discarding event %+v", event)
+	}
+}
+
+func (c *criService) getPodSandboxStatus(ctx context.Context, podSandboxID string) (*runtime.PodSandboxStatus, error) {
+	request := &runtime.PodSandboxStatusRequest{PodSandboxId: podSandboxID}
+	response, err := c.PodSandboxStatus(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return response.GetStatus(), nil
+}
+
+func (c *criService) getContainerStatuses(ctx context.Context, podSandboxID string) ([]*runtime.ContainerStatus, error) {
+	response, err := c.ListContainers(ctx, &runtime.ListContainersRequest{
+		Filter: &runtime.ContainerFilter{
+			PodSandboxId: podSandboxID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	containerStatuses := []*runtime.ContainerStatus{}
+	for _, container := range response.Containers {
+		statusResp, err := c.ContainerStatus(ctx, &runtime.ContainerStatusRequest{
+			ContainerId: container.Id,
+			Verbose:     false,
+		})
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
+			return nil, err
+		}
+		containerStatuses = append(containerStatuses, statusResp.GetStatus())
+	}
+	return containerStatuses, nil
 }

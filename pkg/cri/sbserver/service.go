@@ -123,6 +123,9 @@ type criService struct {
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+	// containerEventsChan is used to capture container events and send them
+	// to the caller of GetContainerEvents.
+	containerEventsChan chan runtime.ContainerEventResponse
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -144,6 +147,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 		unpackDuplicationSuppressor: kmutex.New(),
 		sandboxControllers:          make(map[criconfig.SandboxControllerMode]sandbox.Controller),
 	}
+
+	// TODO: figure out a proper channel size.
+	c.containerEventsChan = make(chan runtime.ContainerEventResponse, 1000)
 
 	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
 		return nil, fmt.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
