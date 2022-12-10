@@ -97,10 +97,10 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
         with:
           use: true
-      - uses: crazy-max/ghaction-github-runtime@v1 # sets up needed vars for caching to github
+      - uses: crazy-max/ghaction-github-runtime@v2 # sets up needed vars for caching to github
       - name: Make
         shell: bash
         run: |
@@ -135,7 +135,7 @@ jobs:
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           path: builds
       - name: Create Release
