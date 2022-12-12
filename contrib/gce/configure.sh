@@ -104,6 +104,17 @@ if [ -f "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}" ]; then
   source "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
 fi
 
+set +x
+# GCS_BUCKET_TOKEN_METADATA is the metadata key for the GCS bucket token
+GCS_BUCKET_TOKEN_METADATA="GCS_BUCKET_TOKEN"
+# GCS_BUCKET_TOKEN should have read access to the bucket from which
+# containerd artifacts need to be downloaded
+GCS_BUCKET_TOKEN=$(fetch_metadata "${GCS_BUCKET_TOKEN_METADATA}")
+if [[ -n "${GCS_BUCKET_TOKEN}" ]]; then
+  HEADERS=(-H "Authorization: Bearer ${GCS_BUCKET_TOKEN}")
+fi
+set -x
+
 # CONTAINERD_PKG_PREFIX is the prefix of the cri-containerd tarball name.
 # By default use the release tarball with cni built in.
 pkg_prefix=${CONTAINERD_PKG_PREFIX:-"cri-containerd-cni"}
@@ -133,7 +144,7 @@ else
       | jq -r .tag_name \
       | sed "s:v::g")
   else
-    version=$(curl -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
+    version=$(set +x; curl -X GET "${HEADERS[@]}" -f --ipv4 --retry 6 --retry-delay 3 --silent --show-error \
       https://storage.googleapis.com/${deploy_path}/latest)
   fi
 fi
@@ -165,7 +176,8 @@ else
     echo "${TARBALL_GCS_NAME} is preloaded"
   else
     # Download and untar the release tar ball.
-    curl -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${TARBALL_GCS_PATH}"
+    $(set +x; curl -X GET "${HEADERS[@]}" -f --ipv4 -Lo "${TARBALL}" --connect-timeout 20 --max-time 300 --retry 6 \
+      --retry-delay 10 "${TARBALL_GCS_PATH}")
     tar xvf "${TARBALL}"
     rm -f "${TARBALL}"
   fi
