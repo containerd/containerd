@@ -82,6 +82,7 @@ func FuzzImportIndex(data []byte) int {
 		return 0
 	}
 	if shouldRequireLayoutOrManifest {
+		hasLayoutOrManifest := false
 		tr := tar.NewReader(r)
 		for {
 			hdr, err := tr.Next()
@@ -93,13 +94,12 @@ func FuzzImportIndex(data []byte) int {
 			}
 			hdrName := path.Clean(hdr.Name)
 			switch hdrName {
-			case ocispec.ImageLayoutFile:
-				break
-			case "manifest.json":
-				break
-			default:
-				return 0
+			case ocispec.ImageLayoutFile, "manifest.json":
+				hasLayoutOrManifest = true
 			}
+		}
+		if !hasLayoutOrManifest {
+			return 0
 		}
 	}
 	tmpdir, err := os.MkdirTemp("", "fuzzing-")
