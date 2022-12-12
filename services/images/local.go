@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
@@ -107,6 +108,10 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 		image = imageFromProto(req.Image)
 		resp  imagesapi.CreateImageResponse
 	)
+	if req.SourceDateEpoch != nil {
+		tm := req.SourceDateEpoch.AsTime()
+		ctx = epoch.WithSourceDateEpoch(ctx, &tm)
+	}
 	created, err := l.store.Create(ctx, image)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -138,6 +143,11 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 
 	if req.UpdateMask != nil && len(req.UpdateMask.Paths) > 0 {
 		fieldpaths = append(fieldpaths, req.UpdateMask.Paths...)
+	}
+
+	if req.SourceDateEpoch != nil {
+		tm := req.SourceDateEpoch.AsTime()
+		ctx = epoch.WithSourceDateEpoch(ctx, &tm)
 	}
 
 	updated, err := l.store.Update(ctx, image, fieldpaths...)

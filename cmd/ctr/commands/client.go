@@ -20,7 +20,9 @@ import (
 	gocontext "context"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/urfave/cli"
 )
 
@@ -41,6 +43,12 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 		ctx, cancel = gocontext.WithTimeout(ctx, timeout)
 	} else {
 		ctx, cancel = gocontext.WithCancel(ctx)
+	}
+	if tm, err := epoch.SourceDateEpoch(); err != nil {
+		log.L.WithError(err).Warn("Failed to read SOURCE_DATE_EPOCH")
+	} else if tm != nil {
+		log.L.Debugf("Using SOURCE_DATE_EPOCH: %v", tm)
+		ctx = epoch.WithSourceDateEpoch(ctx, tm)
 	}
 	return ctx, cancel
 }

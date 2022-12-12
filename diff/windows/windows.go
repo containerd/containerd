@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/opencontainers/go-digest"
@@ -176,6 +177,9 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		if err := opt(&config); err != nil {
 			return emptyDesc, err
 		}
+	}
+	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
+		config.SourceDateEpoch = tm
 	}
 
 	layers, err := mountPairToLayerStack(lower, upper)
