@@ -29,14 +29,27 @@ This API makes it easier to manage these groups of containers at a higher level 
 * **Sandbox API** ([#6703](https://github.com/containerd/containerd/pull/6703))
 * **CRI Sandbox API Implementation** ([#7228](https://github.com/containerd/containerd/pull/7228))
 
-#### Transfer Service _(in progress)_
+#### Transfer Service _(experimental)_
 
 * **Transfer Service** ([#7320](https://github.com/containerd/containerd/pull/7320))
 
-#### NRI _(in progress)_
+The transfer service provides a simple interface to transfer artifact objects between any source and destination. This allows for
+pull and push operations to be done in containerd whether requested from clients or plugins. It is experimental in this release
+to allow for further plugin development and integration into existing plugins.
+
+See the [Transfer Docs](https://github.com/containerd/containerd/blob/main/docs/transfer.md)
+
+#### NRI _(experimental)_
 
 * **Extend NRI scope** ([nri#16](https://github.com/containerd/nri/pull/16))
 * **Support for updated NRI** ([#6019](https://github.com/containerd/containerd/pull/6019))
+
+The Node Resource Interface is a common framework for plugging extensions into OCI-compatible container runtimes. It provides
+basic mechanisms for plugins to track the state of containers and to make limited changes to their configuration.
+
+This release introduces NRI v0.2.0 with an updated plugin interface to cover a wide range of use cases.
+
+See the [NRI Docs](https://github.com/containerd/containerd/blob/main/docs/NRI.md)
 
 #### Platform Support
 
@@ -86,11 +99,17 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 
 * **Support image pull progress timeout** ([#6150](https://github.com/containerd/containerd/pull/6150))
 * **Fix CRI plugin to setup pod network after creating the sandbox container** ([#5904](https://github.com/containerd/containerd/pull/5904))
+* **Pass all TOML runtime configuration options from CRI to the runtime** ([#7764](https://github.com/containerd/containerd/pull/7764))
 
 #### Other
 
 * **Support shallow content copy by adding reader option to local content reader at** ([#7414](https://github.com/containerd/containerd/pull/7414))
 * **Add NoSameOwner option when unpacking tars** ([#7386](https://github.com/containerd/containerd/pull/7386))
+* **Add `FetcherByDigest` for fetching blobs without fetching a manifest** ([#7460](https://github.com/containerd/containerd/pull/7460))
+* **Update default seccomp profile to block socket calls to AF_VSOCK** ([#7510](https://github.com/containerd/containerd/pull/7510))
+* **Replace fork on mount logic with CLONE_FS** ([#7513](https://github.com/containerd/containerd/pull/7513))
+* **Add support for default registry host configuration** ([#7607](https://github.com/containerd/containerd/pull/7607))
+* **Use github.com/minio/sha256-simd for more efficient sha256 calculation** ([#7732](https://github.com/containerd/containerd/pull/7732))
 
 See the changelog for complete list of changes"""
 
