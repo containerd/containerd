@@ -28,6 +28,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,8 +94,22 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (*runtime.PullImageResponse, error) {
+func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
 	span := tracing.SpanFromContext(ctx)
+	defer func() {
+		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
+		// for the user to configure the set of registries that they are interested in.
+		if err != nil {
+			imagePulls.WithValues("failure").Inc()
+		} else {
+			imagePulls.WithValues("success").Inc()
+		}
+	}()
+
+	inProgressImagePulls.Inc()
+	defer inProgressImagePulls.Dec()
+	startTime := time.Now()
+
 	imageRef := r.GetImage().GetImage()
 	namedRef, err := distribution.ParseDockerRef(imageRef)
 	if err != nil {
@@ -194,8 +209,12 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	}
 
-	log.G(ctx).Debugf("Pulled image %q with image id %q, repo tag %q, repo digest %q", imageRef, imageID,
-		repoTag, repoDigest)
+	size, _ := image.Size(ctx)
+	imagePullingSpeed := float64(size) / time.Since(startTime).Seconds()
+	imagePullThroughput.Observe(imagePullingSpeed)
+
+	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", imageRef, imageID,
+		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
