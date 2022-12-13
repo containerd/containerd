@@ -20,13 +20,20 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// NewMatcher returns a Windows matcher that will match on osVersionPrefix if
-// the platform is Windows otherwise use the default matcher
+// newDefaultMatcher returns an instance of the Windows matcher for the proived platform specs.
+//
+// If the reference platform is pre-RS5 (< 18.09), the default matcher compares a given
+// platforms' build number so it exactly matches the expected build number, alongside
+// the default OS type/architecture checks.
+//
+// If comparing against RS5+, which should be able to run any newer/older Windows images under
+// Hyper-V isolation, only the OS type/architecture are checked.
+//
+// https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/version-compatibility#windows-server-host-os-compatibility
+
 func newDefaultMatcher(platform specs.Platform) Matcher {
-	prefix := prefix(platform.OSVersion)
-	return windowsmatcher{
-		Platform:        platform,
-		osVersionPrefix: prefix,
+	return defaultWindowsMatcher{
+		innerPlatform: platform,
 		defaultMatcher: &matcher{
 			Platform: Normalize(platform),
 		},
