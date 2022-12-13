@@ -9,6 +9,11 @@ on:
       - main
       - 'release/**'
 
+env:
+  # Go version we currently use to build containerd across all CI.
+  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
+  GO_VERSION: '1.18.9'
+
 jobs:
   #
   # golangci-lint
@@ -20,15 +25,20 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.18.9]
-        os: [ubuntu-18.04, macos-12, windows-2019]
+        os: [ubuntu-20.04, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
+      - name: Install dependencies
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v3
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.49.0
@@ -40,15 +50,15 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -68,7 +78,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     defaults:
@@ -76,11 +86,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -104,14 +114,14 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
-      - uses: actions/checkout@v2
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
 
@@ -146,10 +156,10 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
-      - uses: actions/checkout@v2
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
       - run: |
           set -e -x
 
@@ -214,11 +224,16 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-18.04, macos-12, windows-2019, windows-2022]
-        go-version: ['1.17.13', '1.18.9']
-
+        os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
+        go-version: ["1.17.13", "1.18.9"]
     steps:
-      - uses: actions/setup-go@v2
+      - name: Install dependencies
+        if: matrix.os == 'ubuntu-20.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libbtrfs-dev
+
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -228,7 +243,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
@@ -260,15 +275,15 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           repository: Microsoft/hcsshim
           path: src/github.com/Microsoft/hcsshim
@@ -323,7 +338,7 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults Windows
@@ -332,7 +347,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -350,32 +365,28 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
+          go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
-          GOFLAGS: -modcacherw
         run: |
-          sudo apt-get install -y gperf
-          sudo -E PATH=$PATH script/setup/install-seccomp
-          sudo -E PATH=$PATH script/setup/install-runc
-          sudo -E PATH=$PATH script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
-          sudo -E PATH=$PATH script/setup/install-critools
+          sudo apt-get install -y gperf libbtrfs-dev
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
 
       - name: Install criu
         run: |
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
           sudo apt-get install -y criu
-
-      - name: Install failpoint binaries
-        run: |
-          script/setup/install-failpoint-binaries
 
       - name: Install containerd
         env:
@@ -384,7 +395,7 @@ jobs:
           make binaries GO_BUILD_FLAGS="-mod=vendor"
           sudo -E PATH=$PATH make install
 
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root-junit.xml
@@ -456,7 +467,7 @@ jobs:
           mount
           df
           losetup -l
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
@@ -473,16 +484,16 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.18.9'
-      - uses: actions/checkout@v2
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+          go-version: ${{ env.GO_VERSION }}
+      - uses: actions/checkout@v3
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: make test
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           name: TestResults MacOS
@@ -506,10 +517,10 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
@@ -551,7 +562,7 @@ jobs:
           vagrant plugin install vagrant-scp
           vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
           vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         if: always()
         with:
           # ${{ matrix.box }} cannot be used here due to character limitation
@@ -567,10 +578,10 @@ jobs:
     timeout-minutes: 45
     needs: [project, linters, protos, man]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: ~/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
