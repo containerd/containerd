@@ -70,7 +70,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  proto.Int64(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -113,7 +116,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  proto.Int64(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -151,7 +157,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  proto.Int64(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
@@ -197,7 +206,10 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
 					Resources: &runtimespec.LinuxResources{
-						Memory: &runtimespec.LinuxMemory{Limit: proto.Int64(54321)},
+						Memory: &runtimespec.LinuxMemory{
+							Limit: proto.Int64(54321),
+							Swap:  proto.Int64(54321),
+						},
 						CPU: &runtimespec.LinuxCPU{
 							Shares: proto.Uint64(4444),
 							Quota:  proto.Int64(5555),
