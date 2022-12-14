@@ -30,10 +30,10 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
+	"github.com/containerd/containerd/pkg/net/compat"
 	"github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/plugin"
 	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -98,7 +98,7 @@ type criService struct {
 	// snapshotStore stores information of all snapshots.
 	snapshotStore *snapshotstore.Store
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
-	netPlugin map[string]cni.CNI
+	netPlugin map[string]compat.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// streamServer is the streaming server serves container streaming request.
@@ -122,13 +122,16 @@ type criService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 
 	nri *nriAPI
+
+	netAPI compat.API
+
 	// containerEventsChan is used to capture container events and send them
 	// to the caller of GetContainerEvents.
 	containerEventsChan chan runtime.ContainerEventResponse
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nrip nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, nrip nri.API, netp compat.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -142,7 +145,8 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nrip nri.
 		sandboxNameIndex:            registrar.NewRegistrar(),
 		containerNameIndex:          registrar.NewRegistrar(),
 		initialized:                 atomic.NewBool(false),
-		netPlugin:                   make(map[string]cni.CNI),
+		netPlugin:                   make(map[string]compat.CNI),
+		netAPI:                      netp,
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
 

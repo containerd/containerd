@@ -19,7 +19,7 @@ package server
 import (
 	"fmt"
 
-	cni "github.com/containerd/go-cni"
+	cni "github.com/containerd/containerd/pkg/net/compat"
 )
 
 // windowsNetworkAttachCount is the minimum number of networks the PodSandbox
@@ -50,7 +50,8 @@ func (c *criService) initPlatform() error {
 		// If there are more network configs the pod will be attached to all the
 		// networks but we will only use the ip of the default network interface
 		// as the pod IP.
-		i, err := cni.New(cni.WithMinNetworkCount(windowsNetworkAttachCount),
+		i, err := newCNIAdaptor(c.netAPI, name,
+			cni.WithMinNetworkCount(windowsNetworkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
 			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
@@ -64,6 +65,6 @@ func (c *criService) initPlatform() error {
 }
 
 // cniLoadOptions returns cni load options for the windows.
-func (c *criService) cniLoadOptions() []cni.Opt {
-	return []cni.Opt{cni.WithDefaultConf}
+func (c *criService) cniLoadOptions() []cni.LoadOpt {
+	return []cni.LoadOpt{cni.WithDefaultConf}
 }

@@ -88,6 +88,8 @@ const (
 	TransferPlugin Type = "io.containerd.transfer.v1"
 	// SandboxStorePlugin implements a sandbox store
 	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
+	// NetworkPlugin implements a networks service
+	NetworkPlugin Type = "io.containerd.network.v1"
 )
 
 const (

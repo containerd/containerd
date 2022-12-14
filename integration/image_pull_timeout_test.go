@@ -471,5 +471,5 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 		RootDir:           filepath.Join(criWorkDir, "root"),
 		StateDir:          filepath.Join(criWorkDir, "state"),
 	}
-	return criserver.NewCRIService(cfg, client, nil)
+	return criserver.NewCRIService(cfg, client, nil, nil)
 }

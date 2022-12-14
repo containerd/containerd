@@ -49,6 +49,8 @@ const (
 	resourceEnd
 	// ResourceStream specifies a stream
 	ResourceStream
+	// ResourceNetwork specifies a network resource
+	ResourceNetwork
 )
 
 const (

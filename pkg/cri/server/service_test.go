@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -33,6 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/pkg/net/compat"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 	"github.com/containerd/containerd/pkg/registrar"
 )
@@ -40,6 +40,10 @@ import (
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
 	labels := label.NewStore()
+	netp := &cniAdaptor{
+		adapt: true,
+		g:     servertesting.NewFakeCNIPlugin(),
+	}
 	return &criService{
 		config:             testConfig,
 		imageFSPath:        testImageFSPath,
@@ -50,8 +54,8 @@ func newTestCRIService() *criService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels),
 		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin: map[string]cni.CNI{
-			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
+		netPlugin: map[string]compat.CNI{
+			defaultNetworkPlugin: netp,
 		},
 	}
 }

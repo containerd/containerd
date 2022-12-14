@@ -22,7 +22,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/pkg/net/compat"
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 )
@@ -36,12 +37,12 @@ type cniNetConfSyncer struct {
 
 	watcher   *fsnotify.Watcher
 	confDir   string
-	netPlugin cni.CNI
-	loadOpts  []cni.Opt
+	netPlugin compat.CNI
+	loadOpts  []compat.LoadOpt
 }
 
 // newCNINetConfSyncer creates cni network conf syncer.
-func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) (*cniNetConfSyncer, error) {
+func newCNINetConfSyncer(confDir string, netPlugin compat.CNI, loadOpts []compat.LoadOpt) (*cniNetConfSyncer, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
@@ -69,7 +70,7 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) 
 		loadOpts:  loadOpts,
 	}
 
-	if err := syncer.netPlugin.Load(syncer.loadOpts...); err != nil {
+	if err := syncer.netPlugin.Load(util.NamespacedContext(), syncer.loadOpts...); err != nil {
 		logrus.WithError(err).Error("failed to load cni during init, please check CRI plugin status before setting up network for pods")
 		syncer.updateLastStatus(err)
 	}
@@ -97,7 +98,7 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			}
 			logrus.Debugf("receiving change event from cni conf dir: %s", event)
 
-			lerr := syncer.netPlugin.Load(syncer.loadOpts...)
+			lerr := syncer.netPlugin.Load(util.NamespacedContext(), syncer.loadOpts...)
 			if lerr != nil {
 				logrus.WithError(lerr).
 					Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)

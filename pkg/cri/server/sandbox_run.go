@@ -27,7 +27,9 @@ import (
 	"strings"
 	"time"
 
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/containerd/pkg/net"
+	cni "github.com/containerd/containerd/pkg/net/compat"
+	gocni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -544,6 +546,13 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return errors.New("cni config not initialized")
 	}
 
+	// a lease for the network resources are required until the gc lables are set to the owning container
+	ctx, done, err := c.client.WithLease(ctx)
+	if err != nil {
+		return err
+	}
+	defer done(ctx)
+
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)
@@ -561,26 +570,34 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
 		return err
 	}
+
 	logDebugCNIResult(ctx, id, result)
+
+	// set the gc labels
+	if len(result.Labels) > 0 {
+		if _, err = sandbox.Container.SetLabels(ctx, result.Labels); err != nil {
+			return err
+		}
+	}
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
 		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
-		sandbox.CNIResult = result
+		sandbox.CNIResult = &result.Result
 		return nil
 	}
 	return fmt.Errorf("failed to find network info for sandbox %q", id)
 }
 
 // cniNamespaceOpts get CNI namespace options from sandbox config.
-func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.NamespaceOpts, error) {
-	opts := []cni.NamespaceOpts{
-		cni.WithLabels(toCNILabels(id, config)),
-		cni.WithCapability(annotations.PodAnnotations, config.Annotations),
+func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]net.AttachmentOpt, error) {
+	opts := []net.AttachmentOpt{
+		net.WithLabels(toCNILabels(id, config)),
+		net.WithCapability(annotations.PodAnnotations, config.Annotations),
 	}
 
 	portMappings := toCNIPortMappings(config.GetPortMappings())
 	if len(portMappings) > 0 {
-		opts = append(opts, cni.WithCapabilityPortMap(portMappings))
+		opts = append(opts, net.WithCapabilityPortMap(portMappings))
 	}
 
 	// Will return an error if the bandwidth limitation has the wrong unit
@@ -590,12 +607,12 @@ func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.Namesp
 		return nil, err
 	}
 	if bandWidth != nil {
-		opts = append(opts, cni.WithCapabilityBandWidth(*bandWidth))
+		opts = append(opts, net.WithCapabilityBandWidth(*bandWidth))
 	}
 
 	dns := toCNIDNS(config.GetDnsConfig())
 	if dns != nil {
-		opts = append(opts, cni.WithCapabilityDNS(*dns))
+		opts = append(opts, net.WithCapabilityDNS(*dns))
 	}
 
 	return opts, nil
@@ -613,7 +630,7 @@ func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string 
 }
 
 // toCNIBandWidth converts CRI annotations to CNI bandwidth.
-func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
+func toCNIBandWidth(annotations map[string]string) (*gocni.BandWidth, error) {
 	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("reading pod bandwidth annotations: %w", err)
@@ -623,7 +640,7 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 		return nil, nil
 	}
 
-	bandWidth := &cni.BandWidth{}
+	bandWidth := &gocni.BandWidth{}
 
 	if ingress != nil {
 		bandWidth.IngressRate = uint64(ingress.Value())
@@ -639,13 +656,13 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 }
 
 // toCNIPortMappings converts CRI port mappings to CNI.
-func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping {
-	var portMappings []cni.PortMapping
+func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []gocni.PortMapping {
+	var portMappings []gocni.PortMapping
 	for _, mapping := range criPortMappings {
 		if mapping.HostPort <= 0 {
 			continue
 		}
-		portMappings = append(portMappings, cni.PortMapping{
+		portMappings = append(portMappings, gocni.PortMapping{
 			HostPort:      mapping.HostPort,
 			ContainerPort: mapping.ContainerPort,
 			Protocol:      strings.ToLower(mapping.Protocol.String()),
@@ -656,11 +673,11 @@ func toCNIPortMappings(criPortMappings []*runtime.PortMapping) []cni.PortMapping
 }
 
 // toCNIDNS converts CRI DNSConfig to CNI.
-func toCNIDNS(dns *runtime.DNSConfig) *cni.DNS {
+func toCNIDNS(dns *runtime.DNSConfig) *gocni.DNS {
 	if dns == nil {
 		return nil
 	}
-	return &cni.DNS{
+	return &gocni.DNS{
 		Servers:  dns.GetServers(),
 		Searches: dns.GetSearches(),
 		Options:  dns.GetOptions(),
@@ -668,11 +685,11 @@ func toCNIDNS(dns *runtime.DNSConfig) *cni.DNS {
 }
 
 // selectPodIPs select an ip from the ip list.
-func selectPodIPs(ctx context.Context, configs []*cni.IPConfig, preference string) (string, []string) {
+func selectPodIPs(ctx context.Context, configs []*gocni.IPConfig, preference string) (string, []string) {
 	if len(configs) == 1 {
 		return ipString(configs[0]), nil
 	}
-	toStrings := func(ips []*cni.IPConfig) (o []string) {
+	toStrings := func(ips []*gocni.IPConfig) (o []string) {
 		for _, i := range ips {
 			o = append(o, ipString(i))
 		}
@@ -705,7 +722,7 @@ func selectPodIPs(ctx context.Context, configs []*cni.IPConfig, preference strin
 	return all[0], all[1:]
 }
 
-func ipString(ip *cni.IPConfig) string {
+func ipString(ip *gocni.IPConfig) string {
 	return ip.IP.String()
 }
 

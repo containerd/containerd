@@ -23,6 +23,7 @@ import (
 	_ "github.com/containerd/containerd/gc/scheduler"
 	_ "github.com/containerd/containerd/leases/plugin"
 	_ "github.com/containerd/containerd/metadata/plugin"
+	_ "github.com/containerd/containerd/pkg/net/plugin"
 	_ "github.com/containerd/containerd/pkg/nri/plugin"
 	_ "github.com/containerd/containerd/plugins/sandbox"
 	_ "github.com/containerd/containerd/plugins/streaming"

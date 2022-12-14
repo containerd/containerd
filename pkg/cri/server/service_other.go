@@ -19,7 +19,7 @@
 package server
 
 import (
-	cni "github.com/containerd/go-cni"
+	cni "github.com/containerd/containerd/pkg/net/compat"
 )
 
 // initPlatform handles initialization for the CRI service on non-Windows and non-Linux
@@ -29,6 +29,6 @@ func (c *criService) initPlatform() error {
 }
 
 // cniLoadOptions returns cni load options for non-Windows and non-Linux platforms.
-func (c *criService) cniLoadOptions() []cni.Opt {
-	return []cni.Opt{}
+func (c *criService) cniLoadOptions() []cni.LoadOpt {
+	return []cni.LoadOpt{}
 }

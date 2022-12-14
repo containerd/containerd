@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/net/compat"
 	"github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -48,6 +49,7 @@ func init() {
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
 			plugin.NRIApiPlugin,
+			plugin.NetworkPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -88,6 +90,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 
 	var s server.CRIService
 	var nrip nri.API
+	var netp compat.API
 	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		log.G(ctx).Info("using experimental CRI Sandbox server - unset ENABLE_CRI_SANDBOXES to disable")
 		s, err = sbserver.NewCRIService(c, client)
@@ -99,7 +102,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 			log.G(ctx).Info("NRI service not found, disabling NRI support")
 		}
 
-		s, err = server.NewCRIService(c, client, nrip)
+		netp, err = getNetworkPlugin(ic)
+		if err == nil {
+			log.G(ctx).Info("using experimental network plugin")
+		}
+
+		s, err = server.NewCRIService(c, client, nrip, netp)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
@@ -161,6 +169,31 @@ func getNRIPlugin(ic *plugin.InitContext) (nri.API, error) {
 	api, ok := p.(nri.API)
 	if !ok {
 		return nil, fmt.Errorf("NRI plugin (%s, %q) has incompatible type %T",
+			pluginType, pluginName, api)
+	}
+
+	return api, nil
+}
+
+// Get the Network plugin and verify its type.
+func getNetworkPlugin(ic *plugin.InitContext) (compat.API, error) {
+	const (
+		pluginType = plugin.NetworkPlugin
+		pluginName = "cni"
+	)
+
+	if os.Getenv("ENABLE_NETWORK_SRV") == "" {
+		return nil, nil
+	}
+
+	p, err := ic.GetByID(pluginType, pluginName)
+	if err != nil {
+		return nil, err
+	}
+
+	api, ok := p.(compat.API)
+	if !ok {
+		return nil, fmt.Errorf("network plugin (%s, %q) has incompatible type %T",
 			pluginType, pluginName, api)
 	}
 

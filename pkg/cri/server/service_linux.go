@@ -21,8 +21,8 @@ import (
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/pkg/cap"
+	cni "github.com/containerd/containerd/pkg/net/compat"
 	"github.com/containerd/containerd/pkg/userns"
-	cni "github.com/containerd/go-cni"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 )
@@ -71,13 +71,16 @@ func (c *criService) initPlatform() (err error) {
 		// hence networkAttachCount is 2. If there are more network configs the
 		// pod will be attached to all the networks but we will only use the ip
 		// of the default network interface as the pod IP.
-		i, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
+		i, err := newCNIAdaptor(c.netAPI, name,
+			cni.WithMinNetworkCount(networkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
 			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
+
 		c.netPlugin[name] = i
 	}
 
@@ -100,6 +103,6 @@ func (c *criService) initPlatform() (err error) {
 }
 
 // cniLoadOptions returns cni load options for the linux.
-func (c *criService) cniLoadOptions() []cni.Opt {
-	return []cni.Opt{cni.WithLoNetwork, cni.WithDefaultConf}
+func (c *criService) cniLoadOptions() []cni.LoadOpt {
+	return []cni.LoadOpt{cni.WithLoNetwork, cni.WithDefaultConf}
 }

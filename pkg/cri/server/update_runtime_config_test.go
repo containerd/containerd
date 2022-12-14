@@ -119,8 +119,8 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 				req.RuntimeConfig.NetworkConfig.PodCidr = ""
 			}
 			if !test.networkReady {
-				c.netPlugin[defaultNetworkPlugin].(*servertesting.FakeCNIPlugin).StatusErr = errors.New("random error")
-				c.netPlugin[defaultNetworkPlugin].(*servertesting.FakeCNIPlugin).LoadErr = errors.New("random error")
+				c.netPlugin[defaultNetworkPlugin].(*cniAdaptor).g.(*servertesting.FakeCNIPlugin).StatusErr = errors.New("random error")
+				c.netPlugin[defaultNetworkPlugin].(*cniAdaptor).g.(*servertesting.FakeCNIPlugin).LoadErr = errors.New("random error")
 			}
 			_, err = c.UpdateRuntimeConfig(context.Background(), req)
 			assert.NoError(t, err)

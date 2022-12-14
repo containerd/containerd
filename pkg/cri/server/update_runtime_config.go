@@ -77,7 +77,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 	}
 
 	netStart := time.Now()
-	err = netPlugin.Status()
+	err = netPlugin.Status(ctx)
 	networkPluginOperations.WithValues(networkStatusOp).Inc()
 	networkPluginOperationsLatency.WithValues(networkStatusOp).UpdateSince(netStart)
 	if err == nil {
@@ -85,7 +85,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
 	networkPluginOperationsErrors.WithValues(networkStatusOp).Inc()
-	if err := netPlugin.Load(c.cniLoadOptions()...); err == nil {
+	if err := netPlugin.Load(ctx, c.cniLoadOptions()...); err == nil {
 		log.G(ctx).Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}

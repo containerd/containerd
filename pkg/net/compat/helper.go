@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -16,31 +14,28 @@
    limitations under the License.
 */
 
-package fuzz
+package compat
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"fmt"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	types100 "github.com/containernetworking/cni/pkg/types/100"
 )
 
-func FuzzCRIServer(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
+func validateInterfaceConfig(ipConf *types100.IPConfig, ifs int) error {
+	if ipConf == nil {
+		return fmt.Errorf("invalid IP configuration (nil)")
 	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil, nil)
-	if err != nil {
-		panic(err)
+	if ipConf.Interface != nil && *ipConf.Interface > ifs {
+		return fmt.Errorf("invalid IP configuration (interface number %d is > number of interfaces %d)", *ipConf.Interface, ifs)
 	}
+	return nil
+}
 
-	return fuzzCRI(f, c)
+func getIfName(prefix string, i int) string {
+	return fmt.Sprintf("%s%d", prefix, i)
+}
+
+func defaultInterface(prefix string) string {
+	return getIfName(prefix, 0)
 }
