@@ -51,9 +51,9 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	status := toCRISandboxStatus(sandbox.Metadata, statusResponse.State, statusResponse.GetCreatedAt().AsTime(), ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
-		sandboxInfo, err := c.client.SandboxStore().Get(ctx, r.GetPodSandboxId())
+		sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandbox.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", r.GetPodSandboxId(), err)
+			return nil, fmt.Errorf("failed to get sandbox %q from metadata store: %w", sandbox.ID, err)
 		}
 		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
 	}
