@@ -56,7 +56,7 @@ require (
 	github.com/pelletier/go-toml v1.9.3
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.9.0
-	github.com/stretchr/testify v1.8.0
+	github.com/stretchr/testify v1.8.1
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli v1.22.10
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
@@ -70,8 +70,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.11.1
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.3.0
-	google.golang.org/genproto v0.0.0-20221107162902-2d387536bcdd
-	google.golang.org/grpc v1.50.1
+	google.golang.org/genproto v0.0.0-20221206210731-b1a01be3a5f6
+	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
@@ -121,7 +121,7 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
-	go.opencensus.io v0.23.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.1 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
