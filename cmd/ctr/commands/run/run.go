@@ -140,9 +140,6 @@ var Command = cli.Command{
 
 		if config {
 			id = context.Args().First()
-			if context.NArg() > 1 {
-				return errors.New("with spec config file, only container id should be provided")
-			}
 		} else {
 			id = context.Args().Get(1)
 			ref = context.Args().First()
