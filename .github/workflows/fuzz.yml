@@ -38,8 +38,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v3
         with:
-          go-version: 1.18
-      - uses: actions/checkout@v3
+          go-version-file: go.mod
       - run: script/go-test-fuzz.sh

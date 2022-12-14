@@ -26,13 +26,13 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
-        with:
-          go-version: "1.19.4"
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: src/github.com/containerd/containerd/go.mod
 
       - name: Set env
         shell: bash
