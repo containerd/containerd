@@ -19,7 +19,6 @@ package sbserver
 import (
 	"context"
 	"fmt"
-	goruntime "runtime"
 	"time"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
@@ -67,18 +66,9 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, error) {
 	config := sandbox.Config
 
-	if goruntime.GOOS != "windows" &&
-		config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
-		// For sandboxes using the node network we are not
-		// responsible for reporting the IP.
-		return "", nil, nil
-	}
-
-	if goruntime.GOOS == "windows" && config.GetWindows().GetSecurityContext().GetHostProcess() {
-		return "", nil, nil
-	}
-
-	if goruntime.GOOS == "darwin" {
+	// For sandboxes using the node network we are not
+	// responsible for reporting the IP.
+	if hostNetwork(config) {
 		return "", nil, nil
 	}
 
