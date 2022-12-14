@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"sync"
 	"time"
 
@@ -485,15 +484,8 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 }
 
 func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
-	if goruntime.GOOS != "windows" &&
-		meta.Config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
-		// Don't need to load netns for host network sandbox.
-		return nil
-	}
-	if goruntime.GOOS == "windows" && meta.Config.GetWindows().GetSecurityContext().GetHostProcess() {
-		return nil
-	}
-	if goruntime.GOOS == "darwin" {
+	// Don't need to load netns for host network sandbox.
+	if hostNetwork(meta.Config) {
 		return nil
 	}
 	return netns.LoadNetNS(meta.NetNSPath)

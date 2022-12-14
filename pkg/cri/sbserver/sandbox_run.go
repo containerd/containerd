@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -146,24 +145,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	podNetwork := true
-	if goruntime.GOOS != "windows" &&
-		config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE {
-		// Pod network is not needed on linux with host network.
-		podNetwork = false
-	}
-	if goruntime.GOOS == "windows" &&
-		config.GetWindows().GetSecurityContext().GetHostProcess() {
-		// Windows HostProcess pods can only run on the host network
-		podNetwork = false
-	}
-
-	// No CNI on darwin yet
-	if goruntime.GOOS == "darwin" {
-		podNetwork = false
-	}
-
-	if podNetwork {
+	// Setup the network namespace if host networking wasn't requested.
+	if !hostNetwork(config) {
 		netStart := time.Now()
 		// If it is not in host network namespace then create a namespace and set the sandbox
 		// handle. NetNSPath in sandbox metadata and NetNS is non empty only for non host network
