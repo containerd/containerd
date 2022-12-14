@@ -1,0 +1,26 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.12"
+
+pre_release = false
+
+preface = """\
+The thirteenth patch release for containerd 1.6 contains various fixes and updates.
+
+### Notable Updates
+
+* **Update overlay snapshotter to check for tmpfs when evaluating usage of userxattr** ([#7788](https://github.com/containerd/containerd/pull/7788))
+* **Update hcsschim to v0.9.6 to fix resource leak on exec** ([#7808](https://github.com/containerd/containerd/pull/7808))
+* **Make swapping disabled with memory limit in CRI plugin** ([#7815](https://github.com/containerd/containerd/pull/7815))
+* **Allow clients to remove created tasks with PID 0** ([#7816](https://github.com/containerd/containerd/pull/7816))
+* **Fix concurrent map iteration and map write in CRI port forwarding** ([#7819](https://github.com/containerd/containerd/pull/7819))
+* **Check for nil `HugepageLimits` to avoid panic in CRI plugin** ([#7820](https://github.com/containerd/containerd/pull/7820))
+
+
+See the changelog for complete list of changes"""
