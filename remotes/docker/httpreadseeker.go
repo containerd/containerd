@@ -20,12 +20,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 )
 
-const maxRetry = 3
+const (
+	maxRetry      = 3
+	readerTimeout = 5
+)
 
 type httpReadSeeker struct {
 	size   int64
@@ -54,7 +58,22 @@ func (hrs *httpReadSeeker) Read(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	n, err = rd.Read(p)
+	var schedC <-chan time.Time
+
+	schedC = time.After(readerTimeout * time.Second)
+
+	bc := make(chan int)
+	go func() {
+		var nc int
+		nc, err = rd.Read(p)
+		bc <- nc
+	}()
+	select {
+	case n = <-bc:
+	case <-schedC:
+		return 0, fmt.Errorf("httpreadseeker: read timeout")
+	}
+
 	hrs.offset += int64(n)
 	if n > 0 || err == nil {
 		hrs.errsWithNoProgress = 0
