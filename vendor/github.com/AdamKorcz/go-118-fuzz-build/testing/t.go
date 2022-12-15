@@ -2,6 +2,7 @@ package testing
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 )
@@ -11,6 +12,12 @@ import (
 // panic with the text "GO-FUZZ-BUILD-PANIC" and the fuzzer
 // will recover.
 type T struct {
+	TempDirs []string
+}
+
+func NewT() *T {
+	tempDirs := make([]string, 0)
+	return &T{TempDirs: tempDirs}
 }
 
 func unsupportedApi(name string) string {
@@ -35,8 +42,7 @@ func (t *T) Error(args ...any) {
 }
 
 func (t *T) Errorf(format string, args ...any) {
-	fmt.Println(format)
-	fmt.Println(args...)
+	fmt.Printf(format+"\n", args...)
 	panic("errorf")
 }
 
@@ -58,11 +64,11 @@ func (t *T) Fatal(args ...any) {
 	panic("fatal")
 }
 func (t *T) Fatalf(format string, args ...any) {
-	fmt.Println(format, args)
+	fmt.Printf(format+"\n", args...)
 	panic("fatal")
 }
 func (t *T) Helper() {
-	panic(unsupportedApi("t.Failed()"))
+	// We can't support it, but it also just impacts how failures are reported, so we can ignore it
 }
 func (t *T) Log(args ...any) {
 	fmt.Println(args...)
@@ -78,10 +84,10 @@ func (t *T) Name() string {
 }
 
 func (t *T) Parallel() {
-	panic(unsupportedApi("t.Failed()"))
+	panic(unsupportedApi("t.Parallel()"))
 }
 func (t *T) Run(name string, f func(t *T)) bool {
-	panic(unsupportedApi("t.Run()."))
+	panic(unsupportedApi("t.Run()"))
 }
 
 func (t *T) Setenv(key, value string) {
@@ -105,5 +111,19 @@ func (t *T) Skipped() bool {
 	panic(unsupportedApi("t.Skipped()"))
 }
 func (t *T) TempDir() string {
-	panic(unsupportedApi("t.TempDir()"))
+	dir, err := os.MkdirTemp("", "fuzzdir-")
+	if err != nil {
+		panic(err)
+	}
+	t.TempDirs = append(t.TempDirs, dir)
+
+	return dir
+}
+
+func (t *T) CleanupTempDirs() {
+	if len(t.TempDirs) > 0 {
+		for _, tempDir := range t.TempDirs {
+			os.RemoveAll(tempDir)
+		}
+	}
 }
