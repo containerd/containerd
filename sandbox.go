@@ -46,8 +46,8 @@ type Sandbox interface {
 	Stop(ctx context.Context) error
 	// Wait blocks until sandbox process exits.
 	Wait(ctx context.Context) (<-chan ExitStatus, error)
-	// Delete removes sandbox from the metadata store.
-	Delete(ctx context.Context) error
+	// Shutdown removes sandbox from the metadata store and shutdowns shim instance.
+	Shutdown(ctx context.Context) error
 }
 
 type sandboxClient struct {
@@ -121,11 +121,16 @@ func (s *sandboxClient) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (s *sandboxClient) Delete(ctx context.Context) error {
-	if _, err := s.client.SandboxController().Delete(ctx, s.ID()); err != nil {
-		return err
+func (s *sandboxClient) Shutdown(ctx context.Context) error {
+	if _, err := s.client.SandboxController().Shutdown(ctx, s.ID()); err != nil {
+		return fmt.Errorf("failed to shutdown sandbox: %w", err)
 	}
-	return s.client.SandboxStore().Delete(ctx, s.ID())
+
+	if err := s.client.SandboxStore().Delete(ctx, s.ID()); err != nil {
+		return fmt.Errorf("failed to delete sandbox from store: %w", err)
+	}
+
+	return nil
 }
 
 // NewSandbox creates new sandbox client

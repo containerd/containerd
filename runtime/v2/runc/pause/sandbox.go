@@ -92,3 +92,7 @@ func (p *pauseService) SandboxStatus(ctx context.Context, req *api.SandboxStatus
 func (p *pauseService) PingSandbox(ctx context.Context, req *api.PingRequest) (*api.PingResponse, error) {
 	return &api.PingResponse{}, nil
 }
+
+func (p *pauseService) ShutdownSandbox(ctx context.Context, request *api.ShutdownSandboxRequest) (*api.ShutdownSandboxResponse, error) {
+	return &api.ShutdownSandboxResponse{}, nil
+}

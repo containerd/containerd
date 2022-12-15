@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/log"
 )
 
-func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
+func (c *Controller) Shutdown(ctx context.Context, sandboxID string) (*api.ControllerShutdownResponse, error) {
 	sandbox, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -34,7 +34,7 @@ func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.Control
 		}
 		// Do not return error if the id doesn't exist.
 		log.G(ctx).Tracef("Sandbox controller Delete called for sandbox %q that does not exist", sandboxID)
-		return &api.ControllerDeleteResponse{}, nil
+		return &api.ControllerShutdownResponse{}, nil
 	}
 
 	// Cleanup the sandbox root directories.
@@ -58,5 +58,5 @@ func (c *Controller) Delete(ctx context.Context, sandboxID string) (*api.Control
 		}
 	}
 
-	return &api.ControllerDeleteResponse{}, nil
+	return &api.ControllerShutdownResponse{}, nil
 }
