@@ -25,8 +25,6 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
-
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the
@@ -37,12 +35,12 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		return fmt.Errorf("failed to find sandbox %q in store: %w", id, err)
 	}
 
-	var netNSDo func(func(ns.NetNS) error) error
-	// netNSPath is the network namespace path for logging.
-	var netNSPath string
-	securityContext := s.Config.GetLinux().GetSecurityContext()
-	hostNet := securityContext.GetNamespaceOptions().GetNetwork() == runtime.NamespaceMode_NODE
-	if !hostNet {
+	var (
+		netNSDo func(func(ns.NetNS) error) error
+		// netNSPath is the network namespace path for logging.
+		netNSPath string
+	)
+	if !hostNetwork(s.Config) {
 		if closed, err := s.NetNS.Closed(); err != nil {
 			return fmt.Errorf("failed to check netwok namespace closed for sandbox %q: %w", id, err)
 		} else if closed {
