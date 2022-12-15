@@ -14,6 +14,7 @@ type SandboxService interface {
 	WaitSandbox(context.Context, *WaitSandboxRequest) (*WaitSandboxResponse, error)
 	SandboxStatus(context.Context, *SandboxStatusRequest) (*SandboxStatusResponse, error)
 	PingSandbox(context.Context, *PingRequest) (*PingResponse, error)
+	ShutdownSandbox(context.Context, *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error)
 }
 
 func RegisterSandboxService(srv *ttrpc.Server, svc SandboxService) {
@@ -60,6 +61,13 @@ func RegisterSandboxService(srv *ttrpc.Server, svc SandboxService) {
 					return nil, err
 				}
 				return svc.PingSandbox(ctx, &req)
+			},
+			"ShutdownSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ShutdownSandboxRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.ShutdownSandbox(ctx, &req)
 			},
 		},
 	})
@@ -118,6 +126,14 @@ func (c *sandboxClient) SandboxStatus(ctx context.Context, req *SandboxStatusReq
 func (c *sandboxClient) PingSandbox(ctx context.Context, req *PingRequest) (*PingResponse, error) {
 	var resp PingResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "PingSandbox", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *sandboxClient) ShutdownSandbox(ctx context.Context, req *ShutdownSandboxRequest) (*ShutdownSandboxResponse, error) {
+	var resp ShutdownSandboxResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "ShutdownSandbox", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

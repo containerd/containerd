@@ -178,7 +178,7 @@ var removeCommand = cli.Command{
 				}
 			}
 
-			err = sandbox.Delete(ctx)
+			err = sandbox.Shutdown(ctx)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to shutdown sandbox %s", id)
 				continue

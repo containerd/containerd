@@ -1071,6 +1071,19 @@ file {
   message_type {
     name: "PingResponse"
   }
+  message_type {
+    name: "ShutdownSandboxRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ShutdownSandboxResponse"
+  }
   service {
     name: "Sandbox"
     method {
@@ -1102,6 +1115,11 @@ file {
       name: "PingSandbox"
       input_type: ".containerd.runtime.sandbox.v1.PingRequest"
       output_type: ".containerd.runtime.sandbox.v1.PingResponse"
+    }
+    method {
+      name: "ShutdownSandbox"
+      input_type: ".containerd.runtime.sandbox.v1.ShutdownSandboxRequest"
+      output_type: ".containerd.runtime.sandbox.v1.ShutdownSandboxResponse"
     }
   }
   options {
@@ -4468,7 +4486,7 @@ file {
     }
   }
   message_type {
-    name: "ControllerDeleteRequest"
+    name: "ControllerShutdownRequest"
     field {
       name: "sandbox_id"
       number: 1
@@ -4478,7 +4496,7 @@ file {
     }
   }
   message_type {
-    name: "ControllerDeleteResponse"
+    name: "ControllerShutdownResponse"
   }
   service {
     name: "Store"
@@ -4536,9 +4554,9 @@ file {
       output_type: ".containerd.services.sandbox.v1.ControllerStatusResponse"
     }
     method {
-      name: "Delete"
-      input_type: ".containerd.services.sandbox.v1.ControllerDeleteRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerDeleteResponse"
+      name: "Shutdown"
+      input_type: ".containerd.services.sandbox.v1.ControllerShutdownRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerShutdownResponse"
     }
   }
   options {

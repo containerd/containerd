@@ -257,7 +257,7 @@ type ControllerClient interface {
 	Stop(ctx context.Context, in *ControllerStopRequest, opts ...grpc.CallOption) (*ControllerStopResponse, error)
 	Wait(ctx context.Context, in *ControllerWaitRequest, opts ...grpc.CallOption) (*ControllerWaitResponse, error)
 	Status(ctx context.Context, in *ControllerStatusRequest, opts ...grpc.CallOption) (*ControllerStatusResponse, error)
-	Delete(ctx context.Context, in *ControllerDeleteRequest, opts ...grpc.CallOption) (*ControllerDeleteResponse, error)
+	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
 }
 
 type controllerClient struct {
@@ -313,9 +313,9 @@ func (c *controllerClient) Status(ctx context.Context, in *ControllerStatusReque
 	return out, nil
 }
 
-func (c *controllerClient) Delete(ctx context.Context, in *ControllerDeleteRequest, opts ...grpc.CallOption) (*ControllerDeleteResponse, error) {
-	out := new(ControllerDeleteResponse)
-	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Delete", in, out, opts...)
+func (c *controllerClient) Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error) {
+	out := new(ControllerShutdownResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Shutdown", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ type ControllerServer interface {
 	Stop(context.Context, *ControllerStopRequest) (*ControllerStopResponse, error)
 	Wait(context.Context, *ControllerWaitRequest) (*ControllerWaitResponse, error)
 	Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error)
-	Delete(context.Context, *ControllerDeleteRequest) (*ControllerDeleteResponse, error)
+	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -354,8 +354,8 @@ func (UnimplementedControllerServer) Wait(context.Context, *ControllerWaitReques
 func (UnimplementedControllerServer) Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Status not implemented")
 }
-func (UnimplementedControllerServer) Delete(context.Context, *ControllerDeleteRequest) (*ControllerDeleteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+func (UnimplementedControllerServer) Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -460,20 +460,20 @@ func _Controller_Status_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Controller_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ControllerDeleteRequest)
+func _Controller_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerShutdownRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ControllerServer).Delete(ctx, in)
+		return srv.(ControllerServer).Shutdown(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/containerd.services.sandbox.v1.Controller/Delete",
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Shutdown",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ControllerServer).Delete(ctx, req.(*ControllerDeleteRequest))
+		return srv.(ControllerServer).Shutdown(ctx, req.(*ControllerShutdownRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -506,8 +506,8 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Controller_Status_Handler,
 		},
 		{
-			MethodName: "Delete",
-			Handler:    _Controller_Delete_Handler,
+			MethodName: "Shutdown",
+			Handler:    _Controller_Shutdown_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
