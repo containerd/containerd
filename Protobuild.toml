@@ -22,6 +22,12 @@ prefixes = [
 ]
 generators = ["go", "go-ttrpc"]
 
+[[overrides]]
+prefixes = [
+    "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2",
+]
+generators = ["go", "go-grpc"]
+
 # Lock down runc config
 [[descriptors]]
 prefix = "github.com/containerd/containerd/runtime/linux/runctypes"
