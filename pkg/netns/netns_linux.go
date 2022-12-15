@@ -50,7 +50,9 @@ import (
 
 // newNS creates a new persistent (bind-mounted) network namespace and returns the
 // path to the network namespace.
-func newNS(baseDir string) (nsPath string, err error) {
+// If pid is not 0, returns the netns from that pid persistently mounted. Otherwise,
+// a new netns is created.
+func newNS(baseDir string, pid uint32) (nsPath string, err error) {
 	b := make([]byte, 16)
 
 	_, err = rand.Read(b)
@@ -80,6 +82,16 @@ func newNS(baseDir string) (nsPath string, err error) {
 			os.RemoveAll(nsPath)
 		}
 	}()
+
+	if pid != 0 {
+		procNsPath := getNetNSPathFromPID(pid)
+		// bind mount the netns onto the mount point. This causes the namespace
+		// to persist, even when there are no threads in the ns.
+		if err = unix.Mount(procNsPath, nsPath, "none", unix.MS_BIND, ""); err != nil {
+			return "", fmt.Errorf("failed to bind mount ns src: %v at %s: %w", procNsPath, nsPath, err)
+		}
+		return nsPath, nil
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -155,6 +167,10 @@ func getCurrentThreadNetNSPath() string {
 	return fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), unix.Gettid())
 }
 
+func getNetNSPathFromPID(pid uint32) string {
+	return fmt.Sprintf("/proc/%d/ns/net", pid)
+}
+
 // NetNS holds network namespace.
 type NetNS struct {
 	path string
@@ -162,7 +178,12 @@ type NetNS struct {
 
 // NewNetNS creates a network namespace.
 func NewNetNS(baseDir string) (*NetNS, error) {
-	path, err := newNS(baseDir)
+	return NewNetNSFromPID(baseDir, 0)
+}
+
+// NewNetNS returns the netns from pid or a new netns if pid is 0.
+func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
+	path, err := newNS(baseDir, pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup netns: %w", err)
 	}
