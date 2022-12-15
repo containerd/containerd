@@ -3,8 +3,8 @@ module github.com/containerd/containerd
 go 1.18
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221206110420-d395f97c4830
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/container-orchestrated-devices/container-device-interface v0.5.1

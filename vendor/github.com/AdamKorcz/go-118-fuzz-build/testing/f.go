@@ -3,6 +3,7 @@ package testing
 import (
 	"fmt"
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"os"
 	"reflect"
 )
 
@@ -10,6 +11,10 @@ type F struct {
 	Data     []byte
 	T        *T
 	FuzzFunc func(*T, any)
+}
+
+func (f *F) CleanupTempDirs() {
+	f.T.CleanupTempDirs()
 }
 
 func (f *F) Add(args ...any)                   {}
@@ -173,10 +178,10 @@ func (f *F) Fuzz(ff any) {
 }
 func (f *F) Helper() {}
 func (c *F) Log(args ...any) {
-	fmt.Println(args)
+	fmt.Println(args...)
 }
 func (c *F) Logf(format string, args ...any) {
-	fmt.Println(format, args, "\n")
+	fmt.Println(format, args)
 }
 func (c *F) Name() string             { return "libFuzzer" }
 func (c *F) Setenv(key, value string) {}
@@ -190,6 +195,13 @@ func (c *F) Skipf(format string, args ...any) {
 	panic("GO-FUZZ-BUILD-PANIC")
 }
 func (f *F) Skipped() bool { return false }
-func (c *F) TempDir() string {
-	panic("TempDir() is not supported")
+
+func (f *F) TempDir() string {
+	dir, err := os.MkdirTemp("", "fuzzdir-")
+	if err != nil {
+		panic(err)
+	}
+	f.T.TempDirs = append(f.T.TempDirs, dir)
+
+	return dir
 }
