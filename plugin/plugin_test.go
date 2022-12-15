@@ -237,6 +237,19 @@ func TestContainerdPlugin(t *testing.T) {
 		},
 	})
 
+	Register(&Registration{
+		Type: TracingProcessorPlugin,
+		ID:   "otlp",
+	})
+
+	Register(&Registration{
+		Type: InternalPlugin,
+		ID:   "tracing",
+		Requires: []Type{
+			TracingProcessorPlugin,
+		},
+	})
+
 	ordered := Graph(mockPluginFilter)
 	expectedURI := []string{
 		"io.containerd.monitor.v1.cgroups",
@@ -270,6 +283,8 @@ func TestContainerdPlugin(t *testing.T) {
 		"io.containerd.internal.v1.opt",
 		"io.containerd.grpc.v1.cri",
 		"io.containerd.internal.v1.restart",
+		"io.containerd.tracing.processor.v1.otlp",
+		"io.containerd.internal.v1.tracing",
 		"io.containerd.grpc.v1.introspection",
 	}
 	cmpOrdered(t, ordered, expectedURI)
