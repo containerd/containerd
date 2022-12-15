@@ -94,7 +94,7 @@ func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatu
 	return s.local.Status(ctx, req)
 }
 
-func (s *controllerService) Delete(ctx context.Context, req *api.ControllerDeleteRequest) (*api.ControllerDeleteResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("delete sandbox")
-	return s.local.Delete(ctx, req)
+func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShutdownRequest) (*api.ControllerShutdownResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("shutdown sandbox")
+	return s.local.Shutdown(ctx, req)
 }

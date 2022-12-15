@@ -154,12 +154,22 @@ func (c *controllerLocal) Stop(ctx context.Context, in *api.ControllerStopReques
 	return &api.ControllerStopResponse{}, nil
 }
 
-func (c *controllerLocal) Delete(ctx context.Context, in *api.ControllerDeleteRequest, opts ...grpc.CallOption) (*api.ControllerDeleteResponse, error) {
+func (c *controllerLocal) Shutdown(ctx context.Context, in *api.ControllerShutdownRequest, opts ...grpc.CallOption) (*api.ControllerShutdownResponse, error) {
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{SandboxID: in.SandboxID})
+	if err != nil {
+		return nil, errdefs.ToGRPC(fmt.Errorf("failed to shutdown sandbox: %w", err))
+	}
+
 	if err := c.shims.Delete(ctx, in.SandboxID); err != nil {
 		return nil, errdefs.ToGRPC(fmt.Errorf("failed to delete sandbox shim: %w", err))
 	}
 
-	return &api.ControllerDeleteResponse{}, nil
+	return &api.ControllerShutdownResponse{}, nil
 }
 
 func (c *controllerLocal) Wait(ctx context.Context, in *api.ControllerWaitRequest, opts ...grpc.CallOption) (*api.ControllerWaitResponse, error) {

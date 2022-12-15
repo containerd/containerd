@@ -63,8 +63,8 @@ func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) (*
 	return resp, nil
 }
 
-func (s *remoteSandboxController) Delete(ctx context.Context, sandboxID string) (*api.ControllerDeleteResponse, error) {
-	resp, err := s.client.Delete(ctx, &api.ControllerDeleteRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string) (*api.ControllerShutdownResponse, error) {
+	resp, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{SandboxID: sandboxID})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
