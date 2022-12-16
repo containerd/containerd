@@ -18,6 +18,7 @@ package logtest
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -26,6 +27,7 @@ import (
 type testHook struct {
 	t   testing.TB
 	fmt logrus.Formatter
+	mu  sync.Mutex
 }
 
 func (*testHook) Levels() []logrus.Level {
@@ -37,6 +39,12 @@ func (h *testHook) Fire(e *logrus.Entry) error {
 	if err != nil {
 		return err
 	}
+
+	// Because the logger could be called from multiple goroutines,
+	// but t.Log() is not designed for.
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.t.Log(string(bytes.TrimRight(s, "\n")))
+
 	return nil
 }
