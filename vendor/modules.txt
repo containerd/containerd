@@ -1,9 +1,9 @@
 # cloud.google.com/go/compute/metadata v0.2.1
 ## explicit; go 1.19
-# github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
+# github.com/AdaLogics/go-fuzz-headers v0.0.0-20221206110420-d395f97c4830
 ## explicit; go 1.18
 github.com/AdaLogics/go-fuzz-headers
-# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318
+# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 ## explicit; go 1.18
 github.com/AdamKorcz/go-118-fuzz-build/testing
 # github.com/Microsoft/go-winio v0.6.0

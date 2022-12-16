@@ -3,7 +3,7 @@ module github.com/containerd/containerd/integration/client
 go 1.18
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221118232415-3345c89a7c72
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221206110420-d395f97c4830
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
@@ -20,7 +20,7 @@ require (
 )
 
 require (
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221121202950-b2031950a318 // indirect
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652 // indirect
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
