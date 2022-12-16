@@ -333,9 +333,9 @@ var removeCommand = cli.Command{
 			exitErr    error
 			imageStore = client.ImageService()
 		)
-		for i, target := range context.Args() {
+		for _, target := range context.Args() {
 			var opts []images.DeleteOpt
-			if context.Bool("sync") && i == context.NArg()-1 {
+			if context.Bool("sync") {
 				opts = append(opts, images.SynchronousDelete())
 			}
 			if err := imageStore.Delete(ctx, target, opts...); err != nil {
