@@ -1,0 +1,20 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.13"
+
+pre_release = false
+
+preface = """\
+The fourteenth patch release for containerd 1.6 fixes a regression in the CRI plugin related to swap
+
+### Notable Updates
+
+* **Fix `memory.memsw.limit_in_bytes: no such file or directory` error in CRI plugin** ([#7838](https://github.com/containerd/containerd/pull/7838))
+
+See the changelog for complete list of changes"""
