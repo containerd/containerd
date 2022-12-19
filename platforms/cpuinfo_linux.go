@@ -70,7 +70,7 @@ func getCPUInfo(pattern string) (info string, err error) {
 		return "", err
 	}
 
-	return "", fmt.Errorf("getCPUInfo for pattern: %s: %w", pattern, errdefs.ErrNotFound)
+	return "", fmt.Errorf("getCPUInfo for pattern %s: %w", pattern, errdefs.ErrNotFound)
 }
 
 // getCPUVariantFromArch get CPU variant from arch through a system call
@@ -82,7 +82,7 @@ func getCPUVariantFromArch(arch string) (string, error) {
 
 	if arch == "aarch64" {
 		variant = "8"
-	} else if len(arch) >= 5 {
+	} else if arch[0:4] == "armv" && len(arch) >= 5 {
 		//Valid arch format is in form of armvXx
 		switch arch[3:5] {
 		case "v8":
@@ -101,7 +101,7 @@ func getCPUVariantFromArch(arch string) (string, error) {
 			variant = "unknown"
 		}
 	} else {
-		return "", fmt.Errorf("getCPUVariantFromArch invalid arch : %s, %v", arch, errdefs.ErrInvalidArgument)
+		return "", fmt.Errorf("getCPUVariantFromArch invalid arch: %s, %w", arch, errdefs.ErrInvalidArgument)
 	}
 	return variant, nil
 }
@@ -119,15 +119,15 @@ func getCPUVariant() (string, error) {
 			//Let's try getting CPU variant from machine architecture
 			arch, err := getMachineArch()
 			if err != nil {
-				return "", fmt.Errorf("failure getting machine architecture : %v", err)
+				return "", fmt.Errorf("failure getting machine architecture: %v", err)
 			}
 
 			variant, err = getCPUVariantFromArch(arch)
 			if err != nil {
-				return "", fmt.Errorf("failure getting CPU variant from machine architecture : %v", err)
+				return "", fmt.Errorf("failure getting CPU variant from machine architecture: %v", err)
 			}
 		} else {
-			return "", fmt.Errorf("failure getting CPU variant : %v", err)
+			return "", fmt.Errorf("failure getting CPU variant: %v", err)
 		}
 	}
 

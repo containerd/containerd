@@ -35,7 +35,7 @@ func cpuVariant() string {
 			var err error
 			cpuVariantValue, err = getCPUVariant()
 			if err != nil {
-				log.L.Errorf("Error getCPUVariant for OS %s : %v", runtime.GOOS, err)
+				log.L.Errorf("Error getCPUVariant for OS %s: %v", runtime.GOOS, err)
 			}
 		}
 	})
