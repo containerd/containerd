@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/Microsoft/hcsshim v0.9.6
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
-	github.com/containerd/cgroups v1.0.3
+	github.com/containerd/cgroups v1.0.4
 	// the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/containerd v1.6.1
 	github.com/containerd/go-runc v1.0.0
