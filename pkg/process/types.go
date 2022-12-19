@@ -20,20 +20,11 @@ import (
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 )
 
-// Mount holds filesystem mount configuration
-type Mount struct {
-	Type    string
-	Source  string
-	Target  string
-	Options []string
-}
-
 // CreateConfig hold task creation configuration
 type CreateConfig struct {
 	ID               string
 	Bundle           string
 	Runtime          string
-	Rootfs           []Mount
 	Terminal         bool
 	Stdin            string
 	Stdout           string

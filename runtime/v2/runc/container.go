@@ -59,18 +59,8 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
-	var pmounts []process.Mount
-	for _, m := range r.Rootfs {
-		pmounts = append(pmounts, process.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		})
-	}
-
 	rootfs := ""
-	if len(pmounts) > 0 {
+	if len(r.Rootfs) > 0 {
 		rootfs = filepath.Join(r.Bundle, "rootfs")
 		if err := os.Mkdir(rootfs, 0711); err != nil && !os.IsExist(err) {
 			return nil, err
@@ -81,7 +71,6 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		ID:               r.ID,
 		Bundle:           r.Bundle,
 		Runtime:          opts.BinaryName,
-		Rootfs:           pmounts,
 		Terminal:         r.Terminal,
 		Stdin:            r.Stdin,
 		Stdout:           r.Stdout,
@@ -100,12 +89,12 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 
 	var mounts []mount.Mount
-	for _, pm := range pmounts {
+	for _, m := range r.Rootfs {
 		mounts = append(mounts, mount.Mount{
-			Type:    pm.Type,
-			Source:  pm.Source,
-			Target:  pm.Target,
-			Options: pm.Options,
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
 		})
 	}
 	defer func() {
