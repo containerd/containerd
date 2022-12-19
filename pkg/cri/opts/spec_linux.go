@@ -29,6 +29,8 @@ import (
 	"syscall"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -404,6 +406,36 @@ func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 	}
 }
 
+var (
+	swapControllerAvailability     bool
+	swapControllerAvailabilityOnce sync.Once
+)
+
+func swapControllerAvailable() bool {
+	swapControllerAvailabilityOnce.Do(func() {
+		const warn = "Failed to detect the availability of the swap controller, assuming not available"
+		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
+		if cgroups.Mode() == cgroups.Unified {
+			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
+			_, unified, err := cgroup1.ParseCgroupFileUnified("/proc/self/cgroup")
+			if err != nil {
+				err = fmt.Errorf("failed to parse /proc/self/cgroup: %w", err)
+				logrus.WithError(err).Warn(warn)
+				return
+			}
+			p = filepath.Join("/sys/fs/cgroup", unified, "memory.swap.max")
+		}
+		if _, err := os.Stat(p); err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				logrus.WithError(err).Warn(warn)
+			}
+			return
+		}
+		swapControllerAvailability = true
+	})
+	return swapControllerAvailability
+}
+
 // WithResources sets the provided resource restrictions
 func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHugetlbController, disableHugetlbController bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
@@ -449,7 +481,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 			// swap/memory limit should be equal to prevent container from swapping by default
-			if swapLimit == 0 {
+			if swapLimit == 0 && swapControllerAvailable() {
 				s.Linux.Resources.Memory.Swap = &limit
 			}
 		}
