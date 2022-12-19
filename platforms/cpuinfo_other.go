@@ -20,7 +20,10 @@
 package platforms
 
 import (
+	"fmt"
 	"runtime"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 func getCPUVariant() (string, error) {
