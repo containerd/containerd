@@ -114,23 +114,33 @@ func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, wor
 
 // checkRename
 // https://github.com/docker/docker/issues/25409
-func checkRename(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
-	t.Skip("rename test still fails on some kernels with overlay")
-	l1Init := fstest.Apply(
-		fstest.CreateDir("/dir1", 0700),
-		fstest.CreateDir("/somefiles", 0700),
-		fstest.CreateFile("/somefiles/f1", []byte("was here first!"), 0644),
-		fstest.CreateFile("/somefiles/f2", []byte("nothing interesting"), 0644),
-	)
-	l2Init := fstest.Apply(
-		fstest.Rename("/dir1", "/dir2"),
-		fstest.CreateFile("/somefiles/f1-overwrite", []byte("new content 1"), 0644),
-		fstest.Rename("/somefiles/f1-overwrite", "/somefiles/f1"),
-		fstest.Rename("/somefiles/f2", "/somefiles/f3"),
-	)
+func checkRename(ss string) func(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+	return func(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
+		l1Init := fstest.Apply(
+			fstest.CreateDir("/dir1", 0700),
+			fstest.CreateDir("/somefiles", 0700),
+			fstest.CreateFile("/somefiles/f1", []byte("was here first!"), 0644),
+			fstest.CreateFile("/somefiles/f2", []byte("nothing interesting"), 0644),
+		)
 
-	if err := checkSnapshots(ctx, sn, work, l1Init, l2Init); err != nil {
-		t.Fatalf("Check snapshots failed: %+v", err)
+		var applier []fstest.Applier
+		if ss != "overlayfs" {
+			// With neither OVERLAY_FS_REDIRECT_DIR nor redirect_dir,
+			// renaming the directory on the lower directory doesn't work on overlayfs.
+			// https://github.com/torvalds/linux/blob/v5.18/Documentation/filesystems/overlayfs.rst#renaming-directories
+			applier = append(applier, fstest.Rename("/dir1", "/dir2"))
+		}
+		applier = append(
+			applier,
+			fstest.CreateFile("/somefiles/f1-overwrite", []byte("new content 1"), 0644),
+			fstest.Rename("/somefiles/f1-overwrite", "/somefiles/f1"),
+			fstest.Rename("/somefiles/f2", "/somefiles/f3"),
+		)
+		l2Init := fstest.Apply(applier...)
+
+		if err := checkSnapshots(ctx, sn, work, l1Init, l2Init); err != nil {
+			t.Fatalf("Check snapshots failed: %+v", err)
+		}
 	}
 }
 
