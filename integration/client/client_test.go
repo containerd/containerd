@@ -26,6 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
@@ -36,10 +43,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
-	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/identity"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
 )
 
 var (
@@ -455,6 +458,34 @@ func TestImagePullWithConcurrencyLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestImagePullWithTracing(t *testing.T) {
+	client, err := newClient(t, address)
+	require.NoError(t, err)
+	defer client.Close()
+
+	ctx := namespaces.WithNamespace(context.Background(), "tracing")
+
+	//create in memory exporter and global tracer provider for test
+	exp, tp := newInMemoryExporterTracer()
+	//set the tracer provider global available
+	otel.SetTracerProvider(tp)
+	// Shutdown properly so nothing leaks.
+	defer func() { _ = tp.Shutdown(ctx) }()
+
+	//do an image pull which is instrumented, we should expect spans in the exporter
+	_, err = client.Pull(ctx, testImage, WithPlatformMatcher(platforms.Default()))
+	require.NoError(t, err)
+
+	err = tp.ForceFlush(ctx)
+	require.NoError(t, err)
+
+	//The span name was defined in client.pull when instrumented it
+	spanNameExpected := "pull.Pull"
+	spans := exp.GetSpans()
+	validateRootSpan(t, spanNameExpected, spans)
+
 }
 
 func TestClientReconnect(t *testing.T) {
