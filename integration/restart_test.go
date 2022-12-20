@@ -191,6 +191,21 @@ func TestContainerdRestart(t *testing.T) {
 			if s.id == loaded.Id {
 				t.Logf("Checking sandbox state for '%s'", s.name)
 				assert.Equal(t, s.state, loaded.State)
+
+				// See https://github.com/containerd/containerd/issues/7843 for details.
+				// Test that CNI result and sandbox IPs are still present after restart.
+				if loaded.State == runtime.PodSandboxState_SANDBOX_READY {
+					status, info, err := SandboxInfo(loaded.Id)
+					require.NoError(t, err)
+
+					// Check that the NetNS didn't close on us, that we still have
+					// the CNI result, and that we still have the IP we were given
+					// for this pod.
+					require.False(t, info.NetNSClosed)
+					require.NotNil(t, info.CNIResult)
+					require.NotNil(t, status.Network)
+					require.NotEmpty(t, status.Network.Ip)
+				}
 				break
 			}
 		}
