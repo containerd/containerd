@@ -18,6 +18,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"path/filepath"
 	goruntime "runtime"
@@ -286,8 +287,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			// Update spec of the container
 			containerd.UpdateContainerOpts(containerd.WithSpec(spec)),
 			// Update sandbox metadata to include NetNS info
-			containerd.UpdateContainerOpts(containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata))); err != nil {
-			return nil, errors.Wrapf(err, "failed to update the network namespace for the sandbox container %q", id)
+			containerd.UpdateContainerOpts(containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata)),
+		); err != nil {
+			return nil, fmt.Errorf("failed to update the network namespace for the sandbox container %q: %w", id, err)
 		}
 
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
@@ -314,6 +316,14 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// SandboxStatus request.
 		if err := c.setupPodNetwork(ctx, &sandbox); err != nil {
 			return nil, errors.Wrapf(err, "failed to setup network for sandbox %q", id)
+		}
+
+		// Update metadata here to save CNI result and pod IPs to disk.
+		if err := container.Update(ctx,
+			// Update sandbox metadata to include NetNS info
+			containerd.UpdateContainerOpts(containerd.WithContainerExtension(sandboxMetadataExtension, &sandbox.Metadata)),
+		); err != nil {
+			return nil, fmt.Errorf("failed to update the network namespace for the sandbox container %q: %w", id, err)
 		}
 	}
 
