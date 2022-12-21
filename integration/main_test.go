@@ -126,6 +126,35 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 	p.Linux.SecurityContext.NamespaceOptions.Network = runtime.NamespaceMode_NODE
 }
 
+// Set pod userns.
+func WithPodUserNs(containerID, hostID, length uint32) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		if p.Linux.SecurityContext.NamespaceOptions == nil {
+			p.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+		}
+
+		idMap := runtime.IDMapping{
+			HostId:      hostID,
+			ContainerId: containerID,
+			Length:      length,
+		}
+		if p.Linux.SecurityContext.NamespaceOptions.UsernsOptions == nil {
+			p.Linux.SecurityContext.NamespaceOptions.UsernsOptions = &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+			}
+		}
+
+		p.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Uids = append(p.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Uids, &idMap)
+		p.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Gids = append(p.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Gids, &idMap)
+	}
+}
+
 // Set host pid.
 func WithHostPid(p *runtime.PodSandboxConfig) {
 	if p.Linux == nil {
@@ -312,6 +341,35 @@ func WithPidNamespace(mode runtime.NamespaceMode) ContainerOpts {
 		c.Linux.SecurityContext.NamespaceOptions.Pid = mode
 	}
 
+}
+
+// Add user namespace pod mode.
+func WithUserNamespace(containerID, hostID, length uint32) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		if c.Linux.SecurityContext.NamespaceOptions == nil {
+			c.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{}
+		}
+		idMap := runtime.IDMapping{
+			HostId:      hostID,
+			ContainerId: containerID,
+			Length:      length,
+		}
+
+		if c.Linux.SecurityContext.NamespaceOptions.UsernsOptions == nil {
+			c.Linux.SecurityContext.NamespaceOptions.UsernsOptions = &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+			}
+		}
+
+		c.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Uids = append(c.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Uids, &idMap)
+		c.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Gids = append(c.Linux.SecurityContext.NamespaceOptions.UsernsOptions.Gids, &idMap)
+	}
 }
 
 // Add container log path.
