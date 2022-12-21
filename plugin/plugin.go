@@ -86,6 +86,8 @@ const (
 	NRIApiPlugin Type = "io.containerd.nri.v1"
 	// TransferPlugin implements a transfer service
 	TransferPlugin Type = "io.containerd.transfer.v1"
+	// SandboxStorePlugin implements a sandbox store
+	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
 )
 
 const (

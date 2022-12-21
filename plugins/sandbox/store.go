@@ -14,12 +14,27 @@
    limitations under the License.
 */
 
-package integration
+package sandbox
 
 import (
-	// Register for linux platforms
-	_ "github.com/containerd/containerd/plugins/sandbox" // WithInMemoryServices will fail otherwise
-	_ "github.com/containerd/containerd/runtime/v1/linux"
-	_ "github.com/containerd/containerd/services/sandbox" // WithInMemoryServices will fail otherwise
-	_ "github.com/containerd/containerd/snapshots/overlay/plugin"
+	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/plugin"
 )
+
+func init() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.SandboxStorePlugin,
+		ID:   "local",
+		Requires: []plugin.Type{
+			plugin.MetadataPlugin,
+		},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			m, err := ic.Get(plugin.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			return metadata.NewSandboxStore(m.(*metadata.DB)), nil
+		},
+	})
+}
