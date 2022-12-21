@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
@@ -40,16 +39,11 @@ func init() {
 		ID:   services.SandboxControllerService,
 		Requires: []plugin.Type{
 			plugin.RuntimePluginV2,
-			plugin.MetadataPlugin,
 			plugin.EventPlugin,
+			plugin.SandboxStorePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			shimPlugin, err := ic.GetByID(plugin.RuntimePluginV2, "shim")
-			if err != nil {
-				return nil, err
-			}
-
-			metadataPlugin, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -59,11 +53,14 @@ func init() {
 				return nil, err
 			}
 
+			storePlugin, err := ic.GetByID(plugin.SandboxStorePlugin, "local")
+			if err != nil {
+				return nil, err
+			}
 			var (
 				shims     = shimPlugin.(*v2.ShimManager)
 				publisher = exchangePlugin.(*exchange.Exchange)
-				db        = metadataPlugin.(*metadata.DB)
-				store     = metadata.NewSandboxStore(db)
+				store     = storePlugin.(sandbox.Store)
 			)
 
 			return &controllerLocal{
