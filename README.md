@@ -7,7 +7,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
 
-containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
+containerd is an industry-standard container runtime with an emphasis on simplicity, robustness, and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
 
 containerd is a member of CNCF with ['graduated'](https://landscape.cncf.io/?selected=containerd) status.
 
@@ -24,7 +24,7 @@ We felt it important to announce this, particularly in view of [the dockershim r
 
 It should be noted here that moving to CRI integrations has been in the plan for many years.  `containerd` began as part of `Docker` and was donated to `CNCF`. `containerd` remains in use today by Docker/moby/buildkit etc., and has many other [adopters](https://github.com/containerd/containerd/blob/main/ADOPTERS.md). `containerd` has a namespace that isolates use of `containerd` from various clients/adopters. The Kubernetes namespace is appropriately named `k8s.io`. The CRI API and `containerd` CRI plugin project has, from the start, been an effort to reduce the impact surface for Kubernetes container runtime integration. If you can't tell, we are excited to see this come to fruition.
 
-If you have any concerns or questions, we will be here to answer them in [issues, discussions, and/or on slack](#communication). Below you will find information / detail about our [CRI Integration](#cri) implementation.
+If you have any concerns or questions, we will be here to answer them in [issues, discussions, and/or on slack](#communication). Below you will find information/detail about our [CRI Integration](#cri) implementation.
 
 For containerd users already on v1.6.0-v1.6.3, there are known issues addressed by [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). The issues are primarily related to [CNI setup](https://github.com/kubernetes/website/blob/dev-1.24/content/en/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors.md)
 
@@ -32,13 +32,13 @@ For containerd users already on v1.6.0-v1.6.3, there are known issues addressed 
 
 We are a large inclusive OSS project that is welcoming help of any kind shape or form:
 * Documentation help is needed to make the product easier to consume and extend.
-* We need OSS community outreach / organizing help to get the word out; manage
-and create messaging and educational content; and to help with social media, community forums/groups, and google groups.
+* We need OSS community outreach/organizing help to get the word out; manage
+and create messaging and educational content; and help with social media, community forums/groups, and google groups.
 * We are actively inviting new [security advisors](https://github.com/containerd/project/blob/main/GOVERNANCE.md#security-advisors) to join the team.
 * New sub-projects are being created, core and non-core that could use additional development help.
 * Each of the [containerd projects](https://github.com/containerd) has a list of issues currently being worked on or that need help resolving.
-  - If the issue has not already been assigned to someone, or has not made recent progress and you are interested, please inquire.
-  - If you are interested in starting with a smaller / beginner level issue, look for issues with an `exp/beginner` tag, for example [containerd/containerd beginner issues.](https://github.com/containerd/containerd/issues?q=is%3Aissue+is%3Aopen+label%3Aexp%2Fbeginner)
+  - If the issue has not already been assigned to someone or has not made recent progress and you are interested, please inquire.
+  - If you are interested in starting with a smaller/beginner-level issue, look for issues with an `exp/beginner` tag, for example [containerd/containerd beginner issues.](https://github.com/containerd/containerd/issues?q=is%3Aissue+is%3Aopen+label%3Aexp%2Fbeginner)
 
 ## Getting Started
 
@@ -115,7 +115,7 @@ func main() {
 
 ### Namespaces
 
-Namespaces allow multiple consumers to use the same containerd without conflicting with each other.  It has the benefit of sharing content but still having separation with containers and images.
+Namespaces allow multiple consumers to use the same containerd without conflicting with each other.  It has the benefit of sharing content while maintaining separation with containers and images.
 
 To set a namespace for requests to the API:
 
@@ -145,7 +145,7 @@ err := client.Push(context, "docker.io/library/redis:latest", image.Target())
 
 ### Containers
 
-In containerd, a container is a metadata object.  Resources such as an OCI runtime specification, image, root filesystem, and other metadata can be attached to a container.
+In containerd, a container is a metadata object. Resources such as an OCI runtime specification, image, root filesystem, and other metadata can be attached to a container.
 
 ```go
 redis, err := client.NewContainer(context, "redis-master")
@@ -154,7 +154,7 @@ defer redis.Delete(context)
 
 ### OCI Runtime Specification
 
-containerd fully supports the OCI runtime specification for running containers.  We have built in functions to help you generate runtime specifications based on images as well as custom parameters.
+containerd fully supports the OCI runtime specification for running containers.  We have built-in functions to help you generate runtime specifications based on images as well as custom parameters.
 
 You can specify options when creating a container about how to modify the specification.
 
@@ -164,7 +164,7 @@ redis, err := client.NewContainer(context, "redis-master", containerd.WithNewSpe
 
 ### Root Filesystems
 
-containerd allows you to use overlay or snapshot filesystems with your containers.  It comes with built in support for overlayfs and btrfs.
+containerd allows you to use overlay or snapshot filesystems with your containers.  It comes with built-in support for overlayfs and btrfs.
 
 ```go
 // pull an image and unpack it into the configured snapshotter
@@ -317,14 +317,14 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 
 ### Communication
 
-For async communication and long running discussions please use issues and pull requests on the github repo.
+For async communication and long-running discussions please use issues and pull requests on the GitHub repo.
 This will be the best place to discuss design and implementation.
 
 For sync communication catch us in the `#containerd` and `#containerd-dev` slack channels on Cloud Native Computing Foundation's (CNCF) slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF slack.](https://slack.cncf.io)
 
 ### Security audit
 
-A third party security audit was performed by Cure53 in 4Q2018; the [full report](docs/SECURITY_AUDIT.pdf) is available in our docs/ directory.
+A third-party security audit was performed by Cure53 in 4Q2018; the [full report](docs/SECURITY_AUDIT.pdf) is available in our docs/ directory.
 
 ### Reporting security issues
 
@@ -333,7 +333,7 @@ Please follow the instructions at [containerd/project](https://github.com/contai
 ## Licenses
 
 The containerd codebase is released under the [Apache 2.0 license](LICENSE).
-The README.md file, and files in the "docs" folder are licensed under the
+The README.md file and files in the "docs" folder are licensed under the
 Creative Commons Attribution 4.0 International License. You may obtain a
 copy of the license, titled CC-BY-4.0, at http://creativecommons.org/licenses/by/4.0/.
 
