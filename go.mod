@@ -6,7 +6,7 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221206110420-d395f97c4830
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 	github.com/Microsoft/go-winio v0.6.0
-	github.com/Microsoft/hcsshim v0.10.0-rc.1
+	github.com/Microsoft/hcsshim v0.10.0-rc.3
 	github.com/container-orchestrated-devices/container-device-interface v0.5.1
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs v1.0.0
@@ -23,12 +23,12 @@ require (
 	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/cni v1.1.1
 	github.com/containernetworking/plugins v1.1.1
-	github.com/coreos/go-systemd/v22 v22.3.2
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.4.0
-	github.com/emicklei/go-restful/v3 v3.8.0
+	github.com/emicklei/go-restful/v3 v3.10.1
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
@@ -52,7 +52,7 @@ require (
 	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools v0.9.0
 	github.com/opencontainers/selinux v1.10.2
-	github.com/pelletier/go-toml v1.9.3
+	github.com/pelletier/go-toml v1.9.4
 	github.com/prometheus/client_golang v1.12.1
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
@@ -61,12 +61,12 @@ require (
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.36.4
-	go.opentelemetry.io/otel v1.11.1
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.11.1
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.1
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.11.1
-	go.opentelemetry.io/otel/sdk v1.11.1
-	go.opentelemetry.io/otel/trace v1.11.1
+	go.opentelemetry.io/otel v1.11.2
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.11.2
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.11.2
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.11.2
+	go.opentelemetry.io/otel/sdk v1.11.2
+	go.opentelemetry.io/otel/trace v1.11.2
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.3.0
 	google.golang.org/genproto v0.0.0-20221206210731-b1a01be3a5f6
@@ -84,9 +84,10 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.1 // indirect
+	github.com/akavel/rsrc v0.10.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
@@ -102,6 +103,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
+	github.com/josephspurrier/goversioninfo v1.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.4 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
@@ -122,7 +124,7 @@ require (
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.1 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.11.2 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.6.0 // indirect

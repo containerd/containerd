@@ -471,7 +471,7 @@ func (job *JobObject) QueryStorageStats() (*winapi.JOBOBJECT_IO_ATTRIBUTION_INFO
 // ApplyFileBinding makes a file binding using the Bind Filter from target to root. If the job has
 // not been upgraded to a silo this call will fail. The binding is only applied and visible for processes
 // running in the job, any processes on the host or in another job will not be able to see the binding.
-func (job *JobObject) ApplyFileBinding(root, target string, merged bool) error {
+func (job *JobObject) ApplyFileBinding(root, target string, readOnly bool) error {
 	job.handleLock.RLock()
 	defer job.handleLock.RUnlock()
 
@@ -501,8 +501,8 @@ func (job *JobObject) ApplyFileBinding(root, target string, merged bool) error {
 	}
 
 	flags := winapi.BINDFLT_FLAG_USE_CURRENT_SILO_MAPPING
-	if merged {
-		flags |= winapi.BINDFLT_FLAG_MERGED_BIND_MAPPING
+	if readOnly {
+		flags |= winapi.BINDFLT_FLAG_READ_ONLY_MAPPING
 	}
 
 	if err := winapi.BfSetupFilter(
