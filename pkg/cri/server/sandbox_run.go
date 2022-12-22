@@ -440,12 +440,16 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
+	netStart := time.Now()
 	if c.config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
 	} else {
 		result, err = netPlugin.Setup(ctx, id, path, opts...)
 	}
+	networkPluginOperations.WithValues(networkSetUpOp).Inc()
+	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
 	if err != nil {
+		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
 		return err
 	}
 	logDebugCNIResult(ctx, id, result)
