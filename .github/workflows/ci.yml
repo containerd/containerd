@@ -546,30 +546,7 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
-          BDIR="$(mktemp -d -p $PWD)"
-          mkdir -p ${{github.workspace}}/report
-
-          function cleanup() {
-            sudo pkill containerd || true
-
-            echo ::group::containerd logs
-            cat ${{github.workspace}}/report/containerd.log
-            echo ::endgroup::
-
-            sudo -E rm -rf ${BDIR}
-          }
-          trap cleanup EXIT
-
-          mkdir -p ${BDIR}/{root,state}
-          cat > ${BDIR}/config.toml <<EOF
-            version = 2
-            [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-            runtime_type = "${TEST_RUNTIME}"
-          EOF
-          sudo ls /etc/cni/net.d
-          sudo -E PATH=$PATH /usr/local/bin/containerd -a ${BDIR}/c.sock --config ${BDIR}/config.toml --root ${BDIR}/root --state ${BDIR}/state --log-level debug &> ${{github.workspace}}/report/containerd.log &
-          sudo -E PATH=$PATH /usr/local/bin/ctr -a ${BDIR}/c.sock version
-          sudo -E PATH=$PATH critest --report-dir "${{github.workspace}}/report" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
+          sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
