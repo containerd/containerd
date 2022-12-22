@@ -342,7 +342,7 @@ func (u *Unpacker) unpack(
 		}
 
 		// Abort the snapshot if commit does not happen
-		abort := func() {
+		abort := func(ctx context.Context) {
 			if err := sn.Remove(ctx, key); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
 			}
@@ -367,11 +367,11 @@ func (u *Unpacker) unpack(
 
 		select {
 		case <-ctx.Done():
-			abort()
+			abort(context.Background()) // Cleanup context
 			return ctx.Err()
 		case err := <-fetchErr:
 			if err != nil {
-				abort()
+				abort(ctx)
 				return err
 			}
 		case <-fetchC[i-fetchOffset]:
@@ -379,16 +379,16 @@ func (u *Unpacker) unpack(
 
 		diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
 		if err != nil {
-			abort()
+			abort(ctx)
 			return fmt.Errorf("failed to extract layer %s: %w", diffIDs[i], err)
 		}
 		if diff.Digest != diffIDs[i] {
-			abort()
+			abort(ctx)
 			return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
 		}
 
 		if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
-			abort()
+			abort(ctx)
 			if errdefs.IsAlreadyExists(err) {
 				return nil
 			}
