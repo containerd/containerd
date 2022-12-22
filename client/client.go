@@ -80,6 +80,24 @@ func init() {
 	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
 }
 
+// DefaultDialOptions return the default list of dial options to connect
+// containerd's socket.
+func DefaultDialOptions() []grpc.DialOption {
+	backoffConfig := backoff.DefaultConfig
+	backoffConfig.MaxDelay = 3 * time.Second
+	connParams := grpc.ConnectParams{
+		Backoff: backoffConfig,
+	}
+	return []grpc.DialOption{
+		grpc.WithBlock(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.FailOnNonTempDialError(true),
+		grpc.WithConnectParams(connParams),
+		grpc.WithContextDialer(dialer.ContextDialer),
+		grpc.WithReturnConnectionError(),
+	}
+}
+
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
 func New(address string, opts ...Opt) (*Client, error) {
@@ -113,19 +131,7 @@ func New(address string, opts ...Opt) (*Client, error) {
 		c.services = *copts.services
 	}
 	if address != "" {
-		backoffConfig := backoff.DefaultConfig
-		backoffConfig.MaxDelay = 3 * time.Second
-		connParams := grpc.ConnectParams{
-			Backoff: backoffConfig,
-		}
-		gopts := []grpc.DialOption{
-			grpc.WithBlock(),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.FailOnNonTempDialError(true),
-			grpc.WithConnectParams(connParams),
-			grpc.WithContextDialer(dialer.ContextDialer),
-			grpc.WithReturnConnectionError(),
-		}
+		gopts := DefaultDialOptions()
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
