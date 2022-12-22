@@ -177,7 +177,6 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			restartCount, _ := strconv.Atoi(labels[restart.CountLabel])
 			changes = append(changes, &startChange{
 				container: c,
-				logPath:   labels[restart.LogPathLabel],
 				logURI:    labels[restart.LogURILabel],
 				count:     restartCount + 1,
 			})

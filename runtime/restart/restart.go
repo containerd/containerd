@@ -37,7 +37,6 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/sirupsen/logrus"
 )
@@ -54,11 +53,6 @@ const (
 	CountLabel = "containerd.io/restart.count"
 	// ExplicitlyStoppedLabel sets the restart explicitly stopped label for a container
 	ExplicitlyStoppedLabel = "containerd.io/restart.explicitly-stopped"
-
-	// LogPathLabel sets the restart log path label for a container
-	//
-	// Deprecated(in release 1.5): use LogURILabel
-	LogPathLabel = "containerd.io/restart.logpath"
 )
 
 // Policy represents the restart policies of a container.
@@ -162,43 +156,6 @@ func WithLogURIString(uriString string) func(context.Context, *containerd.Client
 	}
 }
 
-// WithBinaryLogURI sets the binary-type log uri for a container.
-//
-// Deprecated(in release 1.5): use WithLogURI
-func WithBinaryLogURI(binary string, args map[string]string) func(context.Context, *containerd.Client, *containers.Container) error {
-	uri, err := cio.LogURIGenerator("binary", binary, args)
-	if err != nil {
-		return func(context.Context, *containerd.Client, *containers.Container) error {
-			return err
-		}
-	}
-	return WithLogURI(uri)
-}
-
-// WithFileLogURI sets the file-type log uri for a container.
-//
-// Deprecated(in release 1.5): use WithLogURI
-func WithFileLogURI(path string) func(context.Context, *containerd.Client, *containers.Container) error {
-	uri, err := cio.LogURIGenerator("file", path, nil)
-	if err != nil {
-		return func(context.Context, *containerd.Client, *containers.Container) error {
-			return err
-		}
-	}
-	return WithLogURI(uri)
-}
-
-// WithLogPath sets the log path for a container
-//
-// Deprecated(in release 1.5): use WithLogURI with "file://<path>" URI.
-func WithLogPath(path string) func(context.Context, *containerd.Client, *containers.Container) error {
-	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
-		ensureLabels(c)
-		c.Labels[LogPathLabel] = path
-		return nil
-	}
-}
-
 // WithStatus sets the status for a container
 func WithStatus(status containerd.ProcessStatus) func(context.Context, *containerd.Client, *containers.Container) error {
 	return func(_ context.Context, _ *containerd.Client, c *containers.Container) error {
@@ -224,7 +181,6 @@ func WithNoRestarts(_ context.Context, _ *containerd.Client, c *containers.Conta
 	}
 	delete(c.Labels, StatusLabel)
 	delete(c.Labels, PolicyLabel)
-	delete(c.Labels, LogPathLabel)
 	delete(c.Labels, LogURILabel)
 	return nil
 }
