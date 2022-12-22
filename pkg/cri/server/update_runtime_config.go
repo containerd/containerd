@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/containerd/containerd/log"
 	"golang.org/x/net/context"
@@ -74,10 +75,17 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		log.G(ctx).Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
-	if err := netPlugin.Status(); err == nil {
+
+	netStart := time.Now()
+	err = netPlugin.Status()
+	networkPluginOperations.WithValues(networkStatusOp).Inc()
+	networkPluginOperationsLatency.WithValues(networkStatusOp).UpdateSince(netStart)
+	if err == nil {
 		log.G(ctx).Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
-	} else if err := netPlugin.Load(c.cniLoadOptions()...); err == nil {
+	}
+	networkPluginOperationsErrors.WithValues(networkStatusOp).Inc()
+	if err := netPlugin.Load(c.cniLoadOptions()...); err == nil {
 		log.G(ctx).Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}

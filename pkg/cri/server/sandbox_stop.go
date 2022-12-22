@@ -185,7 +185,15 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
 
-	return netPlugin.Remove(ctx, id, path, opts...)
+	netStart := time.Now()
+	err = netPlugin.Remove(ctx, id, path, opts...)
+	networkPluginOperations.WithValues(networkTearDownOp).Inc()
+	networkPluginOperationsLatency.WithValues(networkTearDownOp).UpdateSince(netStart)
+	if err != nil {
+		networkPluginOperationsErrors.WithValues(networkTearDownOp).Inc()
+		return err
+	}
+	return nil
 }
 
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
