@@ -213,6 +213,14 @@ var (
 			Name:  "user,u",
 			Usage: "username or user id, group optional (format: <name|uid>[:<group|gid>])",
 		},
+		cli.StringFlag{
+			Name:  "cgroup",
+			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
+		},
+		cli.StringFlag{
+			Name:  "platform",
+			Usage: "run image for specific platform",
+		},
 	}
 )
 

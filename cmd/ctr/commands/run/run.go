@@ -111,21 +111,12 @@ var Command = cli.Command{
 			Name:  "fifo-dir",
 			Usage: "directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
-			Name:  "cgroup",
-			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
-		},
-		cli.StringFlag{
-			Name:  "platform",
-			Usage: "run image for specific platform",
-		},
 		cli.BoolFlag{
 			Name:  "cni",
 			Usage: "enable cni networking for the container",
 		},
-	}, append(platformRunFlags,
-		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
-			commands.ContainerFlags...)...)...),
+	}, append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+		commands.ContainerFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
