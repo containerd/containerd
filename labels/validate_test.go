@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidLabels(t *testing.T) {
@@ -50,4 +51,30 @@ func TestInvalidLabels(t *testing.T) {
 			t.Fatal("error should be an invalid label error")
 		}
 	}
+}
+
+func TestLongKey(t *testing.T) {
+	key := strings.Repeat("s", keyMaxLen+1)
+	value := strings.Repeat("v", maxSize-len(key))
+
+	err := Validate(key, value)
+	assert.Equal(t, err, nil)
+
+	key = strings.Repeat("s", keyMaxLen+12)
+	value = strings.Repeat("v", maxSize-len(key)+1)
+
+	err = Validate(key, value)
+	assert.ErrorIs(t, err, errdefs.ErrInvalidArgument)
+
+	key = strings.Repeat("s", keyMaxLen-1)
+	value = strings.Repeat("v", maxSize-len(key))
+
+	err = Validate(key, value)
+	assert.Equal(t, err, nil)
+
+	key = strings.Repeat("s", keyMaxLen-1)
+	value = strings.Repeat("v", maxSize-len(key)-1)
+
+	err = Validate(key, value)
+	assert.Equal(t, err, nil)
 }
