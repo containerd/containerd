@@ -78,7 +78,7 @@ var startCommand = cli.Command{
 		}
 		var (
 			tty    = spec.Process.Terminal
-			opts   = getNewTaskOpts(context)
+			opts   = GetNewTaskOpts(context)
 			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		)
 		var con console.Console

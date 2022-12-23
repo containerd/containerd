@@ -82,6 +82,7 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 	return container.NewTask(ctx, ioCreator)
 }
 
-func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+// GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
+func GetNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
 	return nil
 }

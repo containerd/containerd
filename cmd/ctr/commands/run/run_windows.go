@@ -182,10 +182,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	return client.NewContainer(ctx, id, cOpts...)
 }
 
-func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
-	return nil
-}
-
 func getNetNSPath(ctx gocontext.Context, t containerd.Task) (string, error) {
 	s, err := t.Spec(ctx)
 	if err != nil {
