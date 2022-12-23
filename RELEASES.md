@@ -129,14 +129,17 @@ for the list of actively tested versions. Kubernetes only supports n-3 minor
 release versions and containerd will ensure there is always a supported version
 of containerd for every supported version of Kubernetes.
 
-| Kubernetes Version | containerd Version | CRI Version  |
-|--------------------|--------------------|--------------|
-| 1.20               | 1.5.0+             | v1alpha2     |
-| 1.21               | 1.5.0+             | v1alpha2     |
-| 1.22               | 1.5.5+             | v1alpha2     |
-| 1.23               | 1.6.0+, 1,5.8+     | v1, v1alpha2 |
-| 1.24               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
-| 1.25               | 1.6.4+, 1.5.11+    | v1, v1alpha2 |
+| Kubernetes Version | containerd Version | CRI Version     |
+|--------------------|--------------------|-----------------|
+| 1.20               | 1.5.0+             | v1alpha2        |
+| 1.21               | 1.5.0+             | v1alpha2        |
+| 1.22               | 1.5.5+             | v1alpha2        |
+| 1.23               | 1.6.0+, 1,5.8+     | v1, v1alpha2    |
+| 1.24               | 1.6.4+, 1.5.11+    | v1, v1alpha2    |
+| 1.25               | 1.6.4+, 1.5.11+    | v1, v1alpha2 ** |
+| 1.26               | 1.6.tbd, 1.7.tbd   | v1              |
+
+** Note: containerd v.1.5._, v1.6._, and v1.7.* will support CRI v1 and v1alpha2 through EOL as those releases will continue to support older versions of k8s, cloud providers, and other clients using CRI v1alpha2. CRI v1alpha2 will be deprecated in v1.7 and removed in containerd v2.
 
 Deprecated containerd and kubernetes versions
 
