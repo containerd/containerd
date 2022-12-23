@@ -131,6 +131,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, err
 			}
 			opts = append(opts, oci.WithWindowsNetworkNamespace(ns.GetPath()))
+			cniMeta := &commands.NetworkMetaData{EnableCni: true}
+			cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 		}
 		if context.Bool("isolated") {
 			opts = append(opts, oci.WithWindowsHyperV)
