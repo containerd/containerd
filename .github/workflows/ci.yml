@@ -266,11 +266,132 @@ jobs:
           make binaries
         working-directory: src/github.com/containerd/containerd
 
-  #
-  # Integration and CRI tests
-  #
   integration-windows:
     name: Windows Integration
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    needs: [project, linters, protos, man]
+    env:
+      GOTEST: gotestsum --
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2019, windows-2022]
+        enable_cri_sandboxes: ["", "sandboxed"]
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: src/github.com/containerd/containerd
+
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v3
+        with:
+          path: src/github.com/containerd/containerd
+
+      - uses: actions/checkout@v3
+        with:
+          repository: kubernetes-sigs/cri-tools
+          path: src/github.com/kubernetes-sigs/cri-tools
+
+      - name: Set env
+        run: |
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin" >> $GITHUB_PATH
+
+      - run: script/setup/install-dev-tools
+
+      - name: Binaries
+        env:
+          CGO_ENABLED: 1
+        run: |
+          set -o xtrace
+          mingw32-make.exe binaries
+          cd ../../kubernetes-sigs/cri-tools
+          make critest
+
+      - run: script/setup/install-cni-windows
+
+      - env:
+          TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          BUSYBOX_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/busybox:1.29-2"
+          RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
+          WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
+        run: |
+          cat > "${{ env.TEST_IMAGE_LIST }}" << EOF
+          busybox = "${{ env.BUSYBOX_TESTING_IMAGE_REF }}"
+          ResourceConsumer = "${{ env.RESOURCE_CONSUMER_TESTING_IMAGE_REF }}"
+          EOF
+          cat > "${{ env.CRI_TEST_IMAGES }}" << EOF
+          defaultTestContainerImage: ${{ env.BUSYBOX_TESTING_IMAGE_REF }}
+          webServerTestImage: ${{ env.WEBSERVER_TESTING_IMAGE_REF }}
+          EOF
+
+      - run: script/setup/install-gotestsum
+      - run: script/setup/install-teststat
+      - name: Tests
+        env:
+          CGO_ENABLED: 1
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        run: mingw32-make.exe test root-test
+      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-unit-root-gotest.json
+        if: always()
+
+      - name: Integration 1
+        env:
+          CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        run: mingw32-make.exe integration
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+        if: always()
+
+      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
+      - name: Integration 2
+        env:
+          TESTFLAGS_PARALLEL: 1
+          EXTRA_TESTFLAGS: "-short"
+          CGO_ENABLED: 1
+          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
+          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
+          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
+        run: mingw32-make.exe integration
+      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
+        if: always()
+      - run: script/test/test2annotation.sh ${TESTFILE}
+        env:
+          TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
+        if: always()
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: TestResults ${{ matrix.os }}
+          path: |
+            ${{github.workspace}}/*-junit.xml
+            ${{github.workspace}}/*-gotest.json
+            ${{github.workspace}}/report/*.log
+
+  integration-windows-cri:
+    name: Windows CRI
     runs-on: ${{ matrix.os }}
     timeout-minutes: 50
     needs: [project, linters, protos, man]
@@ -346,52 +467,6 @@ jobs:
           curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
           tar -xvf c:\crictl.tar.gz
           mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
-
-      - run: script/setup/install-gotestsum
-      - run: script/setup/install-teststat
-      - name: Tests
-        env:
-          CGO_ENABLED: 1
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-unit-root.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-unit-root-gotest.json
-        run: mingw32-make.exe test root-test
-      - run: if [ -f *-gotest.json ]; then echo '# Root Test' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
-        env:
-          TESTFILE: ${{github.workspace}}/test-unit-root-gotest.json
-        if: always()
-
-      - name: Integration 1
-        env:
-          CGO_ENABLED: 1
-          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-        run: mingw32-make.exe integration
-      - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
-        env:
-          TESTFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-        if: always()
-
-      # Run the integration suite a second time. See discussion in github.com/containerd/containerd/pull/1759
-      - name: Integration 2
-        env:
-          TESTFLAGS_PARALLEL: 1
-          EXTRA_TESTFLAGS: "-short"
-          CGO_ENABLED: 1
-          ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
-          GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
-          GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
-        run: mingw32-make.exe integration
-      - run: if [ -f *-gotest.json ]; then echo '# Integration 2' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
-        if: always()
-      - run: script/test/test2annotation.sh ${TESTFILE}
-        env:
-          TESTFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
-        if: always()
 
       - name: CRI Integration Test
         env:
@@ -534,6 +609,76 @@ jobs:
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
 
+      # Log the status of this VM to investigate issues like
+      # https://github.com/containerd/containerd/issues/4969
+      - name: Host Status
+        if: always()
+        run: |
+          set -x
+          mount
+          df
+          losetup -l
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          path: |
+            *-junit.xml
+            *-gotest.json
+            ${{github.workspace}}/report/*.xml
+            ${{github.workspace}}/report/*.log
+
+  integration-linux-cri:
+    name: Linux CRI
+    runs-on: ubuntu-20.04
+    timeout-minutes: 40
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime:
+          [
+            io.containerd.runtime.v1.linux,
+            io.containerd.runc.v1,
+            io.containerd.runc.v2,
+          ]
+        runc: [runc, crun]
+        enable_cri_sandboxes: ["", "sandboxed"]
+        exclude:
+          - runtime: io.containerd.runc.v1
+            runc: crun
+          - runtime: io.containerd.runtime.v1.linux
+            runc: crun
+
+    env:
+      GOTEST: gotestsum --
+    steps:
+      - uses: actions/setup-go@v3
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/checkout@v3
+
+      - name: Install containerd dependencies
+        env:
+          RUNC_FLAVOR: ${{ matrix.runc }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gperf libbtrfs-dev
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          script/setup/install-critools
+          script/setup/install-failpoint-binaries
+
+      - name: Install containerd
+        env:
+          CGO_ENABLED: 1
+        run: |
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo -E PATH=$PATH make install
+
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
@@ -548,15 +693,6 @@ jobs:
         run: |
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
-      # Log the status of this VM to investigate issues like
-      # https://github.com/containerd/containerd/issues/4969
-      - name: Host Status
-        if: always()
-        run: |
-          set -x
-          mount
-          df
-          losetup -l
       - uses: actions/upload-artifact@v3
         if: always()
         with:
