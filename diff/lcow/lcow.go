@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"runtime"
 	"time"
 
 	"github.com/Microsoft/go-winio/pkg/security"
@@ -36,6 +35,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -60,10 +60,7 @@ func init() {
 				return nil, err
 			}
 
-			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
-				OS:           "linux",
-				Architecture: runtime.GOARCH,
-			})
+			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewWindowsLcowDiff(md.(*metadata.DB).ContentStore())
 		},
 	})
