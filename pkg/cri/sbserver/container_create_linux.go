@@ -137,7 +137,8 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		// Because it is still useful to get additional gids for uid 0.
 		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
 	}
-	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr))
+	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr),
+		customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {
