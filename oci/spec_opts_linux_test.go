@@ -179,23 +179,23 @@ sys:x:3:root,bin,adm
 	}{
 		{
 			user:     "root",
-			expected: []uint32{1, 2, 3},
+			expected: []uint32{0, 1, 2, 3},
 		},
 		{
 			user:     "1000",
-			expected: nil,
+			expected: []uint32{0},
 		},
 		{
 			user:     "bin",
-			expected: []uint32{2, 3},
+			expected: []uint32{0, 2, 3},
 		},
 		{
 			user:     "bin:root",
-			expected: []uint32{},
+			expected: []uint32{0},
 		},
 		{
 			user:     "daemon",
-			expected: []uint32{1},
+			expected: []uint32{0, 1},
 		},
 	}
 	for _, testCase := range testCases {
@@ -460,8 +460,9 @@ daemon:x:2:root,bin,daemon
 		err            string
 	}{
 		{
-			name:   "no additional gids",
-			groups: []string{},
+			name:     "no additional gids",
+			groups:   []string{},
+			expected: []uint32{0},
 		},
 		{
 			name:     "no additional gids, append root gid",
@@ -471,7 +472,7 @@ daemon:x:2:root,bin,daemon
 		{
 			name:     "no additional gids, append bin and daemon gids",
 			groups:   []string{"bin", "daemon"},
-			expected: []uint32{1, 2},
+			expected: []uint32{0, 1, 2},
 		},
 		{
 			name:           "has root additional gids, append bin and daemon gids",
@@ -482,12 +483,13 @@ daemon:x:2:root,bin,daemon
 		{
 			name:     "append group id",
 			groups:   []string{"999"},
-			expected: []uint32{999},
+			expected: []uint32{0, 999},
 		},
 		{
-			name:   "unknown group",
-			groups: []string{"unknown"},
-			err:    "unable to find group unknown",
+			name:     "unknown group",
+			groups:   []string{"unknown"},
+			err:      "unable to find group unknown",
+			expected: []uint32{0},
 		},
 	}
 
