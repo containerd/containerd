@@ -384,6 +384,45 @@ func WithLogPath(path string) ContainerOpts {
 	}
 }
 
+// WithRunAsUser sets the uid.
+func WithRunAsUser(uid int64) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.RunAsUser = &runtime.Int64Value{Value: uid}
+	}
+}
+
+// WithRunAsUsername sets the username.
+func WithRunAsUsername(username string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.RunAsUsername = username
+	}
+}
+
+// WithRunAsGroup sets the gid.
+func WithRunAsGroup(gid int64) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.RunAsGroup = &runtime.Int64Value{Value: gid}
+	}
+}
+
 // WithSupplementalGroups adds supplemental groups.
 func WithSupplementalGroups(gids []int64) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {

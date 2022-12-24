@@ -19,6 +19,7 @@
 package integration
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,47 +33,98 @@ import (
 )
 
 func TestAdditionalGids(t *testing.T) {
-	testPodLogDir := t.TempDir()
-
-	t.Log("Create a sandbox with log directory")
-	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "additional-gids",
-		WithPodLogDirectory(testPodLogDir))
-
-	var (
-		testImage     = images.Get(images.BusyBox)
-		containerName = "test-container"
-	)
-
+	testImage := images.Get(images.BusyBox)
 	EnsureImageExists(t, testImage)
+	type testCase struct {
+		description string
+		opts        []ContainerOpts
+		expected    string
+	}
 
-	t.Log("Create a container to print id")
-	cnConfig := ContainerConfig(
-		containerName,
-		testImage,
-		WithCommand("id"),
-		WithLogPath(containerName),
-		WithSupplementalGroups([]int64{1 /*daemon*/, 1234 /*new group*/}),
-	)
-	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
-	require.NoError(t, err)
+	testCases := []testCase{
+		{
+			description: "Equivalent of `docker run` (no option)",
+			opts:        nil,
+			expected:    "groups=0(root),10(wheel)",
+		},
+		{
+			description: "Equivalent of `docker run --group-add 1 --group-add 1234`",
+			opts:        []ContainerOpts{WithSupplementalGroups([]int64{1 /*daemon*/, 1234 /*new group*/})},
+			expected:    "groups=0(root),1(daemon),10(wheel),1234",
+		},
+		{
+			description: "Equivalent of `docker run --user 1234`",
+			opts:        []ContainerOpts{WithRunAsUser(1234)},
+			expected:    "groups=0(root)",
+		},
+		{
+			description: "Equivalent of `docker run --user 1234:1234`",
+			opts:        []ContainerOpts{WithRunAsUser(1234), WithRunAsGroup(1234)},
+			expected:    "groups=1234",
+		},
+		{
+			description: "Equivalent of `docker run --user 1234 --group-add 1234`",
+			opts:        []ContainerOpts{WithRunAsUser(1234), WithSupplementalGroups([]int64{1234})},
+			expected:    "groups=0(root),1234",
+		},
+		{
+			description: "Equivalent of `docker run --user daemon` (Supported by CRI, although unsupported by kube-apiserver)",
+			opts:        []ContainerOpts{WithRunAsUsername("daemon")},
+			expected:    "groups=1(daemon)",
+		},
+		{
+			description: "Equivalent of `docker run --user daemon --group-add 1234` (Supported by CRI, although unsupported by kube-apiserver)",
+			opts:        []ContainerOpts{WithRunAsUsername("daemon"), WithSupplementalGroups([]int64{1234})},
+			expected:    "groups=1(daemon),1234",
+		},
+	}
 
-	t.Log("Start the container")
-	require.NoError(t, runtimeService.StartContainer(cn))
+	for i, tc := range testCases {
+		i, tc := i, tc
+		tBasename := fmt.Sprintf("case-%d", i)
+		t.Run(tBasename, func(t *testing.T) {
+			t.Log(tc.description)
+			t.Logf("Expected=%q", tc.expected)
 
-	t.Log("Wait for container to finish running")
-	require.NoError(t, Eventually(func() (bool, error) {
-		s, err := runtimeService.ContainerStatus(cn)
-		if err != nil {
-			return false, err
-		}
-		if s.GetState() == runtime.ContainerState_CONTAINER_EXITED {
-			return true, nil
-		}
-		return false, nil
-	}, time.Second, 30*time.Second))
+			testPodLogDir := t.TempDir()
 
-	t.Log("Search additional groups in container log")
-	content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
-	assert.NoError(t, err)
-	assert.Contains(t, string(content), "groups=1(daemon),10(wheel),1234")
+			t.Log("Create a sandbox with log directory")
+			sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", tBasename,
+				WithPodLogDirectory(testPodLogDir))
+
+			t.Log("Create a container to print id")
+			containerName := tBasename
+			cnConfig := ContainerConfig(
+				containerName,
+				testImage,
+				append(
+					[]ContainerOpts{
+						WithCommand("id"),
+						WithLogPath(containerName),
+					}, tc.opts...)...,
+			)
+			cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+			require.NoError(t, err)
+
+			t.Log("Start the container")
+			require.NoError(t, runtimeService.StartContainer(cn))
+
+			t.Log("Wait for container to finish running")
+			require.NoError(t, Eventually(func() (bool, error) {
+				s, err := runtimeService.ContainerStatus(cn)
+				if err != nil {
+					return false, err
+				}
+				if s.GetState() == runtime.ContainerState_CONTAINER_EXITED {
+					return true, nil
+				}
+				return false, nil
+			}, time.Second, 30*time.Second))
+
+			t.Log("Search additional groups in container log")
+			content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+			assert.NoError(t, err)
+			assert.Contains(t, string(content), tc.expected+"\n")
+		})
+	}
 }
