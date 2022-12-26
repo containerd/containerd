@@ -37,6 +37,7 @@ message TaskCreate {
 message TaskStart {
 	string container_id = 1;
 	uint32 pid = 2;
+	uint32 shim_pid = 3;
 }
 
 message TaskDelete {

@@ -50,7 +50,6 @@ jobs:
   #
   project:
     name: Project Checks
-    if: github.repository == 'containerd/containerd'
     runs-on: ubuntu-20.04
     timeout-minutes: 5
 

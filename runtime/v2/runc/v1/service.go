@@ -327,6 +327,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		s.send(&eventstypes.TaskStart{
 			ContainerID: container.ID,
 			Pid:         uint32(p.Pid()),
+			ShimPid:     uint32(os.Getpid()),
 		})
 	default:
 		s.send(&eventstypes.TaskExecStarted{

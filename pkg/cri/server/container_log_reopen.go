@@ -20,6 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -36,17 +39,74 @@ func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenCo
 		return nil, errors.New("container is not running")
 	}
 
-	// Create new container logger and replace the existing ones.
-	stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
-	if err != nil {
-		return nil, err
-	}
-	oldStdoutWC, oldStderrWC := container.IO.AddOutput("log", stdoutWC, stderrWC)
-	if oldStdoutWC != nil {
-		oldStdoutWC.Close()
-	}
-	if oldStderrWC != nil {
-		oldStderrWC.Close()
+	logTheme := container.LogTheme
+	if logTheme == "" || logTheme == "fifo" {
+		// Create new container logger and replace the existing ones.
+		stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
+		if err != nil {
+			return nil, err
+		}
+		oldStdoutWC, oldStderrWC := container.IO.AddOutput("log", stdoutWC, stderrWC)
+		if oldStdoutWC != nil {
+			oldStdoutWC.Close()
+		}
+		if oldStderrWC != nil {
+			oldStderrWC.Close()
+		}
+		return &runtime.ReopenContainerLogResponse{}, nil
+	} else if logTheme == "file" {
+		labels, err := container.Container.Labels(ctx)
+		if err != nil {
+			return nil, err
+		}
+		pidStr, ok := labels["shim-pid"]
+		if !ok {
+			return nil, err
+		}
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return nil, err
+		}
+		err = notifyReopen(pid)
+		if err != nil {
+			return nil, err
+		}
+		if err = checkLogFileCreate(container.LogPath); err != nil {
+			return nil, err
+		}
+		return &runtime.ReopenContainerLogResponse{}, nil
 	}
 	return &runtime.ReopenContainerLogResponse{}, nil
+}
+
+func fileExist(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func checkLogFileCreate(path string) error {
+	timeout := time.After(time.Second * 5)
+	finish := make(chan bool)
+	for {
+		select {
+		case <-timeout:
+			finish <- true
+			return fmt.Errorf("get log file status timeout")
+		default:
+		loop:
+			_, err := fileExist(path)
+			if err != nil {
+				time.Sleep(time.Millisecond * 10)
+				goto loop
+			} else {
+				return nil
+			}
+		}
+	}
 }

@@ -44,6 +44,7 @@ func (m *TaskStart) Field(fieldpath []string) (string, bool) {
 	}
 	switch fieldpath[0] {
 	// unhandled: pid
+	// unhandled: shim_pid
 	case "container_id":
 		return string(m.ContainerID), len(m.ContainerID) > 0
 	}

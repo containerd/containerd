@@ -15,7 +15,6 @@ permissions: # added using https://github.com/step-security/secure-workflows
 
 jobs:
   CodeQL-Build:
-    if: github.repository == 'containerd/containerd'
     permissions:
       actions: read # for github/codeql-action/init to get workflow details
       contents: read # for actions/checkout to fetch code

@@ -19,6 +19,7 @@
 package process
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -144,10 +145,21 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
-						log.G(ctx).Warn("error copying stdout")
+					rbuf := bufio.NewReader(rio.Stdout())
+					buf := make([]byte, 4096)
+					for {
+						n, err := rbuf.Read(buf)
+						if err != nil {
+							if err == io.EOF {
+								break
+							}
+							log.G(ctx).Warnf("failed to readBytes,err is %v when read stdout", err)
+							break
+						}
+						_, err = wc.Write(buf[:n])
+						if err != nil {
+							log.G(ctx).Warnf("failed to writes,err is %v when write stdout", err)
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -163,10 +175,21 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
-						log.G(ctx).Warn("error copying stderr")
+					rbuf := bufio.NewReader(rio.Stderr())
+					buf := make([]byte, 4096)
+					for {
+						n, err := rbuf.Read(buf)
+						if err != nil {
+							if err == io.EOF {
+								break
+							}
+							log.G(ctx).Warnf("failed to readBytes,err is %v when read stderr", err)
+							break
+						}
+						_, err = wc.Write(buf[:n])
+						if err != nil {
+							log.G(ctx).Warnf("failed to writes,err is %v when write stderr", err)
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -198,7 +221,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				i.dest(sameFile, nil)
 				continue
 			}
-			if fw, err = os.OpenFile(i.name, syscall.O_WRONLY|syscall.O_APPEND, 0); err != nil {
+			if fw, err = OpenFile(i.name); err != nil {
 				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
 			if stdout == stderr {
