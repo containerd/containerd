@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -285,7 +286,8 @@ type PluginConfig struct {
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
-	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	MaxContainerLogLineSize int    `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	ContainerLogScheme      string `toml:"container_log_scheme" json:"containerLogScheme"`
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
@@ -423,6 +425,14 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	}
+	logScheme := c.ContainerLogScheme
+
+	if logScheme != "" && logScheme != "file" && logScheme != "fifo" && logScheme != "binary" {
+		log.G(ctx).Fatalf("invalid  container_log_scheme: %s, please use \"fifo\"  \"binary\" or \"file\" instead", logScheme)
+	}
+	if runtime.GOOS == "windows" && logScheme != "" {
+		log.G(ctx).Fatalf("scheme must be 'binary',%s is not support on windows ", logScheme)
 	}
 
 	// Validation for deprecated runtime options.

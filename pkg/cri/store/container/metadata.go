@@ -57,6 +57,8 @@ type Metadata struct {
 	ImageRef string
 	// LogPath is the container log path.
 	LogPath string
+	// logScheme is the scheme of container log.
+	LogScheme string
 	// StopSignal is the system call signal that will be sent to the container to exit.
 	// TODO(random-liu): Add integration test for stop signal.
 	StopSignal string

@@ -19,12 +19,14 @@
 package process
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -32,6 +34,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
@@ -74,7 +77,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 		return nil
 	}
 	var cwg sync.WaitGroup
-	if err := copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
+	if err := p.copyPipes(ctx, p.IO(), p.stdio.Stdin, p.stdio.Stdout, p.stdio.Stderr, wg, &cwg); err != nil {
 		return fmt.Errorf("unable to copy pipes: %w", err)
 	}
 	cwg.Wait()
@@ -131,7 +134,7 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 	return pio, nil
 }
 
-func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
+func (p *processIO) copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
 		name string
@@ -144,10 +147,49 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
-						log.G(ctx).Warn("error copying stdout")
+					if p.uri.Scheme == "" || p.uri.Scheme == "fifo" {
+						p := bufPool.Get().(*[]byte)
+						defer bufPool.Put(p)
+						if _, err := io.CopyBuffer(wc, rio.Stdout(), *p); err != nil {
+							log.G(ctx).Warn("error copying stdout")
+						}
+					} else if p.uri.Scheme == "file" {
+						u, err := url.Parse(p.uri.String())
+						if err != nil {
+							log.G(ctx).Warnf("error parse uri %v", err)
+						}
+						values, err := url.ParseQuery(u.RawQuery)
+						if err != nil {
+							log.G(ctx).Warnf("error parse query uri %v", err)
+						}
+						client := values.Get("client")
+						rbuf := bufio.NewReader(rio.Stdout())
+						if client == "cri" {
+							// format log for cri
+							maxLineStr := values.Get("max_container_log_line_size")
+							maxLine, err := strconv.Atoi(maxLineStr)
+							if err != nil {
+								log.G(ctx).Warnf("error trans %s to int %v", maxLineStr, err)
+							}
+							cio.RedirectLogs(p.uri.Path, rbuf, wc, "stdout", maxLine)
+						} else {
+							// keep original log format
+							buf := make([]byte, 4096)
+							for {
+								n, err := rbuf.Read(buf)
+								if err != nil {
+									if err == io.EOF {
+										break
+									}
+									log.G(ctx).Warnf("failed to readBytes,err is %v when read stdout", err)
+									break
+								}
+								_, err = wc.Write(buf[:n])
+								if err != nil {
+									log.G(ctx).Warnf("failed to writes,err is %v when write stdout", err)
+								}
+							}
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -163,10 +205,50 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				cwg.Add(1)
 				go func() {
 					cwg.Done()
-					p := bufPool.Get().(*[]byte)
-					defer bufPool.Put(p)
-					if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
-						log.G(ctx).Warn("error copying stderr")
+					if p.uri.Scheme == "" || p.uri.Scheme == "fifo" {
+						p := bufPool.Get().(*[]byte)
+						defer bufPool.Put(p)
+						if _, err := io.CopyBuffer(wc, rio.Stderr(), *p); err != nil {
+							log.G(ctx).Warn("error copying stderr")
+						}
+					} else if p.uri.Scheme == "file" {
+						u, err := url.Parse(p.uri.String())
+						if err != nil {
+							log.G(ctx).Warnf("error parse uri %v", err)
+						}
+						values, err := url.ParseQuery(u.RawQuery)
+						if err != nil {
+							log.G(ctx).Warnf("error parse query uri %v", err)
+						}
+						client := values.Get("client")
+						rbuf := bufio.NewReader(rio.Stderr())
+						if client == "cri" {
+							// format log for cri
+							maxLineStr := values.Get("max_container_log_line_size")
+							maxLine, err := strconv.Atoi(maxLineStr)
+							if err != nil {
+								log.G(ctx).Warnf("error trans %s to int %v", maxLineStr, err)
+							}
+							cio.RedirectLogs(p.uri.Path, rbuf, wc, "stderr", maxLine)
+						} else {
+							// keep original log format
+							rbuf := bufio.NewReader(rio.Stderr())
+							buf := make([]byte, 4096)
+							for {
+								n, err := rbuf.Read(buf)
+								if err != nil {
+									if err == io.EOF {
+										break
+									}
+									log.G(ctx).Warnf("failed to readBytes,err is %v when read stderr", err)
+									break
+								}
+								_, err = wc.Write(buf[:n])
+								if err != nil {
+									log.G(ctx).Warnf("failed to writes,err is %v when write stderr", err)
+								}
+							}
+						}
 					}
 					wg.Done()
 					wc.Close()
@@ -198,7 +280,7 @@ func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, w
 				i.dest(sameFile, nil)
 				continue
 			}
-			if fw, err = os.OpenFile(i.name, syscall.O_WRONLY|syscall.O_APPEND, 0); err != nil {
+			if fw, err = OpenFile(i.name); err != nil {
 				return fmt.Errorf("containerd-shim: opening file %q failed: %w", i.name, err)
 			}
 			if stdout == stderr {

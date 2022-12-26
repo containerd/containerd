@@ -218,18 +218,22 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
-	containerIO, err := cio.NewContainerIO(id,
-		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create container io: %w", err)
-	}
-	defer func() {
-		if retErr != nil {
-			if err := containerIO.Close(); err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
-			}
+	var containerIO *cio.ContainerIO
+	meta.LogScheme = c.config.ContainerLogScheme
+	if c.config.ContainerLogScheme == "" || c.config.ContainerLogScheme == "fifo" {
+		containerIO, err = cio.NewContainerIO(id,
+			cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create container io: %w", err)
 		}
-	}()
+		defer func() {
+			if retErr != nil {
+				if err := containerIO.Close(); err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
+				}
+			}
+		}()
+	}
 
 	specOpts, err := c.containerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
@@ -274,13 +278,25 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	status := containerstore.Status{CreatedAt: time.Now().UnixNano()}
 	status = copyResourcesToStatus(spec, status)
-	container, err := containerstore.NewContainer(meta,
-		containerstore.WithStatus(status, containerRootDir),
-		containerstore.WithContainer(cntr),
-		containerstore.WithContainerIO(containerIO),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create internal container object for %q: %w", id, err)
+
+	var container containerstore.Container
+	if meta.LogScheme == "fifo" || meta.LogScheme == "" {
+		container, err = containerstore.NewContainer(meta,
+			containerstore.WithStatus(status, containerRootDir),
+			containerstore.WithContainer(cntr),
+			containerstore.WithContainerIO(containerIO),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create internal container object for %q: %w", id, err)
+		}
+	} else {
+		container, err = containerstore.NewContainer(meta,
+			containerstore.WithStatus(status, containerRootDir),
+			containerstore.WithContainer(cntr),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create internal container object for %q: %w", id, err)
+		}
 	}
 	defer func() {
 		if retErr != nil {

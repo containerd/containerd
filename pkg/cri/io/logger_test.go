@@ -240,7 +240,7 @@ func TestRedirectLogs(t *testing.T) {
 			rc := io.NopCloser(strings.NewReader(test.input))
 			buf := bytes.NewBuffer(nil)
 			wc := cioutil.NewNopWriteCloser(buf)
-			redirectLogs("test-path", rc, wc, test.stream, test.maxLen)
+			RedirectLogs("test-path", rc, wc, test.stream, test.maxLen)
 			output := buf.String()
 			lines := strings.Split(output, "\n")
 			lines = lines[:len(lines)-1] // Discard empty string after last \n

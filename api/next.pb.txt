@@ -594,6 +594,13 @@ file {
       type: TYPE_UINT32
       json_name: "pid"
     }
+    field {
+      name: "shim_pid"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "shimPid"
+    }
   }
   message_type {
     name: "TaskDelete"

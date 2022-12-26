@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -100,14 +101,29 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}
 
-	ioCreation := func(id string) (_ containerdio.IO, err error) {
-		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create container loggers: %w", err)
+	var ioCreation containerdio.Creator
+	if meta.LogScheme == "" || meta.LogScheme == "fifo" {
+		ioCreation = func(id string) (_ containerdio.IO, err error) {
+			stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
+			if err != nil {
+				return nil, fmt.Errorf("failed to create container loggers: %w", err)
+			}
+			cntr.IO.AddOutput("log", stdoutWC, stderrWC)
+			cntr.IO.Pipe()
+			return cntr.IO, nil
 		}
-		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
-		cntr.IO.Pipe()
-		return cntr.IO, nil
+	} else {
+		ioCreation = containerdio.NullIO
+		if meta.LogPath != "" {
+			args := make(map[string]string)
+			args["client"] = "cri"
+			args["max_container_log_line_size"] = strconv.Itoa(c.config.MaxContainerLogLineSize)
+			u, err := containerdio.LogURIGenerator("file", meta.LogPath, args)
+			if err != nil {
+				return nil, err
+			}
+			ioCreation = containerdio.LogURI(u)
+		}
 	}
 
 	ctrInfo, err := container.Info(ctx)

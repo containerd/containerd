@@ -55,7 +55,8 @@ func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.W
 	prc, pwc := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
-		redirectLogs(path, prc, w, stream, maxLen)
+		RedirectLogs(path, prc, w, stream, maxLen)
+		prc.Close()
 		close(stop)
 	}()
 	return pwc, stop
@@ -111,8 +112,7 @@ func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
 	return
 }
 
-func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
-	defer rc.Close()
+func RedirectLogs(path string, rc io.Reader, w io.Writer, s StreamType, maxLen int) {
 	var (
 		stream    = []byte(s)
 		delimiter = []byte{delimiter}

@@ -99,6 +99,7 @@ func DefaultConfig() PluginConfig {
 		StatsCollectPeriod:               10,
 		SystemdCgroup:                    false,
 		MaxContainerLogLineSize:          16 * 1024,
+		ContainerLogScheme:               "fifo",
 		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
