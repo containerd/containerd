@@ -285,7 +285,8 @@ type PluginConfig struct {
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
-	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	MaxContainerLogLineSize int    `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	ContainerLogTheme       string `toml:"container_log_theme" json:"containerLogTheme"`
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
@@ -423,6 +424,11 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	}
+	logTheme := c.ContainerLogTheme
+
+	if logTheme != "" && logTheme != "file" && logTheme != "fifo" {
+		log.G(ctx).Fatalf("invalid  container_log_theme: %s, please use \"fifo\" or \"file\" instead", logTheme)
 	}
 
 	// Validation for deprecated runtime options.

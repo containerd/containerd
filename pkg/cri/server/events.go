@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -102,6 +103,7 @@ func (em *eventMonitor) subscribe(subscriber events.Subscriber) {
 	filters := []string{
 		`topic=="/tasks/oom"`,
 		`topic~="/images/"`,
+		`topic=="/tasks/start"`,
 	}
 	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
 }
@@ -224,6 +226,8 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 		id = e.Name
 	case *eventtypes.ImageDelete:
 		id = e.Name
+	case *eventtypes.TaskStart:
+		id = e.ContainerID
 	default:
 		return "", nil, errors.New("unsupported event")
 	}
@@ -357,6 +361,21 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 	case *eventtypes.ImageDelete:
 		logrus.Infof("ImageDelete event %+v", e)
 		return em.c.updateImage(ctx, e.Name)
+	case *eventtypes.TaskStart:
+		cntr, err := em.c.containerStore.Get(e.ContainerID)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("can't find container for TaskStart event: %w", err)
+			}
+			return nil
+		}
+		labels := map[string]string{
+			"shim-pid": strconv.Itoa(int(e.ShimPid)),
+		}
+		opt := containerd.WithAdditionalContainerLabels(labels)
+		if err := cntr.Container.Update(ctx, containerd.UpdateContainerOpts(opt)); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -36,17 +37,39 @@ func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenCo
 		return nil, errors.New("container is not running")
 	}
 
-	// Create new container logger and replace the existing ones.
-	stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
-	if err != nil {
-		return nil, err
-	}
-	oldStdoutWC, oldStderrWC := container.IO.AddOutput("log", stdoutWC, stderrWC)
-	if oldStdoutWC != nil {
-		oldStdoutWC.Close()
-	}
-	if oldStderrWC != nil {
-		oldStderrWC.Close()
+	logTheme := container.LogTheme
+	if logTheme == "" || logTheme == "fifo" {
+		// Create new container logger and replace the existing ones.
+		stdoutWC, stderrWC, err := c.createContainerLoggers(container.LogPath, container.Config.GetTty())
+		if err != nil {
+			return nil, err
+		}
+		oldStdoutWC, oldStderrWC := container.IO.AddOutput("log", stdoutWC, stderrWC)
+		if oldStdoutWC != nil {
+			oldStdoutWC.Close()
+		}
+		if oldStderrWC != nil {
+			oldStderrWC.Close()
+		}
+		return &runtime.ReopenContainerLogResponse{}, nil
+	} else if logTheme == "file" {
+		labels, err := container.Container.Labels(ctx)
+		if err != nil {
+			return nil, err
+		}
+		pidStr, ok := labels["shim-pid"]
+		if !ok {
+			return nil, err
+		}
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			return nil, err
+		}
+		err = notifyReopen(pid)
+		if err != nil {
+			return nil, err
+		}
+		return &runtime.ReopenContainerLogResponse{}, nil
 	}
 	return &runtime.ReopenContainerLogResponse{}, nil
 }

@@ -199,34 +199,41 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 
 	var containerIO *cio.ContainerIO
 	err = func() error {
-		// Load up-to-date status from containerd.
-		t, err := cntr.Task(ctx, func(fifos *containerdio.FIFOSet) (_ containerdio.IO, err error) {
-			stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, meta.Config.GetTty())
-			if err != nil {
-				return nil, err
-			}
-			defer func() {
+		var t containerd.Task
+		if meta.LogTheme == "" || meta.LogTheme == "fifo" {
+			t, err = cntr.Task(ctx, func(fifos *containerdio.FIFOSet) (_ containerdio.IO, err error) {
+				stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, meta.Config.GetTty())
 				if err != nil {
-					if stdoutWC != nil {
-						stdoutWC.Close()
-					}
-					if stderrWC != nil {
-						stderrWC.Close()
-					}
+					return nil, err
 				}
-			}()
-			containerIO, err = cio.NewContainerIO(id,
-				cio.WithFIFOs(fifos),
-			)
-			if err != nil {
-				return nil, err
+				defer func() {
+					if err != nil {
+						if stdoutWC != nil {
+							stdoutWC.Close()
+						}
+						if stderrWC != nil {
+							stderrWC.Close()
+						}
+					}
+				}()
+				containerIO, err = cio.NewContainerIO(id,
+					cio.WithFIFOs(fifos),
+				)
+				if err != nil {
+					return nil, err
+				}
+				containerIO.AddOutput("log", stdoutWC, stderrWC)
+				containerIO.Pipe()
+				return containerIO, nil
+			})
+			if err != nil && !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to load task: %w", err)
 			}
-			containerIO.AddOutput("log", stdoutWC, stderrWC)
-			containerIO.Pipe()
-			return containerIO, nil
-		})
-		if err != nil && !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to load task: %w", err)
+		} else {
+			t, err = cntr.Task(ctx, nil)
+			if err != nil && !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to load task: %w", err)
+			}
 		}
 		var s containerd.Status
 		var notFound bool
@@ -252,11 +259,13 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				// NOTE: Another possibility is that we've tried to start the container, but
 				// containerd got restarted during that. In that case, we still
 				// treat the container as `CREATED`.
-				containerIO, err = cio.NewContainerIO(id,
-					cio.WithNewFIFOs(volatileContainerDir, meta.Config.GetTty(), meta.Config.GetStdin()),
-				)
-				if err != nil {
-					return fmt.Errorf("failed to create container io: %w", err)
+				if meta.LogTheme == "" || meta.LogTheme == "fifo" {
+					containerIO, err = cio.NewContainerIO(id,
+						cio.WithNewFIFOs(volatileContainerDir, meta.Config.GetTty(), meta.Config.GetStdin()),
+					)
+					if err != nil {
+						return fmt.Errorf("failed to create container io: %w", err)
+					}
 				}
 			case runtime.ContainerState_CONTAINER_RUNNING:
 				// Container was in running state, but its task has been deleted,
