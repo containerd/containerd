@@ -274,6 +274,14 @@ func WithHostname(name string) SpecOpts {
 	}
 }
 
+// WithDomainname sets the container's NIS domain name
+func WithDomainname(name string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		s.Domainname = name
+		return nil
+	}
+}
+
 // WithMounts appends mounts
 func WithMounts(mounts []specs.Mount) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
