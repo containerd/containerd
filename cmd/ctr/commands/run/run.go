@@ -17,72 +17,18 @@
 package run
 
 import (
-	gocontext "context"
-	"encoding/csv"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
-	"github.com/containerd/containerd/containers"
-	clabels "github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/oci"
 	gocni "github.com/containerd/go-cni"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
-
-func withMounts(context *cli.Context) oci.SpecOpts {
-	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
-		mounts := make([]specs.Mount, 0)
-		for _, mount := range context.StringSlice("mount") {
-			m, err := parseMountFlag(mount)
-			if err != nil {
-				return err
-			}
-			mounts = append(mounts, m)
-		}
-		return oci.WithMounts(mounts)(ctx, client, container, s)
-	}
-}
-
-// parseMountFlag parses a mount string in the form "type=foo,source=/path,destination=/target,options=rbind:rw"
-func parseMountFlag(m string) (specs.Mount, error) {
-	mount := specs.Mount{}
-	r := csv.NewReader(strings.NewReader(m))
-
-	fields, err := r.Read()
-	if err != nil {
-		return mount, err
-	}
-
-	for _, field := range fields {
-		key, val, ok := strings.Cut(field, "=")
-		if !ok {
-			return mount, fmt.Errorf("invalid mount specification: expected key=val")
-		}
-
-		switch key {
-		case "type":
-			mount.Type = val
-		case "source", "src":
-			mount.Source = val
-		case "destination", "dst":
-			mount.Destination = val
-		case "options":
-			mount.Options = strings.Split(val, ":")
-		default:
-			return mount, fmt.Errorf("mount option %q not supported", key)
-		}
-	}
-
-	return mount, nil
-}
 
 // Command runs a container
 var Command = cli.Command{
@@ -96,36 +42,11 @@ var Command = cli.Command{
 			Usage: "remove the container after running",
 		},
 		cli.BoolFlag{
-			Name:  "null-io",
-			Usage: "send all IO to /dev/null",
-		},
-		cli.StringFlag{
-			Name:  "log-uri",
-			Usage: "log uri",
-		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution",
-		},
-		cli.StringFlag{
-			Name:  "fifo-dir",
-			Usage: "directory used for storing IO FIFOs",
-		},
-		cli.StringFlag{
-			Name:  "cgroup",
-			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
-		},
-		cli.StringFlag{
-			Name:  "platform",
-			Usage: "run image for specific platform",
-		},
-		cli.BoolFlag{
 			Name:  "cni",
 			Usage: "enable cni networking for the container",
 		},
-	}, append(platformRunFlags,
-		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
-			commands.ContainerFlags...)...)...),
+	}, append(append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+		commands.ContainerFlags...), commands.TaskFlags...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
@@ -159,7 +80,7 @@ var Command = cli.Command{
 			return err
 		}
 		defer cancel()
-		container, err := NewContainer(ctx, client, context)
+		container, err := containers.NewContainer(ctx, client, context)
 		if err != nil {
 			return err
 		}
@@ -181,7 +102,7 @@ var Command = cli.Command{
 			}
 		}
 
-		opts := getNewTaskOpts(context)
+		opts := tasks.GetNewTaskOpts(context)
 		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
 		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), con, context.Bool("null-io"), context.String("log-uri"), ioOpts, opts...)
 		if err != nil {
@@ -245,23 +166,4 @@ var Command = cli.Command{
 		}
 		return nil
 	},
-}
-
-// buildLabel builds the labels from command line labels and the image labels
-func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
-	labels := make(map[string]string)
-	for k, v := range imageLabels {
-		if err := clabels.Validate(k, v); err == nil {
-			labels[k] = v
-		} else {
-			// In case the image label is invalid, we output a warning and skip adding it to the
-			// container.
-			logrus.WithError(err).Warnf("unable to add image label with key %s to the container", k)
-		}
-	}
-	// labels from the command line will override image and the initial image config labels
-	for k, v := range cmdLabels {
-		labels[k] = v
-	}
-	return labels
 }

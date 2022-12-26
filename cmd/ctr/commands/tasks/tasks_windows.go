@@ -29,8 +29,6 @@ import (
 	"github.com/urfave/cli"
 )
 
-var platformStartFlags = []cli.Flag{}
-
 // HandleConsoleResize resizes the console
 func HandleConsoleResize(ctx gocontext.Context, task resizer, con console.Console) error {
 	// do an initial resize of the console
@@ -82,6 +80,7 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 	return container.NewTask(ctx, ioCreator)
 }
 
-func getNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
+// GetNewTaskOpts resolves containerd.NewTaskOpts from cli.Context
+func GetNewTaskOpts(_ *cli.Context) []containerd.NewTaskOpts {
 	return nil
 }

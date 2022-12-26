@@ -17,7 +17,8 @@
 package containers
 
 import (
-	"context"
+	gocontext "context"
+	"encoding/csv"
 	"fmt"
 	"os"
 	"strings"
@@ -26,11 +27,14 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
+	clabels "github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -83,7 +87,7 @@ var createCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		_, err = run.NewContainer(ctx, client, context)
+		_, err = NewContainer(ctx, client, context)
 		if err != nil {
 			return err
 		}
@@ -183,7 +187,7 @@ var deleteCommand = cli.Command{
 	},
 }
 
-func deleteContainer(ctx context.Context, client *containerd.Client, id string, opts ...containerd.DeleteOpts) error {
+func deleteContainer(ctx gocontext.Context, client *containerd.Client, id string, opts ...containerd.DeleteOpts) error {
 	container, err := client.LoadContainer(ctx, id)
 	if err != nil {
 		return err
@@ -298,4 +302,70 @@ var infoCommand = cli.Command{
 		commands.PrintAsJSON(info)
 		return nil
 	},
+}
+
+func withMounts(context *cli.Context) oci.SpecOpts {
+	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
+		mounts := make([]specs.Mount, 0)
+		for _, mount := range context.StringSlice("mount") {
+			m, err := parseMountFlag(mount)
+			if err != nil {
+				return err
+			}
+			mounts = append(mounts, m)
+		}
+		return oci.WithMounts(mounts)(ctx, client, container, s)
+	}
+}
+
+// parseMountFlag parses a mount string in the form "type=foo,source=/path,destination=/target,options=rbind:rw"
+func parseMountFlag(m string) (specs.Mount, error) {
+	mount := specs.Mount{}
+	r := csv.NewReader(strings.NewReader(m))
+
+	fields, err := r.Read()
+	if err != nil {
+		return mount, err
+	}
+
+	for _, field := range fields {
+		key, val, ok := strings.Cut(field, "=")
+		if !ok {
+			return mount, fmt.Errorf("invalid mount specification: expected key=val")
+		}
+
+		switch key {
+		case "type":
+			mount.Type = val
+		case "source", "src":
+			mount.Source = val
+		case "destination", "dst":
+			mount.Destination = val
+		case "options":
+			mount.Options = strings.Split(val, ":")
+		default:
+			return mount, fmt.Errorf("mount option %q not supported", key)
+		}
+	}
+
+	return mount, nil
+}
+
+// buildLabel builds the labels from command line labels and the image labels
+func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
+	labels := make(map[string]string)
+	for k, v := range imageLabels {
+		if err := clabels.Validate(k, v); err == nil {
+			labels[k] = v
+		} else {
+			// In case the image label is invalid, we output a warning and skip adding it to the
+			// container.
+			logrus.WithError(err).Warnf("unable to add image label with key %s to the container", k)
+		}
+	}
+	// labels from the command line will override image and the initial image config labels
+	for k, v := range cmdLabels {
+		labels[k] = v
+	}
+	return labels
 }
