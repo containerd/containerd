@@ -412,11 +412,17 @@ func TestBaseRuntimeSpec(t *testing.T) {
 		},
 	}
 
-	out, err := c.runtimeSpec("id1", "/etc/containerd/cri-base.json", oci.WithHostname("new"))
+	out, err := c.runtimeSpec(
+		"id1",
+		"/etc/containerd/cri-base.json",
+		oci.WithHostname("new-host"),
+		oci.WithDomainname("new-domain"),
+	)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "1.0.2", out.Version)
-	assert.Equal(t, "new", out.Hostname)
+	assert.Equal(t, "new-host", out.Hostname)
+	assert.Equal(t, "new-domain", out.Domainname)
 
 	// Make sure original base spec not changed
 	assert.NotEqual(t, out, c.baseOCISpecs["/etc/containerd/cri-base.json"])
