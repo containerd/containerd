@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -93,41 +94,41 @@ func (i fakeImage) ContentStore() content.Store {
 func (i fakeImage) ReaderAt(ctx context.Context, dec ocispec.Descriptor) (content.ReaderAt, error) {
 	blob, found := i.blobs[dec.Digest.String()]
 	if !found {
-		return nil, errors.New("not found")
+		return nil, errdefs.ErrNotFound
 	}
 	return blob, nil
 }
 
 func (i fakeImage) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
-	return content.Info{}, errors.New("not implemented")
+	return content.Info{}, errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Update(ctx context.Context, info content.Info, fieldpaths ...string) (content.Info, error) {
-	return content.Info{}, errors.New("not implemented")
+	return content.Info{}, errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Walk(ctx context.Context, fn content.WalkFunc, filters ...string) error {
-	return errors.New("not implemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Delete(ctx context.Context, dgst digest.Digest) error {
-	return errors.New("not implemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Status(ctx context.Context, ref string) (content.Status, error) {
-	return content.Status{}, errors.New("not implemented")
+	return content.Status{}, errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) ListStatuses(ctx context.Context, filters ...string) ([]content.Status, error) {
-	return nil, errors.New("not implemented")
+	return nil, errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Abort(ctx context.Context, ref string) error {
-	return errors.New("not implemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (i fakeImage) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
-	return nil, errors.New("not implemented")
+	return nil, errdefs.ErrNotImplemented
 }
 
 func TestReplaceOrAppendEnvValues(t *testing.T) {
