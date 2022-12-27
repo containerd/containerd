@@ -75,7 +75,7 @@ export GOARCH=amd64
 
 # Build runc
 cd $SRC/
-git clone https://github.com/opencontainers/runc --branch release-1.0
+git clone https://github.com/opencontainers/runc --branch release-1.1
 cd runc
 make
 make install
