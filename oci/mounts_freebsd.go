@@ -35,3 +35,31 @@ func defaultMounts() []specs.Mount {
 		},
 	}
 }
+
+// appendOSMounts modifies the mount spec to mount emulated Linux filesystems on FreeBSD,
+// as per: https://wiki.freebsd.org/LinuxJails
+func appendOSMounts(s *Spec, os string) {
+	// No-op for FreeBSD containers
+	if os != "linux" {
+		return
+	}
+	/* The nosuid noexec options are for consistency with Linux mounts: on FreeBSD it is
+	   by default impossible to execute anything from these filesystems.
+	*/
+	var mounts = []specs.Mount{
+		{
+			Destination: "/proc",
+			Type:        "linprocfs",
+			Source:      "linprocfs",
+			Options:     []string{"nosuid", "noexec"},
+		},
+		{
+			Destination: "/sys",
+			Type:        "linsysfs",
+			Source:      "linsysfs",
+			Options:     []string{"nosuid", "noexec", "nodev"},
+		},
+	}
+
+	s.Mounts = append(mounts, s.Mounts...)
+}
