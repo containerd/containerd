@@ -59,7 +59,7 @@ func init() {
 }
 
 const (
-	rootfsSizeLabel           = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.size-gb"
+	rootfsSizeInBytesLabel    = "containerd.io/snapshot/windows/rootfs.sizebytes"
 	rootfsLocLabel            = "containerd.io/snapshot/io.microsoft.container.storage.rootfs.location"
 	reuseScratchLabel         = "containerd.io/snapshot/io.microsoft.container.storage.reuse-scratch"
 	reuseScratchOwnerKeyLabel = "containerd.io/snapshot/io.microsoft.owner.key"
@@ -356,9 +356,9 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 				}
 			} else {
 				var sizeGB int
-				if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeLabel]; ok {
-					i64, _ := strconv.ParseInt(sizeGBstr, 10, 32)
-					sizeGB = int(i64)
+				if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
+					i64, _ := strconv.ParseInt(sizeGBstr, 10, 64)
+					sizeGB = int(i64) / (1024 * 1024 * 1024)
 				}
 
 				scratchLocation := snapshotInfo.Labels[rootfsLocLabel]
