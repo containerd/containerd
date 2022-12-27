@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/containerd/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -50,9 +51,9 @@ var (
 
 var (
 	// ErrNotFound represents an error returned when object not found in meta store
-	ErrNotFound = errors.New("not found")
+	ErrNotFound = errdefs.ErrNotFound
 	// ErrAlreadyExists represents an error returned when object can't be duplicated in meta store
-	ErrAlreadyExists = errors.New("object already exists")
+	ErrAlreadyExists = errdefs.ErrAlreadyExists
 )
 
 // PoolMetadata keeps device info for the given thin-pool device, generates next available device ids,
