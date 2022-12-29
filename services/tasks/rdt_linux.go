@@ -1,5 +1,4 @@
 //go:build linux && !no_rdt
-// +build linux,!no_rdt
 
 /*
    Copyright The containerd Authors.
