@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
@@ -368,11 +369,11 @@ func (u *Unpacker) unpack(
 
 		select {
 		case <-ctx.Done():
-			abort(context.Background()) // Cleanup context
+			cleanup.Do(ctx, abort)
 			return ctx.Err()
 		case err := <-fetchErr:
 			if err != nil {
-				abort(ctx)
+				cleanup.Do(ctx, abort)
 				return err
 			}
 		case <-fetchC[i-fetchOffset]:
@@ -380,16 +381,16 @@ func (u *Unpacker) unpack(
 
 		diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
 		if err != nil {
-			abort(ctx)
+			cleanup.Do(ctx, abort)
 			return fmt.Errorf("failed to extract layer %s: %w", diffIDs[i], err)
 		}
 		if diff.Digest != diffIDs[i] {
-			abort(ctx)
+			cleanup.Do(ctx, abort)
 			return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
 		}
 
 		if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
-			abort(ctx)
+			cleanup.Do(ctx, abort)
 			if errdefs.IsAlreadyExists(err) {
 				return nil
 			}

@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -231,7 +232,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 	}
 	defer func() {
 		if retErr != nil {
-			m.cleanupShim(shim)
+			m.cleanupShim(ctx, shim)
 		}
 	}()
 
@@ -247,6 +248,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	if err != nil {
 		return nil, err
 	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
 
 	topts := opts.TaskOptions
 	if topts == nil || topts.GetValue() == nil {
@@ -267,7 +269,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	shim, err := b.Start(ctx, protobuf.FromAny(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, b)
+		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
@@ -360,8 +362,8 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 }
 
 // cleanupShim attempts to properly delete and cleanup shim after error
-func (m *ShimManager) cleanupShim(shim *shim) {
-	dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+func (m *ShimManager) cleanupShim(ctx context.Context, shim *shim) {
+	dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
 	defer cancel()
 
 	_ = shim.Delete(dctx)
@@ -429,14 +431,14 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		// NOTE: ctx contains required namespace information.
 		m.manager.shims.Delete(ctx, taskID)
 
-		dctx, cancel := timeout.WithContext(context.Background(), cleanupTimeout)
+		dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
 		defer cancel()
 
 		sandboxed := opts.SandboxID != ""
 		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
-				dctx, cancel = timeout.WithContext(context.Background(), cleanupTimeout)
+				dctx, cancel = timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
 				defer cancel()
 			}
 
