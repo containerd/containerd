@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/snapshots"
 	bolt "go.etcd.io/bbolt"
 )
@@ -423,7 +424,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 			log.G(ctx).WithField("snapshotter", snapshotterName).Debug("schedule snapshotter cleanup")
 			go func(snapshotterName string) {
 				st1 := time.Now()
-				m.cleanupSnapshotter(snapshotterName)
+				m.cleanupSnapshotter(ctx, snapshotterName)
 
 				sl.Lock()
 				stats.SnapshotD[snapshotterName] = time.Since(st1)
@@ -440,7 +441,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		log.G(ctx).Debug("schedule content cleanup")
 		go func() {
 			ct1 := time.Now()
-			m.cleanupContent()
+			m.cleanupContent(ctx)
 			stats.ContentD = time.Since(ct1)
 			wg.Done()
 		}()
@@ -506,8 +507,8 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 	return marked, nil
 }
 
-func (m *DB) cleanupSnapshotter(name string) (time.Duration, error) {
-	ctx := context.Background()
+func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration, error) {
+	ctx = cleanup.Background(ctx)
 	sn, ok := m.ss[name]
 	if !ok {
 		return 0, nil
@@ -523,8 +524,8 @@ func (m *DB) cleanupSnapshotter(name string) (time.Duration, error) {
 	return d, err
 }
 
-func (m *DB) cleanupContent() (time.Duration, error) {
-	ctx := context.Background()
+func (m *DB) cleanupContent(ctx context.Context) (time.Duration, error) {
+	ctx = cleanup.Background(ctx)
 	if m.cs == nil {
 		return 0, nil
 	}
