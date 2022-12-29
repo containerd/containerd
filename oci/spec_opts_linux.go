@@ -176,7 +176,3 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 func escapeAndCombineArgs(args []string) string {
 	panic("not supported")
 }
-
-func appendOSMounts(s *Spec, os string) error {
-	return nil
-}

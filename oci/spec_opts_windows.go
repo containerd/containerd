@@ -115,7 +115,3 @@ func escapeAndCombineArgs(args []string) string {
 	}
 	return strings.Join(escaped, " ")
 }
-
-func appendOSMounts(s *Spec, os string) error {
-	return nil
-}
