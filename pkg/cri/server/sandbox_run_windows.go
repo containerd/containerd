@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -115,4 +116,9 @@ func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 
 func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {
 	spec.Windows.Network.NetworkNamespace = nsPath
+}
+
+// No sandbox snapshotter options needed for windows.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	return []snapshots.Opt{}, nil
 }

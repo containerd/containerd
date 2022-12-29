@@ -661,7 +661,7 @@ func WithSupplementalGroups(groups []int64) oci.SpecOpts {
 }
 
 // WithPodNamespaces sets the pod namespaces for the container
-func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32) oci.SpecOpts {
+func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
 	namespaces := config.GetNamespaceOptions()
 
 	opts := []oci.SpecOpts{
@@ -672,6 +672,17 @@ func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid
 	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
 		opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
 	}
+
+	if namespaces.GetUsernsOptions() != nil {
+		switch namespaces.GetUsernsOptions().GetMode() {
+		case runtime.NamespaceMode_NODE:
+			// Nothing to do. Not adding userns field uses the node userns.
+		case runtime.NamespaceMode_POD:
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: GetUserNamespace(sandboxPid)}))
+			opts = append(opts, oci.WithUserNamespace(uids, gids))
+		}
+	}
+
 	return oci.Compose(opts...)
 }
 
@@ -745,6 +756,8 @@ const (
 	utsNSFormat = "/proc/%v/ns/uts"
 	// pidNSFormat is the format of pid namespace of a process.
 	pidNSFormat = "/proc/%v/ns/pid"
+	// userNSFormat is the format of user namespace of a process.
+	userNSFormat = "/proc/%v/ns/user"
 )
 
 // GetNetworkNamespace returns the network namespace of a process.
@@ -765,6 +778,11 @@ func GetUTSNamespace(pid uint32) string {
 // GetPIDNamespace returns the pid namespace of a process.
 func GetPIDNamespace(pid uint32) string {
 	return fmt.Sprintf(pidNSFormat, pid)
+}
+
+// GetUserNamespace returns the user namespace of a process.
+func GetUserNamespace(pid uint32) string {
+	return fmt.Sprintf(userNSFormat, pid)
 }
 
 // WithCDI updates OCI spec with CDI content

@@ -313,7 +313,8 @@ func (c *criService) containerSpec(
 
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid),
+		// TODO: This is a hack to make this compile. We should move userns support to sbserver.
+		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, nil, nil),
 		customopts.WithSupplementalGroups(supplementalGroups),
 		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
 		customopts.WithAnnotation(annotations.SandboxID, sandboxID),

@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
@@ -93,6 +94,23 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 	if nsOptions.GetIpc() == runtime.NamespaceMode_NODE {
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.IPCNamespace))
+	}
+
+	usernsOpts := nsOptions.GetUsernsOptions()
+	uids, gids, err := parseUsernsIDs(usernsOpts)
+	if err != nil {
+		return nil, fmt.Errorf("user namespace configuration: %w", err)
+	}
+
+	if usernsOpts != nil {
+		switch mode := usernsOpts.GetMode(); mode {
+		case runtime.NamespaceMode_NODE:
+			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
+		case runtime.NamespaceMode_POD:
+			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
+		default:
+			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
+		}
 	}
 
 	// It's fine to generate the spec before the sandbox /dev/shm
@@ -357,4 +375,11 @@ func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath strin
 			break
 		}
 	}
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return snapshotterRemapOpts(nsOpts)
 }
