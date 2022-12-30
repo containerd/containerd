@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -211,6 +212,7 @@ var (
 					for k, v := range info.Labels {
 						labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
 					}
+					sort.Strings(labelStrings)
 					labels := strings.Join(labelStrings, ",")
 					if labels == "" {
 						labels = "-"
