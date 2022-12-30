@@ -895,11 +895,11 @@ func TestUserNamespace(t *testing.T) {
 			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 
 			if test.err {
-				assert.Error(t, err)
+				require.Error(t, err)
 				assert.Nil(t, spec)
 				return
 			}
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, spec.Linux.UIDMappings, test.expUIDMapping)
 			assert.Equal(t, spec.Linux.GIDMappings, test.expGIDMapping)
 
