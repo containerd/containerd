@@ -316,6 +316,12 @@ func (c *criService) containerSpec(
 		return nil, fmt.Errorf("user namespace configuration: %w", err)
 	}
 
+	// Check sandbox userns config is consistent with container config.
+	sandboxUsernsOpts := sandboxConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
+	if !sameUsernsConfig(sandboxUsernsOpts, nsOpts.GetUsernsOptions()) {
+		return nil, fmt.Errorf("user namespace config for sandbox is different from container. Sandbox userns config: %v - Container userns config: %v", sandboxUsernsOpts, nsOpts.GetUsernsOptions())
+	}
+
 	specOpts = append(specOpts,
 		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
 		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
