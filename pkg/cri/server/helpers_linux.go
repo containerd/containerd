@@ -319,15 +319,12 @@ func parseUsernsIDs(userns *runtime.UserNamespace) (uids, gids []specs.LinuxIDMa
 		return nil, nil, nil
 	}
 
-	uidRuntimeMap := userns.GetUids()
-	gidRuntimeMap := userns.GetGids()
-
-	uids, err := parseUsernsIDMap(uidRuntimeMap)
+	uids, err := parseUsernsIDMap(userns.GetUids())
 	if err != nil {
 		return nil, nil, fmt.Errorf("UID mapping: %w", err)
 	}
 
-	gids, err = parseUsernsIDMap(gidRuntimeMap)
+	gids, err = parseUsernsIDMap(userns.GetGids())
 	if err != nil {
 		return nil, nil, fmt.Errorf("GID mapping: %w", err)
 	}
