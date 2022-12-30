@@ -1,5 +1,4 @@
 //go:build linux
-// +build linux
 
 /*
    Copyright The docker Authors.

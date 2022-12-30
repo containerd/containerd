@@ -1,5 +1,4 @@
 //go:build gofuzz
-// +build gofuzz
 
 // Copyright 2022 ADA Logics Ltd
 //
