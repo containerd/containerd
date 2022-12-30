@@ -888,6 +888,8 @@ func TestUserNamespace(t *testing.T) {
 			err: true,
 		},
 	} {
+		desc := desc
+		test := test
 		t.Run(desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: test.userNS}
 			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
