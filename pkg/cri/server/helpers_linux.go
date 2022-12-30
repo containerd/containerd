@@ -349,6 +349,64 @@ func parseUsernsIDs(userns *runtime.UserNamespace) (uids, gids []specs.LinuxIDMa
 	return uids, gids, nil
 }
 
+// sameUsernsConfig checks if the userns configs are the same. If the mappings
+// on each config are the same but in different order, it returns false.
+// XXX: If the runtime.UserNamespace struct changes, we should update this
+// function accordingly.
+func sameUsernsConfig(a, b *runtime.UserNamespace) bool {
+	// If both are nil, they are the same.
+	if a == nil && b == nil {
+		return true
+	}
+	// If only one is nil, they are different.
+	if a == nil || b == nil {
+		return false
+	}
+	// At this point, a is not nil nor b.
+
+	if a.GetMode() != b.GetMode() {
+		return false
+	}
+
+	aUids, aGids, err := parseUsernsIDs(a)
+	if err != nil {
+		return false
+	}
+	bUids, bGids, err := parseUsernsIDs(b)
+	if err != nil {
+		return false
+	}
+
+	if !sameMapping(aUids, bUids) {
+		return false
+	}
+	if !sameMapping(aGids, bGids) {
+		return false
+	}
+	return true
+}
+
+// sameMapping checks if the mappings are the same. If the mappings are the same
+// but in different order, it returns false.
+func sameMapping(a, b []specs.LinuxIDMapping) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for x := range a {
+		if a[x].ContainerID != b[x].ContainerID {
+			return false
+		}
+		if a[x].HostID != b[x].HostID {
+			return false
+		}
+		if a[x].Size != b[x].Size {
+			return false
+		}
+	}
+	return true
+}
+
 func snapshotterRemapOpts(nsOpts *runtime.NamespaceOption) ([]snapshots.Opt, error) {
 	snapshotOpt := []snapshots.Opt{}
 	usernsOpts := nsOpts.GetUsernsOptions()

@@ -814,6 +814,11 @@ func TestUserNamespace(t *testing.T) {
 		ContainerId: 1000,
 		Length:      10,
 	}
+	otherIDMap := runtime.IDMapping{
+		HostId:      2000,
+		ContainerId: 2000,
+		Length:      10,
+	}
 	expIDMap := runtimespec.LinuxIDMapping{
 		HostID:      1000,
 		ContainerID: 1000,
@@ -824,6 +829,7 @@ func TestUserNamespace(t *testing.T) {
 	c := newTestCRIService()
 	for desc, test := range map[string]struct {
 		userNS        *runtime.UserNamespace
+		sandboxUserNS *runtime.UserNamespace
 		expNS         *runtimespec.LinuxNamespace
 		expNotNS      *runtimespec.LinuxNamespace // Does NOT contain this namespace
 		expUIDMapping []runtimespec.LinuxIDMapping
@@ -871,6 +877,58 @@ func TestUserNamespace(t *testing.T) {
 			expUIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
 			expGIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
 		},
+		"pod namespace mode with inconsistent sandbox config (different GIDs)": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			sandboxUserNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&otherIDMap},
+			},
+			err: true,
+		},
+		"pod namespace mode with inconsistent sandbox config (different UIDs)": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			sandboxUserNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&otherIDMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			err: true,
+		},
+		"pod namespace mode with inconsistent sandbox config (different len)": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			sandboxUserNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap, &idMap},
+				Gids: []*runtime.IDMapping{&idMap, &idMap},
+			},
+			err: true,
+		},
+		"pod namespace mode with inconsistent sandbox config (different mode)": {
+			userNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_POD,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			sandboxUserNS: &runtime.UserNamespace{
+				Mode: runtime.NamespaceMode_NODE,
+				Uids: []*runtime.IDMapping{&idMap},
+				Gids: []*runtime.IDMapping{&idMap},
+			},
+			err: true,
+		},
 		"pod namespace mode with several mappings": {
 			userNS: &runtime.UserNamespace{
 				Mode: runtime.NamespaceMode_POD,
@@ -892,6 +950,15 @@ func TestUserNamespace(t *testing.T) {
 		test := test
 		t.Run(desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: test.userNS}
+			// By default, set sandbox and container config to the same (this is
+			// required by containerSpec). However, if the test wants to test for what
+			// happens when they don't match, the test.sandboxUserNS should be set and
+			// we just use that.
+			sandboxUserns := test.userNS
+			if test.sandboxUserNS != nil {
+				sandboxUserns = test.sandboxUserNS
+			}
+			sandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: sandboxUserns}
 			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 
 			if test.err {
