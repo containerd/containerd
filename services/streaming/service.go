@@ -74,17 +74,20 @@ func (s *service) Stream(srv api.Streaming_StreamServer) error {
 	if err != nil {
 		return err
 	}
-	if err := srv.Send(protobuf.FromAny(response)); err != nil {
-		return err
-	}
 
 	cc := make(chan struct{})
 	ss := &serviceStream{
 		s:  srv,
 		cc: cc,
 	}
+
 	log.G(srv.Context()).WithField("stream", i.ID).Debug("registering stream")
 	if err := s.manager.Register(srv.Context(), i.ID, ss); err != nil {
+		return err
+	}
+
+	// Send response packet after registering stream
+	if err := srv.Send(protobuf.FromAny(response)); err != nil {
 		return err
 	}
 
