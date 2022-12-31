@@ -32,6 +32,12 @@ import (
 )
 
 func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
+	ctx, done, err := c.WithLease(ctx)
+	if err != nil {
+		return err
+	}
+	defer done(ctx)
+
 	return proxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator()).Transfer(ctx, src, dest, opts...)
 }
 
