@@ -207,6 +207,19 @@ EOF
       SHELL
   end
 
+  config.vm.provision "install-failpoint-binaries", type: "shell",  run: "once" do |sh|
+      sh.upload_path = "/tmp/vagrant-install-failpoint-binaries"
+      sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-failpoint-binaries
+        chcon -v -t container_runtime_exec_t $(type -ap containerd-shim-runc-fp-v1)
+        containerd-shim-runc-fp-v1 -v
+      SHELL
+  end
+
   # SELinux is Enforcing by default.
   # To set SELinux as Disabled on a VM that has already been provisioned:
   #   SELINUX=Disabled vagrant up --provision-with=selinux
@@ -243,6 +256,36 @@ EOF
         cd ${GOPATH}/src/github.com/containerd/containerd
         go test -v -count=1 -race ./metrics/cgroups
         make integration EXTRA_TESTFLAGS="-timeout 15m -no-criu -test.v" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
+    SHELL
+  end
+
+  # SELinux is Enforcing by default (via provisioning) in this VM. To re-run with SELinux disabled:
+  #   SELINUX=Disabled vagrant up --provision-with=selinux,test-cri-integration
+  #
+  config.vm.provision "test-cri-integration", type: "shell", run: "never" do |sh|
+    sh.upload_path = "/tmp/test-cri-integration"
+    sh.env = {
+        'GOTEST': ENV['GOTEST'] || "go test",
+        'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
+        'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
+        'GITHUB_WORKSPACE': '',
+        'ENABLE_CRI_SANDBOXES': ENV['ENABLE_CRI_SANDBOXES'],
+    }
+    sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        cleanup() {
+          rm -rf /var/lib/containerd* /run/containerd* /tmp/containerd* /tmp/test* /tmp/failpoint* /tmp/nri*
+        }
+        cleanup
+        cd ${GOPATH}/src/github.com/containerd/containerd
+        # cri-integration.sh executes containerd from ./bin, not from $PATH .
+        make BUILDTAGS="seccomp selinux no_aufs no_btrfs no_devmapper no_zfs" binaries bin/cri-integration.test
+        chcon -v -t container_runtime_exec_t ./bin/{containerd,containerd-shim*}
+        CONTAINERD_RUNTIME=io.containerd.runc.v2 ./script/test/cri-integration.sh
+        cleanup
     SHELL
   end
 
