@@ -295,8 +295,6 @@ EOF
 [registries.search]
 registries = ['docker.io']
 EOF
-        # Disable SELinux to allow overlayfs
-        setenforce 0
     SHELL
   end
 
