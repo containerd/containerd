@@ -40,6 +40,9 @@ task:
   integration_script: |
     vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
 
+  cri_integration_script: |
+    vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+
   cri_test_script: |
     vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
