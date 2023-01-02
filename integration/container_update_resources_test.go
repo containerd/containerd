@@ -81,7 +81,7 @@ func getCgroupSwapLimitForTask(t *testing.T, task containerd.Task) uint64 {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return stat.Memory.SwapLimit
+		return stat.Memory.SwapLimit + stat.Memory.UsageLimit
 	}
 	cgroup, err := cgroup1.Load(cgroup1.PidPath(int(task.Pid())))
 	if err != nil {
@@ -171,11 +171,6 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	expectedBaseSwap := baseSwapLimit
 	expectedIncreasedSwap := increasedSwapLimit
 
-	if cgroups.Mode() == cgroups.Unified {
-		expectedBaseSwap = baseSwapLimit - memoryLimit
-		expectedIncreasedSwap = increasedSwapLimit - memoryLimit
-	}
-
 	t.Log("Create a container with memory limit but no swap")
 	cnConfig := ContainerConfig(
 		"container",
@@ -237,9 +232,6 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	EnsureImageExists(t, pauseImage)
 
 	expectedSwapLimit := func(memoryLimit int64) *int64 {
-		if cgroups.Mode() == cgroups.Unified {
-			memoryLimit = 0
-		}
 		return &memoryLimit
 	}
 
