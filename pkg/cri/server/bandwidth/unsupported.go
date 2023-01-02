@@ -35,7 +35,7 @@ limitations under the License.
 package bandwidth
 
 import (
-	"errors"
+	"github.com/containerd/containerd/errdefs"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -49,7 +49,7 @@ func NewTCShaper(iface string) Shaper {
 }
 
 func (f *unsupportedShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (f *unsupportedShaper) Reset(cidr string) error {
@@ -57,11 +57,11 @@ func (f *unsupportedShaper) Reset(cidr string) error {
 }
 
 func (f *unsupportedShaper) ReconcileInterface() error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (f *unsupportedShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 func (f *unsupportedShaper) GetCIDRs() ([]string, error) {
