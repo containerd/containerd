@@ -33,7 +33,7 @@ limitations under the License.
 package bandwidth
 
 import (
-	"errors"
+	"github.com/containerd/containerd/errdefs"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -47,7 +47,7 @@ type FakeShaper struct {
 
 // Limit is not implemented
 func (f *FakeShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 // Reset appends a particular CIDR to the set of ResetCIDRs being managed by this shaper
@@ -58,12 +58,12 @@ func (f *FakeShaper) Reset(cidr string) error {
 
 // ReconcileInterface is not implemented
 func (f *FakeShaper) ReconcileInterface() error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 // ReconcileCIDR is not implemented
 func (f *FakeShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
-	return errors.New("unimplemented")
+	return errdefs.ErrNotImplemented
 }
 
 // GetCIDRs returns the set of CIDRs that are being managed by this shaper
