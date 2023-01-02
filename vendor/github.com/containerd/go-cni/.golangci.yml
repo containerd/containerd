@@ -1,3 +1,4 @@
+---
 linters:
   enable:
     - structcheck
@@ -15,7 +16,7 @@ linters:
     - errcheck
 
 # FIXME: re-enable after fixing GoDoc in this repository
-#issues:
+# issues:
 #  include:
 #    - EXC0002
 

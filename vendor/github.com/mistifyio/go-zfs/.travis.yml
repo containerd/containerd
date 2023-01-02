@@ -1,3 +1,5 @@
+# yamllint disable-file
+---
 language: go
 dist: trusty
 sudo: required

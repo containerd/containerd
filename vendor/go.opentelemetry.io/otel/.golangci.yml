@@ -1,7 +1,8 @@
+---
 # See https://github.com/golangci/golangci-lint#config-file
 run:
-  issues-exit-code: 1 #Default
-  tests: true #Default
+  issues-exit-code: 1 # Default
+  tests: true # Default
 
 linters:
   # Disable everything by default so upgrades to not include new "default

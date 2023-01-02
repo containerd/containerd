@@ -51,6 +51,9 @@ jobs:
           skip-cache: true
           args: --timeout=8m
 
+      - name: yamllint-lint
+        run: yamllint .
+
   #
   # Project checks
   #

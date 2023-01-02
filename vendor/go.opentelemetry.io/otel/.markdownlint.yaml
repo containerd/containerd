@@ -1,3 +1,4 @@
+---
 # Default state for all rules
 default: true
 
@@ -14,7 +15,7 @@ MD013: false
 MD024:
   siblings_only: true
 
-#single-title
+# single-title
 MD025: false
 
 # ol-prefix
@@ -26,4 +27,3 @@ MD033: false
 
 # fenced-code-language
 MD040: false
-

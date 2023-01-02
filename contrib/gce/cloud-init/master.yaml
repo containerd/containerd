@@ -1,13 +1,14 @@
-#cloud-config
+---
+# cloud-config
 
 users:
-- name: etcd
-  homedir: /var/etcd
-  lock_passwd: true
-  ssh_redirect_user: true
+  - name: etcd
+    homedir: /var/etcd
+    lock_passwd: true
+    ssh_redirect_user: true
 
 write_files:
-# Setup containerd.
+  # Setup containerd.
   - path: /etc/systemd/system/containerd-installation.service
     permissions: 0644
     owner: root

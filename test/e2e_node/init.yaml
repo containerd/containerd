@@ -1,4 +1,5 @@
-#cloud-config
+---
+# cloud-config
 
 write_files:
   - path: /etc/systemd/system/containerd-installation.service

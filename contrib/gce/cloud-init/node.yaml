@@ -1,7 +1,8 @@
-#cloud-config
+---
+# cloud-config
 
 write_files:
-# Setup containerd.
+  # Setup containerd.
   - path: /etc/systemd/system/containerd-installation.service
     permissions: 0644
     owner: root

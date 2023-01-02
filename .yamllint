@@ -1,0 +1,13 @@
+---
+extends: default
+
+rules:
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes']
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 1
+  document-start: disable
+  line-length: disable
+  key-duplicates: disable

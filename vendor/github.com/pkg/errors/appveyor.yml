@@ -27,6 +27,6 @@ test_script:
   - set PATH=C:\gopath\bin;%PATH%
   - go test -v ./...
 
-#artifacts:
+# artifacts:
 #  - path: '%GOPATH%\bin\*.exe'
 deploy: off

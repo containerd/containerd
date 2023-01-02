@@ -4,9 +4,9 @@
     name: "{{ item }}"
     state: latest
   with_items:
-      - unzip
-      - tar
-      - apt-transport-https
-      - btrfs-tools
-      - libseccomp2
-      - util-linux
+    - unzip
+    - tar
+    - apt-transport-https
+    - btrfs-tools
+    - libseccomp2
+    - util-linux

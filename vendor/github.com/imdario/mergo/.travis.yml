@@ -1,7 +1,8 @@
+---
 language: go
 arch:
-    - amd64
-    - ppc64le
+  - amd64
+  - ppc64le
 install:
   - go get -t
   - go get golang.org/x/tools/cmd/cover
