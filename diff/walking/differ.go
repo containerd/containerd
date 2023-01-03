@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/epoch"
@@ -42,7 +43,6 @@ type walkingDiff struct {
 }
 
 var emptyDesc = ocispec.Descriptor{}
-var uncompressed = "containerd.io/uncompressed"
 
 // NewWalkingDiff is a generic implementation of diff.Comparer.  The diff is
 // calculated by mounting both the upper and lower mount sets and walking the
@@ -154,7 +154,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				if config.Labels == nil {
 					config.Labels = map[string]string{}
 				}
-				config.Labels[uncompressed] = dgstr.Digest().String()
+				config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 			} else {
 				if errOpen = archive.WriteDiff(ctx, cw, lowerRoot, upperRoot, writeDiffOpts...); errOpen != nil {
 					return fmt.Errorf("failed to write diff: %w", errOpen)
@@ -181,10 +181,10 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 			if info.Labels == nil {
 				info.Labels = make(map[string]string)
 			}
-			// Set uncompressed label if digest already existed without label
-			if _, ok := info.Labels[uncompressed]; !ok {
-				info.Labels[uncompressed] = config.Labels[uncompressed]
-				if _, err := s.store.Update(ctx, info, "labels."+uncompressed); err != nil {
+			// Set "containerd.io/uncompressed" label if digest already existed without label
+			if _, ok := info.Labels[labels.LabelUncompressed]; !ok {
+				info.Labels[labels.LabelUncompressed] = config.Labels[labels.LabelUncompressed]
+				if _, err := s.store.Update(ctx, info, "labels."+labels.LabelUncompressed); err != nil {
 					return fmt.Errorf("error setting uncompressed label: %w", err)
 				}
 			}

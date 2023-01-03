@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
@@ -392,10 +393,10 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 			cinfo := content.Info{
 				Digest: layer.Blob.Digest,
 				Labels: map[string]string{
-					"containerd.io/uncompressed": layer.Diff.Digest.String(),
+					labels.LabelUncompressed: layer.Diff.Digest.String(),
 				},
 			}
-			if _, err := cs.Update(ctx, cinfo, "labels.containerd.io/uncompressed"); err != nil {
+			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
 				return err
 			}
 		}
