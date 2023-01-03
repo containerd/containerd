@@ -24,10 +24,11 @@ Vagrant.configure("2") do |config|
   memory = 4096
   cpus = 2
   disk_size = 60
-  config.vm.provider :virtualbox do |v|
+  config.vm.provider :virtualbox do |v, o|
     v.memory = memory
     v.cpus = cpus
-    v.disk :disk, size: "#{disk_size}GB", primary: true
+    # Needs env var VAGRANT_EXPERIMENTAL="disks"
+    o.vm.disk :disk, size: "#{disk_size}GB", primary: true
   end
   config.vm.provider :libvirt do |v|
     v.memory = memory
