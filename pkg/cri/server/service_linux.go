@@ -92,7 +92,7 @@ func (c *criService) initPlatform() (err error) {
 		reg := cdi.GetRegistry()
 		err = reg.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
 		if err != nil {
-			return fmt.Errorf("failed to configure CDI registry")
+			return fmt.Errorf("failed to configure CDI registry: %w", err)
 		}
 	}
 
