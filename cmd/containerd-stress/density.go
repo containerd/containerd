@@ -198,6 +198,7 @@ type Stat struct {
 }
 
 func parseStat(data string) (stat Stat, err error) {
+	//nolint:dupword
 	// From proc(5), field 2 could contain space and is inside `(` and `)`.
 	// The following is an example:
 	// 89653 (gunicorn: maste) S 89630 89653 89653 0 -1 4194560 29689 28896 0 3 146 32 76 19 20 0 1 0 2971844 52965376 3920 18446744073709551615 1 1 0 0 0 0 0 16781312 137447943 0 0 0 17 1 0 0 0 0 0 0 0 0 0 0 0 0 0

@@ -1504,7 +1504,7 @@ func (in *instrumentedService) UpdateRuntimeConfig(ctx context.Context, r *runti
 		if err != nil {
 			log.G(ctx).WithError(err).Error("UpdateRuntimeConfig failed")
 		} else {
-			log.G(ctx).Debug("UpdateRuntimeConfig returns returns successfully")
+			log.G(ctx).Debug("UpdateRuntimeConfig returns successfully")
 		}
 	}()
 	res, err = in.c.UpdateRuntimeConfig(ctrdutil.WithNamespace(ctx), r)
@@ -1520,7 +1520,7 @@ func (in *instrumentedAlphaService) UpdateRuntimeConfig(ctx context.Context, r *
 		if err != nil {
 			log.G(ctx).WithError(err).Error("UpdateRuntimeConfig failed")
 		} else {
-			log.G(ctx).Debug("UpdateRuntimeConfig returns returns successfully")
+			log.G(ctx).Debug("UpdateRuntimeConfig returns successfully")
 		}
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version

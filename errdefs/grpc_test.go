@@ -42,6 +42,7 @@ func TestGRPCRoundTrip(t *testing.T) {
 			input: ErrNotFound,
 			cause: ErrNotFound,
 		},
+		//nolint:dupword
 		{
 			input: fmt.Errorf("test test test: %w", ErrFailedPrecondition),
 			cause: ErrFailedPrecondition,

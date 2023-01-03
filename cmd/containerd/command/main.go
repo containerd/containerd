@@ -187,7 +187,7 @@ can be used and modified as necessary as a custom configuration.`
 		// run server initialization in a goroutine so we don't end up blocking important things like SIGTERM handling
 		// while the server is initializing.
 		// As an example opening the bolt database will block forever if another containerd is already running and containerd
-		// will have to be be `kill -9`'ed to recover.
+		// will have to be `kill -9`'ed to recover.
 		chsrv := make(chan srvResp)
 		go func() {
 			defer close(chsrv)
