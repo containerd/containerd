@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -162,7 +163,7 @@ func init() {
 			}
 
 			dbopts := []metadata.DBOpt{
-				//	metadata.WithEventsPublisher(ic.Events),
+				metadata.WithEventsPublisher(ic.Events),
 			}
 
 			if !shared {

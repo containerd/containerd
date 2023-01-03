@@ -17,30 +17,16 @@
 package snapshots
 
 import (
-	"context"
-
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/snapshots"
 )
-
-// snapshotter wraps snapshots.Snapshotter with proper events published.
-type snapshotter struct {
-	snapshots.Snapshotter
-	name      string
-	publisher events.Publisher
-}
 
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.ServicePlugin,
 		ID:   services.SnapshotsService,
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -48,61 +34,8 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.Get(plugin.EventPlugin)
-			if err != nil {
-				return nil, err
-			}
 
-			db := m.(*metadata.DB)
-			ss := make(map[string]snapshots.Snapshotter)
-			for n, sn := range db.Snapshotters() {
-				ss[n] = newSnapshotter(sn, n, ep.(events.Publisher))
-			}
-			return ss, nil
+			return m.(*metadata.DB).Snapshotters(), nil
 		},
-	})
-}
-
-func newSnapshotter(sn snapshots.Snapshotter, name string, publisher events.Publisher) snapshots.Snapshotter {
-	return &snapshotter{
-		Snapshotter: sn,
-		name:        name,
-		publisher:   publisher,
-	}
-}
-
-func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	mounts, err := s.Snapshotter.Prepare(ctx, key, parent, opts...)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.publisher.Publish(ctx, "/snapshot/prepare", &eventstypes.SnapshotPrepare{
-		Key:         key,
-		Parent:      parent,
-		Snapshotter: s.name,
-	}); err != nil {
-		return nil, err
-	}
-	return mounts, nil
-}
-
-func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
-	if err := s.Snapshotter.Commit(ctx, name, key, opts...); err != nil {
-		return err
-	}
-	return s.publisher.Publish(ctx, "/snapshot/commit", &eventstypes.SnapshotCommit{
-		Key:         key,
-		Name:        name,
-		Snapshotter: s.name,
-	})
-}
-
-func (s *snapshotter) Remove(ctx context.Context, key string) error {
-	if err := s.Snapshotter.Remove(ctx, key); err != nil {
-		return err
-	}
-	return s.publisher.Publish(ctx, "/snapshot/remove", &eventstypes.SnapshotRemove{
-		Key:         key,
-		Snapshotter: s.name,
 	})
 }
