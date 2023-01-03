@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/kmutex"
@@ -302,16 +303,16 @@ func (u *Unpacker) unpack(
 		}
 
 		// inherits annotations which are provided as snapshot labels.
-		labels := snapshots.FilterInheritedLabels(desc.Annotations)
-		if labels == nil {
-			labels = make(map[string]string)
+		snapshotLabels := snapshots.FilterInheritedLabels(desc.Annotations)
+		if snapshotLabels == nil {
+			snapshotLabels = make(map[string]string)
 		}
-		labels[labelSnapshotRef] = chainID
+		snapshotLabels[labelSnapshotRef] = chainID
 
 		var (
 			key    string
 			mounts []mount.Mount
-			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(labels))
+			opts   = append(unpack.SnapshotOpts, snapshots.WithLabels(snapshotLabels))
 		)
 
 		for try := 1; try <= 3; try++ {
@@ -400,10 +401,10 @@ func (u *Unpacker) unpack(
 		cinfo := content.Info{
 			Digest: desc.Digest,
 			Labels: map[string]string{
-				"containerd.io/uncompressed": diff.Digest.String(),
+				labels.LabelUncompressed: diff.Digest.String(),
 			},
 		}
-		if _, err := cs.Update(ctx, cinfo, "labels.containerd.io/uncompressed"); err != nil {
+		if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
 			return err
 		}
 		return nil

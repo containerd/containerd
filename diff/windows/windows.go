@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
@@ -77,7 +78,6 @@ type windowsDiff struct {
 }
 
 var emptyDesc = ocispec.Descriptor{}
-var uncompressed = "containerd.io/uncompressed"
 
 // NewWindowsDiff is the Windows container layer implementation
 // for comparing and applying filesystem layers
@@ -255,7 +255,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		if config.Labels == nil {
 			config.Labels = map[string]string{}
 		}
-		config.Labels[uncompressed] = dgstr.Digest().String()
+		config.Labels[labels.LabelUncompressed] = dgstr.Digest().String()
 	} else {
 		if err = archive.WriteDiff(ctx, cw, "", layers[0], archive.AsWindowsContainerLayerPair(), archive.WithParentLayers(layers[1:])); err != nil {
 			return emptyDesc, fmt.Errorf("failed to write diff: %w", err)
@@ -281,10 +281,10 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	if info.Labels == nil {
 		info.Labels = make(map[string]string)
 	}
-	// Set uncompressed label if digest already existed without label
-	if _, ok := info.Labels[uncompressed]; !ok {
-		info.Labels[uncompressed] = config.Labels[uncompressed]
-		if _, err := s.store.Update(ctx, info, "labels."+uncompressed); err != nil {
+	// Set "containerd.io/uncompressed" label if digest already existed without label
+	if _, ok := info.Labels[labels.LabelUncompressed]; !ok {
+		info.Labels[labels.LabelUncompressed] = config.Labels[labels.LabelUncompressed]
+		if _, err := s.store.Update(ctx, info, "labels."+labels.LabelUncompressed); err != nil {
 			return emptyDesc, fmt.Errorf("error setting uncompressed label: %w", err)
 		}
 	}
