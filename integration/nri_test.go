@@ -32,6 +32,7 @@ import (
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/nri/pkg/api"
 	"github.com/containerd/nri/pkg/stub"
+	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/integration/images"
@@ -56,6 +57,11 @@ var (
 func skipNriTestIfNecessary(t *testing.T, extraSkipChecks ...map[string]bool) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("Not running on linux")
+	}
+
+	if selinux.GetEnabled() {
+		// https://github.com/containerd/containerd/pull/7892#issuecomment-1369825603
+		t.Skip("SELinux relabeling is not supported for NRI yet")
 	}
 	_, err := os.Stat(nriTestSocket)
 	if err != nil {
