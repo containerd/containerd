@@ -166,9 +166,9 @@ func WithIntrospectionService(in introspection.Service) ServicesOpt {
 }
 
 // WithSandboxStore sets the sandbox store.
-func WithSandboxStore(client sandboxapi.StoreClient) ServicesOpt {
+func WithSandboxStore(client sandbox.Store) ServicesOpt {
 	return func(s *services) {
-		s.sandboxStore = proxy.NewSandboxStore(client)
+		s.sandboxStore = client
 	}
 }
 
@@ -190,6 +190,9 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			plugin.LeasePlugin: func(i interface{}) ServicesOpt {
 				return WithLeasesService(i.(leases.Manager))
+			},
+			plugin.SandboxStorePlugin: func(i interface{}) ServicesOpt {
+				return WithSandboxStore(i.(sandbox.Store))
 			},
 		} {
 			i, err := ic.Get(t)
@@ -227,9 +230,6 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			srv.IntrospectionService: func(s interface{}) ServicesOpt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
-			},
-			srv.SandboxStoreService: func(s interface{}) ServicesOpt {
-				return WithSandboxStore(s.(sandboxapi.StoreClient))
 			},
 			srv.SandboxControllerService: func(s interface{}) ServicesOpt {
 				return WithSandboxController(s.(sandboxapi.ControllerClient))
