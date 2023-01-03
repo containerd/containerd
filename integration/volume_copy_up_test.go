@@ -118,17 +118,17 @@ func TestVolumeOwnership(t *testing.T) {
 	require.NoError(t, runtimeService.StartContainer(cn))
 
 	// ghcr.io/containerd/volume-ownership:2.1 contains a test_dir
-	// volume, which is owned by nobody:nogroup.
+	// volume, which is owned by 65534:65534 (nobody:nogroup, or nobody:nobody).
 	// On Windows, the folder is situated in C:\volumes\test_dir and is owned
 	// by ContainerUser (SID: S-1-5-93-2-2). A helper tool get_owner.exe should
 	// exist inside the container that returns the owner in the form of USERNAME:SID.
 	t.Logf("Check ownership of test directory inside container")
 
 	cmd := []string{
-		"stat", "-c", "%U:%G", "/test_dir",
+		"stat", "-c", "%u:%g", "/test_dir",
 	}
-	expectedContainerOutput := "nobody:nogroup\n"
-	expectedHostOutput := "nobody:nogroup\n"
+	expectedContainerOutput := "65534:65534\n"
+	expectedHostOutput := "65534:65534\n"
 	if goruntime.GOOS == "windows" {
 		cmd = []string{
 			"C:\\bin\\get_owner.exe",
