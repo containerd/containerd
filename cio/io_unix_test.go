@@ -240,7 +240,7 @@ func TestLogURIGenerator(t *testing.T) {
 		{
 			scheme: "binary",
 			path:   "C:\\path\\to\\binary",
-			// NOTE: Windows paths should not be be parse-able outside of Windows:
+			// NOTE: Windows paths should not be parse-able outside of Windows:
 			err: "must be absolute",
 		},
 	})

@@ -216,7 +216,7 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 }
 
 // Overrides the default snapshotter if Snapshotter is set for this runtime.
-// See See https://github.com/containerd/containerd/issues/6657
+// See https://github.com/containerd/containerd/issues/6657
 func (c *Controller) runtimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
 	if ociRuntime.Snapshotter == "" {
 		return c.config.ContainerdConfig.Snapshotter

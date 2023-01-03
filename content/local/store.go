@@ -505,6 +505,7 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 		return status, fmt.Errorf("provided total differs from status: %v != %v", total, status.Total)
 	}
 
+	//nolint:dupword
 	// TODO(stevvooe): slow slow slow!!, send to goroutine or use resumable hashes
 	fp, err := os.Open(data)
 	if err != nil {
