@@ -215,8 +215,8 @@ EOF
     SHELL
   end
 
-  # SELinux is permissive by default (via provisioning) in this VM. To re-run with SELinux enforcing:
-  #   vagrant up --provision-with=selinux-enforcing,test-integration
+  # SELinux is Enforcing by default (via provisioning) in this VM. To re-run with SELinux disabled:
+  #   SELINUX=Disabled vagrant up --provision-with=selinux,test-integration
   #
   config.vm.provision "test-integration", type: "shell", run: "never" do |sh|
     sh.upload_path = "/tmp/test-integration"
@@ -237,8 +237,8 @@ EOF
     SHELL
   end
 
-  # SELinux is permissive by default (via provisioning) in this VM. To re-run with SELinux enforcing:
-  #   vagrant up --provision-with=selinux-enforcing,test-cri
+  # SELinux is Enforcing by default (via provisioning) in this VM. To re-run with SELinux disabled:
+  #   SELINUX=Disabled vagrant up --provision-with=selinux,test-cri
   #
   config.vm.provision "test-cri", type: "shell", run: "never" do |sh|
     sh.upload_path = "/tmp/test-cri"
