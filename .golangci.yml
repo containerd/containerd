@@ -13,6 +13,7 @@ linters:
     - unconvert
     - unused
     - vet
+    - dupword # Checks for duplicate words in the source code
   disable:
     - errcheck
 
@@ -34,7 +35,7 @@ linters-settings:
     # The following issues surfaced when `gosec` linter
     # was enabled. They are temporarily excluded to unblock
     # the existing workflow, but still to be addressed by
-    # by future works.
+    # future works.
     excludes:
       - G204
       - G305

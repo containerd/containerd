@@ -283,7 +283,7 @@ func (m *DB) RegisterMutationCallback(fn func(bool)) {
 // RegisterCollectibleResource registers a resource type which can be
 // referenced by metadata resources and garbage collected.
 // Collectible Resources are useful ephemeral resources which need to
-// to be tracked by go away after reboot or process restart.
+// be tracked by go away after reboot or process restart.
 //
 // A few limitations to consider:
 //   - Collectible Resources cannot reference other resources.
