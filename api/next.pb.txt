@@ -6857,6 +6857,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/transfer/importexport.proto"
   package: "containerd.types.transfer"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
   message_type {
     name: "ImageImportStream"
     field {
@@ -6896,6 +6897,42 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "mediaType"
+    }
+    field {
+      name: "images"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "images"
+    }
+    field {
+      name: "platforms"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platforms"
+    }
+    field {
+      name: "all_platforms"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "allPlatforms"
+    }
+    field {
+      name: "skip_docker_manifest"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "skipDockerManifest"
+    }
+    field {
+      name: "skip_non_distributable"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "skipNonDistributable"
     }
   }
   options {
