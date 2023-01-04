@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -289,7 +290,11 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		hostPath, _ = filepath.Abs(hostPath)
 		containerPath, _ = filepath.Abs(containerPath)
-		mount := &runtime.Mount{HostPath: hostPath, ContainerPath: containerPath}
+		mount := &runtime.Mount{
+			HostPath:       hostPath,
+			ContainerPath:  containerPath,
+			SelinuxRelabel: selinux.GetEnabled(),
+		}
 		c.Mounts = append(c.Mounts, mount)
 	}
 }
