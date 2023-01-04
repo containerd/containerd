@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,8 +67,12 @@ command. As part of this process, we do the following:
 			Usage: "Pull metadata for all platforms",
 		},
 		cli.BoolFlag{
+			Name:  "no-unpack",
+			Usage: "skip unpacking the images, cannot be used with --print-chainid (default: false)",
+		},
+		cli.BoolFlag{
 			Name:  "print-chainid",
-			Usage: "Print the resulting image's chain ID",
+			Usage: "Print the resulting image's chain ID, cannot be used with --no-unpack (default: false)",
 		},
 		cli.IntFlag{
 			Name:  "max-concurrent-downloads",
@@ -84,6 +89,12 @@ command. As part of this process, we do the following:
 		)
 		if ref == "" {
 			return fmt.Errorf("please provide an image reference to pull")
+		}
+
+		if context.Bool("print-chainid") {
+			if context.Bool("no-unpack") {
+				return errors.New("--print-chainid and --no-unpack are incompatible options")
+			}
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
@@ -149,6 +160,10 @@ command. As part of this process, we do the following:
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
+		}
+
+		if context.Bool("no-unpack") {
+			return nil
 		}
 
 		log.G(ctx).WithField("image", ref).Debug("unpacking")
