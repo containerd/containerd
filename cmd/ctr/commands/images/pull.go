@@ -66,8 +66,12 @@ command. As part of this process, we do the following:
 			Usage: "Pull metadata for all platforms",
 		},
 		cli.BoolFlag{
+			Name:  "no-unpack",
+			Usage: "skip unpacking the images, cannot be used with --print-chainid, false by default",
+		},		
+		cli.BoolFlag{
 			Name:  "print-chainid",
-			Usage: "Print the resulting image's chain ID",
+			Usage: "Print the resulting image's chain ID, cannot be used with --no-unpack, false by default",
 		},
 		cli.IntFlag{
 			Name:  "max-concurrent-downloads",
@@ -84,6 +88,12 @@ command. As part of this process, we do the following:
 		)
 		if ref == "" {
 			return fmt.Errorf("please provide an image reference to pull")
+		}
+
+		if context.Bool("print-chainid") {
+			if context.Bool("no-unpack") {
+				return fmt.Errorf("--print-chainid and --no-unpack are incompatible options")
+			}
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
@@ -178,17 +188,19 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
-			if err != nil {
-				return err
-			}
-			if context.Bool("print-chainid") {
-				diffIDs, err := i.RootFS(ctx)
+			if !context.Bool("no-unpack") {
+				err = i.Unpack(ctx, context.String("snapshotter"))
 				if err != nil {
 					return err
 				}
-				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
+				if context.Bool("print-chainid") {
+					diffIDs, err := i.RootFS(ctx)
+					if err != nil {
+						return err
+					}
+					chainID := identity.ChainID(diffIDs).String()
+					fmt.Printf("image chain ID: %s\n", chainID)
+				}
 			}
 		}
 		fmt.Printf("done: %s\t\n", time.Since(start))
