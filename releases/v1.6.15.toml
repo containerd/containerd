@@ -1,0 +1,20 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.14"
+
+pre_release = false
+
+preface = """\
+The fifteenth patch release for containerd 1.6 fixes an issue with CNI in the CRI plugin
+
+### Notable Updates
+
+* **Fix no CNI info for pod sandbox on restart in CRI plugin** ([#7848](https://github.com/containerd/containerd/pull/7848))
+
+See the changelog for complete list of changes"""
