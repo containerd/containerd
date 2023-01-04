@@ -100,6 +100,9 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Support image pull progress timeout** ([#6150](https://github.com/containerd/containerd/pull/6150))
 * **Fix CRI plugin to setup pod network after creating the sandbox container** ([#5904](https://github.com/containerd/containerd/pull/5904))
 * **Pass all TOML runtime configuration options from CRI to the runtime** ([#7764](https://github.com/containerd/containerd/pull/7764))
+* **Support for user namespaces in stateless pods ([KEP-127](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/127-user-namespaces)) _(experimental)_** ([#7679](https://github.com/containerd/containerd/pull/7679))
+* **Add network plugin metrics** ([#7858](https://github.com/containerd/containerd/pull/7858))
+* **CRI v1alpha2 is deprecated and will be removed from containerd in containerd v2.0; if you are using the CRI API please move up to CRI v1; Kubernetes supports CRI v1 since Kubernetes 1.23** ([#7863](https://github.com/containerd/containerd/pull/7863))
 
 #### Other
 
