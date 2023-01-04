@@ -161,7 +161,9 @@ command. As part of this process, we do the following:
 			return err
 		}
 
-		log.G(ctx).WithField("image", ref).Debug("unpacking")
+		if !context.Bool("no-unpack") {
+			log.G(ctx).WithField("image", ref).Debug("unpacking")
+		}
 
 		// TODO: Show unpack status
 
@@ -186,9 +188,9 @@ command. As part of this process, we do the following:
 
 		start := time.Now()
 		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
 			if !context.Bool("no-unpack") {
+				fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 				err = i.Unpack(ctx, context.String("snapshotter"))
 				if err != nil {
 					return err
