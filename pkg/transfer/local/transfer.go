@@ -72,6 +72,8 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 		switch d := dest.(type) {
 		case transfer.ImagePusher:
 			return ts.push(ctx, s, d, topts)
+		case transfer.ImageExporter:
+			return ts.exportStream(ctx, d, topts)
 		}
 	case transfer.ImageImporter:
 		switch d := dest.(type) {
