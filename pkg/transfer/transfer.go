@@ -69,6 +69,11 @@ type ImageGetter interface {
 	Get(context.Context, images.Store) (images.Image, error)
 }
 
+// ImageExporter exports images to a writer
+type ImageExporter interface {
+	Export(ctx context.Context, is images.Store, cs content.Store) error
+}
+
 // ImageImporter imports an image into a content store
 type ImageImporter interface {
 	Import(context.Context, content.Store) (ocispec.Descriptor, error)
