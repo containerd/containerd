@@ -56,6 +56,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.MetadataPlugin,
+			plugin.TaskMonitorPlugin,
 		},
 		Config: &Config{
 			Platforms: defaultPlatforms(),
@@ -77,6 +78,10 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			taskMonitor, err := ic.Get(plugin.TaskMonitorPlugin)
+			if err != nil {
+				return nil, err
+			}
 			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
 			events := ep.(*exchange.Exchange)
@@ -90,6 +95,7 @@ func init() {
 				Store:        cs,
 				SchedCore:    config.SchedCore,
 				SandboxStore: ss,
+				monitor:      taskMonitor.(runtime.TaskMonitor),
 			})
 			if err != nil {
 				return nil, err
@@ -127,6 +133,7 @@ type ManagerConfig struct {
 	TTRPCAddress string
 	SchedCore    bool
 	SandboxStore sandbox.Store
+	monitor      runtime.TaskMonitor
 }
 
 // NewShimManager creates a manager for v2 shims
@@ -147,6 +154,7 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
 		sandboxStore:           config.SandboxStore,
+		monitor:                config.monitor,
 	}
 
 	if err := m.loadExistingTasks(ctx); err != nil {
@@ -172,6 +180,7 @@ type ShimManager struct {
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
 	sandboxStore sandbox.Store
+	monitor      runtime.TaskMonitor
 }
 
 // ID of the shim manager
@@ -266,6 +275,12 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	})
 	shim, err := b.Start(ctx, protobuf.FromAny(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+		if task, getErr := m.shims.Get(ctx, id); getErr == nil {
+			if err := m.monitor.Stop(task); err != nil {
+				log.G(ctx).Errorf("Failed to remove task %q from monitor list", id)
+			}
+		}
 
 		cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
