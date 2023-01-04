@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/labels"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/reference/docker"
 
@@ -45,6 +46,8 @@ type Image struct {
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
+	// Pinned image to prevent it from garbage collection
+	Pinned bool
 }
 
 // Store stores all images.
@@ -131,7 +134,6 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get image config descriptor: %w", err)
 	}
-
 	id := desc.Digest.String()
 
 	spec, err := i.Spec(ctx)
@@ -139,13 +141,17 @@ func getImage(ctx context.Context, i containerd.Image) (*Image, error) {
 		return nil, fmt.Errorf("failed to get OCI image spec: %w", err)
 	}
 
+	pinned := i.Labels()[labels.PinnedImageLabelKey] == labels.PinnedImageLabelValue
+
 	return &Image{
 		ID:         id,
 		References: []string{i.Name()},
 		ChainID:    chainID.String(),
 		Size:       size,
 		ImageSpec:  spec,
+		Pinned:     pinned,
 	}, nil
+
 }
 
 // Resolve resolves a image reference to image id.
