@@ -68,7 +68,7 @@ command. As part of this process, we do the following:
 		cli.BoolFlag{
 			Name:  "no-unpack",
 			Usage: "skip unpacking the images, cannot be used with --print-chainid, false by default",
-		},		
+		},
 		cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID, cannot be used with --no-unpack, false by default",
