@@ -3,7 +3,7 @@
 containerd supports OpenTelemetry tracing since v1.6.0.
 Tracing currently targets only gRPC calls.
 
-## Sending traces from containerd deamon
+## Sending traces from containerd daemon
 
 By configuring `io.containerd.tracing.processor.v1.otlp` plugin.
 containerd daemon can send traces to the specified OpenTelemetry endpoint.
