@@ -63,9 +63,10 @@ jobs:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
 
-      - uses: containerd/project-checks@v1
+      - uses: containerd/project-checks@v1.1.0
         with:
           working-directory: src/github.com/containerd/containerd
+          repo-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: verify go modules and vendor directory
         run: |
