@@ -254,8 +254,20 @@ sha256:1ed3521a5dcbd05214eb7f35b952ecf018d5a6610c32ba4e315028c556f45e94 1.732kB 
 
 #### Labels
 
-Note that each chunk of content has several labels on it. This sub-section describes the labels.
+Note that each blob of content has several labels on it. This sub-section describes the labels.
 This is not intended to be a comprehensive overview of labels.
+
+#### Common Labels
+For images pulled from remotes, the `containerd.io.distribution.source.<registry>=[<repo/1>,<repo/2>]` label
+is added to each blob of the image to indicate its source.
+```
+containerd.io/distribution.source.docker.io=library/redis
+```
+
+If the blob is shared by different repos in the same registry, the repo name will be appended:
+```
+containerd.io/distribution.source.docker.io=library/redis,myrepo/redis
+```
 
 ##### Layer Labels
 
@@ -294,7 +306,9 @@ This is used to connect this config to a snapshot. We will look at that shortly 
 The labels on the manifest also begin with `containerd.io/gc.ref`, indicating that they are used to control
 garbage collection. A manifest has several "children". These normally are the config and the layers. We want
 to ensure that as long as the image remains around, i.e. the manifest, the children do not get garbage collected.
-Thus, we have labels referencing each child, `containerd.io/gc.ref.content.<index>`.
+Thus, we have labels referencing each child:
+* `containerd.io/gc.ref.content.config` references the config
+* `containerd.io/gc.ref.content.l.<index>` reference the layers
 
 In our example, the manifest is `sha256:9bb13890319dc01e5f8a4d3d0c4c72685654d682d568350fd38a02b1d70aee6b`, and the labels are as follows.
 
@@ -315,7 +329,7 @@ These are precisely those children of the manifest - the config and layers - tha
 The labels on the index also begin with `containerd.io/gc.ref`, indicating that they are used to control
 garbage collection. An index has several "children", i.e. the manifests, one for each platform, as discussed above.
 We want to ensure that as long as the index remains around, the children do not get garbage collected.
-Thus, we have labels referencing each child, `containerd.io/gc.ref.content.<index>`.
+Thus, we have labels referencing each child, `containerd.io/gc.ref.content.m.<index>`.
 
 In our example, the index is `sha256:2a9865e55c37293b71df051922022898d8e4ec0f579c9b53a0caee1b170bc81c`, and the labels are as follows:
 
