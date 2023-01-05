@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
@@ -40,7 +39,6 @@ import (
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -131,21 +129,14 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	return shim, nil
 }
 
-func cleanupAfterDeadShim(ctx context.Context, id, ns string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) {
-	ctx = namespaces.WithNamespace(ctx, ns)
+func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[ShimInstance], events *exchange.Exchange, binaryCall *binary) {
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithFields(logrus.Fields{
-		"id":        id,
-		"namespace": ns,
-	}).Warn("cleaning up after shim disconnected")
+	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
-		log.G(ctx).WithError(err).WithFields(logrus.Fields{
-			"id":        id,
-			"namespace": ns,
-		}).Warn("failed to clean up after shim disconnected")
+		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
 	}
 
 	if _, err := rt.Get(ctx, id); err != nil {

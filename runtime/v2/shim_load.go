@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/cleanup"
 )
 
 func (m *ShimManager) loadExistingTasks(ctx context.Context) error {
@@ -60,6 +61,8 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
+
 	shimDirs, err := os.ReadDir(filepath.Join(m.state, ns))
 	if err != nil {
 		return err
@@ -133,12 +136,12 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		instance, err := loadShim(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-			cleanupAfterDeadShim(context.Background(), id, ns, m.shims, m.events, binaryCall)
+			cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
 			m.shims.Delete(ctx, id)
 		})
 		if err != nil {
-			cleanupAfterDeadShim(ctx, id, ns, m.shims, m.events, binaryCall)
+			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 			continue
 		}
 		shim := newShimTask(instance)
