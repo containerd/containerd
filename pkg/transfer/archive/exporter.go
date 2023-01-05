@@ -49,8 +49,7 @@ type ExportOptions struct {
 	SkipNonDistributable bool
 }
 
-// NewImageExportStream returns a image importer via tar stream
-// TODO: Add export options
+// NewImageExportStream returns an image exporter via tar stream
 func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ExportOptions) *ImageExportStream {
 	return &ImageExportStream{
 		stream:    stream,
@@ -92,7 +91,7 @@ func (iis *ImageExportStream) Export(ctx context.Context, is images.Store, cs co
 	if iis.allPlatforms {
 		opts = append(opts, archive.WithAllPlatforms())
 	}
-	if iis.skipNonDistributable {
+	if iis.skipDockerManifest {
 		opts = append(opts, archive.WithSkipDockerManifest())
 	}
 	if iis.skipNonDistributable {
