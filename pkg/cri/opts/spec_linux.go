@@ -35,63 +35,13 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	osinterface "github.com/containerd/containerd/pkg/os"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/util"
-	osinterface "github.com/containerd/containerd/pkg/os"
 )
-
-// WithAdditionalGIDs adds any additional groups listed for a particular user in the
-// /etc/groups file of the image's root filesystem to the OCI spec's additionalGids array.
-func WithAdditionalGIDs(userstr string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
-		if s.Process == nil {
-			s.Process = &runtimespec.Process{}
-		}
-		gids := s.Process.User.AdditionalGids
-		if err := oci.WithAdditionalGIDs(userstr)(ctx, client, c, s); err != nil {
-			return err
-		}
-		// Merge existing gids and new gids.
-		s.Process.User.AdditionalGids = mergeGids(s.Process.User.AdditionalGids, gids)
-		return nil
-	}
-}
-
-func mergeGids(gids1, gids2 []uint32) []uint32 {
-	gidsMap := make(map[uint32]struct{})
-	for _, gid1 := range gids1 {
-		gidsMap[gid1] = struct{}{}
-	}
-	for _, gid2 := range gids2 {
-		gidsMap[gid2] = struct{}{}
-	}
-	var gids []uint32
-	for gid := range gidsMap {
-		gids = append(gids, gid)
-	}
-	sort.Slice(gids, func(i, j int) bool { return gids[i] < gids[j] })
-	return gids
-}
-
-// WithoutDefaultSecuritySettings removes the default security settings generated on a spec
-func WithoutDefaultSecuritySettings(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Process == nil {
-		s.Process = &runtimespec.Process{}
-	}
-	// Make sure no default seccomp/apparmor is specified
-	s.Process.ApparmorProfile = ""
-	if s.Linux != nil {
-		s.Linux.Seccomp = nil
-	}
-	// Remove default rlimits (See issue #515)
-	s.Process.Rlimits = nil
-	return nil
-}
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
 func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string) oci.SpecOpts {
@@ -330,82 +280,6 @@ func WithDevices(osi osinterface.OS, config *runtime.ContainerConfig, enableDevi
 	}
 }
 
-// WithCapabilities sets the provided capabilities from the security context
-func WithCapabilities(sc *runtime.LinuxContainerSecurityContext, allCaps []string) oci.SpecOpts {
-	capabilities := sc.GetCapabilities()
-	if capabilities == nil {
-		return nullOpt
-	}
-
-	var opts []oci.SpecOpts
-	// Add/drop all capabilities if "all" is specified, so that
-	// following individual add/drop could still work. E.g.
-	// AddCapabilities: []string{"ALL"}, DropCapabilities: []string{"CHOWN"}
-	// will be all capabilities without `CAP_CHOWN`.
-	if util.InStringSlice(capabilities.GetAddCapabilities(), "ALL") {
-		opts = append(opts, oci.WithCapabilities(allCaps))
-	}
-	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
-		opts = append(opts, oci.WithCapabilities(nil))
-	}
-
-	var caps []string
-	for _, c := range capabilities.GetAddCapabilities() {
-		if strings.ToUpper(c) == "ALL" {
-			continue
-		}
-		// Capabilities in CRI doesn't have `CAP_` prefix, so add it.
-		caps = append(caps, "CAP_"+strings.ToUpper(c))
-	}
-	opts = append(opts, oci.WithAddedCapabilities(caps))
-
-	caps = []string{}
-	for _, c := range capabilities.GetDropCapabilities() {
-		if strings.ToUpper(c) == "ALL" {
-			continue
-		}
-		caps = append(caps, "CAP_"+strings.ToUpper(c))
-	}
-	opts = append(opts, oci.WithDroppedCapabilities(caps))
-	return oci.Compose(opts...)
-}
-
-// WithoutAmbientCaps removes the ambient caps from the spec
-func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Process == nil {
-		s.Process = &runtimespec.Process{}
-	}
-	if s.Process.Capabilities == nil {
-		s.Process.Capabilities = &runtimespec.LinuxCapabilities{}
-	}
-	s.Process.Capabilities.Ambient = nil
-	return nil
-}
-
-// WithDisabledCgroups clears the Cgroups Path from the spec
-func WithDisabledCgroups(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Linux == nil {
-		s.Linux = &runtimespec.Linux{}
-	}
-	s.Linux.CgroupsPath = ""
-	return nil
-}
-
-// WithSelinuxLabels sets the mount and process labels
-func WithSelinuxLabels(process, mount string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
-		if s.Linux == nil {
-			s.Linux = &runtimespec.Linux{}
-		}
-		if s.Process == nil {
-			s.Process = &runtimespec.Process{}
-		}
-		s.Linux.MountLabel = mount
-		s.Process.SelinuxLabel = process
-		return nil
-	}
-}
-
 var (
 	swapControllerAvailability     bool
 	swapControllerAvailabilityOnce sync.Once
@@ -612,22 +486,6 @@ func WithOOMScoreAdj(config *runtime.ContainerConfig, restrict bool) oci.SpecOpt
 	}
 }
 
-// WithSysctls sets the provided sysctls onto the spec
-func WithSysctls(sysctls map[string]string) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-		if s.Linux == nil {
-			s.Linux = &runtimespec.Linux{}
-		}
-		if s.Linux.Sysctl == nil {
-			s.Linux.Sysctl = make(map[string]string)
-		}
-		for k, v := range sysctls {
-			s.Linux.Sysctl[k] = v
-		}
-		return nil
-	}
-}
-
 // WithPodOOMScoreAdj sets the oom score for the pod sandbox
 func WithPodOOMScoreAdj(adj int, restrict bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
@@ -644,84 +502,6 @@ func WithPodOOMScoreAdj(adj int, restrict bool) oci.SpecOpts {
 		s.Process.OOMScoreAdj = &adj
 		return nil
 	}
-}
-
-// WithSupplementalGroups sets the supplemental groups for the process
-func WithSupplementalGroups(groups []int64) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-		if s.Process == nil {
-			s.Process = &runtimespec.Process{}
-		}
-		var guids []uint32
-		for _, g := range groups {
-			guids = append(guids, uint32(g))
-		}
-		s.Process.User.AdditionalGids = mergeGids(s.Process.User.AdditionalGids, guids)
-		return nil
-	}
-}
-
-// WithPodNamespaces sets the pod namespaces for the container
-func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
-	namespaces := config.GetNamespaceOptions()
-
-	opts := []oci.SpecOpts{
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: GetNetworkNamespace(sandboxPid)}),
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.IPCNamespace, Path: GetIPCNamespace(sandboxPid)}),
-		oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UTSNamespace, Path: GetUTSNamespace(sandboxPid)}),
-	}
-	if namespaces.GetPid() != runtime.NamespaceMode_CONTAINER {
-		opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.PIDNamespace, Path: GetPIDNamespace(targetPid)}))
-	}
-
-	if namespaces.GetUsernsOptions() != nil {
-		switch namespaces.GetUsernsOptions().GetMode() {
-		case runtime.NamespaceMode_NODE:
-			// Nothing to do. Not adding userns field uses the node userns.
-		case runtime.NamespaceMode_POD:
-			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.UserNamespace, Path: GetUserNamespace(sandboxPid)}))
-			opts = append(opts, oci.WithUserNamespace(uids, gids))
-		}
-	}
-
-	return oci.Compose(opts...)
-}
-
-// WithDefaultSandboxShares sets the default sandbox CPU shares
-func WithDefaultSandboxShares(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Linux == nil {
-		s.Linux = &runtimespec.Linux{}
-	}
-	if s.Linux.Resources == nil {
-		s.Linux.Resources = &runtimespec.LinuxResources{}
-	}
-	if s.Linux.Resources.CPU == nil {
-		s.Linux.Resources.CPU = &runtimespec.LinuxCPU{}
-	}
-	i := uint64(DefaultSandboxCPUshares)
-	s.Linux.Resources.CPU.Shares = &i
-	return nil
-}
-
-// WithoutNamespace removes the provided namespace
-func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
-	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-		if s.Linux == nil {
-			return nil
-		}
-		var namespaces []runtimespec.LinuxNamespace
-		for i, ns := range s.Linux.Namespaces {
-			if ns.Type != t {
-				namespaces = append(namespaces, s.Linux.Namespaces[i])
-			}
-		}
-		s.Linux.Namespaces = namespaces
-		return nil
-	}
-}
-
-func nullOpt(_ context.Context, _ oci.Client, _ *containers.Container, _ *runtimespec.Spec) error {
-	return nil
 }
 
 func getCurrentOOMScoreAdj() (int, error) {
@@ -746,44 +526,6 @@ func restrictOOMScoreAdj(preferredOOMScoreAdj int) (int, error) {
 		return currentOOMScoreAdj, nil
 	}
 	return preferredOOMScoreAdj, nil
-}
-
-const (
-	// netNSFormat is the format of network namespace of a process.
-	netNSFormat = "/proc/%v/ns/net"
-	// ipcNSFormat is the format of ipc namespace of a process.
-	ipcNSFormat = "/proc/%v/ns/ipc"
-	// utsNSFormat is the format of uts namespace of a process.
-	utsNSFormat = "/proc/%v/ns/uts"
-	// pidNSFormat is the format of pid namespace of a process.
-	pidNSFormat = "/proc/%v/ns/pid"
-	// userNSFormat is the format of user namespace of a process.
-	userNSFormat = "/proc/%v/ns/user"
-)
-
-// GetNetworkNamespace returns the network namespace of a process.
-func GetNetworkNamespace(pid uint32) string {
-	return fmt.Sprintf(netNSFormat, pid)
-}
-
-// GetIPCNamespace returns the ipc namespace of a process.
-func GetIPCNamespace(pid uint32) string {
-	return fmt.Sprintf(ipcNSFormat, pid)
-}
-
-// GetUTSNamespace returns the uts namespace of a process.
-func GetUTSNamespace(pid uint32) string {
-	return fmt.Sprintf(utsNSFormat, pid)
-}
-
-// GetPIDNamespace returns the pid namespace of a process.
-func GetPIDNamespace(pid uint32) string {
-	return fmt.Sprintf(pidNSFormat, pid)
-}
-
-// GetUserNamespace returns the user namespace of a process.
-func GetUserNamespace(pid uint32) string {
-	return fmt.Sprintf(userNSFormat, pid)
 }
 
 // WithCDI updates OCI spec with CDI content
