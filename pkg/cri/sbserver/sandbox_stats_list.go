@@ -33,12 +33,7 @@ func (c *criService) ListPodSandboxStats(
 
 	podSandboxStats := new(runtime.ListPodSandboxStatsResponse)
 	for _, sandbox := range sandboxes {
-		metrics, err := metricsForSandbox(sandbox)
-		if err != nil {
-			return nil, fmt.Errorf("failed to obtain metrics for sandbox %q: %w", sandbox.ID, err)
-		}
-
-		sandboxStats, err := c.podSandboxStats(ctx, sandbox, metrics)
+		sandboxStats, err := c.podSandboxStats(ctx, sandbox)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err)
 		}
