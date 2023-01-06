@@ -1186,6 +1186,9 @@ func TestSourceDateEpoch(t *testing.T) {
 		fstest.Chtimes("/f3", veryRecent, veryRecent),
 	)
 	makeDiffTarTest(validators, a, b, opts...)(t)
+	if testing.Short() {
+		t.Skip("short: skipping repro test")
+	}
 	makeDiffTarReproTest(a, b, opts...)(t)
 }
 
@@ -1350,13 +1353,13 @@ func makeDiffTar(t *testing.T, a, b fstest.Applier, opts ...WriteDiffOpt) (diges
 func makeDiffTarReproTest(a, b fstest.Applier, opts ...WriteDiffOpt) func(*testing.T) {
 	return func(t *testing.T) {
 		const (
-			count = 5
+			count = 30
 			delay = 100 * time.Millisecond
 		)
 		var lastDigest digest.Digest
 		for i := 0; i < count; i++ {
 			dgst, _ := makeDiffTar(t, a, b, opts...)
-			t.Logf("#%d: digest %s", i, dgst)
+			t.Logf("#%02d: %v: digest %s", i, time.Now(), dgst)
 			if lastDigest == "" {
 				lastDigest = dgst
 			} else if dgst != lastDigest {
