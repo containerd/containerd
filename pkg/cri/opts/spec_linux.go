@@ -31,16 +31,17 @@ import (
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/oci"
-	osinterface "github.com/containerd/containerd/pkg/os"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
+	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
@@ -134,13 +135,13 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				// Since default root propagation in runc is rprivate ignore
 				// setting the root propagation
 			case runtime.MountPropagation_PROPAGATION_BIDIRECTIONAL:
-				if err := ensureShared(src, osi.(osinterface.UNIX).LookupMount); err != nil {
+				if err := ensureShared(src, osi.LookupMount); err != nil {
 					return err
 				}
 				options = append(options, "rshared")
 				s.Linux.RootfsPropagation = "rshared"
 			case runtime.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
-				if err := ensureSharedOrSlave(src, osi.(osinterface.UNIX).LookupMount); err != nil {
+				if err := ensureSharedOrSlave(src, osi.LookupMount); err != nil {
 					return err
 				}
 				options = append(options, "rslave")
