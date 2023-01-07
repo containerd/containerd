@@ -11,6 +11,21 @@ Native Go bindings for btrfs.
 These are in the early stages. We will try to maintain stability, but please
 vendor if you are relying on these directly.
 
+# Dependencies
+
+## v2.x
+
+Headers from kernel 4.12 or newer.
+The package name is `linux-libc-dev` on Debian/Ubuntu, `kernel-headers` on Fedora and RHEL-like distros.
+
+The headers are only required on compilation time, not on run time.
+
+## v1.x
+
+libbtrfs headers.
+The package name is `libbtrfs-dev` on Debian/Ubuntu, `btrfs-progs-devel` on Fedora and CentOS 7.
+The package is not available for Rocky Linux and AlmaLinux.
+
 # Contribute
 
 This package may not cover all the use cases for btrfs. If something you need

@@ -17,8 +17,7 @@
 package btrfs
 
 /*
-#include <stddef.h>
-#include <btrfs/ioctl.h>
+#include <linux/magic.h>
 #include "btrfs.h"
 
 static char* get_name_btrfs_ioctl_vol_args_v2(struct btrfs_ioctl_vol_args_v2* btrfs_struct) {
@@ -28,13 +27,13 @@ static char* get_name_btrfs_ioctl_vol_args_v2(struct btrfs_ioctl_vol_args_v2* bt
 import "C"
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"syscall"
 	"unsafe"
-
-	"github.com/pkg/errors"
 )
 
 // maxByteSliceSize is the smallest size that Go supports on various platforms.
@@ -99,7 +98,7 @@ func SubvolInfo(path string) (info Info, err error) {
 		return *info, nil
 	}
 
-	return info, errors.Errorf("%q not found", path)
+	return info, fmt.Errorf("%q not found", path)
 }
 
 func subvolMap(path string) (map[uint64]*Info, error) {
@@ -154,13 +153,13 @@ func subvolMap(path string) (map[uint64]*Info, error) {
 				// get an entry of the objectid, with name, but the parent is
 				// the offset.
 
-				nname := C.btrfs_stack_root_ref_name_len(&rr)
+				nname := le16ToNative(rr.name_len)
 				name := string(buf[C.sizeof_struct_btrfs_root_ref : C.sizeof_struct_btrfs_root_ref+uintptr(nname)])
 
 				info.ID = uint64(sh.objectid)
 				info.ParentID = uint64(sh.offset)
 				info.Name = name
-				info.DirID = uint64(C.btrfs_stack_root_ref_dirid(&rr))
+				info.DirID = le64ToNative(rr.dirid)
 
 				subvolsByID[uint64(sh.objectid)] = info
 			} else if sh._type == C.BTRFS_ROOT_ITEM_KEY &&
@@ -185,8 +184,8 @@ func subvolMap(path string) (map[uint64]*Info, error) {
 				info.ParentUUID = uuidString(&gri.parent_uuid)
 				info.ReceivedUUID = uuidString(&gri.received_uuid)
 
-				info.Generation = uint64(gri.gen)
-				info.OriginalGeneration = uint64(gri.ogen)
+				info.Generation = le64ToNative(gri.generation)
+				info.OriginalGeneration = le64ToNative(gri.otransid)
 
 				subvolsByID[uint64(sh.objectid)] = info
 			}
@@ -273,13 +272,13 @@ func SubvolCreate(path string) error {
 	args.fd = C.__s64(fp.Fd())
 
 	if len(name) > C.BTRFS_PATH_NAME_MAX {
-		return errors.Errorf("%q too long for subvolume", name)
+		return fmt.Errorf("%q too long for subvolume", name)
 	}
 	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))[:C.BTRFS_PATH_NAME_MAX:C.BTRFS_PATH_NAME_MAX]
 	copy(nameptr[:C.BTRFS_PATH_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SUBVOL_CREATE, uintptr(unsafe.Pointer(&args))); err != nil {
-		return errors.Wrap(err, "btrfs subvolume create failed")
+		return fmt.Errorf("btrfs subvolume create failed: %w", err)
 	}
 
 	return nil
@@ -292,13 +291,13 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 
 	dstfp, err := openSubvolDir(dstdir)
 	if err != nil {
-		return errors.Wrapf(err, "opening snapshot destination subvolume failed")
+		return fmt.Errorf("opening snapshot destination subvolume failed: %w", err)
 	}
 	defer dstfp.Close()
 
 	srcfp, err := openSubvolDir(src)
 	if err != nil {
-		return errors.Wrapf(err, "opening snapshot source subvolume failed")
+		return fmt.Errorf("opening snapshot source subvolume failed: %w", err)
 	}
 	defer srcfp.Close()
 
@@ -308,7 +307,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 	name := C.get_name_btrfs_ioctl_vol_args_v2(&args)
 
 	if len(dstname) > C.BTRFS_SUBVOL_NAME_MAX {
-		return errors.Errorf("%q too long for subvolume", dstname)
+		return fmt.Errorf("%q too long for subvolume", dstname)
 	}
 
 	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(name))[:C.BTRFS_SUBVOL_NAME_MAX:C.BTRFS_SUBVOL_NAME_MAX]
@@ -319,7 +318,7 @@ func SubvolSnapshot(dst, src string, readonly bool) error {
 	}
 
 	if err := ioctl(dstfp.Fd(), C.BTRFS_IOC_SNAP_CREATE_V2, uintptr(unsafe.Pointer(&args))); err != nil {
-		return errors.Wrapf(err, "snapshot create failed")
+		return fmt.Errorf("snapshot create failed: %w", err)
 	}
 
 	return nil
@@ -330,7 +329,7 @@ func SubvolDelete(path string) error {
 	dir, name := filepath.Split(path)
 	fp, err := openSubvolDir(dir)
 	if err != nil {
-		return errors.Wrapf(err, "failed opening %v", path)
+		return fmt.Errorf("failed opening %v: %w", path, err)
 	}
 	defer fp.Close()
 
@@ -341,7 +340,7 @@ func SubvolDelete(path string) error {
 				return nil
 			}
 
-			return errors.Wrapf(err, "failed walking subvolume %v", p)
+			return fmt.Errorf("failed walking subvolume %v: %w", p, err)
 		}
 
 		if !fi.IsDir() {
@@ -357,7 +356,7 @@ func SubvolDelete(path string) error {
 		}
 
 		if err := SubvolDelete(p); err != nil {
-			return errors.Wrapf(err, "recursive delete of %v failed", p)
+			return fmt.Errorf("recursive delete of %v failed: %w", p, err)
 		}
 
 		return filepath.SkipDir // children get walked by call above.
@@ -367,14 +366,14 @@ func SubvolDelete(path string) error {
 
 	var args C.struct_btrfs_ioctl_vol_args
 	if len(name) > C.BTRFS_SUBVOL_NAME_MAX {
-		return errors.Errorf("%q too long for subvolume", name)
+		return fmt.Errorf("%q too long for subvolume", name)
 	}
 
 	nameptr := (*[maxByteSliceSize]byte)(unsafe.Pointer(&args.name[0]))[:C.BTRFS_SUBVOL_NAME_MAX:C.BTRFS_SUBVOL_NAME_MAX]
 	copy(nameptr[:C.BTRFS_SUBVOL_NAME_MAX], []byte(name))
 
 	if err := ioctl(fp.Fd(), C.BTRFS_IOC_SNAP_DESTROY, uintptr(unsafe.Pointer(&args))); err != nil {
-		return errors.Wrapf(err, "failed removing subvolume %v", path)
+		return fmt.Errorf("failed removing subvolume %v: %w", path, err)
 	}
 
 	return nil
@@ -383,7 +382,7 @@ func SubvolDelete(path string) error {
 func openSubvolDir(path string) (*os.File, error) {
 	fp, err := os.Open(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "opening %v as subvolume failed", path)
+		return nil, fmt.Errorf("opening %v as subvolume failed: %w", path, err)
 	}
 
 	return fp, nil
@@ -391,7 +390,7 @@ func openSubvolDir(path string) (*os.File, error) {
 
 func isStatfsSubvol(statfs *syscall.Statfs_t) error {
 	if int64(statfs.Type) != int64(C.BTRFS_SUPER_MAGIC) {
-		return errors.Errorf("not a btrfs filesystem")
+		return fmt.Errorf("not a btrfs filesystem")
 	}
 
 	return nil
@@ -399,13 +398,13 @@ func isStatfsSubvol(statfs *syscall.Statfs_t) error {
 
 func isFileInfoSubvol(fi os.FileInfo) error {
 	if !fi.IsDir() {
-		errors.Errorf("must be a directory")
+		return errors.New("must be a directory")
 	}
 
 	stat := fi.Sys().(*syscall.Stat_t)
 
 	if stat.Ino != C.BTRFS_FIRST_FREE_OBJECTID {
-		return errors.Errorf("incorrect inode type")
+		return fmt.Errorf("incorrect inode type")
 	}
 
 	return nil
