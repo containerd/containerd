@@ -43,7 +43,7 @@ jobs:
         #   languages: go, javascript, csharp, python, cpp, java
 
       - run: |
-          sudo apt-get install -y libseccomp-dev libbtrfs-dev
+          sudo apt-get install -y libseccomp-dev
           make
 
       - name: Perform CodeQL Analysis

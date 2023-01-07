@@ -9,7 +9,7 @@ require (
 	github.com/Microsoft/hcsshim v0.10.0-rc.5
 	github.com/container-orchestrated-devices/container-device-interface v0.5.1
 	github.com/containerd/aufs v1.0.0
-	github.com/containerd/btrfs v1.0.0
+	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.0
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.3.0
@@ -68,7 +68,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.12.0
 	go.opentelemetry.io/otel/trace v1.12.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.4.0
+	golang.org/x/sys v0.5.0
 	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
 	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1

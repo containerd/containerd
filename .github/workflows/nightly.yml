@@ -62,12 +62,7 @@ jobs:
             libseccomp-dev:arm64 \
             libseccomp-dev:s390x \
             libseccomp-dev:ppc64el \
-            libseccomp-dev:riscv64 \
-            libbtrfs-dev:amd64 \
-            libbtrfs-dev:arm64 \
-            libbtrfs-dev:s390x \
-            libbtrfs-dev:ppc64el \
-            libbtrfs-dev:riscv64
+            libseccomp-dev:riscv64
 
       - name: Build amd64
         env:
