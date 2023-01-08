@@ -20,6 +20,7 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	sb "github.com/containerd/containerd/sandbox"
 )
@@ -52,6 +53,15 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 	}
 
 	return resp, nil
+}
+
+func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (*types.Platform, error) {
+	resp, err := s.client.Platform(ctx, &api.ControllerPlatformRequest{SandboxID: sandboxID})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+
+	return resp.GetPlatform(), nil
 }
 
 func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {

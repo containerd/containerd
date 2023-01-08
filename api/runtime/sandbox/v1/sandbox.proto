@@ -22,6 +22,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 import "github.com/containerd/containerd/api/types/mount.proto";
+import "github.com/containerd/containerd/api/types/platform.proto";
 
 option go_package = "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox";
 
@@ -35,6 +36,10 @@ service Sandbox {
 
 	// StartSandbox will start previsouly created sandbox.
 	rpc StartSandbox(StartSandboxRequest) returns (StartSandboxResponse);
+
+	// Platform queries platform sandbox is going to run containers on.
+	// containerd will use this to generate proper OCI spec.
+	rpc Platform(PlatformRequest) returns (PlatformResponse);
 
 	// StopSandbox will stop existing sandbox instance
 	rpc StopSandbox(StopSandboxRequest) returns (StopSandboxResponse);
@@ -68,6 +73,14 @@ message StartSandboxRequest {
 message StartSandboxResponse {
 	uint32 pid = 1;
 	google.protobuf.Timestamp created_at = 2;
+}
+
+message PlatformRequest {
+	string sandbox_id = 1;
+}
+
+message PlatformResponse {
+	containerd.types.Platform platform = 1;
 }
 
 message StopSandboxRequest {
