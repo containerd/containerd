@@ -20,7 +20,9 @@ package pause
 
 import (
 	"context"
+	"runtime"
 
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/ttrpc"
 	log "github.com/sirupsen/logrus"
@@ -69,6 +71,17 @@ func (p *pauseService) CreateSandbox(ctx context.Context, req *api.CreateSandbox
 func (p *pauseService) StartSandbox(ctx context.Context, req *api.StartSandboxRequest) (*api.StartSandboxResponse, error) {
 	log.Debugf("start sandbox request: %+v", req)
 	return &api.StartSandboxResponse{}, nil
+}
+
+func (p *pauseService) Platform(ctx context.Context, req *api.PlatformRequest) (*api.PlatformResponse, error) {
+	log.Debugf("platform request: %+v", req)
+
+	platform := types.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+
+	return &api.PlatformResponse{Platform: &platform}, nil
 }
 
 func (p *pauseService) StopSandbox(ctx context.Context, req *api.StopSandboxRequest) (*api.StopSandboxResponse, error) {

@@ -135,6 +135,22 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 	}, nil
 }
 
+func (c *controllerLocal) Platform(ctx context.Context, in *api.ControllerPlatformRequest, opts ...grpc.CallOption) (*api.ControllerPlatformResponse, error) {
+	svc, err := c.getSandbox(ctx, in.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := svc.Platform(ctx, &runtimeAPI.PlatformRequest{SandboxID: in.GetSandboxID()})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox platform: %w", err)
+	}
+
+	return &api.ControllerPlatformResponse{
+		Platform: response.GetPlatform(),
+	}, nil
+}
+
 func (c *controllerLocal) Stop(ctx context.Context, in *api.ControllerStopRequest, opts ...grpc.CallOption) (*api.ControllerStopResponse, error) {
 	svc, err := c.getSandbox(ctx, in.SandboxID)
 	if err != nil {

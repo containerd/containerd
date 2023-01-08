@@ -799,11 +799,44 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/platform.proto"
+  package: "containerd.types"
+  message_type {
+    name: "Platform"
+    field {
+      name: "os"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "os"
+    }
+    field {
+      name: "architecture"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "architecture"
+    }
+    field {
+      name: "variant"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "variant"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/runtime/sandbox/v1/sandbox.proto"
   package: "containerd.runtime.sandbox.v1"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
   message_type {
     name: "CreateSandboxRequest"
     field {
@@ -866,6 +899,27 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       json_name: "createdAt"
+    }
+  }
+  message_type {
+    name: "PlatformRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "PlatformResponse"
+    field {
+      name: "platform"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
     }
   }
   message_type {
@@ -1095,6 +1149,11 @@ file {
       name: "StartSandbox"
       input_type: ".containerd.runtime.sandbox.v1.StartSandboxRequest"
       output_type: ".containerd.runtime.sandbox.v1.StartSandboxResponse"
+    }
+    method {
+      name: "Platform"
+      input_type: ".containerd.runtime.sandbox.v1.PlatformRequest"
+      output_type: ".containerd.runtime.sandbox.v1.PlatformResponse"
     }
     method {
       name: "StopSandbox"
@@ -3362,38 +3421,6 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/platform.proto"
-  package: "containerd.types"
-  message_type {
-    name: "Platform"
-    field {
-      name: "os"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "os"
-    }
-    field {
-      name: "architecture"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "architecture"
-    }
-    field {
-      name: "variant"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "variant"
-    }
-  }
-  options {
-    go_package: "github.com/containerd/containerd/api/types;types"
-  }
-  syntax: "proto3"
-}
-file {
   name: "google/rpc/status.proto"
   package: "google.rpc"
   dependency: "google/protobuf/any.proto"
@@ -4139,6 +4166,7 @@ file {
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
   message_type {
     name: "StoreCreateRequest"
     field {
@@ -4345,6 +4373,27 @@ file {
     }
   }
   message_type {
+    name: "ControllerPlatformRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerPlatformResponse"
+    field {
+      name: "platform"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
+  }
+  message_type {
     name: "ControllerStopRequest"
     field {
       name: "sandbox_id"
@@ -4537,6 +4586,11 @@ file {
       name: "Start"
       input_type: ".containerd.services.sandbox.v1.ControllerStartRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerStartResponse"
+    }
+    method {
+      name: "Platform"
+      input_type: ".containerd.services.sandbox.v1.ControllerPlatformRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerPlatformResponse"
     }
     method {
       name: "Stop"
