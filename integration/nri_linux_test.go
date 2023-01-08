@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,10 +54,6 @@ var (
 
 // skipNriTestIfNecessary skips NRI tests if necessary.
 func skipNriTestIfNecessary(t *testing.T, extraSkipChecks ...map[string]bool) {
-	if goruntime.GOOS != "linux" {
-		t.Skip("Not running on linux")
-	}
-
 	if selinux.GetEnabled() {
 		// https://github.com/containerd/containerd/pull/7892#issuecomment-1369825603
 		t.Skip("SELinux relabeling is not supported for NRI yet")
