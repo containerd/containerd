@@ -110,44 +110,40 @@ func NewSnapshotter(root string) (snapshots.Snapshotter, error) {
 //
 // Should be used for parent resolution, existence checks and to discern
 // the kind of snapshot.
-func (s *snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Stat(ctx context.Context, key string) (info snapshots.Info, err error) {
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		_, info, _, err = storage.GetInfo(ctx, key)
+		return err
+	})
 	if err != nil {
-		return snapshots.Info{}, err
-	}
-	defer t.Rollback()
-
-	_, info, _, err := storage.GetInfo(ctx, key)
-	return info, err
-}
-
-func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, true)
-	if err != nil {
-		return snapshots.Info{}, err
-	}
-	defer t.Rollback()
-
-	info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
-	if err != nil {
-		return snapshots.Info{}, err
-	}
-
-	if err := t.Commit(); err != nil {
 		return snapshots.Info{}, err
 	}
 
 	return info, nil
 }
 
-func (s *snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (_ snapshots.Info, err error) {
+	err = s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		info, err = storage.UpdateInfo(ctx, info, fieldpaths...)
+		return err
+	})
 	if err != nil {
-		return snapshots.Usage{}, err
+		return snapshots.Info{}, err
 	}
-	id, info, usage, err := storage.GetInfo(ctx, key)
-	t.Rollback() // transaction no longer needed at this point.
 
+	return info, nil
+}
+
+func (s *snapshotter) Usage(ctx context.Context, key string) (usage snapshots.Usage, err error) {
+	var (
+		id   string
+		info snapshots.Info
+	)
+
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		id, info, usage, err = storage.GetInfo(ctx, key)
+		return err
+	})
 	if err != nil {
 		return snapshots.Usage{}, err
 	}
@@ -177,115 +173,113 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 // called on an read-write or readonly transaction.
 //
 // This can be used to recover mounts after calling View or Prepare.
-func (s *snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, false)
+func (s *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, err error) {
+	var snapshot storage.Snapshot
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		snapshot, err = storage.GetSnapshot(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot mount: %w", err)
+		}
+
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer t.Rollback()
 
-	snapshot, err := storage.GetSnapshot(ctx, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get snapshot mount: %w", err)
-	}
 	return s.mounts(snapshot), nil
 }
 
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) (retErr error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, true)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		if retErr != nil {
-			if rerr := t.Rollback(); rerr != nil {
-				log.G(ctx).WithError(rerr).Warn("failed to rollback transaction")
-			}
+	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		// grab the existing id
+		id, _, _, err := storage.GetInfo(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to get storage info for %s: %w", key, err)
 		}
-	}()
 
-	// grab the existing id
-	id, _, _, err := storage.GetInfo(ctx, key)
-	if err != nil {
-		return fmt.Errorf("failed to get storage info for %s: %w", key, err)
-	}
-
-	snapshot, err := storage.GetSnapshot(ctx, key)
-	if err != nil {
-		return err
-	}
-
-	path := s.getSnapshotDir(id)
-
-	// If (windowsDiff).Apply was used to populate this layer, then it's already in the 'committed' state.
-	// See createSnapshot below for more details
-	if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-		if err := s.convertScratchToReadOnlyLayer(ctx, snapshot, path); err != nil {
+		snapshot, err := storage.GetSnapshot(ctx, key)
+		if err != nil {
 			return err
 		}
-	}
 
-	usage, err := fs.DiskUsage(ctx, path)
-	if err != nil {
-		return fmt.Errorf("failed to collect disk usage of snapshot storage: %s: %w", path, err)
-	}
+		path := s.getSnapshotDir(id)
 
-	if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
-		return fmt.Errorf("failed to commit snapshot: %w", err)
-	}
-	return t.Commit()
+		// If (windowsDiff).Apply was used to populate this layer, then it's already in the 'committed' state.
+		// See createSnapshot below for more details
+		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
+			if err := s.convertScratchToReadOnlyLayer(ctx, snapshot, path); err != nil {
+				return err
+			}
+		}
+
+		usage, err := fs.DiskUsage(ctx, path)
+		if err != nil {
+			return fmt.Errorf("failed to collect disk usage of snapshot storage: %s: %w", path, err)
+		}
+
+		if _, err := storage.CommitActive(ctx, key, name, snapshots.Usage(usage), opts...); err != nil {
+			return fmt.Errorf("failed to commit snapshot: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
 func (s *snapshotter) Remove(ctx context.Context, key string) error {
-	ctx, t, err := s.ms.TransactionContext(ctx, true)
+	var (
+		renamed, path, renamedID string
+		restore                  bool
+	)
+
+	err := s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		id, _, err := storage.Remove(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to remove: %w", err)
+		}
+
+		path = s.getSnapshotDir(id)
+		renamedID = "rm-" + id
+		renamed = s.getSnapshotDir(renamedID)
+		if err = os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
+			if !os.IsPermission(err) {
+				return err
+			}
+			// If permission denied, it's possible that the scratch is still mounted, an
+			// artifact after a hard daemon crash for example. Worth a shot to try deactivating it
+			// before retrying the rename.
+			var (
+				home, layerID = filepath.Split(path)
+				di            = hcsshim.DriverInfo{
+					HomeDir: home,
+				}
+			)
+
+			if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil {
+				return fmt.Errorf("failed to deactivate layer following failed rename: %s: %w", deactivateErr, err)
+			}
+
+			if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
+				return fmt.Errorf("second rename attempt following detach failed: %s: %w", renameErr, err)
+			}
+		}
+
+		restore = true
+		return nil
+	})
 	if err != nil {
+		if restore { // failed to commit
+			if err1 := os.Rename(renamed, path); err1 != nil {
+				// May cause inconsistent data on disk
+				log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
+			}
+		}
 		return err
 	}
-	defer t.Rollback()
 
-	id, _, err := storage.Remove(ctx, key)
-	if err != nil {
-		return fmt.Errorf("failed to remove: %w", err)
-	}
-
-	path := s.getSnapshotDir(id)
-	renamedID := "rm-" + id
-	renamed := s.getSnapshotDir(renamedID)
-	if err := os.Rename(path, renamed); err != nil && !os.IsNotExist(err) {
-		if !os.IsPermission(err) {
-			return err
-		}
-		// If permission denied, it's possible that the scratch is still mounted, an
-		// artifact after a hard daemon crash for example. Worth a shot to try deactivating it
-		// before retrying the rename.
-		var (
-			home, layerID = filepath.Split(path)
-			di            = hcsshim.DriverInfo{
-				HomeDir: home,
-			}
-		)
-
-		if deactivateErr := hcsshim.DeactivateLayer(di, layerID); deactivateErr != nil {
-			return fmt.Errorf("failed to deactivate layer following failed rename: %s: %w", deactivateErr, err)
-		}
-
-		if renameErr := os.Rename(path, renamed); renameErr != nil && !os.IsNotExist(renameErr) {
-			return fmt.Errorf("second rename attempt following detach failed: %s: %w", renameErr, err)
-		}
-	}
-
-	if err := t.Commit(); err != nil {
-		if err1 := os.Rename(renamed, path); err1 != nil {
-			// May cause inconsistent data on disk
-			log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
-		}
-		return fmt.Errorf("failed to commit: %w", err)
-	}
-
-	if err := hcsshim.DestroyLayer(s.info, renamedID); err != nil {
+	if err = hcsshim.DestroyLayer(s.info, renamedID); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
 		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("Failed to remove root filesystem")
 	}
@@ -295,13 +289,9 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 // Walk the committed snapshots.
 func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
-	ctx, t, err := s.ms.TransactionContext(ctx, false)
-	if err != nil {
-		return err
-	}
-	defer t.Rollback()
-
-	return storage.WalkInfo(ctx, fn, fs...)
+	return s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		return storage.WalkInfo(ctx, fn, fs...)
+	})
 }
 
 // Close closes the snapshotter
@@ -351,24 +341,23 @@ func (s *snapshotter) getSnapshotDir(id string) string {
 	return filepath.Join(s.root, "snapshots", id)
 }
 
-func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) ([]mount.Mount, error) {
-	ctx, t, err := s.ms.TransactionContext(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	defer t.Rollback()
+func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
+	var newSnapshot storage.Snapshot
+	err = s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
+		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create snapshot: %w", err)
+		}
 
-	newSnapshot, err := storage.CreateSnapshot(ctx, kind, key, parent, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create snapshot: %w", err)
-	}
+		if kind != snapshots.KindActive {
+			return nil
+		}
 
-	if kind == snapshots.KindActive {
 		log.G(ctx).Debug("createSnapshot active")
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
-		if err := os.MkdirAll(snDir, 0700); err != nil {
-			return nil, err
+		if err = os.MkdirAll(snDir, 0700); err != nil {
+			return err
 		}
 
 		// IO/disk space optimization
@@ -391,7 +380,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 				sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
+					return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
 				}
 				sizeInBytes = sizeInGB * 1024 * 1024 * 1024
 			}
@@ -400,7 +389,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
 				sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
 				if err != nil {
-					return nil, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
+					return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
 				}
 			}
 
@@ -411,18 +400,19 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 
 			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
 			if makeUVMScratch {
-				if err := s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-					return nil, fmt.Errorf("failed to make UVM's scratch layer: %w", err)
+				if err = s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+					return fmt.Errorf("failed to make UVM's scratch layer: %w", err)
 				}
 			}
-			if err := s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
-				return nil, fmt.Errorf("failed to create scratch layer: %w", err)
+			if err = s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
+				return fmt.Errorf("failed to create scratch layer: %w", err)
 			}
 		}
-	}
 
-	if err := t.Commit(); err != nil {
-		return nil, fmt.Errorf("commit failed: %w", err)
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return s.mounts(newSnapshot), nil
