@@ -419,49 +419,11 @@ func (c *criService) buildContainerSpec(
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
-		specOpts  []oci.SpecOpts
+		specOpts []oci.SpecOpts
+
+		// Platform helpers
 		isLinux   = platform.OS == "linux"
 		isWindows = platform.OS == "windows"
-	)
-
-	specOpts = append(specOpts, customopts.WithProcessArgs(config, imageConfig))
-
-	if config.GetWorkingDir() != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
-	} else if imageConfig.WorkingDir != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	}
-
-	if config.GetTty() {
-		specOpts = append(specOpts, oci.WithTTY)
-	}
-
-	// Apply envs from image config first, so that envs from container config
-	// can override them.
-	env := append([]string{}, imageConfig.Env...)
-	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
-	}
-	specOpts = append(specOpts, oci.WithEnv(env))
-
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
-		ociRuntime.PodAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
-		ociRuntime.ContainerAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	specOpts = append(specOpts,
-		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
-		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
-		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
-		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
-		customopts.WithAnnotation(annotations.ContainerName, containerName),
-		customopts.WithAnnotation(annotations.ImageName, imageName),
 	)
 
 	if isLinux {
@@ -492,80 +454,29 @@ func (c *criService) buildContainerSpec(
 			}
 		}
 		specOpts = append(specOpts, oci.WithEnv([]string{hostnameEnv + "=" + hostname}))
+	}
 
-		securityContext := config.GetLinux().GetSecurityContext()
+	specOpts = append(specOpts, customopts.WithProcessArgs(config, imageConfig))
 
-		// Clear all ambient capabilities. The implication of non-root + caps
-		// is not clearly defined in Kubernetes.
-		// See https://github.com/kubernetes/kubernetes/issues/56374
-		// Keep docker's behavior for now.
-		specOpts = append(specOpts, customopts.WithoutAmbientCaps)
+	if config.GetWorkingDir() != "" {
+		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
+	} else if imageConfig.WorkingDir != "" {
+		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
+	}
 
-		if securityContext.GetPrivileged() {
-			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
-				return nil, errors.New("no privileged container allowed in sandbox")
-			}
-			specOpts = append(specOpts, oci.WithPrivileged)
-			if !ociRuntime.PrivilegedWithoutHostDevices {
-				specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
-			} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-				// allow rwm on all devices for the container
-				specOpts = append(specOpts, oci.WithAllDevicesAllowed)
-			}
-		}
+	if config.GetTty() {
+		specOpts = append(specOpts, oci.WithTTY)
+	}
 
-		// TODO: Figure out whether we should set no new privilege for sandbox container by default
-		if securityContext.GetNoNewPrivs() {
-			specOpts = append(specOpts, oci.WithNoNewPrivileges)
-		}
-		// TODO(random-liu): [P1] Set selinux options (privileged or not).
-		if securityContext.GetReadonlyRootfs() {
-			specOpts = append(specOpts, oci.WithRootFSReadonly())
-		}
+	// Apply envs from image config first, so that envs from container config
+	// can override them.
+	env := append([]string{}, imageConfig.Env...)
+	for _, e := range config.GetEnvs() {
+		env = append(env, e.GetKey()+"="+e.GetValue())
+	}
+	specOpts = append(specOpts, oci.WithEnv(env))
 
-		if !c.config.DisableProcMount {
-			// Change the default masked/readonly paths to empty slices
-			// See https://github.com/containerd/containerd/issues/5029
-			// TODO: Provide an option to set default paths to the ones in oci.populateDefaultUnixSpec()
-			specOpts = append(specOpts, oci.WithMaskedPaths([]string{}), oci.WithReadonlyPaths([]string{}))
-
-			// Apply masked paths if specified.
-			// If the container is privileged, this will be cleared later on.
-			if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
-				specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
-			}
-
-			// Apply readonly paths if specified.
-			// If the container is privileged, this will be cleared later on.
-			if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
-				specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
-			}
-		}
-
-		supplementalGroups := securityContext.GetSupplementalGroups()
-		specOpts = append(specOpts, customopts.WithSupplementalGroups(supplementalGroups))
-
-		// Default target PID namespace is the sandbox PID.
-		targetPid := sandboxPid
-		// If the container targets another container's PID namespace,
-		// set targetPid to the PID of that container.
-		nsOpts := securityContext.GetNamespaceOptions()
-		if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
-			targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
-			if err != nil {
-				return nil, fmt.Errorf("invalid target container: %w", err)
-			}
-
-			status := targetContainer.Status.Get()
-			targetPid = status.Pid
-		}
-
-		specOpts = append(specOpts,
-			// TODO: This is a hack to make this compile. We should move userns support to sbserver.
-			customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, nil, nil),
-		)
-
-	} else if isWindows {
+	if isWindows {
 		specOpts = append(specOpts,
 			// Clear the root location since hcsshim expects it.
 			// NOTE: readonly rootfs doesn't work on windows.
@@ -605,6 +516,100 @@ func (c *criService) buildContainerSpec(
 	}
 
 	specOpts = append(specOpts, platformSpecOpts...)
+
+	if isLinux {
+		securityContext := config.GetLinux().GetSecurityContext()
+
+		if !c.config.DisableProcMount {
+			// Change the default masked/readonly paths to empty slices
+			// See https://github.com/containerd/containerd/issues/5029
+			// TODO: Provide an option to set default paths to the ones in oci.populateDefaultUnixSpec()
+			specOpts = append(specOpts, oci.WithMaskedPaths([]string{}), oci.WithReadonlyPaths([]string{}))
+
+			// Apply masked paths if specified.
+			// If the container is privileged, this will be cleared later on.
+			if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
+				specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
+			}
+
+			// Apply readonly paths if specified.
+			// If the container is privileged, this will be cleared later on.
+			if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
+				specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
+			}
+		}
+
+		if securityContext.GetPrivileged() {
+			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+				return nil, errors.New("no privileged container allowed in sandbox")
+			}
+			specOpts = append(specOpts, oci.WithPrivileged)
+			if !ociRuntime.PrivilegedWithoutHostDevices {
+				specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+			} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+				// allow rwm on all devices for the container
+				specOpts = append(specOpts, oci.WithAllDevicesAllowed)
+			}
+		}
+
+		// Clear all ambient capabilities. The implication of non-root + caps
+		// is not clearly defined in Kubernetes.
+		// See https://github.com/kubernetes/kubernetes/issues/56374
+		// Keep docker's behavior for now.
+		specOpts = append(specOpts, customopts.WithoutAmbientCaps)
+
+		// TODO: Figure out whether we should set no new privilege for sandbox container by default
+		if securityContext.GetNoNewPrivs() {
+			specOpts = append(specOpts, oci.WithNoNewPrivileges)
+		}
+		// TODO(random-liu): [P1] Set selinux options (privileged or not).
+		if securityContext.GetReadonlyRootfs() {
+			specOpts = append(specOpts, oci.WithRootFSReadonly())
+		}
+
+		supplementalGroups := securityContext.GetSupplementalGroups()
+		specOpts = append(specOpts, customopts.WithSupplementalGroups(supplementalGroups))
+
+		// Default target PID namespace is the sandbox PID.
+		targetPid := sandboxPid
+		// If the container targets another container's PID namespace,
+		// set targetPid to the PID of that container.
+		nsOpts := securityContext.GetNamespaceOptions()
+		if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
+			targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
+			if err != nil {
+				return nil, fmt.Errorf("invalid target container: %w", err)
+			}
+
+			status := targetContainer.Status.Get()
+			targetPid = status.Pid
+		}
+
+		specOpts = append(specOpts,
+			// TODO: This is a hack to make this compile. We should move userns support to sbserver.
+			customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, nil, nil),
+		)
+	}
+
+	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+		ociRuntime.PodAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		ociRuntime.ContainerAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	specOpts = append(specOpts,
+		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
+		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
+		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
+		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
+		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
+		customopts.WithAnnotation(annotations.ContainerName, containerName),
+		customopts.WithAnnotation(annotations.ImageName, imageName),
+	)
 
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }

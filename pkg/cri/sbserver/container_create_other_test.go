@@ -21,8 +21,10 @@ package sbserver
 import (
 	"testing"
 
+	"github.com/containerd/containerd/pkg/cri/annotations"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -31,10 +33,66 @@ var _ = checkMount
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
 	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
-	config := &runtime.ContainerConfig{}
-	sandboxConfig := &runtime.PodSandboxConfig{}
-	imageConfig := &imagespec.ImageConfig{}
+	config := &runtime.ContainerConfig{
+		Metadata: &runtime.ContainerMetadata{
+			Name:    "test-name",
+			Attempt: 1,
+		},
+		Image: &runtime.ImageSpec{
+			Image: "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
+		},
+		Command:    []string{"test", "command"},
+		Args:       []string{"test", "args"},
+		WorkingDir: "test-cwd",
+		Envs: []*runtime.KeyValue{
+			{Key: "k1", Value: "v1"},
+			{Key: "k2", Value: "v2"},
+			{Key: "k3", Value: "v3=v3bis"},
+			{Key: "k4", Value: "v4=v4bis=foop"},
+		},
+		Labels:      map[string]string{"a": "b"},
+		Annotations: map[string]string{"ca-c": "ca-d"},
+	}
+	sandboxConfig := &runtime.PodSandboxConfig{
+		Metadata: &runtime.PodSandboxMetadata{
+			Name:      "test-sandbox-name",
+			Uid:       "test-sandbox-uid",
+			Namespace: "test-sandbox-ns",
+			Attempt:   2,
+		},
+		Annotations: map[string]string{"c": "d"},
+	}
+	imageConfig := &imagespec.ImageConfig{
+		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
+		Entrypoint: []string{"/entrypoint"},
+		Cmd:        []string{"cmd"},
+		WorkingDir: "/workspace",
+	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
+		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
+		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
+		assert.Equal(t, "test-cwd", spec.Process.Cwd)
+		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "k3=v3=v3bis", "ik4=iv4=iv4bis=boop")
+		assert.Contains(t, spec.Process.Env, "ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "k4=v4=v4bis=foop")
+
+		t.Logf("Check PodSandbox annotations")
+		assert.Contains(t, spec.Annotations, annotations.SandboxID)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxID], sandboxID)
+
+		assert.Contains(t, spec.Annotations, annotations.ContainerType)
+		assert.EqualValues(t, spec.Annotations[annotations.ContainerType], annotations.ContainerTypeContainer)
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxNamespace)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxNamespace], "test-sandbox-ns")
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxUID)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxUID], "test-sandbox-uid")
+
+		assert.Contains(t, spec.Annotations, annotations.SandboxName)
+		assert.EqualValues(t, spec.Annotations[annotations.SandboxName], "test-sandbox-name")
+
+		assert.Contains(t, spec.Annotations, annotations.ImageName)
+		assert.EqualValues(t, spec.Annotations[annotations.ImageName], testImageName)
 	}
 	return config, sandboxConfig, imageConfig, specCheck
 }
