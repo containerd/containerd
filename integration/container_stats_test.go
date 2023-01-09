@@ -103,8 +103,14 @@ func TestContainerConsumedStats(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if s.GetWritableLayer().GetTimestamp() > 0 {
-			return true, nil
+		if goruntime.GOOS == "windows" {
+			if s.GetMemory().GetWorkingSetBytes().GetValue() > 0 {
+				return true, nil
+			}
+		} else {
+			if s.GetWritableLayer().GetTimestamp() > 0 {
+				return true, nil
+			}
 		}
 		return false, nil
 	}, time.Second, 30*time.Second))
