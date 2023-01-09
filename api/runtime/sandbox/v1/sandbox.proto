@@ -37,8 +37,8 @@ service Sandbox {
 	// StartSandbox will start previsouly created sandbox.
 	rpc StartSandbox(StartSandboxRequest) returns (StartSandboxResponse);
 
-	// Platform queries platform sandbox is going to run containers on.
-	// containerd will use this to generate proper OCI spec.
+	// Platform queries the platform the sandbox is going to run containers on.
+	// containerd will use this to generate a proper OCI spec.
 	rpc Platform(PlatformRequest) returns (PlatformResponse);
 
 	// StopSandbox will stop existing sandbox instance
