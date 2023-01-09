@@ -36,7 +36,6 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
@@ -126,51 +125,7 @@ func (c *criService) platformSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
-	specOpts := []oci.SpecOpts{
-		oci.WithoutRunMount,
-	}
-	// only clear the default security settings if the runtime does not have a custom
-	// base runtime spec spec.  Admins can use this functionality to define
-	// default ulimits, seccomp, or other default settings.
-	if ociRuntime.BaseRuntimeSpec == "" {
-		specOpts = append(specOpts, customopts.WithoutDefaultSecuritySettings)
-	}
-	specOpts = append(specOpts,
-		customopts.WithRelativeRoot(relativeRootfsPath),
-		customopts.WithProcessArgs(config, imageConfig),
-		oci.WithDefaultPathEnv,
-		// this will be set based on the security context below
-		oci.WithNewPrivileges,
-	)
-	if config.GetWorkingDir() != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
-	} else if imageConfig.WorkingDir != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	}
-
-	if config.GetTty() {
-		specOpts = append(specOpts, oci.WithTTY)
-	}
-
-	// Add HOSTNAME env.
-	var (
-		err      error
-		hostname = sandboxConfig.GetHostname()
-	)
-	if hostname == "" {
-		if hostname, err = c.os.Hostname(); err != nil {
-			return nil, err
-		}
-	}
-	specOpts = append(specOpts, oci.WithEnv([]string{hostnameEnv + "=" + hostname}))
-
-	// Apply envs from image config first, so that envs from container config
-	// can override them.
-	env := append([]string{}, imageConfig.Env...)
-	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
-	}
-	specOpts = append(specOpts, oci.WithEnv(env))
+	specOpts := []oci.SpecOpts{}
 
 	securityContext := config.GetLinux().GetSecurityContext()
 	labelOptions, err := toLabel(securityContext.GetSelinuxOptions())
@@ -197,60 +152,12 @@ func (c *criService) platformSpec(
 		}
 	}()
 
-	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
-
-	if !c.config.DisableProcMount {
-		// Change the default masked/readonly paths to empty slices
-		// See https://github.com/containerd/containerd/issues/5029
-		// TODO: Provide an option to set default paths to the ones in oci.populateDefaultUnixSpec()
-		specOpts = append(specOpts, oci.WithMaskedPaths([]string{}), oci.WithReadonlyPaths([]string{}))
-
-		// Apply masked paths if specified.
-		// If the container is privileged, this will be cleared later on.
-		if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
-			specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
-		}
-
-		// Apply readonly paths if specified.
-		// If the container is privileged, this will be cleared later on.
-		if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
-			specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
-		}
-	}
-
-	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
-		customopts.WithCapabilities(securityContext, c.allCaps))
-
-	if securityContext.GetPrivileged() {
-		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
-			return nil, errors.New("no privileged container allowed in sandbox")
-		}
-		specOpts = append(specOpts, oci.WithPrivileged)
-		if !ociRuntime.PrivilegedWithoutHostDevices {
-			specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
-		} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			// allow rwm on all devices for the container
-			specOpts = append(specOpts, oci.WithAllDevicesAllowed)
-		}
-	}
-
-	// Clear all ambient capabilities. The implication of non-root + caps
-	// is not clearly defined in Kubernetes.
-	// See https://github.com/kubernetes/kubernetes/issues/56374
-	// Keep docker's behavior for now.
 	specOpts = append(specOpts,
-		customopts.WithoutAmbientCaps,
 		customopts.WithSelinuxLabels(processLabel, mountLabel),
+		customopts.WithMounts(c.os, config, extraMounts, mountLabel),
+		customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
+		customopts.WithCapabilities(securityContext, c.allCaps),
 	)
-
-	// TODO: Figure out whether we should set no new privilege for sandbox container by default
-	if securityContext.GetNoNewPrivs() {
-		specOpts = append(specOpts, oci.WithNoNewPrivileges)
-	}
-	// TODO(random-liu): [P1] Set selinux options (privileged or not).
-	if securityContext.GetReadonlyRootfs() {
-		specOpts = append(specOpts, oci.WithRootFSReadonly())
-	}
 
 	if c.config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
@@ -261,8 +168,6 @@ func (c *criService) platformSpec(
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 		}
 	}
-
-	supplementalGroups := securityContext.GetSupplementalGroups()
 
 	// Get blockio class
 	blockIOClass, err := c.blockIOClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
@@ -286,53 +191,14 @@ func (c *criService) platformSpec(
 		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
-		ociRuntime.PodAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
+	specOpts = append(specOpts, customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj))
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
-		ociRuntime.ContainerAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	// Default target PID namespace is the sandbox PID.
-	targetPid := sandboxPid
-	// If the container targets another container's PID namespace,
-	// set targetPid to the PID of that container.
-	nsOpts := securityContext.GetNamespaceOptions()
-	if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
-		targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
-		if err != nil {
-			return nil, fmt.Errorf("invalid target container: %w", err)
-		}
-
-		status := targetContainer.Status.Get()
-		targetPid = status.Pid
-	}
-
-	specOpts = append(specOpts,
-		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
-		// TODO: This is a hack to make this compile. We should move userns support to sbserver.
-		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, nil, nil),
-		customopts.WithSupplementalGroups(supplementalGroups),
-		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
-		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
-		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
-		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
-		customopts.WithAnnotation(annotations.ContainerName, containerName),
-		customopts.WithAnnotation(annotations.ImageName, imageName),
-	)
 	// cgroupns is used for hiding /sys/fs/cgroup from containers.
 	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
 	// https://github.com/containers/libpod/issues/4363
 	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
 	if cgroups.Mode() == cgroups.Unified && !securityContext.GetPrivileged() {
-		specOpts = append(specOpts, oci.WithLinuxNamespace(
-			runtimespec.LinuxNamespace{
-				Type: runtimespec.CgroupNamespace,
-			}))
+		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
 	return specOpts, nil

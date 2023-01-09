@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -28,6 +29,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	cio "github.com/containerd/containerd/pkg/cri/io"
@@ -394,6 +396,13 @@ func (c *criService) runtimeSnapshotter(ctx context.Context, ociRuntime criconfi
 	return ociRuntime.Snapshotter
 }
 
+const (
+	// relativeRootfsPath is the rootfs path relative to bundle path.
+	relativeRootfsPath = "rootfs"
+	// hostnameEnv is the key for HOSTNAME env.
+	hostnameEnv = "HOSTNAME"
+)
+
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
 	platform *types.Platform,
@@ -410,8 +419,49 @@ func (c *criService) buildContainerSpec(
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
-		specOpts []oci.SpecOpts
-		isLinux  = platform.OS == "linux"
+		specOpts  []oci.SpecOpts
+		isLinux   = platform.OS == "linux"
+		isWindows = platform.OS == "windows"
+	)
+
+	specOpts = append(specOpts, customopts.WithProcessArgs(config, imageConfig))
+
+	if config.GetWorkingDir() != "" {
+		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
+	} else if imageConfig.WorkingDir != "" {
+		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
+	}
+
+	if config.GetTty() {
+		specOpts = append(specOpts, oci.WithTTY)
+	}
+
+	// Apply envs from image config first, so that envs from container config
+	// can override them.
+	env := append([]string{}, imageConfig.Env...)
+	for _, e := range config.GetEnvs() {
+		env = append(env, e.GetKey()+"="+e.GetValue())
+	}
+	specOpts = append(specOpts, oci.WithEnv(env))
+
+	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+		ociRuntime.PodAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+		ociRuntime.ContainerAnnotations) {
+		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
+	}
+
+	specOpts = append(specOpts,
+		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
+		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
+		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
+		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
+		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
+		customopts.WithAnnotation(annotations.ContainerName, containerName),
+		customopts.WithAnnotation(annotations.ImageName, imageName),
 	)
 
 	if isLinux {
@@ -423,6 +473,117 @@ func (c *criService) buildContainerSpec(
 		if ociRuntime.BaseRuntimeSpec == "" {
 			specOpts = append(specOpts, customopts.WithoutDefaultSecuritySettings)
 		}
+
+		specOpts = append(specOpts,
+			customopts.WithRelativeRoot(relativeRootfsPath),
+			oci.WithDefaultPathEnv,
+			// this will be set based on the security context below
+			oci.WithNewPrivileges,
+		)
+
+		// Add HOSTNAME env.
+		var (
+			err      error
+			hostname = sandboxConfig.GetHostname()
+		)
+		if hostname == "" {
+			if hostname, err = c.os.Hostname(); err != nil {
+				return nil, err
+			}
+		}
+		specOpts = append(specOpts, oci.WithEnv([]string{hostnameEnv + "=" + hostname}))
+
+		securityContext := config.GetLinux().GetSecurityContext()
+
+		// Clear all ambient capabilities. The implication of non-root + caps
+		// is not clearly defined in Kubernetes.
+		// See https://github.com/kubernetes/kubernetes/issues/56374
+		// Keep docker's behavior for now.
+		specOpts = append(specOpts, customopts.WithoutAmbientCaps)
+
+		if securityContext.GetPrivileged() {
+			if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
+				return nil, errors.New("no privileged container allowed in sandbox")
+			}
+			specOpts = append(specOpts, oci.WithPrivileged)
+			if !ociRuntime.PrivilegedWithoutHostDevices {
+				specOpts = append(specOpts, oci.WithHostDevices, oci.WithAllDevicesAllowed)
+			} else if ociRuntime.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+				// allow rwm on all devices for the container
+				specOpts = append(specOpts, oci.WithAllDevicesAllowed)
+			}
+		}
+
+		// TODO: Figure out whether we should set no new privilege for sandbox container by default
+		if securityContext.GetNoNewPrivs() {
+			specOpts = append(specOpts, oci.WithNoNewPrivileges)
+		}
+		// TODO(random-liu): [P1] Set selinux options (privileged or not).
+		if securityContext.GetReadonlyRootfs() {
+			specOpts = append(specOpts, oci.WithRootFSReadonly())
+		}
+
+		if !c.config.DisableProcMount {
+			// Change the default masked/readonly paths to empty slices
+			// See https://github.com/containerd/containerd/issues/5029
+			// TODO: Provide an option to set default paths to the ones in oci.populateDefaultUnixSpec()
+			specOpts = append(specOpts, oci.WithMaskedPaths([]string{}), oci.WithReadonlyPaths([]string{}))
+
+			// Apply masked paths if specified.
+			// If the container is privileged, this will be cleared later on.
+			if maskedPaths := securityContext.GetMaskedPaths(); maskedPaths != nil {
+				specOpts = append(specOpts, oci.WithMaskedPaths(maskedPaths))
+			}
+
+			// Apply readonly paths if specified.
+			// If the container is privileged, this will be cleared later on.
+			if readonlyPaths := securityContext.GetReadonlyPaths(); readonlyPaths != nil {
+				specOpts = append(specOpts, oci.WithReadonlyPaths(readonlyPaths))
+			}
+		}
+
+		supplementalGroups := securityContext.GetSupplementalGroups()
+		specOpts = append(specOpts, customopts.WithSupplementalGroups(supplementalGroups))
+
+		// Default target PID namespace is the sandbox PID.
+		targetPid := sandboxPid
+		// If the container targets another container's PID namespace,
+		// set targetPid to the PID of that container.
+		nsOpts := securityContext.GetNamespaceOptions()
+		if nsOpts.GetPid() == runtime.NamespaceMode_TARGET {
+			targetContainer, err := c.validateTargetContainer(sandboxID, nsOpts.TargetId)
+			if err != nil {
+				return nil, fmt.Errorf("invalid target container: %w", err)
+			}
+
+			status := targetContainer.Status.Get()
+			targetPid = status.Pid
+		}
+
+		specOpts = append(specOpts,
+			// TODO: This is a hack to make this compile. We should move userns support to sbserver.
+			customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, nil, nil),
+		)
+
+	} else if isWindows {
+		specOpts = append(specOpts,
+			// Clear the root location since hcsshim expects it.
+			// NOTE: readonly rootfs doesn't work on windows.
+			customopts.WithoutRoot,
+			oci.WithWindowsNetworkNamespace(netNSPath),
+			oci.WithHostname(sandboxConfig.GetHostname()),
+		)
+
+		// All containers in a pod need to have HostProcess set if it was set on the pod,
+		// and vice versa no containers in the pod can be HostProcess if the pods spec
+		// didn't have the field set. The only case that is valid is if these are the same value.
+		cntrHpc := config.GetWindows().GetSecurityContext().GetHostProcess()
+		sandboxHpc := sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess()
+		if cntrHpc != sandboxHpc {
+			return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
+		}
+
+		specOpts = append(specOpts, customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxHpc)))
 	}
 
 	// Get spec opts that depend on features offered by the platform containerd daemon is running on.

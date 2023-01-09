@@ -17,18 +17,15 @@
 package sbserver
 
 import (
-	"errors"
 	"fmt"
-	"strconv"
 
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/snapshots"
 )
 
 // No container mounts for windows.
@@ -49,46 +46,12 @@ func (c *criService) platformSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) ([]oci.SpecOpts, error) {
-	specOpts := []oci.SpecOpts{
-		customopts.WithProcessArgs(config, imageConfig),
-	}
-
-	// All containers in a pod need to have HostProcess set if it was set on the pod,
-	// and vice versa no containers in the pod can be HostProcess if the pods spec
-	// didn't have the field set. The only case that is valid is if these are the same value.
-	cntrHpc := config.GetWindows().GetSecurityContext().GetHostProcess()
-	sandboxHpc := sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess()
-	if cntrHpc != sandboxHpc {
-		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
-	}
-
-	if config.GetWorkingDir() != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
-	} else if imageConfig.WorkingDir != "" {
-		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	}
-
-	if config.GetTty() {
-		specOpts = append(specOpts, oci.WithTTY)
-	}
-
-	// Apply envs from image config first, so that envs from container config
-	// can override them.
-	env := append([]string{}, imageConfig.Env...)
-	for _, e := range config.GetEnvs() {
-		env = append(env, e.GetKey()+"="+e.GetValue())
-	}
-	specOpts = append(specOpts, oci.WithEnv(env))
+	specOpts := []oci.SpecOpts{}
 
 	specOpts = append(specOpts,
-		// Clear the root location since hcsshim expects it.
-		// NOTE: readonly rootfs doesn't work on windows.
-		customopts.WithoutRoot,
-		oci.WithWindowsNetworkNamespace(netNSPath),
-		oci.WithHostname(sandboxConfig.GetHostname()),
+		customopts.WithWindowsMounts(c.os, config, extraMounts),
+		customopts.WithDevices(config),
 	)
-
-	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts), customopts.WithDevices(config))
 
 	// Start with the image config user and override below if RunAsUsername is not "".
 	username := imageConfig.User
@@ -114,27 +77,6 @@ func (c *criService) platformSpec(
 	// will handle the behavior of erroring out if the user isn't available in the image
 	// when trying to run the init process.
 	specOpts = append(specOpts, oci.WithUser(username))
-
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
-		ociRuntime.PodAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
-		ociRuntime.ContainerAnnotations) {
-		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
-	}
-
-	specOpts = append(specOpts,
-		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
-		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
-		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
-		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
-		customopts.WithAnnotation(annotations.ContainerName, containerName),
-		customopts.WithAnnotation(annotations.ImageName, imageName),
-		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxHpc)),
-	)
 
 	return specOpts, nil
 }
