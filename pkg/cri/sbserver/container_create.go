@@ -23,23 +23,24 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/typeurl"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/cri/config"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/typeurl"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -161,8 +162,25 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
-	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
-		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
+	platform, err := controller.Platform(ctx, sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
+	}
+
+	spec, err := c.buildContainerSpec(
+		platform,
+		id,
+		sandboxID,
+		sandboxPid,
+		sandbox.NetNSPath,
+		containerName,
+		containerdImage.Name(),
+		config,
+		sandboxConfig,
+		&image.ImageSpec.Config,
+		append(mounts, volumeMounts...),
+		ociRuntime,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %w", id, err)
 	}
@@ -374,4 +392,58 @@ func (c *criService) runtimeSnapshotter(ctx context.Context, ociRuntime criconfi
 
 	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
 	return ociRuntime.Snapshotter
+}
+
+// buildContainerSpec build container's OCI spec depending on controller's target platform OS.
+func (c *criService) buildContainerSpec(
+	platform *types.Platform,
+	id string,
+	sandboxID string,
+	sandboxPid uint32,
+	netNSPath string,
+	containerName string,
+	imageName string,
+	config *runtime.ContainerConfig,
+	sandboxConfig *runtime.PodSandboxConfig,
+	imageConfig *imagespec.ImageConfig,
+	extraMounts []*runtime.Mount,
+	ociRuntime config.Runtime,
+) (_ *runtimespec.Spec, retErr error) {
+	var (
+		specOpts []oci.SpecOpts
+		isLinux  = platform.OS == "linux"
+	)
+
+	if isLinux {
+		specOpts = append(specOpts, oci.WithoutRunMount)
+
+		// Only clear the default security settings if the runtime does not have a custom
+		// base runtime spec. Admins can use this functionality to define
+		// default ulimits, seccomp, or other default settings.
+		if ociRuntime.BaseRuntimeSpec == "" {
+			specOpts = append(specOpts, customopts.WithoutDefaultSecuritySettings)
+		}
+	}
+
+	// Get spec opts that depend on features offered by the platform containerd daemon is running on.
+	platformSpecOpts, err := c.platformSpec(
+		id,
+		sandboxID,
+		sandboxPid,
+		netNSPath,
+		containerName,
+		imageName,
+		config,
+		sandboxConfig,
+		imageConfig,
+		extraMounts,
+		ociRuntime,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	specOpts = append(specOpts, platformSpecOpts...)
+
+	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
