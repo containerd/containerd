@@ -62,6 +62,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	testID := "test-id"
 	testPid := uint32(1234)
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
+	containerConfig.Command = []string{"/bin/true"}
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
