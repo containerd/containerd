@@ -113,7 +113,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 	return mounts
 }
 
-func (c *criService) containerSpec(
+func (c *criService) platformSpec(
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
@@ -125,7 +125,7 @@ func (c *criService) containerSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
-) (_ *runtimespec.Spec, retErr error) {
+) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		oci.WithoutRunMount,
 	}
@@ -334,7 +334,8 @@ func (c *criService) containerSpec(
 				Type: runtimespec.CgroupNamespace,
 			}))
 	}
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+
+	return specOpts, nil
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {

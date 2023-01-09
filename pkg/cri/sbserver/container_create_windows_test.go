@@ -19,6 +19,7 @@ package sbserver
 import (
 	"testing"
 
+	"github.com/containerd/containerd/api/types"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -142,6 +143,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 	return config, sandboxConfig, imageConfig, specCheck
 }
 
+var windowsPlatform = &types.Platform{OS: "windows"}
+
 func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	testID := "test-id"
 	testSandboxID := "sandbox-id"
@@ -151,7 +154,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	c := newTestCRIService()
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(windowsPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -173,7 +176,7 @@ func TestMountCleanPath(t *testing.T) {
 		ContainerPath: "c:/test/container-path",
 		HostPath:      "c:/test/host-path",
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(windowsPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -193,7 +196,7 @@ func TestMountNamedPipe(t *testing.T) {
 		ContainerPath: `\\.\pipe\foo`,
 		HostPath:      `\\.\pipe\foo`,
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(windowsPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -239,7 +242,7 @@ func TestHostProcessRequirements(t *testing.T) {
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
 				HostProcess: test.sandboxHostProcess,
 			}
-			_, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			_, err := c.platformSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
