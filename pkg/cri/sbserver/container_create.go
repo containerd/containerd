@@ -501,15 +501,10 @@ func (c *criService) buildContainerSpec(
 	platformSpecOpts, err := c.platformSpec(
 		id,
 		sandboxID,
-		sandboxPid,
-		netNSPath,
-		containerName,
-		imageName,
 		config,
 		sandboxConfig,
 		imageConfig,
 		extraMounts,
-		ociRuntime,
 	)
 	if err != nil {
 		return nil, err

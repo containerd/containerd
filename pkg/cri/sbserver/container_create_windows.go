@@ -23,7 +23,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/snapshots"
 )
@@ -36,15 +35,10 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 func (c *criService) platformSpec(
 	id string,
 	sandboxID string,
-	sandboxPid uint32,
-	netNSPath string,
-	containerName string,
-	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
-	ociRuntime config.Runtime,
 ) ([]oci.SpecOpts, error) {
 	specOpts := []oci.SpecOpts{}
 
