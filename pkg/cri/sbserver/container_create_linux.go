@@ -36,7 +36,6 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
@@ -115,15 +114,10 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 func (c *criService) platformSpec(
 	id string,
 	sandboxID string,
-	sandboxPid uint32,
-	netNSPath string,
-	containerName string,
-	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
-	ociRuntime config.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{}
 
