@@ -71,7 +71,7 @@ func serveListener(path string) (net.Listener, error) {
 }
 
 func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
-	logger.Info("starting signal loop")
+	logger.Debug("starting signal loop")
 
 	for {
 		select {
