@@ -312,6 +312,9 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	// Handle explicit actions
 	switch action {
 	case "delete":
+		if debugFlag {
+			logrus.SetLevel(logrus.DebugLevel)
+		}
 		logger := log.G(ctx).WithFields(logrus.Fields{
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
@@ -400,14 +403,14 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		initContext.TTRPCAddress = ttrpcAddress
 
 		// load the plugin specific configuration if it is provided
-		//TODO: Read configuration passed into shim, or from state directory?
-		//if p.Config != nil {
+		// TODO: Read configuration passed into shim, or from state directory?
+		// if p.Config != nil {
 		//	pc, err := config.Decode(p)
 		//	if err != nil {
 		//		return nil, err
 		//	}
 		//	initContext.Config = pc
-		//}
+		// }
 
 		result := p.Init(initContext)
 		if err := initialized.Add(result); err != nil {
