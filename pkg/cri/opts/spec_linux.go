@@ -411,7 +411,8 @@ var (
 	swapControllerAvailabilityOnce sync.Once
 )
 
-func swapControllerAvailable() bool {
+// SwapControllerAvailable returns true if the swap controller is available
+func SwapControllerAvailable() bool {
 	swapControllerAvailabilityOnce.Do(func() {
 		const warn = "Failed to detect the availability of the swap controller, assuming not available"
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
@@ -481,7 +482,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
 			// swap/memory limit should be equal to prevent container from swapping by default
-			if swapLimit == 0 && swapControllerAvailable() {
+			if swapLimit == 0 && SwapControllerAvailable() {
 				s.Linux.Resources.Memory.Swap = &limit
 			}
 		}
