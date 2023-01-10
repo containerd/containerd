@@ -96,7 +96,8 @@ func (m defaultWindowsMatcher) Match(p specs.Platform) bool {
 }
 
 // Less sorts matched platforms in front of other platforms.
-// For matched platforms, it puts platforms with larger build number in front.
+// For matched platforms, it puts the platform closest to the comparer's platform
+// in front of lesser matches.
 // If the build numbers happen to coincide, any revision specifier is also taken into account.
 func (m defaultWindowsMatcher) Less(p1, p2 specs.Platform) bool {
 	m1, m2 := m.Match(p1), m.Match(p2)
@@ -116,15 +117,24 @@ func (m defaultWindowsMatcher) Less(p1, p2 specs.Platform) bool {
 			return false
 		}
 
-		// If builds coincide, order by revision number:
-		if osv1.Build == osv2.Build {
+		// Fetch host platform version:
+		innerOsv, _, err := osVersionFromString(m.innerPlatform.OSVersion)
+		if err != nil {
+			logrus.Warnf("failed to parse inner Windows platform string %q for comparison: %s", m.innerPlatform.OSVersion, err)
+		}
+
+		delta1 := absDiff(innerOsv.Build, osv1.Build)
+		delta2 := absDiff(innerOsv.Build, osv2.Build)
+
+		// If builds diffs, order by revision number:
+		if delta1 == delta2 {
 			if rev1 == 0 {
 				return true
 			}
 			return rev1 < rev2
 		}
 
-		return osv1.Build < osv2.Build
+		return delta1 < delta2
 	}
 
 	return m1 && !m2
@@ -176,4 +186,11 @@ func osVersionFromString(version string) (*osversion.OSVersion, uint32, error) {
 // Default returns the current platform's default platform specification.
 func Default() MatchComparer {
 	return Only(DefaultSpec())
+}
+
+func absDiff(v1 uint16, v2 uint16) uint16 {
+	if v1 > v2 {
+		return v1 - v2
+	}
+	return v2 - v1
 }

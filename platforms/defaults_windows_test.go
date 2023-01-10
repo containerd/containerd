@@ -409,11 +409,36 @@ func TestMatchComparerLessPostRS5(t *testing.T) {
 		},
 	}
 
+	// Exact build number match:
+	match0 := fmt.Sprintf("10.0.%d", build)
+	// Exact build number match plus revision number:
+	match1 := fmt.Sprintf("10.0.%d.10", build)
+	// Minor build number difference:
+	match2 := fmt.Sprintf("10.0.%d.20", build+1)
+	// Minor build number difference with relevant revision:
+	submatch2 := fmt.Sprintf("10.0.%d.30", build+1)
+	// Major build number difference:
+	match3 := fmt.Sprintf("10.0.%d.30", build-10)
+	// A larger build number than the host, but should come before `match3` since
+	// the absolute difference in build version between the matches and the host
+	// make the countermatch more enticing:
+	countermatch3 := fmt.Sprintf("10.0.%d.30", build+3)
+
 	platforms := []imagespec.Platform{
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17764.1",
+			OSVersion:    match0,
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    countermatch3,
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    submatch2,
 		},
 		{
 			Architecture: "amd64",
@@ -422,17 +447,17 @@ func TestMatchComparerLessPostRS5(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.3",
+			OSVersion:    match1,
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.2",
+			OSVersion:    match3,
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17762.2",
+			OSVersion:    match2,
 		},
 	}
 	expected := []imagespec.Platform{
@@ -443,22 +468,32 @@ func TestMatchComparerLessPostRS5(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17762.2",
+			OSVersion:    match0,
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.2",
+			OSVersion:    match1,
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.3",
+			OSVersion:    match2,
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17764.1",
+			OSVersion:    submatch2,
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    countermatch3,
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    match3,
 		},
 	}
 	sort.SliceStable(platforms, func(i, j int) bool {
