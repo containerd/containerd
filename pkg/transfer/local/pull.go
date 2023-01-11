@@ -198,17 +198,18 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	img, err := is.Store(ctx, desc, ts.images)
+	imgs, err := is.Store(ctx, desc, ts.images)
 	if err != nil {
 		return err
 	}
 
 	if tops.Progress != nil {
-		tops.Progress(transfer.Progress{
-			Event: "saved",
-			Name:  img.Name,
-			//Digest: img.Target.Digest.String(),
-		})
+		for _, img := range imgs {
+			tops.Progress(transfer.Progress{
+				Event: "saved",
+				Name:  img.Name,
+			})
+		}
 	}
 
 	if tops.Progress != nil {

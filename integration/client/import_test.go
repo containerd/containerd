@@ -20,12 +20,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"hash/fnv"
 	"io"
-	"os"
-
 	"math/rand"
+	"os"
 	"reflect"
 	"runtime"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -36,6 +39,9 @@ import (
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/transfer"
+	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
+	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
 
 	digest "github.com/opencontainers/go-digest"
@@ -165,8 +171,8 @@ func TestImport(t *testing.T) {
 	empty := []byte("{}")
 	version := []byte("1.0")
 
-	c1, d2 := createConfig(runtime.GOOS, runtime.GOARCH)
-	badConfig, _ := createConfig("foo", "lish")
+	c1, d2 := createConfig(runtime.GOOS, runtime.GOARCH, "test")
+	badConfig, _ := createConfig("foo", "lish", "test")
 
 	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
@@ -381,11 +387,11 @@ func createContent(size int64, seed int64) ([]byte, digest.Digest) {
 	return b, digest.FromBytes(b)
 }
 
-func createConfig(osName, archName string) ([]byte, digest.Digest) {
+func createConfig(osName, archName, author string) ([]byte, digest.Digest) {
 	image := ocispec.Image{
 		OS:           osName,
 		Architecture: archName,
-		Author:       "test",
+		Author:       author,
 	}
 	b, _ := json.Marshal(image)
 
@@ -449,4 +455,235 @@ func createIndex(manifest []byte, tags ...string) []byte {
 	b, _ := json.Marshal(idx)
 
 	return b
+}
+
+func TestTransferImport(t *testing.T) {
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	for _, testCase := range []struct {
+		// Name is the name of the test
+		Name string
+
+		// Images is the names of the images to create
+		// [0]: Index name or ""
+		// [1:]: Additional images and manifest to import
+		//  Images ending with @ will have digest appended and use the digest of the previously imported image
+		//  A space can be used to seperate a repo name and tag, only the tag will be set in the imported image
+		Images []string
+		Opts   []image.StoreOpt
+	}{
+		{
+			Name:   "Basic",
+			Images: []string{"", "registry.test/basic:latest"},
+			Opts:   []image.StoreOpt{image.WithNamedPrefix("unused", true)},
+		},
+		{
+			Name:   "IndexRef",
+			Images: []string{"registry.test/index-ref:latest", ""},
+		},
+		{
+			Name:   "AllRefs",
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1"},
+			Opts:   []image.StoreOpt{image.WithNamedPrefix("registry.test/all-refs", false)},
+		},
+		{
+			Name:   "DigestRefs",
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "registry.test/all-refs@"},
+			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, false)},
+		},
+		{
+			Name:   "DigestRefsSkipNamed",
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1"},
+			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, true)},
+		},
+		{
+			Name:   "DigestOnly",
+			Images: []string{"", "", "imported-image@"},
+			Opts:   []image.StoreOpt{image.WithDigestRef("imported-image", false, true)},
+		},
+		{
+			Name:   "OverwriteDigestRefs",
+			Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "someimportname@"},
+			Opts:   []image.StoreOpt{image.WithDigestRef("someimportname", true, false)},
+		},
+		{
+			Name:   "TagOnlyRef",
+			Images: []string{"", "registry.test/myimage thebest"},
+			Opts:   []image.StoreOpt{image.WithNamedPrefix("registry.test/myimage", false)},
+		},
+		{
+			Name:   "TagOnlyOverwriteDigestRefs",
+			Images: []string{"registry.test/all-refs:index", "registry.test/basename latest", "registry.test/basename@"},
+			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/basename", true, false)},
+		},
+	} {
+		testCase := testCase
+		t.Run(testCase.Name, func(t *testing.T) {
+			tc := tartest.TarContext{}
+			files := []tartest.WriterToTar{
+				tc.Dir("blobs", 0755),
+				tc.Dir("blobs/sha256", 0755),
+			}
+
+			descs, tws := createImages(tc, testCase.Images...)
+			files = append(files, tws...)
+
+			files = append(files, tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644))
+
+			r := tartest.TarFromWriterTo(tartest.TarAll(files...))
+
+			var idxName string
+			if len(testCase.Images) > 0 {
+				idxName = testCase.Images[0]
+			}
+
+			is := image.NewStore(idxName, testCase.Opts...)
+
+			iis := tarchive.NewImageImportStream(r, "")
+
+			progressTracker := &imagesProgress{}
+
+			err := client.Transfer(ctx, iis, is, transfer.WithProgress(progressTracker.Progress))
+			closeErr := r.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if closeErr != nil {
+				t.Fatal(closeErr)
+			}
+
+			imgs := progressTracker.getImages()
+			if len(descs) != len(imgs) {
+				t.Fatalf("unexpected number of images saved:\n\t(%d) %v\nexpected image map:\n\t(%d) %v", len(imgs), imgs, len(descs), descs)
+			}
+			store := client.ImageService()
+			for _, image := range imgs {
+				desc, ok := descs[image]
+				if !ok {
+					t.Fatalf("saved image %q not found in expected list\nimages saved:\n\t(%d) %v\nexpected image map:\n\t(%d) %v", image, len(progressTracker.images), progressTracker.images, len(descs), descs)
+				}
+				img, err := store.Get(ctx, image)
+				if err != nil {
+					t.Fatalf("error getting image %s: %v", image, err)
+				}
+				if img.Target.Digest != desc.Digest {
+					t.Fatalf("digests don't match for %s: got %s, expected %s", image, img.Target.Digest, desc.Digest)
+				}
+				if img.Target.MediaType != desc.MediaType {
+					t.Fatalf("media type don't match for %s: got %s, expected %s", image, img.Target.MediaType, desc.MediaType)
+				}
+				if img.Target.Size != desc.Size {
+					t.Fatalf("size don't match for %s: got %d, expected %d", image, img.Target.Size, desc.Size)
+				}
+			}
+		})
+	}
+}
+
+type imagesProgress struct {
+	sync.Mutex
+	images []string
+}
+
+func (ip *imagesProgress) Progress(p transfer.Progress) {
+	ip.Lock()
+	if p.Event == "saved" {
+		ip.images = append(ip.images, p.Name)
+	}
+	ip.Unlock()
+}
+
+func (ip *imagesProgress) getImages() []string {
+	ip.Lock()
+	imgs := ip.images
+	ip.Unlock()
+	return imgs
+
+}
+
+func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string]ocispec.Descriptor, tw []tartest.WriterToTar) {
+	descs = map[string]ocispec.Descriptor{}
+	idx := ocispec.Index{
+		Versioned: specs.Versioned{
+			SchemaVersion: 2,
+		},
+	}
+
+	if len(imageNames) > 1 {
+		var lastManifest ocispec.Descriptor
+
+		for _, image := range imageNames[1:] {
+			if image != "" && image[len(image)-1] == '@' {
+				image = image[:len(image)-1]
+				descs[fmt.Sprintf("%s@%s", image, lastManifest.Digest)] = lastManifest
+				continue
+			}
+			seed := hash64(image)
+			bb, b := createContent(128, seed)
+			tw = append(tw, tc.File("blobs/sha256/"+b.Encoded(), bb, 0644))
+
+			cb, c := createConfig("linux", "amd64", image)
+			tw = append(tw, tc.File("blobs/sha256/"+c.Encoded(), cb, 0644))
+
+			mb, m, _ := createManifest(cb, [][]byte{bb})
+			tw = append(tw, tc.File("blobs/sha256/"+m.Encoded(), mb, 0644))
+
+			annotations := map[string]string{}
+			if image != "" {
+				if parts := strings.SplitN(image, " ", 2); len(parts) == 2 {
+					annotations[ocispec.AnnotationRefName] = parts[1]
+					image = strings.Join(parts, ":")
+				} else {
+					annotations[images.AnnotationImageName] = image
+				}
+			}
+
+			md := ocispec.Descriptor{
+				Digest:      m,
+				Size:        int64(len(mb)),
+				MediaType:   ocispec.MediaTypeImageManifest,
+				Annotations: annotations,
+			}
+
+			// If image is empty, but has base and digest, still use digest
+			// If image is not a full reference, then add base if provided?
+			if image != "" {
+				descs[image] = md
+			}
+
+			idx.Manifests = append(idx.Manifests, md)
+			lastManifest = md
+		}
+	}
+
+	ib, _ := json.Marshal(idx)
+	id := ocispec.Descriptor{
+		Digest:    digest.FromBytes(ib),
+		Size:      int64(len(ib)),
+		MediaType: ocispec.MediaTypeImageIndex,
+	}
+	tw = append(tw, tc.File("index.json", ib, 0644))
+
+	var idxName string
+	if len(imageNames) > 0 {
+		idxName = imageNames[0]
+	}
+	if idxName != "" {
+		descs[idxName] = id
+	}
+
+	return
+}
+
+func hash64(s string) int64 {
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return int64(h.Sum64())
 }

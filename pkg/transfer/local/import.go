@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/transfer"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -67,14 +68,8 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 		}
 
 		for _, m := range idx.Manifests {
-			m1 := m
-			m1.Annotations = mergeMap(m.Annotations, map[string]string{"io.containerd.import.ref-type": "name"})
-			descriptors = append(descriptors, m1)
-
-			// If add digest references, add twice
-			m2 := m
-			m2.Annotations = mergeMap(m.Annotations, map[string]string{"io.containerd.import.ref-type": "digest"})
-			descriptors = append(descriptors, m2)
+			m.Annotations = mergeMap(m.Annotations, map[string]string{"io.containerd.import.ref-source": "annotation"})
+			descriptors = append(descriptors, m)
 		}
 
 		return idx.Manifests, nil
@@ -85,23 +80,27 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	}
 
 	if err := images.WalkNotEmpty(ctx, handler, index); err != nil {
+		// TODO: Handle Not Empty as a special case on the input
 		return err
 	}
 
 	for _, desc := range descriptors {
-		img, err := is.Store(ctx, desc, ts.images)
+		imgs, err := is.Store(ctx, desc, ts.images)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
+				log.G(ctx).Infof("No images store for %s", desc.Digest)
 				continue
 			}
 			return err
 		}
 
 		if tops.Progress != nil {
-			tops.Progress(transfer.Progress{
-				Event: "saved",
-				Name:  img.Name,
-			})
+			for _, img := range imgs {
+				tops.Progress(transfer.Progress{
+					Event: "saved",
+					Name:  img.Name,
+				})
+			}
 		}
 	}
 
