@@ -6757,32 +6757,12 @@ file {
       json_name: "manifestLimit"
     }
     field {
-      name: "prefix"
+      name: "extra_references"
       number: 6
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "prefix"
-    }
-    field {
-      name: "check_prefix"
-      number: 7
-      label: LABEL_OPTIONAL
-      type: TYPE_BOOL
-      json_name: "checkPrefix"
-    }
-    field {
-      name: "digest_refs"
-      number: 8
-      label: LABEL_OPTIONAL
-      type: TYPE_BOOL
-      json_name: "digestRefs"
-    }
-    field {
-      name: "always_digest"
-      number: 9
-      label: LABEL_OPTIONAL
-      type: TYPE_BOOL
-      json_name: "alwaysDigest"
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.transfer.ImageReference"
+      json_name: "extraReferences"
     }
     field {
       name: "unpacks"
@@ -6829,6 +6809,44 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "snapshotter"
+    }
+  }
+  message_type {
+    name: "ImageReference"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "is_prefix"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "isPrefix"
+    }
+    field {
+      name: "allow_overwrite"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "allowOverwrite"
+    }
+    field {
+      name: "add_digest"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "addDigest"
+    }
+    field {
+      name: "skip_named_digest"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "skipNamedDigest"
     }
   }
   options {

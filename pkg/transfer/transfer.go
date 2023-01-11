@@ -57,10 +57,11 @@ type ImageFilterer interface {
 	ImageFilter(images.HandlerFunc, content.Store) images.HandlerFunc
 }
 
-// ImageStorer is a type which is capable of storing an image to
-// for a provided descriptor
+// ImageStorer is a type which is capable of storing images for
+// the provided descriptor. The descriptor may be any type of manifest
+// including an index with multiple image references.
 type ImageStorer interface {
-	Store(context.Context, ocispec.Descriptor, images.Store) (images.Image, error)
+	Store(context.Context, ocispec.Descriptor, images.Store) ([]images.Image, error)
 }
 
 // ImageGetter is type which returns an image from an image store

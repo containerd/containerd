@@ -34,14 +34,8 @@ message ImageStore {
 
 	// Import naming
 
-	// prefix is the intended image name prefix for imported images
-	string prefix = 6;
-	// check_prefix only stores images with the prefix
-	bool check_prefix = 7;
-	// digest_refs adds digest references for images using prefix
-	bool digest_refs = 8;
-	// always_digest includes a digest image even when a non-digest image is stored
-	bool always_digest = 9;
+	// extra_references are used to set image names on imports of sub-images from the index
+	repeated ImageReference extra_references = 6;
 
 	// Unpack Configuration, multiple allowed
 
@@ -55,4 +49,34 @@ message UnpackConfiguration {
 
 	// snapshotter to unpack to, if not provided default for platform shoudl be used
 	string snapshotter = 2;
+}
+
+// ImageReference is used to create or find a reference for an image
+message ImageReference {
+	string name = 1;
+
+	// is_prefix determines whether the Name should be considered
+	// a prefix (without tag or digest).
+	// For lookup, this may allow matching multiple tags.
+	// For store, this must have a tag or digest added.
+	bool is_prefix = 2;
+
+	// allow_overwrite allows overwriting or ignoring the name if
+	// another reference is provided (such as through an annotation).
+	// Only used if IsPrefix is true.
+	bool allow_overwrite = 3;
+
+	// add_digest adds the manifest digest to the reference.
+	// For lookup, this allows matching tags with any digest.
+	// For store, this allows adding the digest to the name.
+	// Only used if IsPrefix is true.
+	bool add_digest = 4;
+
+	// skip_named_digest only considers digest references which do not
+	// have a non-digested named reference.
+	// For lookup, this will deduplicate digest references when there is a named match.
+	// For store, this only adds this digest reference when there is no matching full
+	// name reference from the prefix.
+	// Only used if IsPrefix is true.
+	bool skip_named_digest = 5;
 }
