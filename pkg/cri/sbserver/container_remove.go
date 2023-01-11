@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // RemoveContainer removes the container.
@@ -106,7 +107,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 
 	c.containerNameIndex.ReleaseByKey(id)
 
-	c.generateAndSendContainerEvent(ctx, id, container.SandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
+	c.GenerateAndSendContainerEvent(ctx, id, container.SandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 

@@ -521,7 +521,7 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 	return status
 }
 
-func (c *criService) generateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
+func (c *criService) GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
 	podSandboxStatus, err := c.getPodSandboxStatus(ctx, sandboxID)
 	if err != nil {
 		// TODO(https://github.com/containerd/containerd/issues/7785):

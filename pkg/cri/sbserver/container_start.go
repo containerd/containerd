@@ -23,14 +23,15 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -177,7 +178,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// It handles the TaskExit event and update container state after this.
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
-	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
+	c.GenerateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
 	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)
 

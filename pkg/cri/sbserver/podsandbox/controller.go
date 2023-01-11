@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
@@ -33,8 +36,6 @@ import (
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.
@@ -44,6 +45,10 @@ type CRIService interface {
 
 	// TODO: we should implement Event backoff in Controller.
 	BackOffEvent(id string, event interface{})
+
+	// TODO: refactor event generator for PLEG.
+	// GenerateAndSendContainerEvent is called by controller for sandbox container events.
+	GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType)
 }
 
 type Controller struct {

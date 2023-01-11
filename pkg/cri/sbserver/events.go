@@ -413,7 +413,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	}
 	// Using channel to propagate the information of container stop
 	cntr.Stop()
-	c.generateAndSendContainerEvent(ctx, cntr.ID, sandboxID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
+	c.GenerateAndSendContainerEvent(ctx, cntr.ID, sandboxID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
 	return nil
 }
 
@@ -435,6 +435,9 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 				if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to stop sandbox: %w", err)
 				}
+
+				c.GenerateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
+
 				// Move on to make sure container status is updated.
 			}
 		}
@@ -450,7 +453,6 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 
 	// Using channel to propagate the information of sandbox stop
 	sb.Stop()
-	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
 	return nil
 }
 
