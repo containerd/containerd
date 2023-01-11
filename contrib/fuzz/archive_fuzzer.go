@@ -74,8 +74,9 @@ func FuzzImportIndex(data []byte) int {
 	if err != nil {
 		return 0
 	}
+	var r *bytes.Reader
 	ctx := context.Background()
-	r := bytes.NewReader(tarBytes)
+	r = bytes.NewReader(tarBytes)
 	shouldRequireLayoutOrManifest, err := f.GetBool()
 	if err != nil {
 		return 0
@@ -98,7 +99,37 @@ func FuzzImportIndex(data []byte) int {
 			}
 		}
 		if !hasLayoutOrManifest {
-			return 0
+			var buf bytes.Buffer
+			tw := tar.NewWriter(&buf)
+			defer tw.Close()
+			tr := tar.NewReader(r)
+			for {
+				hdr, err := tr.Next()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return 0
+				}
+				fileContents, err := io.ReadAll(tr)
+				if err != nil {
+					return 0
+				}
+				tw.WriteHeader(hdr)
+				tw.Write(fileContents)
+			}
+			manifestFileContents, err := f.GetBytes()
+			if err != nil {
+				return 0
+			}
+			tw.WriteHeader(&tar.Header{
+				Name:     "manifest.json",
+				Mode:     0644,
+				Size:     int64(len(manifestFileContents)),
+				Typeflag: tar.TypeReg,
+			})
+			tw.Write(manifestFileContents)
+			r = bytes.NewReader(buf.Bytes())
 		}
 	}
 	tmpdir, err := os.MkdirTemp("", "fuzzing-")
