@@ -41,3 +41,7 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
 }
+
+func isUnifiedCgroupsMode() bool {
+	return false
+}

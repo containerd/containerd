@@ -25,16 +25,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/cgroups/v3"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
@@ -109,93 +106,6 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 		})
 	}
 	return mounts
-}
-
-func (c *criService) platformSpec(
-	id string,
-	sandboxID string,
-	config *runtime.ContainerConfig,
-	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
-	extraMounts []*runtime.Mount,
-) (_ []oci.SpecOpts, retErr error) {
-	specOpts := []oci.SpecOpts{}
-
-	securityContext := config.GetLinux().GetSecurityContext()
-	labelOptions, err := toLabel(securityContext.GetSelinuxOptions())
-	if err != nil {
-		return nil, err
-	}
-	if len(labelOptions) == 0 {
-		// Use pod level SELinux config
-		if sandbox, err := c.sandboxStore.Get(sandboxID); err == nil {
-			labelOptions, err = selinux.DupSecOpt(sandbox.ProcessLabel)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	processLabel, mountLabel, err := label.InitLabels(labelOptions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init selinux options %+v: %w", securityContext.GetSelinuxOptions(), err)
-	}
-	defer func() {
-		if retErr != nil {
-			selinux.ReleaseLabel(processLabel)
-		}
-	}()
-
-	specOpts = append(specOpts,
-		customopts.WithSelinuxLabels(processLabel, mountLabel),
-		customopts.WithMounts(c.os, config, extraMounts, mountLabel),
-		customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
-		customopts.WithCapabilities(securityContext, c.allCaps),
-	)
-
-	if c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDisabledCgroups)
-	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
-		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
-			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
-		}
-	}
-
-	// Get blockio class
-	blockIOClass, err := c.blockIOClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set blockio class: %w", err)
-	}
-	if blockIOClass != "" {
-		if linuxBlockIO, err := blockIOToLinuxOci(blockIOClass); err == nil {
-			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
-		} else {
-			return nil, err
-		}
-	}
-
-	// Get RDT class
-	rdtClass, err := c.rdtClassFromAnnotations(config.GetMetadata().GetName(), config.Annotations, sandboxConfig.Annotations)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set RDT class: %w", err)
-	}
-	if rdtClass != "" {
-		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
-	}
-
-	specOpts = append(specOpts, customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj))
-
-	// cgroupns is used for hiding /sys/fs/cgroup from containers.
-	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
-	// https://github.com/containers/libpod/issues/4363
-	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if cgroups.Mode() == cgroups.Unified && !securityContext.GetPrivileged() {
-		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
-	}
-
-	return specOpts, nil
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {

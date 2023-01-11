@@ -22,14 +22,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
-	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
+	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
 func TestWithDevices(t *testing.T) {
@@ -183,7 +184,7 @@ func TestWithDevices(t *testing.T) {
 			config := runtime.ContainerConfig{}
 			config.Devices = tc.devices
 
-			specOpts := []oci.SpecOpts{WithDevices(&config)}
+			specOpts := []oci.SpecOpts{WithWindowsDevices(&config)}
 
 			platform := "windows"
 			if tc.isLCOW {

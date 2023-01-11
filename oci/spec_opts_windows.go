@@ -45,3 +45,10 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	return nil, errors.New("device from path not supported on Windows")
 }
+
+// WithDevices does nothing on Windows.
+func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
+	return func(ctx context.Context, client Client, container *containers.Container, spec *Spec) error {
+		return nil
+	}
+}
