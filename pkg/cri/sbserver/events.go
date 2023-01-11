@@ -23,6 +23,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/typeurl"
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/utils/clock"
+
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	containerdio "github.com/containerd/containerd/cio"
@@ -33,10 +38,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/typeurl"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -137,7 +138,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 
 				sb, err := em.c.sandboxStore.Get(e.ID)
 				if err == nil {
-					if err := handleSandboxExit(dctx, e, sb, em.c); err != nil {
+					if err := handleSandboxExit(dctx, e, sb, em.c, false); err != nil {
 						return err
 					}
 					return nil
@@ -323,7 +324,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		sb, err := em.c.sandboxStore.Get(e.ID)
 		if err == nil {
-			if err := handleSandboxExit(ctx, e, sb, em.c); err != nil {
+			if err := handleSandboxExit(ctx, e, sb, em.c, true); err != nil {
 				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
 			}
 			return nil
@@ -417,30 +418,36 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 }
 
 // handleSandboxExit handles TaskExit event for sandbox.
-func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService) error {
-	// No stream attached to sandbox container.
-	task, err := sb.Container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to load task for sandbox: %w", err)
-		}
-	} else {
-		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService, removeContainer bool) error {
+	// TODO: Move container remove to podsandbox/ package.
+	// Currently we require a boolean flag, because event monitoring is happening on CRI, so we stil have to take care of
+	// sandbox container from event handler. That part of the event handler must move to podsandbox/.
+	if removeContainer {
+		// No stream attached to sandbox container.
+		task, err := sb.Container.Task(ctx, nil)
+		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to stop sandbox: %w", err)
+				return fmt.Errorf("failed to load task for sandbox: %w", err)
 			}
-			// Move on to make sure container status is updated.
+		} else {
+			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+			if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return fmt.Errorf("failed to stop sandbox: %w", err)
+				}
+				// Move on to make sure container status is updated.
+			}
 		}
 	}
-	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+
+	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
 		return status, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to update sandbox state: %w", err)
 	}
+
 	// Using channel to propagate the information of sandbox stop
 	sb.Stop()
 	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)

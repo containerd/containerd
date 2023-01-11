@@ -31,7 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/protobuf"
 	sb "github.com/containerd/containerd/sandbox"
@@ -282,23 +282,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	//
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
+
+	// TODO: Use sandbox client instead
+	exitCh := make(chan containerd.ExitStatus, 1)
 	go func() {
-		resp, err := controller.Wait(ctrdutil.NamespacedContext(), id)
+		defer close(exitCh)
+
+		resp, err := controller.Wait(ctx, id)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to wait for sandbox controller, skipping exit event")
+			exitCh <- containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
 			return
 		}
 
-		e := &eventtypes.TaskExit{
-			ContainerID: id,
-			ID:          id,
-			// Pid is not used
-			Pid:        0,
-			ExitStatus: resp.ExitStatus,
-			ExitedAt:   resp.ExitedAt,
-		}
-		c.eventMonitor.backOff.enBackOff(id, e)
+		exitCh <- containerd.NewExitStatus(resp.ExitStatus, protobuf.FromTimestamp(resp.ExitedAt), nil)
 	}()
+
+	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, 0, exitCh)
 
 	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)

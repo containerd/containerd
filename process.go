@@ -54,8 +54,8 @@ type Process interface {
 }
 
 // NewExitStatus populates an ExitStatus
-func NewExitStatus(code uint32, t time.Time, err error) *ExitStatus {
-	return &ExitStatus{
+func NewExitStatus(code uint32, t time.Time, err error) ExitStatus {
+	return ExitStatus{
 		code:     code,
 		exitedAt: t,
 		err:      err,
