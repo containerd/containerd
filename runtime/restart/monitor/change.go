@@ -29,14 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type stopChange struct {
-	container containerd.Container
-}
-
-func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
-	return killTask(ctx, s.container)
-}
-
 type startChange struct {
 	container containerd.Container
 	logURI    string
@@ -64,6 +56,18 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 			s.logPath, s.logURI)
 	}
 
+	task, err := s.container.Task(ctx, nil)
+	if err == nil {
+		if status, err := task.Status(ctx); err == nil {
+			switch status.Status {
+			case containerd.Stopped, containerd.Unknown:
+			default:
+				return nil
+			}
+		}
+		task.Delete(ctx)
+	}
+
 	if s.count > 0 {
 		labels := map[string]string{
 			restart.CountLabel: strconv.Itoa(s.count),
@@ -73,12 +77,20 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 			return err
 		}
 	}
-	killTask(ctx, s.container)
-	task, err := s.container.NewTask(ctx, log)
+
+	task, err = s.container.NewTask(ctx, log)
 	if err != nil {
 		return err
 	}
 	return task.Start(ctx)
+}
+
+type stopChange struct {
+	container containerd.Container
+}
+
+func (s *stopChange) apply(ctx context.Context, client *containerd.Client) error {
+	return killTask(ctx, s.container)
 }
 
 func killTask(ctx context.Context, container containerd.Container) error {
