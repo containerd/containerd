@@ -1,4 +1,4 @@
-//go:build gofuzz
+//go:build linux
 
 /*
    Copyright The containerd Authors.
@@ -16,31 +16,20 @@
    limitations under the License.
 */
 
-package fuzz
+package sbserver
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"context"
+	"time"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/sbserver"
+	cstore "github.com/containerd/containerd/pkg/cri/store/container"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
+func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cstore.Container, req *cri.UpdateContainerResourcesRequest, status cstore.Status) (cstore.Status, error) {
+	return i.c.updateContainerResources(ctx, ctr, req, status)
+}
 
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
-	}
-	defer client.Close()
-
-	c, err := sbserver.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+func (i *criImplementation) StopContainer(ctx context.Context, ctr cstore.Container, timeout time.Duration) error {
+	return i.c.stopContainer(ctx, ctr, timeout)
 }

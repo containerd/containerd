@@ -27,8 +27,6 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/nri"
-	v1 "github.com/containerd/nri/types/v1"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -135,7 +133,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
 			// It's possible that task is deleted by event monitor.
-			if _, err := task.Delete(deferCtx, WithNRISandboxDelete(sandboxID), containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+			if _, err := task.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 				log.G(ctx).WithError(err).Errorf("Failed to delete containerd task %q", id)
 			}
 		}
@@ -146,18 +144,22 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
 	}
-	nric, err := nri.New()
+
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
+			}
+		}
+	}()
+
+	err = c.nri.StartContainer(ctx, &sandbox, &cntr)
 	if err != nil {
-		log.G(ctx).WithError(err).Error("unable to create nri client")
-	}
-	if nric != nil {
-		nriSB := &nri.Sandbox{
-			ID:     sandboxID,
-			Labels: sandbox.Config.Labels,
-		}
-		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
-			return nil, fmt.Errorf("nri invoke: %w", err)
-		}
+		log.G(ctx).WithError(err).Errorf("NRI container start failed")
+		return nil, fmt.Errorf("NRI container start failed: %w", err)
 	}
 
 	// Start containerd task.
@@ -178,6 +180,11 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	c.eventMonitor.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
 
 	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
+
+	err = c.nri.PostStartContainer(ctx, &sandbox, &cntr)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-start notification failed")
+	}
 
 	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)
 
