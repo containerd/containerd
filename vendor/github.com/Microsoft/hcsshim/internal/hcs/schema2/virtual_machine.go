@@ -31,4 +31,6 @@ type VirtualMachine struct {
 	GuestConnection *GuestConnection `json:"GuestConnection,omitempty"`
 
 	SecuritySettings *SecuritySettings `json:"SecuritySettings,omitempty"`
+
+	DebugOptions *DebugOptions `json:"DebugOptions,omitempty"`
 }

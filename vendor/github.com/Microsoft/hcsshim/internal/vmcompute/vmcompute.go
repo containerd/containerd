@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"go.opencensus.io/trace"
 
 	"github.com/Microsoft/hcsshim/internal/interop"
@@ -16,7 +17,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/timeout"
 )
 
-//go:generate go run ../../mksyscall_windows.go -output zsyscall_windows.go vmcompute.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go vmcompute.go
 
 //sys hcsEnumerateComputeSystems(query string, computeSystems **uint16, result **uint16) (hr error) = vmcompute.HcsEnumerateComputeSystems?
 //sys hcsCreateComputeSystem(id string, configuration string, identity syscall.Handle, computeSystem *HcsSystem, result **uint16) (hr error) = vmcompute.HcsCreateComputeSystem?
@@ -65,7 +66,7 @@ type HcsCallback syscall.Handle
 type HcsProcessInformation struct {
 	// ProcessId is the pid of the created process.
 	ProcessId uint32
-	reserved  uint32 //nolint:structcheck
+	_         uint32 // reserved padding
 	// StdInput is the handle associated with the stdin of the process.
 	StdInput syscall.Handle
 	// StdOutput is the handle associated with the stdout of the process.
@@ -75,10 +76,26 @@ type HcsProcessInformation struct {
 }
 
 func execute(ctx gcontext.Context, timeout time.Duration, f func() error) error {
+	now := time.Now()
 	if timeout > 0 {
 		var cancel gcontext.CancelFunc
 		ctx, cancel = gcontext.WithTimeout(ctx, timeout)
 		defer cancel()
+	}
+
+	// if ctx already has prior deadlines, the shortest timeout takes precedence and is used.
+	// find the true timeout for reporting
+	//
+	// this is mostly an issue with (*UtilityVM).Start(context.Context), which sets its
+	// own (2 minute) timeout.
+	deadline, ok := ctx.Deadline()
+	trueTimeout := timeout
+	if ok {
+		trueTimeout = deadline.Sub(now)
+		log.G(ctx).WithFields(logrus.Fields{
+			logfields.Timeout: trueTimeout,
+			"desiredTimeout":  timeout,
+		}).Trace("Executing syscall with deadline")
 	}
 
 	done := make(chan error, 1)
@@ -88,8 +105,10 @@ func execute(ctx gcontext.Context, timeout time.Duration, f func() error) error 
 	select {
 	case <-ctx.Done():
 		if ctx.Err() == gcontext.DeadlineExceeded {
-			log.G(ctx).WithField(logfields.Timeout, timeout).
-				Warning("Syscall did not complete within operation timeout. This may indicate a platform issue. If it appears to be making no forward progress, obtain the stacks and see if there is a syscall stuck in the platform API for a significant length of time.")
+			log.G(ctx).WithField(logfields.Timeout, trueTimeout).
+				Warning("Syscall did not complete within operation timeout. This may indicate a platform issue. " +
+					"If it appears to be making no forward progress, obtain the stacks and see if there is a syscall " +
+					"stuck in the platform API for a significant length of time.")
 		}
 		return ctx.Err()
 	case err := <-done:
