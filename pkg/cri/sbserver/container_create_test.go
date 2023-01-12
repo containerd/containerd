@@ -22,7 +22,8 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/platforms"
+
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/opts"
 )
 
-var currentPlatform = &types.Platform{OS: goruntime.GOOS, Architecture: goruntime.GOARCH}
+var currentPlatform = platforms.DefaultSpec()
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 	contains, notcontains []string) {
