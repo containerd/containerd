@@ -3,7 +3,7 @@ module github.com/containerd/containerd/integration/client
 go 1.18
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20221206110420-d395f97c4830
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1
 	github.com/Microsoft/hcsshim v0.10.0-rc.1
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.0-20221112182753-e8802a182774
@@ -77,3 +77,5 @@ replace (
 	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
 )
+
+replace github.com/AdaLogics/go-fuzz-headers => github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230111232327-1f10f66a31bf

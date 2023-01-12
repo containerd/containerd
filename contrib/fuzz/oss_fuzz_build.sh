@@ -37,7 +37,6 @@ compile_fuzzers() {
     done
 }
 
-
 # This is from https://github.com/AdamKorcz/instrumentation
 cd $SRC/instrumentation
 go run main.go $SRC/containerd/images
