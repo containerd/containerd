@@ -5,9 +5,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +13,7 @@ import (
 	"github.com/Microsoft/hcsshim/ext4/dmverity"
 	"github.com/Microsoft/hcsshim/ext4/internal/compactext4"
 	"github.com/Microsoft/hcsshim/ext4/internal/format"
+	"github.com/pkg/errors"
 )
 
 type params struct {
@@ -243,7 +242,7 @@ func ReadExt4SuperBlock(vhdPath string) (*format.SuperBlock, error) {
 // merkle tree root digest. Convert is called with minimal options: ConvertWhiteout and MaximumDiskSize
 // set to dmverity.RecommendedVHDSizeGB.
 func ConvertAndComputeRootDigest(r io.Reader) (string, error) {
-	out, err := ioutil.TempFile("", "")
+	out, err := os.CreateTemp("", "")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary file: %s", err)
 	}

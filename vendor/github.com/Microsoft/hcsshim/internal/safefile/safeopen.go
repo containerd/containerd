@@ -345,7 +345,6 @@ func MkdirRelative(path string, root *os.File) error {
 func MkdirAllRelative(path string, root *os.File) error {
 	pathParts := strings.Split(filepath.Clean(path), (string)(filepath.Separator))
 	for index := range pathParts {
-
 		partialPath := filepath.Join(pathParts[0 : index+1]...)
 		stat, err := LstatRelative(partialPath, root)
 

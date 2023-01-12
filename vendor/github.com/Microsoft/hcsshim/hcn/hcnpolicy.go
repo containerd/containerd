@@ -315,7 +315,7 @@ const (
 	ProtocolTypeICMPv6  ProtocolType = 58
 )
 
-//L4ProxyPolicySetting applies proxy policy on network/endpoint
+// L4ProxyPolicySetting applies proxy policy on network/endpoint
 type L4ProxyPolicySetting struct {
 	IP          string       `json:",omitempty"`
 	Port        string       `json:",omitempty"`

@@ -87,7 +87,7 @@ var (
 	// ErrProcessAlreadyStopped is returned by hcs if the process we're trying to kill has already been stopped.
 	ErrProcessAlreadyStopped = syscall.Errno(0x8037011f)
 
-	// ErrInvalidHandle is an error that can be encountrered when querying the properties of a compute system when the handle to that
+	// ErrInvalidHandle is an error that can be encountered when querying the properties of a compute system when the handle to that
 	// compute system has already been closed.
 	ErrInvalidHandle = syscall.Errno(0x6)
 )
@@ -157,33 +157,38 @@ func (e *HcsError) Error() string {
 	return s
 }
 
+func (e *HcsError) Is(target error) bool {
+	return errors.Is(e.Err, target)
+}
+
+// unwrap isnt really needed, but helpful convince function
+
+func (e *HcsError) Unwrap() error {
+	return e.Err
+}
+
+// Deprecated: net.Error.Temporary is deprecated.
 func (e *HcsError) Temporary() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Temporary()
+	err := e.netError()
+	return (err != nil) && err.Temporary()
 }
 
 func (e *HcsError) Timeout() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Timeout()
+	err := e.netError()
+	return (err != nil) && err.Timeout()
 }
 
-// ProcessError is an error encountered in HCS during an operation on a Process object
-type ProcessError struct {
-	SystemID string
-	Pid      int
-	Op       string
-	Err      error
-	Events   []ErrorEvent
+func (e *HcsError) netError() (err net.Error) {
+	if errors.As(e.Unwrap(), &err) {
+		return err
+	}
+	return nil
 }
-
-var _ net.Error = &ProcessError{}
 
 // SystemError is an error encountered in HCS during an operation on a Container object
 type SystemError struct {
-	ID     string
-	Op     string
-	Err    error
-	Events []ErrorEvent
+	HcsError
+	ID string
 }
 
 var _ net.Error = &SystemError{}
@@ -196,28 +201,31 @@ func (e *SystemError) Error() string {
 	return s
 }
 
-func (e *SystemError) Temporary() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Temporary()
-}
-
-func (e *SystemError) Timeout() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Timeout()
-}
-
 func makeSystemError(system *System, op string, err error, events []ErrorEvent) error {
 	// Don't double wrap errors
-	if _, ok := err.(*SystemError); ok {
+	var e *SystemError
+	if errors.As(err, &e) {
 		return err
 	}
+
 	return &SystemError{
-		ID:     system.ID(),
-		Op:     op,
-		Err:    err,
-		Events: events,
+		ID: system.ID(),
+		HcsError: HcsError{
+			Op:     op,
+			Err:    err,
+			Events: events,
+		},
 	}
 }
+
+// ProcessError is an error encountered in HCS during an operation on a Process object
+type ProcessError struct {
+	HcsError
+	SystemID string
+	Pid      int
+}
+
+var _ net.Error = &ProcessError{}
 
 func (e *ProcessError) Error() string {
 	s := fmt.Sprintf("%s %s:%d: %s", e.Op, e.SystemID, e.Pid, e.Err.Error())
@@ -227,27 +235,20 @@ func (e *ProcessError) Error() string {
 	return s
 }
 
-func (e *ProcessError) Temporary() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Temporary()
-}
-
-func (e *ProcessError) Timeout() bool {
-	err, ok := e.Err.(net.Error)
-	return ok && err.Timeout()
-}
-
 func makeProcessError(process *Process, op string, err error, events []ErrorEvent) error {
 	// Don't double wrap errors
-	if _, ok := err.(*ProcessError); ok {
+	var e *ProcessError
+	if errors.As(err, &e) {
 		return err
 	}
 	return &ProcessError{
 		Pid:      process.Pid(),
 		SystemID: process.SystemID(),
-		Op:       op,
-		Err:      err,
-		Events:   events,
+		HcsError: HcsError{
+			Op:     op,
+			Err:    err,
+			Events: events,
+		},
 	}
 }
 
@@ -256,41 +257,41 @@ func makeProcessError(process *Process, op string, err error, events []ErrorEven
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
 // will currently return true when the error is ErrElementNotFound.
 func IsNotExist(err error) bool {
-	err = getInnerError(err)
-	return errors.Is(err, ErrComputeSystemDoesNotExist) ||
-		errors.Is(err, ErrElementNotFound)
+	return IsAny(err, ErrComputeSystemDoesNotExist, ErrElementNotFound)
 }
 
 // IsErrorInvalidHandle checks whether the error is the result of an operation carried
 // out on a handle that is invalid/closed. This error popped up while trying to query
 // stats on a container in the process of being stopped.
 func IsErrorInvalidHandle(err error) bool {
-	err = getInnerError(err)
 	return errors.Is(err, ErrInvalidHandle)
 }
 
 // IsAlreadyClosed checks if an error is caused by the Container or Process having been
 // already closed by a call to the Close() method.
 func IsAlreadyClosed(err error) bool {
-	err = getInnerError(err)
 	return errors.Is(err, ErrAlreadyClosed)
 }
 
 // IsPending returns a boolean indicating whether the error is that
 // the requested operation is being completed in the background.
 func IsPending(err error) bool {
-	err = getInnerError(err)
 	return errors.Is(err, ErrVmcomputeOperationPending)
 }
 
 // IsTimeout returns a boolean indicating whether the error is caused by
 // a timeout waiting for the operation to complete.
 func IsTimeout(err error) bool {
-	if err, ok := err.(net.Error); ok && err.Timeout() {
+	// HcsError and co. implement Timeout regardless of whether the errors they wrap do,
+	// so `errors.As(err, net.Error)`` will always be true.
+	// Using `errors.As(err.Unwrap(), net.Err)` wont work for general errors.
+	// So first check if there an `ErrTimeout` in the chain, then convert to a net error.
+	if errors.Is(err, ErrTimeout) {
 		return true
 	}
-	err = getInnerError(err)
-	return errors.Is(err, ErrTimeout)
+
+	var nerr net.Error
+	return errors.As(err, &nerr) && nerr.Timeout()
 }
 
 // IsAlreadyStopped returns a boolean indicating whether the error is caused by
@@ -299,10 +300,7 @@ func IsTimeout(err error) bool {
 // already exited, or does not exist. Both IsAlreadyStopped and IsNotExist
 // will currently return true when the error is ErrElementNotFound.
 func IsAlreadyStopped(err error) bool {
-	err = getInnerError(err)
-	return errors.Is(err, ErrVmcomputeAlreadyStopped) ||
-		errors.Is(err, ErrProcessAlreadyStopped) ||
-		errors.Is(err, ErrElementNotFound)
+	return IsAny(err, ErrVmcomputeAlreadyStopped, ErrProcessAlreadyStopped, ErrElementNotFound)
 }
 
 // IsNotSupported returns a boolean indicating whether the error is caused by
@@ -311,38 +309,28 @@ func IsAlreadyStopped(err error) bool {
 // ErrVmcomputeInvalidJSON, ErrInvalidData, ErrNotSupported or ErrVmcomputeUnknownMessage
 // is thrown from the Platform
 func IsNotSupported(err error) bool {
-	err = getInnerError(err)
 	// If Platform doesn't recognize or support the request sent, below errors are seen
-	return errors.Is(err, ErrVmcomputeInvalidJSON) ||
-		errors.Is(err, ErrInvalidData) ||
-		errors.Is(err, ErrNotSupported) ||
-		errors.Is(err, ErrVmcomputeUnknownMessage)
+	return IsAny(err, ErrVmcomputeInvalidJSON, ErrInvalidData, ErrNotSupported, ErrVmcomputeUnknownMessage)
 }
 
 // IsOperationInvalidState returns true when err is caused by
 // `ErrVmcomputeOperationInvalidState`.
 func IsOperationInvalidState(err error) bool {
-	err = getInnerError(err)
 	return errors.Is(err, ErrVmcomputeOperationInvalidState)
 }
 
 // IsAccessIsDenied returns true when err is caused by
 // `ErrVmcomputeOperationAccessIsDenied`.
 func IsAccessIsDenied(err error) bool {
-	err = getInnerError(err)
 	return errors.Is(err, ErrVmcomputeOperationAccessIsDenied)
 }
 
-func getInnerError(err error) error {
-	switch pe := err.(type) {
-	case nil:
-		return nil
-	case *HcsError:
-		err = pe.Err
-	case *SystemError:
-		err = pe.Err
-	case *ProcessError:
-		err = pe.Err
+// IsAny is a vectorized version of [errors.Is], it returns true if err is one of targets.
+func IsAny(err error, targets ...error) bool {
+	for _, e := range targets {
+		if errors.Is(err, e) {
+			return true
+		}
 	}
-	return err
+	return false
 }

@@ -48,9 +48,10 @@ func GetEntry(ctx context.Context) *logrus.Entry {
 }
 
 // SetEntry updates the log entry in the context with the provided fields, and
-// returns both. It is equivlent to:
-//   entry := GetEntry(ctx).WithFields(fields)
-//   ctx = WithContext(ctx, entry)
+// returns both. It is equivalent to:
+//
+//	entry := GetEntry(ctx).WithFields(fields)
+//	ctx = WithContext(ctx, entry)
 //
 // See WithContext for more information.
 func SetEntry(ctx context.Context, fields logrus.Fields) (context.Context, *logrus.Entry) {
@@ -63,9 +64,10 @@ func SetEntry(ctx context.Context, fields logrus.Fields) (context.Context, *logr
 
 // UpdateContext extracts the log entry from the context, and, if the entry's
 // context points to a parent's of the current context, ands the entry
-// to the most recent context. It is equivlent to:
-//   entry :=GetEntry(ctx)
-//   ctx = WithContext(ctx, entry)
+// to the most recent context. It is equivalent to:
+//
+//	entry := GetEntry(ctx)
+//	ctx = WithContext(ctx, entry)
 //
 // This allows the entry to reference the most recent context and any new
 // values (such as span contexts) added to it.
