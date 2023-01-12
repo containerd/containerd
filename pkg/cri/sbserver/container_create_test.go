@@ -22,6 +22,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
+	"github.com/containerd/containerd/api/types"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,8 @@ import (
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/opts"
 )
+
+var currentPlatform = &types.Platform{OS: goruntime.GOOS, Architecture: goruntime.GOARCH}
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 	contains, notcontains []string) {
@@ -63,7 +66,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -134,7 +137,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -391,7 +394,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)

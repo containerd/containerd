@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
@@ -89,7 +90,7 @@ func (c *criService) containerSpec(
 		oci.WithHostname(sandboxConfig.GetHostname()),
 	)
 
-	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts), customopts.WithDevices(config))
+	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts), customopts.WithWindowsDevices(config))
 
 	// Start with the image config user and override below if RunAsUsername is not "".
 	username := imageConfig.User

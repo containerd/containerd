@@ -34,7 +34,6 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
-	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/pkg/userns"
 )
 
@@ -309,7 +308,7 @@ func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 			return fmt.Errorf("failed to create sandbox shm: %w", err)
 		}
 		shmproperty := fmt.Sprintf("mode=1777,size=%d", defaultShmSize)
-		if err := c.os.(osinterface.UNIX).Mount("shm", sandboxDevShm, "tmpfs", uintptr(unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV), shmproperty); err != nil {
+		if err := c.os.Mount("shm", sandboxDevShm, "tmpfs", uintptr(unix.MS_NOEXEC|unix.MS_NOSUID|unix.MS_NODEV), shmproperty); err != nil {
 			return fmt.Errorf("failed to mount sandbox shm: %w", err)
 		}
 	}
@@ -345,7 +344,7 @@ func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 		if err != nil {
 			return fmt.Errorf("failed to follow symlink: %w", err)
 		}
-		if err := c.os.(osinterface.UNIX).Unmount(path); err != nil && !os.IsNotExist(err) {
+		if err := c.os.Unmount(path); err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("failed to unmount %q: %w", path, err)
 		}
 	}

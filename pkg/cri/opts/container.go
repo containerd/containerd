@@ -25,13 +25,14 @@ import (
 	goruntime "runtime"
 	"strings"
 
+	"github.com/containerd/continuity/fs"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/continuity/fs"
 )
 
 // WithNewSnapshot wraps `containerd.WithNewSnapshot` so that if creating the

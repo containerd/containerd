@@ -10,6 +10,7 @@ import (
 type SandboxService interface {
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	StartSandbox(context.Context, *StartSandboxRequest) (*StartSandboxResponse, error)
+	Platform(context.Context, *PlatformRequest) (*PlatformResponse, error)
 	StopSandbox(context.Context, *StopSandboxRequest) (*StopSandboxResponse, error)
 	WaitSandbox(context.Context, *WaitSandboxRequest) (*WaitSandboxResponse, error)
 	SandboxStatus(context.Context, *SandboxStatusRequest) (*SandboxStatusResponse, error)
@@ -33,6 +34,13 @@ func RegisterSandboxService(srv *ttrpc.Server, svc SandboxService) {
 					return nil, err
 				}
 				return svc.StartSandbox(ctx, &req)
+			},
+			"Platform": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req PlatformRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Platform(ctx, &req)
 			},
 			"StopSandbox": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
 				var req StopSandboxRequest
@@ -94,6 +102,14 @@ func (c *sandboxClient) CreateSandbox(ctx context.Context, req *CreateSandboxReq
 func (c *sandboxClient) StartSandbox(ctx context.Context, req *StartSandboxRequest) (*StartSandboxResponse, error) {
 	var resp StartSandboxResponse
 	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "StartSandbox", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *sandboxClient) Platform(ctx context.Context, req *PlatformRequest) (*PlatformResponse, error) {
+	var resp PlatformResponse
+	if err := c.client.Call(ctx, "containerd.runtime.sandbox.v1.Sandbox", "Platform", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

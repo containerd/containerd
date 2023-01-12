@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,8 +16,26 @@
    limitations under the License.
 */
 
-package testing
+package opts
 
-import osInterface "github.com/containerd/containerd/pkg/os"
+import (
+	"context"
 
-var _ osInterface.UNIX = &FakeOS{}
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
+)
+
+func isHugetlbControllerPresent() bool {
+	return false
+}
+
+func SwapControllerAvailable() bool {
+	return false
+}
+
+// WithCDI does nothing on non Linux platforms.
+func WithCDI(_ map[string]string) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, container *containers.Container, spec *oci.Spec) error {
+		return nil
+	}
+}

@@ -1433,3 +1433,170 @@ func WithWindowsDevice(idType, id string) SpecOpts {
 		return nil
 	}
 }
+
+// WithMemorySwap sets the container's swap in bytes
+func WithMemorySwap(swap int64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setResources(s)
+		if s.Linux.Resources.Memory == nil {
+			s.Linux.Resources.Memory = &specs.LinuxMemory{}
+		}
+		s.Linux.Resources.Memory.Swap = &swap
+		return nil
+	}
+}
+
+// WithPidsLimit sets the container's pid limit or maximum
+func WithPidsLimit(limit int64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setResources(s)
+		if s.Linux.Resources.Pids == nil {
+			s.Linux.Resources.Pids = &specs.LinuxPids{}
+		}
+		s.Linux.Resources.Pids.Limit = limit
+		return nil
+	}
+}
+
+// WithBlockIO sets the container's blkio parameters
+func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setResources(s)
+		s.Linux.Resources.BlockIO = blockio
+		return nil
+	}
+}
+
+// WithCPUShares sets the container's cpu shares
+func WithCPUShares(shares uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Shares = &shares
+		return nil
+	}
+}
+
+// WithCPUs sets the container's cpus/cores for use by the container
+func WithCPUs(cpus string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Cpus = cpus
+		return nil
+	}
+}
+
+// WithCPUsMems sets the container's cpu mems for use by the container
+func WithCPUsMems(mems string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Mems = mems
+		return nil
+	}
+}
+
+// WithCPUCFS sets the container's Completely fair scheduling (CFS) quota and period
+func WithCPUCFS(quota int64, period uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Quota = &quota
+		s.Linux.Resources.CPU.Period = &period
+		return nil
+	}
+}
+
+// WithCPURT sets the container's realtime scheduling (RT) runtime and period.
+func WithCPURT(runtime int64, period uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.RealtimeRuntime = &runtime
+		s.Linux.Resources.CPU.RealtimePeriod = &period
+		return nil
+	}
+}
+
+// WithoutRunMount removes the `/run` inside the spec
+func WithoutRunMount(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	return WithoutMounts("/run")(ctx, client, c, s)
+}
+
+// WithRdt sets the container's RDT parameters
+func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		s.Linux.IntelRdt = &specs.LinuxIntelRdt{
+			ClosID:        closID,
+			L3CacheSchema: l3CacheSchema,
+			MemBwSchema:   memBwSchema,
+		}
+		return nil
+	}
+}
+
+// WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
+// `count` specified.
+func WithWindowsCPUCount(count uint64) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Count = &count
+		return nil
+	}
+}
+
+// WithWindowsCPUShares sets the `Windows.Resources.CPU.Shares` section to the
+// `shares` specified.
+func WithWindowsCPUShares(shares uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Shares = &shares
+		return nil
+	}
+}
+
+// WithWindowsCPUMaximum sets the `Windows.Resources.CPU.Maximum` section to the
+// `max` specified.
+func WithWindowsCPUMaximum(max uint16) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setCPUWindows(s)
+		s.Windows.Resources.CPU.Maximum = &max
+		return nil
+	}
+}
+
+// WithWindowsIgnoreFlushesDuringBoot sets `Windows.IgnoreFlushesDuringBoot`.
+func WithWindowsIgnoreFlushesDuringBoot() SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		s.Windows.IgnoreFlushesDuringBoot = true
+		return nil
+	}
+}
+
+// WithWindowNetworksAllowUnqualifiedDNSQuery sets `Windows.Network.AllowUnqualifiedDNSQuery`.
+func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		if s.Windows.Network == nil {
+			s.Windows.Network = &specs.WindowsNetwork{}
+		}
+
+		s.Windows.Network.AllowUnqualifiedDNSQuery = true
+		return nil
+	}
+}
+
+// WithWindowsNetworkNamespace sets the network namespace for a Windows container.
+func WithWindowsNetworkNamespace(ns string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			s.Windows = &specs.Windows{}
+		}
+		if s.Windows.Network == nil {
+			s.Windows.Network = &specs.WindowsNetwork{}
+		}
+		s.Windows.Network.NetworkNamespace = ns
+		return nil
+	}
+}

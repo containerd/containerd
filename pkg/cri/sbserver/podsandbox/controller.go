@@ -19,11 +19,13 @@ package podsandbox
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"time"
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -83,6 +85,13 @@ func New(
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
+
+func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (*types.Platform, error) {
+	return &types.Platform{
+		OS:           goruntime.GOOS,
+		Architecture: goruntime.GOARCH,
+	}, nil
+}
 
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
 	status := c.store.Get(sandboxID)

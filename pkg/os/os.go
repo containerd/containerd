@@ -21,6 +21,8 @@ import (
 	"os"
 
 	"github.com/moby/sys/symlink"
+
+	"github.com/containerd/containerd/mount"
 )
 
 // OS collects system level operations that need to be mocked out
@@ -34,6 +36,9 @@ type OS interface {
 	CopyFile(src, dest string, perm os.FileMode) error
 	WriteFile(filename string, data []byte, perm os.FileMode) error
 	Hostname() (string, error)
+	Mount(source string, target string, fstype string, flags uintptr, data string) error
+	Unmount(target string) error
+	LookupMount(path string) (mount.Info, error)
 }
 
 // RealOS is used to dispatch the real system level operations.

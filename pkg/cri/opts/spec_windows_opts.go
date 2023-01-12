@@ -24,11 +24,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/oci"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
 	osinterface "github.com/containerd/containerd/pkg/os"
 )
 
@@ -229,8 +229,8 @@ func WithWindowsCredentialSpec(credentialSpec string) oci.SpecOpts {
 	}
 }
 
-// WithDevices sets the provided devices onto the container spec
-func WithDevices(config *runtime.ContainerConfig) oci.SpecOpts {
+// WithWindowsDevices sets the provided devices onto the container spec
+func WithWindowsDevices(config *runtime.ContainerConfig) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		for _, device := range config.GetDevices() {
 			if device.ContainerPath != "" {

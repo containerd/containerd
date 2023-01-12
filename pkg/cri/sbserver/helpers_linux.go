@@ -20,28 +20,25 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/containerd/cgroups/v3"
+	"github.com/moby/sys/mountinfo"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
-	"github.com/moby/sys/mountinfo"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"golang.org/x/sys/unix"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
-	// relativeRootfsPath is the rootfs path relative to bundle path.
-	relativeRootfsPath = "rootfs"
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
 	// etcHosts is the default path of /etc/hosts file.
@@ -50,20 +47,7 @@ const (
 	etcHostname = "/etc/hostname"
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
-	// hostnameEnv is the key for HOSTNAME env.
-	hostnameEnv = "HOSTNAME"
 )
-
-// getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent, id string) string {
-	base := path.Base(cgroupsParent)
-	if strings.HasSuffix(base, ".slice") {
-		// For a.slice/b.slice/c.slice, base is c.slice.
-		// runc systemd cgroup path format is "slice:prefix:name".
-		return strings.Join([]string{base, "cri-containerd", id}, ":")
-	}
-	return filepath.Join(cgroupsParent, id)
-}
 
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
@@ -95,46 +79,6 @@ func (c *criService) getResolvPath(id string) string {
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
 func (c *criService) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
-}
-
-func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
-	var labels []string
-
-	if selinuxOptions == nil {
-		return nil, nil
-	}
-	if err := checkSelinuxLevel(selinuxOptions.Level); err != nil {
-		return nil, err
-	}
-	if selinuxOptions.User != "" {
-		labels = append(labels, "user:"+selinuxOptions.User)
-	}
-	if selinuxOptions.Role != "" {
-		labels = append(labels, "role:"+selinuxOptions.Role)
-	}
-	if selinuxOptions.Type != "" {
-		labels = append(labels, "type:"+selinuxOptions.Type)
-	}
-	if selinuxOptions.Level != "" {
-		labels = append(labels, "level:"+selinuxOptions.Level)
-	}
-
-	return labels, nil
-}
-
-func checkSelinuxLevel(level string) error {
-	if len(level) == 0 {
-		return nil
-	}
-
-	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}(\.c\d{1,4})?(,c\d{1,4}(\.c\d{1,4})?)*)?$`, level)
-	if err != nil {
-		return fmt.Errorf("the format of 'level' %q is not correct: %w", level, err)
-	}
-	if !matched {
-		return fmt.Errorf("the format of 'level' %q is not correct", level)
-	}
-	return nil
 }
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
@@ -273,4 +217,10 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	}
 	spec.Process.SelinuxLabel = l
 	return nil
+}
+
+// getCgroupsMode returns cgropu mode.
+// TODO: add build constraints to cgroups package and remove this helper
+func isUnifiedCgroupsMode() bool {
+	return cgroups.Mode() == cgroups.Unified
 }

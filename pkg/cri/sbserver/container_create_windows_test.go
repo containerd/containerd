@@ -151,7 +151,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	c := newTestCRIService()
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -173,7 +173,7 @@ func TestMountCleanPath(t *testing.T) {
 		ContainerPath: "c:/test/container-path",
 		HostPath:      "c:/test/host-path",
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -193,7 +193,7 @@ func TestMountNamedPipe(t *testing.T) {
 		ContainerPath: `\\.\pipe\foo`,
 		HostPath:      `\\.\pipe\foo`,
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -239,7 +239,7 @@ func TestHostProcessRequirements(t *testing.T) {
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
 				HostProcess: test.sandboxHostProcess,
 			}
-			_, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
