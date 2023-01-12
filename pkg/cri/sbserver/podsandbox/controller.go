@@ -19,13 +19,14 @@ package podsandbox
 import (
 	"context"
 	"fmt"
-	goruntime "runtime"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -33,10 +34,9 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/sirupsen/logrus"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.
@@ -86,11 +86,8 @@ func New(
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (*types.Platform, error) {
-	return &types.Platform{
-		OS:           goruntime.GOOS,
-		Architecture: goruntime.GOARCH,
-	}, nil
+func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error) {
+	return platforms.DefaultSpec(), nil
 }
 
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {

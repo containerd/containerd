@@ -20,8 +20,8 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/platforms"
 	sb "github.com/containerd/containerd/sandbox"
 )
 
@@ -55,13 +55,18 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 	return resp, nil
 }
 
-func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (*types.Platform, error) {
+func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (platforms.Platform, error) {
 	resp, err := s.client.Platform(ctx, &api.ControllerPlatformRequest{SandboxID: sandboxID})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return platforms.Platform{}, errdefs.FromGRPC(err)
 	}
 
-	return resp.GetPlatform(), nil
+	platform := resp.GetPlatform()
+	return platforms.Platform{
+		Architecture: platform.GetArchitecture(),
+		OS:           platform.GetOS(),
+		Variant:      platform.GetVariant(),
+	}, nil
 }
 
 func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
