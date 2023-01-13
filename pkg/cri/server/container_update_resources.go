@@ -32,7 +32,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
@@ -43,21 +42,18 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
 
-	var sandbox sandboxstore.Sandbox
-	if c.nri.isEnabled() {
-		sandbox, err = c.sandboxStore.Get(container.SandboxID)
-		if err != nil {
-			return nil, err
-		}
+	sandbox, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil {
+		return nil, err
+	}
 
-		resources := r.GetLinux()
-		updated, err := c.nri.updateContainer(ctx, &sandbox, &container, resources)
-		if err != nil {
-			return nil, fmt.Errorf("NRI container update failed: %w", err)
-		}
-		if updated != nil {
-			*resources = *updated
-		}
+	resources := r.GetLinux()
+	updated, err := c.nri.UpdateContainerResources(ctx, &sandbox, &container, resources)
+	if err != nil {
+		return nil, fmt.Errorf("NRI container update failed: %w", err)
+	}
+	if updated != nil {
+		*resources = *updated
 	}
 
 	// Update resources in status update transaction, so that:
@@ -69,11 +65,9 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
 
-	if c.nri.isEnabled() {
-		err = c.nri.postUpdateContainer(ctx, &sandbox, &container)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
-		}
+	err = c.nri.PostUpdateContainerResources(ctx, &sandbox, &container)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
 	}
 
 	return &runtime.UpdateContainerResourcesResponse{}, nil

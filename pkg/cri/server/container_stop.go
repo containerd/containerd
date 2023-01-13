@@ -47,16 +47,14 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		return nil, err
 	}
 
-	if c.nri.isEnabled() {
-		sandbox, err := c.sandboxStore.Get(container.SandboxID)
-		if err != nil {
-			err = c.nri.stopContainer(ctx, nil, &container)
-		} else {
-			err = c.nri.stopContainer(ctx, &sandbox, &container)
-		}
-		if err != nil {
-			log.G(ctx).WithError(err).Error("NRI failed to stop container")
-		}
+	sandbox, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil {
+		err = c.nri.StopContainer(ctx, nil, &container)
+	} else {
+		err = c.nri.StopContainer(ctx, &sandbox, &container)
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).Error("NRI failed to stop container")
 	}
 
 	i, err := container.Container.Info(ctx)

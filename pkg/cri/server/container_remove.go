@@ -73,16 +73,14 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		}
 	}()
 
-	if c.nri.isEnabled() {
-		sandbox, err := c.sandboxStore.Get(container.SandboxID)
-		if err != nil {
-			err = c.nri.removeContainer(ctx, nil, &container)
-		} else {
-			err = c.nri.removeContainer(ctx, &sandbox, &container)
-		}
-		if err != nil {
-			log.G(ctx).WithError(err).Error("NRI failed to remove container")
-		}
+	sandbox, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil {
+		err = c.nri.RemoveContainer(ctx, nil, &container)
+	} else {
+		err = c.nri.RemoveContainer(ctx, &sandbox, &container)
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).Error("NRI failed to remove container")
 	}
 
 	// NOTE(random-liu): Docker set container to "Dead" state when start removing the
