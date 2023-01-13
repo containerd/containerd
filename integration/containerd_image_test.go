@@ -18,7 +18,6 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -74,7 +73,7 @@ func TestContainerdImage(t *testing.T) {
 		if img == nil {
 			// We always generate image id as a reference first, it must
 			// be ready here.
-			return false, errors.New("can't reference image by id")
+			return false, fmt.Errorf("can't reference image by id")
 		}
 		if len(img.RepoTags) != 1 {
 			// RepoTags must have been populated correctly.

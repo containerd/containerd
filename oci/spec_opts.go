@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -450,7 +449,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 			cmd = append(config.Entrypoint, cmd...)
 			if len(cmd) == 0 {
-				return errors.New("no arguments specified")
+				return fmt.Errorf("no arguments specified")
 			}
 
 			if config.ArgsEscaped && (len(config.Entrypoint) > 0 || cmdFromImage) {
@@ -469,7 +468,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 				Username: config.User,
 			}
 		} else {
-			return errors.New("spec does not contain Linux or Windows section")
+			return fmt.Errorf("spec does not contain Linux or Windows section")
 		}
 		return nil
 	}
@@ -652,15 +651,15 @@ func WithUser(userstr string) SpecOpts {
 			}
 			if c.Snapshotter == "" && c.SnapshotKey == "" {
 				if !isRootfsAbs(s.Root.Path) {
-					return errors.New("rootfs absolute path is required")
+					return fmt.Errorf("rootfs absolute path is required")
 				}
 				return f(s.Root.Path)
 			}
 			if c.Snapshotter == "" {
-				return errors.New("no snapshotter set for container")
+				return fmt.Errorf("no snapshotter set for container")
 			}
 			if c.SnapshotKey == "" {
-				return errors.New("rootfs snapshot not created for container")
+				return fmt.Errorf("rootfs snapshot not created for container")
 			}
 			snapshotter := client.SnapshotService(c.Snapshotter)
 			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -709,15 +708,15 @@ func WithUserID(uid uint32) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.New("rootfs absolute path is required")
+				return fmt.Errorf("rootfs absolute path is required")
 			}
 			return setUser(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
-			return errors.New("no snapshotter set for container")
+			return fmt.Errorf("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.New("rootfs snapshot not created for container")
+			return fmt.Errorf("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -752,15 +751,15 @@ func WithUsername(username string) SpecOpts {
 			}
 			if c.Snapshotter == "" && c.SnapshotKey == "" {
 				if !isRootfsAbs(s.Root.Path) {
-					return errors.New("rootfs absolute path is required")
+					return fmt.Errorf("rootfs absolute path is required")
 				}
 				return setUser(s.Root.Path)
 			}
 			if c.Snapshotter == "" {
-				return errors.New("no snapshotter set for container")
+				return fmt.Errorf("no snapshotter set for container")
 			}
 			if c.SnapshotKey == "" {
-				return errors.New("rootfs snapshot not created for container")
+				return fmt.Errorf("rootfs snapshot not created for container")
 			}
 			snapshotter := client.SnapshotService(c.Snapshotter)
 			mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -773,7 +772,7 @@ func WithUsername(username string) SpecOpts {
 		} else if s.Windows != nil {
 			s.Process.User.Username = username
 		} else {
-			return errors.New("spec does not contain Linux or Windows section")
+			return fmt.Errorf("spec does not contain Linux or Windows section")
 		}
 		return nil
 	}
@@ -829,15 +828,15 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !isRootfsAbs(s.Root.Path) {
-				return errors.New("rootfs absolute path is required")
+				return fmt.Errorf("rootfs absolute path is required")
 			}
 			return setAdditionalGids(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
-			return errors.New("no snapshotter set for container")
+			return fmt.Errorf("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.New("rootfs snapshot not created for container")
+			return fmt.Errorf("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -890,15 +889,15 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
 			if !filepath.IsAbs(s.Root.Path) {
-				return errors.New("rootfs absolute path is required")
+				return fmt.Errorf("rootfs absolute path is required")
 			}
 			return setAdditionalGids(s.Root.Path)
 		}
 		if c.Snapshotter == "" {
-			return errors.New("no snapshotter set for container")
+			return fmt.Errorf("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.New("rootfs snapshot not created for container")
+			return fmt.Errorf("rootfs snapshot not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)
@@ -993,7 +992,7 @@ func WithAmbientCapabilities(caps []string) SpecOpts {
 }
 
 // ErrNoUsersFound can be returned from UserFromPath
-var ErrNoUsersFound = errors.New("no users found")
+var ErrNoUsersFound = fmt.Errorf("no users found")
 
 // UserFromPath inspects the user object using /etc/passwd in the specified rootfs.
 // filter can be nil.
@@ -1013,7 +1012,7 @@ func UserFromPath(root string, filter func(user.User) bool) (user.User, error) {
 }
 
 // ErrNoGroupsFound can be returned from GIDFromPath
-var ErrNoGroupsFound = errors.New("no groups found")
+var ErrNoGroupsFound = fmt.Errorf("no groups found")
 
 // GIDFromPath inspects the GID using /etc/group in the specified rootfs.
 // filter can be nil.
@@ -1379,7 +1378,7 @@ func WithEnvFile(path string) SpecOpts {
 
 // ErrNoShmMount is returned when there is no /dev/shm mount specified in the config
 // and an Opts was trying to set a configuration value on the mount.
-var ErrNoShmMount = errors.New("no /dev/shm mount specified")
+var ErrNoShmMount = fmt.Errorf("no /dev/shm mount specified")
 
 // WithDevShmSize sets the size of the /dev/shm mount for the container.
 //
@@ -1424,7 +1423,7 @@ func tryReadonlyMounts(mounts []mount.Mount) []mount.Mount {
 func WithWindowsDevice(idType, id string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if idType == "" {
-			return errors.New("missing idType")
+			return fmt.Errorf("missing idType")
 		}
 		if s.Windows == nil {
 			s.Windows = &specs.Windows{}

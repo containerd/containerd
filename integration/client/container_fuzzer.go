@@ -322,7 +322,7 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 		}
 		return container, nil
 	}
-	return nil, errors.New("Could not create container")
+	return nil, fmt.Errorf("Could not create container")
 }
 
 // doFuzz() implements the logic of FuzzCreateContainerNoTearDown()

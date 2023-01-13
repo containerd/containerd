@@ -33,17 +33,17 @@ import (
 var (
 	// ErrSkipDesc is used to skip processing of a descriptor and
 	// its descendants.
-	ErrSkipDesc = errors.New("skip descriptor")
+	ErrSkipDesc = fmt.Errorf("skip descriptor")
 
 	// ErrStopHandler is used to signify that the descriptor
 	// has been handled and should not be handled further.
 	// This applies only to a single descriptor in a handler
 	// chain and does not apply to descendant descriptors.
-	ErrStopHandler = errors.New("stop handler")
+	ErrStopHandler = fmt.Errorf("stop handler")
 
 	// ErrEmptyWalk is used when the WalkNotEmpty handlers return no
 	// children (e.g.: they were filtered out).
-	ErrEmptyWalk = errors.New("image might be filtered out")
+	ErrEmptyWalk = fmt.Errorf("image might be filtered out")
 )
 
 // Handler handles image manifests

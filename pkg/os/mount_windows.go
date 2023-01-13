@@ -24,15 +24,15 @@ import (
 
 // Mount is an empty stub on Windows.
 func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return errors.New("mount is not supported on Windows")
+	return fmt.Errorf("mount is not supported on Windows")
 }
 
 // Unmount is an empty stub on Windows.
 func (RealOS) Unmount(target string) error {
-	return errors.New("unmount is not supported on Windows")
+	return fmt.Errorf("unmount is not supported on Windows")
 }
 
 // LookupMount is an empty stub on Windows.
 func (RealOS) LookupMount(path string) (mount.Info, error) {
-	return mount.Info{}, errors.New("mount lookups are not supported on Windows")
+	return mount.Info{}, fmt.Errorf("mount lookups are not supported on Windows")
 }

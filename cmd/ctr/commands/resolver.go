@@ -21,7 +21,6 @@ import (
 	gocontext "context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -140,7 +139,7 @@ func resolverDefaultTLS(clicontext *cli.Context) (*tls.Config, error) {
 	tlsKeyPath := clicontext.String("tlskey")
 	if tlsCertPath != "" || tlsKeyPath != "" {
 		if tlsCertPath == "" || tlsKeyPath == "" {
-			return nil, errors.New("flags --tlscert and --tlskey must be set together")
+			return nil, fmt.Errorf("flags --tlscert and --tlskey must be set together")
 		}
 		keyPair, err := tls.LoadX509KeyPair(tlsCertPath, tlsKeyPath)
 		if err != nil {

@@ -17,7 +17,6 @@
 package sbserver
 
 import (
-	"errors"
 	"fmt"
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
@@ -63,7 +62,7 @@ func (c *criService) containerMetrics(
 		}
 		wstats := s.(*wstats.Statistics).GetWindows()
 		if wstats == nil {
-			return nil, errors.New("windows stats is empty")
+			return nil, fmt.Errorf("windows stats is empty")
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.CpuUsage{

@@ -18,7 +18,7 @@ package logging
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"net"
 	"os"
@@ -50,14 +50,14 @@ func runInternal(fn LoggerFunc) error {
 	)
 
 	if soutPipe, ok = os.LookupEnv("CONTAINER_STDOUT"); !ok {
-		return errors.New("'CONTAINER_STDOUT' environment variable missing")
+		return fmt.Errorf("'CONTAINER_STDOUT' environment variable missing")
 	}
 	if sout, err = winio.DialPipeContext(ctx, soutPipe); err != nil {
 		return fmt.Errorf("unable to dial stdout pipe: %w", err)
 	}
 
 	if serrPipe, ok = os.LookupEnv("CONTAINER_STDERR"); !ok {
-		return errors.New("'CONTAINER_STDERR' environment variable missing")
+		return fmt.Errorf("'CONTAINER_STDERR' environment variable missing")
 	}
 	if serr, err = winio.DialPipeContext(ctx, serrPipe); err != nil {
 		return fmt.Errorf("unable to dial stderr pipe: %w", err)

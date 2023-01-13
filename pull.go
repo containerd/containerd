@@ -18,7 +18,6 @@ package containerd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
@@ -53,7 +52,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 
 	if pullCtx.PlatformMatcher == nil {
 		if len(pullCtx.Platforms) > 1 {
-			return nil, errors.New("cannot pull multiplatform image locally, try Fetch")
+			return nil, fmt.Errorf("cannot pull multiplatform image locally, try Fetch")
 		} else if len(pullCtx.Platforms) == 0 {
 			pullCtx.PlatformMatcher = c.platform
 		} else {

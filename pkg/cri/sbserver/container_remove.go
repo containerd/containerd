@@ -18,7 +18,7 @@ package sbserver
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"time"
 
@@ -119,16 +119,16 @@ func setContainerRemoving(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Do not remove container if it's still running or unknown.
 		if status.State() == runtime.ContainerState_CONTAINER_RUNNING {
-			return status, errors.New("container is still running, to stop first")
+			return status, fmt.Errorf("container is still running, to stop first")
 		}
 		if status.State() == runtime.ContainerState_CONTAINER_UNKNOWN {
-			return status, errors.New("container state is unknown, to stop first")
+			return status, fmt.Errorf("container state is unknown, to stop first")
 		}
 		if status.Starting {
-			return status, errors.New("container is in starting state, can't be removed")
+			return status, fmt.Errorf("container is in starting state, can't be removed")
 		}
 		if status.Removing {
-			return status, errors.New("container is already in removing state")
+			return status, fmt.Errorf("container is already in removing state")
 		}
 		status.Removing = true
 		return status, nil

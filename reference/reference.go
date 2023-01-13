@@ -17,7 +17,6 @@
 package reference
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"path"
@@ -29,11 +28,11 @@ import (
 
 var (
 	// ErrInvalid is returned when there is an invalid reference
-	ErrInvalid = errors.New("invalid reference")
+	ErrInvalid = fmt.Errorf("invalid reference")
 	// ErrObjectRequired is returned when the object is required
-	ErrObjectRequired = errors.New("object required")
+	ErrObjectRequired = fmt.Errorf("object required")
 	// ErrHostnameRequired is returned when the hostname is required
-	ErrHostnameRequired = errors.New("hostname required")
+	ErrHostnameRequired = fmt.Errorf("hostname required")
 )
 
 // Spec defines the main components of a reference specification.

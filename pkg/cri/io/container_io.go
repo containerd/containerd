@@ -17,7 +17,7 @@
 package io
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -84,7 +84,7 @@ func NewContainerIO(id string, opts ...ContainerIOOpts) (_ *ContainerIO, err err
 		}
 	}
 	if c.fifos == nil {
-		return nil, errors.New("fifos are not set")
+		return nil, fmt.Errorf("fifos are not set")
 	}
 	// Create actual fifos.
 	stdio, closer, err := newStdioPipes(c.fifos)

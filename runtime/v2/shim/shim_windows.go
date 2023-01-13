@@ -18,7 +18,6 @@ package shim
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net"
 	"os"
@@ -28,31 +27,31 @@ import (
 )
 
 func setupSignals(config Config) (chan os.Signal, error) {
-	return nil, errors.New("not supported")
+	return nil, fmt.Errorf("not supported")
 }
 
 func newServer(opts ...ttrpc.ServerOpt) (*ttrpc.Server, error) {
-	return nil, errors.New("not supported")
+	return nil, fmt.Errorf("not supported")
 }
 
 func subreaper() error {
-	return errors.New("not supported")
+	return fmt.Errorf("not supported")
 }
 
 func setupDumpStacks(dump chan<- os.Signal) {
 }
 
 func serveListener(path string) (net.Listener, error) {
-	return nil, errors.New("not supported")
+	return nil, fmt.Errorf("not supported")
 }
 
 func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
-	return errors.New("not supported")
+	return fmt.Errorf("not supported")
 }
 
 func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
 }
 
 func openLog(ctx context.Context, _ string) (io.Writer, error) {
-	return nil, errors.New("not supported")
+	return nil, fmt.Errorf("not supported")
 }

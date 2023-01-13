@@ -18,7 +18,6 @@ package ttrpcutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -65,11 +64,11 @@ func (c *Client) Reconnect() error {
 	defer c.mu.Unlock()
 
 	if c.connector == nil {
-		return errors.New("unable to reconnect to containerd, no connector available")
+		return fmt.Errorf("unable to reconnect to containerd, no connector available")
 	}
 
 	if c.closed {
-		return errors.New("client is closed")
+		return fmt.Errorf("client is closed")
 	}
 
 	if c.client != nil {

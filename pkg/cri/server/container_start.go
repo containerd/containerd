@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"io"
 	"time"
@@ -204,10 +204,10 @@ func setContainerStarting(container containerstore.Container) error {
 		}
 		// Do not start the container when there is a removal in progress.
 		if status.Removing {
-			return status, errors.New("container is in removing state, can't be started")
+			return status, fmt.Errorf("container is in removing state, can't be started")
 		}
 		if status.Starting {
-			return status, errors.New("container is already in starting state")
+			return status, fmt.Errorf("container is already in starting state")
 		}
 		status.Starting = true
 		return status, nil

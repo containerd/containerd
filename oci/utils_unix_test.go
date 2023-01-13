@@ -19,7 +19,6 @@
 package oci
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"runtime"

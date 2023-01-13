@@ -20,7 +20,7 @@ package containerd
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -35,7 +35,7 @@ func WithNoNewKeyring(ctx context.Context, c *Client, ti *TaskInfo) error {
 		}
 		opts, ok := ti.Options.(*options.Options)
 		if !ok {
-			return errors.New("invalid v2 shim create options format")
+			return fmt.Errorf("invalid v2 shim create options format")
 		}
 		opts.NoNewKeyring = true
 	} else {
@@ -44,7 +44,7 @@ func WithNoNewKeyring(ctx context.Context, c *Client, ti *TaskInfo) error {
 		}
 		opts, ok := ti.Options.(*runctypes.CreateOptions)
 		if !ok {
-			return errors.New("could not cast TaskInfo Options to CreateOptions")
+			return fmt.Errorf("could not cast TaskInfo Options to CreateOptions")
 		}
 		opts.NoNewKeyring = true
 	}
@@ -59,7 +59,7 @@ func WithNoPivotRoot(_ context.Context, _ *Client, ti *TaskInfo) error {
 		}
 		opts, ok := ti.Options.(*options.Options)
 		if !ok {
-			return errors.New("invalid v2 shim create options format")
+			return fmt.Errorf("invalid v2 shim create options format")
 		}
 		opts.NoPivotRoot = true
 	} else {
@@ -71,7 +71,7 @@ func WithNoPivotRoot(_ context.Context, _ *Client, ti *TaskInfo) error {
 		}
 		opts, ok := ti.Options.(*runctypes.CreateOptions)
 		if !ok {
-			return errors.New("invalid options type, expected runctypes.CreateOptions")
+			return fmt.Errorf("invalid options type, expected runctypes.CreateOptions")
 		}
 		opts.NoPivotRoot = true
 	}
@@ -87,7 +87,7 @@ func WithShimCgroup(path string) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*options.Options)
 			if !ok {
-				return errors.New("invalid v2 shim create options format")
+				return fmt.Errorf("invalid v2 shim create options format")
 			}
 			opts.ShimCgroup = path
 		} else {
@@ -96,7 +96,7 @@ func WithShimCgroup(path string) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*runctypes.CreateOptions)
 			if !ok {
-				return errors.New("could not cast TaskInfo Options to CreateOptions")
+				return fmt.Errorf("could not cast TaskInfo Options to CreateOptions")
 			}
 			opts.ShimCgroup = path
 		}
@@ -113,7 +113,7 @@ func WithUIDOwner(uid uint32) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*options.Options)
 			if !ok {
-				return errors.New("invalid v2 shim create options format")
+				return fmt.Errorf("invalid v2 shim create options format")
 			}
 			opts.IoUid = uid
 		} else {
@@ -122,7 +122,7 @@ func WithUIDOwner(uid uint32) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*runctypes.CreateOptions)
 			if !ok {
-				return errors.New("could not cast TaskInfo Options to CreateOptions")
+				return fmt.Errorf("could not cast TaskInfo Options to CreateOptions")
 			}
 			opts.IoUid = uid
 		}
@@ -139,7 +139,7 @@ func WithGIDOwner(gid uint32) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*options.Options)
 			if !ok {
-				return errors.New("invalid v2 shim create options format")
+				return fmt.Errorf("invalid v2 shim create options format")
 			}
 			opts.IoGid = gid
 		} else {
@@ -148,7 +148,7 @@ func WithGIDOwner(gid uint32) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*runctypes.CreateOptions)
 			if !ok {
-				return errors.New("could not cast TaskInfo Options to CreateOptions")
+				return fmt.Errorf("could not cast TaskInfo Options to CreateOptions")
 			}
 			opts.IoGid = gid
 		}

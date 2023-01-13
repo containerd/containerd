@@ -23,7 +23,7 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256"
-	"errors"
+
 	"fmt"
 	"io"
 	"os"
@@ -242,7 +242,7 @@ func TestBreakouts(t *testing.T) {
 		}
 		return nil
 	}
-	errFileDiff := errors.New("files differ")
+	errFileDiff := fmt.Errorf("files differ")
 	td := t.TempDir()
 
 	isSymlinkFile := func(f string) func(string) error {
@@ -316,7 +316,7 @@ func TestBreakouts(t *testing.T) {
 		return func(root string) error {
 			err := same(root)
 			if err == nil {
-				return errors.New("files are the same, expected diff")
+				return fmt.Errorf("files are the same, expected diff")
 			}
 			if !errors.Is(err, errFileDiff) {
 				return err
@@ -340,7 +340,7 @@ func TestBreakouts(t *testing.T) {
 		return func(root string) error {
 			_, err := os.Lstat(filepath.Join(root, f1))
 			if err == nil {
-				return errors.New("file exists")
+				return fmt.Errorf("file exists")
 			} else if !os.IsNotExist(err) {
 				return err
 			}
@@ -421,7 +421,7 @@ func TestBreakouts(t *testing.T) {
 					return fmt.Errorf("failed to read unbroken: %w", err)
 				}
 				if len(b) > 0 {
-					return errors.New("/etc/emptied: non-empty")
+					return fmt.Errorf("/etc/emptied: non-empty")
 				}
 				return nil
 			},
@@ -1208,7 +1208,7 @@ func composeValidators(vv ...tarEntryValidator) tarEntryValidator {
 func dirEntry(name string, mode int) tarEntryValidator {
 	return func(hdr *tar.Header, b []byte) error {
 		if hdr.Typeflag != tar.TypeDir {
-			return errors.New("not directory type")
+			return fmt.Errorf("not directory type")
 		}
 		if hdr.Name != name {
 			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)
@@ -1223,7 +1223,7 @@ func dirEntry(name string, mode int) tarEntryValidator {
 func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 	return func(hdr *tar.Header, b []byte) error {
 		if hdr.Typeflag != tar.TypeReg {
-			return errors.New("not file type")
+			return fmt.Errorf("not file type")
 		}
 		if hdr.Name != name {
 			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)
@@ -1232,7 +1232,7 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 			return fmt.Errorf("wrong mode %o, expected %o", hdr.Mode, mode)
 		}
 		if !bytes.Equal(b, expected) {
-			return errors.New("different file content")
+			return fmt.Errorf("different file content")
 		}
 		return nil
 	}
@@ -1241,7 +1241,7 @@ func fileEntry(name string, expected []byte, mode int) tarEntryValidator {
 func linkEntry(name, link string) tarEntryValidator {
 	return func(hdr *tar.Header, b []byte) error {
 		if hdr.Typeflag != tar.TypeLink {
-			return errors.New("not link type")
+			return fmt.Errorf("not link type")
 		}
 		if hdr.Name != name {
 			return fmt.Errorf("wrong name %q, expected %q", hdr.Name, name)

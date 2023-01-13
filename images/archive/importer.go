@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -142,7 +141,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	}
 
 	if mfsts == nil {
-		return ocispec.Descriptor{}, errors.New("unrecognized image format")
+		return ocispec.Descriptor{}, fmt.Errorf("unrecognized image format")
 	}
 
 	for name, linkname := range symlinks {

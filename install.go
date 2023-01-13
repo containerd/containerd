@@ -19,7 +19,6 @@ package containerd
 import (
 	"archive/tar"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -117,11 +116,11 @@ func (c *Client) getInstallPath(ctx context.Context, config InstallConfig) (stri
 		return "", err
 	}
 	if len(resp.Plugins) != 1 {
-		return "", errors.New("opt service not enabled")
+		return "", fmt.Errorf("opt service not enabled")
 	}
 	path := resp.Plugins[0].Exports["path"]
 	if path == "" {
-		return "", errors.New("opt path not exported")
+		return "", fmt.Errorf("opt path not exported")
 	}
 	return path, nil
 }

@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	goruntime "runtime"
@@ -593,7 +592,7 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 		if err != nil && errdefs.IsNotFound(err) {
 			return nil, err
 		}
-		return nil, errors.New("no metrics received")
+		return nil, fmt.Errorf("no metrics received")
 	}
 
 	return response.Metrics[0], nil

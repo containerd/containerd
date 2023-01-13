@@ -62,11 +62,11 @@ import (
 func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	switch {
 	case config.Root == "":
-		return errors.New("root must be specified")
+		return fmt.Errorf("root must be specified")
 	case config.State == "":
-		return errors.New("state must be specified")
+		return fmt.Errorf("state must be specified")
 	case config.Root == config.State:
-		return errors.New("root and state must be different paths")
+		return fmt.Errorf("root and state must be different paths")
 	}
 
 	if err := sys.MkdirAllWithACL(config.Root, 0711); err != nil {

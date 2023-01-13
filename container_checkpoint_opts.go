@@ -19,7 +19,6 @@ package containerd
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"runtime"
 
@@ -38,9 +37,9 @@ import (
 
 var (
 	// ErrCheckpointRWUnsupported is returned if the container runtime does not support checkpoint
-	ErrCheckpointRWUnsupported = errors.New("rw checkpoint is only supported on v2 runtimes")
+	ErrCheckpointRWUnsupported = fmt.Errorf("rw checkpoint is only supported on v2 runtimes")
 	// ErrMediaTypeNotFound returns an error when a media type in the manifest is unknown
-	ErrMediaTypeNotFound = errors.New("media type not found")
+	ErrMediaTypeNotFound = fmt.Errorf("media type not found")
 )
 
 // CheckpointOpts are options to manage the checkpoint operation

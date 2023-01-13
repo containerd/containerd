@@ -18,7 +18,6 @@ package containerd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -136,7 +135,7 @@ func (s *sandboxClient) Shutdown(ctx context.Context) error {
 // NewSandbox creates new sandbox client
 func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSandboxOpts) (Sandbox, error) {
 	if sandboxID == "" {
-		return nil, errors.New("sandbox ID must be specified")
+		return nil, fmt.Errorf("sandbox ID must be specified")
 	}
 
 	newSandbox := api.Sandbox{

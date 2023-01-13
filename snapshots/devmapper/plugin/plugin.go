@@ -19,8 +19,6 @@
 package plugin
 
 import (
-	"errors"
-
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/devmapper"
@@ -36,11 +34,11 @@ func init() {
 
 			config, ok := ic.Config.(*devmapper.Config)
 			if !ok {
-				return nil, errors.New("invalid devmapper configuration")
+				return nil, fmt.Errorf("invalid devmapper configuration")
 			}
 
 			if config.PoolName == "" {
-				return nil, errors.New("devmapper not configured")
+				return nil, fmt.Errorf("devmapper not configured")
 			}
 
 			if config.RootPath == "" {

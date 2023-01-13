@@ -18,17 +18,16 @@ package util
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 )
 
 // DeepCopy makes a deep copy from src into dst.
 func DeepCopy(dst interface{}, src interface{}) error {
 	if dst == nil {
-		return errors.New("dst cannot be nil")
+		return fmt.Errorf("dst cannot be nil")
 	}
 	if src == nil {
-		return errors.New("src cannot be nil")
+		return fmt.Errorf("src cannot be nil")
 	}
 	bytes, err := json.Marshal(src)
 	if err != nil {

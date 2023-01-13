@@ -18,7 +18,7 @@ package oci
 
 import (
 	"context"
-	"errors"
+
 	"strings"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -43,7 +43,7 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 }
 
 func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
-	return nil, errors.New("device from path not supported on Windows")
+	return nil, fmt.Errorf("device from path not supported on Windows")
 }
 
 // WithDevices does nothing on Windows.

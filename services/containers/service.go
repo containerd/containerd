@@ -18,7 +18,7 @@ package containers
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	api "github.com/containerd/containerd/api/services/containers/v1"
@@ -42,7 +42,7 @@ func init() {
 			}
 			p, ok := plugins[services.ContainersService]
 			if !ok {
-				return nil, errors.New("containers service not found")
+				return nil, fmt.Errorf("containers service not found")
 			}
 			i, err := p.Instance()
 			if err != nil {

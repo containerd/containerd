@@ -18,7 +18,7 @@ package introspection
 
 import (
 	context "context"
-	"errors"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/plugin"
@@ -39,7 +39,7 @@ func init() {
 			}
 			p, ok := plugins[services.IntrospectionService]
 			if !ok {
-				return nil, errors.New("introspection service not found")
+				return nil, fmt.Errorf("introspection service not found")
 			}
 
 			i, err := p.Instance()
@@ -49,7 +49,7 @@ func init() {
 
 			localClient, ok := i.(*Local)
 			if !ok {
-				return nil, errors.New("Could not create a local client for introspection service")
+				return nil, fmt.Errorf("Could not create a local client for introspection service")
 			}
 			localClient.UpdateLocal(ic.Root)
 

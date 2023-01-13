@@ -18,7 +18,7 @@ package diff
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/plugin"
@@ -40,7 +40,7 @@ func init() {
 			}
 			p, ok := plugins[services.DiffService]
 			if !ok {
-				return nil, errors.New("diff service not found")
+				return nil, fmt.Errorf("diff service not found")
 			}
 			i, err := p.Instance()
 			if err != nil {

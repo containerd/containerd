@@ -18,7 +18,6 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -219,7 +218,7 @@ func (s *gcScheduler) wait(ctx context.Context, trigger bool) (gc.Stats, error) 
 	select {
 	case stats, ok := <-wc:
 		if !ok {
-			return gcStats, errors.New("gc failed")
+			return gcStats, fmt.Errorf("gc failed")
 		}
 		gcStats = stats
 	case <-ctx.Done():

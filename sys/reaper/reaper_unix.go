@@ -19,7 +19,6 @@
 package reaper
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"syscall"
@@ -31,7 +30,7 @@ import (
 )
 
 // ErrNoSuchProcess is returned when the process no longer exists
-var ErrNoSuchProcess = errors.New("no such process")
+var ErrNoSuchProcess = fmt.Errorf("no such process")
 
 const bufferSize = 32
 

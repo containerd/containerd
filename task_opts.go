@@ -19,7 +19,6 @@ package containerd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"syscall"
 
@@ -110,7 +109,7 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 			}
 			opts, ok := r.Options.(*options.CheckpointOptions)
 			if !ok {
-				return errors.New("invalid v2 shim checkpoint options format")
+				return fmt.Errorf("invalid v2 shim checkpoint options format")
 			}
 			opts.ImagePath = path
 		} else {
@@ -119,7 +118,7 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 			}
 			opts, ok := r.Options.(*runctypes.CheckpointOptions)
 			if !ok {
-				return errors.New("invalid v1 shim checkpoint options format")
+				return fmt.Errorf("invalid v1 shim checkpoint options format")
 			}
 			opts.ImagePath = path
 		}
@@ -136,7 +135,7 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*options.Options)
 			if !ok {
-				return errors.New("invalid v2 shim create options format")
+				return fmt.Errorf("invalid v2 shim create options format")
 			}
 			opts.CriuImagePath = path
 		} else {
@@ -145,7 +144,7 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 			}
 			opts, ok := ti.Options.(*runctypes.CreateOptions)
 			if !ok {
-				return errors.New("invalid v1 shim create options format")
+				return fmt.Errorf("invalid v1 shim create options format")
 			}
 			opts.CriuImagePath = path
 		}
@@ -221,7 +220,7 @@ func WithResources(resources interface{}) UpdateTaskOpts {
 		case *specs.LinuxResources:
 		case *specs.WindowsResources:
 		default:
-			return errors.New("WithResources requires a *specs.LinuxResources or *specs.WindowsResources")
+			return fmt.Errorf("WithResources requires a *specs.LinuxResources or *specs.WindowsResources")
 		}
 
 		r.Resources = resources

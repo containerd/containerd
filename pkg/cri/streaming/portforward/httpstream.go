@@ -33,7 +33,6 @@ limitations under the License.
 package portforward
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -62,7 +61,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	upgrader := spdy.NewResponseUpgrader()
 	conn := upgrader.UpgradeResponse(w, req, httpStreamReceived(streamChan))
 	if conn == nil {
-		return errors.New("unable to upgrade httpstream connection")
+		return fmt.Errorf("unable to upgrade httpstream connection")
 	}
 	defer conn.Close()
 
@@ -230,7 +229,7 @@ Loop:
 			}
 			if complete, err := p.add(stream); err != nil {
 				msg := fmt.Sprintf("error processing stream for request %s: %v", requestID, err)
-				utilruntime.HandleError(errors.New(msg))
+				utilruntime.HandleError(fmt.Errorf(msg))
 				p.printError(msg)
 			} else if complete {
 				go h.portForward(p)
@@ -288,12 +287,12 @@ func (p *httpStreamPair) add(stream httpstream.Stream) (bool, error) {
 	switch stream.Headers().Get(api.StreamType) {
 	case api.StreamTypeError:
 		if p.errorStream != nil {
-			return false, errors.New("error stream already assigned")
+			return false, fmt.Errorf("error stream already assigned")
 		}
 		p.errorStream = stream
 	case api.StreamTypeData:
 		if p.dataStream != nil {
-			return false, errors.New("data stream already assigned")
+			return false, fmt.Errorf("data stream already assigned")
 		}
 		p.dataStream = stream
 	}

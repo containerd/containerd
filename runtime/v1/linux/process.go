@@ -20,7 +20,6 @@ package linux
 
 import (
 	"context"
-	"errors"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"

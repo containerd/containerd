@@ -20,7 +20,6 @@ package archive
 
 import (
 	"archive/tar"
-	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -54,7 +53,7 @@ func setHeaderForSpecialDevice(hdr *tar.Header, name string, fi os.FileInfo) err
 	}
 	s, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok {
-		return errors.New("unsupported stat type")
+		return fmt.Errorf("unsupported stat type")
 	}
 
 	rdev := uint64(s.Rdev) //nolint:nolintlint,unconvert // rdev is int32 on darwin/bsd, int64 on linux/solaris

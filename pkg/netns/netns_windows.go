@@ -17,12 +17,10 @@
 package netns
 
 import (
-	"errors"
-
 	"github.com/Microsoft/hcsshim/hcn"
 )
 
-var errNotImplementedOnWindows = errors.New("not implemented on windows")
+var errNotImplementedOnWindows = fmt.Errorf("not implemented on windows")
 
 // NetNS holds network namespace for sandbox
 type NetNS struct {

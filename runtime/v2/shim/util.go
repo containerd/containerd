@@ -19,7 +19,6 @@ package shim
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -155,7 +154,7 @@ func WriteAddress(path, address string) error {
 }
 
 // ErrNoAddress is returned when the address file has no content
-var ErrNoAddress = errors.New("no shim address")
+var ErrNoAddress = fmt.Errorf("no shim address")
 
 // ReadAddress returns the shim's socket address from the path
 func ReadAddress(path string) (string, error) {

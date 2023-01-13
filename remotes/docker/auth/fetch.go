@@ -19,7 +19,6 @@ package auth
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -34,14 +33,14 @@ import (
 var (
 	// ErrNoToken is returned if a request is successful but the body does not
 	// contain an authorization token.
-	ErrNoToken = errors.New("authorization server did not include a token in the response")
+	ErrNoToken = fmt.Errorf("authorization server did not include a token in the response")
 )
 
 // GenerateTokenOptions generates options for fetching a token based on a challenge
 func GenerateTokenOptions(ctx context.Context, host, username, secret string, c Challenge) (TokenOptions, error) {
 	realm, ok := c.Parameters["realm"]
 	if !ok {
-		return TokenOptions{}, errors.New("no realm specified for token auth challenge")
+		return TokenOptions{}, fmt.Errorf("no realm specified for token auth challenge")
 	}
 
 	realmURL, err := url.Parse(realm)

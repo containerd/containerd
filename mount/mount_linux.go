@@ -17,7 +17,6 @@
 package mount
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -64,7 +63,7 @@ func (m *Mount) Mount(target string) (err error) {
 
 	flags, data, losetup := parseMountOptions(options)
 	if len(data) > pagesize {
-		return errors.New("mount options is too long")
+		return fmt.Errorf("mount options is too long")
 	}
 
 	// propagation types.

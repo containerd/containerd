@@ -21,7 +21,6 @@ package diff
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -128,7 +127,7 @@ func (c *binaryProcessor) wait() {
 	if err := c.cmd.Wait(); err != nil {
 		if _, ok := err.(*exec.ExitError); ok {
 			c.mu.Lock()
-			c.err = errors.New(c.stderr.String())
+			c.err = fmt.Errorf(c.stderr.String())
 			c.mu.Unlock()
 		}
 	}

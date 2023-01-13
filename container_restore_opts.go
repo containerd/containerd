@@ -18,7 +18,6 @@ package containerd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/containers"
@@ -32,11 +31,11 @@ import (
 
 var (
 	// ErrImageNameNotFoundInIndex is returned when the image name is not found in the index
-	ErrImageNameNotFoundInIndex = errors.New("image name not found in index")
+	ErrImageNameNotFoundInIndex = fmt.Errorf("image name not found in index")
 	// ErrRuntimeNameNotFoundInIndex is returned when the runtime is not found in the index
-	ErrRuntimeNameNotFoundInIndex = errors.New("runtime not found in index")
+	ErrRuntimeNameNotFoundInIndex = fmt.Errorf("runtime not found in index")
 	// ErrSnapshotterNameNotFoundInIndex is returned when the snapshotter is not found in the index
-	ErrSnapshotterNameNotFoundInIndex = errors.New("snapshotter not found in index")
+	ErrSnapshotterNameNotFoundInIndex = fmt.Errorf("snapshotter not found in index")
 )
 
 // RestoreOpts are options to manage the restore operation

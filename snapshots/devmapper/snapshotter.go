@@ -20,7 +20,7 @@ package devmapper
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"os"
 	"path/filepath"
@@ -484,7 +484,7 @@ func mkfs(ctx context.Context, fs fsType, fsOptions string, path string) error {
 			path,
 		}
 	default:
-		return errors.New("file system not supported")
+		return fmt.Errorf("file system not supported")
 	}
 
 	log.G(ctx).Debugf("%s %s", mkfsCommand, strings.Join(args, " "))

@@ -18,7 +18,7 @@ package tasks
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/plugin"
@@ -45,7 +45,7 @@ func init() {
 			}
 			p, ok := plugins[services.TasksService]
 			if !ok {
-				return nil, errors.New("tasks service not found")
+				return nil, fmt.Errorf("tasks service not found")
 			}
 			i, err := p.Instance()
 			if err != nil {

@@ -17,7 +17,6 @@
 package integration
 
 import (
-	"errors"
 	"fmt"
 	goruntime "runtime"
 	"testing"
@@ -242,7 +241,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, errors.New("unexpected stats length")
+				return false, fmt.Errorf("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetTimestamp() != 0 {
 				return true, nil
@@ -301,7 +300,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 			return false, err
 		}
 		if len(stats) != 3 {
-			return false, errors.New("unexpected stats length")
+			return false, fmt.Errorf("unexpected stats length")
 		}
 
 		for _, containerStats := range stats {
@@ -362,7 +361,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 				return false, err
 			}
 			if len(stats) != 1 {
-				return false, errors.New("unexpected stats length")
+				return false, fmt.Errorf("unexpected stats length")
 			}
 			if stats[0].GetWritableLayer().GetTimestamp() != 0 {
 				return true, nil

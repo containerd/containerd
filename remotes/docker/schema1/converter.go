@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -87,7 +86,7 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 
 		m := c.pulledManifest
 		if len(m.FSLayers) != len(m.History) {
-			return nil, errors.New("invalid schema 1 manifest, history and layer mismatch")
+			return nil, fmt.Errorf("invalid schema 1 manifest, history and layer mismatch")
 		}
 		descs := make([]ocispec.Descriptor, 0, len(c.pulledManifest.FSLayers))
 
@@ -116,7 +115,7 @@ func (c *Converter) Handle(ctx context.Context, desc ocispec.Descriptor) ([]ocis
 		return descs, nil
 	case images.MediaTypeDockerSchema2LayerGzip:
 		if c.pulledManifest == nil {
-			return nil, errors.New("manifest required for schema 1 blob pull")
+			return nil, fmt.Errorf("manifest required for schema 1 blob pull")
 		}
 		return nil, c.fetchBlob(ctx, desc)
 	default:
@@ -259,7 +258,7 @@ func (c *Converter) fetchManifest(ctx context.Context, desc ocispec.Descriptor) 
 		return err
 	}
 	if len(m.Manifests) != 0 || len(m.Layers) != 0 {
-		return errors.New("converter: expected schema1 document but found extra keys")
+		return fmt.Errorf("converter: expected schema1 document but found extra keys")
 	}
 	c.pulledManifest = &m
 
@@ -431,12 +430,12 @@ func (c *Converter) reuseLabelBlobState(ctx context.Context, desc ocispec.Descri
 
 func (c *Converter) schema1ManifestHistory() ([]ocispec.History, []digest.Digest, error) {
 	if c.pulledManifest == nil {
-		return nil, nil, errors.New("missing schema 1 manifest for conversion")
+		return nil, nil, fmt.Errorf("missing schema 1 manifest for conversion")
 	}
 	m := *c.pulledManifest
 
 	if len(m.History) == 0 {
-		return nil, nil, errors.New("no history")
+		return nil, nil, fmt.Errorf("no history")
 	}
 
 	history := make([]ocispec.History, len(m.History))
@@ -541,7 +540,7 @@ func joseBase64UrlDecode(s string) ([]byte, error) {
 	case 3:
 		s += "="
 	default:
-		return nil, errors.New("illegal base64url string")
+		return nil, fmt.Errorf("illegal base64url string")
 	}
 	return base64.URLEncoding.DecodeString(s)
 }
@@ -552,7 +551,7 @@ func stripSignature(b []byte) ([]byte, error) {
 		return nil, err
 	}
 	if len(sig.Signatures) == 0 {
-		return nil, errors.New("no signatures")
+		return nil, fmt.Errorf("no signatures")
 	}
 	pb, err := joseBase64UrlDecode(sig.Signatures[0].Protected)
 	if err != nil {
@@ -565,7 +564,7 @@ func stripSignature(b []byte) ([]byte, error) {
 	}
 
 	if protected.Length > len(b) {
-		return nil, errors.New("invalid protected length block")
+		return nil, fmt.Errorf("invalid protected length block")
 	}
 
 	tail, err := joseBase64UrlDecode(protected.Tail)

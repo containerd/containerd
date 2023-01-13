@@ -17,7 +17,7 @@
 package tasks
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -75,7 +75,7 @@ var execCommand = cli.Command{
 			detach = context.Bool("detach")
 		)
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -126,9 +126,9 @@ var execCommand = cli.Command{
 		ioOpts := []cio.Opt{cio.WithFIFODir(fifoDir)}
 		switch {
 		case tty && logURI != "":
-			return errors.New("can't use log-uri with tty")
+			return fmt.Errorf("can't use log-uri with tty")
 		case logURI != "" && fifoDir != "":
-			return errors.New("can't use log-uri with fifo-dir")
+			return fmt.Errorf("can't use log-uri with fifo-dir")
 
 		case tty:
 			con = console.Current()

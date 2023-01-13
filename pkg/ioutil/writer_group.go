@@ -17,7 +17,7 @@
 package ioutil
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"sync"
 )
@@ -87,7 +87,7 @@ func (g *WriterGroup) Write(p []byte) (int, error) {
 		delete(g.writers, k)
 	}
 	if len(g.writers) == 0 {
-		return 0, errors.New("writer group is empty")
+		return 0, fmt.Errorf("writer group is empty")
 	}
 	return len(p), nil
 }

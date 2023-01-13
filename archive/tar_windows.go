@@ -18,7 +18,7 @@ package archive
 
 import (
 	"archive/tar"
-	"errors"
+
 	"fmt"
 	"os"
 	"strings"
@@ -92,7 +92,7 @@ func getxattr(path, attr string) ([]byte, error) {
 func setxattr(path, key, value string) error {
 	// Return not support error, do not wrap underlying not supported
 	// since xattrs should not exist in windows diff archives
-	return errors.New("xattrs not supported on Windows")
+	return fmt.Errorf("xattrs not supported on Windows")
 }
 
 func copyDirInfo(fi os.FileInfo, path string) error {

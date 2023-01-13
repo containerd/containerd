@@ -17,7 +17,6 @@
 package content
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -113,7 +112,7 @@ var (
 				return err
 			}
 			if ref == "" {
-				return errors.New("must specify a transaction reference")
+				return fmt.Errorf("must specify a transaction reference")
 			}
 			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
@@ -309,7 +308,7 @@ var (
 			)
 
 			if validate != "" {
-				return errors.New("validating the edit result not supported")
+				return fmt.Errorf("validating the edit result not supported")
 			}
 
 			// TODO(stevvooe): Support looking up objects by a reference through
@@ -458,7 +457,7 @@ var (
 				digests = context.Args().Tail()
 			)
 			if len(digests) == 0 {
-				return errors.New("must specify digests")
+				return fmt.Errorf("must specify digests")
 			}
 			ctx, cancel := commands.AppContext(context)
 			defer cancel()

@@ -17,7 +17,7 @@
 package filters
 
 import (
-	"errors"
+	"fmt"
 	"unicode/utf8"
 )
 
@@ -25,7 +25,7 @@ import (
 // strconv package and modified to be able to handle quoting with `/` and `|`
 // as delimiters.  The copyright is held by the Go authors.
 
-var errQuoteSyntax = errors.New("quote syntax error")
+var errQuoteSyntax = fmt.Errorf("quote syntax error")
 
 // UnquoteChar decodes the first character or byte in the escaped string
 // or character literal represented by the string s.

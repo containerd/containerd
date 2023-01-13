@@ -17,7 +17,7 @@
 package docker
 
 import (
-	"errors"
+	"fmt"
 	"net"
 	"net/http"
 )
@@ -231,7 +231,7 @@ func MatchLocalhost(host string) (bool, error) {
 		// host string without any port specified
 		h = host
 	} else if len(p) == 0 {
-		return false, errors.New("invalid host name format")
+		return false, fmt.Errorf("invalid host name format")
 	}
 
 	// use ipv4 dotted decimal for further checking

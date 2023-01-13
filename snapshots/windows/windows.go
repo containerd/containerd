@@ -22,7 +22,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"io"
 	"os"
@@ -431,7 +431,7 @@ func (s *snapshotter) parentIDsToParentPaths(parentIDs []string) []string {
 func (s *snapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
-		return errors.New("no parent layers present")
+		return fmt.Errorf("no parent layers present")
 	}
 
 	baseLayer := parentLayers[parentLen-1]
@@ -490,7 +490,7 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 func (s *snapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string) error {
 	parentLen := len(parentLayers)
 	if parentLen == 0 {
-		return errors.New("no parent layers present")
+		return fmt.Errorf("no parent layers present")
 	}
 	baseLayer := parentLayers[parentLen-1]
 

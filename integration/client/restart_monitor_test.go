@@ -19,7 +19,6 @@ package client
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -351,7 +350,7 @@ func convertTaskCreateEvent(e typeurl.Any) (string, error) {
 	case *eventtypes.TaskCreate:
 		id = e.ContainerID
 	default:
-		return "", errors.New("unsupported event")
+		return "", fmt.Errorf("unsupported event")
 	}
 	return id, nil
 }

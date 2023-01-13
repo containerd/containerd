@@ -19,8 +19,6 @@
 package tasks
 
 import (
-	"errors"
-
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -52,7 +50,7 @@ func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime,
 	}
 
 	if len(runtimes) == 0 {
-		return nil, errors.New("no runtimes available to create task service")
+		return nil, fmt.Errorf("no runtimes available to create task service")
 	}
 	return runtimes, nil
 }

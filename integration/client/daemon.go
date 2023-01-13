@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"runtime"
@@ -40,7 +39,7 @@ func (d *daemon) start(name, address string, args []string, stdout, stderr io.Wr
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd != nil {
-		return errors.New("daemon is already running")
+		return fmt.Errorf("daemon is already running")
 	}
 	args = append(args, []string{"--address", address}...)
 	cmd := exec.Command(name, args...)
@@ -75,7 +74,7 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 			if !serving {
 				client.Close()
 				if err == nil {
-					err = errors.New("connection was successful but service is not available")
+					err = fmt.Errorf("connection was successful but service is not available")
 				}
 				continue
 			}
@@ -90,7 +89,7 @@ func (d *daemon) Stop() error {
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd == nil {
-		return errors.New("daemon is not running")
+		return fmt.Errorf("daemon is not running")
 	}
 	return d.cmd.Process.Signal(syscall.SIGTERM)
 }
@@ -99,7 +98,7 @@ func (d *daemon) Kill() error {
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd == nil {
-		return errors.New("daemon is not running")
+		return fmt.Errorf("daemon is not running")
 	}
 	return d.cmd.Process.Kill()
 }
@@ -108,7 +107,7 @@ func (d *daemon) Wait() error {
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd == nil {
-		return errors.New("daemon is not running")
+		return fmt.Errorf("daemon is not running")
 	}
 	err := d.cmd.Wait()
 	d.cmd = nil
@@ -119,7 +118,7 @@ func (d *daemon) Restart(stopCb func()) error {
 	d.Lock()
 	defer d.Unlock()
 	if d.cmd == nil {
-		return errors.New("daemon is not running")
+		return fmt.Errorf("daemon is not running")
 	}
 
 	signal := syscall.SIGTERM

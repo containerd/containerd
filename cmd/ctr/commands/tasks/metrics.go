@@ -18,7 +18,6 @@ package tasks
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -85,7 +84,7 @@ var metricsCommand = cli.Command{
 		case *wstats.Statistics:
 			windowsStats = v
 		default:
-			return errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+			return fmt.Errorf("cannot convert metric data to cgroups.Metrics or windows.Statistics")
 		}
 
 		switch context.String(formatFlag) {
@@ -112,7 +111,7 @@ var metricsCommand = cli.Command{
 			fmt.Println(string(marshaledJSON))
 			return nil
 		default:
-			return errors.New("format must be table or json")
+			return fmt.Errorf("format must be table or json")
 		}
 	},
 }

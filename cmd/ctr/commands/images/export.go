@@ -17,7 +17,6 @@
 package images
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,7 +65,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			exportOpts = []archive.ExportOpt{}
 		)
 		if out == "" || len(images) == 0 {
-			return errors.New("please provide both an output filename and an image reference to export")
+			return fmt.Errorf("please provide both an output filename and an image reference to export")
 		}
 
 		if pss := context.StringSlice("platform"); len(pss) > 0 {

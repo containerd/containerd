@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -57,7 +57,7 @@ func (in *instrumentedService) checkInitialized() error {
 	if in.c.initialized.IsSet() {
 		return nil
 	}
-	return errors.New("server is not initialized yet")
+	return fmt.Errorf("server is not initialized yet")
 }
 
 // checkInitialized returns error if the server is not fully initialized.
@@ -68,7 +68,7 @@ func (in *instrumentedAlphaService) checkInitialized() error {
 	if in.c.initialized.IsSet() {
 		return nil
 	}
-	return errors.New("server is not initialized yet")
+	return fmt.Errorf("server is not initialized yet")
 }
 
 func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (res *runtime.RunPodSandboxResponse, err error) {

@@ -34,7 +34,7 @@ package streaming
 
 import (
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -252,7 +252,7 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 func (s *server) Start(stayUp bool) error {
 	if !stayUp {
 		// TODO(tallclair): Implement this.
-		return errors.New("stayUp=false is not yet implemented")
+		return fmt.Errorf("stayUp=false is not yet implemented")
 	}
 
 	listener, err := net.Listen("tcp", s.config.Addr)

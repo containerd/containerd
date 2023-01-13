@@ -29,6 +29,7 @@ package errdefs
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 // Definitions of common error types used throughout containerd. All containerd
@@ -39,13 +40,13 @@ import (
 // For the most part, we just try to provide local grpc errors. Most conditions
 // map very well to those defined by grpc.
 var (
-	ErrUnknown            = errors.New("unknown") // used internally to represent a missed mapping.
-	ErrInvalidArgument    = errors.New("invalid argument")
-	ErrNotFound           = errors.New("not found")
-	ErrAlreadyExists      = errors.New("already exists")
-	ErrFailedPrecondition = errors.New("failed precondition")
-	ErrUnavailable        = errors.New("unavailable")
-	ErrNotImplemented     = errors.New("not implemented") // represents not supported and unimplemented
+	ErrUnknown            = fmt.Errorf("unknown") // used internally to represent a missed mapping.
+	ErrInvalidArgument    = fmt.Errorf("invalid argument")
+	ErrNotFound           = fmt.Errorf("not found")
+	ErrAlreadyExists      = fmt.Errorf("already exists")
+	ErrFailedPrecondition = fmt.Errorf("failed precondition")
+	ErrUnavailable        = fmt.Errorf("unavailable")
+	ErrNotImplemented     = fmt.Errorf("not implemented") // represents not supported and unimplemented
 )
 
 // IsInvalidArgument returns true if the error is due to an invalid argument

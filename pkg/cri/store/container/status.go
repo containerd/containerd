@@ -18,7 +18,6 @@ package container
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -137,7 +136,7 @@ func (s *Status) decode(data []byte) error {
 		*s = versioned.Status
 		return nil
 	}
-	return errors.New("unsupported version")
+	return fmt.Errorf("unsupported version")
 }
 
 // UpdateFunc is function used to update the container status. If there

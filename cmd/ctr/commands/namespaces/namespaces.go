@@ -17,7 +17,6 @@
 package namespaces
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -52,7 +51,7 @@ var createCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
-			return errors.New("please specify a namespace")
+			return fmt.Errorf("please specify a namespace")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -72,7 +71,7 @@ var setLabelsCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		namespace, labels := commands.ObjectWithLabelArgs(context)
 		if namespace == "" {
-			return errors.New("please specify a namespace")
+			return fmt.Errorf("please specify a namespace")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

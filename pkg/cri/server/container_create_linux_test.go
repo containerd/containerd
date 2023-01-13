@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"os"
 	"path/filepath"
@@ -567,7 +567,7 @@ func TestContainerMounts(t *testing.T) {
 		"should skip hostname mount if the old sandbox doesn't have hostname file": {
 			statFn: func(path string) (os.FileInfo, error) {
 				assert.Equal(t, filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"), path)
-				return nil, errors.New("random error")
+				return nil, fmt.Errorf("random error")
 			},
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts: []*runtime.Mount{

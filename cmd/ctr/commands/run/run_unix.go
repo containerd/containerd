@@ -20,7 +20,6 @@ package run
 
 import (
 	gocontext "context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -302,7 +301,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		period := context.Uint64("cpu-period")
 		if quota != -1 || period != 0 {
 			if cpus := context.Float64("cpus"); cpus > 0.0 {
-				return nil, errors.New("cpus and quota/period should be used separately")
+				return nil, fmt.Errorf("cpus and quota/period should be used separately")
 			}
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
@@ -311,10 +310,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		for _, ns := range joinNs {
 			nsType, nsPath, ok := strings.Cut(ns, ":")
 			if !ok {
-				return nil, errors.New("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
+				return nil, fmt.Errorf("joining a Linux namespace using --with-ns requires the format 'nstype:path'")
 			}
 			if !validNamespace(nsType) {
-				return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + nsType)
+				return nil, fmt.Errorf("the Linux namespace type specified in --with-ns is not valid: %s", nsType)
 			}
 			opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
 				Type: specs.LinuxNamespaceType(nsType),
@@ -400,7 +399,7 @@ func getRuncOptions(context *cli.Context) (*options.Options, error) {
 	if context.Bool("runc-systemd-cgroup") {
 		if context.String("cgroup") == "" {
 			// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
-			return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
+			return nil, fmt.Errorf("option --runc-systemd-cgroup requires --cgroup to be set, e.g. %q", "machine.slice:foo:deadbeef")
 		}
 		runtimeOpts.SystemdCgroup = true
 	}
@@ -415,7 +414,7 @@ func getRuntimeOptions(context *cli.Context) (interface{}, error) {
 	// validate first
 	if (context.String("runc-binary") != "" || context.Bool("runc-systemd-cgroup")) &&
 		context.String("runtime") != "io.containerd.runc.v2" {
-		return nil, errors.New("specifying runc-binary and runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
+		return nil, fmt.Errorf("specifying runc-binary and runc-systemd-cgroup is only supported for %q runtime", "io.containerd.runc.v2")
 	}
 
 	if context.String("runtime") == "io.containerd.runc.v2" {
@@ -459,7 +458,7 @@ func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
 	// We expect 3 parts, but limit to 4 to allow detection of invalid values.
 	parts := strings.SplitN(mapping, ":", 4)
 	if len(parts) != 3 {
-		return specs.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
+		return specs.LinuxIDMapping{}, fmt.Errorf("user namespace mappings require the format %q", "container-id:host-id:size")
 	}
 	cID, err := strconv.ParseUint(parts[0], 0, 32)
 	if err != nil {

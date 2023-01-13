@@ -44,7 +44,7 @@ import (
 var (
 	// ErrInvalidAuthorization is used when credentials are passed to a server but
 	// those credentials are rejected.
-	ErrInvalidAuthorization = errors.New("authorization failed")
+	ErrInvalidAuthorization = fmt.Errorf("authorization failed")
 
 	// MaxManifestSize represents the largest size accepted from a registry
 	// during resolution. Larger manifests may be accepted using a
@@ -568,7 +568,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	if client.CheckRedirect == nil {
 		client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
-				return errors.New("stopped after 10 redirects")
+				return fmt.Errorf("stopped after 10 redirects")
 			}
 			if err := r.authorize(ctx, req); err != nil {
 				return fmt.Errorf("failed to authorize redirect: %w", err)

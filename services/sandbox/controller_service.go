@@ -18,7 +18,7 @@ package sandbox
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/log"
@@ -42,7 +42,7 @@ func init() {
 
 			p, ok := plugins[services.SandboxControllerService]
 			if !ok {
-				return nil, errors.New("sandbox service not found")
+				return nil, fmt.Errorf("sandbox service not found")
 			}
 
 			i, err := p.Instance()

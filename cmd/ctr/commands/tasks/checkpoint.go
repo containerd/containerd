@@ -17,7 +17,6 @@
 package tasks
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd"
@@ -49,7 +48,7 @@ var checkpointCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context, containerd.WithDefaultRuntime(context.String("runtime")))
 		if err != nil {

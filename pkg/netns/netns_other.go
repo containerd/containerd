@@ -19,10 +19,10 @@
 package netns
 
 import (
-	"errors"
+	"fmt"
 )
 
-var errNotImplementedOnUnix = errors.New("not implemented on unix")
+var errNotImplementedOnUnix = fmt.Errorf("not implemented on unix")
 
 // NetNS holds network namespace.
 type NetNS struct {

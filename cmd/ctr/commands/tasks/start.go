@@ -17,8 +17,7 @@
 package tasks
 
 import (
-	"errors"
-
+	"fmt"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
@@ -60,7 +59,7 @@ var startCommand = cli.Command{
 			detach = context.Bool("detach")
 		)
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

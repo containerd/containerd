@@ -18,7 +18,7 @@ package run
 
 import (
 	gocontext "context"
-	"errors"
+
 	"strings"
 
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
@@ -123,7 +123,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithTTYSize(int(size.Width), int(size.Height)))
 		}
 		if context.Bool("net-host") {
-			return nil, errors.New("Cannot use host mode networking with Windows containers")
+			return nil, fmt.Errorf("Cannot use host mode networking with Windows containers")
 		}
 		if context.Bool("cni") {
 			ns, err := netns.NewNetNS("")
@@ -156,10 +156,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		for _, dev := range context.StringSlice("device") {
 			idType, devID, ok := strings.Cut(dev, "://")
 			if !ok {
-				return nil, errors.New("devices must be in the format IDType://ID")
+				return nil, fmt.Errorf("devices must be in the format IDType://ID")
 			}
 			if idType == "" {
-				return nil, errors.New("devices must have a non-empty IDType")
+				return nil, fmt.Errorf("devices must have a non-empty IDType")
 			}
 			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}

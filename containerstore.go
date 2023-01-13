@@ -18,7 +18,7 @@ package containerd
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
@@ -76,7 +76,7 @@ func (r *remoteContainers) list(ctx context.Context, filters ...string) ([]conta
 	return containersFromProto(resp.Containers), nil
 }
 
-var errStreamNotAvailable = errors.New("streaming api not available")
+var errStreamNotAvailable = fmt.Errorf("streaming api not available")
 
 func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]containers.Container, error) {
 	session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{

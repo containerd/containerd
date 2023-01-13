@@ -18,7 +18,6 @@ package metadata
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -339,7 +338,7 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 
 	runtimeBucket := bucket.Bucket(bucketKeyRuntime)
 	if runtimeBucket == nil {
-		return api.Sandbox{}, errors.New("no runtime bucket")
+		return api.Sandbox{}, fmt.Errorf("no runtime bucket")
 	}
 
 	inst.Runtime.Name = string(runtimeBucket.Get(bucketKeyName))

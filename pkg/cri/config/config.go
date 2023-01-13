@@ -18,7 +18,6 @@ package config
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -410,7 +409,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 
 	// Validation for default_runtime_name
 	if c.ContainerdConfig.DefaultRuntimeName == "" {
-		return errors.New("`default_runtime_name` is empty")
+		return fmt.Errorf("`default_runtime_name` is empty")
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
@@ -444,7 +443,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+			return fmt.Errorf("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
 		// If empty, use default podSandbox mode
 		if len(r.SandboxMode) == 0 {
@@ -456,7 +455,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	useConfigPath := c.Registry.ConfigPath != ""
 	if len(c.Registry.Mirrors) > 0 {
 		if useConfigPath {
-			return errors.New("`mirrors` cannot be set when `config_path` is provided")
+			return fmt.Errorf("`mirrors` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
 	}
@@ -469,7 +468,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	}
 	if hasDeprecatedTLS {
 		if useConfigPath {
-			return errors.New("`configs.tls` cannot be set when `config_path` is provided")
+			return fmt.Errorf("`configs.tls` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`configs.tls` is deprecated, please use `config_path` instead")
 	}

@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"path/filepath"
 	"time"
@@ -69,7 +69,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	id := util.GenerateID()
 	metadata := config.GetMetadata()
 	if metadata == nil {
-		return nil, errors.New("container config must include metadata")
+		return nil, fmt.Errorf("container config must include metadata")
 	}
 	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())

@@ -18,7 +18,7 @@ package diff
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -32,7 +32,7 @@ var (
 	handlers []Handler
 
 	// ErrNoProcessor is returned when no stream processor is available for a media-type
-	ErrNoProcessor = errors.New("no processor for media-type")
+	ErrNoProcessor = fmt.Errorf("no processor for media-type")
 )
 
 func init() {

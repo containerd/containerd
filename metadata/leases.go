@@ -18,7 +18,6 @@ package metadata
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -56,7 +55,7 @@ func (lm *leaseManager) Create(ctx context.Context, opts ...leases.Opt) (leases.
 		}
 	}
 	if l.ID == "" {
-		return leases.Lease{}, errors.New("lease id must be provided")
+		return leases.Lease{}, fmt.Errorf("lease id must be provided")
 	}
 
 	namespace, err := namespaces.NamespaceRequired(ctx)

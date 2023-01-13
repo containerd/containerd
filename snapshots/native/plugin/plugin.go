@@ -17,8 +17,7 @@
 package plugin
 
 import (
-	"errors"
-
+	"fmt"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/native"
@@ -40,7 +39,7 @@ func init() {
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
-				return nil, errors.New("invalid native configuration")
+				return nil, fmt.Errorf("invalid native configuration")
 			}
 
 			root := ic.Root

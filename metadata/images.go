@@ -19,7 +19,6 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -322,7 +321,7 @@ func readImage(image *images.Image, bkt *bolt.Bucket) error {
 
 	tbkt := bkt.Bucket(bucketKeyTarget)
 	if tbkt == nil {
-		return errors.New("unable to read target bucket")
+		return fmt.Errorf("unable to read target bucket")
 	}
 	return tbkt.ForEach(func(k, v []byte) error {
 		if v == nil {

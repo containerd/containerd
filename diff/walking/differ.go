@@ -19,7 +19,6 @@ package walking
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -77,7 +76,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 	var isCompressed bool
 	if config.Compressor != nil {
 		if config.MediaType == "" {
-			return emptyDesc, errors.New("media type must be explicitly specified when using custom compressor")
+			return emptyDesc, fmt.Errorf("media type must be explicitly specified when using custom compressor")
 		}
 		isCompressed = true
 	} else {

@@ -27,7 +27,7 @@ import (
 )
 
 func TestGRPCRoundTrip(t *testing.T) {
-	errShouldLeaveAlone := errors.New("unknown to package")
+	errShouldLeaveAlone := fmt.Errorf("unknown to package")
 
 	for _, testcase := range []struct {
 		input error

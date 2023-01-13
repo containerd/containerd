@@ -18,11 +18,11 @@
 
 package mount
 
-import "errors"
+import "fmt"
 
 var (
 	// ErrNotImplementOnUnix is returned for methods that are not implemented
-	ErrNotImplementOnUnix = errors.New("not implemented under unix")
+	ErrNotImplementOnUnix = fmt.Errorf("not implemented under unix")
 )
 
 // Mount is not implemented on this platform

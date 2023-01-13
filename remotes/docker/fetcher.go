@@ -19,7 +19,6 @@ package docker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -303,7 +302,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 				return nil, fmt.Errorf("failed to discard to offset: %w", err)
 			}
 			if n != offset {
-				return nil, errors.New("unable to discard to offset")
+				return nil, fmt.Errorf("unable to discard to offset")
 			}
 
 		}

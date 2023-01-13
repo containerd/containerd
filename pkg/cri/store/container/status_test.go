@@ -18,7 +18,7 @@ package container
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -111,7 +111,7 @@ func TestStatus(t *testing.T) {
 		CreatedAt: time.Now().UnixNano(),
 		StartedAt: time.Now().UnixNano(),
 	}
-	updateErr := errors.New("update error")
+	updateErr := fmt.Errorf("update error")
 	assert := assertlib.New(t)
 	require := requirelib.New(t)
 

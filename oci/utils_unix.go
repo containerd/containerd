@@ -30,7 +30,7 @@ import (
 )
 
 // ErrNotADevice denotes that a file is not a valid linux device.
-var ErrNotADevice = errors.New("not a device node")
+var ErrNotADevice = fmt.Errorf("not a device node")
 
 // Testing dependencies
 var (

@@ -18,7 +18,6 @@ package opts
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -60,10 +59,10 @@ func WithNewSnapshot(id string, i containerd.Image, opts ...snapshots.Opt) conta
 func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 	return func(ctx context.Context, client *containerd.Client, c *containers.Container) (err error) {
 		if c.Snapshotter == "" {
-			return errors.New("no snapshotter set for container")
+			return fmt.Errorf("no snapshotter set for container")
 		}
 		if c.SnapshotKey == "" {
-			return errors.New("rootfs not created for container")
+			return fmt.Errorf("rootfs not created for container")
 		}
 		snapshotter := client.SnapshotService(c.Snapshotter)
 		mounts, err := snapshotter.Mounts(ctx, c.SnapshotKey)

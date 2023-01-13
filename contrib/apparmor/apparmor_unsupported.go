@@ -20,7 +20,7 @@ package apparmor
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
@@ -30,7 +30,7 @@ import (
 // WithProfile sets the provided apparmor profile to the spec
 func WithProfile(profile string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		return errors.New("apparmor is not supported")
+		return fmt.Errorf("apparmor is not supported")
 	}
 }
 
@@ -38,6 +38,6 @@ func WithProfile(profile string) oci.SpecOpts {
 // for the container.  It is only generated if a profile under that name does not exist.
 func WithDefaultProfile(name string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		return errors.New("apparmor is not supported")
+		return fmt.Errorf("apparmor is not supported")
 	}
 }

@@ -19,7 +19,6 @@ package containerd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
@@ -438,7 +437,7 @@ func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer,
 		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
 	if len(diffIDs) != len(manifest.Layers) {
-		return nil, errors.New("mismatched image rootfs and manifest layers")
+		return nil, fmt.Errorf("mismatched image rootfs and manifest layers")
 	}
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {

@@ -18,7 +18,7 @@ package sbserver
 
 import (
 	"bufio"
-	"errors"
+
 	"fmt"
 	"io"
 	"os"
@@ -229,7 +229,7 @@ func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 	if !seccompEnabled {
 		if sp != nil {
 			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
-				return nil, errors.New("seccomp is not supported")
+				return nil, fmt.Errorf("seccomp is not supported")
 			}
 		}
 		return nil, nil
@@ -240,7 +240,7 @@ func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 	}
 
 	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
-		return nil, errors.New("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
+		return nil, fmt.Errorf("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
 	}
 	switch sp.ProfileType {
 	case runtime.SecurityProfile_Unconfined:
@@ -253,7 +253,7 @@ func (c *criService) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 		// be necessary with the new SecurityProfile struct
 		return seccomp.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
 	default:
-		return nil, errors.New("seccomp unknown ProfileType")
+		return nil, fmt.Errorf("seccomp unknown ProfileType")
 	}
 }
 
@@ -264,7 +264,7 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorE
 		// but we don't support it.
 		if sp != nil {
 			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
-				return nil, errors.New("apparmor is not supported")
+				return nil, fmt.Errorf("apparmor is not supported")
 			}
 		}
 		return nil, nil
@@ -277,7 +277,7 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorE
 	}
 
 	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
-		return nil, errors.New("apparmor config invalid LocalhostRef must only be set if ProfileType is Localhost")
+		return nil, fmt.Errorf("apparmor config invalid LocalhostRef must only be set if ProfileType is Localhost")
 	}
 
 	switch sp.ProfileType {
@@ -303,14 +303,14 @@ func generateApparmorSpecOpts(sp *runtime.SecurityProfile, privileged, apparmorE
 		}
 		return apparmor.WithProfile(appArmorProfile), nil
 	default:
-		return nil, errors.New("apparmor unknown ProfileType")
+		return nil, fmt.Errorf("apparmor unknown ProfileType")
 	}
 }
 
 // appArmorProfileExists scans apparmor/profiles for the requested profile
 func appArmorProfileExists(profile string) (bool, error) {
 	if profile == "" {
-		return false, errors.New("nil apparmor profile is not supported")
+		return false, fmt.Errorf("nil apparmor profile is not supported")
 	}
 	profiles, err := os.Open("/sys/kernel/security/apparmor/profiles")
 	if err != nil {

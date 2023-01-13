@@ -18,7 +18,7 @@ package snapshots
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
@@ -58,7 +58,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	}
 	p, ok := plugins[services.SnapshotsService]
 	if !ok {
-		return nil, errors.New("snapshots service not found")
+		return nil, fmt.Errorf("snapshots service not found")
 	}
 	i, err := p.Instance()
 	if err != nil {

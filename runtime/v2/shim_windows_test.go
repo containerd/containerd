@@ -18,7 +18,7 @@ package v2
 
 import (
 	"context"
-	"errors"
+
 	"os"
 	"testing"
 )
@@ -26,7 +26,7 @@ import (
 func TestCheckCopyShimLogError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testError := errors.New("test error")
+	testError := fmt.Errorf("test error")
 
 	if err := checkCopyShimLogError(ctx, nil); err != nil {
 		t.Fatalf("should return the actual error except ErrNotExist, but %v", err)

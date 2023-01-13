@@ -19,7 +19,7 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"math"
 	"path/filepath"
@@ -64,7 +64,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	id := util.GenerateID()
 	metadata := config.GetMetadata()
 	if metadata == nil {
-		return nil, errors.New("sandbox config must include metadata")
+		return nil, fmt.Errorf("sandbox config must include metadata")
 	}
 	name := makeSandboxName(metadata)
 	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
@@ -541,7 +541,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		result    *cni.Result
 	)
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return fmt.Errorf("cni config not initialized")
 	}
 
 	opts, err := cniNamespaceOpts(id, config)
@@ -736,7 +736,7 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 	if untrustedWorkload(config) {
 		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
 		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
-			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
+			return criconfig.Runtime{}, fmt.Errorf("untrusted workload with explicit runtime handler is not allowed")
 		}
 
 		//  If the untrusted workload is requesting access to the host/node, this request will fail.
@@ -746,7 +746,7 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		// is a supported option, granting the workload to access the entire guest VM instead of host.
 		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
 		if hostAccessingSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
+			return criconfig.Runtime{}, fmt.Errorf("untrusted workload with host access is not allowed")
 		}
 
 		runtimeHandler = criconfig.RuntimeUntrusted

@@ -18,7 +18,6 @@ package snapshots
 
 import (
 	gocontext "context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -115,7 +114,7 @@ var diffCommand = cli.Command{
 			idB = context.Args().Get(1)
 		)
 		if idA == "" {
-			return errors.New("snapshot id must be provided")
+			return fmt.Errorf("snapshot id must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -563,7 +562,7 @@ var unpackCommand = cli.Command{
 			}
 		}
 		if !unpacked {
-			return errors.New("manifest not found")
+			return fmt.Errorf("manifest not found")
 		}
 		// TODO: Get rootfs from Image
 		//log.G(ctx).Infof("chain ID: %s", chainID.String())

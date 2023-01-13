@@ -20,7 +20,7 @@ package devmapper
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -494,7 +494,7 @@ func (p *PoolDevice) GetUsage(deviceName string) (int64, error) {
 	}
 
 	if len(status.Params) == 0 {
-		return 0, errors.New("failed to get the number of used blocks, unexpected output from dmsetup status")
+		return 0, fmt.Errorf("failed to get the number of used blocks, unexpected output from dmsetup status")
 	}
 
 	count, err := strconv.ParseInt(status.Params[0], 10, 64)

@@ -407,7 +407,7 @@ func (pw *pushWriter) Close() error {
 		status, err := pw.tracker.GetStatus(pw.ref)
 		if err == nil && !status.Committed {
 			// Closing an incomplete writer. Record this as an error so that following write can retry it.
-			status.ErrClosed = errors.New("closed incomplete writer")
+			status.ErrClosed = fmt.Errorf("closed incomplete writer")
 			pw.tracker.SetStatus(pw.ref, status)
 		}
 		return pw.pipe.Close()
@@ -510,7 +510,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 func (pw *pushWriter) Truncate(size int64) error {
 	// TODO: if blob close request and start new request at offset
 	// TODO: always error on manifest
-	return errors.New("cannot truncate remote upload")
+	return fmt.Errorf("cannot truncate remote upload")
 }
 
 func requestWithMountFrom(req *request, mount, from string) *request {

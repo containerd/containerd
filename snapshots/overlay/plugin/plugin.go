@@ -19,8 +19,6 @@
 package overlay
 
 import (
-	"errors"
-
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/overlay"
@@ -43,7 +41,7 @@ func init() {
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
-				return nil, errors.New("invalid overlay configuration")
+				return nil, fmt.Errorf("invalid overlay configuration")
 			}
 
 			root := ic.Root

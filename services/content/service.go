@@ -17,7 +17,7 @@
 package content
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/plugin"
@@ -39,7 +39,7 @@ func init() {
 			}
 			p, ok := plugins[services.ContentService]
 			if !ok {
-				return nil, errors.New("content store service not found")
+				return nil, fmt.Errorf("content store service not found")
 			}
 			cs, err := p.Instance()
 			if err != nil {

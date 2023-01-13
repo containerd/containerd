@@ -17,7 +17,6 @@
 package sys
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -124,6 +123,6 @@ func waitForPid(process *os.Process) (int, error) {
 	case pid := <-c:
 		return pid, nil
 	case <-time.After(10 * time.Second):
-		return 0, errors.New("process did not start in 10 seconds")
+		return 0, fmt.Errorf("process did not start in 10 seconds")
 	}
 }

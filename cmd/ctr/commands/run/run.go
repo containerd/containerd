@@ -19,7 +19,7 @@ package run
 import (
 	gocontext "context"
 	"encoding/csv"
-	"errors"
+
 	"fmt"
 	"strings"
 
@@ -142,21 +142,21 @@ var Command = cli.Command{
 		if config {
 			id = context.Args().First()
 			if context.NArg() > 1 {
-				return errors.New("with spec config file, only container id should be provided")
+				return fmt.Errorf("with spec config file, only container id should be provided")
 			}
 		} else {
 			id = context.Args().Get(1)
 			ref = context.Args().First()
 
 			if ref == "" {
-				return errors.New("image ref must be provided")
+				return fmt.Errorf("image ref must be provided")
 			}
 		}
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		if rm && detach {
-			return errors.New("flags --detach and --rm cannot be specified together")
+			return fmt.Errorf("flags --detach and --rm cannot be specified together")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

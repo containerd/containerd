@@ -18,7 +18,6 @@ package docker
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -375,7 +374,7 @@ func Test_dockerPusher_push(t *testing.T) {
 
 			pw, ok := got.(*pushWriter)
 			if !ok {
-				assert.Errorf(t, errors.New("unable to cast content.Writer to pushWriter"), "got %v instead of pushwriter", got)
+				assert.Errorf(t, fmt.Errorf("unable to cast content.Writer to pushWriter"), "got %v instead of pushwriter", got)
 			}
 
 			// test whether a proper response has been received after the push operation

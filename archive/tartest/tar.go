@@ -18,7 +18,7 @@ package tartest
 
 import (
 	"archive/tar"
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -196,7 +196,7 @@ func (tc TarContext) Link(oldname, newname string) WriterToTar {
 
 func writeHeaderAndContent(tw *tar.Writer, h *tar.Header, b []byte) error {
 	if h.Size != int64(len(b)) {
-		return errors.New("bad content length")
+		return fmt.Errorf("bad content length")
 	}
 	if err := tw.WriteHeader(h); err != nil {
 		return err

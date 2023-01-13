@@ -21,6 +21,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -99,7 +100,7 @@ func testFailFastWhenConnectShim(abstract bool, dialFn dialFunc) func(*testing.T
 			for {
 				select {
 				case <-to:
-					errCh <- errors.New("timeout")
+					errCh <- fmt.Errorf("timeout")
 					return
 				default:
 				}

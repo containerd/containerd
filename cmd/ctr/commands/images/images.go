@@ -17,7 +17,6 @@
 package images
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -161,7 +160,7 @@ var setLabelsCommand = cli.Command{
 		}
 		defer cancel()
 		if name == "" {
-			return errors.New("please specify an image")
+			return fmt.Errorf("please specify an image")
 		}
 
 		var (

@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -44,7 +43,7 @@ var (
 
 	// ErrNoTransaction is returned when an operation is attempted with
 	// a context which is not inside of a transaction.
-	ErrNoTransaction = errors.New("no transaction in context")
+	ErrNoTransaction = fmt.Errorf("no transaction in context")
 )
 
 // parentKey returns a composite key of the parent and child identifiers. The

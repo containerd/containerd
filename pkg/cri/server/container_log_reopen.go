@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,7 +33,7 @@ func (c *criService) ReopenContainerLog(ctx context.Context, r *runtime.ReopenCo
 	}
 
 	if container.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
-		return nil, errors.New("container is not running")
+		return nil, fmt.Errorf("container is not running")
 	}
 
 	// Create new container logger and replace the existing ones.

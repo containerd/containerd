@@ -17,7 +17,7 @@
 package containers
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
@@ -46,11 +46,11 @@ var restoreCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		ref := context.Args().Get(1)
 		if ref == "" {
-			return errors.New("ref must be provided")
+			return fmt.Errorf("ref must be provided")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

@@ -19,7 +19,6 @@ package oci
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -638,18 +637,18 @@ func getShmSize(opts []string) (string, error) {
 	for _, o := range opts {
 		if strings.HasPrefix(o, "size=") {
 			if so != "" {
-				return "", errors.New("contains multiple size options")
+				return "", fmt.Errorf("contains multiple size options")
 			}
 			so = o
 		}
 	}
 	if so == "" {
-		return "", errors.New("shm size not specified")
+		return "", fmt.Errorf("shm size not specified")
 	}
 
 	parts := strings.Split(so, "=")
 	if len(parts) != 2 {
-		return "", errors.New("invalid size format")
+		return "", fmt.Errorf("invalid size format")
 	}
 	return parts[1], nil
 }

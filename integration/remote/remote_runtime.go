@@ -34,7 +34,6 @@ package remote
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -139,7 +138,7 @@ func (r *RuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runt
 	if resp.PodSandboxId == "" {
 		errorMessage := fmt.Sprintf("PodSandboxId is not set for sandbox %q", config.GetMetadata())
 		klog.Errorf("RunPodSandbox failed: %s", errorMessage)
-		return "", errors.New(errorMessage)
+		return "", fmt.Errorf(errorMessage)
 	}
 
 	klog.V(10).Infof("[RuntimeService] RunPodSandbox Response (PodSandboxId=%v)", resp.PodSandboxId)
@@ -251,7 +250,7 @@ func (r *RuntimeService) CreateContainer(podSandBoxID string, config *runtimeapi
 	if resp.ContainerId == "" {
 		errorMessage := fmt.Sprintf("ContainerId is not set for container %q", config.GetMetadata())
 		klog.Errorf("CreateContainer failed: %s", errorMessage)
-		return "", errors.New(errorMessage)
+		return "", fmt.Errorf(errorMessage)
 	}
 
 	return resp.ContainerId, nil
@@ -441,7 +440,7 @@ func (r *RuntimeService) Exec(req *runtimeapi.ExecRequest, opts ...grpc.CallOpti
 	if resp.Url == "" {
 		errorMessage := "URL is not set"
 		klog.Errorf("Exec failed: %s", errorMessage)
-		return nil, errors.New(errorMessage)
+		return nil, fmt.Errorf(errorMessage)
 	}
 
 	return resp, nil
@@ -463,7 +462,7 @@ func (r *RuntimeService) Attach(req *runtimeapi.AttachRequest, opts ...grpc.Call
 	if resp.Url == "" {
 		errorMessage := "URL is not set"
 		klog.Errorf("Attach failed: %s", errorMessage)
-		return nil, errors.New(errorMessage)
+		return nil, fmt.Errorf(errorMessage)
 	}
 	return resp, nil
 }
@@ -484,7 +483,7 @@ func (r *RuntimeService) PortForward(req *runtimeapi.PortForwardRequest, opts ..
 	if resp.Url == "" {
 		errorMessage := "URL is not set"
 		klog.Errorf("PortForward failed: %s", errorMessage)
-		return nil, errors.New(errorMessage)
+		return nil, fmt.Errorf(errorMessage)
 	}
 
 	return resp, nil
@@ -530,7 +529,7 @@ func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeSta
 	if resp.Status == nil || len(resp.Status.Conditions) < 2 {
 		errorMessage := "RuntimeReady or NetworkReady condition are not set"
 		klog.Errorf("Status failed: %s", errorMessage)
-		return nil, errors.New(errorMessage)
+		return nil, fmt.Errorf(errorMessage)
 	}
 
 	return resp.Status, nil

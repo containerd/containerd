@@ -34,7 +34,7 @@ import (
 // maxResets is the no.of times the Copy() method can tolerate a reset of the body
 const maxResets = 5
 
-var ErrReset = errors.New("writer has been reset")
+var ErrReset = fmt.Errorf("writer has been reset")
 
 var bufPool = sync.Pool{
 	New: func() interface{} {
@@ -278,7 +278,7 @@ func seekReader(r io.Reader, offset, size int64) (io.Reader, error) {
 		return nil, fmt.Errorf("failed to discard to offset: %w", err)
 	}
 	if n != offset {
-		return nil, errors.New("unable to discard to offset")
+		return nil, fmt.Errorf("unable to discard to offset")
 	}
 
 	return r, nil

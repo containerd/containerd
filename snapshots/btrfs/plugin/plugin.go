@@ -19,8 +19,6 @@
 package plugin
 
 import (
-	"errors"
-
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/platforms"
@@ -44,7 +42,7 @@ func init() {
 
 			config, ok := ic.Config.(*Config)
 			if !ok {
-				return nil, errors.New("invalid btrfs configuration")
+				return nil, fmt.Errorf("invalid btrfs configuration")
 			}
 
 			root := ic.Root

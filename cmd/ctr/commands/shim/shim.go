@@ -20,7 +20,6 @@ package shim
 
 import (
 	gocontext "context"
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -163,7 +162,7 @@ var execCommand = cli.Command{
 		)
 
 		if id == "" {
-			return errors.New("exec id must be provided")
+			return fmt.Errorf("exec id must be provided")
 		}
 
 		tty := context.Bool("tty")

@@ -19,7 +19,6 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -144,7 +143,7 @@ func (m *DB) Init(ctx context.Context) error {
 	// errSkip is used when no migration or version needs to be written
 	// to the database and the transaction can be immediately rolled
 	// back rather than performing a much slower and unnecessary commit.
-	var errSkip = errors.New("skip update")
+	var errSkip = fmt.Errorf("skip update")
 
 	err := m.db.Update(func(tx *bolt.Tx) error {
 		var (

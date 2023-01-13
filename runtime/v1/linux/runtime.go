@@ -20,7 +20,7 @@ package linux
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"io"
 	"os"
@@ -537,7 +537,7 @@ func (r *Runtime) getRuncOptions(ctx context.Context, id string) (*runctypes.Run
 		}
 		ropts, ok := v.(*runctypes.RuncOptions)
 		if !ok {
-			return nil, errors.New("invalid runtime options format")
+			return nil, fmt.Errorf("invalid runtime options format")
 		}
 
 		return ropts, nil

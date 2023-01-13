@@ -35,7 +35,6 @@ package remotecommand
 import (
 	gocontext "context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -259,7 +258,7 @@ WaitForStreams:
 		case <-expired:
 			// TODO find a way to return the error to the user. Maybe use a separate
 			// stream to report errors?
-			return nil, errors.New("timed out waiting for client to create streams")
+			return nil, fmt.Errorf("timed out waiting for client to create streams")
 		}
 	}
 
@@ -310,7 +309,7 @@ WaitForStreams:
 		case <-expired:
 			// TODO find a way to return the error to the user. Maybe use a separate
 			// stream to report errors?
-			return nil, errors.New("timed out waiting for client to create streams")
+			return nil, fmt.Errorf("timed out waiting for client to create streams")
 		}
 	}
 
@@ -358,7 +357,7 @@ WaitForStreams:
 		case <-expired:
 			// TODO find a way to return the error to the user. Maybe use a separate
 			// stream to report errors?
-			return nil, errors.New("timed out waiting for client to create streams")
+			return nil, fmt.Errorf("timed out waiting for client to create streams")
 		}
 	}
 
@@ -412,7 +411,7 @@ WaitForStreams:
 		case <-expired:
 			// TODO find a way to return the error to the user. Maybe use a separate
 			// stream to report errors?
-			return nil, errors.New("timed out waiting for client to create streams")
+			return nil, fmt.Errorf("timed out waiting for client to create streams")
 		}
 	}
 

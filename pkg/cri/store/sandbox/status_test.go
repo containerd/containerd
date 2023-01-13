@@ -17,7 +17,7 @@
 package sandbox
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -35,7 +35,7 @@ func TestStatus(t *testing.T) {
 		CreatedAt: time.Now(),
 		State:     StateReady,
 	}
-	updateErr := errors.New("update error")
+	updateErr := fmt.Errorf("update error")
 	assert := assertlib.New(t)
 
 	t.Logf("simple store and get")

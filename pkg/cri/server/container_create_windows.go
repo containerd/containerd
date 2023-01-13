@@ -17,7 +17,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -61,7 +60,7 @@ func (c *criService) containerSpec(
 	cntrHpc := config.GetWindows().GetSecurityContext().GetHostProcess()
 	sandboxHpc := sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess()
 	if cntrHpc != sandboxHpc {
-		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
+		return nil, fmt.Errorf("pod spec and all containers inside must have the HostProcess field set to be valid")
 	}
 
 	if config.GetWorkingDir() != "" {

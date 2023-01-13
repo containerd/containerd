@@ -20,7 +20,8 @@ package tasks
 
 import (
 	gocontext "context"
-	"errors"
+	"fmt"
+
 	"net/url"
 	"os"
 	"os/signal"
@@ -82,7 +83,7 @@ func NewTask(ctx gocontext.Context, client *containerd.Client, container contain
 	var ioCreator cio.Creator
 	if con != nil {
 		if nullIO {
-			return nil, errors.New("tty and null-io cannot be used together")
+			return nil, fmt.Errorf("tty and null-io cannot be used together")
 		}
 		ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(con, con, nil), cio.WithTerminal}, ioOpts...)...)
 	} else if nullIO {

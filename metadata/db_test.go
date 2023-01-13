@@ -19,7 +19,6 @@ package metadata
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -276,7 +275,7 @@ func TestMigrations(t *testing.T) {
 
 				dbkt := getBucket(tx, bucketKeyVersion, []byte("testing"), bucketKeyObjectContent, deprecatedBucketKeyObjectIngest)
 				if dbkt != nil {
-					return errors.New("deprecated ingest bucket still exists")
+					return fmt.Errorf("deprecated ingest bucket still exists")
 				}
 
 				return nil

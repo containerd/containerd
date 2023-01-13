@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -438,7 +437,7 @@ func Eventually(f CheckFunc, period, timeout time.Duration) error {
 			return err
 		}
 		if time.Since(start) >= timeout {
-			return errors.New("timeout exceeded")
+			return fmt.Errorf("timeout exceeded")
 		}
 		time.Sleep(period)
 	}
@@ -452,7 +451,7 @@ func Consistently(f CheckFunc, period, timeout time.Duration) error {
 	for {
 		ok, err := f()
 		if !ok {
-			return errors.New("get false")
+			return fmt.Errorf("get false")
 		}
 		if err != nil {
 			return err

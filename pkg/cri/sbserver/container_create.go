@@ -18,7 +18,7 @@ package sbserver
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"path/filepath"
 	"strconv"
@@ -83,7 +83,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	id := util.GenerateID()
 	metadata := config.GetMetadata()
 	if metadata == nil {
-		return nil, errors.New("container config must include metadata")
+		return nil, fmt.Errorf("container config must include metadata")
 	}
 	containerName := metadata.Name
 	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
@@ -584,7 +584,7 @@ func (c *criService) buildLinuxSpec(
 
 	if securityContext.GetPrivileged() {
 		if !sandboxConfig.GetLinux().GetSecurityContext().GetPrivileged() {
-			return nil, errors.New("no privileged container allowed in sandbox")
+			return nil, fmt.Errorf("no privileged container allowed in sandbox")
 		}
 		specOpts = append(specOpts, oci.WithPrivileged)
 		if !ociRuntime.PrivilegedWithoutHostDevices {
@@ -730,7 +730,7 @@ func (c *criService) buildWindowsSpec(
 	cntrHpc := config.GetWindows().GetSecurityContext().GetHostProcess()
 	sandboxHpc := sandboxConfig.GetWindows().GetSecurityContext().GetHostProcess()
 	if cntrHpc != sandboxHpc {
-		return nil, errors.New("pod spec and all containers inside must have the HostProcess field set to be valid")
+		return nil, fmt.Errorf("pod spec and all containers inside must have the HostProcess field set to be valid")
 	}
 
 	if config.GetWorkingDir() != "" {

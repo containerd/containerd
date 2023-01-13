@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -270,7 +269,7 @@ func testWalk(ctx context.Context, t *testing.T, _ *MetaStore) {
 	found := map[string]snapshots.Info{}
 	err := WalkInfo(ctx, func(ctx context.Context, info snapshots.Info) error {
 		if _, ok := found[info.Name]; ok {
-			return errors.New("entry already encountered")
+			return fmt.Errorf("entry already encountered")
 		}
 		found[info.Name] = info
 		return nil

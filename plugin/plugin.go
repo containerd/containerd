@@ -24,19 +24,19 @@ import (
 
 var (
 	// ErrNoType is returned when no type is specified
-	ErrNoType = errors.New("plugin: no type")
+	ErrNoType = fmt.Errorf("plugin: no type")
 	// ErrNoPluginID is returned when no id is specified
-	ErrNoPluginID = errors.New("plugin: no id")
+	ErrNoPluginID = fmt.Errorf("plugin: no id")
 	// ErrIDRegistered is returned when a duplicate id is already registered
-	ErrIDRegistered = errors.New("plugin: id already registered")
+	ErrIDRegistered = fmt.Errorf("plugin: id already registered")
 	// ErrSkipPlugin is used when a plugin is not initialized and should not be loaded,
 	// this allows the plugin loader differentiate between a plugin which is configured
 	// not to load and one that fails to load.
-	ErrSkipPlugin = errors.New("skip plugin")
+	ErrSkipPlugin = fmt.Errorf("skip plugin")
 
 	// ErrInvalidRequires will be thrown if the requirements for a plugin are
 	// defined in an invalid manner.
-	ErrInvalidRequires = errors.New("invalid requires")
+	ErrInvalidRequires = fmt.Errorf("invalid requires")
 )
 
 // IsSkipPlugin returns true if the error is skipping the plugin

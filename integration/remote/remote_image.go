@@ -34,7 +34,6 @@ package remote
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -114,7 +113,7 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 		if resp.Image.Id == "" || resp.Image.Size() == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
 			klog.Errorf("ImageStatus failed: %s", errorMessage)
-			return nil, errors.New(errorMessage)
+			return nil, fmt.Errorf(errorMessage)
 		}
 	}
 
@@ -139,7 +138,7 @@ func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.A
 	if resp.ImageRef == "" {
 		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
 		klog.Errorf("PullImage failed: %s", errorMessage)
-		return "", errors.New(errorMessage)
+		return "", fmt.Errorf(errorMessage)
 	}
 
 	return resp.ImageRef, nil

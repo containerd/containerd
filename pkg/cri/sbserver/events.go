@@ -18,7 +18,7 @@ package sbserver
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"sync"
 	"time"
@@ -225,7 +225,7 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 	case *eventtypes.ImageDelete:
 		id = e.Name
 	default:
-		return "", nil, errors.New("unsupported event")
+		return "", nil, fmt.Errorf("unsupported event")
 	}
 	return id, evt, nil
 }

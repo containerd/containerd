@@ -18,7 +18,6 @@ package tasks
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd"
@@ -83,7 +82,7 @@ var killCommand = cli.Command{
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()
 		if id == "" {
-			return errors.New("container id must be provided")
+			return fmt.Errorf("container id must be provided")
 		}
 		sig, err := signal.ParseSignal(defaultSignal)
 		if err != nil {
@@ -95,7 +94,7 @@ var killCommand = cli.Command{
 			opts   []containerd.KillOpts
 		)
 		if all && execID != "" {
-			return errors.New("specify an exec-id or all; not both")
+			return fmt.Errorf("specify an exec-id or all; not both")
 		}
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

@@ -21,7 +21,7 @@ package devmapper
 import (
 	"context"
 	"encoding/json"
-	"errors"
+
 	"fmt"
 	"strconv"
 
@@ -193,7 +193,7 @@ func getNextDeviceID(tx *bolt.Tx) (uint32, error) {
 	}
 
 	if seq >= maxDeviceID {
-		return 0, errors.New("dm-meta: couldn't find free device key")
+		return 0, fmt.Errorf("dm-meta: couldn't find free device key")
 	}
 
 	id := uint32(seq)

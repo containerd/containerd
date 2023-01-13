@@ -19,7 +19,6 @@ package metadata
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sync/atomic"
@@ -190,11 +189,11 @@ func createLease(ctx context.Context, db *DB, name string) (context.Context, fun
 func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 	ns, ok := namespaces.Namespace(ctx)
 	if !ok {
-		return errors.New("no namespace in context")
+		return fmt.Errorf("no namespace in context")
 	}
 	lease, ok := leases.FromContext(ctx)
 	if !ok {
-		return errors.New("no lease in context")
+		return fmt.Errorf("no lease in context")
 	}
 
 	return db.View(func(tx *bolt.Tx) error {
@@ -214,11 +213,11 @@ func checkContentLeased(ctx context.Context, db *DB, dgst digest.Digest) error {
 func checkIngestLeased(ctx context.Context, db *DB, ref string) error {
 	ns, ok := namespaces.Namespace(ctx)
 	if !ok {
-		return errors.New("no namespace in context")
+		return fmt.Errorf("no namespace in context")
 	}
 	lease, ok := leases.FromContext(ctx)
 	if !ok {
-		return errors.New("no lease in context")
+		return fmt.Errorf("no lease in context")
 	}
 
 	return db.View(func(tx *bolt.Tx) error {

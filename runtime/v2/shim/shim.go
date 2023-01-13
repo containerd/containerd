@@ -469,7 +469,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	case <-publisher.Done():
 		return nil
 	case <-time.After(5 * time.Second):
-		return errors.New("publisher not closed")
+		return fmt.Errorf("publisher not closed")
 	}
 }
 

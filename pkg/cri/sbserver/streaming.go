@@ -19,7 +19,7 @@ package sbserver
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+
 	"fmt"
 	"io"
 	"math"
@@ -51,18 +51,18 @@ func getStreamListenerMode(c *criService) (streamListenerMode, error) {
 			return x509KeyPairTLS, nil
 		}
 		if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile == "" {
-			return -1, errors.New("must set X509KeyPairStreaming.TLSKeyFile")
+			return -1, fmt.Errorf("must set X509KeyPairStreaming.TLSKeyFile")
 		}
 		if c.config.X509KeyPairStreaming.TLSCertFile == "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
-			return -1, errors.New("must set X509KeyPairStreaming.TLSCertFile")
+			return -1, fmt.Errorf("must set X509KeyPairStreaming.TLSCertFile")
 		}
 		return selfSignTLS, nil
 	}
 	if c.config.X509KeyPairStreaming.TLSCertFile != "" {
-		return -1, errors.New("X509KeyPairStreaming.TLSCertFile is set but EnableTLSStreaming is not set")
+		return -1, fmt.Errorf("X509KeyPairStreaming.TLSCertFile is set but EnableTLSStreaming is not set")
 	}
 	if c.config.X509KeyPairStreaming.TLSKeyFile != "" {
-		return -1, errors.New("X509KeyPairStreaming.TLSKeyFile is set but EnableTLSStreaming is not set")
+		return -1, fmt.Errorf("X509KeyPairStreaming.TLSKeyFile is set but EnableTLSStreaming is not set")
 	}
 	return withoutTLS, nil
 }
@@ -112,7 +112,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 	case withoutTLS:
 		return streaming.NewServer(config, run)
 	default:
-		return nil, errors.New("invalid configuration for the stream listener")
+		return nil, fmt.Errorf("invalid configuration for the stream listener")
 	}
 }
 

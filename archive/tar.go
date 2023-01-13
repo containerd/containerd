@@ -42,7 +42,7 @@ var bufPool = &sync.Pool{
 	},
 }
 
-var errInvalidArchive = errors.New("invalid archive")
+var errInvalidArchive = fmt.Errorf("invalid archive")
 
 // Diff returns a tar stream of the computed filesystem
 // difference between the provided directories.
@@ -672,7 +672,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 				return fmt.Errorf("failed to copy: %w", err)
 			}
 			if n != hdr.Size {
-				return errors.New("short write copying file")
+				return fmt.Errorf("short write copying file")
 			}
 		}
 

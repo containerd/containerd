@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -54,7 +53,7 @@ var densityCommand = cli.Command{
 		)
 
 		if count < 1 {
-			return errors.New("count cannot be less than one")
+			return fmt.Errorf("count cannot be less than one")
 		}
 
 		config := config{

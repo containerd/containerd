@@ -18,7 +18,7 @@ package images
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/plugin"
@@ -41,7 +41,7 @@ func init() {
 			}
 			p, ok := plugins[services.ImagesService]
 			if !ok {
-				return nil, errors.New("images service not found")
+				return nil, fmt.Errorf("images service not found")
 			}
 			i, err := p.Instance()
 			if err != nil {

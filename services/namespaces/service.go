@@ -18,7 +18,7 @@ package namespaces
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/plugin"
@@ -41,7 +41,7 @@ func init() {
 			}
 			p, ok := plugins[services.NamespacesService]
 			if !ok {
-				return nil, errors.New("namespaces service not found")
+				return nil, fmt.Errorf("namespaces service not found")
 			}
 			i, err := p.Instance()
 			if err != nil {

@@ -20,7 +20,7 @@ package linux
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"sync"
 

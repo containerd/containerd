@@ -18,7 +18,6 @@ package local
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -197,7 +196,7 @@ func (w *writer) Close() (err error) {
 
 func (w *writer) Truncate(size int64) error {
 	if size != 0 {
-		return errors.New("Truncate: unsupported size")
+		return fmt.Errorf("Truncate: unsupported size")
 	}
 	w.offset = 0
 	w.digester.Hash().Reset()

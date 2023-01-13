@@ -21,7 +21,7 @@ package btrfs
 import (
 	"bytes"
 	"context"
-	"errors"
+
 	"fmt"
 	"os"
 	"path/filepath"

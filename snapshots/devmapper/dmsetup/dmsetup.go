@@ -21,7 +21,6 @@
 package dmsetup
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,7 +40,7 @@ const (
 )
 
 // ErrInUse represents an error mutating a device because it is in use elsewhere
-var ErrInUse = errors.New("device is in use")
+var ErrInUse = fmt.Errorf("device is in use")
 
 // DeviceInfo represents device info returned by "dmsetup info".
 // dmsetup(8) provides more information on each of these fields.
@@ -440,7 +439,7 @@ func isInUse(deviceName string) (bool, error) {
 		return true, err
 	}
 	if len(info) != 1 {
-		return true, errors.New("could not get device info")
+		return true, fmt.Errorf("could not get device info")
 	}
 	return info[0].OpenCount != 0, nil
 }

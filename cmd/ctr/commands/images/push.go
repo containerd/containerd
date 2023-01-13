@@ -18,7 +18,7 @@ package images
 
 import (
 	gocontext "context"
-	"errors"
+
 	"fmt"
 	"net/http/httptrace"
 	"os"
@@ -85,7 +85,7 @@ var pushCommand = cli.Command{
 			desc  ocispec.Descriptor
 		)
 		if ref == "" {
-			return errors.New("please provide a remote image reference to push")
+			return fmt.Errorf("please provide a remote image reference to push")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

@@ -20,7 +20,6 @@ package config
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -497,7 +496,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 func getSortedHosts(root *toml.Tree) ([]string, error) {
 	iter, ok := root.Get("host").(*toml.Tree)
 	if !ok {
-		return nil, errors.New("invalid `host` tree")
+		return nil, fmt.Errorf("invalid `host` tree")
 	}
 
 	list := append([]string{}, iter.Keys()...)

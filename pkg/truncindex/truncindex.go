@@ -22,7 +22,6 @@
 package truncindex
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -32,13 +31,13 @@ import (
 
 var (
 	// ErrEmptyPrefix is an error returned if the prefix was empty.
-	ErrEmptyPrefix = errors.New("Prefix can't be empty")
+	ErrEmptyPrefix = fmt.Errorf("Prefix can't be empty")
 
 	// ErrIllegalChar is returned when a space is in the ID
-	ErrIllegalChar = errors.New("illegal character: ' '")
+	ErrIllegalChar = fmt.Errorf("illegal character: ' '")
 
 	// ErrNotExist is returned when ID or its prefix not found in index.
-	ErrNotExist = errors.New("ID does not exist")
+	ErrNotExist = fmt.Errorf("ID does not exist")
 )
 
 // ErrAmbiguousPrefix is returned if the prefix was ambiguous

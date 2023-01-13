@@ -17,7 +17,6 @@
 package mount
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -161,7 +160,7 @@ func setupLoop(backingFile string, param LoopParams) (*os.File, error) {
 		return file, nil
 	}
 
-	return nil, errors.New("timeout creating new loopback device")
+	return nil, fmt.Errorf("timeout creating new loopback device")
 }
 
 func removeLoop(loopdev string) error {

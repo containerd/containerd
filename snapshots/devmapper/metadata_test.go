@@ -20,7 +20,7 @@ package devmapper
 
 import (
 	"context"
-	"errors"
+
 	"path/filepath"
 	"strconv"
 	"testing"

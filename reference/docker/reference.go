@@ -43,7 +43,6 @@
 package docker
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -57,25 +56,25 @@ const (
 
 var (
 	// ErrReferenceInvalidFormat represents an error while trying to parse a string as a reference.
-	ErrReferenceInvalidFormat = errors.New("invalid reference format")
+	ErrReferenceInvalidFormat = fmt.Errorf("invalid reference format")
 
 	// ErrTagInvalidFormat represents an error while trying to parse a string as a tag.
-	ErrTagInvalidFormat = errors.New("invalid tag format")
+	ErrTagInvalidFormat = fmt.Errorf("invalid tag format")
 
 	// ErrDigestInvalidFormat represents an error while trying to parse a string as a tag.
-	ErrDigestInvalidFormat = errors.New("invalid digest format")
+	ErrDigestInvalidFormat = fmt.Errorf("invalid digest format")
 
 	// ErrNameContainsUppercase is returned for invalid repository names that contain uppercase characters.
-	ErrNameContainsUppercase = errors.New("repository name must be lowercase")
+	ErrNameContainsUppercase = fmt.Errorf("repository name must be lowercase")
 
 	// ErrNameEmpty is returned for empty, invalid repository names.
-	ErrNameEmpty = errors.New("repository name must have at least one component")
+	ErrNameEmpty = fmt.Errorf("repository name must have at least one component")
 
 	// ErrNameTooLong is returned when a repository name is longer than NameTotalLengthMax.
 	ErrNameTooLong = fmt.Errorf("repository name must not be more than %v characters", NameTotalLengthMax)
 
 	// ErrNameNotCanonical is returned when a name is not canonical.
-	ErrNameNotCanonical = errors.New("repository name must be canonical")
+	ErrNameNotCanonical = fmt.Errorf("repository name must be canonical")
 )
 
 // Reference is an opaque object reference identifier that may include

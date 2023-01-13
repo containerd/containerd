@@ -18,7 +18,7 @@ package sbserver
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"time"
 
@@ -119,7 +119,7 @@ func (c *criService) waitSandboxStop(ctx context.Context, sandbox sandboxstore.S
 func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstore.Sandbox) error {
 	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
 	if netPlugin == nil {
-		return errors.New("cni config not initialized")
+		return fmt.Errorf("cni config not initialized")
 	}
 
 	var (

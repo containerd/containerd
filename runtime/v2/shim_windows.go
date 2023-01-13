@@ -18,7 +18,7 @@ package v2
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"io"
 	"net"

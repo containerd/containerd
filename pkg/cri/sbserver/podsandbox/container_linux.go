@@ -19,7 +19,6 @@
 package podsandbox
 
 import (
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,7 +48,7 @@ func (c *Controller) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 	if !seccompEnabled {
 		if sp != nil {
 			if sp.ProfileType != runtime.SecurityProfile_Unconfined {
-				return nil, errors.New("seccomp is not supported")
+				return nil, fmt.Errorf("seccomp is not supported")
 			}
 		}
 		return nil, nil
@@ -60,7 +59,7 @@ func (c *Controller) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 	}
 
 	if sp.ProfileType != runtime.SecurityProfile_Localhost && sp.LocalhostRef != "" {
-		return nil, errors.New("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
+		return nil, fmt.Errorf("seccomp config invalid LocalhostRef must only be set if ProfileType is Localhost")
 	}
 	switch sp.ProfileType {
 	case runtime.SecurityProfile_Unconfined:
@@ -73,7 +72,7 @@ func (c *Controller) generateSeccompSpecOpts(sp *runtime.SecurityProfile, privil
 		// be necessary with the new SecurityProfile struct
 		return seccomp.WithProfile(strings.TrimPrefix(sp.LocalhostRef, profileNamePrefix)), nil
 	default:
-		return nil, errors.New("seccomp unknown ProfileType")
+		return nil, fmt.Errorf("seccomp unknown ProfileType")
 	}
 }
 

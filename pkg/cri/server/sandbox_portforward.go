@@ -18,7 +18,7 @@ package server
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -33,7 +33,7 @@ func (c *criService) PortForward(ctx context.Context, r *runtime.PortForwardRequ
 		return nil, fmt.Errorf("failed to find sandbox %q: %w", r.GetPodSandboxId(), err)
 	}
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, errors.New("sandbox container is not running")
+		return nil, fmt.Errorf("sandbox container is not running")
 	}
 	// TODO(random-liu): Verify that ports are exposed.
 	return c.streamServer.GetPortForward(r)

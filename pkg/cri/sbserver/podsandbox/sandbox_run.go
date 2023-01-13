@@ -18,7 +18,7 @@ package podsandbox
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 
 	"github.com/containerd/nri"
@@ -297,7 +297,7 @@ func (c *Controller) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 	if untrustedWorkload(config) {
 		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
 		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
-			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
+			return criconfig.Runtime{}, fmt.Errorf("untrusted workload with explicit runtime handler is not allowed")
 		}
 
 		//  If the untrusted workload is requesting access to the host/node, this request will fail.
@@ -307,7 +307,7 @@ func (c *Controller) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		// is a supported option, granting the workload to access the entire guest VM instead of host.
 		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
 		if hostAccessingSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
+			return criconfig.Runtime{}, fmt.Errorf("untrusted workload with host access is not allowed")
 		}
 
 		runtimeHandler = criconfig.RuntimeUntrusted

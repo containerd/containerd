@@ -20,7 +20,7 @@ package runc
 
 import (
 	"context"
-	"errors"
+
 	"fmt"
 	"io"
 	"net/url"
@@ -62,7 +62,7 @@ type linuxPlatform struct {
 
 func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console, id, stdin, stdout, stderr string, wg *sync.WaitGroup) (cons console.Console, retErr error) {
 	if p.epoller == nil {
-		return nil, errors.New("uninitialized epoller")
+		return nil, fmt.Errorf("uninitialized epoller")
 	}
 
 	epollConsole, err := p.epoller.Add(console)
@@ -188,7 +188,7 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 
 func (p *linuxPlatform) ShutdownConsole(ctx context.Context, cons console.Console) error {
 	if p.epoller == nil {
-		return errors.New("uninitialized epoller")
+		return fmt.Errorf("uninitialized epoller")
 	}
 	epollConsole, ok := cons.(*console.EpollConsole)
 	if !ok {

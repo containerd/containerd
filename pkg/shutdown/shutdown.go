@@ -18,7 +18,7 @@ package shutdown
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -26,7 +26,7 @@ import (
 )
 
 // ErrShutdown is the error condition when a context has been fully shutdown
-var ErrShutdown = errors.New("shutdown")
+var ErrShutdown = fmt.Errorf("shutdown")
 
 // Service is used to facilitate shutdown by through callback
 // registration and shutdown initiation

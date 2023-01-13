@@ -17,7 +17,6 @@
 package images
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -65,7 +64,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		srcRef := context.Args().Get(0)
 		targetRef := context.Args().Get(1)
 		if srcRef == "" || targetRef == "" {
-			return errors.New("src and target image need to be specified")
+			return fmt.Errorf("src and target image need to be specified")
 		}
 
 		if !context.Bool("all-platforms") {
