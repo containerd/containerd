@@ -10,6 +10,7 @@ import (
 	"github.com/Microsoft/hcsshim/internal/hcserror"
 	"github.com/Microsoft/hcsshim/internal/interop"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -48,8 +49,8 @@ type ErrorCode uint32
 
 // For common errors, define the error as it is in windows, so we can quickly determine it later
 const (
-	ERROR_NOT_FOUND                     = 0x490
-	HCN_E_PORT_ALREADY_EXISTS ErrorCode = 0x803b0013
+	ERROR_NOT_FOUND                     = ErrorCode(windows.ERROR_NOT_FOUND)
+	HCN_E_PORT_ALREADY_EXISTS ErrorCode = ErrorCode(windows.HCN_E_PORT_ALREADY_EXISTS)
 )
 
 type HcnError struct {

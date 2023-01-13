@@ -122,8 +122,8 @@ type JOBOBJECT_BASIC_AND_IO_ACCOUNTING_INFORMATION struct {
 }
 
 //	typedef struct _JOBOBJECT_MEMORY_USAGE_INFORMATION {
-//	    ULONG64 JobMemory;
-//	    ULONG64 PeakJobMemoryUsed;
+//		ULONG64 JobMemory;
+//		ULONG64 PeakJobMemoryUsed;
 //	} JOBOBJECT_MEMORY_USAGE_INFORMATION, *PJOBOBJECT_MEMORY_USAGE_INFORMATION;
 type JOBOBJECT_MEMORY_USAGE_INFORMATION struct {
 	JobMemory         uint64
@@ -131,10 +131,10 @@ type JOBOBJECT_MEMORY_USAGE_INFORMATION struct {
 }
 
 //	typedef struct _JOBOBJECT_IO_ATTRIBUTION_STATS {
-//	    ULONG_PTR IoCount;
-//	    ULONGLONG TotalNonOverlappedQueueTime;
-//	    ULONGLONG TotalNonOverlappedServiceTime;
-//	    ULONGLONG TotalSize;
+//		ULONG_PTR IoCount;
+//		ULONGLONG TotalNonOverlappedQueueTime;
+//		ULONGLONG TotalNonOverlappedServiceTime;
+//		ULONGLONG TotalSize;
 //	} JOBOBJECT_IO_ATTRIBUTION_STATS, *PJOBOBJECT_IO_ATTRIBUTION_STATS;
 type JOBOBJECT_IO_ATTRIBUTION_STATS struct {
 	IoCount                       uintptr

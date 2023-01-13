@@ -10,7 +10,7 @@ import (
 	"github.com/Microsoft/go-winio/pkg/guid"
 )
 
-//go:generate go run ../mksyscall_windows.go -output zsyscall_windows.go hcn.go
+//go:generate go run github.com/Microsoft/go-winio/tools/mkwinsyscall -output zsyscall_windows.go hcn.go
 
 /// HNS V1 API
 
@@ -228,7 +228,7 @@ func IPv6DualStackSupported() error {
 	return platformDoesNotSupportError("IPv6 DualStack")
 }
 
-//L4proxySupported returns an error if the HCN version does not support L4Proxy
+// L4proxySupported returns an error if the HCN version does not support L4Proxy
 func L4proxyPolicySupported() error {
 	supported, err := GetCachedSupportedFeatures()
 	if err != nil {

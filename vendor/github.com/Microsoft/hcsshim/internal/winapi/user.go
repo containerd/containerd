@@ -23,32 +23,32 @@ const (
 
 const NERR_UserNotFound = syscall.Errno(0x8AD)
 
-// typedef struct _LOCALGROUP_MEMBERS_INFO_0 {
-// 	PSID lgrmi0_sid;
-// } LOCALGROUP_MEMBERS_INFO_0, *PLOCALGROUP_MEMBERS_INFO_0, *LPLOCALGROUP_MEMBERS_INFO_0;
+//	typedef struct _LOCALGROUP_MEMBERS_INFO_0 {
+//		PSID lgrmi0_sid;
+//	} LOCALGROUP_MEMBERS_INFO_0, *PLOCALGROUP_MEMBERS_INFO_0, *LPLOCALGROUP_MEMBERS_INFO_0;
 type LocalGroupMembersInfo0 struct {
 	Sid *windows.SID
 }
 
-// typedef struct _LOCALGROUP_INFO_1 {
-// 	LPWSTR lgrpi1_name;
-// 	LPWSTR lgrpi1_comment;
-// } LOCALGROUP_INFO_1, *PLOCALGROUP_INFO_1, *LPLOCALGROUP_INFO_1;
+//	typedef struct _LOCALGROUP_INFO_1 {
+//		LPWSTR lgrpi1_name;
+//		LPWSTR lgrpi1_comment;
+//	} LOCALGROUP_INFO_1, *PLOCALGROUP_INFO_1, *LPLOCALGROUP_INFO_1;
 type LocalGroupInfo1 struct {
 	Name    *uint16
 	Comment *uint16
 }
 
-// typedef struct _USER_INFO_1 {
-// 	LPWSTR usri1_name;
-// 	LPWSTR usri1_password;
-// 	DWORD  usri1_password_age;
-// 	DWORD  usri1_priv;
-// 	LPWSTR usri1_home_dir;
-// 	LPWSTR usri1_comment;
-// 	DWORD  usri1_flags;
-// 	LPWSTR usri1_script_path;
-// } USER_INFO_1, *PUSER_INFO_1, *LPUSER_INFO_1;
+//	typedef struct _USER_INFO_1 {
+//		LPWSTR usri1_name;
+//		LPWSTR usri1_password;
+//		DWORD  usri1_password_age;
+//		DWORD  usri1_priv;
+//		LPWSTR usri1_home_dir;
+//		LPWSTR usri1_comment;
+//		DWORD  usri1_flags;
+//		LPWSTR usri1_script_path;
+//	} USER_INFO_1, *PUSER_INFO_1, *LPUSER_INFO_1;
 type UserInfo1 struct {
 	Name        *uint16
 	Password    *uint16
