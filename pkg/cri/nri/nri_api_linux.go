@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -16,7 +14,7 @@
    limitations under the License.
 */
 
-package server
+package nri
 
 import (
 	"context"
@@ -29,6 +27,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/pkg/cri/constants"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
@@ -38,29 +37,37 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/nri"
-
 	"github.com/containerd/nri/pkg/api"
-
 	nrigen "github.com/containerd/nri/pkg/runtime-tools/generate"
 )
 
-type nriAPI struct {
-	cri *criService
+type API struct {
+	cri CRIImplementation
 	nri nri.API
 }
 
-func (a *nriAPI) register() {
-	if !a.isEnabled() {
-		return
+func NewAPI(nri nri.API) *API {
+	return &API{
+		nri: nri,
 	}
-
-	nri.RegisterDomain(a)
 }
 
-func (a *nriAPI) isEnabled() bool {
-	return a != nil && a.nri != nil && a.nri.IsEnabled()
+func (a *API) IsDisabled() bool {
+	return a == nil || a.nri == nil || !a.nri.IsEnabled()
+}
+
+func (a *API) IsEnabled() bool { return !a.IsDisabled() }
+
+func (a *API) Register(cri CRIImplementation) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	a.cri = cri
+	nri.RegisterDomain(a)
+
+	return a.nri.Start()
 }
 
 //
@@ -71,7 +78,11 @@ func (a *nriAPI) isEnabled() bool {
 // interface.
 //
 
-func (a *nriAPI) runPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	err := a.nri.RunPodSandbox(ctx, pod)
 
@@ -83,14 +94,22 @@ func (a *nriAPI) runPodSandbox(ctx context.Context, criPod *sstore.Sandbox) erro
 	return err
 }
 
-func (a *nriAPI) stopPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+func (a *API) StopPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	err := a.nri.StopPodSandbox(ctx, pod)
 
 	return err
 }
 
-func (a *nriAPI) removePodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+func (a *API) RemovePodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 
 	err := a.nri.RemovePodSandbox(ctx, pod)
@@ -98,10 +117,10 @@ func (a *nriAPI) removePodSandbox(ctx context.Context, criPod *sstore.Sandbox) e
 	return err
 }
 
-func (a *nriAPI) createContainer(ctx context.Context, ctrs *containers.Container, spec *specs.Spec) (*api.ContainerAdjustment, error) {
+func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *specs.Spec) (*api.ContainerAdjustment, error) {
 	ctr := a.nriContainer(ctrs, spec)
 
-	criPod, err := a.cri.sandboxStore.Get(ctr.GetPodSandboxID())
+	criPod, err := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +132,11 @@ func (a *nriAPI) createContainer(ctx context.Context, ctrs *containers.Container
 	return adjust, err
 }
 
-func (a *nriAPI) postCreateContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) PostCreateContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
@@ -122,7 +145,11 @@ func (a *nriAPI) postCreateContainer(ctx context.Context, criPod *sstore.Sandbox
 	return err
 }
 
-func (a *nriAPI) startContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) StartContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
@@ -131,7 +158,11 @@ func (a *nriAPI) startContainer(ctx context.Context, criPod *sstore.Sandbox, cri
 	return err
 }
 
-func (a *nriAPI) postStartContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) PostStartContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
@@ -140,7 +171,11 @@ func (a *nriAPI) postStartContainer(ctx context.Context, criPod *sstore.Sandbox,
 	return err
 }
 
-func (a *nriAPI) updateContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container, req *cri.LinuxContainerResources) (*cri.LinuxContainerResources, error) {
+func (a *API) UpdateContainerResources(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container, req *cri.LinuxContainerResources) (*cri.LinuxContainerResources, error) {
+	if a.IsDisabled() {
+		return nil, nil
+	}
+
 	const noOomAdj = 0
 
 	pod := a.nriPodSandbox(criPod)
@@ -154,7 +189,11 @@ func (a *nriAPI) updateContainer(ctx context.Context, criPod *sstore.Sandbox, cr
 	return r.ToCRI(noOomAdj), nil
 }
 
-func (a *nriAPI) postUpdateContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) PostUpdateContainerResources(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
@@ -163,7 +202,11 @@ func (a *nriAPI) postUpdateContainer(ctx context.Context, criPod *sstore.Sandbox
 	return err
 }
 
-func (a *nriAPI) stopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) StopContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	ctr := a.nriContainer(criCtr, nil)
 
 	if criPod == nil || criPod.ID == "" {
@@ -180,10 +223,14 @@ func (a *nriAPI) stopContainer(ctx context.Context, criPod *sstore.Sandbox, criC
 	return err
 }
 
-func (a *nriAPI) notifyContainerExit(ctx context.Context, criCtr *cstore.Container) {
+func (a *API) NotifyContainerExit(ctx context.Context, criCtr *cstore.Container) {
+	if a.IsDisabled() {
+		return
+	}
+
 	ctr := a.nriContainer(criCtr, nil)
 
-	criPod, _ := a.cri.sandboxStore.Get(ctr.GetPodSandboxID())
+	criPod, _ := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
 	if criPod.ID == "" {
 		criPod = sstore.Sandbox{
 			Metadata: sstore.Metadata{
@@ -196,7 +243,11 @@ func (a *nriAPI) notifyContainerExit(ctx context.Context, criCtr *cstore.Contain
 	a.nri.NotifyContainerExit(ctx, pod, ctr)
 }
 
-func (a *nriAPI) removeContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+func (a *API) RemoveContainer(ctx context.Context, criPod *sstore.Sandbox, criCtr *cstore.Container) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(criCtr, nil)
 
@@ -205,7 +256,11 @@ func (a *nriAPI) removeContainer(ctx context.Context, criPod *sstore.Sandbox, cr
 	return err
 }
 
-func (a *nriAPI) undoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, id string, spec *specs.Spec) {
+func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, id string, spec *specs.Spec) {
+	if a.IsDisabled() {
+		return
+	}
+
 	pod := a.nriPodSandbox(criPod)
 	ctr := a.nriContainer(&containers.Container{ID: id}, spec)
 
@@ -220,11 +275,17 @@ func (a *nriAPI) undoCreateContainer(ctx context.Context, criPod *sstore.Sandbox
 	}
 }
 
-func (a *nriAPI) WithContainerAdjustment() containerd.NewContainerOpts {
+func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
+	if a.IsDisabled() {
+		return func(context.Context, *containerd.Client, *containers.Container) error {
+			return nil
+		}
+	}
+
 	resourceCheckOpt := nrigen.WithResourceChecker(
 		func(r *runtimespec.LinuxResources) error {
 			if r != nil {
-				if a.cri.config.DisableHugetlbController {
+				if a.cri.Config().DisableHugetlbController {
 					r.HugepageLimits = nil
 				}
 			}
@@ -262,7 +323,7 @@ func (a *nriAPI) WithContainerAdjustment() containerd.NewContainerOpts {
 			return fmt.Errorf("failed to unmarshal container OCI Spec for NRI: %w", err)
 		}
 
-		adjust, err := a.createContainer(ctx, c, spec)
+		adjust, err := a.CreateContainer(ctx, c, spec)
 		if err != nil {
 			return fmt.Errorf("failed to get NRI adjustment for container: %w", err)
 		}
@@ -285,15 +346,15 @@ func (a *nriAPI) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 }
 
-func (a *nriAPI) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDeleteOpts {
-	if !a.isEnabled() {
+func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDeleteOpts {
+	if a.IsDisabled() {
 		return func(_ context.Context, _ containerd.Process) error {
 			return nil
 		}
 	}
 
 	return func(_ context.Context, _ containerd.Process) error {
-		a.notifyContainerExit(context.Background(), criCtr)
+		a.NotifyContainerExit(context.Background(), criCtr)
 		return nil
 	}
 }
@@ -310,13 +371,13 @@ const (
 	nriDomain = constants.K8sContainerdNamespace
 )
 
-func (a *nriAPI) GetName() string {
+func (a *API) GetName() string {
 	return nriDomain
 }
 
-func (a *nriAPI) ListPodSandboxes() []nri.PodSandbox {
+func (a *API) ListPodSandboxes() []nri.PodSandbox {
 	pods := []nri.PodSandbox{}
-	for _, pod := range a.cri.sandboxStore.List() {
+	for _, pod := range a.cri.SandboxStore().List() {
 		if pod.Status.Get().State != sstore.StateUnknown {
 			pod := pod
 			pods = append(pods, a.nriPodSandbox(&pod))
@@ -325,9 +386,9 @@ func (a *nriAPI) ListPodSandboxes() []nri.PodSandbox {
 	return pods
 }
 
-func (a *nriAPI) ListContainers() []nri.Container {
+func (a *API) ListContainers() []nri.Container {
 	containers := []nri.Container{}
-	for _, ctr := range a.cri.containerStore.List() {
+	for _, ctr := range a.cri.ContainerStore().List() {
 		switch ctr.Status.Get().State() {
 		case cri.ContainerState_CONTAINER_EXITED:
 			continue
@@ -340,8 +401,8 @@ func (a *nriAPI) ListContainers() []nri.Container {
 	return containers
 }
 
-func (a *nriAPI) GetPodSandbox(id string) (nri.PodSandbox, bool) {
-	pod, err := a.cri.sandboxStore.Get(id)
+func (a *API) GetPodSandbox(id string) (nri.PodSandbox, bool) {
+	pod, err := a.cri.SandboxStore().Get(id)
 	if err != nil {
 		return nil, false
 	}
@@ -349,8 +410,8 @@ func (a *nriAPI) GetPodSandbox(id string) (nri.PodSandbox, bool) {
 	return a.nriPodSandbox(&pod), true
 }
 
-func (a *nriAPI) GetContainer(id string) (nri.Container, bool) {
-	ctr, err := a.cri.containerStore.Get(id)
+func (a *API) GetContainer(id string) (nri.Container, bool) {
+	ctr, err := a.cri.ContainerStore().Get(id)
 	if err != nil {
 		return nil, false
 	}
@@ -358,8 +419,8 @@ func (a *nriAPI) GetContainer(id string) (nri.Container, bool) {
 	return a.nriContainer(&ctr, nil), true
 }
 
-func (a *nriAPI) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error {
-	ctr, err := a.cri.containerStore.Get(u.ContainerId)
+func (a *API) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) error {
+	ctr, err := a.cri.ContainerStore().Get(u.ContainerId)
 	if err != nil {
 		return nil
 	}
@@ -370,7 +431,7 @@ func (a *nriAPI) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) er
 				ContainerId: u.ContainerId,
 				Linux:       u.GetLinux().GetResources().ToCRI(0),
 			}
-			newStatus, err := a.cri.updateContainerResources(ctx, ctr, criReq, status)
+			newStatus, err := a.cri.UpdateContainerResources(ctx, ctr, criReq, status)
 			return newStatus, err
 		},
 	)
@@ -383,12 +444,12 @@ func (a *nriAPI) UpdateContainer(ctx context.Context, u *api.ContainerUpdate) er
 	return nil
 }
 
-func (a *nriAPI) EvictContainer(ctx context.Context, e *api.ContainerEviction) error {
-	ctr, err := a.cri.containerStore.Get(e.ContainerId)
+func (a *API) EvictContainer(ctx context.Context, e *api.ContainerEviction) error {
+	ctr, err := a.cri.ContainerStore().Get(e.ContainerId)
 	if err != nil {
 		return nil
 	}
-	err = a.cri.stopContainer(ctx, ctr, 0)
+	err = a.cri.StopContainer(ctx, ctr, 0)
 	if err != nil {
 		return err
 	}
@@ -406,7 +467,7 @@ type criPodSandbox struct {
 	pid  uint32
 }
 
-func (a *nriAPI) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
+func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 	criPod := &criPodSandbox{
 		Sandbox: pod,
 		spec:    &specs.Spec{},
@@ -581,14 +642,14 @@ func (p *criPodSandbox) GetPid() uint32 {
 //
 
 type criContainer struct {
-	api  *nriAPI
+	api  *API
 	ctrs *containers.Container
 	spec *specs.Spec
 	meta *cstore.Metadata
 	pid  uint32
 }
 
-func (a *nriAPI) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
+func (a *API) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
 	switch c := ctr.(type) {
 	case *cstore.Container:
 		ctx := ctrdutil.NamespacedContext()
@@ -623,7 +684,7 @@ func (a *nriAPI) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
 	case *containers.Container:
 		ctrs := c
 		meta := &cstore.Metadata{}
-		if ext := ctrs.Extensions[containerMetadataExtension]; ext != nil {
+		if ext := ctrs.Extensions[a.cri.ContainerMetadataExtensionKey()]; ext != nil {
 			err := typeurl.UnmarshalTo(ext, meta)
 			if err != nil {
 				log.L.WithError(err).Errorf("failed to get metadata for container %s", ctrs.ID)
@@ -666,7 +727,7 @@ func (c *criContainer) GetName() string {
 }
 
 func (c *criContainer) GetState() api.ContainerState {
-	criCtr, err := c.api.cri.containerStore.Get(c.GetID())
+	criCtr, err := c.api.cri.ContainerStore().Get(c.GetID())
 	if err != nil {
 		return api.ContainerState_CONTAINER_UNKNOWN
 	}

@@ -149,18 +149,16 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		if retErr != nil {
 			deferCtx, deferCancel := ctrdutil.DeferContext()
 			defer deferCancel()
-			err = c.nri.stopContainer(deferCtx, &sandbox, &cntr)
+			err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
 			}
 		}
 	}()
-	if c.nri.isEnabled() {
-		err = c.nri.startContainer(ctx, &sandbox, &cntr)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("NRI container start failed")
-			return nil, fmt.Errorf("NRI container start failed: %w", err)
-		}
+	err = c.nri.StartContainer(ctx, &sandbox, &cntr)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI container start failed")
+		return nil, fmt.Errorf("NRI container start failed: %w", err)
 	}
 
 	// Start containerd task.
@@ -182,11 +180,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
-	if c.nri.isEnabled() {
-		err = c.nri.postStartContainer(ctx, &sandbox, &cntr)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("NRI post-start notification failed")
-		}
+	err = c.nri.PostStartContainer(ctx, &sandbox, &cntr)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-start notification failed")
 	}
 
 	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)

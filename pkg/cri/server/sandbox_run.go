@@ -461,20 +461,18 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
-	if c.nri.isEnabled() {
-		err = c.nri.runPodSandbox(ctx, &sandbox)
-		if err != nil {
-			return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
-		}
-
-		defer func() {
-			if retErr != nil {
-				deferCtx, deferCancel := util.DeferContext()
-				defer deferCancel()
-				c.nri.removePodSandbox(deferCtx, &sandbox)
-			}
-		}()
+	err = c.nri.RunPodSandbox(ctx, &sandbox)
+	if err != nil {
+		return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
 	}
+
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			c.nri.RemovePodSandbox(deferCtx, &sandbox)
+		}
+	}()
 
 	if err := task.Start(ctx); err != nil {
 		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)

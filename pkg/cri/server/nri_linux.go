@@ -1,4 +1,4 @@
-//go:build windows
+//go:build linux
 
 /*
    Copyright The containerd Authors.
@@ -20,17 +20,16 @@ package server
 
 import (
 	"context"
+	"time"
 
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (*nriAPI) updateContainer(context.Context, *sstore.Sandbox, *cstore.Container, *cri.LinuxContainerResources) (*cri.LinuxContainerResources, error) {
-	return nil, nil
+func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cstore.Container, req *cri.UpdateContainerResourcesRequest, status cstore.Status) (cstore.Status, error) {
+	return i.c.updateContainerResources(ctx, ctr, req, status)
 }
 
-func (*nriAPI) postUpdateContainer(context.Context, *sstore.Sandbox, *cstore.Container) error {
-	return nil
+func (i *criImplementation) StopContainer(ctx context.Context, ctr cstore.Container, timeout time.Duration) error {
+	return i.c.stopContainer(ctx, ctr, timeout)
 }
