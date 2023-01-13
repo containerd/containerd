@@ -418,6 +418,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 	out, err := c.runtimeSpec(
 		"id1",
+		platforms.DefaultSpec(),
 		"/etc/containerd/cri-base.json",
 		oci.WithHostname("new-host"),
 		oci.WithDomainname("new-domain"),
