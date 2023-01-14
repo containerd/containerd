@@ -70,6 +70,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		},
 	}
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(fmt.Sprintf("user %d", testCase.userID), func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -129,6 +130,7 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		},
 	}
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -178,11 +180,11 @@ sys:x:3:root,bin,adm
 	}{
 		{
 			user:     "root",
-			expected: []uint32{},
+			expected: []uint32{1, 2, 3},
 		},
 		{
 			user:     "1000",
-			expected: []uint32{},
+			expected: nil,
 		},
 		{
 			user:     "bin",
@@ -198,6 +200,7 @@ sys:x:3:root,bin,adm
 		},
 	}
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
@@ -490,6 +493,7 @@ daemon:x:2:root,bin,daemon
 	}
 
 	for _, testCase := range testCases {
+		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
