@@ -17,7 +17,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -201,6 +203,11 @@ func LoadConfig(path string, out *Config) error {
 		// Check if a file at the given path already loaded to prevent circular imports
 		if _, ok := loaded[path]; ok {
 			continue
+		}
+
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			// use default config
+			return nil
 		}
 
 		config, err := loadConfigFile(path)
