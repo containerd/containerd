@@ -1,7 +1,14 @@
 on:
   push:
+    branches:
+      - main
+      - "release/**"
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+  pull_request:
+    branches:
+      - main
+      - "release/**"
 
 name: Containerd Release
 
@@ -14,6 +21,7 @@ permissions: # added using https://github.com/step-security/secure-workflows
 jobs:
   check:
     name: Check Signed Tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-20.04
     timeout-minutes: 5
     outputs:
@@ -57,7 +65,6 @@ jobs:
   build:
     name: Build Release Binaries
     runs-on: ubuntu-20.04
-    needs: [check]
     timeout-minutes: 30
     strategy:
       matrix:
@@ -77,15 +84,13 @@ jobs:
           - dockerfile-ubuntu: 18.04
             dockerfile-platform: windows/amd64
     steps:
-      - name: Set env
+      - name: Set RELEASE_VER
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         shell: bash
-        env:
-          MOS: ubuntu-20.04
         run: |
           releasever=${{ github.ref }}
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
       - name: Checkout containerd
         uses: actions/checkout@v3
         with:
@@ -128,6 +133,7 @@ jobs:
 
   release:
     name: Create containerd Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     runs-on: ubuntu-20.04
