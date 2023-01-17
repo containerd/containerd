@@ -23,6 +23,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.1.0@sha256:76a8510b1798f66fcc87e7
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS base
 COPY --from=xx / /
 SHELL ["/bin/bash", "-xec"]
+ENV DEBIAN_FRONTEND=noninteractive
 RUN	apt-get update && \
 	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM
