@@ -330,6 +330,8 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		config    = sandbox.Config
 		path      = sandbox.NetNSPath
 		netPlugin = c.getNetworkPlugin(sandbox.RuntimeHandler)
+		err       error
+		result    *cni.Result
 	)
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
@@ -341,7 +343,11 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
-	result, err := netPlugin.Setup(ctx, id, path, opts...)
+	if c.config.CniConfig.NetworkPluginSetupSerially {
+		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
+	} else {
+		result, err = netPlugin.Setup(ctx, id, path, opts...)
+	}
 	networkPluginOperations.WithValues(networkSetUpOp).Inc()
 	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
 	if err != nil {
