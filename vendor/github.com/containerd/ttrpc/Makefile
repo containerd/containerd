@@ -57,7 +57,7 @@ TESTFLAGS_PARALLEL ?= 8
 # Use this to replace `go test` with, for instance, `gotestsum`
 GOTEST ?= $(GO) test
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos checkprotos coverage ci check help install vendor install-protobuf install-protobuild
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install vendor install-protobuf install-protobuild
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -69,7 +69,7 @@ check: proto-fmt ## run all linters
 	@echo "$(WHALE) $@"
 	GOGC=75 golangci-lint run
 
-ci: check binaries checkprotos coverage # coverage-integration ## to be used by the CI
+ci: check binaries check-protos coverage # coverage-integration ## to be used by the CI
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@
@@ -145,8 +145,8 @@ install-protobuf:
 
 install-protobuild:
 	@echo "$(WHALE) $@"
-	@$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1
-	@$(GO) install github.com/containerd/protobuild@7e5ee24bc1f70e9e289fef15e2631eb3491320bf
+	@$(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1
+	@$(GO) install github.com/containerd/protobuild@14832ccc41429f5c4f81028e5af08aa233a219cf
 
 coverage: ## generate coverprofiles from the unit tests, except tests that require root
 	@echo "$(WHALE) $@"
