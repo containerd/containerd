@@ -18,9 +18,10 @@ package sandbox
 
 import (
 	"context"
+	"time"
 
-	"github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/typeurl"
 )
 
 // Controller is an interface to manage sandboxes at runtime.
@@ -30,17 +31,39 @@ type Controller interface {
 	// Create is used to initialize sandbox environment.
 	Create(ctx context.Context, sandboxID string) error
 	// Start will start previously created sandbox.
-	Start(ctx context.Context, sandboxID string) (*sandbox.ControllerStartResponse, error)
+	Start(ctx context.Context, sandboxID string) (ControllerInstance, error)
 	// Platform returns target sandbox OS that will be used by Controller.
 	// containerd will rely on this to generate proper OCI spec.
 	Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error)
 	// Stop will stop sandbox instance
-	Stop(ctx context.Context, sandboxID string) (*sandbox.ControllerStopResponse, error)
+	Stop(ctx context.Context, sandboxID string) error
 	// Wait blocks until sandbox process exits.
-	Wait(ctx context.Context, sandboxID string) (*sandbox.ControllerWaitResponse, error)
+	Wait(ctx context.Context, sandboxID string) (ExitStatus, error)
 	// Status will query sandbox process status. It is heavier than Ping call and must be used whenever you need to
 	// gather metadata about current sandbox state (status, uptime, resource use, etc).
-	Status(ctx context.Context, sandboxID string, verbose bool) (*sandbox.ControllerStatusResponse, error)
+	Status(ctx context.Context, sandboxID string, verbose bool) (ControllerStatus, error)
 	// Shutdown deletes and cleans all tasks and sandbox instance.
-	Shutdown(ctx context.Context, sandboxID string) (*sandbox.ControllerShutdownResponse, error)
+	Shutdown(ctx context.Context, sandboxID string) error
+}
+
+type ControllerInstance struct {
+	SandboxID string
+	Pid       uint32
+	CreatedAt time.Time
+	Labels    map[string]string
+}
+
+type ExitStatus struct {
+	ExitStatus uint32
+	ExitedAt   time.Time
+}
+
+type ControllerStatus struct {
+	SandboxID string
+	Pid       uint32
+	State     string
+	Info      map[string]string
+	CreatedAt time.Time
+	ExitedAt  time.Time
+	Extra     typeurl.Any
 }

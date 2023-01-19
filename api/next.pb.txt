@@ -1039,11 +1039,11 @@ file {
   message_type {
     name: "SandboxStatusResponse"
     field {
-      name: "id"
+      name: "sandbox_id"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "id"
+      json_name: "sandboxId"
     }
     field {
       name: "pid"
@@ -5176,11 +5176,11 @@ file {
   message_type {
     name: "ControllerStatusResponse"
     field {
-      name: "id"
+      name: "sandbox_id"
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_STRING
-      json_name: "id"
+      json_name: "sandboxId"
     }
     field {
       name: "pid"

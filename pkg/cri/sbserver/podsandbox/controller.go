@@ -26,7 +26,6 @@ import (
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -94,17 +93,17 @@ func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (platform
 	return platforms.DefaultSpec(), nil
 }
 
-func (c *Controller) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
+func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitStatus, error) {
 	status := c.store.Get(sandboxID)
 	if status == nil {
-		return nil, fmt.Errorf("failed to get exit channel. %q", sandboxID)
+		return sandbox.ExitStatus{}, fmt.Errorf("failed to get exit channel. %q", sandboxID)
 	}
 
 	exitStatus, exitedAt, err := c.waitSandboxExit(ctx, sandboxID, status.Waiter)
 
-	return &api.ControllerWaitResponse{
+	return sandbox.ExitStatus{
 		ExitStatus: exitStatus,
-		ExitedAt:   protobuf.ToTimestamp(exitedAt),
+		ExitedAt:   exitedAt,
 	}, err
 }
 

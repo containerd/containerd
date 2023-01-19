@@ -22,11 +22,10 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -55,36 +54,36 @@ type SandboxInfo struct {
 	Metadata    *sandboxstore.Metadata `json:"sandboxMetadata"`
 }
 
-func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (*api.ControllerStatusResponse, error) {
-	sandbox, err := c.sandboxStore.Get(sandboxID)
+func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
+	sb, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred while trying to find sandbox %q: %w",
+		return sandbox.ControllerStatus{}, fmt.Errorf("an error occurred while trying to find sandbox %q: %w",
 			sandboxID, err)
 	}
 
-	status := sandbox.Status.Get()
-	resp := &api.ControllerStatusResponse{
-		ID:        sandboxID,
+	status := sb.Status.Get()
+	cstatus := sandbox.ControllerStatus{
+		SandboxID: sandboxID,
 		Pid:       status.Pid,
 		State:     status.State.String(),
-		CreatedAt: protobuf.ToTimestamp(status.CreatedAt),
+		CreatedAt: status.CreatedAt,
 		Extra:     nil,
 	}
 
 	if !status.ExitedAt.IsZero() {
-		resp.ExitedAt = protobuf.ToTimestamp(status.ExitedAt)
+		cstatus.ExitedAt = status.ExitedAt
 	}
 
 	if verbose {
-		info, err := toCRISandboxInfo(ctx, sandbox)
+		info, err := toCRISandboxInfo(ctx, sb)
 		if err != nil {
-			return nil, err
+			return sandbox.ControllerStatus{}, err
 		}
 
-		resp.Info = info
+		cstatus.Info = info
 	}
 
-	return resp, nil
+	return cstatus, nil
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.

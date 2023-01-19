@@ -29,7 +29,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
@@ -38,7 +37,7 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 )
 
@@ -51,23 +50,22 @@ func init() {
 // down the created resources.  If an error occurs while tearing down resources, a zero-valued response is returned
 // alongside the error.  If the teardown was successful, a nil response is returned with the error.
 // TODO(samuelkarp) Determine whether this error indication is reasonable to retain once controller.Delete is implemented.
-func (c *Controller) Start(ctx context.Context, id string) (resp *api.ControllerStartResponse, retErr error) {
+func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.ControllerInstance, retErr error) {
 	var cleanupErr error
 	defer func() {
 		if retErr != nil && cleanupErr != nil {
 			log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
-			resp = &api.ControllerStartResponse{}
 		}
 	}()
 
 	sandboxInfo, err := c.client.SandboxStore().Get(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find sandbox with id %q: %w", id, err)
+		return cin, fmt.Errorf("unable to find sandbox with id %q: %w", id, err)
 	}
 
 	var metadata sandboxstore.Metadata
 	if err := sandboxInfo.GetExtension(MetadataKey, &metadata); err != nil {
-		return nil, fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
+		return cin, fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
 	}
 
 	var (
@@ -78,17 +76,17 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// Ensure sandbox container image snapshot.
 	image, err := c.cri.EnsureImageExists(ctx, c.config.SandboxImage, config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
 	ociRuntime, err := c.getSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
 
@@ -100,7 +98,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// it safely.
 	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
+		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
@@ -114,7 +112,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 
 	// handle any KVM based runtime
 	if err := modifyProcessLabel(ociRuntime.Type, spec); err != nil {
-		return nil, err
+		return cin, err
 	}
 
 	if config.GetLinux().GetSecurityContext().GetPrivileged() {
@@ -126,7 +124,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// Generate spec options that will be applied to the spec later.
 	specOpts, err := c.sandboxContainerSpecOpts(config, &image.ImageSpec.Config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
+		return cin, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
@@ -143,7 +141,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd container: %w", err)
+		return cin, fmt.Errorf("failed to create containerd container: %w", err)
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
@@ -163,7 +161,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create sandbox root directory %q: %w",
+		return cin, fmt.Errorf("failed to create sandbox root directory %q: %w",
 			sandboxRootDir, err)
 	}
 	defer func() {
@@ -178,7 +176,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 
 	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
 	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
+		return cin, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
 			volatileSandboxRootDir, err)
 	}
 	defer func() {
@@ -193,7 +191,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 
 	// Setup files required for the sandbox.
 	if err = c.setupSandboxFiles(id, config); err != nil {
-		return nil, fmt.Errorf("failed to setup sandbox files: %w", err)
+		return cin, fmt.Errorf("failed to setup sandbox files: %w", err)
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
@@ -207,7 +205,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// Update sandbox created timestamp.
 	info, err := container.Info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox container info: %w", err)
+		return cin, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
 
 	// Create sandbox task in containerd.
@@ -221,7 +219,7 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// We don't need stdio for sandbox container.
 	task, err := container.NewTask(ctx, containerdio.NullIO, taskOpts...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd task: %w", err)
+		return cin, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
@@ -238,13 +236,13 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
-		return nil, fmt.Errorf("failed to wait for sandbox container task: %w", err)
+		return cin, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
 	c.store.Save(id, exitCh)
 
 	nric, err := nri.New()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create nri client: %w", err)
+		return cin, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
 		nriSB := &nri.Sandbox{
@@ -252,25 +250,23 @@ func (c *Controller) Start(ctx context.Context, id string) (resp *api.Controller
 			Labels: config.Labels,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
-			return nil, fmt.Errorf("nri invoke: %w", err)
+			return cin, fmt.Errorf("nri invoke: %w", err)
 		}
 	}
 
 	if err := task.Start(ctx); err != nil {
-		return nil, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
+		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
 
 	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
 	c.cri.GenerateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
-	resp = &api.ControllerStartResponse{
-		SandboxID: id,
-		Pid:       task.Pid(),
-		CreatedAt: protobuf.ToTimestamp(info.CreatedAt),
-		Labels:    labels,
-	}
+	cin.SandboxID = id
+	cin.Pid = task.Pid()
+	cin.CreatedAt = info.CreatedAt
+	cin.Labels = labels
 
-	return resp, nil
+	return
 }
 
 func (c *Controller) Create(ctx context.Context, _id string) error {
