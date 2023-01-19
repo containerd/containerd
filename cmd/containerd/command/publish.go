@@ -38,15 +38,15 @@ import (
 
 var publishCommand = cli.Command{
 	Name:  "publish",
-	Usage: "binary to publish events to containerd",
+	Usage: "Binary to publish events to containerd",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "namespace",
-			Usage: "namespace to publish to",
+			Usage: "Namespace to publish to",
 		},
 		cli.StringFlag{
 			Name:  "topic",
-			Usage: "topic of the event",
+			Usage: "Topic of the event",
 		},
 	},
 	Action: func(context *cli.Context) error {

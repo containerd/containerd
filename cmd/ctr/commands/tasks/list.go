@@ -34,7 +34,7 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the task id",
+			Usage: "Print only the task id",
 		},
 	},
 	Action: func(context *cli.Context) error {

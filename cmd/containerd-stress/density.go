@@ -39,11 +39,11 @@ import (
 
 var densityCommand = cli.Command{
 	Name:  "density",
-	Usage: "stress tests density of containers running on a system",
+	Usage: "Stress tests density of containers running on a system",
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "count",
-			Usage: "number of containers to run",
+			Usage: "Number of containers to run",
 			Value: 10,
 		},
 	},

@@ -58,43 +58,43 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
-			Usage: "base image name for added images, when provided only images with this name prefix are imported",
+			Usage: "Base image name for added images, when provided only images with this name prefix are imported",
 		},
 		cli.BoolFlag{
 			Name:  "digests",
-			Usage: "whether to create digest images (default: false)",
+			Usage: "Whether to create digest images (default: false)",
 		},
 		cli.BoolFlag{
 			Name:  "skip-digest-for-named",
-			Usage: "skip applying --digests option to images named in the importing tar (use it in conjunction with --digests)",
+			Usage: "Skip applying --digests option to images named in the importing tar (use it in conjunction with --digests)",
 		},
 		cli.StringFlag{
 			Name:  "index-name",
-			Usage: "image name to keep index as, by default index is discarded",
+			Usage: "Image name to keep index as, by default index is discarded",
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "imports content for all platforms, false by default",
+			Usage: "Imports content for all platforms, false by default",
 		},
 		cli.StringFlag{
 			Name:  "platform",
-			Usage: "imports content for specific platform",
+			Usage: "Imports content for specific platform",
 		},
 		cli.BoolFlag{
 			Name:  "no-unpack",
-			Usage: "skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
+			Usage: "Skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
 		cli.BoolTFlag{
 			Name:  "local",
-			Usage: "run import locally rather than through transfer API",
+			Usage: "Run import locally rather than through transfer API",
 		},
 		cli.BoolFlag{
 			Name:  "compress-blobs",
-			Usage: "compress uncompressed blobs when creating manifest (Docker format only)",
+			Usage: "Compress uncompressed blobs when creating manifest (Docker format only)",
 		},
 		cli.BoolFlag{
 			Name:  "discard-unpacked-layers",
-			Usage: "allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
+			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
 		},
 	}, commands.SnapshotterFlags...),
 

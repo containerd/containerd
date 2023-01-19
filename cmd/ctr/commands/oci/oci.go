@@ -38,11 +38,11 @@ var Command = cli.Command{
 
 var defaultSpecCommand = cli.Command{
 	Name:  "spec",
-	Usage: "see the output of the default OCI spec",
+	Usage: "See the output of the default OCI spec",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "platform",
-			Usage: "platform of the spec to print (Examples: 'linux/arm64', 'windows/amd64')",
+			Usage: "Platform of the spec to print (Examples: 'linux/arm64', 'windows/amd64')",
 		},
 	},
 	Action: func(context *cli.Context) error {
