@@ -22,7 +22,9 @@ import (
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/sandbox"
 	sb "github.com/containerd/containerd/sandbox"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // remoteSandboxController is a low level GRPC client for containerd's sandbox controller service
@@ -37,8 +39,19 @@ func NewSandboxController(client api.ControllerClient) sb.Controller {
 	return &remoteSandboxController{client: client}
 }
 
-func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, opts ...sandbox.CreateOpt) error {
+	var options sandbox.CreateOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
+		SandboxID: sandboxID,
+		Rootfs:    options.Rootfs,
+		Options: &anypb.Any{
+			TypeUrl: options.Options.GetTypeUrl(),
+			Value:   options.Options.GetValue(),
+		},
+	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
@@ -74,8 +87,16 @@ func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string
 	}, nil
 }
 
-func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Stop(ctx, &api.ControllerStopRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string, opts ...sandbox.StopOpt) error {
+	var soptions sandbox.StopOptions
+	for _, opt := range opts {
+		opt(&soptions)
+	}
+	req := &api.ControllerStopRequest{SandboxID: sandboxID}
+	if soptions.Timeout != nil {
+		req.TimeoutSecs = uint32(soptions.Timeout.Seconds())
+	}
+	_, err := s.client.Stop(ctx, req)
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
