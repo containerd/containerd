@@ -67,14 +67,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
-	statusResponse, err := controller.Status(ctx, sandbox.ID, false)
+	cstatus, err := controller.Status(ctx, sandbox.ID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get controller status: %w", err)
 	}
 
 	var (
-		sandboxID  = statusResponse.GetID()
-		sandboxPid = statusResponse.GetPid()
+		sandboxID  = cstatus.SandboxID
+		sandboxPid = cstatus.Pid
 	)
 
 	// Generate unique id and name for the container and reserve the name.
