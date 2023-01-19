@@ -101,7 +101,7 @@ func (c *controllerLocal) Create(ctx context.Context, in *api.ControllerCreateRe
 		return nil, fmt.Errorf("failed to start new sandbox: %w", err)
 	}
 
-	svc := runtimeAPI.NewSandboxClient(shim.Client())
+	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
 
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  in.SandboxID,
@@ -122,7 +122,7 @@ func (c *controllerLocal) Start(ctx context.Context, in *api.ControllerStartRequ
 		return nil, fmt.Errorf("unable to find sandbox %q", in.GetSandboxID())
 	}
 
-	svc := runtimeAPI.NewSandboxClient(shim.Client())
+	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
 	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{SandboxID: in.SandboxID})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start sandbox %s: %w", in.SandboxID, err)
@@ -225,12 +225,12 @@ func (c *controllerLocal) Status(ctx context.Context, in *api.ControllerStatusRe
 	}, nil
 }
 
-func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.SandboxService, error) {
+func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {
 		return nil, errdefs.ErrNotFound
 	}
 
-	svc := runtimeAPI.NewSandboxClient(shim.Client())
+	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
 	return svc, nil
 }
