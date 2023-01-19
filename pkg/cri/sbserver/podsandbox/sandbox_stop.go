@@ -29,9 +29,10 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/sandbox"
 )
 
-func (c *Controller) Stop(ctx context.Context, sandboxID string) error {
+func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.StopOpt) error {
 	sandbox, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
 		return fmt.Errorf("an error occurred when try to find sandbox %q: %w",
