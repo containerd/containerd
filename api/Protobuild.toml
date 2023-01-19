@@ -43,6 +43,15 @@ generators = ["go", "go-ttrpc", "go-grpc"]
 [overrides.parameters.go-ttrpc]
 prefix = "TTRPC"
 
+[[overrides]]
+prefixes = [
+  "github.com/containerd/containerd/api/runtime/task/v3",
+]
+generators = ["go", "go-ttrpc", "go-grpc"]
+
+[overrides.parameters.go-ttrpc]
+prefix = "TTRPC"
+
 # Aggregrate the API descriptors to lock down API changes.
 [[descriptors]]
 prefix = "github.com/containerd/containerd/api"
