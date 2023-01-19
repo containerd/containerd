@@ -18,7 +18,7 @@ require (
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028
 	github.com/containerd/nri v0.2.1-0.20230131001841-b3cabdec0657
-	github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
+	github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
 	github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
 	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/cni v1.1.2
@@ -69,8 +69,8 @@ require (
 	go.opentelemetry.io/otel/trace v1.12.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.4.0
-	google.golang.org/genproto v0.0.0-20221206210731-b1a01be3a5f6
-	google.golang.org/grpc v1.52.0
+	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
+	google.golang.org/grpc v1.52.3
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4

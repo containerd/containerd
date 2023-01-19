@@ -136,7 +136,7 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
-# github.com/containerd/ttrpc v1.1.1-0.20220420014843-944ef4a40df3
+# github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
 ## explicit; go 1.13
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
@@ -575,21 +575,21 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20221206210731-b1a01be3a5f6
+# google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.52.0
+# google.golang.org/grpc v1.52.3
 ## explicit; go 1.17
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
-google.golang.org/grpc/balancer/grpclb/grpclbstate
+google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/roundrobin
 google.golang.org/grpc/binarylog/grpc_binarylog_v1
 google.golang.org/grpc/channelz

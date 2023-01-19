@@ -18,11 +18,13 @@ package ttrpc
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math/rand"
 	"net"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -318,6 +320,7 @@ func (c *serverConn) run(sctx context.Context) {
 		responses              = make(chan response)
 		recvErr                = make(chan error, 1)
 		done                   = make(chan struct{})
+		streams                = sync.Map{}
 		active       int32
 		lastStreamID uint32
 	)
@@ -347,7 +350,6 @@ func (c *serverConn) run(sctx context.Context) {
 
 	go func(recvErr chan error) {
 		defer close(recvErr)
-		streams := map[uint32]*streamHandler{}
 		for {
 			select {
 			case <-c.shutdown:
@@ -383,12 +385,13 @@ func (c *serverConn) run(sctx context.Context) {
 			}
 
 			if mh.Type == messageTypeData {
-				sh, ok := streams[mh.StreamID]
+				i, ok := streams.Load(mh.StreamID)
 				if !ok {
 					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID is no longer active")) {
 						return
 					}
 				}
+				sh := i.(*streamHandler)
 				if mh.Flags&flagNoData != flagNoData {
 					unmarshal := func(obj interface{}) error {
 						err := protoUnmarshal(p, obj)
@@ -458,7 +461,7 @@ func (c *serverConn) run(sctx context.Context) {
 					continue
 				}
 
-				streams[id] = sh
+				streams.Store(id, sh)
 				atomic.AddInt32(&active, 1)
 			}
 			// TODO: else we must ignore this for future compat. log this?
@@ -518,6 +521,7 @@ func (c *serverConn) run(sctx context.Context) {
 				// The ttrpc protocol currently does not support the case where
 				// the server is localClosed but not remoteClosed. Once the server
 				// is closing, the whole stream may be considered finished
+				streams.Delete(response.id)
 				atomic.AddInt32(&active, -1)
 			}
 		case err := <-recvErr:
@@ -525,14 +529,12 @@ func (c *serverConn) run(sctx context.Context) {
 			// branch. Basically, it means that we are no longer receiving
 			// requests due to a terminal error.
 			recvErr = nil // connection is now "closing"
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, syscall.ECONNRESET) {
 				// The client went away and we should stop processing
 				// requests, so that the client connection is closed
 				return
 			}
-			if err != nil {
-				logrus.WithError(err).Error("error receiving message")
-			}
+			logrus.WithError(err).Error("error receiving message")
 			// else, initiate shutdown
 		case <-shutdown:
 			return
