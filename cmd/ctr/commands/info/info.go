@@ -30,7 +30,7 @@ type Info struct {
 // Command is a cli command to output the containerd server info
 var Command = cli.Command{
 	Name:  "info",
-	Usage: "print the server info",
+	Usage: "Print the server info",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

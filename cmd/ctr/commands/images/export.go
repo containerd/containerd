@@ -43,11 +43,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "skip-manifest-json",
-			Usage: "do not add Docker compatible manifest.json to archive",
+			Usage: "Do not add Docker compatible manifest.json to archive",
 		},
 		cli.BoolFlag{
 			Name:  "skip-non-distributable",
-			Usage: "do not add non-distributable blobs such as Windows layers to archive",
+			Usage: "Do not add non-distributable blobs such as Windows layers to archive",
 		},
 		cli.StringSliceFlag{
 			Name:  "platform",
@@ -56,7 +56,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "exports content from all platforms",
+			Usage: "Exports content from all platforms",
 		},
 	},
 	Action: func(context *cli.Context) error {

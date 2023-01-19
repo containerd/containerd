@@ -49,11 +49,11 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet,q",
-			Usage: "print only the plugin ids",
+			Usage: "Print only the plugin ids",
 		},
 		cli.BoolFlag{
 			Name:  "detailed,d",
-			Usage: "print detailed information about each plugin",
+			Usage: "Print detailed information about each plugin",
 		},
 	},
 	Action: func(context *cli.Context) error {

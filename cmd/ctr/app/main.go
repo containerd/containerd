@@ -78,7 +78,7 @@ containerd CLI
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
-			Usage: "enable debug output in logs",
+			Usage: "Enable debug output in logs",
 		},
 		cli.StringFlag{
 			Name:   "address, a",
@@ -88,11 +88,11 @@ containerd CLI
 		},
 		cli.DurationFlag{
 			Name:  "timeout",
-			Usage: "total timeout for ctr commands",
+			Usage: "Total timeout for ctr commands",
 		},
 		cli.DurationFlag{
 			Name:  "connect-timeout",
-			Usage: "timeout for connecting to containerd",
+			Usage: "Timeout for connecting to containerd",
 		},
 		cli.StringFlag{
 			Name:   "namespace, n",

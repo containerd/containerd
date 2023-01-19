@@ -69,15 +69,15 @@ var killCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "signal, s",
 			Value: "",
-			Usage: "signal to send to the container",
+			Usage: "Signal to send to the container",
 		},
 		cli.StringFlag{
 			Name:  "exec-id",
-			Usage: "process ID to kill",
+			Usage: "Process ID to kill",
 		},
 		cli.BoolFlag{
 			Name:  "all, a",
-			Usage: "send signal to all processes inside the container",
+			Usage: "Send signal to all processes inside the container",
 		},
 	},
 	Action: func(context *cli.Context) error {

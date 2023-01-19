@@ -93,35 +93,35 @@ var Command = cli.Command{
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "rm",
-			Usage: "remove the container after running, cannot be used with --detach",
+			Usage: "Remove the container after running, cannot be used with --detach",
 		},
 		cli.BoolFlag{
 			Name:  "null-io",
-			Usage: "send all IO to /dev/null",
+			Usage: "Send all IO to /dev/null",
 		},
 		cli.StringFlag{
 			Name:  "log-uri",
-			Usage: "log uri",
+			Usage: "Log uri",
 		},
 		cli.BoolFlag{
 			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution, cannot be used with --rm",
+			Usage: "Detach from the task after it has started execution, cannot be used with --rm",
 		},
 		cli.StringFlag{
 			Name:  "fifo-dir",
-			Usage: "directory used for storing IO FIFOs",
+			Usage: "Directory used for storing IO FIFOs",
 		},
 		cli.StringFlag{
 			Name:  "cgroup",
-			Usage: "cgroup path (To disable use of cgroup, set to \"\" explicitly)",
+			Usage: "Cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
 		cli.StringFlag{
 			Name:  "platform",
-			Usage: "run image for specific platform",
+			Usage: "Run image for specific platform",
 		},
 		cli.BoolFlag{
 			Name:  "cni",
-			Usage: "enable cni networking for the container",
+			Usage: "Enable cni networking for the container",
 		},
 	}, append(platformRunFlags,
 		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),

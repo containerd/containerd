@@ -34,11 +34,11 @@ var deleteCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "force, f",
-			Usage: "force delete task process",
+			Usage: "Force delete task process",
 		},
 		cli.StringFlag{
 			Name:  "exec-id",
-			Usage: "process ID to kill",
+			Usage: "Process ID to kill",
 		},
 	},
 	Action: func(context *cli.Context) error {

@@ -43,11 +43,11 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		// generic flags
 		cli.BoolFlag{
 			Name:  "uncompress",
-			Usage: "convert tar.gz layers to uncompressed tar layers",
+			Usage: "Convert tar.gz layers to uncompressed tar layers",
 		},
 		cli.BoolFlag{
 			Name:  "oci",
-			Usage: "convert Docker media types to OCI media types",
+			Usage: "Convert Docker media types to OCI media types",
 		},
 		// platform flags
 		cli.StringSliceFlag{
@@ -57,7 +57,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 		cli.BoolFlag{
 			Name:  "all-platforms",
-			Usage: "exports content from all platforms",
+			Usage: "Exports content from all platforms",
 		},
 	},
 	Action: func(context *cli.Context) error {
