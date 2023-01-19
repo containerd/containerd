@@ -19,12 +19,15 @@ package local
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/transfer"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/containerd/containerd/pkg/unpack"
 )
 
 func (ts *localTransferService) importStream(ctx context.Context, i transfer.ImageImporter, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -45,12 +48,16 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 		return err
 	}
 
-	var descriptors []ocispec.Descriptor
+	var (
+		descriptors []ocispec.Descriptor
+		handler     images.Handler
+		unpacker    *unpack.Unpacker
+	)
 
 	// If save index, add index
 	descriptors = append(descriptors, index)
 
-	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var handlerFunc images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		// Only save images at top level
 		if desc.Digest != index.Digest {
 			return images.Children(ctx, ts.content, desc)
@@ -81,14 +88,54 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	}
 
 	if f, ok := is.(transfer.ImageFilterer); ok {
-		handler = f.ImageFilter(handler, ts.content)
+		handlerFunc = f.ImageFilter(handlerFunc, ts.content)
 	}
 
-	if err := images.WalkNotEmpty(ctx, handler, index); err != nil {
+	if err := images.WalkNotEmpty(ctx, handlerFunc, index); err != nil {
 		return err
 	}
 
+	// First find suitable platforms to unpack into
+	//if unpacker, ok := is.
+	if iu, ok := is.(transfer.ImageUnpacker); ok {
+		unpacks := iu.UnpackPlatforms()
+		if len(unpacks) > 0 {
+			uopts := []unpack.UnpackerOpt{}
+			for _, u := range unpacks {
+				uopts = append(uopts, unpack.WithUnpackPlatform(u))
+			}
+			if ts.limiter != nil {
+				uopts = append(uopts, unpack.WithLimiter(ts.limiter))
+			}
+			//if uconfig.DuplicationSuppressor != nil {
+			//	uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
+			//}
+			unpacker, err := unpack.NewUnpacker(ctx, ts.content, uopts...)
+			if err != nil {
+				return fmt.Errorf("unable to initialize unpacker: %w", err)
+			}
+			handler = unpacker.Unpack(handlerFunc)
+		}
+	}
+
 	for _, desc := range descriptors {
+		if err := images.Dispatch(ctx, handler, ts.limiter, desc); err != nil {
+			if unpacker != nil {
+				// wait for unpacker to cleanup
+				unpacker.Wait()
+			}
+			return err
+		}
+		// NOTE(fuweid): unpacker defers blobs download. before create image
+		// record in ImageService, should wait for unpacking(including blobs
+		// download).
+		if unpacker != nil {
+			if _, err = unpacker.Wait(); err != nil {
+				return err
+			}
+			// TODO: Check results to make sure unpack was successful
+		}
+
 		img, err := is.Store(ctx, desc, ts.images)
 		if err != nil {
 			if errdefs.IsNotFound(err) {

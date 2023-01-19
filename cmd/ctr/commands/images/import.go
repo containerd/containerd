@@ -22,6 +22,9 @@ import (
 	"os"
 	"time"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
@@ -30,7 +33,6 @@ import (
 	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
 	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
-	"github.com/urfave/cli"
 )
 
 var importCommand = cli.Command{
@@ -126,9 +128,34 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				opts = append(opts, image.WithDigestRefs(!context.Bool("skip-digest-for-named")))
 			}
 
-			// TODO: Add platform options
+			var platSpec ocispec.Platform
+			//Only when all-platforms not specified, we will check platform value
+			//Implicitly if the platforms is empty, it means all-platforms
+			if !context.Bool("all-platforms") {
+				//If platform specified, use that one, if not use default
+				if platform := context.String("platform"); platform != "" {
+					platSpec, err = platforms.Parse(platform)
+					if err != nil {
+						return err
+					}
+				} else {
+					platSpec = platforms.DefaultSpec()
+				}
+				opts = append(opts, image.WithPlatforms(platSpec))
+			}
 
-			// TODO: Add unpack options
+			if !context.Bool("no-unpack") {
+				snapshotter := context.String("snapshotter")
+				//If OS filed is not empty, it means platSpec was updated in the above block
+				//i.e all-platforms was not specified
+				if platSpec.OS != "" {
+					opts = append(opts, image.WithUnpack(platSpec, snapshotter))
+				} else {
+					//empty spec means all platforms
+					var emptySpec ocispec.Platform
+					opts = append(opts, image.WithUnpack(emptySpec, snapshotter))
+				}
+			}
 
 			is := image.NewStore(context.String("index-name"), opts...)
 

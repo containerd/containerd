@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
@@ -32,7 +34,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/typeurl"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
