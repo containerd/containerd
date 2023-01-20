@@ -69,19 +69,20 @@ jobs:
     strategy:
       matrix:
         include:
-          # Choose an old release of Ubuntu to avoid glibc issue https://github.com/containerd/containerd/issues/7255
-          - dockerfile-ubuntu: 18.04
+          # Ubuntu 22.04 can't be used until we drop support for binary compatibility with dynamically-linked glibc 2.17 (CentOS 7).
+          # https://github.com/containerd/containerd/issues/7255
+          # https://github.com/containerd/containerd/issues/7961
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: linux/amd64
-          - dockerfile-ubuntu: 18.04
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: linux/arm64
-          - dockerfile-ubuntu: 18.04
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: linux/ppc64le
-          - dockerfile-ubuntu: 18.04
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: linux/s390x
-          # riscv64 isn't supported by Ubuntu 18.04
-          - dockerfile-ubuntu: 22.04
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: linux/riscv64
-          - dockerfile-ubuntu: 18.04
+          - dockerfile-ubuntu: 20.04
             dockerfile-platform: windows/amd64
     steps:
       - name: Set RELEASE_VER
