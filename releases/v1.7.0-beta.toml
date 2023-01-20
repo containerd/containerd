@@ -119,7 +119,7 @@ See the changelog for complete list of changes"""
 
 postface = """\
 ### Which file should I download?
-* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.27 (Ubuntu 18.04).
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
 * `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
 * `cri-containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:     (Deprecated)
 * `cri-containerd-cni-<VERSION>-<OS>-<ARCH>.tar.gz`: (Deprecated)

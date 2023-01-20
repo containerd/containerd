@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# UBUNTU_VERSION can be set to 18.04 (bionic), 20.04 (focal), or 22.04 (jammy)
-ARG UBUNTU_VERSION=18.04
+# UBUNTU_VERSION can be set to 18.04 (bionic, DEPRECATED), 20.04 (focal), or 22.04 (jammy)
+ARG UBUNTU_VERSION=20.04
 ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
