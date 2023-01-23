@@ -59,9 +59,9 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		}
 	}
 
-	var mounts []process.Mount
+	var pmounts []process.Mount
 	for _, m := range r.Rootfs {
-		mounts = append(mounts, process.Mount{
+		pmounts = append(pmounts, process.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
 			Target:  m.Target,
@@ -70,7 +70,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 
 	rootfs := ""
-	if len(mounts) > 0 {
+	if len(pmounts) > 0 {
 		rootfs = filepath.Join(r.Bundle, "rootfs")
 		if err := os.Mkdir(rootfs, 0711); err != nil && !os.IsExist(err) {
 			return nil, err
@@ -81,7 +81,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		ID:               r.ID,
 		Bundle:           r.Bundle,
 		Runtime:          opts.BinaryName,
-		Rootfs:           mounts,
+		Rootfs:           pmounts,
 		Terminal:         r.Terminal,
 		Stdin:            r.Stdin,
 		Stdout:           r.Stdout,
@@ -98,22 +98,25 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	if err := WriteRuntime(r.Bundle, opts.BinaryName); err != nil {
 		return nil, err
 	}
+
+	var mounts []mount.Mount
+	for _, pm := range pmounts {
+		mounts = append(mounts, mount.Mount{
+			Type:    pm.Type,
+			Source:  pm.Source,
+			Target:  pm.Target,
+			Options: pm.Options,
+		})
+	}
 	defer func() {
 		if retErr != nil {
-			if err := mount.UnmountAll(rootfs, 0); err != nil {
+			if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
 				logrus.WithError(err).Warn("failed to cleanup rootfs mount")
 			}
 		}
 	}()
-	for _, rm := range mounts {
-		m := &mount.Mount{
-			Type:    rm.Type,
-			Source:  rm.Source,
-			Options: rm.Options,
-		}
-		if err := m.Mount(rootfs); err != nil {
-			return nil, fmt.Errorf("failed to mount rootfs component %v: %w", m, err)
-		}
+	if err := mount.All(mounts, rootfs); err != nil {
+		return nil, fmt.Errorf("failed to mount rootfs component: %w", err)
 	}
 
 	p, err := newInit(
