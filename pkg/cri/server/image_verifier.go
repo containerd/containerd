@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/server/imageverifier/v1"
 	"github.com/containerd/containerd/remotes"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 type verifyingResolver struct {
@@ -46,20 +47,32 @@ func (r *verifyingResolver) Resolve(ctx context.Context, ref string) (name strin
 
 	digest := desc.Digest.String()
 
-	log.G(ctx).Infof("Verifying image ref: %q, name: %q, digest %q", ref, name, digest)
+	rlog := log.G(ctx).WithFields(logrus.Fields{
+		"req.name":   name,
+		"req.digest": digest,
+	})
+	rlog.Info("Verifying image ref")
+
 	resp, err := r.verifier.VerifyImage(ctx, &imageverifier.VerifyImageRequest{
 		ImageName:   name,
 		ImageDigest: digest,
 	})
 	if err != nil {
+		rlog.WithError(err).Error("Failed to verify image, blocking pull")
 		return "", ocispec.Descriptor{}, fmt.Errorf("VerifyImage RPC failed: %w", err)
 	}
-	log.G(ctx).Infof("Image verifier plugin returned OK: %t with reason: %q", resp.Ok, resp.Reason)
+
+	rlog = rlog.WithFields(logrus.Fields{
+		"resp.ok":     resp.Ok,
+		"resp.reason": resp.Reason,
+	})
 
 	if !resp.Ok {
-		return "", ocispec.Descriptor{}, fmt.Errorf("image verifier blocked pull of %q with reason %q", ref, resp.Reason)
+		rlog.Warn("Image verifier blocked pull")
+		return "", ocispec.Descriptor{}, fmt.Errorf("image verifier blocked pull of %v with digest %v for reason %q", ref, digest, resp.Reason)
 	}
 
+	rlog.Warn("Image verifier allowed pull")
 	return name, desc, err
 }
 
