@@ -279,8 +279,9 @@ func TestVolumeMounts(t *testing.T) {
 			config := &imagespec.ImageConfig{
 				Volumes: test.imageVolumes,
 			}
+			containerConfig := &runtime.ContainerConfig{Mounts: test.criMounts}
 			c := newTestCRIService()
-			got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
+			got := c.volumeMounts(testContainerRootDir, containerConfig, config)
 			assert.Len(t, got, len(test.expectedMountDest))
 			for _, dest := range test.expectedMountDest {
 				found := false

@@ -143,7 +143,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	var volumeMounts []*runtime.Mount
 	if !c.config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
-		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+		volumeMounts = c.volumeMounts(containerRootDir, config, &image.ImageSpec.Config)
 	} else if len(image.ImageSpec.Config.Volumes) != 0 {
 		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
 	}
@@ -318,10 +318,19 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
 	if len(config.Volumes) == 0 {
 		return nil
 	}
+	var uidMappings, gidMappings []*runtime.IDMapping
+	if goruntime.GOOS != "windows" {
+		if usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
+			uidMappings = usernsOpts.GetUids()
+			gidMappings = usernsOpts.GetGids()
+		}
+	}
+
+	criMounts := containerConfig.GetMounts()
 	var mounts []*runtime.Mount
 	for dst := range config.Volumes {
 		if isInCRIMounts(dst, criMounts) {
@@ -343,6 +352,8 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 			ContainerPath:  dst,
 			HostPath:       src,
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 	return mounts
