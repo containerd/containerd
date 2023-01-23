@@ -69,7 +69,7 @@ func (r *verifyingResolver) Resolve(ctx context.Context, ref string) (name strin
 
 	if !resp.Ok {
 		rlog.Warn("Image verifier blocked pull")
-		return "", ocispec.Descriptor{}, fmt.Errorf("image verifier blocked pull of %v with digest %v for reason %q", ref, digest, resp.Reason)
+		return "", ocispec.Descriptor{}, fmt.Errorf("image verifier blocked pull of %v with digest %v for reason: %v", ref, digest, resp.Reason)
 	}
 
 	rlog.Warn("Image verifier allowed pull")
