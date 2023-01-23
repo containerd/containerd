@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/containerd/containerd/plugin"
@@ -73,6 +74,94 @@ func TestMergeConfigs(t *testing.T) {
 	err = mergeConfig(a, b)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
+}
+
+func TestMergePlugins(t *testing.T) {
+	t.Run("MergeNilTo", func(t *testing.T) {
+		to := &Config{
+			Plugins: nil,
+		}
+		from := &Config{
+			Plugins: map[string]toml.Tree{},
+		}
+
+		mergePlugins(to, from)
+		assert.Equal(t, from.Plugins, to.Plugins)
+	})
+
+	t.Run("MergeEmptykey", func(t *testing.T) {
+		to := &Config{
+			Plugins: map[string]toml.Tree{},
+		}
+		from := &Config{
+			Plugins: map[string]toml.Tree{
+				"foo": {},
+			},
+		}
+		mergePlugins(to, from)
+		assert.Equal(t, from.Plugins["foo"], to.Plugins["foo"])
+	})
+
+	t.Run("MergeTrees", func(t *testing.T) {
+		to := &Config{
+			Plugins: map[string]toml.Tree{},
+		}
+		// toml.Tree.Set() panics if the map is nil, so we need to
+		// initialize it. We only need this  on tests because unmarshalling
+		// from a file will always generate a map even if it's empty.
+		toBar := toml.Tree{}
+		toBar.SetValues(map[string]interface{}{})
+		to.Plugins["bar"] = toBar
+
+		from := &Config{
+			Plugins: map[string]toml.Tree{},
+		}
+		fromBar := toml.Tree{}
+		fromBar.SetValues(map[string]interface{}{
+			"foo": "bar",
+		})
+		from.Plugins["bar"] = fromBar
+
+		mergePlugins(to, from)
+
+		resultBar := to.Plugins["bar"]
+		assert.Equal(t, fromBar.Get("foo"), resultBar.Get("foo"))
+	})
+}
+
+func TestMergeTrees(t *testing.T) {
+	var to, from toml.Tree
+	to.SetValues(map[string]interface{}{
+		"foo": "bar",
+	})
+
+	from.SetValues(map[string]interface{}{
+		"foo": "wrong value",
+		"bar": "bar",
+	})
+
+	toSubTree := &toml.Tree{}
+	toSubTree.SetValues(map[string]interface{}{
+		"foo": "bar",
+	})
+
+	fromSubTree := &toml.Tree{}
+	fromSubTree.SetValues(map[string]interface{}{
+		"bar": "bar",
+		"foo": "wrong value",
+	})
+	to.Set("subtree", toSubTree)
+	from.Set("subtree", fromSubTree)
+
+	mergeTrees(to, from)
+
+	resultSubTree := to.Get("subtree").(*toml.Tree)
+	assert.Equal(t, from.Get("bar"), to.Get("bar"))
+	assert.NotEqual(t, from.Get("foo"), to.Get("foo"))
+	assert.Equal(t, toSubTree.Get("foo"), resultSubTree.Get("foo"))
+	assert.Equal(t, fromSubTree.Get("bar"), resultSubTree.Get("bar"))
+	assert.NotEqual(t, fromSubTree.Get("foo"), resultSubTree.Get("foo"))
+
 }
 
 func TestResolveImports(t *testing.T) {

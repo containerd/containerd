@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/imdario/mergo"
@@ -288,16 +289,18 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // []{"1"}      []{}        []{"1"}
 // Maps merged by keys, but values are replaced entirely.
 func mergeConfig(to, from *Config) error {
+	// mergo.Merge will overwrite the entire key in the map so we need to
+	// merge the plugins manually in a different step. After they are merged
+	// we have to nil from.Plugins precisely to prevent this overwrite.
+	mergePlugins(to, from)
+	from.Plugins = nil
+
 	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithAppendSlice)
 	if err != nil {
 		return err
 	}
 
 	// Replace entire sections instead of merging map's values.
-	for k, v := range from.Plugins {
-		to.Plugins[k] = v
-	}
-
 	for k, v := range from.StreamProcessors {
 		to.StreamProcessors[k] = v
 	}
@@ -311,6 +314,43 @@ func mergeConfig(to, from *Config) error {
 	}
 
 	return nil
+}
+
+func isTree(v interface{}) bool {
+	return reflect.TypeOf(v).String() == "*toml.Tree"
+}
+
+func mergePlugins(to, from *Config) {
+	if to.Plugins == nil {
+		to.Plugins = from.Plugins
+		return
+	}
+
+	for k := range from.Plugins {
+		// If plugin is not present in the target config, just copy the whole section.
+		if _, ok := to.Plugins[k]; !ok {
+			to.Plugins[k] = from.Plugins[k]
+			continue
+		}
+
+		mergeTrees(to.Plugins[k], from.Plugins[k])
+	}
+}
+
+// mergeTrees merges two toml.Trees recursively until it hits a tomlValue, in
+// which case it stops and preserves the value in to.
+func mergeTrees(to, from toml.Tree) {
+	for _, k := range from.Keys() {
+		if !to.Has(k) {
+			to.Set(k, from.Get(k))
+			continue
+		}
+		if isTree(to.Get(k)) && isTree(from.Get(k)) {
+			t := to.Get(k).(*toml.Tree)
+			f := from.Get(k).(*toml.Tree)
+			mergeTrees(*t, *f)
+		}
+	}
 }
 
 // V1DisabledFilter matches based on ID
