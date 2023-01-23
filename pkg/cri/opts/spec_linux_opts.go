@@ -163,6 +163,10 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 					return fmt.Errorf("relabel %q with %q failed: %w", src, mountLabel, err)
 				}
 			}
+			if mount.UidMappings != nil || mount.GidMappings != nil {
+				return fmt.Errorf("idmap mounts not yet supported, but they were requested for: %q", src)
+			}
+
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
 				Source:      src,
 				Destination: dst,
