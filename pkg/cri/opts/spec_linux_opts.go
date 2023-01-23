@@ -166,11 +166,34 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				return fmt.Errorf("idmap mounts not yet supported, but they were requested for: %q", src)
 			}
 
+			var uidMapping []runtimespec.LinuxIDMapping
+			if mount.UidMappings != nil {
+				for _, mapping := range mount.UidMappings {
+					uidMapping = append(uidMapping, runtimespec.LinuxIDMapping{
+						HostID:      mapping.HostId,
+						ContainerID: mapping.ContainerId,
+						Size:        mapping.Length,
+					})
+				}
+			}
+			var gidMapping []runtimespec.LinuxIDMapping
+			if mount.GidMappings != nil {
+				for _, mapping := range mount.GidMappings {
+					gidMapping = append(gidMapping, runtimespec.LinuxIDMapping{
+						HostID:      mapping.HostId,
+						ContainerID: mapping.ContainerId,
+						Size:        mapping.Length,
+					})
+				}
+			}
+
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
 				Source:      src,
 				Destination: dst,
 				Type:        "bind",
 				Options:     options,
+				UIDMappings: uidMapping,
+				GIDMappings: gidMapping,
 			})
 		}
 		return nil
