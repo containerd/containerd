@@ -62,6 +62,12 @@ const (
 func (c *criService) containerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
+	var uidMappings, gidMappings []*runtime.IDMapping
+	if usernsOpts := securityContext.GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
+		uidMappings = usernsOpts.GetUids()
+		gidMappings = usernsOpts.GetGids()
+	}
+
 	if !isInCRIMounts(etcHostname, config.GetMounts()) {
 		// /etc/hostname is added since 1.1.6, 1.2.4 and 1.3.
 		// For in-place upgrade, the old sandbox doesn't have the hostname file,
@@ -75,6 +81,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 				HostPath:       hostpath,
 				Readonly:       securityContext.GetReadonlyRootfs(),
 				SelinuxRelabel: true,
+				UidMappings:    uidMappings,
+				GidMappings:    gidMappings,
 			})
 		}
 	}
@@ -85,6 +93,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 			HostPath:       c.getSandboxHosts(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 
@@ -96,6 +106,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 			HostPath:       c.getResolvPath(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 

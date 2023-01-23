@@ -163,11 +163,35 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 					return fmt.Errorf("relabel %q with %q failed: %w", src, mountLabel, err)
 				}
 			}
+
+			var uidMapping []runtimespec.LinuxIDMapping
+			if mount.UidMappings != nil {
+				for _, mapping := range mount.UidMappings {
+					uidMapping = append(uidMapping, runtimespec.LinuxIDMapping{
+						HostID:      uint32(mapping.HostId),
+						ContainerID: uint32(mapping.ContainerId),
+						Size:        uint32(mapping.Length),
+					})
+				}
+			}
+			var gidMapping []runtimespec.LinuxIDMapping
+			if mount.GidMappings != nil {
+				for _, mapping := range mount.GidMappings {
+					gidMapping = append(gidMapping, runtimespec.LinuxIDMapping{
+						HostID:      uint32(mapping.HostId),
+						ContainerID: uint32(mapping.ContainerId),
+						Size:        uint32(mapping.Length),
+					})
+				}
+			}
+
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
 				Source:      src,
 				Destination: dst,
 				Type:        "bind",
 				Options:     options,
+				UIDMappings: uidMapping,
+				GIDMappings: gidMapping,
 			})
 		}
 		return nil
