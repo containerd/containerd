@@ -219,7 +219,7 @@ func deepCopyOf(s Status) Status {
 	}
 	copy.Resources = &runtime.ContainerResources{}
 	if s.Resources != nil && s.Resources.Linux != nil {
-		hugepageLimits := make([]*runtime.HugepageLimit, 0)
+		hugepageLimits := make([]*runtime.HugepageLimit, 0, len(s.Resources.Linux.HugepageLimits))
 		for _, l := range s.Resources.Linux.HugepageLimits {
 			if l != nil {
 				hugepageLimits = append(hugepageLimits, &runtime.HugepageLimit{
