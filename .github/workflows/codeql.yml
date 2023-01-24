@@ -26,7 +26,7 @@ jobs:
 
     - uses: actions/setup-go@v3
       with:
-        go-version: 1.18.9
+        go-version: 1.18.10
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
