@@ -16,6 +16,7 @@
 
 : ${RUNHCS_VERSION:="$(grep 'Microsoft/hcsshim ' go.mod | awk '{print $2}')"}
 : ${RUNHCS_REPO:="https://github.com/Microsoft/hcsshim.git"}
+: ${HCSSHIM_SRC:=''}
 : ${DESTDIR:=''}
 : ${GOOS:="windows"}
 
@@ -28,13 +29,15 @@ cleanup() {
 trap 'cleanup' EXIT
 
 export GOOS
-
-(
+if [ "$HCSSHIM_SRC" == "" ]
+then
     set -e -x
     cd "$tmpdir"
     git init .
     git remote add origin "$RUNHCS_REPO"
     git fetch --tags --depth=1 origin ${RUNHCS_VERSION}
-    git checkout "refs/tags/${RUNHCS_VERSION}" || git checkout "refs/heads/${RUNHCS_VERSION}" || git checkout "${RUNHCS_VERSION}"
-    GO111MODULE=on go build -mod=vendor -o "${DESTDIR}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
-)
+else
+    cd "${HCSSHIM_SRC}"
+fi
+git checkout "refs/tags/${RUNHCS_VERSION}" || git checkout "refs/heads/${RUNHCS_VERSION}" || git checkout "${RUNHCS_VERSION}"
+GO111MODULE=on go build -mod=vendor -o "${DESTDIR}/containerd-shim-runhcs-v1.exe" ./cmd/containerd-shim-runhcs-v1
