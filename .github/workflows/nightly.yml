@@ -7,7 +7,7 @@ on:
       - '.github/workflows/nightly.yml'
 
 env:
-  GO_VERSION: '1.18.9'
+  GO_VERSION: '1.18.10'
 
 jobs:
   linux:
