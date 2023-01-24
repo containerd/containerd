@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -436,6 +437,16 @@ func (p *PoolDevice) DeactivateDevice(ctx context.Context, deviceName string, de
 
 	if err := p.transition(ctx, deviceName, Deactivating, Deactivated, func() error {
 		return retry(ctx, func() error {
+			// device nodes only exist for non-committed snapshots
+			device, err := os.OpenFile(deviceName, os.O_RDWR, 0)
+			if err != nil && !os.IsNotExist(err) {
+				log.G(ctx).Warnf("unable to open device %q to flush buffers: %+v", deviceName, err)
+			} else if err == nil {
+				defer device.Close()
+				if err := unix.IoctlSetInt(int(device.Fd()), unix.BLKFLSBUF, 0); err != nil {
+					log.G(ctx).Warnf("could not flush buffers for device %q: %+v", deviceName, err)
+				}
+			}
 			if !deferred && p.discardBlocks {
 				err := dmsetup.DiscardBlocks(deviceName)
 				if err != nil {
