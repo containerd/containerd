@@ -117,26 +117,19 @@ func TestPusherErrReset(t *testing.T) {
 	}
 
 	w, err := p.push(context.Background(), desc, remotes.MakeRefKey(context.Background(), desc), false)
-	assert.Equal(t, err, nil, "no error should be there")
+	assert.NoError(t, err)
 
-	w.Write(ct)
+	// first push should fail with ErrReset
+	_, err = w.Write(ct)
+	assert.NoError(t, err)
+	err = w.Commit(context.Background(), desc.Size, desc.Digest)
+	assert.Equal(t, content.ErrReset, err)
 
-	pw, _ := w.(*pushWriter)
-
-	select {
-	case p := <-pw.pipeC:
-		p.Write(ct)
-	case e := <-pw.errC:
-		assert.Failf(t, "error: %v while retrying request", e.Error())
-	}
-
-	select {
-	case resp := <-pw.respC:
-		assert.Equalf(t, resp.StatusCode, http.StatusCreated,
-			"201 should be the response code when uploading new content")
-	case <-pw.errC:
-		assert.Fail(t, "should not give error")
-	}
+	// second push should succeed
+	_, err = w.Write(ct)
+	assert.NoError(t, err)
+	err = w.Commit(context.Background(), desc.Size, desc.Digest)
+	assert.NoError(t, err)
 }
 
 func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent []byte) error {
