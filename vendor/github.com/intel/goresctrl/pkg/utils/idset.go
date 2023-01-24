@@ -129,7 +129,7 @@ func (s IDSet) String() string {
 
 // StringWithSeparator returns the set as a string, separated with the given separator.
 func (s IDSet) StringWithSeparator(args ...string) string {
-	if s == nil || len(s) == 0 {
+	if len(s) == 0 {
 		return ""
 	}
 

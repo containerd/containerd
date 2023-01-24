@@ -44,7 +44,7 @@ func OciLinuxBlockIO(class string) (*oci.LinuxBlockIO, error) {
 }
 
 func ociLinuxWeightDevices(dws cgroups.DeviceWeights) []oci.LinuxWeightDevice {
-	if dws == nil || len(dws) == 0 {
+	if len(dws) == 0 {
 		return nil
 	}
 	olwds := make([]oci.LinuxWeightDevice, len(dws))
@@ -58,7 +58,7 @@ func ociLinuxWeightDevices(dws cgroups.DeviceWeights) []oci.LinuxWeightDevice {
 }
 
 func ociLinuxThrottleDevices(drs cgroups.DeviceRates) []oci.LinuxThrottleDevice {
-	if drs == nil || len(drs) == 0 {
+	if len(drs) == 0 {
 		return nil
 	}
 	oltds := make([]oci.LinuxThrottleDevice, len(drs))
