@@ -249,6 +249,9 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"pidfd_send_signal",
 				"pipe",
 				"pipe2",
+				"pkey_alloc",
+				"pkey_free",
+				"pkey_mprotect",
 				"poll",
 				"ppoll",
 				"ppoll_time64",
@@ -649,6 +652,16 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		case "CAP_SYS_TTY_CONFIG":
 			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 				Names:  []string{"vhangup"},
+				Action: specs.ActAllow,
+				Args:   []specs.LinuxSeccompArg{},
+			})
+		case "CAP_SYS_NICE":
+			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+				Names: []string{
+					"get_mempolicy",
+					"mbind",
+					"set_mempolicy",
+				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},
 			})
