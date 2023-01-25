@@ -27,6 +27,8 @@ env:
   RESOURCE_CONSUMER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/resource-consumer:1.10"
   WEBSERVER_TESTING_IMAGE_REF: "registry.k8s.io/e2e-test-images/nginx:1.14-2"
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
 
 jobs:
   winIntegration:

@@ -14,11 +14,17 @@ env:
   # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
   GO_VERSION: '1.18.10'
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
+
 jobs:
   #
   # golangci-lint
   #
   linters:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     name: Linters
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10

@@ -9,6 +9,8 @@ on:
       image:
         description: "Target image name (override)"
 
+permissions:  # added using https://github.com/step-security/secure-workflows
+  contents: read
 
 jobs:
   mirror:
