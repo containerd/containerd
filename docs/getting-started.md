@@ -117,7 +117,7 @@ tar.exe xvf .\containerd-windows-amd64.tar.gz
 
 # Copy and configure
 Copy-Item -Path ".\bin\" -Destination "$Env:ProgramFiles\containerd" -Recurse -Force
-cd $Env:ProgramFiles\containerd\
+cd $Env:ProgramFiles\containerd\bin
 .\containerd.exe config default | Out-File config.toml -Encoding ascii
 
 # Review the configuration. Depending on setup you may want to adjust:
