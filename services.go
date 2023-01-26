@@ -192,6 +192,9 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			plugin.SandboxStorePlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
 			},
+			plugin.SandboxControllerPlugin: func(i interface{}) ServicesOpt {
+				return WithSandboxController(i.(sandbox.Controller))
+			},
 		} {
 			i, err := ic.Get(t)
 			if err != nil {
@@ -228,9 +231,6 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			srv.IntrospectionService: func(s interface{}) ServicesOpt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
-			},
-			srv.SandboxControllerService: func(s interface{}) ServicesOpt {
-				return WithSandboxController(s.(sandbox.Controller))
 			},
 		} {
 			p := plugins[s]
