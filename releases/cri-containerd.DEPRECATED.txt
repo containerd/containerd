@@ -1,0 +1,12 @@
+The "cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz" release bundle has been deprecated since containerd 1.6,
+does not work on some Linux distributions, and will be removed in containerd 2.0.
+
+Instead of this, install the following components separately, either from the binary or from the source:
+* containerd:  https://github.com/containerd/containerd/releases
+* runc:        https://github.com/opencontainers/runc/releases
+* CNI plugins: https://github.com/containernetworking/plugins/releases
+
+The CRI plugin has been included in containerd since containerd 1.1.
+
+See also the "Getting started" document:
+https://github.com/containerd/containerd/blob/main/docs/getting-started.md
