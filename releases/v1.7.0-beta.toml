@@ -113,6 +113,7 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Replace fork on mount logic with CLONE_FS** ([#7513](https://github.com/containerd/containerd/pull/7513))
 * **Add support for default registry host configuration** ([#7607](https://github.com/containerd/containerd/pull/7607))
 * **Use github.com/minio/sha256-simd for more efficient sha256 calculation** ([#7732](https://github.com/containerd/containerd/pull/7732))
+* **Make OCI options cross-platform** ([#7928](https://github.com/containerd/containerd/pull/7928))
 
 See the changelog for complete list of changes"""
 
