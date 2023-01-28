@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.15"
+
+pre_release = false
+
+preface = """\
+The sixteenth patch release for containerd 1.6 includes various bug fixes and updates.
+
+### Notable Updates
+
+* **Fix push error propagation** ([#7990](https://github.com/containerd/containerd/pull/7990))
+* **Fix slice append error with HugepageLimits for Linux** ([#7995](https://github.com/containerd/containerd/pull/7995))
+* **Update default seccomp profile for PKU and CAP_SYS_NICE** ([#8001](https://github.com/containerd/containerd/pull/8001))
+* **Fix overlayfs error when upperdirlabel option is set** ([#8002](https://github.com/containerd/containerd/pull/8002))
+
+See the changelog for complete list of changes"""
