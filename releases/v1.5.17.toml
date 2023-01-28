@@ -1,0 +1,22 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.5.16"
+
+pre_release = false
+
+preface = """\
+The seventeenth patch release for containerd 1.5 includes various fixes and updates.
+
+### Notable Updates
+
+* **Update shim to fail fast on dial error** ([#7953](https://github.com/containerd/containerd/pull/7953))
+* **Fix no CNI info for pod sandbox on restart** ([#7849](https://github.com/containerd/containerd/pull/7849))
+* **Fix push error propagation** ([#7998](https://github.com/containerd/containerd/pull/7998))
+
+See the changelog for complete list of changes"""
