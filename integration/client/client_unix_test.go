@@ -30,7 +30,19 @@ var (
 	testImage             = images.Get(images.BusyBox)
 	testMultiLayeredImage = images.Get(images.VolumeCopyUp)
 	shortCommand          = withProcessArgs("true")
-	longCommand           = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
+	// NOTE: The TestContainerPids needs two running processes in one
+	// container. But busybox:1.36 sh shell, the `sleep` is a builtin.
+	//
+	// 	/bin/sh -c "type sleep"
+	//      sleep is a shell builtin
+	//
+	// We should use `/bin/sleep` instead of `sleep`. And busybox sh shell
+	// will execve directly instead of clone-execve if there is only one
+	// command. There will be only one process in container if we use
+	// '/bin/sh -c "/bin/sleep inf"'.
+	//
+	// So we append `&& exit 0` to force sh shell uses clone-execve.
+	longCommand = withProcessArgs("/bin/sh", "-c", "/bin/sleep inf && exit 0")
 )
 
 func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
