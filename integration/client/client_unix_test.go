@@ -30,7 +30,7 @@ var (
 	testImage             = images.Get(images.BusyBox)
 	testMultiLayeredImage = images.Get(images.VolumeCopyUp)
 	shortCommand          = withProcessArgs("true")
-	longCommand           = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1; done")
+	longCommand           = withProcessArgs("/bin/sh", "-c", "while true; do sleep 1d; done")
 )
 
 func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
