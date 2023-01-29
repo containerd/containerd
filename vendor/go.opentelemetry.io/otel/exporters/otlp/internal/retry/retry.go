@@ -119,8 +119,8 @@ func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 				delay = throttle
 			}
 
-			if err := waitFunc(ctx, delay); err != nil {
-				return err
+			if ctxErr := waitFunc(ctx, delay); ctxErr != nil {
+				return fmt.Errorf("%w: %s", ctxErr, err)
 			}
 		}
 	}
@@ -129,6 +129,9 @@ func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 // Allow override for testing.
 var waitFunc = wait
 
+// wait takes the caller's context, and the amount of time to wait.  It will
+// return nil if the timer fires before or at the same time as the context's
+// deadline.  This indicates that the call can be retried.
 func wait(ctx context.Context, delay time.Duration) error {
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
