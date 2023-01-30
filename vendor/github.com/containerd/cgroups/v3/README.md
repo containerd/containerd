@@ -188,6 +188,19 @@ if err != nil {
 }
 ```
 
+### Kill all processes in a cgroup
+
+```go
+m, err := cgroup2.LoadSystemd("/", "my-cgroup-abc.slice")
+if err != nil {
+	return err
+}
+err = m.Kill()
+if err != nil {
+	return err
+}
+```
+
 ### Attention
 
 All static path should not include `/sys/fs/cgroup/` prefix, it should start with your own cgroups name
