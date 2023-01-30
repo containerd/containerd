@@ -418,32 +418,38 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 
 // handleSandboxExit handles TaskExit event for sandbox.
 func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService) error {
-	// No stream attached to sandbox container.
-	task, err := sb.Container.Task(ctx, nil)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to load task for sandbox: %w", err)
-		}
-	} else {
-		// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-		if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+	// TODO: Move pause container cleanup to podsandbox/ package.
+	if sb.Container != nil {
+		// No stream attached to sandbox container.
+		task, err := sb.Container.Task(ctx, nil)
+		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to stop sandbox: %w", err)
+				return fmt.Errorf("failed to load task for sandbox: %w", err)
 			}
-			// Move on to make sure container status is updated.
+		} else {
+			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
+			if _, err = task.Delete(ctx, WithNRISandboxDelete(sb.ID), containerd.WithProcessKill); err != nil {
+				if !errdefs.IsNotFound(err) {
+					return fmt.Errorf("failed to stop sandbox: %w", err)
+				}
+				// Move on to make sure container status is updated.
+			}
+
+			c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
 		}
 	}
-	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+
+	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
 		return status, nil
-	})
-	if err != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to update sandbox state: %w", err)
 	}
+
 	// Using channel to propagate the information of sandbox stop
 	sb.Stop()
-	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
+
 	return nil
 }
 

@@ -46,6 +46,10 @@ type CRIService interface {
 
 	// TODO: we should implement Event backoff in Controller.
 	BackOffEvent(id string, event interface{})
+
+	// TODO: refactor event generator for PLEG.
+	// GenerateAndSendContainerEvent is called by controller for sandbox container events.
+	GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType)
 }
 
 type Controller struct {

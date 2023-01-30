@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -57,6 +59,11 @@ func (c *Controller) Shutdown(ctx context.Context, sandboxID string) (*api.Contr
 			log.G(ctx).Tracef("Sandbox controller Delete called for sandbox container %q that does not exist", sandboxID)
 		}
 	}
+
+	c.sandboxStore.Delete(sandboxID)
+
+	// Send CONTAINER_DELETED event with ContainerId equal to SandboxId.
+	c.cri.GenerateAndSendContainerEvent(ctx, sandboxID, sandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	return &api.ControllerShutdownResponse{}, nil
 }
