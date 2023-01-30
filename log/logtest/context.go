@@ -52,5 +52,5 @@ func WithT(ctx context.Context, t testing.TB) context.Context {
 		},
 	})
 
-	return log.WithLogger(ctx, logrus.NewEntry(l))
+	return log.WithLogger(ctx, logrus.NewEntry(l).WithField("testcase", t.Name()))
 }
