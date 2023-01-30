@@ -26,12 +26,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/containerd/cgroups/v3/cgroup2/stats"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -433,4 +435,12 @@ func readHugeTlbStats(path string) []*stats.HugeTlbStat {
 		usage = append(usage, entry)
 	}
 	return usage
+}
+
+func getSubreaper() (int, error) {
+	var i uintptr
+	if err := unix.Prctl(unix.PR_GET_CHILD_SUBREAPER, uintptr(unsafe.Pointer(&i)), 0, 0, 0); err != nil {
+		return -1, err
+	}
+	return int(i), nil
 }

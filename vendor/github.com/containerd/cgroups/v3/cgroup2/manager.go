@@ -42,6 +42,7 @@ import (
 const (
 	subtreeControl     = "cgroup.subtree_control"
 	controllersFile    = "cgroup.controllers"
+	killFile           = "cgroup.kill"
 	defaultCgroup2Path = "/sys/fs/cgroup"
 	defaultSlice       = "system.slice"
 )
@@ -144,20 +145,11 @@ func (c *Value) write(path string, perm os.FileMode) error {
 		return ErrInvalidFormat
 	}
 
-	// Retry writes on EINTR; see:
-	//    https://github.com/golang/go/issues/38033
-	for {
-		err := os.WriteFile(
-			filepath.Join(path, c.filename),
-			data,
-			perm,
-		)
-		if err == nil {
-			return nil
-		} else if !errors.Is(err, syscall.EINTR) {
-			return err
-		}
-	}
+	return os.WriteFile(
+		filepath.Join(path, c.filename),
+		data,
+		perm,
+	)
 }
 
 func writeValues(path string, values []Value) error {
@@ -202,7 +194,7 @@ type InitConfig struct {
 
 type InitOpts func(c *InitConfig) error
 
-// WithMountpoint sets the unified mountpoint. The deault path is /sys/fs/cgroup.
+// WithMountpoint sets the unified mountpoint. The default path is /sys/fs/cgroup.
 func WithMountpoint(path string) InitOpts {
 	return func(c *InitConfig) error {
 		c.mountpoint = path
@@ -364,6 +356,86 @@ func (c *Manager) AddThread(tid uint64) error {
 		value:    tid,
 	}
 	return writeValues(c.path, []Value{v})
+}
+
+// Kill will try to forcibly exit all of the processes in the cgroup. This is
+// equivalent to sending a SIGKILL to every process. On kernels 5.14 and greater
+// this will use the cgroup.kill file, on anything that doesn't have the cgroup.kill
+// file, a manual process of freezing -> sending a SIGKILL to every process -> thawing
+// will be used.
+func (c *Manager) Kill() error {
+	v := Value{
+		filename: killFile,
+		value:    "1",
+	}
+	err := writeValues(c.path, []Value{v})
+	if err == nil {
+		return nil
+	}
+	logrus.Warnf("falling back to slower kill implementation: %s", err)
+	// Fallback to slow method.
+	return c.fallbackKill()
+}
+
+// fallbackKill is a slower fallback to the more modern (kernels 5.14+)
+// approach of writing to the cgroup.kill file. This is heavily pulled
+// from runc's same approach (in signalAllProcesses), with the only differences
+// being this is just tailored to the API exposed in this library, and we don't
+// need to care about signals other than SIGKILL.
+//
+// https://github.com/opencontainers/runc/blob/8da0a0b5675764feaaaaad466f6567a9983fcd08/libcontainer/init_linux.go#L523-L529
+func (c *Manager) fallbackKill() error {
+	if err := c.Freeze(); err != nil {
+		logrus.Warn(err)
+	}
+	pids, err := c.Procs(true)
+	if err != nil {
+		if err := c.Thaw(); err != nil {
+			logrus.Warn(err)
+		}
+		return err
+	}
+	var procs []*os.Process
+	for _, pid := range pids {
+		p, err := os.FindProcess(int(pid))
+		if err != nil {
+			logrus.Warn(err)
+			continue
+		}
+		procs = append(procs, p)
+		if err := p.Signal(unix.SIGKILL); err != nil {
+			logrus.Warn(err)
+		}
+	}
+	if err := c.Thaw(); err != nil {
+		logrus.Warn(err)
+	}
+
+	subreaper, err := getSubreaper()
+	if err != nil {
+		// The error here means that PR_GET_CHILD_SUBREAPER is not
+		// supported because this code might run on a kernel older
+		// than 3.4. We don't want to throw an error in that case,
+		// and we simplify things, considering there is no subreaper
+		// set.
+		subreaper = 0
+	}
+
+	for _, p := range procs {
+		// In case a subreaper has been setup, this code must not
+		// wait for the process. Otherwise, we cannot be sure the
+		// current process will be reaped by the subreaper, while
+		// the subreaper might be waiting for this process in order
+		// to retrieve its exit code.
+		if subreaper == 0 {
+			if _, err := p.Wait(); err != nil {
+				if !errors.Is(err, unix.ECHILD) {
+					logrus.Warnf("wait on pid %d failed: %s", p.Pid, err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (c *Manager) Delete() error {
@@ -763,7 +835,8 @@ func setDevices(path string, devices []specs.LinuxDeviceCgroup) error {
 // the reason this is necessary is because the "-" character has a special meaning in
 // systemd slice. For example, when creating a slice called "my-group-112233.slice",
 // systemd will create a hierarchy like this:
-//      /sys/fs/cgroup/my.slice/my-group.slice/my-group-112233.slice
+//
+//	/sys/fs/cgroup/my.slice/my-group.slice/my-group-112233.slice
 func getSystemdFullPath(slice, group string) string {
 	return filepath.Join(defaultCgroup2Path, dashesToPath(slice), dashesToPath(group))
 }
