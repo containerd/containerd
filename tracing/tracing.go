@@ -23,7 +23,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	httpconv "go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -39,8 +40,8 @@ type SpanOpt func(config *StartConfig)
 func WithHTTPRequest(request *http.Request) SpanOpt {
 	return func(config *StartConfig) {
 		config.spanOpts = append(config.spanOpts,
-			trace.WithSpanKind(trace.SpanKindClient),                                      // A client making a request to a server
-			trace.WithAttributes(semconv.HTTPClientAttributesFromHTTPRequest(request)...), // Add HTTP attributes
+			trace.WithSpanKind(trace.SpanKindClient),                 // A client making a request to a server
+			trace.WithAttributes(httpconv.ClientRequest(request)...), // Add HTTP attributes
 		)
 	}
 }
@@ -112,5 +113,5 @@ func Attribute(k string, v interface{}) attribute.KeyValue {
 // HTTPStatusCodeAttributes generates attributes of the HTTP namespace as specified by the OpenTelemetry
 // specification for a span.
 func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
-	return semconv.HTTPAttributesFromHTTPStatusCode(code)
+	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
 }
