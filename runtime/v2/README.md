@@ -67,9 +67,9 @@ The delete command MUST accept the following flags:
 * `-address` the address of the containerd's main socket
 * `-publish-binary` the binary path to publish events back to containerd
 * `-id` the id of the container
-* `-bundle` the path to the bundle to delete. On non-Windows platforms this will match `cwd`
+* `-bundle` the path to the bundle to delete. On non-Windows and non-FreeBSD platforms this will match `cwd`
 
-The delete command will be executed in the container's bundle as its `cwd` except for on the Windows platform.
+The delete command will be executed in the container's bundle as its `cwd` except for on Windows and FreeBSD platforms.
 
 ### Host Level Shim Configuration
 
