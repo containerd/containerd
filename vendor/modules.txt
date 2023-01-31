@@ -125,7 +125,7 @@ github.com/containerd/go-runc
 ## explicit; go 1.16
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
-# github.com/containerd/nri v0.2.0
+# github.com/containerd/nri v0.2.1-0.20230131001841-b3cabdec0657
 ## explicit; go 1.18
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation
