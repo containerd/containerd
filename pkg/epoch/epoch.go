@@ -41,7 +41,7 @@ func SourceDateEpoch() (*time.Time, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid %s value %q: %w", SourceDateEpochEnv, v, err)
 	}
-	unix := time.Unix(i64, 0)
+	unix := time.Unix(i64, 0).UTC()
 	return &unix, nil
 }
 
@@ -55,7 +55,7 @@ func SourceDateEpochOrNow() time.Time {
 	if epoch != nil {
 		return *epoch
 	}
-	return time.Now()
+	return time.Now().UTC()
 }
 
 // SetSourceDateEpoch sets the SOURCE_DATE_EPOCH env var.
