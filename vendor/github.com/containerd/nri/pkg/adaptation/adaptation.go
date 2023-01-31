@@ -109,6 +109,13 @@ func WithSocketPath(path string) Option {
 func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option) (*Adaptation, error) {
 	var err error
 
+	if syncFn == nil {
+		return nil, fmt.Errorf("failed to create NRI adaptation, nil SyncFn")
+	}
+	if updateFn == nil {
+		return nil, fmt.Errorf("failed to create NRI adaptation, nil UpdateFn")
+	}
+
 	r := &Adaptation{
 		name:       name,
 		version:    version,
@@ -328,7 +335,7 @@ func (r *Adaptation) startPlugins() (retErr error) {
 
 		id := ids[i]
 
-		p, err := newLaunchedPlugin(r.pluginPath, id, name, configs[i])
+		p, err := r.newLaunchedPlugin(r.pluginPath, id, name, configs[i])
 		if err != nil {
 			return fmt.Errorf("failed to start NRI plugin %q: %w", name, err)
 		}
@@ -408,7 +415,7 @@ func (r *Adaptation) acceptPluginConnections(l net.Listener) error {
 				return
 			}
 
-			p, err := newExternalPlugin(conn)
+			p, err := r.newExternalPlugin(conn)
 			if err != nil {
 				log.Errorf(ctx, "failed to create external plugin: %v", err)
 				continue
