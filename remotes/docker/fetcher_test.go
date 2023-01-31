@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -121,6 +122,8 @@ func TestDockerFetcherOpen(t *testing.T) {
 		mockedErr              error
 		want                   io.ReadCloser
 		wantErr                bool
+		wantUnavailableError   bool
+		wantNotFoundError      bool
 		wantServerMessageError bool
 		wantPlainError         bool
 		retries                int
@@ -159,6 +162,20 @@ func TestDockerFetcherOpen(t *testing.T) {
 			wantErr:        true,
 			wantPlainError: true,
 			retries:        5,
+		}, {
+			name:                 "should return StatusServiceUnavailable",
+			mockedStatus:         http.StatusServiceUnavailable,
+			mockedErr:            fmt.Errorf(http.StatusText(http.StatusServiceUnavailable)),
+			want:                 nil,
+			wantErr:              true,
+			wantUnavailableError: true,
+		}, {
+			name:              "should return StatusNotFound",
+			mockedStatus:      http.StatusNotFound,
+			mockedErr:         fmt.Errorf(http.StatusText(http.StatusNotFound)),
+			want:              nil,
+			wantErr:           true,
+			wantNotFoundError: true,
 		},
 	}
 	for _, tt := range tests {
@@ -202,6 +219,12 @@ func TestDockerFetcherOpen(t *testing.T) {
 					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
 				} else if tt.wantPlainError {
 					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
+				} else if tt.wantUnavailableError {
+					expectedError = fmt.Errorf("unavailable at %v/ns could not retrieve: unavailable", s.URL)
+					assert.True(t, errdefs.IsUnavailable(err))
+				} else if tt.wantNotFoundError {
+					expectedError = fmt.Errorf("content at %v/ns not found: not found", s.URL)
+					assert.True(t, errdefs.IsNotFound(err))
 				}
 				assert.Equal(t, expectedError.Error(), err.Error())
 

@@ -82,8 +82,11 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 			rc, err := r.open(ctx, req, desc.MediaType, offset)
 			if err != nil {
-				if errdefs.IsNotFound(err) {
-					continue // try one of the other urls.
+				if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) {
+					// If the current provider doesn't have the image or isn't
+					// available then fallback to another provider if there is
+					// one.
+					continue
 				}
 
 				return nil, err
@@ -275,9 +278,15 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// can discard the bytes, hiding the seek behavior from the
 		// implementation.
 
-		if resp.StatusCode == http.StatusNotFound {
+		switch resp.StatusCode {
+		case http.StatusNotFound:
 			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
+		case http.StatusServiceUnavailable:
+			// Similar to not found, if the service is unavailable then it should
+			// be handled deliberately by the caller (if necessary).
+			return nil, fmt.Errorf("unavailable at %v could not retrieve: %w", req.String(), errdefs.ErrUnavailable)
 		}
+
 		var registryErr Errors
 		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
 			return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
