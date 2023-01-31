@@ -27,6 +27,9 @@ import (
 // UnmountRecursive unmounts the target and all mounts underneath, starting
 // with the deepest mount first.
 func UnmountRecursive(target string, flags int) error {
+	if target == "" {
+		return nil
+	}
 	mounts, err := mountinfo.GetMounts(mountinfo.PrefixFilter(target))
 	if err != nil {
 		return err
