@@ -226,6 +226,7 @@ func toMounts(mm []*types.Mount) []mount.Mount {
 		mounts[i] = mount.Mount{
 			Type:    m.Type,
 			Source:  m.Source,
+			Target:  m.Target,
 			Options: m.Options,
 		}
 	}

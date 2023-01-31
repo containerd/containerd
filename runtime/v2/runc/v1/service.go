@@ -254,7 +254,7 @@ func (s *service) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) 
 	}); err != nil {
 		logrus.WithError(err).Warn("failed to remove runc container")
 	}
-	if err := mount.UnmountAll(filepath.Join(path, "rootfs"), 0); err != nil {
+	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
 		logrus.WithError(err).Warn("failed to cleanup rootfs mount")
 	}
 
