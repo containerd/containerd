@@ -57,7 +57,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.1
 	github.com/tchap/go-patricia/v2 v2.3.1
-	github.com/urfave/cli v1.22.10
+	github.com/urfave/cli v1.22.12
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	go.etcd.io/bbolt v1.3.6
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.37.0
