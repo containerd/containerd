@@ -20,11 +20,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"strings"
 	"testing"
 
-	digest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -334,51 +331,6 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 			c.config.ImageDecryption.KeyModel = test.keyModel
 			got := len(c.encryptedImagesPullOpts())
 			assert.Equal(t, test.expectedOpts, got)
-		})
-	}
-}
-
-func TestImageLayersLabel(t *testing.T) {
-	sampleKey := "sampleKey"
-	sampleDigest, err := digest.Parse("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-	assert.NoError(t, err)
-	sampleMaxSize := 300
-	sampleValidate := func(k, v string) error {
-		if (len(k) + len(v)) > sampleMaxSize {
-			return fmt.Errorf("invalid: %q: %q", k, v)
-		}
-		return nil
-	}
-
-	tests := []struct {
-		name      string
-		layersNum int
-		wantNum   int
-	}{
-		{
-			name:      "valid number of layers",
-			layersNum: 2,
-			wantNum:   2,
-		},
-		{
-			name:      "many layers",
-			layersNum: 5, // hits sampleMaxSize (300 chars).
-			wantNum:   4, // layers should be omitted for avoiding invalid label.
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var sampleLayers []imagespec.Descriptor
-			for i := 0; i < tt.layersNum; i++ {
-				sampleLayers = append(sampleLayers, imagespec.Descriptor{
-					MediaType: imagespec.MediaTypeImageLayerGzip,
-					Digest:    sampleDigest,
-				})
-			}
-			gotS := getLayers(context.Background(), sampleKey, sampleLayers, sampleValidate)
-			got := len(strings.Split(gotS, ","))
-			assert.Equal(t, tt.wantNum, got)
 		})
 	}
 }
