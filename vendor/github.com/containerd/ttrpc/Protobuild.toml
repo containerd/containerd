@@ -23,3 +23,6 @@ generators = ["go"]
 # enable ttrpc and disable fieldpath and grpc for the shim
 prefixes = ["github.com/containerd/ttrpc/integration/streaming"]
 generators = ["go", "go-ttrpc"]
+
+[overrides.parameters.go-ttrpc]
+prefix = "TTRPC"

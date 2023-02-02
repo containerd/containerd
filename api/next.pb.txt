@@ -2049,6 +2049,721 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/runtime/task/v3/shim.proto"
+  package: "containerd.task.v3"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/empty.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/api/types/task/task.proto"
+  message_type {
+    name: "CreateTaskRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "bundle"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "bundle"
+    }
+    field {
+      name: "rootfs"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "rootfs"
+    }
+    field {
+      name: "terminal"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
+    }
+    field {
+      name: "stdin"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdin"
+    }
+    field {
+      name: "stdout"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "checkpoint"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "checkpoint"
+    }
+    field {
+      name: "parent_checkpoint"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "parentCheckpoint"
+    }
+    field {
+      name: "options"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
+  message_type {
+    name: "CreateTaskResponse"
+    field {
+      name: "pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+  }
+  message_type {
+    name: "DeleteRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "DeleteResponse"
+    field {
+      name: "pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "exit_status"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "exitedAt"
+    }
+  }
+  message_type {
+    name: "ExecProcessRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+    field {
+      name: "terminal"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
+    }
+    field {
+      name: "stdin"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdin"
+    }
+    field {
+      name: "stdout"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "spec"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+  }
+  message_type {
+    name: "ExecProcessResponse"
+  }
+  message_type {
+    name: "ResizePtyRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+    field {
+      name: "width"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "width"
+    }
+    field {
+      name: "height"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "height"
+    }
+  }
+  message_type {
+    name: "StateRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "StateResponse"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "bundle"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "bundle"
+    }
+    field {
+      name: "pid"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+    field {
+      name: "status"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.v1.types.Status"
+      json_name: "status"
+    }
+    field {
+      name: "stdin"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdin"
+    }
+    field {
+      name: "stdout"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "terminal"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
+    }
+    field {
+      name: "exit_status"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "exitedAt"
+    }
+    field {
+      name: "exec_id"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "KillRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+    field {
+      name: "signal"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "signal"
+    }
+    field {
+      name: "all"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "all"
+    }
+  }
+  message_type {
+    name: "CloseIORequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+    field {
+      name: "stdin"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "stdin"
+    }
+  }
+  message_type {
+    name: "PidsRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "PidsResponse"
+    field {
+      name: "processes"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.ProcessInfo"
+      json_name: "processes"
+    }
+  }
+  message_type {
+    name: "CheckpointTaskRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "path"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
+  message_type {
+    name: "UpdateTaskRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "resources"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "resources"
+    }
+    field {
+      name: "annotations"
+      number: 3
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.task.v3.UpdateTaskRequest.AnnotationsEntry"
+      json_name: "annotations"
+    }
+    nested_type {
+      name: "AnnotationsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  message_type {
+    name: "StartRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "StartResponse"
+    field {
+      name: "pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "pid"
+    }
+  }
+  message_type {
+    name: "WaitRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  message_type {
+    name: "WaitResponse"
+    field {
+      name: "exit_status"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "exitStatus"
+    }
+    field {
+      name: "exited_at"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "exitedAt"
+    }
+  }
+  message_type {
+    name: "StatsRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "StatsResponse"
+    field {
+      name: "stats"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "stats"
+    }
+  }
+  message_type {
+    name: "ConnectRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ConnectResponse"
+    field {
+      name: "shim_pid"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "shimPid"
+    }
+    field {
+      name: "task_pid"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "taskPid"
+    }
+    field {
+      name: "version"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "version"
+    }
+  }
+  message_type {
+    name: "ShutdownRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "now"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "now"
+    }
+  }
+  message_type {
+    name: "PauseRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  message_type {
+    name: "ResumeRequest"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+  }
+  service {
+    name: "Task"
+    method {
+      name: "State"
+      input_type: ".containerd.task.v3.StateRequest"
+      output_type: ".containerd.task.v3.StateResponse"
+    }
+    method {
+      name: "Create"
+      input_type: ".containerd.task.v3.CreateTaskRequest"
+      output_type: ".containerd.task.v3.CreateTaskResponse"
+    }
+    method {
+      name: "Start"
+      input_type: ".containerd.task.v3.StartRequest"
+      output_type: ".containerd.task.v3.StartResponse"
+    }
+    method {
+      name: "Delete"
+      input_type: ".containerd.task.v3.DeleteRequest"
+      output_type: ".containerd.task.v3.DeleteResponse"
+    }
+    method {
+      name: "Pids"
+      input_type: ".containerd.task.v3.PidsRequest"
+      output_type: ".containerd.task.v3.PidsResponse"
+    }
+    method {
+      name: "Pause"
+      input_type: ".containerd.task.v3.PauseRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Resume"
+      input_type: ".containerd.task.v3.ResumeRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Checkpoint"
+      input_type: ".containerd.task.v3.CheckpointTaskRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Kill"
+      input_type: ".containerd.task.v3.KillRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Exec"
+      input_type: ".containerd.task.v3.ExecProcessRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "ResizePty"
+      input_type: ".containerd.task.v3.ResizePtyRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "CloseIO"
+      input_type: ".containerd.task.v3.CloseIORequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.task.v3.UpdateTaskRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Wait"
+      input_type: ".containerd.task.v3.WaitRequest"
+      output_type: ".containerd.task.v3.WaitResponse"
+    }
+    method {
+      name: "Stats"
+      input_type: ".containerd.task.v3.StatsRequest"
+      output_type: ".containerd.task.v3.StatsResponse"
+    }
+    method {
+      name: "Connect"
+      input_type: ".containerd.task.v3.ConnectRequest"
+      output_type: ".containerd.task.v3.ConnectResponse"
+    }
+    method {
+      name: "Shutdown"
+      input_type: ".containerd.task.v3.ShutdownRequest"
+      output_type: ".google.protobuf.Empty"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/runtime/task/v3;task"
+  }
+  syntax: "proto3"
+}
+file {
   name: "google/protobuf/field_mask.proto"
   package: "google.protobuf"
   message_type {

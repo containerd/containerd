@@ -31,9 +31,26 @@ generators = ["go", "go-ttrpc", "go-fieldpath"]
 prefixes = [
   "github.com/containerd/containerd/runtime/v1/shim/v1",
   "github.com/containerd/containerd/api/runtime/task/v2",
-  "github.com/containerd/containerd/api/runtime/sandbox/v1",
 ]
 generators = ["go", "go-ttrpc"]
+
+[[overrides]]
+prefixes = [
+  "github.com/containerd/containerd/api/runtime/sandbox/v1",
+]
+generators = ["go", "go-ttrpc", "go-grpc"]
+
+[overrides.parameters.go-ttrpc]
+prefix = "TTRPC"
+
+[[overrides]]
+prefixes = [
+  "github.com/containerd/containerd/api/runtime/task/v3",
+]
+generators = ["go", "go-ttrpc", "go-grpc"]
+
+[overrides.parameters.go-ttrpc]
+prefix = "TTRPC"
 
 # Aggregrate the API descriptors to lock down API changes.
 [[descriptors]]
