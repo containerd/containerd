@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package semconv implements OpenTelemetry semantic conventions.
-//
-// OpenTelemetry semantic conventions are agreed standardized naming
-// patterns for OpenTelemetry things. This package represents the conventions
-// as of the v1.12.0 version of the OpenTelemetry specification.
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.12.0"
+// Package otelhttp provides an http.Handler and functions that are intended
+// to be used to add tracing by wrapping existing handlers (with Handler) and
+// routes WithRouteTag.
+package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"

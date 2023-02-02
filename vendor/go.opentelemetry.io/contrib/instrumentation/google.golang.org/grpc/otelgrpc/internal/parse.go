@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 // ParseFullMethod returns a span name following the OpenTelemetry semantic
