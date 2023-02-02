@@ -395,8 +395,8 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 	return 1
 }
 
-// FuzzCreateContainerNoTearDown() implements a fuzzer
-// similar to FuzzCreateContainerWithTearDown() and
+// FuzzNoTearDownWithDownload() implements a fuzzer
+// similar to FuzzCreateContainerNoTearDown() and
 // FuzzCreateContainerWithTearDown(), but it takes a
 // different approach to the initialization. Where
 // the other 2 fuzzers depend on the containerd binaries
