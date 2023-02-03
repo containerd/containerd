@@ -59,10 +59,10 @@ func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
 		}
 	}
 
-	c.sandboxStore.Delete(sandboxID)
-
 	// Send CONTAINER_DELETED event with ContainerId equal to SandboxId.
 	c.cri.GenerateAndSendContainerEvent(ctx, sandboxID, sandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
+
+	c.sandboxStore.Delete(sandboxID)
 
 	return nil
 }
