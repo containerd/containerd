@@ -43,3 +43,7 @@ test/results
 # go workspace files
 go.work
 go.work.sum
+
+# keys and related artifacts
+*.pem
+*.cose
