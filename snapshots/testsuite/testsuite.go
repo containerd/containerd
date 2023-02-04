@@ -796,10 +796,6 @@ func checkRemove(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 // checkSnapshotterViewReadonly ensures a KindView snapshot to be mounted as a read-only filesystem.
 // This function is called only when WithTestViewReadonly is true.
 func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Read-only protection on views is not supported on WCOW")
-	}
-
 	preparing := filepath.Join(work, "preparing")
 	if _, err := snapshotter.Prepare(ctx, preparing, "", opt); err != nil {
 		t.Fatal(err)
@@ -946,7 +942,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 
 			t.Log("mount", preparing)
 
-			if err := fstest.CheckDirectoryEqual(preparing, flat); err != nil {
+			if err := fstest.CheckDirectoryEqual(flat, preparing); err != nil {
 				testutil.Unmount(t, preparing)
 				t.Fatalf("[layer %d] preparing doesn't equal to flat before apply: %+v", i, err)
 			}
@@ -961,7 +957,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 				t.Fatalf("[layer %d] failed to apply on preparing dir: %+v", i, err)
 			}
 
-			if err := fstest.CheckDirectoryEqual(preparing, flat); err != nil {
+			if err := fstest.CheckDirectoryEqual(flat, preparing); err != nil {
 				testutil.Unmount(t, preparing)
 				t.Fatalf("[layer %d] preparing doesn't equal to flat after apply: %+v", i, err)
 			}
@@ -990,7 +986,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		}
 		defer testutil.Unmount(t, view)
 
-		if err := fstest.CheckDirectoryEqual(view, flat); err != nil {
+		if err := fstest.CheckDirectoryEqual(flat, view); err != nil {
 			t.Fatalf("fullview should equal to flat: %+v", err)
 		}
 	}
