@@ -199,15 +199,3 @@ func UnmountAll(mount string, flags int) error {
 func UnmountRecursive(mount string, flags int) error {
 	return UnmountAll(mount, flags)
 }
-
-func (m *Mount) bindMount(target string) error {
-	readOnly := false
-	for _, option := range m.Options {
-		if option == "ro" {
-			readOnly = true
-			break
-		}
-	}
-
-	return ApplyFileBinding(target, m.Source, readOnly)
-}
