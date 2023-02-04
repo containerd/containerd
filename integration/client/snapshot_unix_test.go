@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -17,27 +20,15 @@
 package client
 
 import (
-	"context"
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
-func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-	client, err := New(address)
-	if err != nil {
-		return nil, nil, err
+func runTestSnapshotterClient(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	sn := client.SnapshotService(DefaultSnapshotter)
-
-	return sn, func() error {
-		// no need to close remote snapshotter
-		return client.Close()
-	}, nil
-}
-
-func TestSnapshotterClient(t *testing.T) {
-	runTestSnapshotterClient(t)
+	testsuite.SnapshotterSuite(t, "SnapshotterClient", newSnapshotter)
 }
