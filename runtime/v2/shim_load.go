@@ -144,7 +144,10 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 			continue
 		}
-		shim := newShimTask(instance)
+		shim, err := newShimTask(instance)
+		if err != nil {
+			return err
+		}
 
 		// There are 3 possibilities for the loaded shim here:
 		// 1. It could be a shim that is running a task.

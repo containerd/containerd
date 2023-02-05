@@ -47,7 +47,7 @@ func NewTaskClient(client interface{}) (v2.TaskService, error) {
 		return &grpcBridge{client}, nil
 	}
 
-	return nil, fmt.Errorf("unsupported client type %T", client)
+	return nil, fmt.Errorf("unsupported shim client type %T", client)
 }
 
 // grpcBridge implements `v2.TaskService` interface for GRPC shim server.

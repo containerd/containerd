@@ -107,7 +107,10 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		return fmt.Errorf("failed to start new sandbox: %w", err)
 	}
 
-	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
+	svc, err := sandbox.NewClient(shim.Client())
+	if err != nil {
+		return err
+	}
 
 	var options *anypb.Any
 	if coptions.Options != nil {
@@ -136,7 +139,11 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		return sandbox.ControllerInstance{}, fmt.Errorf("unable to find sandbox %q", sandboxID)
 	}
 
-	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
+	svc, err := sandbox.NewClient(shim.Client())
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+
 	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{SandboxID: sandboxID})
 	if err != nil {
 		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
@@ -258,6 +265,5 @@ func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI
 		return nil, errdefs.ErrNotFound
 	}
 
-	svc := runtimeAPI.NewTTRPCSandboxClient(shim.Client())
-	return svc, nil
+	return sandbox.NewClient(shim.Client())
 }
