@@ -121,8 +121,13 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	}
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
 	defer cancel()
+
 	// Check connectivity, TaskService is the only required service, so create a temp one to check connection.
-	s := newShimTask(shim)
+	s, err := newShimTask(shim)
+	if err != nil {
+		return nil, err
+	}
+
 	if _, err := s.PID(ctx); err != nil {
 		return nil, err
 	}
@@ -176,6 +181,8 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 
 // ShimInstance represents running shim process managed by ShimManager.
 type ShimInstance interface {
+	io.Closer
+
 	// ID of the shim.
 	ID() string
 	// Namespace of this shim.
@@ -183,7 +190,7 @@ type ShimInstance interface {
 	// Bundle is a file system path to shim's bundle.
 	Bundle() string
 	// Client returns the underlying TTRPC client for this shim.
-	Client() *ttrpc.Client
+	Client() interface{}
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
 }
@@ -208,8 +215,13 @@ func (s *shim) Bundle() string {
 	return s.bundle.Path
 }
 
-func (s *shim) Client() *ttrpc.Client {
+func (s *shim) Client() interface{} {
 	return s.client
+}
+
+// Close closes the underlying client connection.
+func (s *shim) Close() error {
+	return s.client.Close()
 }
 
 func (s *shim) Delete(ctx context.Context) error {
@@ -241,11 +253,16 @@ type shimTask struct {
 	task task.TaskService
 }
 
-func newShimTask(shim ShimInstance) *shimTask {
+func newShimTask(shim ShimInstance) (*shimTask, error) {
+	taskClient, err := NewTaskClient(shim.Client())
+	if err != nil {
+		return nil, err
+	}
+
 	return &shimTask{
 		ShimInstance: shim,
-		task:         task.NewTaskClient(shim.Client()),
-	}
+		task:         taskClient,
+	}, nil
 }
 
 func (s *shimTask) Shutdown(ctx context.Context) error {

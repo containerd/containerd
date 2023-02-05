@@ -425,7 +425,11 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 
 	// Cast to shim task and call task service to create a new container task instance.
 	// This will not be required once shim service / client implemented.
-	shimTask := newShimTask(shim)
+	shimTask, err := newShimTask(shim)
+	if err != nil {
+		return nil, err
+	}
+
 	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
@@ -443,7 +447,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			}
 
 			shimTask.Shutdown(dctx)
-			shimTask.Client().Close()
+			shimTask.Close()
 		}
 
 		return nil, fmt.Errorf("failed to create shim task: %w", err)
@@ -458,7 +462,7 @@ func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) 
 	if err != nil {
 		return nil, err
 	}
-	return newShimTask(shim), nil
+	return newShimTask(shim)
 }
 
 // Tasks lists all tasks
@@ -469,7 +473,11 @@ func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, erro
 	}
 	out := make([]runtime.Task, len(shims))
 	for i := range shims {
-		out[i] = newShimTask(shims[i])
+		newClient, err := newShimTask(shims[i])
+		if err != nil {
+			return nil, err
+		}
+		out[i] = newClient
 	}
 	return out, nil
 }
@@ -486,10 +494,12 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
-	var (
-		sandboxed = container.SandboxID != ""
-		shimTask  = newShimTask(shim)
-	)
+	shimTask, err := newShimTask(shim)
+	if err != nil {
+		return nil, err
+	}
+
+	sandboxed := container.SandboxID != ""
 
 	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
 		m.manager.shims.Delete(ctx, id)
