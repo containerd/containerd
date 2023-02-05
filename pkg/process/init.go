@@ -46,7 +46,7 @@ type Init struct {
 	initState initState
 
 	// mu is used to ensure that `Start()` and `Exited()` calls return in
-	// the right order when invoked in separate go routines.
+	// the right order when invoked in separate goroutines.
 	// This is the case within the shim implementation as it makes use of
 	// the reaper interface.
 	mu sync.Mutex
