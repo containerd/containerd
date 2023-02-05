@@ -64,7 +64,7 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 		// golang has enabled RFC 6555 Fast Fallback (aka HappyEyeballs) by default in 1.12
 		// It means that if a host resolves to both IPv6 and IPv4, it will try to connect to any
 		// of those addresses and use the working connection.
-		// However, the implementation uses go routines to start both connections in parallel,
+		// However, the implementation uses goroutines to start both connections in parallel,
 		// and this cases that the connection is done outside the namespace, so we try to connect
 		// serially.
 		// We try IPv4 first to keep current behavior and we fallback to IPv6 if the connection fails.
