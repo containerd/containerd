@@ -26,7 +26,6 @@ import (
 	gruntime "runtime"
 	"strings"
 
-	"github.com/containerd/ttrpc"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/api/runtime/task/v2"
@@ -122,10 +121,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, fmt.Errorf("%s: %w", out, err)
 	}
 	address := strings.TrimSpace(string(out))
-	conn, err := client.Connect(address, client.AnonDialer)
-	if err != nil {
-		return nil, err
-	}
+
 	onCloseWithShimLog := func() {
 		onClose()
 		cancelShimLog()
@@ -135,10 +131,15 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
 		return nil, err
 	}
-	client := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
+
+	conn, err := makeConnection(ctx, address, onCloseWithShimLog)
+	if err != nil {
+		return nil, err
+	}
+
 	return &shim{
 		bundle: b.bundle,
-		client: client,
+		client: conn,
 	}, nil
 }
 
