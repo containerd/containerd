@@ -23,7 +23,7 @@ import (
 
 const (
 	// DefaultSocketPath is the default socket path for external plugins.
-	DefaultSocketPath = "/var/run/nri.sock"
+	DefaultSocketPath = "/var/run/nri/nri.sock"
 	// PluginSocketEnvVar is used to inform plugins about pre-connected sockets.
 	PluginSocketEnvVar = "NRI_PLUGIN_SOCKET"
 	// PluginNameEnvVar is used to inform NRI-launched plugins about their name.

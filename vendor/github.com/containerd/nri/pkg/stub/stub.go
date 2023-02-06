@@ -18,6 +18,7 @@ package stub
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	stdnet "net"
 	"os"
@@ -160,6 +161,10 @@ var (
 
 	// Used instead of a nil Context in logging.
 	noCtx = context.TODO()
+
+	// ErrNoService indicates that the stub has no runtime service/connection,
+	// for instance by UpdateContainers on a stub which has not been started.
+	ErrNoService = errors.New("stub: no service/connection")
 )
 
 // EventMask holds a mask of events for plugin subscription.
@@ -515,6 +520,10 @@ func (stub *stub) connClosed() {
 
 // UpdateContainers requests unsolicited updates to containers.
 func (stub *stub) UpdateContainers(update []*api.ContainerUpdate) ([]*api.ContainerUpdate, error) {
+	if stub.runtime == nil {
+		return nil, ErrNoService
+	}
+
 	ctx := context.Background()
 	req := &api.UpdateContainersRequest{
 		Update: update,
