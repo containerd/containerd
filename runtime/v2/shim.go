@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -71,9 +72,6 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, err
 	}
 
-	// TODO: figure out how to negotiate protocol between containerd and shim
-	isGRPC := strings.Contains(strings.ToLower(address), "grpc")
-
 	shimCtx, cancelShimLog := context.WithCancel(ctx)
 	defer func() {
 		if retErr != nil {
@@ -109,48 +107,20 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		f.Close()
 	}
 
-	shim := &shim{bundle: bundle}
+	conn, err := makeConnection(ctx, address, onCloseWithShimLog)
+	if err != nil {
+		return nil, err
+	}
 
-	if !isGRPC {
-		conn, err := client.Connect(address, client.AnonReconnectDialer)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
+	defer func() {
+		if retErr != nil {
+			conn.Close()
 		}
-		defer func() {
-			if retErr != nil {
-				conn.Close()
-			}
-		}()
+	}()
 
-		ttrpcClient := ttrpc.NewClient(conn, ttrpc.WithOnClose(onCloseWithShimLog))
-		defer func() {
-			if retErr != nil {
-				ttrpcClient.Close()
-			}
-		}()
-
-		shim.client = ttrpcClient
-	} else {
-		// GRPC shim
-
-		var (
-			gopts []grpc.DialOption
-		)
-
-		conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create GRPC connection: %w", err)
-		}
-
-		defer func() {
-			if retErr != nil {
-				conn.Close()
-			}
-		}()
-
-		// TODO: figure out how to invoke onCloseWithShimLog callback when shim connection is closed.
-
-		shim.client = conn
+	shim := &shim{
+		bundle: bundle,
+		client: conn,
 	}
 
 	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
@@ -229,6 +199,68 @@ type ShimInstance interface {
 	Client() any
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
+}
+
+// makeConnection creates a new TTRPC or GRPC connection object from address.
+// address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
+func makeConnection(ctx context.Context, address string, onClose func()) (_ io.Closer, retErr error) {
+	var (
+		payload = []byte(address)
+		params  client.BootstrapParams
+	)
+
+	if json.Valid(payload) {
+		if err := json.Unmarshal([]byte(address), &params); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal bootstrap params: %w", err)
+		}
+	} else {
+		// Use TTRPC for legacy shims
+		params.Address = address
+		params.Protocol = "ttrpc"
+	}
+
+	switch strings.ToLower(params.Protocol) {
+	case "ttrpc":
+		conn, err := client.Connect(params.Address, client.AnonReconnectDialer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TTRPC connection: %w", err)
+		}
+		defer func() {
+			if retErr != nil {
+				conn.Close()
+			}
+		}()
+
+		ttrpcClient := ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose))
+		defer func() {
+			if retErr != nil {
+				ttrpcClient.Close()
+			}
+		}()
+
+		return ttrpcClient, nil
+	case "grpc":
+		var (
+			gopts []grpc.DialOption
+		)
+
+		conn, err := grpc.DialContext(ctx, dialer.DialAddress(params.Address), gopts...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GRPC connection: %w", err)
+		}
+
+		defer func() {
+			if retErr != nil {
+				conn.Close()
+			}
+		}()
+
+		// TODO: figure out how to invoke onCloseWithShimLog callback when shim connection is closed.
+
+		return conn, nil
+	default:
+		return nil, fmt.Errorf("unexpected protocol: %q", params.Protocol)
+	}
 }
 
 type shim struct {
