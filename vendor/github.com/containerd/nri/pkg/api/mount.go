@@ -47,7 +47,6 @@ func (m *Mount) ToOCI(propagationQuery *string) rspec.Mount {
 		Destination: m.Destination,
 		Type:        m.Type,
 		Source:      m.Source,
-		Options:     []string{},
 	}
 	for _, opt := range m.Options {
 		o.Options = append(o.Options, opt)
