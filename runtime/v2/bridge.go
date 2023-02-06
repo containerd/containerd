@@ -38,16 +38,14 @@ import (
 // In 1.7 we support TaskService v2 (for backward compatibility with existing shims) and GRPC TaskService v3.
 // In 2.0 we'll switch to TaskService v3 only for both TTRPC and GRPC, which will remove overhead of mapping v2 structs to v3 structs.
 func NewTaskClient(client interface{}) (v2.TaskService, error) {
-	if ttrpcClient, ok := client.(*ttrpc.Client); ok {
-		return v2.NewTaskClient(ttrpcClient), nil
+	switch c := client.(type) {
+	case *ttrpc.Client:
+		return v2.NewTaskClient(c), nil
+	case grpc.ClientConnInterface:
+		return &grpcBridge{v3.NewTaskClient(c)}, nil
+	default:
+		return nil, fmt.Errorf("unsupported shim client type %T", c)
 	}
-
-	if grpcClient, ok := client.(grpc.ClientConnInterface); ok {
-		client := v3.NewTaskClient(grpcClient)
-		return &grpcBridge{client}, nil
-	}
-
-	return nil, fmt.Errorf("unsupported shim client type %T", client)
 }
 
 // grpcBridge implements `v2.TaskService` interface for GRPC shim server.

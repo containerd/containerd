@@ -28,16 +28,14 @@ import (
 
 // NewClient returns a new sandbox client that handles both GRPC and TTRPC clients.
 func NewClient(client interface{}) (api.TTRPCSandboxService, error) {
-	if ttrpcClient, ok := client.(*ttrpc.Client); ok {
-		return api.NewTTRPCSandboxClient(ttrpcClient), nil
+	switch c := client.(type) {
+	case *ttrpc.Client:
+		return api.NewTTRPCSandboxClient(c), nil
+	case grpc.ClientConnInterface:
+		return &grpcBridge{api.NewSandboxClient(c)}, nil
+	default:
+		return nil, fmt.Errorf("unsupported client type %T", client)
 	}
-
-	if grpcClient, ok := client.(grpc.ClientConnInterface); ok {
-		client := api.NewSandboxClient(grpcClient)
-		return &grpcBridge{client}, nil
-	}
-
-	return nil, fmt.Errorf("unsupported client type %T", client)
 }
 
 type grpcBridge struct {
