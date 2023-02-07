@@ -27,6 +27,7 @@ import (
 	_ "github.com/containerd/containerd/pkg/transfer/image"
 )
 
+// Register local transfer service plugin
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.TransferPlugin,
@@ -35,8 +36,9 @@ func init() {
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
 		},
-		Config: &transferConfig{},
+		Config: local.DefaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			config := ic.Config.(*local.TransferConfig)
 			m, err := ic.Get(plugin.MetadataPlugin)
 			if err != nil {
 				return nil, err
@@ -47,12 +49,7 @@ func init() {
 				return nil, err
 			}
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms)), nil
+			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), config), nil
 		},
 	})
-}
-
-type transferConfig struct {
-	// Max concurrent downloads
-	// Snapshotter platforms
 }

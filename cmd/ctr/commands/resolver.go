@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/transfer/image"
+	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
@@ -218,7 +218,7 @@ type staticCredentials struct {
 }
 
 // NewStaticCredentials gets credentials from passing in cli context
-func NewStaticCredentials(ctx gocontext.Context, clicontext *cli.Context, ref string) (image.CredentialHelper, error) {
+func NewStaticCredentials(ctx gocontext.Context, clicontext *cli.Context, ref string) (registry.CredentialHelper, error) {
 	username := clicontext.String("user")
 	var secret string
 	if i := strings.IndexByte(username, ':'); i > 0 {
@@ -248,12 +248,12 @@ func NewStaticCredentials(ctx gocontext.Context, clicontext *cli.Context, ref st
 	}, nil
 }
 
-func (sc *staticCredentials) GetCredentials(ctx gocontext.Context, ref, host string) (image.Credentials, error) {
+func (sc *staticCredentials) GetCredentials(ctx gocontext.Context, ref, host string) (registry.Credentials, error) {
 	if ref == sc.ref {
-		return image.Credentials{
+		return registry.Credentials{
 			Username: sc.username,
 			Secret:   sc.secret,
 		}, nil
 	}
-	return image.Credentials{}, nil
+	return registry.Credentials{}, nil
 }

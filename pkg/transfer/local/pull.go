@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -73,6 +74,8 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	var (
 		handler images.Handler
 
+		baseHandlers []images.Handler
+
 		unpacker *unpack.Unpacker
 
 		// has a config media type bug (distribution#1622)
@@ -97,12 +100,6 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		childrenHandler = f.ImageFilter(childrenHandler, store)
 	}
 
-	// Sort and limit manifests if a finite number is needed
-	//if limit > 0 {
-	//	childrenHandler = images.LimitManifests(childrenHandler, rCtx.PlatformMatcher, limit)
-	//}
-	//SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(ocispec.Descriptor) []string) HandlerFunc {
-
 	checkNeedsFix := images.HandlerFunc(
 		func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 			// set to true if there is application/octet-stream media type
@@ -119,8 +116,12 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		return err
 	}
 
-	// TODO: Allow initialization from configuration
-	baseHandlers := []images.Handler{}
+	//Set up baseHandlers from service configuration if present or create a new one
+	if ts.config.BaseHandlers != nil {
+		baseHandlers = ts.config.BaseHandlers
+	} else {
+		baseHandlers = []images.Handler{}
+	}
 
 	if tops.Progress != nil {
 		baseHandlers = append(baseHandlers, images.HandlerFunc(
@@ -149,22 +150,28 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		appendDistSrcLabelHandler,
 	)...)
 
-	// TODO: Should available platforms be a configuration of the service?
 	// First find suitable platforms to unpack into
-	//if unpacker, ok := is.
+	//If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
 	if iu, ok := is.(transfer.ImageUnpacker); ok {
 		unpacks := iu.UnpackPlatforms()
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
+			//Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
-				uopts = append(uopts, unpack.WithUnpackPlatform(u))
+				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
+				if matched {
+					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
+				}
 			}
-			if ts.limiter != nil {
-				uopts = append(uopts, unpack.WithLimiter(ts.limiter))
+
+			if ts.limiterD != nil {
+				uopts = append(uopts, unpack.WithLimiter(ts.limiterD))
 			}
-			//if uconfig.DuplicationSuppressor != nil {
-			//	uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
-			//}
+
+			if ts.config.DuplicationSuppressor != nil {
+				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+			}
+
 			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
 			if err != nil {
 				return fmt.Errorf("unable to initialize unpacker: %w", err)
@@ -173,7 +180,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	if err := images.Dispatch(ctx, handler, ts.limiter, desc); err != nil {
+	if err := images.Dispatch(ctx, handler, ts.limiterD, desc); err != nil {
 		if unpacker != nil {
 			// wait for unpacker to cleanup
 			unpacker.Wait()
@@ -240,4 +247,24 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 			return nil, err
 		}
 	}
+}
+
+// getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations
+// If input platform didn't specify snapshotter, default will be used if there is a match on platform.
+func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (bool, unpack.Platform) {
+	var u unpack.Platform
+	for _, sp := range supportedPlatforms {
+		//If both platform and snapshotter match, return the supportPlatform
+		//If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
+		//use default Snapshotter
+		if sp.Platform.Match(uc.Platform) {
+			//assuming sp.SnapshotterKey is not empty
+			if uc.Snapshotter == sp.SnapshotterKey {
+				return true, sp
+			} else if uc.Snapshotter == "" && sp.SnapshotterKey == containerd.DefaultSnapshotter {
+				return true, sp
+			}
+		}
+	}
+	return false, u
 }
