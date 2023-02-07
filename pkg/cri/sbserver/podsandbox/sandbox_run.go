@@ -25,6 +25,7 @@ import (
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -46,6 +47,10 @@ func init() {
 		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
 }
 
+type CleanupErr struct {
+	error
+}
+
 // Start creates resources required for the sandbox and starts the sandbox.  If an error occurs, Start attempts to tear
 // down the created resources.  If an error occurs while tearing down resources, a zero-valued response is returned
 // alongside the error.  If the teardown was successful, a nil response is returned with the error.
@@ -55,6 +60,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	defer func() {
 		if retErr != nil && cleanupErr != nil {
 			log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
+			retErr = multierror.Append(retErr, CleanupErr{cleanupErr})
 		}
 	}()
 
