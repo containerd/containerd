@@ -113,12 +113,13 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Replace fork on mount logic with CLONE_FS** ([#7513](https://github.com/containerd/containerd/pull/7513))
 * **Add support for default registry host configuration** ([#7607](https://github.com/containerd/containerd/pull/7607))
 * **Use github.com/minio/sha256-simd for more efficient sha256 calculation** ([#7732](https://github.com/containerd/containerd/pull/7732))
+* **Make OCI options cross-platform** ([#7928](https://github.com/containerd/containerd/pull/7928))
 
 See the changelog for complete list of changes"""
 
 postface = """\
 ### Which file should I download?
-* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.27 (Ubuntu 18.04).
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
 * `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
 * `cri-containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:     (Deprecated)
 * `cri-containerd-cni-<VERSION>-<OS>-<ARCH>.tar.gz`: (Deprecated)

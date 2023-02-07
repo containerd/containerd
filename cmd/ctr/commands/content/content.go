@@ -42,7 +42,7 @@ var (
 	// Command is the cli command for managing content
 	Command = cli.Command{
 		Name:  "content",
-		Usage: "manage content",
+		Usage: "Manage content",
 		Subcommands: cli.Commands{
 			activeIngestCommand,
 			deleteCommand,
@@ -96,11 +96,11 @@ var (
 		Flags: []cli.Flag{
 			cli.Int64Flag{
 				Name:  "expected-size",
-				Usage: "validate against provided size",
+				Usage: "Validate against provided size",
 			},
 			cli.StringFlag{
 				Name:  "expected-digest",
-				Usage: "verify content against expected digest",
+				Usage: "Verify content against expected digest",
 			},
 		},
 		Action: func(context *cli.Context) error {
@@ -143,7 +143,7 @@ var (
 			},
 			cli.StringFlag{
 				Name:  "root",
-				Usage: "path to content store root",
+				Usage: "Path to content store root",
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
 			},
 		},
@@ -181,7 +181,7 @@ var (
 		Flags: []cli.Flag{
 			cli.BoolFlag{
 				Name:  "quiet, q",
-				Usage: "print only the blob digest",
+				Usage: "Print only the blob digest",
 			},
 		},
 		Action: func(context *cli.Context) error {
@@ -294,7 +294,7 @@ var (
 		Flags: []cli.Flag{
 			cli.StringFlag{
 				Name:  "validate",
-				Usage: "validate the result against a format (json, mediatype, etc.)",
+				Usage: "Validate the result against a format (json, mediatype, etc.)",
 			},
 			cli.StringFlag{
 				Name:   "editor",

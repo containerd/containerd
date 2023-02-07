@@ -42,7 +42,7 @@ func init() {
 //
 // If m.Type starts with "fuse." or "fuse3.", "mount.fuse" or "mount.fuse3"
 // helper binary is called.
-func (m *Mount) Mount(target string) (err error) {
+func (m *Mount) mount(target string) (err error) {
 	for _, helperBinary := range allowedHelperBinaries {
 		// helperBinary = "mount.fuse", typePrefix = "fuse."
 		typePrefix := strings.TrimPrefix(helperBinary, "mount.") + "."

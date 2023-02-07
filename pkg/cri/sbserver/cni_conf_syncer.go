@@ -19,6 +19,7 @@ package sbserver
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/containerd/go-cni"
@@ -44,6 +45,13 @@ func newCNINetConfSyncer(confDir string, netPlugin cni.CNI, loadOpts []cni.Opt) 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create fsnotify watcher: %w", err)
+	}
+
+	// /etc/cni has to be readable for non-root users (0755), because /etc/cni/tuning/allowlist.conf is used for rootless mode too.
+	// This file was introduced in CNI plugins 1.2.0 (https://github.com/containernetworking/plugins/pull/693), and its path is hard-coded.
+	confDirParent := filepath.Dir(confDir)
+	if err := os.MkdirAll(confDirParent, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create the parent of the cni conf dir=%s: %w", confDirParent, err)
 	}
 
 	if err := os.MkdirAll(confDir, 0700); err != nil {

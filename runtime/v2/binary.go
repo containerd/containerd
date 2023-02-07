@@ -146,7 +146,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	log.G(ctx).Info("cleaning up dead shim")
 
 	// On Windows and FreeBSD, the current working directory of the shim should
-	// not be the bundle path during the delete operation.  Instead, we invoke
+	// not be the bundle path during the delete operation. Instead, we invoke
 	// with the default work dir and forward the bundle path on the cmdline.
 	// Windows cannot delete the current working directory while an executable
 	// is in use with it. On FreeBSD, fork/exec can fail.

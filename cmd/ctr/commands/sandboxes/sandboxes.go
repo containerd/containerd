@@ -50,7 +50,7 @@ var runCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "runtime name",
+			Usage: "Runtime name",
 			Value: defaults.DefaultRuntime,
 		},
 	},
@@ -104,7 +104,7 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "filters",
-			Usage: "the list of filters to apply when querying sandboxes from the store",
+			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -151,7 +151,7 @@ var removeCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "force, f",
-			Usage: "ignore shutdown errors when removing sandbox",
+			Usage: "Ignore shutdown errors when removing sandbox",
 		},
 	},
 	Action: func(context *cli.Context) error {

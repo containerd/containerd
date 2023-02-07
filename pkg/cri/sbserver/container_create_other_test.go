@@ -21,11 +21,12 @@ package sbserver
 import (
 	"testing"
 
-	"github.com/containerd/containerd/pkg/cri/annotations"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/pkg/cri/annotations"
 )
 
 // checkMount is defined by all tests but not used here
@@ -52,6 +53,19 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		},
 		Labels:      map[string]string{"a": "b"},
 		Annotations: map[string]string{"ca-c": "ca-d"},
+		Mounts: []*runtime.Mount{
+			// everything default
+			{
+				ContainerPath: "container-path-1",
+				HostPath:      "host-path-1",
+			},
+			// readOnly
+			{
+				ContainerPath: "container-path-2",
+				HostPath:      "host-path-2",
+				Readonly:      true,
+			},
+		},
 	}
 	sandboxConfig := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
@@ -69,11 +83,14 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		WorkingDir: "/workspace",
 	}
 	specCheck := func(t *testing.T, id string, sandboxID string, sandboxPid uint32, spec *runtimespec.Spec) {
-		assert.Equal(t, relativeRootfsPath, spec.Root.Path)
 		assert.Equal(t, []string{"test", "command", "test", "args"}, spec.Process.Args)
 		assert.Equal(t, "test-cwd", spec.Process.Cwd)
 		assert.Contains(t, spec.Process.Env, "k1=v1", "k2=v2", "k3=v3=v3bis", "ik4=iv4=iv4bis=boop")
 		assert.Contains(t, spec.Process.Env, "ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "k4=v4=v4bis=foop")
+
+		t.Logf("Check bind mount")
+		checkMount(t, spec.Mounts, "host-path-1", "container-path-1", "bind", []string{"rw"}, nil)
+		checkMount(t, spec.Mounts, "host-path-2", "container-path-2", "bind", []string{"ro"}, nil)
 
 		t.Logf("Check PodSandbox annotations")
 		assert.Contains(t, spec.Annotations, annotations.SandboxID)

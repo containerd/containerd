@@ -37,17 +37,17 @@ const (
 var pruneFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "async",
-		Usage: "allow garbage collection to cleanup asynchronously",
+		Usage: "Allow garbage collection to cleanup asynchronously",
 	},
 	cli.BoolFlag{
 		Name:  "dry",
-		Usage: "just show updates without applying (enables debug logging)",
+		Usage: "Just show updates without applying (enables debug logging)",
 	},
 }
 
 var pruneCommand = cli.Command{
 	Name:  "prune",
-	Usage: "prunes content from the content store",
+	Usage: "Prunes content from the content store",
 	Subcommands: cli.Commands{
 		pruneReferencesCommand,
 	},
@@ -55,7 +55,7 @@ var pruneCommand = cli.Command{
 
 var pruneReferencesCommand = cli.Command{
 	Name:  "references",
-	Usage: "prunes preference labels from the content store (layers only by default)",
+	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
 	Action: func(clicontext *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(clicontext)

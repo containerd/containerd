@@ -4,7 +4,6 @@ package wclayer
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -68,7 +67,7 @@ func NewLayerReader(ctx context.Context, path string, parentLayerPaths []string)
 		trace.StringAttribute("path", path),
 		trace.StringAttribute("parentLayerPaths", strings.Join(parentLayerPaths, ", ")))
 
-	exportPath, err := ioutil.TempDir("", "hcs")
+	exportPath, err := os.MkdirTemp("", "hcs")
 	if err != nil {
 		return nil, err
 	}

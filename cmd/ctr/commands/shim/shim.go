@@ -43,30 +43,30 @@ import (
 var fifoFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "stdin",
-		Usage: "specify the path to the stdin fifo",
+		Usage: "Specify the path to the stdin fifo",
 	},
 	cli.StringFlag{
 		Name:  "stdout",
-		Usage: "specify the path to the stdout fifo",
+		Usage: "Specify the path to the stdout fifo",
 	},
 	cli.StringFlag{
 		Name:  "stderr",
-		Usage: "specify the path to the stderr fifo",
+		Usage: "Specify the path to the stderr fifo",
 	},
 	cli.BoolFlag{
 		Name:  "tty,t",
-		Usage: "enable tty support",
+		Usage: "Enable tty support",
 	},
 }
 
 // Command is the cli command for interacting with a task
 var Command = cli.Command{
 	Name:  "shim",
-	Usage: "interact with a shim directly",
+	Usage: "Interact with a shim directly",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "id",
-			Usage: "container id",
+			Usage: "Container id",
 		},
 	},
 	Subcommands: []cli.Command{
@@ -79,7 +79,7 @@ var Command = cli.Command{
 
 var startCommand = cli.Command{
 	Name:  "start",
-	Usage: "start a container with a task",
+	Usage: "Start a container with a task",
 	Action: func(context *cli.Context) error {
 		service, err := getTaskService(context)
 		if err != nil {
@@ -94,7 +94,7 @@ var startCommand = cli.Command{
 
 var deleteCommand = cli.Command{
 	Name:  "delete",
-	Usage: "delete a container with a task",
+	Usage: "Delete a container with a task",
 	Action: func(context *cli.Context) error {
 		service, err := getTaskService(context)
 		if err != nil {
@@ -113,7 +113,7 @@ var deleteCommand = cli.Command{
 
 var stateCommand = cli.Command{
 	Name:  "state",
-	Usage: "get the state of all the processes of the task",
+	Usage: "Get the state of all the processes of the task",
 	Action: func(context *cli.Context) error {
 		service, err := getTaskService(context)
 		if err != nil {
@@ -132,24 +132,24 @@ var stateCommand = cli.Command{
 
 var execCommand = cli.Command{
 	Name:  "exec",
-	Usage: "exec a new process in the task's container",
+	Usage: "Exec a new process in the task's container",
 	Flags: append(fifoFlags,
 		cli.BoolFlag{
 			Name:  "attach,a",
-			Usage: "stay attached to the container and open the fifos",
+			Usage: "Stay attached to the container and open the fifos",
 		},
 		cli.StringSliceFlag{
 			Name:  "env,e",
-			Usage: "add environment vars",
+			Usage: "Add environment vars",
 			Value: &cli.StringSlice{},
 		},
 		cli.StringFlag{
 			Name:  "cwd",
-			Usage: "current working directory",
+			Usage: "Current working directory",
 		},
 		cli.StringFlag{
 			Name:  "spec",
-			Usage: "runtime spec",
+			Usage: "Runtime spec",
 		},
 	),
 	Action: func(context *cli.Context) error {

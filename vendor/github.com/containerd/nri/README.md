@@ -1,4 +1,4 @@
-## Node Resource Interface, Revisited
+# Node Resource Interface, Revisited
 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/nri)](https://pkg.go.dev/github.com/containerd/nri)
 [![Build Status](https://github.com/containerd/nri/workflows/CI/badge.svg)](https://github.com/containerd/nri/actions?query=workflow%3ACI)
@@ -7,7 +7,7 @@
 
 *This project is currently in DRAFT status*
 
-### Goal
+## Goal
 
 NRI allows plugging domain- or vendor-specific custom logic into OCI-
 compatible runtimes. This logic can make controlled changes to containers
@@ -23,7 +23,7 @@ The goal is to enable NRI support in the most commonly used OCI runtimes,
 [containerd](https://github.com/containerd/containerd) and
 [CRI-O](https://github.com/cri-o/cri-o).
 
-### Background
+## Background
 
 The revisited API is a major rewrite of NRI. It changes the scope of NRI
 and how it gets integrated into runtimes. It reworks how plugins are
@@ -43,7 +43,7 @@ JSON requests and responses NRI is defined as a formal, protobuf-based
 result in improved communication efficiency with lower per-message overhead,
 and enable straightforward implementation of stateful NRI plugins.
 
-### Components
+## Components
 
 The NRI implementation consists of a number of components. The core of
 these are essential for implementing working end-to-end NRI support in
@@ -62,7 +62,7 @@ implement useful functionality in real world scenarios. [A few](plugins/differ)
 serve as practical examples of how the stub library can be used to implement
 NRI plugins.
 
-### Protocol, Plugin API
+## Protocol, Plugin API
 
 The core of NRI is defined by a protobuf [protocol definition](pkg/api/api.proto)
 of the low-level plugin API. The API defines two services, Runtime and Plugin.
@@ -83,7 +83,7 @@ provides functions for
   - hooking the plugin into pod/container lifecycle events
   - shutting down the plugin
 
-#### Plugin Registration
+### Plugin Registration
 
 Before a plugin can start receiving and processing container events, it needs
 to register itself with NRI. During registration the plugin and NRI perform a
@@ -114,7 +114,7 @@ Once the handshake sequence is over and the plugin has registered with NRI,
 it will start receiving pod and container lifecycle events according to its
 subscription.
 
-#### Pod Data and Available Lifecycle Events
+### Pod Data and Available Lifecycle Events
 
 <details>
 <summary>NRI Pod Lifecycle Events</summary>
@@ -140,7 +140,7 @@ The following pieces of pod metadata are available to plugins in NRI:
   - cgroup parent directory
   - runtime handler name
 
-#### Container Data and Available Lifecycle Events
+### Container Data and Available Lifecycle Events
 
 <details>
 <summary>NRI Container Lifecycle Events</summary>
@@ -203,7 +203,7 @@ The following pieces of container metadata are available to plugins in NRI:
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's OCI Spec.
 
-#### Container Adjustment
+### Container Adjustment
 
 During container creation plugins can request changes to the following
 container parameters:
@@ -236,7 +236,7 @@ container parameters:
       - Block I/O class
       - RDT class
 
-#### Container Updates
+### Container Updates
 
 Once a container has been created plugins can request updates to them.
 These updates can be requested in response to another containers creation
@@ -268,7 +268,7 @@ can be updated this way:
     - RDT class
 
 
-### Runtime Adaptation
+## Runtime Adaptation
 
 The NRI [runtime adaptation](pkg/adaptation) package is the interface
 runtimes use to integrate to NRI and interact with NRI plugins. It
@@ -283,7 +283,7 @@ into a single one. While combining responses, the package detects any
 unintentional conflicting changes made by multiple plugins to a single
 container and flags such an event as an error to the runtime.
 
-### Wrapped OCI Spec Generator
+## Wrapped OCI Spec Generator
 
 The [OCI Spec generator](pkg/runtime-tools/generate) package wraps the
 [corresponding package](https://github.com/opencontainers/runtime-tools/tree/master/generate)
@@ -291,7 +291,7 @@ and adds functions for applying NRI container adjustments and updates to
 OCI Specs. This package can be used by runtime NRI integration code to
 apply NRI responses to containers.
 
-### Plugin Stub Library
+## Plugin Stub Library
 
 The plugin stub hides many of the low-level details of implementing an NRI
 plugin. It takes care of connection establishment, plugin registration,
@@ -299,7 +299,7 @@ configuration, and event subscription. All [sample plugins](pkg/plugins)
 are implemented using the stub. Any of these can be used as a tutorial on
 how the stub library should be used.
 
-### Sample Plugins
+## Sample Plugins
 
 The following sample plugins exist for NRI:
 
@@ -311,3 +311,14 @@ The following sample plugins exist for NRI:
 
 Please see the documentation of these plugins for further details
 about what and how each of these plugins can be used for.
+
+## Project details
+
+nri is a containerd sub-project, licensed under the [Apache 2.0 license](./LICENSE).
+As a containerd sub-project, you will find the:
+
+ * [Project governance](https://github.com/containerd/project/blob/main/GOVERNANCE.md),
+ * [Maintainers](https://github.com/containerd/project/blob/main/MAINTAINERS),
+ * and [Contributing guidelines](https://github.com/containerd/project/blob/main/CONTRIBUTING.md)
+
+information in our [`containerd/project`](https://github.com/containerd/project) repository.

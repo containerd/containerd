@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# UBUNTU_VERSION can be set to 18.04 (bionic), 20.04 (focal), or 22.04 (jammy)
-ARG UBUNTU_VERSION=18.04
+# UBUNTU_VERSION can be set to 18.04 (bionic, DEPRECATED), 20.04 (focal), or 22.04 (jammy)
+ARG UBUNTU_VERSION=20.04
 ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
@@ -23,6 +23,7 @@ FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.1.0@sha256:76a8510b1798f66fcc87e7
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS base
 COPY --from=xx / /
 SHELL ["/bin/bash", "-xec"]
+ENV DEBIAN_FRONTEND=noninteractive
 RUN	apt-get update && \
 	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM

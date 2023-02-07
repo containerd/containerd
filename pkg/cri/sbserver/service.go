@@ -17,6 +17,7 @@
 package sbserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -204,6 +205,12 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 // TODO: get rid of this.
 func (c *criService) BackOffEvent(id string, event interface{}) {
 	c.eventMonitor.backOff.enBackOff(id, event)
+}
+
+// GenerateAndSendContainerEvent is a temporary workaround to send PLEG events from podsandbopx/ controller
+// TODO: refactor PLEG event generator so both podsandbox/ controller and CRI service can access it.
+func (c *criService) GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
+	c.generateAndSendContainerEvent(ctx, containerID, sandboxID, eventType)
 }
 
 // Register registers all required services onto a specific grpc server.

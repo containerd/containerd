@@ -31,19 +31,18 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
-	"github.com/containerd/containerd/protobuf"
-	sb "github.com/containerd/containerd/sandbox"
-
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/server/bandwidth"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/protobuf"
+	sb "github.com/containerd/containerd/sandbox"
 )
 
 func init() {
@@ -272,36 +271,28 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
 	}
 
-	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
-	// Note that this has to be done after sandboxStore.Add() because we need to get
-	// SandboxStatus from the store and include it in the event.
-	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
+	// TODO: Use sandbox client instead
+	exitCh := make(chan containerd.ExitStatus, 1)
+	go func() {
+		defer close(exitCh)
+
+		ctx := ctrdutil.NamespacedContext()
+		resp, err := controller.Wait(ctx, id)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
+			exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
+			return
+		}
+
+		exitCh <- *containerd.NewExitStatus(resp.ExitStatus, protobuf.FromTimestamp(resp.ExitedAt), nil)
+	}()
 
 	// start the monitor after adding sandbox into the store, this ensures
 	// that sandbox is in the store, when event monitor receives the TaskExit event.
 	//
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	go func() {
-		resp, err := controller.Wait(ctrdutil.NamespacedContext(), id)
-		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to wait for sandbox controller, skipping exit event")
-			return
-		}
-
-		e := &eventtypes.TaskExit{
-			ContainerID: id,
-			ID:          id,
-			// Pid is not used
-			Pid:        0,
-			ExitStatus: resp.ExitStatus,
-			ExitedAt:   resp.ExitedAt,
-		}
-		c.eventMonitor.backOff.enBackOff(id, e)
-	}()
-
-	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
-	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
+	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, resp.GetPid(), exitCh)
 
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 
@@ -330,6 +321,8 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		config    = sandbox.Config
 		path      = sandbox.NetNSPath
 		netPlugin = c.getNetworkPlugin(sandbox.RuntimeHandler)
+		err       error
+		result    *cni.Result
 	)
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
@@ -341,7 +334,11 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
-	result, err := netPlugin.Setup(ctx, id, path, opts...)
+	if c.config.CniConfig.NetworkPluginSetupSerially {
+		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
+	} else {
+		result, err = netPlugin.Setup(ctx, id, path, opts...)
+	}
 	networkPluginOperations.WithValues(networkSetUpOp).Inc()
 	networkPluginOperationsLatency.WithValues(networkSetUpOp).UpdateSince(netStart)
 	if err != nil {

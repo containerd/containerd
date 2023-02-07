@@ -36,11 +36,11 @@ var restoreCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "rw",
-			Usage: "restore the rw layer from the checkpoint",
+			Usage: "Restore the rw layer from the checkpoint",
 		},
 		cli.BoolFlag{
 			Name:  "live",
-			Usage: "restore the runtime and memory data from the checkpoint",
+			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
 	},
 	Action: func(context *cli.Context) error {

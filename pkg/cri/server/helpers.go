@@ -476,7 +476,7 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 		}
 
 		if spec.Linux.Resources.HugepageLimits != nil {
-			hugepageLimits := make([]*runtime.HugepageLimit, 0)
+			hugepageLimits := make([]*runtime.HugepageLimit, 0, len(spec.Linux.Resources.HugepageLimits))
 			for _, l := range spec.Linux.Resources.HugepageLimits {
 				hugepageLimits = append(hugepageLimits, &runtime.HugepageLimit{
 					PageSize: l.Pagesize,

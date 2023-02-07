@@ -80,16 +80,16 @@ can be used and modified as necessary as a custom configuration.`
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:  "config,c",
-			Usage: "path to the configuration file",
+			Usage: "Path to the configuration file",
 			Value: filepath.Join(defaults.DefaultConfigDir, "config.toml"),
 		},
 		cli.StringFlag{
 			Name:  "log-level,l",
-			Usage: "set the logging level [trace, debug, info, warn, error, fatal, panic]",
+			Usage: "Set the logging level [trace, debug, info, warn, error, fatal, panic]",
 		},
 		cli.StringFlag{
 			Name:  "address,a",
-			Usage: "address for containerd's GRPC server",
+			Usage: "Address for containerd's GRPC server",
 		},
 		cli.StringFlag{
 			Name:  "root",

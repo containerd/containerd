@@ -21,10 +21,11 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/testutil"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestGenerateSpec(t *testing.T) {
@@ -39,7 +40,7 @@ func TestGenerateSpec(t *testing.T) {
 		t.Fatal("GenerateSpec() returns a nil spec")
 	}
 
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "linux" {
 		// check for matching caps
 		defaults := defaultUnixCaps()
 		for _, cl := range [][]string{
@@ -61,9 +62,9 @@ func TestGenerateSpec(t *testing.T) {
 				t.Errorf("ns at %d does not match set %q != %q", i, defaultNS[i], ns)
 			}
 		}
-	} else {
+	} else if runtime.GOOS == "windows" {
 		if s.Windows == nil {
-			t.Fatal("Windows section of spec not filled in on Windows platform")
+			t.Fatal("Windows section of spec not filled in for Windows spec")
 		}
 	}
 
@@ -122,7 +123,7 @@ func TestSpecWithTTY(t *testing.T) {
 	if !s.Process.Terminal {
 		t.Error("terminal net set WithTTY()")
 	}
-	if runtime.GOOS != "windows" {
+	if runtime.GOOS == "linux" {
 		v := s.Process.Env[len(s.Process.Env)-1]
 		if v != "TERM=xterm" {
 			t.Errorf("xterm not set in env for TTY")

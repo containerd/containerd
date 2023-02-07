@@ -110,7 +110,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			container, err := m.containers.Get(ctx, id)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("loading container %s", id)
-				if err := mount.UnmountAll(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+				if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
 					log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
 				}
 				bundle.Delete()

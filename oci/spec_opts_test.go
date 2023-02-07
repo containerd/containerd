@@ -30,17 +30,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
-	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type blob []byte
@@ -302,13 +301,20 @@ func TestWithDefaultSpec(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var expected Spec
-	var err error
-	if runtime.GOOS == "windows" {
+	var (
+		expected Spec
+		err      error
+	)
+
+	switch runtime.GOOS {
+	case "windows":
 		err = populateDefaultWindowsSpec(ctx, &expected, c.ID)
-	} else {
+	case "darwin":
+		err = populateDefaultDarwinSpec(&expected)
+	default:
 		err = populateDefaultUnixSpec(ctx, &expected, c.ID)
 	}
+
 	if err != nil {
 		t.Fatal(err)
 	}

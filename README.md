@@ -35,9 +35,9 @@ We are a large inclusive OSS project that is welcoming help of any kind shape or
 * We need OSS community outreach/organizing help to get the word out; manage
 and create messaging and educational content; and help with social media, community forums/groups, and google groups.
 * We are actively inviting new [security advisors](https://github.com/containerd/project/blob/main/GOVERNANCE.md#security-advisors) to join the team.
-* New sub-projects are being created, core and non-core that could use additional development help.
+* New subprojects are being created, core and non-core that could use additional development help.
 * Each of the [containerd projects](https://github.com/containerd) has a list of issues currently being worked on or that need help resolving.
-  - If the issue has not already been assigned to someone or has not made recent progress and you are interested, please inquire.
+  - If the issue has not already been assigned to someone or has not made recent progress, and you are interested, please inquire.
   - If you are interested in starting with a smaller/beginner-level issue, look for issues with an `exp/beginner` tag, for example [containerd/containerd beginner issues.](https://github.com/containerd/containerd/issues?q=is%3Aissue+is%3Aopen+label%3Aexp%2Fbeginner)
 
 ## Getting Started
@@ -320,7 +320,7 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 For async communication and long-running discussions please use issues and pull requests on the GitHub repo.
 This will be the best place to discuss design and implementation.
 
-For sync communication catch us in the `#containerd` and `#containerd-dev` slack channels on Cloud Native Computing Foundation's (CNCF) slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF slack.](https://slack.cncf.io)
+For sync communication catch us in the `#containerd` and `#containerd-dev` Slack channels on Cloud Native Computing Foundation's (CNCF) Slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF Slack.](https://slack.cncf.io)
 
 ### Security audit
 

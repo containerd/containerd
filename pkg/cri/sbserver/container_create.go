@@ -33,7 +33,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
@@ -45,6 +44,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/platforms"
 )
 
 func init() {
@@ -353,7 +353,7 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, platform platforms.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
 	container := &containers.Container{ID: id}
@@ -379,7 +379,7 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 		return &spec, nil
 	}
 
-	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
+	spec, err := oci.GenerateSpecWithPlatform(ctx, nil, platforms.Format(platform), container, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate spec: %w", err)
 	}
@@ -407,7 +407,7 @@ const (
 
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
-	platform *types.Platform,
+	platform platforms.Platform,
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
@@ -421,6 +421,10 @@ func (c *criService) buildContainerSpec(
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
+		specOpts []oci.SpecOpts
+		err      error
+
+		// Platform helpers
 		isLinux   = platform.OS == "linux"
 		isWindows = platform.OS == "windows"
 		isDarwin  = platform.OS == "darwin"
@@ -428,7 +432,7 @@ func (c *criService) buildContainerSpec(
 
 	switch {
 	case isLinux:
-		return c.buildLinuxSpec(
+		specOpts, err = c.buildLinuxSpec(
 			id,
 			sandboxID,
 			sandboxPid,
@@ -442,7 +446,7 @@ func (c *criService) buildContainerSpec(
 			ociRuntime,
 		)
 	case isWindows:
-		return c.buildWindowsSpec(
+		specOpts, err = c.buildWindowsSpec(
 			id,
 			sandboxID,
 			sandboxPid,
@@ -456,7 +460,7 @@ func (c *criService) buildContainerSpec(
 			ociRuntime,
 		)
 	case isDarwin:
-		return c.buildDarwinSpec(
+		specOpts, err = c.buildDarwinSpec(
 			id,
 			sandboxID,
 			containerName,
@@ -470,6 +474,12 @@ func (c *criService) buildContainerSpec(
 	default:
 		return nil, fmt.Errorf("unsupported spec platform: %s", platform.OS)
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate spec opts: %w", err)
+	}
+
+	return c.runtimeSpec(id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) buildLinuxSpec(
@@ -484,7 +494,7 @@ func (c *criService) buildLinuxSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
-) (_ *runtimespec.Spec, retErr error) {
+) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		oci.WithoutRunMount,
 	}
@@ -704,7 +714,7 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return specOpts, nil
 }
 
 func (c *criService) buildWindowsSpec(
@@ -719,7 +729,7 @@ func (c *criService) buildWindowsSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
-) (_ *runtimespec.Spec, retErr error) {
+) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		customopts.WithProcessArgs(config, imageConfig),
 	}
@@ -807,7 +817,7 @@ func (c *criService) buildWindowsSpec(
 		customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(sandboxHpc)),
 	)
 
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return specOpts, nil
 }
 
 func (c *criService) buildDarwinSpec(
@@ -820,7 +830,7 @@ func (c *criService) buildDarwinSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
-) (_ *runtimespec.Spec, retErr error) {
+) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		customopts.WithProcessArgs(config, imageConfig),
 	}
@@ -843,6 +853,8 @@ func (c *criService) buildDarwinSpec(
 	}
 	specOpts = append(specOpts, oci.WithEnv(env))
 
+	specOpts = append(specOpts, customopts.WithDarwinMounts(c.os, config, extraMounts))
+
 	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
@@ -863,5 +875,5 @@ func (c *criService) buildDarwinSpec(
 		customopts.WithAnnotation(annotations.ImageName, imageName),
 	)
 
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return specOpts, nil
 }

@@ -13,6 +13,10 @@ GO_FLAGS_EXTRA:=
 ifeq "$(GOMODVENDOR)" "1"
 GO_FLAGS_EXTRA += -mod=vendor
 endif
+GO_BUILD_TAGS:=
+ifneq ($(strip $(GO_BUILD_TAGS)),)
+GO_FLAGS_EXTRA += -tags="$(GO_BUILD_TAGS)"
+endif
 GO_BUILD:=CGO_ENABLED=$(CGO_ENABLED) $(GO) build $(GO_FLAGS) $(GO_FLAGS_EXTRA)
 
 SRCROOT=$(dir $(abspath $(firstword $(MAKEFILE_LIST))))

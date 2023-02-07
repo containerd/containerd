@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -97,16 +98,16 @@ var diffCommand = cli.Command{
 	Flags: append([]cli.Flag{
 		cli.StringFlag{
 			Name:  "media-type",
-			Usage: "media type to use for creating diff",
+			Usage: "Media type to use for creating diff",
 			Value: ocispec.MediaTypeImageLayerGzip,
 		},
 		cli.StringFlag{
 			Name:  "ref",
-			Usage: "content upload reference to use",
+			Usage: "Content upload reference to use",
 		},
 		cli.BoolFlag{
 			Name:  "keep",
-			Usage: "keep diff content. up to creator to delete it.",
+			Usage: "Keep diff content. up to creator to delete it.",
 		},
 	}, commands.LabelFlag),
 	Action: func(context *cli.Context) error {
@@ -199,7 +200,7 @@ var usageCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "b",
-			Usage: "display size in bytes",
+			Usage: "Display size in bytes",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -278,11 +279,11 @@ var prepareCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "target, t",
-			Usage: "mount target path, will print mount, if provided",
+			Usage: "Mount target path, will print mount, if provided",
 		},
 		cli.BoolFlag{
 			Name:  "mounts",
-			Usage: "print out snapshot mounts as JSON",
+			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -329,11 +330,11 @@ var viewCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "target, t",
-			Usage: "mount target path, will print mount, if provided",
+			Usage: "Mount target path, will print mount, if provided",
 		},
 		cli.BoolFlag{
 			Name:  "mounts",
-			Usage: "print out snapshot mounts as JSON",
+			Usage: "Print out snapshot mounts as JSON",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -426,7 +427,7 @@ var commitCommand = cli.Command{
 
 var treeCommand = cli.Command{
 	Name:  "tree",
-	Usage: "display tree view of snapshot branches",
+	Usage: "Display tree view of snapshot branches",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -640,6 +641,6 @@ func printNode(name string, tree *snapshotTree, level int) {
 func printMounts(target string, mounts []mount.Mount) {
 	// FIXME: This is specific to Unix
 	for _, m := range mounts {
-		fmt.Printf("mount -t %s %s %s -o %s\n", m.Type, m.Source, target, strings.Join(m.Options, ","))
+		fmt.Printf("mount -t %s %s %s -o %s\n", m.Type, m.Source, filepath.Join(target, m.Target), strings.Join(m.Options, ","))
 	}
 }

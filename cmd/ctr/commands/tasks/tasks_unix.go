@@ -36,7 +36,7 @@ import (
 var platformStartFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "no-pivot",
-		Usage: "disable use of pivot-root (linux only)",
+		Usage: "Disable use of pivot-root (linux only)",
 	},
 }
 
