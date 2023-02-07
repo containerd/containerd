@@ -98,7 +98,7 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the namespace name",
+			Usage: "Print only the namespace name",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -150,7 +150,7 @@ var removeCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "cgroup,c",
-			Usage: "delete the namespace's cgroup",
+			Usage: "Delete the namespace's cgroup",
 		},
 	},
 	Action: func(context *cli.Context) error {

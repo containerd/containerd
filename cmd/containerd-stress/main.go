@@ -126,52 +126,52 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.BoolFlag{
 			Name:  "debug",
-			Usage: "set debug output in the logs",
+			Usage: "Set debug output in the logs",
 		},
 		cli.StringFlag{
 			Name:  "address,a",
 			Value: "/run/containerd/containerd.sock",
-			Usage: "path to the containerd socket",
+			Usage: "Path to the containerd socket",
 		},
 		cli.IntFlag{
 			Name:  "concurrent,c",
 			Value: 1,
-			Usage: "set the concurrency of the stress test",
+			Usage: "Set the concurrency of the stress test",
 		},
 		cli.BoolFlag{
 			Name:  "cri",
-			Usage: "utilize CRI to create pods for the stress test. This requires a runtime that matches CRI runtime handler. Example: --runtime runc",
+			Usage: "Utilize CRI to create pods for the stress test. This requires a runtime that matches CRI runtime handler. Example: --runtime runc",
 		},
 		cli.DurationFlag{
 			Name:  "duration,d",
 			Value: 1 * time.Minute,
-			Usage: "set the duration of the stress test",
+			Usage: "Set the duration of the stress test",
 		},
 		cli.BoolFlag{
 			Name:  "exec",
-			Usage: "add execs to the stress tests (non-CRI only)",
+			Usage: "Add execs to the stress tests (non-CRI only)",
 		},
 		cli.StringFlag{
 			Name:  "image,i",
 			Value: "docker.io/library/alpine:latest",
-			Usage: "image to be utilized for testing",
+			Usage: "Image to be utilized for testing",
 		},
 		cli.BoolFlag{
 			Name:  "json,j",
-			Usage: "output results in json format",
+			Usage: "Output results in json format",
 		},
 		cli.StringFlag{
 			Name:  "metrics,m",
-			Usage: "address to serve the metrics API",
+			Usage: "Address to serve the metrics API",
 		},
 		cli.StringFlag{
 			Name:  "runtime",
-			Usage: "set the runtime to stress test",
+			Usage: "Set the runtime to stress test",
 			Value: plugin.RuntimeRuncV2,
 		},
 		cli.StringFlag{
 			Name:  "snapshotter",
-			Usage: "set the snapshotter to use",
+			Usage: "Set the snapshotter to use",
 			Value: "overlayfs",
 		},
 	}

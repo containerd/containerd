@@ -35,15 +35,15 @@ var checkpointCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "exit",
-			Usage: "stop the container after the checkpoint",
+			Usage: "Stop the container after the checkpoint",
 		},
 		cli.StringFlag{
 			Name:  "image-path",
-			Usage: "path to criu image files",
+			Usage: "Path to criu image files",
 		},
 		cli.StringFlag{
 			Name:  "work-path",
-			Usage: "path to criu work files and logs",
+			Usage: "Path to criu work files and logs",
 		},
 	},
 	Action: func(context *cli.Context) error {

@@ -31,7 +31,7 @@ import (
 
 var ociHook = cli.Command{
 	Name:  "oci-hook",
-	Usage: "provides a base for OCI runtime hooks to allow arguments to be injected.",
+	Usage: "Provides a base for OCI runtime hooks to allow arguments to be injected.",
 	Action: func(context *cli.Context) error {
 		state, err := loadHookState(os.Stdin)
 		if err != nil {

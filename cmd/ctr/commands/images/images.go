@@ -64,7 +64,7 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the image refs",
+			Usage: "Print only the image refs",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -147,7 +147,7 @@ var setLabelsCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "replace-all, r",
-			Usage: "replace all labels",
+			Usage: "Replace all labels",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -206,7 +206,7 @@ var checkCommand = cli.Command{
 	Flags: append([]cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the ready image refs (fully downloaded and unpacked)",
+			Usage: "Print only the ready image refs (fully downloaded and unpacked)",
 		},
 	}, commands.SnapshotterFlags...),
 	Action: func(context *cli.Context) error {
@@ -359,11 +359,11 @@ var removeCommand = cli.Command{
 
 var pruneCommand = cli.Command{
 	Name:  "prune",
-	Usage: "remove unused images",
+	Usage: "Remove unused images",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "all", // TODO: add more filters
-			Usage: "remove all unused images, not just dangling ones (if all is not specified no images will be pruned)",
+			Usage: "Remove all unused images, not just dangling ones (if all is not specified no images will be pruned)",
 		},
 	},
 	// adapted from `nerdctl`:

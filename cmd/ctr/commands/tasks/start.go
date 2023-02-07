@@ -34,23 +34,23 @@ var startCommand = cli.Command{
 	Flags: append(platformStartFlags, []cli.Flag{
 		cli.BoolFlag{
 			Name:  "null-io",
-			Usage: "send all IO to /dev/null",
+			Usage: "Send all IO to /dev/null",
 		},
 		cli.StringFlag{
 			Name:  "log-uri",
-			Usage: "log uri",
+			Usage: "Log uri",
 		},
 		cli.StringFlag{
 			Name:  "fifo-dir",
-			Usage: "directory used for storing IO FIFOs",
+			Usage: "Directory used for storing IO FIFOs",
 		},
 		cli.StringFlag{
 			Name:  "pid-file",
-			Usage: "file path to write the task's pid",
+			Usage: "File path to write the task's pid",
 		},
 		cli.BoolFlag{
 			Name:  "detach,d",
-			Usage: "detach from the task after it has started execution",
+			Usage: "Detach from the task after it has started execution",
 		},
 	}...),
 	Action: func(context *cli.Context) error {

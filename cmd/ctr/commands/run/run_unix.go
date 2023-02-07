@@ -47,40 +47,40 @@ import (
 var platformRunFlags = []cli.Flag{
 	cli.StringFlag{
 		Name:  "runc-binary",
-		Usage: "specify runc-compatible binary",
+		Usage: "Specify runc-compatible binary",
 	},
 	cli.StringFlag{
 		Name:  "runc-root",
-		Usage: "specify runc-compatible root",
+		Usage: "Specify runc-compatible root",
 	},
 	cli.BoolFlag{
 		Name:  "runc-systemd-cgroup",
-		Usage: "start runc with systemd cgroup manager",
+		Usage: "Start runc with systemd cgroup manager",
 	},
 	cli.StringFlag{
 		Name:  "uidmap",
-		Usage: "run inside a user namespace with the specified UID mapping range; specified with the format `container-uid:host-uid:length`",
+		Usage: "Run inside a user namespace with the specified UID mapping range; specified with the format `container-uid:host-uid:length`",
 	},
 	cli.StringFlag{
 		Name:  "gidmap",
-		Usage: "run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
+		Usage: "Run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
 	},
 	cli.BoolFlag{
 		Name:  "remap-labels",
-		Usage: "provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
+		Usage: "Provide the user namespace ID remapping to the snapshotter via label options; requires snapshotter support",
 	},
 	cli.BoolFlag{
 		Name:  "privileged-without-host-devices",
-		Usage: "don't pass all host devices to privileged container",
+		Usage: "Don't pass all host devices to privileged container",
 	},
 	cli.Float64Flag{
 		Name:  "cpus",
-		Usage: "set the CFS cpu quota",
+		Usage: "Set the CFS cpu quota",
 		Value: 0.0,
 	},
 	cli.IntFlag{
 		Name:  "cpu-shares",
-		Usage: "set the cpu shares",
+		Usage: "Set the cpu shares",
 		Value: 1024,
 	},
 }

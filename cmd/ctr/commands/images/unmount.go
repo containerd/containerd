@@ -34,7 +34,7 @@ var unmountCommand = cli.Command{
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 		cli.BoolFlag{
 			Name:  "rm",
-			Usage: "remove the snapshot after a successful unmount",
+			Usage: "Remove the snapshot after a successful unmount",
 		},
 	),
 	Action: func(context *cli.Context) error {

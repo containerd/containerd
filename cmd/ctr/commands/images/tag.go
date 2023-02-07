@@ -32,7 +32,7 @@ var tagCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "force",
-			Usage: "force target_ref to be created, regardless if it already exists",
+			Usage: "Force target_ref to be created, regardless if it already exists",
 		},
 	},
 	Action: func(context *cli.Context) error {

@@ -99,7 +99,7 @@ var listCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
-			Usage: "print only the container id",
+			Usage: "Print only the container id",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -153,7 +153,7 @@ var deleteCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "keep-snapshot",
-			Usage: "do not clean up snapshot with container",
+			Usage: "Do not clean up snapshot with container",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -251,7 +251,7 @@ var infoCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "spec",
-			Usage: "only display the spec",
+			Usage: "Only display the spec",
 		},
 	},
 	Action: func(context *cli.Context) error {

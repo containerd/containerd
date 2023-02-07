@@ -58,24 +58,24 @@ var pushCommand = cli.Command{
 `,
 	Flags: append(commands.RegistryFlags, cli.StringFlag{
 		Name:  "manifest",
-		Usage: "digest of manifest",
+		Usage: "Digest of manifest",
 	}, cli.StringFlag{
 		Name:  "manifest-type",
-		Usage: "media type of manifest digest",
+		Usage: "Media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
 	}, cli.StringSliceFlag{
 		Name:  "platform",
-		Usage: "push content from a specific platform",
+		Usage: "Push content from a specific platform",
 		Value: &cli.StringSlice{},
 	}, cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
-		Usage: "set the max concurrent uploaded layers for each push",
+		Usage: "Set the max concurrent uploaded layers for each push",
 	}, cli.BoolTFlag{
 		Name:  "local",
-		Usage: "push content from local client rather than using transfer service",
+		Usage: "Push content from local client rather than using transfer service",
 	}, cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
-		Usage: "allow pushing blobs that are marked as non-distributable",
+		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
 	Action: func(context *cli.Context) error {
 		var (
