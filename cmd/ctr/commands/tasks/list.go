@@ -19,6 +19,7 @@ package tasks
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
@@ -30,7 +31,7 @@ var listCommand = cli.Command{
 	Name:      "list",
 	Usage:     "list tasks",
 	Aliases:   []string{"ls"},
-	ArgsUsage: "[flags]",
+	ArgsUsage: "[flags] [<filter>, ...]",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet, q",
@@ -38,6 +39,7 @@ var listCommand = cli.Command{
 		},
 	},
 	Action: func(context *cli.Context) error {
+		filters := context.Args()
 		quiet := context.Bool("quiet")
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -45,7 +47,9 @@ var listCommand = cli.Command{
 		}
 		defer cancel()
 		s := client.TaskService()
-		response, err := s.List(ctx, &tasks.ListTasksRequest{})
+		response, err := s.List(ctx, &tasks.ListTasksRequest{
+			Filter: strings.Join(filters, " "),
+		})
 		if err != nil {
 			return err
 		}

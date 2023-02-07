@@ -391,18 +391,22 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 }
 
 func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.CallOption) (*api.ListTasksResponse, error) {
+	filter, err := filters.ParseAll(r.GetFilter())
+	if err != nil {
+		return nil, err
+	}
 	resp := &api.ListTasksResponse{}
 	for _, r := range l.allRuntimes() {
 		tasks, err := r.Tasks(ctx, false)
 		if err != nil {
 			return nil, errdefs.ToGRPC(err)
 		}
-		addTasks(ctx, resp, tasks)
+		addTasks(ctx, filter, resp, tasks)
 	}
 	return resp, nil
 }
 
-func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Task) {
+func addTasks(ctx context.Context, filter filters.Filter, r *api.ListTasksResponse, tasks []runtime.Task) {
 	for _, t := range tasks {
 		tt, err := getProcessState(ctx, t)
 		if err != nil {
@@ -411,7 +415,23 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 			}
 			continue
 		}
-		r.Tasks = append(r.Tasks, tt)
+		if filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+			if len(fieldpath) == 0 {
+				return "", false
+			}
+			switch fieldpath[0] {
+			case "name":
+				return tt.GetID(), true
+			case "pid":
+				return fmt.Sprint(tt.GetPid()), true
+			case "status":
+				return tt.GetStatus().String(), true
+			default:
+				return "", false
+			}
+		})) {
+			r.Tasks = append(r.Tasks, tt)
+		}
 	}
 }
 
