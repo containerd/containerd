@@ -28,6 +28,7 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -231,9 +232,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	ctrl, err := controller.Start(ctx, id)
 	if err != nil {
 		sandbox.Container, _ = c.client.LoadContainer(ctx, id)
-		if ctrl.SandboxID == "" && ctrl.Pid == 0 && ctrl.CreatedAt.IsZero() && len(ctrl.Labels) == 0 {
-			// if resp is a non-nil zero-value, an error occurred during cleanup
-			cleanupErr = fmt.Errorf("failed to cleanup sandbox")
+		var cerr podsandbox.CleanupErr
+		if errors.As(err, &cerr) {
+			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
+
+			// Strip last error as cleanup error to handle separately
+			if merr, ok := err.(*multierror.Error); ok {
+				if errs := merr.WrappedErrors(); len(errs) > 0 {
+					err = errs[0]
+				}
+			}
 		}
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
