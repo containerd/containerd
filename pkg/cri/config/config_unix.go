@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
+	"github.com/containerd/containerd/platforms"
 	"github.com/pelletier/go-toml"
 )
 
@@ -80,6 +81,7 @@ func DefaultConfig() PluginConfig {
 					Type:        "io.containerd.runc.v2",
 					Options:     tree.ToMap(),
 					SandboxMode: string(ModePodSandbox),
+					Platform:    platforms.DefaultString(),
 				},
 			},
 			DisableSnapshotAnnotations: true,

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 )
 
@@ -91,6 +92,10 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	SandboxMode string `toml:"sandbox_mode" json:"sandboxMode"`
+	// Platform denotes the platform that the runtime will run workloads in. This is useful for
+	// emulated or virtualized runtimes where the host and "guest" may differ. This gives the
+	// runtime the ability to make decisions based on what platform was requested.
+	Platform string `toml:"runtime_platform" json:"runtimePlatform"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -449,6 +454,16 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 		// If empty, use default podSandbox mode
 		if len(r.SandboxMode) == 0 {
 			r.SandboxMode = string(ModePodSandbox)
+			c.ContainerdConfig.Runtimes[k] = r
+		}
+		// Validate platform provided. If empty, assign the default for the host.
+		if r.Platform != "" {
+			_, err := platforms.Parse(r.Platform)
+			if err != nil {
+				return fmt.Errorf("`runtime_platform` value %s failed to parse: %w", r.Platform, err)
+			}
+		} else {
+			r.Platform = platforms.DefaultString()
 			c.ContainerdConfig.Runtimes[k] = r
 		}
 	}

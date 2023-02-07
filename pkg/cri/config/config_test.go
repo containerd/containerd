@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,10 +56,12 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeUntrusted: {
 							Type:        "untrusted",
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 						RuntimeDefault: {
 							Type:        "default",
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -101,6 +104,7 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {
 							Type:        "default",
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -138,6 +142,7 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {
 							Type:        plugin.RuntimeLinuxV1,
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -177,6 +182,7 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {
 							Type:        plugin.RuntimeLinuxV1,
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -216,6 +222,7 @@ func TestValidateConfig(t *testing.T) {
 							Engine:      "runc",
 							Type:        plugin.RuntimeLinuxV1,
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -227,8 +234,9 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Engine: "runc",
-							Type:   plugin.RuntimeRuncV1,
+							Engine:   "runc",
+							Type:     plugin.RuntimeRuncV1,
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
@@ -255,6 +263,7 @@ func TestValidateConfig(t *testing.T) {
 							Root:        "/run/containerd/runc",
 							Type:        plugin.RuntimeLinuxV1,
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -266,8 +275,9 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Root: "/run/containerd/runc",
-							Type: plugin.RuntimeRuncV1,
+							Root:     "/run/containerd/runc",
+							Type:     plugin.RuntimeRuncV1,
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
@@ -297,6 +307,7 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {
 							Type:        plugin.RuntimeRuncV1,
 							SandboxMode: string(ModePodSandbox),
+							Platform:    platforms.DefaultString(),
 						},
 					},
 				},
@@ -321,7 +332,8 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Type: "default",
+							Type:     "default",
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
@@ -334,7 +346,8 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Type: "default",
+							Type:     "default",
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
@@ -353,7 +366,8 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Type: "default",
+							Type:     "default",
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
@@ -376,12 +390,52 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {
 							PrivilegedWithoutHostDevices:                  false,
 							PrivilegedWithoutHostDevicesAllDevicesAllowed: true,
-							Type: "default",
+							Type:     "default",
+							Platform: platforms.DefaultString(),
 						},
 					},
 				},
 			},
 			expectedErr: "`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled",
+		},
+		"valid platform": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type:     "default",
+							Platform: "linux/amd64",
+						},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type:        "default",
+							SandboxMode: string(ModePodSandbox),
+							Platform:    "linux/amd64",
+						},
+					},
+				},
+			},
+		},
+		"faulty platform": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type:     "default",
+							Platform: "this/should/not/exist",
+						},
+					},
+				},
+			},
+			expectedErr: "`runtime_platform` value this/should/not/exist failed to parse",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {

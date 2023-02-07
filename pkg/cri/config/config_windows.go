@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
+	"github.com/containerd/containerd/platforms"
 )
 
 // DefaultConfig returns default configurations of cri plugin.
@@ -43,6 +44,7 @@ func DefaultConfig() PluginConfig {
 				"runhcs-wcow-process": {
 					Type:                 "io.containerd.runhcs.v1",
 					ContainerAnnotations: []string{"io.microsoft.container.*"},
+					Platform:             platforms.DefaultString(),
 				},
 				"runhcs-wcow-hypervisor": {
 					Type:                 "io.containerd.runhcs.v1",
@@ -63,6 +65,7 @@ func DefaultConfig() PluginConfig {
 						// This should only be turned on if SandboxIsolation is 1.
 						"ScaleCpuLimitsToSandbox": true,
 					},
+					Platform: platforms.DefaultString(),
 				},
 			},
 		},
