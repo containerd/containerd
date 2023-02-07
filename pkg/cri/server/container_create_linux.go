@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -116,6 +117,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 
 func (c *criService) containerSpec(
 	id string,
+	platform platforms.Platform,
 	sandboxID string,
 	sandboxPid uint32,
 	netNSPath string,
@@ -341,7 +343,7 @@ func (c *criService) containerSpec(
 				Type: runtimespec.CgroupNamespace,
 			}))
 	}
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return c.runtimeSpec(id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {

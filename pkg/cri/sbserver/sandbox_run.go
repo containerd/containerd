@@ -124,6 +124,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			Name:           name,
 			Config:         config,
 			RuntimeHandler: r.GetRuntimeHandler(),
+			Platform:       platform,
 		},
 		sandboxstore.Status{
 			State: sandboxstore.StateUnknown,

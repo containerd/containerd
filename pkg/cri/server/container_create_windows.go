@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -40,6 +41,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 
 func (c *criService) containerSpec(
 	id string,
+	platform platforms.Platform,
 	sandboxID string,
 	sandboxPid uint32,
 	netNSPath string,
@@ -131,8 +133,7 @@ func (c *criService) containerSpec(
 	specOpts = append(specOpts,
 		annotations.DefaultCRIAnnotations(sandboxID, containerName, imageName, sandboxConfig, false)...,
 	)
-
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return c.runtimeSpec(id, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 // No extra spec options needed for windows.

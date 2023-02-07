@@ -39,6 +39,7 @@ import (
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/platforms"
 )
 
 func init() {
@@ -156,7 +157,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
-	spec, err := c.containerSpec(id, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
+	spec, err := c.containerSpec(id, sandbox.Metadata.Platform, sandboxID, sandboxPid, sandbox.NetNSPath, containerName, containerdImage.Name(), config, sandboxConfig,
 		&image.ImageSpec.Config, append(mounts, volumeMounts...), ociRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %w", id, err)
@@ -336,7 +337,7 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, platform platforms.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := util.NamespacedContext()
 	container := &containers.Container{ID: id}
@@ -362,7 +363,7 @@ func (c *criService) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 		return &spec, nil
 	}
 
-	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
+	spec, err := oci.GenerateSpecWithPlatform(ctx, nil, platforms.Format(platform), container, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate spec: %w", err)
 	}

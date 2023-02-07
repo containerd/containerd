@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/platforms"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -101,7 +102,7 @@ func TestSandboxWindowsNetworkNamespace(t *testing.T) {
 	c := newTestCRIService()
 
 	config, imageConfig, specCheck := getRunPodSandboxTestData()
-	spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
+	spec, err := c.sandboxContainerSpec(testID, platforms.DefaultSpec(), config, imageConfig, nsPath, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, spec)

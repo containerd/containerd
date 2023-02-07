@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -37,7 +38,7 @@ import (
 	"github.com/containerd/containerd/pkg/userns"
 )
 
-func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
+func (c *criService) sandboxContainerSpec(id string, platform platforms.Platform, config *runtime.PodSandboxConfig,
 	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
 	// Creates a spec Generator with the default spec.
 	// TODO(random-liu): [P1] Compare the default settings with docker and containerd default.
@@ -194,8 +195,9 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 
 	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", "", config, true)...)
+	specOpts = append(specOpts, customopts.WithAnnotation(annotations.SandboxPlatform, platforms.Format(platform)))
 
-	return c.runtimeSpec(id, "", specOpts...)
+	return c.runtimeSpec(id, platform, "", specOpts...)
 }
 
 // sandboxContainerSpecOpts generates OCI spec options for

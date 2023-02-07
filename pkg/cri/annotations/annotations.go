@@ -64,6 +64,9 @@ const (
 	// SandboxNamespace is the name of the namespace of the sandbox (pod)
 	SandboxNamespace = "io.kubernetes.cri.sandbox-namespace"
 
+	// SandboxPlatform is the platform (OS/Arch/Variant) of the sandbox (pod)
+	SandboxPlatform = "io.kubernetes.cri.sandbox-platform"
+
 	// SandboxUID is the uid of the sandbox (pod) passed to CRI via RunPodSanbox,
 	// this field is useful for linking the uid created by the CRI client (e.g. kubelet)
 	// to the internal Sandbox.ID created by the containerd sandbox service

@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/platforms"
 )
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
@@ -63,7 +64,8 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.containerSpec(testID, platforms.DefaultSpec(), testSandboxID, testPid, "", testContainerName, testImageName,
+		containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -134,7 +136,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.containerSpec(testID, platforms.DefaultSpec(), testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -391,7 +393,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.containerSpec(testID, platforms.DefaultSpec(), testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -414,6 +416,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 	out, err := c.runtimeSpec(
 		"id1",
+		platforms.DefaultSpec(),
 		"/etc/containerd/cri-base.json",
 		oci.WithHostname("new-host"),
 		oci.WithDomainname("new-domain"),

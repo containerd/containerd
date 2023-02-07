@@ -20,6 +20,7 @@ package server
 
 import (
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -37,6 +38,7 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 
 func (c *criService) containerSpec(
 	id string,
+	platform platforms.Platform,
 	sandboxID string,
 	sandboxPid uint32,
 	netNSPath string,
@@ -49,7 +51,7 @@ func (c *criService) containerSpec(
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
 	specOpts := annotations.DefaultCRIAnnotations(id, containerName, imageName, sandboxConfig, false)
-	return c.runtimeSpec(sandboxID, ociRuntime.BaseRuntimeSpec, specOpts...)
+	return c.runtimeSpec(sandboxID, platform, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {

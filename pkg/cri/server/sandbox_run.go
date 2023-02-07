@@ -45,6 +45,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
 )
 
@@ -116,13 +117,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
 
+	platform, err := platforms.Parse(ociRuntime.Platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse runtime platform: %w", err)
+	}
+	sandbox.Metadata.Platform = platform
+
 	runtimeStart := time.Now()
 	// Create sandbox container.
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
 	// NOTE: the network namespace path will be created later and update through updateNetNamespacePath function
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, "", ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, platform, config, &image.ImageSpec.Config, "", ociRuntime.PodAnnotations)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
