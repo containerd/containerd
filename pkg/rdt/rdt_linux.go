@@ -16,10 +16,11 @@
    limitations under the License.
 */
 
-package tasks
+package rdt
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/containerd/containerd/log"
 
@@ -31,28 +32,54 @@ const (
 	ResctrlPrefix = ""
 )
 
-var rdtEnabled bool
+var (
+	enabled   bool
+	enabledMu sync.RWMutex
+)
 
-func RdtEnabled() bool { return rdtEnabled }
+// IsEnabled checks whether rdt is enabled.
+func IsEnabled() bool {
+	enabledMu.RLock()
+	defer enabledMu.RUnlock()
 
-func initRdt(configFilePath string) error {
-	rdtEnabled = false
+	return enabled
+}
 
+var (
+	initOnce sync.Once
+	initErr  error
+)
+
+// SetConfig updates rdt config with a given config path.
+func SetConfig(configFilePath string) error {
+	enabledMu.Lock()
+	defer enabledMu.Unlock()
+
+	enabled = false
 	if configFilePath == "" {
 		log.L.Debug("No RDT config file specified, RDT not configured")
 		return nil
 	}
 
-	if err := rdt.Initialize(ResctrlPrefix); err != nil {
-		return fmt.Errorf("RDT not enabled: %w", err)
+	initOnce.Do(func() {
+		err := rdt.Initialize(ResctrlPrefix)
+		if err != nil {
+			initErr = fmt.Errorf("RDT not enabled: %w", err)
+		}
+	})
+	if initErr != nil {
+		return initErr
 	}
 
 	if err := rdt.SetConfigFromFile(configFilePath, true); err != nil {
 		return err
 	}
-
-	rdtEnabled = true
-
+	enabled = true
 	return nil
+}
 
+// ContainerClassFromAnnotations examines container and pod annotations of a
+// container and returns its RDT class.
+func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+	return rdt.ContainerClassFromAnnotations(containerName, containerAnnotations, podAnnotations)
 }

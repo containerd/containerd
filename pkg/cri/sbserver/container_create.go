@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -641,7 +642,7 @@ func (c *criService) buildLinuxSpec(
 		return nil, fmt.Errorf("failed to set blockio class: %w", err)
 	}
 	if blockIOClass != "" {
-		if linuxBlockIO, err := blockIOToLinuxOci(blockIOClass); err == nil {
+		if linuxBlockIO, err := blockio.ClassNameToLinuxOCI(blockIOClass); err == nil {
 			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
 		} else {
 			return nil, err

@@ -39,6 +39,8 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/blockio"
+	"github.com/containerd/containerd/pkg/rdt"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
@@ -141,10 +143,10 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		l.monitor.Monitor(t, nil)
 	}
 
-	if err := initBlockIO(config.BlockIOConfigFile); err != nil {
+	if err := blockio.SetConfig(config.BlockIOConfigFile); err != nil {
 		log.G(ic.Context).WithError(err).Errorf("blockio initialization failed")
 	}
-	if err := initRdt(config.RdtConfigFile); err != nil {
+	if err := rdt.SetConfig(config.RdtConfigFile); err != nil {
 		log.G(ic.Context).WithError(err).Errorf("RDT initialization failed")
 	}
 

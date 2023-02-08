@@ -21,10 +21,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/services/tasks"
-	"github.com/intel/goresctrl/pkg/blockio"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/pkg/blockio"
 )
 
 // blockIOClassFromAnnotations examines container and pod annotations of a
@@ -35,7 +34,7 @@ func (c *criService) blockIOClassFromAnnotations(containerName string, container
 		return "", err
 	}
 
-	if cls != "" && !tasks.BlockIOEnabled() {
+	if cls != "" && !blockio.IsEnabled() {
 		if c.config.ContainerdConfig.IgnoreBlockIONotEnabledErrors {
 			cls = ""
 			logrus.Debugf("continuing create container %s, ignoring blockio not enabled (%v)", containerName, err)
@@ -44,10 +43,4 @@ func (c *criService) blockIOClassFromAnnotations(containerName string, container
 		}
 	}
 	return cls, nil
-}
-
-// blockIOToLinuxOci converts blockio class name into the LinuxBlockIO
-// structure in the OCI runtime spec.
-func blockIOToLinuxOci(className string) (*runtimespec.LinuxBlockIO, error) {
-	return blockio.OciLinuxBlockIO(className)
 }

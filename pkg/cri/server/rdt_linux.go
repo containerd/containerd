@@ -21,9 +21,9 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/services/tasks"
-	"github.com/intel/goresctrl/pkg/rdt"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/pkg/rdt"
 )
 
 // rdtClassFromAnnotations examines container and pod annotations of a
@@ -33,13 +33,13 @@ func (c *criService) rdtClassFromAnnotations(containerName string, containerAnno
 
 	if err == nil {
 		// Our internal check that RDT has been enabled
-		if cls != "" && !tasks.RdtEnabled() {
+		if cls != "" && !rdt.IsEnabled() {
 			err = fmt.Errorf("RDT disabled, refusing to set RDT class of container %q to %q", containerName, cls)
 		}
 	}
 
 	if err != nil {
-		if !tasks.RdtEnabled() && c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
+		if !rdt.IsEnabled() && c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
 			logrus.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
 			return "", nil
 		}

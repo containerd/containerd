@@ -36,6 +36,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
@@ -270,7 +271,7 @@ func (c *criService) containerSpec(
 		return nil, fmt.Errorf("failed to set blockio class: %w", err)
 	}
 	if blockIOClass != "" {
-		if linuxBlockIO, err := blockIOToLinuxOci(blockIOClass); err == nil {
+		if linuxBlockIO, err := blockio.ClassNameToLinuxOCI(blockIOClass); err == nil {
 			specOpts = append(specOpts, oci.WithBlockIO(linuxBlockIO))
 		} else {
 			return nil, err
