@@ -199,6 +199,15 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 					})
 				}
 			}
+
+			// create a nameless image if `repositories`
+			// isn't present i.e an export with digest
+			if iopts.skipDgstRef == nil && iopts.dgstRefT == nil && name == "" {
+				imgs = append(imgs, images.Image{
+					Name:   "<none>",
+					Target: m,
+				})
+			}
 		}
 
 		return idx.Manifests, nil
