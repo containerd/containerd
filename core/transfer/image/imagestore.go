@@ -241,6 +241,13 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 							Target: desc,
 							Labels: is.imageLabels,
 						})
+					} else {
+						// Create nameless image if no repo tags
+						imgs = append(imgs, images.Image{
+							Name:   "<none>",
+							Target: desc,
+							Labels: is.imageLabels,
+						})
 					}
 					continue
 				}

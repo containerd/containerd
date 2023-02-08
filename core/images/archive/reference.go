@@ -112,3 +112,10 @@ func DigestTranslator(prefix string) func(digest.Digest) string {
 		return prefix + "@" + dgst.String()
 	}
 }
+
+// DanglingImage creates a dangling reference for nameless images
+func DanglingImage() func(digest.Digest) string {
+	return func(_ digest.Digest) string {
+		return "<none>"
+	}
+}
