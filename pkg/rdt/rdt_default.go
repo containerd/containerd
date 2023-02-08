@@ -16,8 +16,15 @@
    limitations under the License.
 */
 
-package tasks
+package rdt
 
-func RdtEnabled() bool { return false }
+// IsEnabled always returns false in non-linux platforms.
+func IsEnabled() bool { return false }
 
-func initRdt(configFilePath string) error { return nil }
+// SetConfig always is no-op in non-linux platforms.
+func SetConfig(configFilePath string) error { return nil }
+
+// ContainerClassFromAnnotations always is no-op in non-linux platforms.
+func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
+	return "", nil
+}
