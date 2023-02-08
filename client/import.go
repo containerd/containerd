@@ -216,6 +216,14 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 					})
 				}
 			}
+
+			// Create nameless image if no repo tags
+			if iopts.skipDgstRef == nil && iopts.dgstRefT == nil && name == "" {
+				imgs = append(imgs, images.Image{
+					Name:   "<none>",
+					Target: m,
+				})
+			}
 		}
 
 		return idx.Manifests, nil
