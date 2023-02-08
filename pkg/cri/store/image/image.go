@@ -96,7 +96,6 @@ func (s *Store) update(ref string, img *Image) error {
 	switch refName {
 	case string(imagedigest.SHA256), string(imagedigest.SHA512), string(imagedigest.SHA384):
 		//  a digested reference
-		break
 	default:
 		// parsing ref consistently for refCache, including adding `docker.io/library` prefix
 		namedRef, err := docker.ParseDockerRef(ref)
