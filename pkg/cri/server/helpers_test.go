@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"os"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -41,6 +42,8 @@ import (
 	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.
@@ -614,4 +617,50 @@ func TestGetRuntimeOptions(t *testing.T) {
 	var typeurlAny typeurl.Any = pbany // This is typed nil.
 	_, err = getRuntimeOptions(containers.Container{Runtime: containers.RuntimeInfo{Options: typeurlAny}})
 	require.NoError(t, err)
+}
+
+func TestHostNetwork(t *testing.T) {
+	tests := []struct {
+		name     string
+		c        *runtime.PodSandboxConfig
+		expected bool
+	}{
+		{
+			name: "when pod namespace return false",
+			c: &runtime.PodSandboxConfig{
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							Network: runtime.NamespaceMode_POD,
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "when node namespace return true",
+			c: &runtime.PodSandboxConfig{
+				Linux: &runtime.LinuxPodSandboxConfig{
+					SecurityContext: &runtime.LinuxSandboxSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							Network: runtime.NamespaceMode_NODE,
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		if goruntime.GOOS != "linux" {
+			t.Skip()
+		}
+		t.Run(tt.name, func(t *testing.T) {
+			if hostNetwork(tt.c) != tt.expected {
+				t.Errorf("failed hostNetwork got %t expected %t", hostNetwork(tt.c), tt.expected)
+			}
+		})
+	}
 }
