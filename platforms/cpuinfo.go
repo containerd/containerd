@@ -17,10 +17,9 @@
 package platforms
 
 import (
+	"fmt"
 	"runtime"
 	"sync"
-
-	"github.com/containerd/containerd/log"
 )
 
 // Present the ARM instruction set architecture, eg: v7, v8
@@ -35,7 +34,7 @@ func cpuVariant() string {
 			var err error
 			cpuVariantValue, err = getCPUVariant()
 			if err != nil {
-				log.L.Errorf("Error getCPUVariant for OS %s: %v", runtime.GOOS, err)
+				panic(fmt.Sprintf("Error getCPUVariant for OS %s: %v", runtime.GOOS, err))
 			}
 		}
 	})
