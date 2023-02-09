@@ -281,7 +281,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
-          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin" >> $GITHUB_PATH
+          echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
 
