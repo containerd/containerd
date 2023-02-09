@@ -224,21 +224,12 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
-      - name: Set env
-        shell: bash
-        run: |
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
-          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
-
       - uses: actions/checkout@v3
-        with:
-          path: src/github.com/containerd/containerd
 
       - name: Make
         run: |
           make build
           make binaries
-        working-directory: src/github.com/containerd/containerd
 
   #
   # Integration and CRI tests
@@ -410,11 +401,9 @@ jobs:
       fail-fast: false
       matrix:
         runtime:
-          [
-            io.containerd.runtime.v1.linux,
-            io.containerd.runc.v1,
-            io.containerd.runc.v2,
-          ]
+          - io.containerd.runtime.v1.linux
+          - io.containerd.runc.v1
+          - io.containerd.runc.v2
         runc: [runc, crun]
         enable_cri_sandboxes: ["", "sandboxed"]
         exclude:
