@@ -88,6 +88,15 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	return poolDevice, nil
 }
 
+func skipRetry(err error) bool {
+	if err == nil {
+		return true // skip retry if no error
+	} else if !errors.Is(err, unix.EBUSY) {
+		return true // skip retry if error is not due to device or resource busy
+	}
+	return false
+}
+
 func retry(ctx context.Context, f func() error) error {
 	var (
 		maxRetries = 100
@@ -97,9 +106,8 @@ func retry(ctx context.Context, f func() error) error {
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		retryErr = f()
-		if retryErr == nil {
-			return nil
-		} else if retryErr != unix.EBUSY {
+
+		if skipRetry(retryErr) {
 			return retryErr
 		}
 
