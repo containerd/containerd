@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
-	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl"
 	exec "golang.org/x/sys/execabs"
@@ -190,7 +189,7 @@ func ReadRuntimeOptions[T any](reader io.Reader) (T, error) {
 		return config, errdefs.ErrNotFound
 	}
 
-	var any ptypes.Any
+	var any types.Any
 	if err := proto.Unmarshal(data, &any); err != nil {
 		return config, err
 	}
