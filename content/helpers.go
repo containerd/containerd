@@ -59,6 +59,10 @@ func NewReader(ra ReaderAt) io.Reader {
 //
 // Avoid using this for large blobs, such as layers.
 func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) ([]byte, error) {
+	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
+		return desc.Data, nil
+	}
+
 	ra, err := provider.ReaderAt(ctx, desc)
 	if err != nil {
 		return nil, err

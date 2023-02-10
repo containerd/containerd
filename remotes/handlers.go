@@ -17,6 +17,7 @@
 package remotes
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -137,6 +138,10 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 			return fmt.Errorf("failed commit on ref %q: %w", ws.Ref, err)
 		}
 		return err
+	}
+
+	if desc.Size == int64(len(desc.Data)) {
+		return content.Copy(ctx, cw, bytes.NewReader(desc.Data), desc.Size, desc.Digest)
 	}
 
 	rc, err := fetcher.Fetch(ctx, desc)
