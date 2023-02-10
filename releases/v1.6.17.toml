@@ -1,0 +1,23 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.16"
+
+pre_release = false
+
+preface = """\
+The seventeenth patch release for containerd 1.6 includes various updates.
+
+### Notable Updates
+
+* **Add network plugin metrics** ([#8018](https://github.com/containerd/containerd/pull/8018))
+* **Update mkdir permission on /etc/cni to 0755 instead of 0700** ([#8030](https://github.com/containerd/containerd/pull/8030))
+* **Export remote snapshotter label handler** ([#8054](https://github.com/containerd/containerd/pull/8054))
+* **Add support for default hosts.toml configuration** ([#8065](https://github.com/containerd/containerd/pull/8065))
+
+See the changelog for complete list of changes"""
