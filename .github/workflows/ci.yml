@@ -56,6 +56,7 @@ jobs:
   #
   project:
     name: Project Checks
+    if: github.repository == 'containerd/containerd'
     runs-on: ubuntu-20.04
     timeout-minutes: 5
 
@@ -135,7 +136,7 @@ jobs:
   # Make sure binaries compile with other platforms
   crossbuild:
     name: Crossbuild Binaries
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
     runs-on: ubuntu-20.04
     timeout-minutes: 10
     strategy:
@@ -227,7 +228,7 @@ jobs:
     name: Binaries
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
 
     strategy:
       matrix:
@@ -267,7 +268,7 @@ jobs:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
     env:
       GOTEST: gotestsum --
 
@@ -356,7 +357,7 @@ jobs:
     name: Linux Integration
     runs-on: ubuntu-20.04
     timeout-minutes: 40
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
 
     strategy:
       fail-fast: false
@@ -486,7 +487,7 @@ jobs:
     name: MacOS unit tests
     runs-on: macos-12
     timeout-minutes: 10
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
     env:
       GOTEST: gotestsum --
 
@@ -512,7 +513,7 @@ jobs:
     # nested virtualization is only available on macOS hosts
     runs-on: macos-12
     timeout-minutes: 45
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
     strategy:
       fail-fast: false
       matrix:
@@ -583,7 +584,7 @@ jobs:
     # nested virtualization is only available on macOS hosts
     runs-on: macos-12
     timeout-minutes: 45
-    needs: [project, linters, protos, man]
+    needs: [linters, protos, man]
     steps:
       - uses: actions/checkout@v3
 
