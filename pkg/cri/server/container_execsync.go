@@ -34,7 +34,6 @@ import (
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/util"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
@@ -158,7 +157,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		return nil, fmt.Errorf("failed to create exec %q: %w", execID, err)
 	}
 	defer func() {
-		deferCtx, deferCancel := ctrdutil.DeferContext()
+		deferCtx, deferCancel := util.DeferContext()
 		defer deferCancel()
 		if _, err := process.Delete(deferCtx, containerd.WithProcessKill); err != nil {
 			log.G(ctx).WithError(err).Errorf("Failed to delete exec process %q for container %q", execID, id)
