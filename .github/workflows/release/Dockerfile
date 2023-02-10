@@ -28,7 +28,6 @@ RUN	apt-get update && \
 	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM
 RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
-RUN if grep -qE 'UBUNTU_CODENAME=(focal|jammy)' /etc/os-release; then xx-apt-get install -y libbtrfs-dev; fi
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1

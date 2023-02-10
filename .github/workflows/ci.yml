@@ -34,12 +34,6 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2019]
 
     steps:
-      - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libbtrfs-dev
-
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -166,7 +160,7 @@ jobs:
       - run: |
           set -e -x
 
-          packages="libbtrfs-dev"
+          packages=""
           platform="${{matrix.goos}}/${{matrix.goarch}}"
           if [ -n "${{matrix.goarm}}" ]; then
             platform+="/v${{matrix.goarm}}"
@@ -215,12 +209,6 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
         go-version: ["1.19.5", "1.18.10"]
     steps:
-      - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libbtrfs-dev
-
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
@@ -427,7 +415,7 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y gperf libbtrfs-dev
+          sudo apt-get install -y gperf
           script/setup/install-seccomp
           script/setup/install-runc
           script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
