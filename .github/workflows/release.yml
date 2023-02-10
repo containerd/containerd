@@ -10,7 +10,7 @@ on:
       - main
       - "release/**"
 
-name: Containerd Release
+name: Release
 
 env:
   GO_VERSION: "1.19.5"
