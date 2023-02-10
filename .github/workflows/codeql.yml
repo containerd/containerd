@@ -10,6 +10,7 @@ on:
 
 jobs:
   CodeQL-Build:
+    if: github.repository == 'containerd/containerd'
 
     strategy:
       fail-fast: false
