@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/runtime/task/v2"
@@ -240,9 +241,9 @@ func makeConnection(ctx context.Context, address string, onClose func()) (_ io.C
 
 		return ttrpcClient, nil
 	case "grpc":
-		var (
-			gopts []grpc.DialOption
-		)
+		gopts := []grpc.DialOption{
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		}
 
 		conn, err := grpc.DialContext(ctx, dialer.DialAddress(params.Address), gopts...)
 		if err != nil {
