@@ -35,7 +35,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
@@ -69,7 +68,7 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
 			}
-			procs := make([]sdktrace.SpanProcessor, 0, len(plugins))
+			procs := make([]trace.SpanProcessor, 0, len(plugins))
 			for id, pctx := range plugins {
 				p, err := pctx.Instance()
 				if err != nil {
@@ -80,7 +79,7 @@ func init() {
 					}
 					continue
 				}
-				proc := p.(sdktrace.SpanProcessor)
+				proc := p.(trace.SpanProcessor)
 				procs = append(procs, proc)
 			}
 			return newTracer(ic.Context, ic.Config.(*TraceConfig), procs)
@@ -152,7 +151,7 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 // its sampling ratio and returns io.Closer.
 //
 // Note that this function sets process-wide tracing configuration.
-func newTracer(ctx context.Context, config *TraceConfig, procs []sdktrace.SpanProcessor) (io.Closer, error) {
+func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProcessor) (io.Closer, error) {
 
 	res, err := resource.New(ctx,
 		resource.WithHost(),
@@ -165,18 +164,18 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []sdktrace.SpanPr
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(config.TraceSamplingRatio))
+	sampler := trace.ParentBased(trace.TraceIDRatioBased(config.TraceSamplingRatio))
 
-	opts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSampler(sampler),
-		sdktrace.WithResource(res),
+	opts := []trace.TracerProviderOption{
+		trace.WithSampler(sampler),
+		trace.WithResource(res),
 	}
 
 	for _, proc := range procs {
-		opts = append(opts, sdktrace.WithSpanProcessor(proc))
+		opts = append(opts, trace.WithSpanProcessor(proc))
 	}
 
-	provider := sdktrace.NewTracerProvider(opts...)
+	provider := trace.NewTracerProvider(opts...)
 
 	otel.SetTracerProvider(provider)
 
