@@ -114,7 +114,7 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 		form.Set("access_type", "offline")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", to.Realm, strings.NewReader(form.Encode()))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, to.Realm, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ type FetchTokenResponse struct {
 
 // FetchToken fetches a token using a GET request
 func FetchToken(ctx context.Context, client *http.Client, headers http.Header, to TokenOptions) (*FetchTokenResponse, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", to.Realm, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, to.Realm, nil)
 	if err != nil {
 		return nil, err
 	}
