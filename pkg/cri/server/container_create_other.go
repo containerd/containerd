@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
-	customopts "github.com/containerd/containerd/pkg/cri/opts"
 )
 
 // containerMounts sets up necessary container system file mounts
@@ -49,16 +48,8 @@ func (c *criService) containerSpec(
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
-	specOpts := []oci.SpecOpts{
-		customopts.WithAnnotation(annotations.ContainerType, annotations.ContainerTypeContainer),
-		customopts.WithAnnotation(annotations.SandboxID, sandboxID),
-		customopts.WithAnnotation(annotations.SandboxNamespace, sandboxConfig.GetMetadata().GetNamespace()),
-		customopts.WithAnnotation(annotations.SandboxUID, sandboxConfig.GetMetadata().GetUid()),
-		customopts.WithAnnotation(annotations.SandboxName, sandboxConfig.GetMetadata().GetName()),
-		customopts.WithAnnotation(annotations.ContainerName, containerName),
-		customopts.WithAnnotation(annotations.ImageName, imageName),
-	}
-	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
+	specOpts := annotations.DefaultCRIAnnotations(id, containerName, imageName, sandboxConfig, false)
+	return c.runtimeSpec(sandboxID, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
