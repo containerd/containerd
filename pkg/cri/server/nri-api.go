@@ -31,7 +31,7 @@ import (
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"

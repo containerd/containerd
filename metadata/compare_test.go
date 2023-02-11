@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 )
 

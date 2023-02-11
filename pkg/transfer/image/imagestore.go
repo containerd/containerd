@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

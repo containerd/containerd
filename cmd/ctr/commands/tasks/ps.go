@@ -23,7 +23,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/urfave/cli"
 )
 

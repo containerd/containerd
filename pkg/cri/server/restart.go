@@ -30,7 +30,7 @@ import (
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 

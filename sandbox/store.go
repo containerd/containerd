@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 // Sandbox is an object stored in metadata database

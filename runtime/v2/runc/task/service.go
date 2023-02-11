@@ -47,7 +47,7 @@ import (
 	"github.com/containerd/containerd/sys/reaper"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/sirupsen/logrus"
 )
 

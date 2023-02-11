@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"go.etcd.io/bbolt"
 )
 

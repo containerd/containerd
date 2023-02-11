@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/go-cni"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

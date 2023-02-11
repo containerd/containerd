@@ -19,7 +19,7 @@ package sandbox
 import (
 	"testing"
 
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 )
 

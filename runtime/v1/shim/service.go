@@ -43,7 +43,7 @@ import (
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys/reaper"
 	runc "github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"

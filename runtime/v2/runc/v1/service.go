@@ -49,7 +49,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sys/reaper"
 	runcC "github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"

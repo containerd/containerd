@@ -61,7 +61,7 @@ import (
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/semaphore"
