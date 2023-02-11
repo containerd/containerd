@@ -22,7 +22,7 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 type CreateOptions struct {

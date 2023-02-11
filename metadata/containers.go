@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
 )
 

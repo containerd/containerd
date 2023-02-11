@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/selinux/go-selinux"

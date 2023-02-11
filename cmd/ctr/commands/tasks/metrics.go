@@ -28,7 +28,7 @@ import (
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/urfave/cli"
 )
 

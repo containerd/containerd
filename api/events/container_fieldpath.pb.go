@@ -3,7 +3,7 @@
 package events
 
 import (
-	typeurl "github.com/containerd/typeurl"
+	v2 "github.com/containerd/typeurl/v2"
 	strings "strings"
 )
 
@@ -43,7 +43,7 @@ func (m *ContainerCreate_Runtime) Field(fieldpath []string) (string, bool) {
 	case "name":
 		return string(m.Name), len(m.Name) > 0
 	case "options":
-		decoded, err := typeurl.UnmarshalAny(m.Options)
+		decoded, err := v2.UnmarshalAny(m.Options)
 		if err != nil {
 			return "", false
 		}

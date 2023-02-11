@@ -3,7 +3,7 @@
 package events
 
 import (
-	typeurl "github.com/containerd/typeurl"
+	v2 "github.com/containerd/typeurl/v2"
 )
 
 // Field returns the value for the given fieldpath as a string, if defined.
@@ -41,7 +41,7 @@ func (m *Envelope) Field(fieldpath []string) (string, bool) {
 	case "topic":
 		return string(m.Topic), len(m.Topic) > 0
 	case "event":
-		decoded, err := typeurl.UnmarshalAny(m.Event)
+		decoded, err := v2.UnmarshalAny(m.Event)
 		if err != nil {
 			return "", false
 		}
