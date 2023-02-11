@@ -33,10 +33,6 @@ const (
 	DiffService = "diff-service"
 	// IntrospectionService is the id of introspection service
 	IntrospectionService = "introspection-service"
-	// SandboxStoreService is the id of Sandbox's store service
-	SandboxStoreService = "sandbox-store-service"
-	// SandboxControllerService is the id of Sandbox's controller service
-	SandboxControllerService = "sandbox-controller-service"
 	// Streaming service is the id of the streaming service
 	StreamingService = "streaming-service"
 )

@@ -25,22 +25,22 @@ import (
 	"github.com/sirupsen/logrus"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/sandbox"
 )
 
-func (c *Controller) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
+func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.StopOpt) error {
 	sandbox, err := c.sandboxStore.Get(sandboxID)
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
+		return fmt.Errorf("an error occurred when try to find sandbox %q: %w",
 			sandboxID, err)
 	}
 
 	if err := c.cleanupSandboxFiles(sandboxID, sandbox.Config); err != nil {
-		return nil, fmt.Errorf("failed to cleanup sandbox files: %w", err)
+		return fmt.Errorf("failed to cleanup sandbox files: %w", err)
 	}
 
 	// TODO: The Controller maintains its own Status instead of CRI's sandboxStore.
@@ -48,10 +48,10 @@ func (c *Controller) Stop(ctx context.Context, sandboxID string) (*api.Controlle
 	state := sandbox.Status.Get().State
 	if (state == sandboxstore.StateReady || state == sandboxstore.StateUnknown) && sandbox.Container != nil {
 		if err := c.stopSandboxContainer(ctx, sandbox); err != nil {
-			return nil, fmt.Errorf("failed to stop sandbox container %q in %q state: %w", sandboxID, state, err)
+			return fmt.Errorf("failed to stop sandbox container %q in %q state: %w", sandboxID, state, err)
 		}
 	}
-	return &api.ControllerStopResponse{}, nil
+	return nil
 }
 
 // stopSandboxContainer kills the sandbox container.

@@ -113,7 +113,7 @@ message SandboxStatusRequest {
 }
 
 message SandboxStatusResponse {
-	string id = 1;
+	string sandbox_id = 1;
 	uint32 pid = 2;
 	string state = 3;
 	map<string, string> info = 4;

@@ -28,6 +28,7 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl"
+	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -40,7 +41,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
-	"github.com/containerd/containerd/protobuf"
 	sb "github.com/containerd/containerd/sandbox"
 )
 
@@ -229,12 +229,19 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
-	resp, err := controller.Start(ctx, id)
+	ctrl, err := controller.Start(ctx, id)
 	if err != nil {
 		sandbox.Container, _ = c.client.LoadContainer(ctx, id)
-		if resp != nil && resp.SandboxID == "" && resp.Pid == 0 && resp.CreatedAt == nil && len(resp.Labels) == 0 {
-			// if resp is a non-nil zero-value, an error occurred during cleanup
-			cleanupErr = fmt.Errorf("failed to cleanup sandbox")
+		var cerr podsandbox.CleanupErr
+		if errors.As(err, &cerr) {
+			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
+
+			// Strip last error as cleanup error to handle separately
+			if merr, ok := err.(*multierror.Error); ok {
+				if errs := merr.WrappedErrors(); len(errs) > 0 {
+					err = errs[0]
+				}
+			}
 		}
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
@@ -248,7 +255,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandbox.Container = container
 	}
 
-	labels := resp.GetLabels()
+	labels := ctrl.Labels
 	if labels == nil {
 		labels = map[string]string{}
 	}
@@ -257,9 +264,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		// Set the pod sandbox as ready after successfully start sandbox container.
-		status.Pid = resp.Pid
+		status.Pid = ctrl.Pid
 		status.State = sandboxstore.StateReady
-		status.CreatedAt = protobuf.FromTimestamp(resp.CreatedAt)
+		status.CreatedAt = ctrl.CreatedAt
 		return status, nil
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
@@ -283,7 +290,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			return
 		}
 
-		exitCh <- *containerd.NewExitStatus(resp.ExitStatus, protobuf.FromTimestamp(resp.ExitedAt), nil)
+		exitCh <- *containerd.NewExitStatus(resp.ExitStatus, resp.ExitedAt, nil)
 	}()
 
 	// start the monitor after adding sandbox into the store, this ensures
@@ -291,7 +298,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	//
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, resp.GetPid(), exitCh)
+	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, ctrl.Pid, exitCh)
 
 	sandboxRuntimeCreateTimer.WithValues(labels["oci_runtime_type"]).UpdateSince(runtimeStart)
 

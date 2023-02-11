@@ -24,7 +24,6 @@ import (
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	introspectionapi "github.com/containerd/containerd/api/services/introspection/v1"
 	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
-	sandboxapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -33,7 +32,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/containerd/containerd/sandbox/proxy"
 	srv "github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/introspection"
 	"github.com/containerd/containerd/snapshots"
@@ -173,9 +171,9 @@ func WithSandboxStore(client sandbox.Store) ServicesOpt {
 }
 
 // WithSandboxController sets the sandbox controller.
-func WithSandboxController(client sandboxapi.ControllerClient) ServicesOpt {
+func WithSandboxController(client sandbox.Controller) ServicesOpt {
 	return func(s *services) {
-		s.sandboxController = proxy.NewSandboxController(client)
+		s.sandboxController = client
 	}
 }
 
@@ -193,6 +191,9 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			plugin.SandboxStorePlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
+			},
+			plugin.SandboxControllerPlugin: func(i interface{}) ServicesOpt {
+				return WithSandboxController(i.(sandbox.Controller))
 			},
 		} {
 			i, err := ic.Get(t)
@@ -230,9 +231,6 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			srv.IntrospectionService: func(s interface{}) ServicesOpt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
-			},
-			srv.SandboxControllerService: func(s interface{}) ServicesOpt {
-				return WithSandboxController(s.(sandboxapi.ControllerClient))
 			},
 		} {
 			p := plugins[s]

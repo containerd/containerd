@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
-	"github.com/containerd/containerd/protobuf"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -83,6 +82,6 @@ func Test_Status(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, s.Pid, pid)
-	assert.Equal(t, s.ExitedAt, protobuf.ToTimestamp(exitedAt))
+	assert.Equal(t, s.ExitedAt, exitedAt)
 	assert.Equal(t, s.State, sandboxstore.StateReady.String())
 }

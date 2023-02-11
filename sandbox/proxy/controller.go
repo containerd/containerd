@@ -22,7 +22,9 @@ import (
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/sandbox"
 	sb "github.com/containerd/containerd/sandbox"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // remoteSandboxController is a low level GRPC client for containerd's sandbox controller service
@@ -37,8 +39,19 @@ func NewSandboxController(client api.ControllerClient) sb.Controller {
 	return &remoteSandboxController{client: client}
 }
 
-func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string) error {
-	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, opts ...sandbox.CreateOpt) error {
+	var options sandbox.CreateOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
+		SandboxID: sandboxID,
+		Rootfs:    options.Rootfs,
+		Options: &anypb.Any{
+			TypeUrl: options.Options.GetTypeUrl(),
+			Value:   options.Options.GetValue(),
+		},
+	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
 	}
@@ -46,13 +59,18 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string) 
 	return nil
 }
 
-func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (*api.ControllerStartResponse, error) {
+func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (sb.ControllerInstance, error) {
 	resp, err := s.client.Start(ctx, &api.ControllerStartRequest{SandboxID: sandboxID})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return sb.ControllerInstance{}, errdefs.FromGRPC(err)
 	}
 
-	return resp, nil
+	return sb.ControllerInstance{
+		SandboxID: sandboxID,
+		Pid:       resp.GetPid(),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Labels:    resp.GetLabels(),
+	}, nil
 }
 
 func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (platforms.Platform, error) {
@@ -69,38 +87,56 @@ func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string
 	}, nil
 }
 
-func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string) (*api.ControllerStopResponse, error) {
-	resp, err := s.client.Stop(ctx, &api.ControllerStopRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string, opts ...sandbox.StopOpt) error {
+	var soptions sandbox.StopOptions
+	for _, opt := range opts {
+		opt(&soptions)
+	}
+	req := &api.ControllerStopRequest{SandboxID: sandboxID}
+	if soptions.Timeout != nil {
+		req.TimeoutSecs = uint32(soptions.Timeout.Seconds())
+	}
+	_, err := s.client.Stop(ctx, req)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
 
-	return resp, nil
+	return nil
 }
 
-func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string) (*api.ControllerShutdownResponse, error) {
-	resp, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{SandboxID: sandboxID})
+func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string) error {
+	_, err := s.client.Shutdown(ctx, &api.ControllerShutdownRequest{SandboxID: sandboxID})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return errdefs.FromGRPC(err)
 	}
 
-	return resp, nil
+	return nil
 }
 
-func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (*api.ControllerWaitResponse, error) {
+func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (sb.ExitStatus, error) {
 	resp, err := s.client.Wait(ctx, &api.ControllerWaitRequest{SandboxID: sandboxID})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return sb.ExitStatus{}, errdefs.FromGRPC(err)
 	}
 
-	return resp, nil
+	return sb.ExitStatus{
+		ExitStatus: resp.GetExitStatus(),
+		ExitedAt:   resp.GetExitedAt().AsTime(),
+	}, nil
 }
 
-func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, verbose bool) (*api.ControllerStatusResponse, error) {
+func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, verbose bool) (sb.ControllerStatus, error) {
 	resp, err := s.client.Status(ctx, &api.ControllerStatusRequest{SandboxID: sandboxID, Verbose: verbose})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return sb.ControllerStatus{}, errdefs.FromGRPC(err)
 	}
-
-	return resp, nil
+	return sb.ControllerStatus{
+		SandboxID: sandboxID,
+		Pid:       resp.GetPid(),
+		State:     resp.GetState(),
+		Info:      resp.GetInfo(),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		ExitedAt:  resp.GetExitedAt().AsTime(),
+		Extra:     resp.GetExtra(),
+	}, nil
 }
