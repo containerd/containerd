@@ -29,7 +29,7 @@ import (
 	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )

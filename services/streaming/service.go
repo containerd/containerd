@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 )
 

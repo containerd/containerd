@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 var register = struct {

@@ -23,7 +23,7 @@ import (
 	gocontext "context"
 	"fmt"
 
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 

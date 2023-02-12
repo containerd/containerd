@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	gocni "github.com/containerd/go-cni"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"

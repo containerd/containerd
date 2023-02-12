@@ -48,7 +48,7 @@ import (
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/go-runc"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"

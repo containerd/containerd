@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 // Sandbox is a high level client to containerd's sandboxes.

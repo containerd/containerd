@@ -29,7 +29,7 @@ import (
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 const maxRead = 32 * 1024

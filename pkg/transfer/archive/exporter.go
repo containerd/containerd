@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 func init() {

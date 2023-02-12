@@ -139,9 +139,12 @@ github.com/containerd/nri/types/v1
 # github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
 ## explicit; go 1.13
 github.com/containerd/ttrpc
-# github.com/containerd/typeurl v1.0.3-0.20220422153119-7f6e6d160d67
+# github.com/containerd/typeurl v1.0.2
 ## explicit; go 1.13
 github.com/containerd/typeurl
+# github.com/containerd/typeurl/v2 v2.1.0
+## explicit; go 1.13
+github.com/containerd/typeurl/v2
 # github.com/containerd/zfs v1.0.0
 ## explicit; go 1.16
 github.com/containerd/zfs

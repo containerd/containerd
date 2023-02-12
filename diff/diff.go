@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/semaphore"
 )
 

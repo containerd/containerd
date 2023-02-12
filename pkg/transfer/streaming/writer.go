@@ -25,7 +25,7 @@ import (
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
-	"github.com/containerd/typeurl"
+	"github.com/containerd/typeurl/v2"
 )
 
 func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteCloser {
