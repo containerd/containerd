@@ -98,9 +98,6 @@ const (
 
 	// runtimeRunhcsV1 is the runtime type for runhcs.
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
-
-	// name prefix for CRI sbserver specific spans
-	criSpanPrefix = "pkg.cri.sbserver"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
