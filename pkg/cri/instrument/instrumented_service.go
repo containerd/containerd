@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package instrument
 
 import (
 	"context"
@@ -29,23 +29,49 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
-// instrumentedService wraps service with containerd namespace and logs.
-type instrumentedService struct {
-	c *criService
+const (
+	// criSpanPrefix is a prefix for CRI server specific spans
+	criSpanPrefix = "pkg.cri.server"
+)
+
+// criService is an CRI server dependency to be wrapped with instrumentation.
+type criService interface {
+	GRPCServices
+
+	IsInitialized() bool
+
+	// AlphaVersion returns the runtime name, runtime version and runtime API version.
+	AlphaVersion(ctx context.Context, r *runtime_alpha.VersionRequest) (*runtime_alpha.VersionResponse, error)
 }
 
-func newInstrumentedService(c *criService) grpcServices {
+// GRPCServices are all the grpc services provided by cri containerd.
+type GRPCServices interface {
+	runtime.RuntimeServiceServer
+	runtime.ImageServiceServer
+}
+
+type GRPCAlphaServices interface {
+	runtime_alpha.RuntimeServiceServer
+	runtime_alpha.ImageServiceServer
+}
+
+// instrumentedService wraps service with containerd namespace and logs.
+type instrumentedService struct {
+	c criService
+}
+
+func NewService(c criService) GRPCServices {
 	return &instrumentedService{c: c}
 }
 
 // instrumentedAlphaService wraps service with containerd namespace and logs.
 type instrumentedAlphaService struct {
-	c *criService
+	c criService
 	runtime_alpha.UnimplementedRuntimeServiceServer
 	runtime_alpha.UnimplementedImageServiceServer
 }
 
-func newInstrumentedAlphaService(c *criService) grpcAlphaServices {
+func NewAlphaService(c criService) GRPCAlphaServices {
 	return &instrumentedAlphaService{c: c}
 }
 
@@ -54,7 +80,7 @@ func newInstrumentedAlphaService(c *criService) grpcAlphaServices {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedService) checkInitialized() error {
-	if in.c.initialized.IsSet() {
+	if in.c.IsInitialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
@@ -65,7 +91,7 @@ func (in *instrumentedService) checkInitialized() error {
 // initialized.
 // NOTE(random-liu): All following functions MUST check initialized at the beginning.
 func (in *instrumentedAlphaService) checkInitialized() error {
-	if in.c.initialized.IsSet() {
+	if in.c.IsInitialized() {
 		return nil
 	}
 	return errors.New("server is not initialized yet")
