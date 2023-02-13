@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/containerd/containerd/api/types"
@@ -26,23 +27,35 @@ import (
 )
 
 type CreateOptions struct {
-	Rootfs  []*types.Mount
+	Rootfs []*types.Mount
+	// Options are used to pass arbitrary options to the shim when creating a new sandbox.
+	// CRI will use this to pass PodSandboxConfig.
+	// Don't confuse this with Runtime options, which are passed at shim instance start
+	// to setup global shim configuration.
 	Options typeurl.Any
 }
 
-type CreateOpt func(*CreateOptions)
+type CreateOpt func(*CreateOptions) error
 
 // WithRootFS is used to create a sandbox with the provided rootfs mount
 // TODO: Switch to mount.Mount once target added
 func WithRootFS(m []*types.Mount) CreateOpt {
-	return func(co *CreateOptions) {
+	return func(co *CreateOptions) error {
 		co.Rootfs = m
+		return nil
 	}
 }
 
-func WithOptions(a typeurl.Any) CreateOpt {
-	return func(co *CreateOptions) {
-		co.Options = a
+// WithOptions allows passing arbitrary options when creating a new sandbox.
+func WithOptions(options any) CreateOpt {
+	return func(co *CreateOptions) error {
+		var err error
+		co.Options, err = typeurl.MarshalAny(options)
+		if err != nil {
+			return fmt.Errorf("failed to marshal sandbox options: %w", err)
+		}
+
+		return nil
 	}
 }
 
