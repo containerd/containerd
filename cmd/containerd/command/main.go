@@ -193,10 +193,7 @@ can be used and modified as necessary as a custom configuration.`
 
 			server, err := server.New(ctx, config)
 			if err != nil {
-				select {
-				case chsrv <- srvResp{err: err}:
-				case <-ctx.Done():
-				}
+				chsrv <- srvResp{err: err}
 				return
 			}
 
