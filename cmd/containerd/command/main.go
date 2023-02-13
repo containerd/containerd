@@ -132,6 +132,16 @@ can be used and modified as necessary as a custom configuration.`
 			return err
 		}
 
+		if config.GRPC.Address == "" {
+			return fmt.Errorf("grpc address cannot be empty: %w", errdefs.ErrInvalidArgument)
+		}
+		if config.TTRPC.Address == "" {
+			// If TTRPC was not explicitly configured, use defaults based on GRPC.
+			config.TTRPC.Address = config.GRPC.Address + ".ttrpc"
+			config.TTRPC.UID = config.GRPC.UID
+			config.TTRPC.GID = config.GRPC.GID
+		}
+
 		// Make sure top-level directories are created early.
 		if err := server.CreateTopLevelDirectories(config); err != nil {
 			return err
@@ -164,15 +174,6 @@ can be used and modified as necessary as a custom configuration.`
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
 
-		if config.GRPC.Address == "" {
-			return fmt.Errorf("grpc address cannot be empty: %w", errdefs.ErrInvalidArgument)
-		}
-		if config.TTRPC.Address == "" {
-			// If TTRPC was not explicitly configured, use defaults based on GRPC.
-			config.TTRPC.Address = fmt.Sprintf("%s.ttrpc", config.GRPC.Address)
-			config.TTRPC.UID = config.GRPC.UID
-			config.TTRPC.GID = config.GRPC.GID
-		}
 		log.G(ctx).WithFields(logrus.Fields{
 			"version":  version.Version,
 			"revision": version.Revision,
