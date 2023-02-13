@@ -128,7 +128,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 				Architecture: "amd64",
 				OS:           "windows",
 			},
-			match: false,
+			match: true,
 		},
 		{
 			platform: imagespec.Platform{
@@ -251,11 +251,11 @@ func TestMatchComparerLess(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17764.1",
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
+			OSVersion:    "10.0.17764.1",
 		},
 		{
 			Architecture: "amd64",
