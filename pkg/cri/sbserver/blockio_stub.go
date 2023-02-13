@@ -18,14 +18,6 @@
 
 package sbserver
 
-import (
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-)
-
 func (c *criService) blockIOClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
 	return "", nil
-}
-
-func blockIOToLinuxOci(className string) (*runtimespec.LinuxBlockIO, error) {
-	return nil, nil
 }

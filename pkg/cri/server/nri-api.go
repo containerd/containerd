@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
@@ -247,7 +248,7 @@ func (a *nriAPI) WithContainerAdjustment() containerd.NewContainerOpts {
 			if className == "" {
 				return nil, nil
 			}
-			blockIO, err := blockIOToLinuxOci(className)
+			blockIO, err := blockio.ClassNameToLinuxOCI(className)
 			if err != nil {
 				return nil, err
 			}
