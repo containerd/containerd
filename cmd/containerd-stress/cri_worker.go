@@ -118,28 +118,19 @@ func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error)
 	// verify it is running ?
 
 	ticker := time.NewTicker(250 * time.Millisecond)
-	quit := make(chan struct{})
-	go func() {
-		for {
-			select {
-			case <-tctx.Done():
-				close(quit)
-				return
-			case <-ticker.C:
-				// do stuff
-				status, err := w.client.PodSandboxStatus(sb)
-				if err != nil && status.GetState() == runtime.PodSandboxState_SANDBOX_READY {
-					close(quit)
-					return
-				}
-			case <-quit:
-				ticker.Stop()
-				return
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-tctx.Done():
+			return nil
+		case <-ticker.C:
+			status, err := w.client.PodSandboxStatus(sb)
+			if err == nil && status.GetState() == runtime.PodSandboxState_SANDBOX_READY {
+				return nil
 			}
 		}
-	}()
-
-	return nil
+	}
 }
 
 func (w *criWorker) getID() string {
