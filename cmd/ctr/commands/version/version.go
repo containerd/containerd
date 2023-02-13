@@ -30,6 +30,10 @@ var Command = cli.Command{
 	Name:  "version",
 	Usage: "Print the client and server versions",
 	Action: func(context *cli.Context) error {
+		if context.NArg() != 0 {
+			return fmt.Errorf("extra arguments: %v", context.Args())
+		}
+
 		fmt.Println("Client:")
 		fmt.Println("  Version: ", version.Version)
 		fmt.Println("  Revision:", version.Revision)
