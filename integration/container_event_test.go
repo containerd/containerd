@@ -18,7 +18,6 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -134,21 +133,19 @@ func drainContainerEventsChan(containerEventsChan chan *runtime.ContainerEventRe
 	}
 }
 
-func checkContainerEventResponse(t *testing.T, containerEventsChan chan *runtime.ContainerEventResponse, expectedType runtime.ContainerEventType, expectedPodSandboxStatus *runtime.PodSandboxStatus, expectedContainerStates []runtime.ContainerState) error {
+func checkContainerEventResponse(t *testing.T, containerEventsChan chan *runtime.ContainerEventResponse, expectedType runtime.ContainerEventType, expectedPodSandboxStatus *runtime.PodSandboxStatus, expectedContainerStates []runtime.ContainerState) {
 	t.Helper()
 	var resp *runtime.ContainerEventResponse
 	select {
 	case resp = <-containerEventsChan:
 	case <-time.After(readContainerEventChannelTimeout):
-		return fmt.Errorf("assertContainerEventResponse: timeout waiting for events from channel")
+		t.Error("assertContainerEventResponse: timeout waiting for events from channel")
 	}
 	t.Logf("Container Event response received: %+v", *resp)
 	assert.Equal(t, expectedType, resp.ContainerEventType)
 
 	// Checking only the State field of PodSandboxStatus
-	if expectedPodSandboxStatus == nil {
-		assert.Nil(t, resp.PodSandboxStatus)
-	} else {
+	if expectedPodSandboxStatus != nil {
 		assert.Equal(t, expectedPodSandboxStatus.State, resp.PodSandboxStatus.State)
 	}
 
@@ -156,5 +153,4 @@ func checkContainerEventResponse(t *testing.T, containerEventsChan chan *runtime
 	for i, cs := range resp.ContainersStatuses {
 		assert.Equal(t, expectedContainerStates[i], cs.State)
 	}
-	return nil
 }

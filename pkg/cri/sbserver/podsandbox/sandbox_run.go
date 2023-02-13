@@ -159,11 +159,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		}
 	}()
 
-	// Send CONTAINER_CREATED event with both ContainerId and SandboxId equal to SandboxId.
-	// Note that this has to be done after sandboxStore.Add() because we need to get
-	// SandboxStatus from the store and include it in the event.
-	c.cri.GenerateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
-
 	// Create sandbox container root directories.
 	sandboxRootDir := c.getSandboxRootDir(id)
 	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
@@ -263,9 +258,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err := task.Start(ctx); err != nil {
 		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
-
-	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
-	c.cri.GenerateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
 
 	cin.SandboxID = id
 	cin.Pid = task.Pid()
