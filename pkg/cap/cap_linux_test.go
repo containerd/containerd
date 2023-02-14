@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-//nolint:dupword
 const procPIDStatus = `Name:   cat
 Umask:  0022
 State:  R (running)
