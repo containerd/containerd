@@ -110,6 +110,10 @@ ca = "/etc/path/default"
 
 [host."https://noprefixnoncompliant.registry"]
   override_path = true
+
+[host."https://test-4.registry"]
+  capabilities = ["pull", "resolve", "push"]
+  namespace = "test-namespace"
 `
 	var tb, fb = true, false
 	expected := []hostConfig{
@@ -174,6 +178,12 @@ ca = "/etc/path/default"
 		{
 			scheme:       "https",
 			host:         "noprefixnoncompliant.registry",
+			capabilities: allCaps,
+		},
+		{
+			scheme:       "https",
+			host:         "test-4.registry",
+			path:         "/v2/test-namespace",
 			capabilities: allCaps,
 		},
 		{

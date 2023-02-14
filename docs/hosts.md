@@ -310,6 +310,14 @@ non-compliant OCI registries which are missing the `/v2` prefix.
 override_path = true
 ```
 
+## namespace field
+
+`namespace` specifies the namespace registry server hosts the images.
+
+```
+namespace = "custom-namespace"
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host].http://namespace` entries in the

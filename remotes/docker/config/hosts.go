@@ -321,6 +321,9 @@ type hostFileConfig struct {
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
 
+	// Namespace indicates the namespace registry server hosts the images.
+	Namespace string `toml:"namespace"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -400,6 +403,10 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		} else if !config.OverridePath {
 			u.Path = "/v2"
+		}
+		if len(config.Namespace) > 0 {
+			ns := strings.TrimPrefix(config.Namespace, "/")
+			u.Path += "/" + ns
 		}
 		result.path = u.Path
 	}
