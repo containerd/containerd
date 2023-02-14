@@ -20,10 +20,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	_ "crypto/sha256" // required for digest package
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/testsuite"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/containerd/containerd/pkg/testutil"
 
 	"github.com/opencontainers/go-digest"
@@ -268,7 +269,7 @@ func generateBlobs(t checker, nblobs, maxsize int64) map[digest.Digest][]byte {
 	blobs := map[digest.Digest][]byte{}
 
 	for i := int64(0); i < nblobs; i++ {
-		p := make([]byte, rand.Int63n(maxsize))
+		p := make([]byte, randutil.Int63n(maxsize))
 
 		if _, err := rand.Read(p); err != nil {
 			t.Fatal(err)
