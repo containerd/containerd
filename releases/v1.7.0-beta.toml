@@ -61,6 +61,16 @@ See the [NRI Docs](https://github.com/containerd/containerd/blob/main/docs/NRI.m
 * **Support for cgroups blockio** ([#5490](https://github.com/containerd/containerd/pull/5490))
 * **Add restart policy for enhanced restart manager** ([#6744](https://github.com/containerd/containerd/pull/6744))
 
+#### gRPC Shim Support _(experimental)_
+
+* **Initial gRPC shim support** ([#8052](https://github.com/containerd/containerd/pull/8052))
+
+Adds support for shims to use gRPC in addition to ttrpc. Existing ttrpc shim support is not going
+away and will continue to be recommended for the best performance and lowest shim memory overhead.
+The gRPC support allows implementation of a wider range of shim implementations which may not
+have access to a stable ttrpc library in the implementation language. The shim protocol is also
+updated to allow the shims to specify the protocol which is supported.
+
 #### Road to 2.0
 
 ##### Refactoring
@@ -68,7 +78,7 @@ See the [NRI Docs](https://github.com/containerd/containerd/blob/main/docs/NRI.m
 There are multiple places in the code today which are being targeted for refactoring to make long term support easier and to provide more extension points.
 
 The CRI plugin is the most complex containerd plugin with a wide range of functionality. A major effort in this release and before 2.0 involves moving functionality
-out of the single CRI plugin into smaller-scoped containerd plugins, such that they can be used and tested independenty. The new sandbox and distribution interfaces provide one example of this,
+out of the single CRI plugin into smaller-scoped containerd plugins, such that they can be used and tested independently. The new sandbox and distribution interfaces provide one example of this,
 but it also being done for image and network management.
 
 The version of ttrpc has been updated this release to support streaming, allowing existing grpc services to use ttrpc.
@@ -97,8 +107,9 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 
 #### CRI Updates
 
-* **Support image pull progress timeout** ([#6150](https://github.com/containerd/containerd/pull/6150))
 * **Fix CRI plugin to setup pod network after creating the sandbox container** ([#5904](https://github.com/containerd/containerd/pull/5904))
+* **Support image pull progress timeout** ([#6150](https://github.com/containerd/containerd/pull/6150))
+* **Add experimental support for runtime specific snapshotters** ([#6899](https://github.com/containerd/containerd/pull/6899))
 * **Pass all TOML runtime configuration options from CRI to the runtime** ([#7764](https://github.com/containerd/containerd/pull/7764))
 * **Support for user namespaces in stateless pods ([KEP-127](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/127-user-namespaces)) _(experimental)_** ([#7679](https://github.com/containerd/containerd/pull/7679))
 * **Add network plugin metrics** ([#7858](https://github.com/containerd/containerd/pull/7858))
@@ -114,6 +125,8 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Add support for default registry host configuration** ([#7607](https://github.com/containerd/containerd/pull/7607))
 * **Use github.com/minio/sha256-simd for more efficient sha256 calculation** ([#7732](https://github.com/containerd/containerd/pull/7732))
 * **Make OCI options cross-platform** ([#7928](https://github.com/containerd/containerd/pull/7928))
+* **Update release builds to build from Ubuntu 20.04 with glibc 2.31** ([#8021](https://github.com/containerd/containerd/pull/8021))
+* **Use data field from OCI descriptor when provided for fetch** ([#8076](https://github.com/containerd/containerd/pull/8076))
 
 See the changelog for complete list of changes"""
 
