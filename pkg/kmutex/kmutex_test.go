@@ -18,20 +18,15 @@ package kmutex
 
 import (
 	"context"
-	"math/rand"
 	"runtime"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/pkg/seed"
+	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/stretchr/testify/assert"
 )
-
-func init() {
-	seed.WithTimeAndRand()
-}
 
 func TestBasic(t *testing.T) {
 	t.Parallel()
@@ -60,7 +55,7 @@ func TestBasic(t *testing.T) {
 				waitLock = true
 				break
 			}
-			time.Sleep(time.Duration(rand.Int63n(100)) * time.Millisecond)
+			time.Sleep(time.Duration(randutil.Int63n(100)) * time.Millisecond)
 		}
 		assert.Equal(t, waitLock, true)
 	}
@@ -130,7 +125,7 @@ func TestMultileAcquireOnKeys(t *testing.T) {
 			for i := 0; i < nloops; i++ {
 				km.Lock(ctx, key)
 
-				time.Sleep(time.Duration(rand.Int63n(100)) * time.Nanosecond)
+				time.Sleep(time.Duration(randutil.Int63n(100)) * time.Nanosecond)
 
 				km.Unlock(key)
 			}
@@ -161,7 +156,7 @@ func TestMultiAcquireOnSameKey(t *testing.T) {
 			for i := 0; i < nloops; i++ {
 				km.Lock(ctx, key)
 
-				time.Sleep(time.Duration(rand.Int63n(100)) * time.Nanosecond)
+				time.Sleep(time.Duration(randutil.Int63n(100)) * time.Nanosecond)
 
 				km.Unlock(key)
 			}
