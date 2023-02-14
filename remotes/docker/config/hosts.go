@@ -332,6 +332,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 
 	// HACK: we want to keep toml parsing structures private in this package, however go-toml ignores private embedded types.
 	// so we remap it to a public type within the func body, so technically it's public, but not possible to import elsewhere.
+	//nolint:unused
 	type HostFileConfig = hostFileConfig
 
 	c := struct {
