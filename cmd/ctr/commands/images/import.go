@@ -114,16 +114,17 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		if !context.BoolT("local") {
 			var opts []image.StoreOpt
 			prefix := context.String("base-name")
+			var overwrite bool
 			if prefix == "" {
 				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
-				opts = append(opts, image.WithNamePrefix(prefix, false))
-			} else {
-				// When provided, filter out references which do not match
-				opts = append(opts, image.WithNamePrefix(prefix, true))
+				// Allow overwriting auto-generated prefix with named annotation
+				overwrite = true
 			}
 
 			if context.Bool("digests") {
-				opts = append(opts, image.WithDigestRefs(!context.Bool("skip-digest-for-named")))
+				opts = append(opts, image.WithDigestRef(prefix, overwrite, !context.Bool("skip-digest-for-named")))
+			} else {
+				opts = append(opts, image.WithNamedPrefix(prefix, overwrite))
 			}
 
 			// TODO: Add platform options
