@@ -104,7 +104,7 @@ func TestMatchComparerMatch(t *testing.T) {
 				Architecture: "amd64",
 				OS:           "windows",
 			},
-			match: false,
+			match: true,
 		},
 	} {
 		assert.Equal(t, test.match, m.Match(test.platform))
@@ -159,11 +159,11 @@ func TestMatchComparerLess(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17764.1",
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
+			OSVersion:    "10.0.17764.1",
 		},
 		{
 			Architecture: "amd64",
