@@ -5,7 +5,7 @@
 # lived test environment.
 Set-MpPreference -DisableRealtimeMonitoring:$true
 
-$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.19.5"; make = ""; nssm = "" }
+$PACKAGES= @{ mingw = "10.2.0"; git = ""; golang = "1.19.6"; make = ""; nssm = "" }
 
 Write-Host "Downloading chocolatey package"
 curl.exe -L "https://packages.chocolatey.org/chocolatey.0.10.15.nupkg" -o 'c:\choco.zip'
