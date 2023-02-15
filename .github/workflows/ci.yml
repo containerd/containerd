@@ -20,7 +20,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: [1.18.10]
+        go-version: [1.19.6]
         os: [ubuntu-18.04, macos-12, windows-2019]
 
     steps:
@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
 
       - uses: actions/checkout@v2
         with:
@@ -73,7 +73,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
 
       - uses: actions/checkout@v2
         with:
@@ -105,7 +105,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
       - uses: actions/checkout@v2
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
       - uses: actions/checkout@v2
       - run: |
           set -e -x
@@ -196,7 +196,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04, macos-12, windows-2019]
-        go-version: ['1.18.10']
+        go-version: ['1.19.6']
 
     steps:
       - uses: actions/setup-go@v2
@@ -238,7 +238,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
 
       - uses: actions/checkout@v2
         with:
@@ -327,7 +327,7 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
 
       - uses: actions/checkout@v2
 
@@ -358,6 +358,10 @@ jobs:
           tar -zxf criu.tar.gz
           cd criu-3.13
           sudo make install-criu
+          # To avoid "open /home/runner/.cache/go-build/06/064d2fc17cbd72370bed4243fab1bf42c225768d47524214a340efd73bf04838-d: permission denied"
+          # in the following steps
+          sudo rm -rf /home/runner/.cache/go-build
+          sudo chown runner /home/runner/.cache
 
       - name: Install failpoint binaries
         run: |
@@ -469,9 +473,9 @@ jobs:
     steps:
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.18.10'
+          go-version: '1.19.6'
       - uses: actions/checkout@v2
-      - run: sudo -E PATH=$PATH script/setup/install-gotestsum
+      - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
