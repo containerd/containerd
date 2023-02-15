@@ -597,6 +597,10 @@ func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.Namesp
 		opts = append(opts, cni.WithCapabilityDNS(*dns))
 	}
 
+	if cgroup := config.GetLinux().GetCgroupParent(); cgroup != "" {
+		opts = append(opts, cni.WithCapabilityCgroupPath(cgroup))
+	}
+
 	return opts, nil
 }
 
