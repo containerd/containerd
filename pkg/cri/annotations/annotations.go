@@ -16,6 +16,12 @@
 
 package annotations
 
+import (
+	"github.com/containerd/containerd/oci"
+	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+)
+
 // ContainerType values
 // Following OCI annotations are used by katacontainers now.
 // We'll switch to standard secure pod API after it is defined in CRI.
@@ -85,3 +91,35 @@ const (
 	// WindowsHostProcess is used by hcsshim to identify windows pods that are running HostProcesses
 	WindowsHostProcess = "microsoft.com/hostprocess-container"
 )
+
+// DefaultCRIAnnotations are the default set of CRI annotations to
+// pass to sandboxes and containers.
+func DefaultCRIAnnotations(
+	sandboxID string,
+	containerName string,
+	imageName string,
+	config *runtime.PodSandboxConfig,
+	sandbox bool,
+) []oci.SpecOpts {
+	opts := []oci.SpecOpts{
+		customopts.WithAnnotation(SandboxID, sandboxID),
+		customopts.WithAnnotation(SandboxNamespace, config.GetMetadata().GetNamespace()),
+		customopts.WithAnnotation(SandboxUID, config.GetMetadata().GetUid()),
+		customopts.WithAnnotation(SandboxName, config.GetMetadata().GetName()),
+	}
+	ctrType := ContainerTypeContainer
+	if sandbox {
+		ctrType = ContainerTypeSandbox
+		// Sandbox log dir only gets passed for sandboxes, the other metadata always
+		// gets sent however.
+		opts = append(opts, customopts.WithAnnotation(SandboxLogDir, config.GetLogDirectory()))
+	} else {
+		// Image name and container name only get passed for containers.s
+		opts = append(
+			opts,
+			customopts.WithAnnotation(ContainerName, containerName),
+			customopts.WithAnnotation(ImageName, imageName),
+		)
+	}
+	return append(opts, customopts.WithAnnotation(ContainerType, ctrType))
+}
