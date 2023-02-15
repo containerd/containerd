@@ -57,6 +57,16 @@ type StartOpts struct {
 	Debug            bool
 }
 
+// BootstrapParams is a JSON payload returned in stdout from shim.Start call.
+type BootstrapParams struct {
+	// Address is a address containerd should use to connect to shim.
+	Address string `json:"address"`
+	// Protocol is either TTRPC or GRPC.
+	Protocol string `json:"protocol"`
+	// Caps is a list of capabilities supported by shim implementation (reserved for future)
+	//Caps []string `json:"caps"`
+}
+
 type StopStatus struct {
 	Pid        int
 	ExitStatus int
