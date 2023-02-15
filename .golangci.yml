@@ -17,6 +17,9 @@ linters:
 issues:
   include:
     - EXC0002
+  exclude:
+    # Silence "SA1019: "io/ioutil" has been deprecated since Go 1.16"
+    - SA1019
 
 run:
   timeout: 3m
