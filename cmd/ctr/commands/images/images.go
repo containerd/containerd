@@ -52,6 +52,7 @@ var Command = cli.Command{
 		tagCommand,
 		setLabelsCommand,
 		convertCommand,
+		usageCommand,
 	},
 }
 
