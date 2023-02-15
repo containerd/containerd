@@ -121,6 +121,17 @@ func setCapabilities(s *Spec) {
 	}
 }
 
+// ensureAdditionalGids ensures that the primary GID is also included in the additional GID list.
+func ensureAdditionalGids(s *Spec) {
+	setProcess(s)
+	for _, f := range s.Process.User.AdditionalGids {
+		if f == s.Process.User.GID {
+			return
+		}
+	}
+	s.Process.User.AdditionalGids = append([]uint32{s.Process.User.GID}, s.Process.User.AdditionalGids...)
+}
+
 // WithDefaultSpec returns a SpecOpts that will populate the spec with default
 // values.
 //
@@ -586,7 +597,9 @@ func WithNamespacedCgroup() SpecOpts {
 //	user, uid, user:group, uid:gid, uid:group, user:gid
 func WithUser(userstr string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		defer ensureAdditionalGids(s)
 		setProcess(s)
+		s.Process.User.AdditionalGids = nil
 
 		// For LCOW it's a bit harder to confirm that the user actually exists on the host as a rootfs isn't
 		// mounted on the host and shared into the guest, but rather the rootfs is constructed entirely in the
@@ -679,7 +692,9 @@ func WithUser(userstr string) SpecOpts {
 // WithUIDGID allows the UID and GID for the Process to be set
 func WithUIDGID(uid, gid uint32) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		defer ensureAdditionalGids(s)
 		setProcess(s)
+		s.Process.User.AdditionalGids = nil
 		s.Process.User.UID = uid
 		s.Process.User.GID = gid
 		return nil
@@ -692,7 +707,9 @@ func WithUIDGID(uid, gid uint32) SpecOpts {
 // additionally sets the gid to 0, and does not return an error.
 func WithUserID(uid uint32) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		defer ensureAdditionalGids(s)
 		setProcess(s)
+		s.Process.User.AdditionalGids = nil
 		setUser := func(root string) error {
 			user, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
@@ -738,7 +755,9 @@ func WithUserID(uid uint32) SpecOpts {
 // the container.
 func WithUsername(username string) SpecOpts {
 	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) (err error) {
+		defer ensureAdditionalGids(s)
 		setProcess(s)
+		s.Process.User.AdditionalGids = nil
 		if s.Linux != nil {
 			setUser := func(root string) error {
 				user, err := UserFromPath(root, func(u user.User) bool {
@@ -789,7 +808,9 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 			return nil
 		}
 		setProcess(s)
+		s.Process.User.AdditionalGids = nil
 		setAdditionalGids := func(root string) error {
+			defer ensureAdditionalGids(s)
 			var username string
 			uid, err := strconv.Atoi(userstr)
 			if err == nil {
@@ -860,6 +881,7 @@ func WithAppendAdditionalGroups(groups ...string) SpecOpts {
 		}
 		setProcess(s)
 		setAdditionalGids := func(root string) error {
+			defer ensureAdditionalGids(s)
 			gpath, err := fs.RootPath(root, "/etc/group")
 			if err != nil {
 				return err
