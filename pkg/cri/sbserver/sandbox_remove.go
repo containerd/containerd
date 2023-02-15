@@ -90,6 +90,11 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		return nil, fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 	}
 
+	err = c.nri.RemovePodSandbox(ctx, &sandbox)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI pod removal notification failed")
+	}
+
 	// Remove sandbox from sandbox store. Note that once the sandbox is successfully
 	// deleted:
 	// 1) ListPodSandbox will not include this sandbox.

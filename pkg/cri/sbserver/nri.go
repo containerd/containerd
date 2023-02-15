@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -16,31 +14,30 @@
    limitations under the License.
 */
 
-package fuzz
+package sbserver
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
-
-	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/sbserver"
+	cstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
+type criImplementation struct {
+	c *criService
+}
 
-	f := fuzz.NewConsumer(data)
+func (i *criImplementation) Config() *criconfig.Config {
+	return &i.c.config
+}
 
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
-	}
-	defer client.Close()
+func (i *criImplementation) SandboxStore() *sstore.Store {
+	return i.c.sandboxStore
+}
 
-	c, err := sbserver.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
+func (i *criImplementation) ContainerStore() *cstore.Store {
+	return i.c.containerStore
+}
 
-	return fuzzCRI(f, c)
+func (i *criImplementation) ContainerMetadataExtensionKey() string {
+	return containerMetadataExtension
 }

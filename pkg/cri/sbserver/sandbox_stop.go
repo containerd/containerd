@@ -80,6 +80,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 
 	sandboxRuntimeStopTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(stop)
 
+	err := c.nri.StopPodSandbox(ctx, &sandbox)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI sandbox stop notification failed")
+	}
+
 	// Teardown network for sandbox.
 	if sandbox.NetNS != nil {
 		netStop := time.Now()

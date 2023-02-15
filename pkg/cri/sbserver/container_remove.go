@@ -73,6 +73,16 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		}
 	}()
 
+	sandbox, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil {
+		err = c.nri.RemoveContainer(ctx, nil, &container)
+	} else {
+		err = c.nri.RemoveContainer(ctx, &sandbox, &container)
+	}
+	if err != nil {
+		log.G(ctx).WithError(err).Error("NRI failed to remove container")
+	}
+
 	// NOTE(random-liu): Docker set container to "Dead" state when start removing the
 	// container so as to avoid start/restart the container again. However, for current
 	// kubelet implementation, we'll never start a container once we decide to remove it,

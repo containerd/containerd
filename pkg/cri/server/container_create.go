@@ -249,17 +249,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(containerMetadataExtension, &meta))
 
-	if c.nri.isEnabled() {
-		opts = append(opts, c.nri.WithContainerAdjustment())
-
-		defer func() {
-			if retErr != nil {
-				deferCtx, deferCancel := util.DeferContext()
-				defer deferCancel()
-				c.nri.undoCreateContainer(deferCtx, &sandbox, id, spec)
-			}
-		}()
-	}
+	opts = append(opts, c.nri.WithContainerAdjustment())
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+			c.nri.UndoCreateContainer(deferCtx, &sandbox, id, spec)
+		}
+	}()
 
 	var cntr containerd.Container
 	if cntr, err = c.client.NewContainer(ctx, id, opts...); err != nil {
@@ -300,11 +297,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
 
-	if c.nri.isEnabled() {
-		err = c.nri.postCreateContainer(ctx, &sandbox, &container)
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("NRI post-create notification failed")
-		}
+	err = c.nri.PostCreateContainer(ctx, &sandbox, &container)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-create notification failed")
 	}
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)

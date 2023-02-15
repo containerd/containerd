@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/instrument"
+	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
@@ -120,10 +121,12 @@ type criService struct {
 	// containerEventsChan is used to capture container events and send them
 	// to the caller of GetContainerEvents.
 	containerEventsChan chan runtime.ContainerEventResponse
+	// nri is used to hook NRI into CRI request processing.
+	nri *nri.API
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -190,6 +193,8 @@ func NewCRIService(config criconfig.Config, client *containerd.Client) (CRIServi
 	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
 	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
 	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
+
+	c.nri = nri
 
 	return c, nil
 }
@@ -270,6 +275,11 @@ func (c *criService) Run() error {
 			streamServerErrCh <- err
 		}
 	}()
+
+	// register CRI domain with NRI
+	if err := c.nri.Register(&criImplementation{c}); err != nil {
+		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
+	}
 
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Set()
