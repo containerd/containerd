@@ -65,12 +65,12 @@ var runCommand = cli.Command{
 
 		spec, err := os.ReadFile(context.Args().First())
 		if err != nil {
-			return fmt.Errorf("Failed to read sandbox config: %w", err)
+			return fmt.Errorf("failed to read sandbox config: %w", err)
 		}
 
 		ociSpec := oci.Spec{}
 		if err = json.Unmarshal(spec, &ociSpec); err != nil {
-			return fmt.Errorf("Failed to parse sandbox config: %w", err)
+			return fmt.Errorf("failed to parse sandbox config: %w", err)
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
