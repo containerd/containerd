@@ -1,0 +1,24 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.17"
+
+pre_release = false
+
+preface = """\
+The eighteenth patch release for containerd 1.6 includes fixes for CVE-2023-25153 and CVE-2023-25173
+along with a security update for Go.
+
+### Notable Updates
+
+* **Fix OCI image importer memory exhaustion** ([GHSA-259w-8hf6-59c2](https://github.com/containerd/containerd/security/advisories/GHSA-259w-8hf6-59c2))
+* **Fix supplementary groups not being set up properly** ([GHSA-hmfx-3pcx-653p](https://github.com/containerd/containerd/security/advisories/GHSA-hmfx-3pcx-653p))
+* **Revert removal of `/sbin/apparmor_parser` check** ([#8087](https://github.com/containerd/containerd/pull/8087))
+* **Update Go to 1.19.6** ([#8111](https://github.com/containerd/containerd/pull/8111))
+
+See the changelog for complete list of changes"""
