@@ -18,6 +18,8 @@ To build the `containerd` daemon, and the `ctr` simple test client, the followin
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
+> *Note*: On macOS, you need a third party runtime to run containers on containerd
+
 ## Build the development environment
 
 First you need to setup your Go development environment. You can follow this
@@ -57,6 +59,8 @@ run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. Make sure to follow the guidelines for versioning
 in [RUNC.md](/docs/RUNC.md) for the best results.
+
+> *Note*: Runc only supports Linux
 
 ## Build containerd
 
@@ -120,6 +124,8 @@ and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` director
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
 Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
+
+> *Note*: On macOS, the containerd daemon can be built and run natively. However, as stated above, runc only supports linux.
 
 ### Static binaries
 
