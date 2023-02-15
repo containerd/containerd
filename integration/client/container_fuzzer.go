@@ -325,8 +325,8 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 	return nil, errors.New("Could not create container")
 }
 
-// doFuzz() implements the logic of FuzzCreateContainerNoTearDown()
-// and FuzzCreateContainerWithTearDown() and allows for
+// doFuzz() implements the logic of FuzzIntegCreateContainerNoTearDown()
+// and FuzzIntegCreateContainerWithTearDown() and allows for
 // the option to turn on/off teardown after each iteration.
 // From a high level it:
 // - Creates a client
@@ -395,9 +395,9 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 	return 1
 }
 
-// FuzzCreateContainerNoTearDown() implements a fuzzer
-// similar to FuzzCreateContainerWithTearDown() and
-// FuzzCreateContainerWithTearDown(), but it takes a
+// FuzzIntegNoTearDownWithDownload() implements a fuzzer
+// similar to FuzzIntegCreateContainerNoTearDown() and
+// FuzzIntegCreateContainerWithTearDown(), but it takes a
 // different approach to the initialization. Where
 // the other 2 fuzzers depend on the containerd binaries
 // that were built manually, this fuzzer downloads them
@@ -416,8 +416,8 @@ func FuzzIntegNoTearDownWithDownload(data []byte) int {
 	return ret
 }
 
-// FuzzCreateContainerNoTearDown() implements a fuzzer
-// similar to FuzzCreateContainerWithTearDown() with
+// FuzzIntegCreateContainerNoTearDown() implements a fuzzer
+// similar to FuzzIntegCreateContainerWithTearDown() with
 // with one minor distinction: One tears down the
 // daemon after each iteration whereas the other doesn't.
 // The two fuzzers' performance will be compared over time.
@@ -432,9 +432,9 @@ func FuzzIntegCreateContainerNoTearDown(data []byte) int {
 	return ret
 }
 
-// FuzzCreateContainerWithTearDown() is similar to
-// FuzzCreateContainerNoTearDown() except that
-// FuzzCreateContainerWithTearDown tears down the daemon
+// FuzzIntegCreateContainerWithTearDown() is similar to
+// FuzzIntegCreateContainerNoTearDown() except that
+// FuzzIntegCreateContainerWithTearDown tears down the daemon
 // after each iteration.
 func FuzzIntegCreateContainerWithTearDown(data []byte) int {
 	if !haveInitialized {
