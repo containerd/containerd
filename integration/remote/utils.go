@@ -57,16 +57,16 @@ func getContextWithCancel() (context.Context, context.CancelFunc) {
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("Id is not set")
+		return fmt.Errorf("id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("Metadata is not set")
+		return fmt.Errorf("metadata is not set")
 	}
 
 	metadata := status.Metadata
 	if metadata.Name == "" || metadata.Namespace == "" || metadata.Uid == "" {
-		return fmt.Errorf("Name, Namespace or Uid is not in metadata %q", metadata)
+		return fmt.Errorf("name, namespace or uid is not in metadata %q", metadata)
 	}
 
 	if status.CreatedAt == 0 {
@@ -79,16 +79,16 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 // verifyContainerStatus verified whether all required fields are set in ContainerStatus.
 func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("Id is not set")
+		return fmt.Errorf("id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("Metadata is not set")
+		return fmt.Errorf("metadata is not set")
 	}
 
 	metadata := status.Metadata
 	if metadata.Name == "" {
-		return fmt.Errorf("Name is not in metadata %q", metadata)
+		return fmt.Errorf("name is not in metadata %q", metadata)
 	}
 
 	if status.CreatedAt == 0 {
@@ -96,7 +96,7 @@ func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	}
 
 	if status.Image == nil || status.Image.Image == "" {
-		return fmt.Errorf("Image is not set")
+		return fmt.Errorf("image is not set")
 	}
 
 	if status.ImageRef == "" {

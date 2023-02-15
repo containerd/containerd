@@ -49,7 +49,7 @@ func init() {
 
 			localClient, ok := i.(*Local)
 			if !ok {
-				return nil, errors.New("Could not create a local client for introspection service")
+				return nil, errors.New("could not create a local client for introspection service")
 			}
 			localClient.UpdateLocal(ic.Root)
 
