@@ -17,8 +17,8 @@
 package util
 
 import (
+	"crypto/rand"
 	"encoding/hex"
-	"math/rand"
 )
 
 // GenerateID generates a random unique id.
