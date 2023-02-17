@@ -59,7 +59,7 @@ require (
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli v1.22.12
 	github.com/vishvananda/netlink v1.2.1-beta.2
-	go.etcd.io/bbolt v1.3.6
+	go.etcd.io/bbolt v1.3.7
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.37.0
 	go.opentelemetry.io/otel v1.12.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.12.0
