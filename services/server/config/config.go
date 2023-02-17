@@ -153,8 +153,9 @@ type Debug struct {
 
 // MetricsConfig provides metrics configuration
 type MetricsConfig struct {
-	Address       string `toml:"address"`
-	GRPCHistogram bool   `toml:"grpc_histogram"`
+	Address              string `toml:"address"`
+	GRPCHistogram        bool   `toml:"grpc_histogram"`
+	ContainerMetricsOnly bool   `toml:"container_metrics_only"`
 }
 
 // CgroupConfig provides cgroup configuration
