@@ -90,7 +90,7 @@ func (t *tcShaper) nextClassID() (int, error) {
 	}
 
 	scanner := bufio.NewScanner(bytes.NewBuffer(data))
-	classes := sets.String{}
+	classes := sets.Set[string]{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		// skip empty lines
