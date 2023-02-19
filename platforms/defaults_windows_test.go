@@ -273,7 +273,7 @@ func TestMatchComparerLess(t *testing.T) {
 }
 
 func TestMatchComparerClientOSMatch(t *testing.T) {
-	m := windowsmatcher{
+	m1 := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: "10.0.22000",
 		defaultMatcher: &matcher{
@@ -281,6 +281,16 @@ func TestMatchComparerClientOSMatch(t *testing.T) {
 		},
 		isClientOS: true,
 	}
+
+	m2 := windowsmatcher{
+		Platform:        DefaultSpec(),
+		osVersionPrefix: "10.0.22621",
+		defaultMatcher: &matcher{
+			Platform: Normalize(DefaultSpec()),
+		},
+		isClientOS: true,
+	}
+
 	for _, test := range []struct {
 		platform imagespec.Platform
 		match    bool
@@ -324,14 +334,23 @@ func TestMatchComparerClientOSMatch(t *testing.T) {
 			match: false,
 		},
 	} {
-		assert.Equal(t, test.match, m.Match(test.platform), "should match %b, %s to %s", test.match, m.Platform, test.platform)
+		assert.Equal(t, test.match, m1.Match(test.platform), "should match %b, %s to %s", test.match, m1.Platform, test.platform)
+		assert.Equal(t, test.match, m2.Match(test.platform), "should match %b, %s to %s", test.match, m2.Platform, test.platform)
 	}
 }
 
 func TestMatchComparerClientOSPriority(t *testing.T) {
-	m := windowsmatcher{
+	m1 := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: "10.0.22000",
+		defaultMatcher: &matcher{
+			Platform: Normalize(DefaultSpec()),
+		},
+		isClientOS: true,
+	}
+	m2 := windowsmatcher{
+		Platform:        DefaultSpec(),
+		osVersionPrefix: "10.0.22621",
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
@@ -362,7 +381,11 @@ func TestMatchComparerClientOSPriority(t *testing.T) {
 		},
 	}
 	sort.SliceStable(platforms, func(i, j int) bool {
-		return m.Less(platforms[i], platforms[j])
+		return m1.Less(platforms[i], platforms[j])
+	})
+	assert.Equal(t, expected, platforms)
+	sort.SliceStable(platforms, func(i, j int) bool {
+		return m2.Less(platforms[i], platforms[j])
 	})
 	assert.Equal(t, expected, platforms)
 }
