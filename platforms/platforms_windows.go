@@ -18,7 +18,23 @@ package platforms
 
 import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/windows/registry"
 )
+
+func isClientOS() bool {
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
+	if err != nil {
+		return false
+	}
+	defer k.Close()
+
+	installationType, _, err := k.GetStringValue("InstallationType")
+	if err != nil {
+		return false
+	}
+
+	return installationType == "Client"
+}
 
 // NewMatcher returns a Windows matcher that will match on osVersionPrefix if
 // the platform is Windows otherwise use the default matcher
@@ -30,5 +46,6 @@ func newDefaultMatcher(platform specs.Platform) Matcher {
 		defaultMatcher: &matcher{
 			Platform: Normalize(platform),
 		},
+		isClientOS: isClientOS(),
 	}
 }

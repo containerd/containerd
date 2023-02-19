@@ -42,6 +42,7 @@ type windowsmatcher struct {
 	specs.Platform
 	osVersionPrefix string
 	defaultMatcher  Matcher
+	isClientOS      bool
 }
 
 // Match matches platform with the same windows major, minor
@@ -53,6 +54,31 @@ func (m windowsmatcher) Match(p specs.Platform) bool {
 		if strings.HasPrefix(p.OSVersion, m.osVersionPrefix) {
 			return true
 		}
+		if m.isClientOS && p.OSVersion != "" {
+			split := strings.Split(p.OSVersion, ".")
+			if len(split) >= 3 {
+				major, err := strconv.Atoi(split[0])
+				if err != nil {
+					return false
+				}
+				minor, err := strconv.Atoi(split[1])
+				if err != nil {
+					return false
+				}
+				build, err := strconv.Atoi(split[2])
+				if err != nil {
+					return false
+				}
+
+				if (major == 10 && minor == 0 && build >= 20348) ||
+					(major == 10 && minor > 0) {
+					// Windows 11 client machines are implicitly
+					// compatible with 10.0.20348 (LTSC2022), even
+					// when the client has a newer build version.
+					return true
+				}
+			}
+		}
 		return p.OSVersion == ""
 	}
 
@@ -61,14 +87,33 @@ func (m windowsmatcher) Match(p specs.Platform) bool {
 
 // Less sorts matched platforms in front of other platforms.
 // For matched platforms, it puts platforms with larger revision
-// number in front.
+// number in front (and for Win 11 clients, larger build numbers).
 func (m windowsmatcher) Less(p1, p2 specs.Platform) bool {
 	m1, m2 := m.Match(p1), m.Match(p2)
 	if m1 && m2 {
+		// Build number comparison will only be used for clients
+		// where differing build versions can match.
+		b1, b2 := build(p1.OSVersion), build(p2.OSVersion)
+		if b1 != b2 {
+			return b1 > b2
+		}
+
 		r1, r2 := revision(p1.OSVersion), revision(p2.OSVersion)
 		return r1 > r2
 	}
 	return m1 && !m2
+}
+
+func build(v string) int {
+	parts := strings.Split(v, ".")
+	if len(parts) < 3 {
+		return 0
+	}
+	r, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0
+	}
+	return r
 }
 
 func revision(v string) int {

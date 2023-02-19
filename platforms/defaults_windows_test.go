@@ -80,6 +80,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
+		isClientOS: false,
 	}
 	for _, test := range []struct {
 		platform imagespec.Platform
@@ -158,6 +159,7 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 			},
 			),
 		},
+		isClientOS: false,
 	}
 	for _, test := range []struct {
 		platform imagespec.Platform
@@ -210,6 +212,7 @@ func TestMatchComparerLess(t *testing.T) {
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
+		isClientOS: false,
 	}
 	platforms := []imagespec.Platform{
 		{
@@ -261,6 +264,101 @@ func TestMatchComparerLess(t *testing.T) {
 			Architecture: "amd64",
 			OS:           "windows",
 			OSVersion:    "10.0.17762.1",
+		},
+	}
+	sort.SliceStable(platforms, func(i, j int) bool {
+		return m.Less(platforms[i], platforms[j])
+	})
+	assert.Equal(t, expected, platforms)
+}
+
+func TestMatchComparerClientOSMatch(t *testing.T) {
+	m := windowsmatcher{
+		Platform:        DefaultSpec(),
+		osVersionPrefix: "10.0.22000",
+		defaultMatcher: &matcher{
+			Platform: Normalize(DefaultSpec()),
+		},
+		isClientOS: true,
+	}
+	for _, test := range []struct {
+		platform imagespec.Platform
+		match    bool
+	}{
+		{
+			platform: imagespec.Platform{
+				Architecture: "amd64",
+				OS:           "windows",
+				OSVersion:    "10.0.17763.2114",
+			},
+			match: false,
+		},
+		{
+			platform: imagespec.Platform{
+				Architecture: "amd64",
+				OS:           "windows",
+				OSVersion:    "10.0.20348.169",
+			},
+			match: true,
+		},
+		{
+			platform: imagespec.Platform{
+				Architecture: "amd64",
+				OS:           "windows",
+				OSVersion:    "10.0.22000",
+			},
+			match: true,
+		},
+		{
+			platform: imagespec.Platform{
+				Architecture: "amd64",
+				OS:           "windows",
+			},
+			match: true,
+		},
+		{
+			platform: imagespec.Platform{
+				Architecture: "amd64",
+				OS:           "linux",
+			},
+			match: false,
+		},
+	} {
+		assert.Equal(t, test.match, m.Match(test.platform), "should match %b, %s to %s", test.match, m.Platform, test.platform)
+	}
+}
+
+func TestMatchComparerClientOSPriority(t *testing.T) {
+	m := windowsmatcher{
+		Platform:        DefaultSpec(),
+		osVersionPrefix: "10.0.22000",
+		defaultMatcher: &matcher{
+			Platform: Normalize(DefaultSpec()),
+		},
+		isClientOS: true,
+	}
+	platforms := []imagespec.Platform{
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.20348.169",
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.22000",
+		},
+	}
+	expected := []imagespec.Platform{
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.22000",
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.20348.169",
 		},
 	}
 	sort.SliceStable(platforms, func(i, j int) bool {
