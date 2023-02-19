@@ -48,7 +48,17 @@ The start command MUST accept the following flags:
 
 The start command, as well as all binary calls to the shim, has the bundle for the container set as the `cwd`.
 
-The start command MUST return an address to a shim for containerd to issue API requests for container operations.
+The start command MUST write to stdout either the ttrpc address that the shim is serving its API on, or _(experimental)_
+a JSON structure in the following format (where protocol can be either "ttrpc" or "grpc"):
+
+```json
+{
+	"address": "/address/of/task/service",
+	"protocol": "grpc"
+}
+```
+
+The address will be used by containerd to issue API requests for container operations.
 
 The start command can either start a new shim or return an address to an existing shim based on the shim's logic.
 
@@ -337,8 +347,8 @@ Messages will automatically be output in the containerd's daemon logs with the c
 
 #### ttrpc
 
-[ttrpc](https://github.com/containerd/ttrpc) is the only currently supported protocol for shims.
+[ttrpc](https://github.com/containerd/ttrpc) is one of the supported protocols for shims.
 It works with standard protobufs and GRPC services as well as generating clients.
 The only difference between grpc and ttrpc is the wire protocol.
 ttrpc removes the http stack in order to save memory and binary size to keep shims small.
-It is recommended to use ttrpc in your shim but grpc support is also in development.
+It is recommended to use ttrpc in your shim but grpc support is currently an experimental feature.
