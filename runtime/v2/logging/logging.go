@@ -29,5 +29,9 @@ type Config struct {
 	Stderr    io.Reader
 }
 
-// LoggerFunc is implemented by custom v2 logging binaries
-type LoggerFunc func(context.Context, *Config, func() error) error
+// LoggerFunc is implemented by custom v2 logging binaries.
+//
+// ready should be called when the logging binary finishes its setup and the container can be started.
+//
+// An example implementation of LoggerFunc: https://github.com/containerd/containerd/tree/main/runtime/v2#logging
+type LoggerFunc func(ctx context.Context, cfg *Config, ready func() error) error
