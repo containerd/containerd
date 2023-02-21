@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Microsoft/hcsshim/osversion"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/windows"
 )
@@ -70,7 +71,7 @@ func (m windowsmatcher) Match(p specs.Platform) bool {
 					return false
 				}
 
-				if (major == 10 && minor == 0 && build >= 20348) ||
+				if (major == 10 && minor == 0 && build >= osversion.V21H2Server) ||
 					(major == 10 && minor > 0) {
 					// Windows 11 client machines are implicitly
 					// compatible with 10.0.20348 (LTSC2022), even
