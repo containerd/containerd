@@ -63,8 +63,8 @@ func (s *controllerService) Register(server *grpc.Server) error {
 
 func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreateRequest) (*api.ControllerCreateResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("create sandbox")
-	// TODO: Rootfs, any
-	err := s.local.Create(ctx, req.GetSandboxID())
+	// TODO: Rootfs
+	err := s.local.Create(ctx, req.GetSandboxID(), sandbox.WithOptions(req.GetOptions()))
 	if err != nil {
 		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
 	}
