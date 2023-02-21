@@ -7,6 +7,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
 
+**⚠️⚠️⚠️Please do not use this repository as balena documentation!⚠️⚠️⚠️** We don't maintain the balena-related docs here. Please refer to the [balena documentation website](https://docs.balena.io) instead.
+
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
 
 containerd is designed to be embedded into a larger system, rather than being used directly by developers or end-users.
