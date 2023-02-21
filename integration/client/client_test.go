@@ -28,7 +28,6 @@ import (
 
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 	exec "golang.org/x/sys/execabs"
@@ -123,7 +122,7 @@ func TestMain(m *testing.M) {
 	}
 
 	// allow comparison with containerd under test
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"version":     version.Version,
 		"revision":    version.Revision,
 		"runtime":     os.Getenv("TEST_RUNTIME"),

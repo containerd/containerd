@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -201,7 +200,7 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 // Prepare creates thin device for an active snapshot identified by key
 func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).WithFields(logrus.Fields{"key": key, "parent": parent}).Debug("prepare")
+	log.G(ctx).WithFields(log.Fields{"key": key, "parent": parent}).Debug("prepare")
 
 	var (
 		mounts []mount.Mount
@@ -218,7 +217,7 @@ func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 // View creates readonly thin device for the given snapshot key
 func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).WithFields(logrus.Fields{"key": key, "parent": parent}).Debug("view")
+	log.G(ctx).WithFields(log.Fields{"key": key, "parent": parent}).Debug("view")
 
 	var (
 		mounts []mount.Mount
@@ -237,7 +236,7 @@ func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 // Block device unmount operation captures snapshot changes by itself, so no
 // additional actions needed within Commit operation.
 func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
-	log.G(ctx).WithFields(logrus.Fields{"name": name, "key": key}).Debug("commit")
+	log.G(ctx).WithFields(log.Fields{"name": name, "key": key}).Debug("commit")
 
 	return s.store.WithTransaction(ctx, true, func(ctx context.Context) error {
 		id, snapInfo, _, err := storage.GetInfo(ctx, key)

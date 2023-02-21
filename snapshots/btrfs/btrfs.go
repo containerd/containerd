@@ -363,7 +363,7 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		if restore { // means failed to commit transaction
 			// Attempt to restore source
 			if err1 := btrfs.SubvolSnapshot(source, removed, readonly); err1 != nil {
-				log.G(ctx).WithFields(logrus.Fields{
+				log.G(ctx).WithFields(log.Fields{
 					logrus.ErrorKey: err1,
 					"subvolume":     source,
 					"renamed":       removed,
