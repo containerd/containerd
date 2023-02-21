@@ -40,7 +40,6 @@ import (
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
@@ -115,7 +114,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			socket.Close()
 			RemoveSocket(address)
 		}()
-		log.G(ctx).WithFields(logrus.Fields{
+		log.G(ctx).WithFields(log.Fields{
 			"pid":     cmd.Process.Pid,
 			"address": address,
 			"debug":   debug,
@@ -132,7 +131,7 @@ func WithStart(binary, address, daemonAddress, cgroup string, debug bool, exitHa
 			if err := setCgroup(cgroup, cmd); err != nil {
 				return nil, nil, err
 			}
-			log.G(ctx).WithFields(logrus.Fields{
+			log.G(ctx).WithFields(log.Fields{
 				"pid":     cmd.Process.Pid,
 				"address": address,
 			}).Infof("shim placed in cgroup %s", cgroup)

@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl/v2"
 	goevents "github.com/docker/go-events"
-	"github.com/sirupsen/logrus"
 )
 
 // Exchange broadcasts events
@@ -59,7 +58,7 @@ func (e *Exchange) Forward(ctx context.Context, envelope *events.Envelope) (err 
 	}
 
 	defer func() {
-		logger := log.G(ctx).WithFields(logrus.Fields{
+		logger := log.G(ctx).WithFields(log.Fields{
 			"topic": envelope.Topic,
 			"ns":    envelope.Namespace,
 			"type":  envelope.Event.GetTypeUrl(),
@@ -103,7 +102,7 @@ func (e *Exchange) Publish(ctx context.Context, topic string, event events.Event
 	envelope.Event = encoded
 
 	defer func() {
-		logger := log.G(ctx).WithFields(logrus.Fields{
+		logger := log.G(ctx).WithFields(log.Fields{
 			"topic": envelope.Topic,
 			"ns":    envelope.Namespace,
 			"type":  envelope.Event.GetTypeUrl(),

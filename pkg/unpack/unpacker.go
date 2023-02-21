@@ -43,7 +43,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -437,7 +436,7 @@ func (u *Unpacker) unpack(
 	if err != nil {
 		return err
 	}
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"config":  config.Digest,
 		"chainID": chainID,
 	}).Debug("image unpacked")
