@@ -88,6 +88,7 @@ func (g *grpcBridge) Create(ctx context.Context, request *v2.CreateTaskRequest) 
 		Checkpoint:       request.GetCheckpoint(),
 		ParentCheckpoint: request.GetParentCheckpoint(),
 		Options:          request.GetOptions(),
+		SandboxID:        request.GetSandboxID(),
 	})
 
 	return &v2.CreateTaskResponse{Pid: resp.GetPid()}, err
