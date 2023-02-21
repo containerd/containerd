@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type dockerAuthorizer struct {
@@ -312,7 +311,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 					}
 					return resp.Token, resp.RefreshToken, nil
 				}
-				log.G(ctx).WithFields(logrus.Fields{
+				log.G(ctx).WithFields(log.Fields{
 					"status": errStatus.Status,
 					"body":   string(errStatus.Body),
 				}).Debugf("token request failed")

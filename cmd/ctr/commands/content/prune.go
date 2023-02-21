@@ -81,7 +81,7 @@ var pruneReferencesCommand = cli.Command{
 
 			for k := range info.Labels {
 				if isLayerLabel(k) {
-					log.G(ctx).WithFields(logrus.Fields{
+					log.G(ctx).WithFields(log.Fields{
 						"digest": info.Digest,
 						"label":  k,
 					}).Debug("Removing label")

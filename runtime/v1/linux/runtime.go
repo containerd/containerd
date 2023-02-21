@@ -50,7 +50,6 @@ import (
 	"github.com/containerd/go-runc"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -166,7 +165,7 @@ func (r *Runtime) Create(ctx context.Context, id string, opts runtime.CreateOpts
 	if err != nil {
 		return nil, err
 	}
-	ctx = log.WithLogger(ctx, log.G(ctx).WithError(err).WithFields(logrus.Fields{
+	ctx = log.WithLogger(ctx, log.G(ctx).WithError(err).WithFields(log.Fields{
 		"id":        id,
 		"namespace": namespace,
 	}))
@@ -361,7 +360,7 @@ func (r *Runtime) loadTasks(ctx context.Context, ns string) ([]*Task, error) {
 			filepath.Join(r.root, ns, id),
 		)
 		ctx = namespaces.WithNamespace(ctx, ns)
-		ctx = log.WithLogger(ctx, log.G(ctx).WithError(err).WithFields(logrus.Fields{
+		ctx = log.WithLogger(ctx, log.G(ctx).WithError(err).WithFields(log.Fields{
 			"id":        id,
 			"namespace": ns,
 		}))
@@ -489,7 +488,7 @@ func (r *Runtime) terminate(ctx context.Context, bundle *bundle, ns, id string) 
 		log.G(ctx).WithError(err).Warnf("delete runtime state %s", id)
 	}
 	if err := mount.Unmount(filepath.Join(bundle.path, "rootfs"), 0); err != nil {
-		log.G(ctx).WithError(err).WithFields(logrus.Fields{
+		log.G(ctx).WithError(err).WithFields(log.Fields{
 			"path": bundle.path,
 			"id":   id,
 		}).Warnf("unmount task rootfs")

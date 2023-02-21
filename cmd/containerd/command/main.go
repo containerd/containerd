@@ -174,7 +174,7 @@ can be used and modified as necessary as a custom configuration.`
 			log.G(ctx).WithError(w).Warn("cleanup temp mount")
 		}
 
-		log.G(ctx).WithFields(logrus.Fields{
+		log.G(ctx).WithFields(log.Fields{
 			"version":  version.Version,
 			"revision": version.Revision,
 		}).Info("starting containerd")

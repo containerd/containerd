@@ -38,7 +38,6 @@ import (
 	"github.com/containerd/containerd/version"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -647,7 +646,7 @@ func (r *request) String() string {
 	return r.host.Scheme + "://" + r.host.Host + r.path
 }
 
-func requestFields(req *http.Request) logrus.Fields {
+func requestFields(req *http.Request) log.Fields {
 	fields := map[string]interface{}{
 		"request.method": req.Method,
 	}
@@ -665,10 +664,10 @@ func requestFields(req *http.Request) logrus.Fields {
 		}
 	}
 
-	return logrus.Fields(fields)
+	return log.Fields(fields)
 }
 
-func responseFields(resp *http.Response) logrus.Fields {
+func responseFields(resp *http.Response) log.Fields {
 	fields := map[string]interface{}{
 		"response.status": resp.Status,
 	}
@@ -683,7 +682,7 @@ func responseFields(resp *http.Response) logrus.Fields {
 		}
 	}
 
-	return logrus.Fields(fields)
+	return log.Fields(fields)
 }
 
 // IsLocalhost checks if the registry host is local.

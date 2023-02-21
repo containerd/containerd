@@ -30,7 +30,6 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -295,7 +294,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 		return status.Errorf(codes.InvalidArgument, "first message must have a reference")
 	}
 
-	fields := logrus.Fields{
+	fields := log.Fields{
 		"ref": ref,
 	}
 	total = req.Total
