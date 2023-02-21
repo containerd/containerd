@@ -29,7 +29,6 @@ import (
 
 	"github.com/containerd/ttrpc"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -222,7 +221,7 @@ func makeConnection(ctx context.Context, address string, onClose func()) (_ io.C
 		params.Protocol = "ttrpc"
 	}
 
-	log.G(ctx).WithFields(logrus.Fields{
+	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
 	}).Debug("shim bootstrap parameters")
