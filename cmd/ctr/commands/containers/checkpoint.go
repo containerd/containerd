@@ -60,6 +60,7 @@ var checkpointCommand = cli.Command{
 		defer cancel()
 		opts := []containerd.CheckpointOpts{
 			containerd.WithCheckpointRuntime,
+			containerd.WithCheckpointTask,
 		}
 
 		if context.Bool("image") {
@@ -67,9 +68,6 @@ var checkpointCommand = cli.Command{
 		}
 		if context.Bool("rw") {
 			opts = append(opts, containerd.WithCheckpointRW)
-		}
-		if context.Bool("task") {
-			opts = append(opts, containerd.WithCheckpointTask)
 		}
 		container, err := client.LoadContainer(ctx, id)
 		if err != nil {
