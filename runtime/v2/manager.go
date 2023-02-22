@@ -429,6 +429,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	if err != nil {
 		return nil, err
 	}
+	defer shimTask.Close()
 
 	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
@@ -447,7 +448,6 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 			}
 
 			shimTask.Shutdown(dctx)
-			shimTask.Close()
 		}
 
 		return nil, fmt.Errorf("failed to create shim task: %w", err)
