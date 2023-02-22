@@ -869,6 +869,13 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "options"
     }
+    field {
+      name: "netns_path"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "netnsPath"
+    }
   }
   message_type {
     name: "CreateSandboxResponse"
@@ -5012,6 +5019,13 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "options"
+    }
+    field {
+      name: "netns_path"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "netnsPath"
     }
   }
   message_type {

@@ -62,6 +62,7 @@ message CreateSandboxRequest {
 	string bundle_path = 2;
 	repeated containerd.types.Mount rootfs = 3;
 	google.protobuf.Any options = 4;
+	string netns_path = 5;
 }
 
 message CreateSandboxResponse {}

@@ -125,6 +125,7 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		BundlePath: shim.Bundle(),
 		Rootfs:     coptions.Rootfs,
 		Options:    options,
+		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
 		// TODO: Delete sandbox shim here.
 		return fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
