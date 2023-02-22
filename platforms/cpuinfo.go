@@ -17,7 +17,7 @@
 package platforms
 
 import (
-	"fmt"
+	"log"
 	"runtime"
 	"sync"
 )
@@ -34,7 +34,7 @@ func cpuVariant() string {
 			var err error
 			cpuVariantValue, err = getCPUVariant()
 			if err != nil {
-				panic(fmt.Sprintf("Error getCPUVariant for OS %s: %v", runtime.GOOS, err))
+				log.Printf("Error getCPUVariant for OS %s: %v", runtime.GOOS, err)
 			}
 		}
 	})
