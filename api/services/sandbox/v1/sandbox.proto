@@ -99,6 +99,7 @@ message ControllerCreateRequest {
 	string sandbox_id = 1;
 	repeated containerd.types.Mount rootfs = 2;
 	google.protobuf.Any options = 3;
+	string netns_path = 4;
 }
 
 message ControllerCreateResponse {

@@ -126,6 +126,7 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		BundlePath: shim.Bundle(),
 		Rootfs:     coptions.Rootfs,
 		Options:    options,
+		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
 		// Let the shim exit, then we can clean up the bundle after.
 		if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{

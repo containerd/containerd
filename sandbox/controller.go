@@ -32,7 +32,8 @@ type CreateOptions struct {
 	// CRI will use this to pass PodSandboxConfig.
 	// Don't confuse this with Runtime options, which are passed at shim instance start
 	// to setup global shim configuration.
-	Options typeurl.Any
+	Options   typeurl.Any
+	NetNSPath string
 }
 
 type CreateOpt func(*CreateOptions) error
@@ -55,6 +56,14 @@ func WithOptions(options any) CreateOpt {
 			return fmt.Errorf("failed to marshal sandbox options: %w", err)
 		}
 
+		return nil
+	}
+}
+
+// WithNetNSPath used to assign network namespace path of a sandbox.
+func WithNetNSPath(netNSPath string) CreateOpt {
+	return func(co *CreateOptions) error {
+		co.NetNSPath = netNSPath
 		return nil
 	}
 }

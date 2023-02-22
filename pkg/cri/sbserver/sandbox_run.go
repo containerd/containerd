@@ -225,7 +225,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	runtimeStart := time.Now()
 
-	if err := controller.Create(ctx, id, sb.WithOptions(config)); err != nil {
+	if err := controller.Create(ctx, id, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
