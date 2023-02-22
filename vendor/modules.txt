@@ -76,8 +76,9 @@ github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/sys
 github.com/cilium/ebpf/internal/unix
 github.com/cilium/ebpf/link
-# github.com/container-orchestrated-devices/container-device-interface v0.5.1
+# github.com/container-orchestrated-devices/container-device-interface v0.5.4
 ## explicit; go 1.17
+github.com/container-orchestrated-devices/container-device-interface/internal/multierror
 github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
 github.com/container-orchestrated-devices/container-device-interface/specs-go
 # github.com/containerd/aufs v1.0.0
@@ -348,7 +349,7 @@ github.com/opencontainers/runc/libcontainer/user
 # github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb
 ## explicit
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/runtime-tools v0.9.0 => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
+# github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626 => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
 ## explicit; go 1.16
 github.com/opencontainers/runtime-tools/generate
 github.com/opencontainers/runtime-tools/generate/seccomp
