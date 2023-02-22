@@ -113,6 +113,9 @@ type ContainerdConfig struct {
 	// IgnoreRdtNotEnabledErrors is a boolean flag to ignore RDT related errors
 	// when RDT support has not been enabled.
 	IgnoreRdtNotEnabledErrors bool `toml:"ignore_rdt_not_enabled_errors" json:"ignoreRdtNotEnabledErrors"`
+
+	// A binary plugin shares the registry credentials to remote snapshotter
+	ImageDistributionHelper ImageDistributionHelper `toml:"image_distribution_helper"`
 }
 
 // CniConfig contains toml config related to cni
@@ -338,6 +341,10 @@ type PluginConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
+}
+
+type ImageDistributionHelper struct {
+	BinaryPath string `toml:"bin_path"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

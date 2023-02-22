@@ -152,8 +152,8 @@ version = 2
   tolerate_missing_hugetlb_controller = true
 
   # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
-	# isolation, security and early detection of issues in the mount configuration when using
-	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  # isolation, security and early detection of issues in the mount configuration when using
+  # ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
   ignore_image_defined_volumes = false
 
   # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
@@ -280,6 +280,10 @@ version = 2
     # 'plugins."io.containerd.grpc.v1.cri".containerd.default_runtime' is the runtime to use in containerd.
     # DEPRECATED: use `default_runtime_name` and `plugins."io.containerd.grpc.v1.cri".containerd.runtimes` instead.
     [plugins."io.containerd.grpc.v1.cri".containerd.default_runtime]
+
+    # Binary plugin helps share the registry credentials to remote snapshotter enabling it to directly access the registry.
+    [plugins."io.containerd.grpc.v1.cri".containerd.image_distribution_helper]
+      bin_path = ""
 
     # 'plugins."io.containerd.grpc.v1.cri".containerd.untrusted_workload_runtime' is a runtime to run untrusted workloads on it.
     # DEPRECATED: use `untrusted` runtime in `plugins."io.containerd.grpc.v1.cri".containerd.runtimes` instead.

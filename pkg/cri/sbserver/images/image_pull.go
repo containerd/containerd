@@ -183,6 +183,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	}
 
 	pullReporter.start(pctx)
+
+	if ImageDistributionHelperEnabled(&c.config) && r.Auth != nil {
+		host := distribution.Domain(namedRef)
+		if err := InvokeImageDistributionHelper(&c.config, host, r.Auth); err != nil {
+			log.G(ctx).WithError(err).Warnf("Invoke image distribution helper failed")
+		}
+	}
+
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
