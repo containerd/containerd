@@ -29,11 +29,6 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
-const (
-	// criSpanPrefix is a prefix for CRI server specific spans
-	criSpanPrefix = "pkg.cri.server"
-)
-
 // criService is an CRI server dependency to be wrapped with instrumentation.
 type criService interface {
 	GRPCServices
@@ -101,8 +96,7 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RunPodSandbox"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RunPodSandbox for %+v", r.GetConfig().GetMetadata())
 	defer func() {
 		if err != nil {
@@ -110,7 +104,7 @@ func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.Run
 		} else {
 			log.G(ctx).Infof("RunPodSandbox for %+v returns sandbox id %q", r.GetConfig().GetMetadata(), res.GetPodSandboxId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.RunPodSandbox(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -263,8 +257,7 @@ func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.St
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "StopPodSandbox"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StopPodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
@@ -272,7 +265,7 @@ func (in *instrumentedService) StopPodSandbox(ctx context.Context, r *runtime.St
 		} else {
 			log.G(ctx).Infof("StopPodSandbox for %q returns successfully", r.GetPodSandboxId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err := in.c.StopPodSandbox(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -319,8 +312,7 @@ func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemovePodSandbox"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemovePodSandbox for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
@@ -328,7 +320,7 @@ func (in *instrumentedService) RemovePodSandbox(ctx context.Context, r *runtime.
 		} else {
 			log.G(ctx).Infof("RemovePodSandbox %q returns successfully", r.GetPodSandboxId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err := in.c.RemovePodSandbox(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -428,8 +420,7 @@ func (in *instrumentedService) CreateContainer(ctx context.Context, r *runtime.C
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "CreateContainer"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("CreateContainer within sandbox %q for container %+v",
 		r.GetPodSandboxId(), r.GetConfig().GetMetadata())
 	defer func() {
@@ -440,7 +431,7 @@ func (in *instrumentedService) CreateContainer(ctx context.Context, r *runtime.C
 			log.G(ctx).Infof("CreateContainer within sandbox %q for %+v returns container id %q",
 				r.GetPodSandboxId(), r.GetConfig().GetMetadata(), res.GetContainerId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.CreateContainer(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -491,8 +482,7 @@ func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.St
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "StartContainer"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StartContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
@@ -500,7 +490,7 @@ func (in *instrumentedService) StartContainer(ctx context.Context, r *runtime.St
 		} else {
 			log.G(ctx).Infof("StartContainer for %q returns successfully", r.GetContainerId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err := in.c.StartContainer(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -655,8 +645,7 @@ func (in *instrumentedService) StopContainer(ctx context.Context, r *runtime.Sto
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "StopContainer"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("StopContainer for %q with timeout %d (s)", r.GetContainerId(), r.GetTimeout())
 	defer func() {
 		if err != nil {
@@ -664,7 +653,7 @@ func (in *instrumentedService) StopContainer(ctx context.Context, r *runtime.Sto
 		} else {
 			log.G(ctx).Infof("StopContainer for %q returns successfully", r.GetContainerId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.StopContainer(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -711,8 +700,7 @@ func (in *instrumentedService) RemoveContainer(ctx context.Context, r *runtime.R
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveContainer"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemoveContainer for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
@@ -720,7 +708,7 @@ func (in *instrumentedService) RemoveContainer(ctx context.Context, r *runtime.R
 		} else {
 			log.G(ctx).Infof("RemoveContainer for %q returns successfully", r.GetContainerId())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.RemoveContainer(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -767,8 +755,7 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ExecSync"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("ExecSync for %q with command %+v and timeout %d (s)", r.GetContainerId(), r.GetCmd(), r.GetTimeout())
 	defer func() {
 		if err != nil {
@@ -776,7 +763,7 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		} else {
 			log.G(ctx).Debugf("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -823,8 +810,7 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "Exec"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("Exec for %q with command %+v, tty %v and stdin %v",
 		r.GetContainerId(), r.GetCmd(), r.GetTty(), r.GetStdin())
 	defer func() {
@@ -833,7 +819,7 @@ func (in *instrumentedService) Exec(ctx context.Context, r *runtime.ExecRequest)
 		} else {
 			log.G(ctx).Debugf("Exec for %q returns URL %q", r.GetContainerId(), res.GetUrl())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.Exec(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -881,8 +867,7 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "Attach"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Debugf("Attach for %q with tty %v and stdin %v", r.GetContainerId(), r.GetTty(), r.GetStdin())
 	defer func() {
 		if err != nil {
@@ -890,7 +875,7 @@ func (in *instrumentedService) Attach(ctx context.Context, r *runtime.AttachRequ
 		} else {
 			log.G(ctx).Debugf("Attach for %q returns URL %q", r.GetContainerId(), res.Url)
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.Attach(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -990,8 +975,7 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "PullImage"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1000,7 +984,7 @@ func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullIma
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err = in.c.PullImage(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1010,8 +994,6 @@ func (in *instrumentedAlphaService) PullImage(ctx context.Context, r *runtime_al
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "PullImage"))
-	defer span.End()
 	log.G(ctx).Infof("PullImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1020,7 +1002,6 @@ func (in *instrumentedAlphaService) PullImage(ctx context.Context, r *runtime_al
 			log.G(ctx).Infof("PullImage %q returns image reference %q",
 				r.GetImage().GetImage(), res.GetImageRef())
 		}
-		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.PullImageRequest
@@ -1051,8 +1032,6 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ListImages"))
-	defer span.End()
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
@@ -1061,7 +1040,6 @@ func (in *instrumentedService) ListImages(ctx context.Context, r *runtime.ListIm
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ListImages(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1071,8 +1049,6 @@ func (in *instrumentedAlphaService) ListImages(ctx context.Context, r *runtime_a
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ListImages"))
-	defer span.End()
 	log.G(ctx).Tracef("ListImages with filter %+v", r.GetFilter())
 	defer func() {
 		if err != nil {
@@ -1081,7 +1057,6 @@ func (in *instrumentedAlphaService) ListImages(ctx context.Context, r *runtime_a
 			log.G(ctx).Tracef("ListImages with filter %+v returns image list %+v",
 				r.GetFilter(), res.GetImages())
 		}
-		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ListImagesRequest
@@ -1112,8 +1087,6 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageStatus"))
-	defer span.End()
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1122,7 +1095,6 @@ func (in *instrumentedService) ImageStatus(ctx context.Context, r *runtime.Image
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageStatus(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1132,8 +1104,6 @@ func (in *instrumentedAlphaService) ImageStatus(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageStatus"))
-	defer span.End()
 	log.G(ctx).Tracef("ImageStatus for %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1142,7 +1112,6 @@ func (in *instrumentedAlphaService) ImageStatus(ctx context.Context, r *runtime_
 			log.G(ctx).Tracef("ImageStatus for %q returns image status %+v",
 				r.GetImage().GetImage(), res.GetImage())
 		}
-		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ImageStatusRequest
@@ -1173,8 +1142,7 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveImage"))
-	defer span.End()
+	span := tracing.SpanFromContext(ctx)
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1182,7 +1150,7 @@ func (in *instrumentedService) RemoveImage(ctx context.Context, r *runtime.Remov
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
-		span.SetStatus(err)
+		span.RecordError(err)
 	}()
 	res, err := in.c.RemoveImage(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1192,8 +1160,6 @@ func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "RemoveImage"))
-	defer span.End()
 	log.G(ctx).Infof("RemoveImage %q", r.GetImage().GetImage())
 	defer func() {
 		if err != nil {
@@ -1201,7 +1167,6 @@ func (in *instrumentedAlphaService) RemoveImage(ctx context.Context, r *runtime_
 		} else {
 			log.G(ctx).Infof("RemoveImage %q returns successfully", r.GetImage().GetImage())
 		}
-		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.RemoveImageRequest
@@ -1232,8 +1197,6 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
-	defer span.End()
 	log.G(ctx).Debugf("ImageFsInfo")
 	defer func() {
 		if err != nil {
@@ -1241,7 +1204,6 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 		} else {
 			log.G(ctx).Debugf("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
-		span.SetStatus(err)
 	}()
 	res, err = in.c.ImageFsInfo(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
@@ -1251,8 +1213,6 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
-	defer span.End()
 	log.G(ctx).Debugf("ImageFsInfo")
 	defer func() {
 		if err != nil {
@@ -1260,7 +1220,6 @@ func (in *instrumentedAlphaService) ImageFsInfo(ctx context.Context, r *runtime_
 		} else {
 			log.G(ctx).Debugf("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
-		span.SetStatus(err)
 	}()
 	// converts request and response for earlier CRI version to call and get response from the current version
 	var v1r runtime.ImageFsInfoRequest
