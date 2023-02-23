@@ -25,6 +25,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -121,16 +122,20 @@ func WritePidFile(path string, pid int) error {
 	if err != nil {
 		return err
 	}
-	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	tempPath := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
 	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(f, "%d", pid)
-	f.Close()
-	if err != nil {
+
+	if _, err = f.WriteString(strconv.Itoa(pid)); err != nil {
 		return err
 	}
+
+	if err := f.Close(); err != nil {
+		return err
+	}
+
 	return os.Rename(tempPath, path)
 }
 
@@ -140,16 +145,20 @@ func WriteAddress(path, address string) error {
 	if err != nil {
 		return err
 	}
-	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
+	tempPath := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
 	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
 	if err != nil {
 		return err
 	}
-	_, err = f.WriteString(address)
-	f.Close()
-	if err != nil {
+
+	if _, err = f.WriteString(address); err != nil {
 		return err
 	}
+
+	if err := f.Close(); err != nil {
+		return err
+	}
+
 	return os.Rename(tempPath, path)
 }
 
