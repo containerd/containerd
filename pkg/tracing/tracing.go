@@ -91,6 +91,11 @@ func (s *Span) AddEvent(name string, attributes ...attribute.KeyValue) {
 	s.otelSpan.AddEvent(name, trace.WithAttributes(attributes...))
 }
 
+// RecordError will record err as an exception span event for this span
+func (s *Span) RecordError(err error, options ...trace.EventOption) {
+	s.otelSpan.RecordError(err, options...)
+}
+
 // SetStatus sets the status of the current span.
 // If an error is encountered, it records the error and sets span status to Error.
 func (s *Span) SetStatus(err error) {
