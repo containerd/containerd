@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/tracing"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -145,6 +146,9 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		m        []platformManifest
 		wasIndex bool
 	)
+
+	ctx, span := tracing.StartSpan(ctx, "Manifest")
+	defer span.End()
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		switch desc.MediaType {

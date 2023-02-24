@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/tracing"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -337,6 +338,9 @@ func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
 }
 
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
+	ctx, span := tracing.StartSpan(ctx, "image.Unpack")
+	defer span.End()
+
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
 		return err
@@ -371,6 +375,8 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	if err != nil {
 		return err
 	}
+	span.SetAttributes(tracing.Attribute("snapshotterName", snapshotterName))
+
 	sn, err := i.client.getSnapshotter(ctx, snapshotterName)
 	if err != nil {
 		return err
@@ -380,6 +386,18 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 			return err
 		}
 	}
+
+	if manifest.Config.Platform != nil {
+		span.SetAttributes(
+			tracing.Attribute("manifestOS", manifest.Config.Platform.OS),
+			tracing.Attribute("manifestOSVersion", manifest.Config.Platform.OSVersion),
+			tracing.Attribute("manifestArchitecture", manifest.Config.Platform.Architecture),
+		)
+	}
+	span.SetAttributes(
+		tracing.Attribute("manifestVersion", manifest.Versioned),
+		tracing.Attribute("manifestMediaType", manifest.MediaType),
+	)
 
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
