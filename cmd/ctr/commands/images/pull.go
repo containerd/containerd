@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/image"
+	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -112,6 +113,11 @@ command. As part of this process, we do the following:
 					p = append(p, platforms.DefaultSpec())
 				}
 				sopts = append(sopts, image.WithPlatforms(p...))
+
+				//set unpack configuration
+				for _, platform := range p {
+					sopts = append(sopts, image.WithUnpack(platform, context.String("snapshotter")))
+				}
 			}
 			// TODO: Support unpack for all platforms..?
 			// Pass in a *?
@@ -125,7 +131,7 @@ command. As part of this process, we do the following:
 				sopts = append(sopts, image.WithAllMetadata)
 			}
 
-			reg := image.NewOCIRegistry(ref, nil, ch)
+			reg := registry.NewOCIRegistry(ref, nil, ch)
 			is := image.NewStore(ref, sopts...)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)

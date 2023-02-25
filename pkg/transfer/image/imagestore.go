@@ -27,8 +27,8 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
-	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/typeurl/v2"
@@ -51,7 +51,7 @@ type Store struct {
 	// extraReferences are used to store or lookup multiple references
 	extraReferences []Reference
 
-	unpacks []UnpackConfiguration
+	unpacks []transfer.UnpackConfiguration
 }
 
 // Reference is used to create or find a reference for an image
@@ -82,14 +82,6 @@ type Reference struct {
 	// name reference from the prefix.
 	// Only used if IsPrefix is true.
 	SkipNamedDigest bool
-}
-
-// UnpackConfiguration specifies the platform and snapshotter to use for resolving
-// the unpack Platform, if snapshotter is not specified the platform default will
-// be used.
-type UnpackConfiguration struct {
-	Platform    ocispec.Platform
-	Snapshotter string
 }
 
 // StoreOpt defines options when configuring an image store source or destination
@@ -171,7 +163,7 @@ func WithExtraReference(name string) StoreOpt {
 // WithUnpack specifies a platform to unpack for and an optional snapshotter to use
 func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
 	return func(s *Store) {
-		s.unpacks = append(s.unpacks, UnpackConfiguration{
+		s.unpacks = append(s.unpacks, transfer.UnpackConfiguration{
 			Platform:    p,
 			Snapshotter: snapshotter,
 		})
@@ -333,11 +325,11 @@ func (is *Store) Get(ctx context.Context, store images.Store) (images.Image, err
 	return store.Get(ctx, is.imageName)
 }
 
-func (is *Store) UnpackPlatforms() []unpack.Platform {
-	unpacks := make([]unpack.Platform, len(is.unpacks))
+func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
+	unpacks := make([]transfer.UnpackConfiguration, len(is.unpacks))
 	for i, uc := range is.unpacks {
-		unpacks[i].SnapshotterKey = uc.Snapshotter
-		unpacks[i].Platform = platforms.Only(uc.Platform)
+		unpacks[i].Snapshotter = uc.Snapshotter
+		unpacks[i].Platform = uc.Platform
 	}
 	return unpacks
 }
@@ -424,7 +416,7 @@ func referencesFromProto(references []*transfertypes.ImageReference) []Reference
 	}
 	return or
 }
-func unpackToProto(uc []UnpackConfiguration) []*transfertypes.UnpackConfiguration {
+func unpackToProto(uc []transfer.UnpackConfiguration) []*transfertypes.UnpackConfiguration {
 	auc := make([]*transfertypes.UnpackConfiguration, len(uc))
 	for i := range uc {
 		p := types.Platform{
@@ -440,8 +432,8 @@ func unpackToProto(uc []UnpackConfiguration) []*transfertypes.UnpackConfiguratio
 	return auc
 }
 
-func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []UnpackConfiguration {
-	uc := make([]UnpackConfiguration, len(auc))
+func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []transfer.UnpackConfiguration {
+	uc := make([]transfer.UnpackConfiguration, len(auc))
 	for i := range auc {
 		uc[i].Snapshotter = auc[i].Snapshotter
 		if auc[i].Platform != nil {

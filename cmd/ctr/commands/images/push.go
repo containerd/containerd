@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/image"
+	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -103,7 +104,7 @@ var pushCommand = cli.Command{
 			if local == "" {
 				local = ref
 			}
-			reg := image.NewOCIRegistry(ref, nil, ch)
+			reg := registry.NewOCIRegistry(ref, nil, ch)
 			is := image.NewStore(local)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)

@@ -105,8 +105,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			wrapper = pushCtx.HandlerWrapper
 		}
 	*/
-
-	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiter, matcher, wrapper); err != nil {
+	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper); err != nil {
 		return err
 	}
 	if tops.Progress != nil {

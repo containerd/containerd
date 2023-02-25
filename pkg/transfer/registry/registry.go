@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package image
+package registry
 
 import (
 	"context"
