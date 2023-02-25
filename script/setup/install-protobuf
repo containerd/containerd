@@ -25,6 +25,7 @@ PROTOBUF_DIR=$(mktemp -d)
 
 # Use `go tool dist list` for the full list of targets
 TARGET="$(go env GOOS)-$(go env GOARCH)"
+TARGET_ORIG=$TARGET
 
 # Fix up OS/ARCH to get proper download link for https://github.com/protocolbuffers/protobuf/releases
 
@@ -41,20 +42,22 @@ TARGET=${TARGET/linux-386/linux-x86_32}
 TARGET=${TARGET/linux-amd64/linux-x86_64}
 TARGET=${TARGET/linux-ppc64le/linux-ppcle_64}
 
-wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-$TARGET.zip"
-unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
-
-wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
-unzip "$PROTOBUF_DIR/protobuf" -d /usr/src/protobuf
-
-cd "/usr/src/protobuf/protobuf-$PROTOBUF_VERSION"
-./autogen.sh
-./configure --disable-shared
-
-make
-make check
-make install
-ldconfig
+if [[ $TARGET != $TARGET_ORIG ]]
+then
+  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-$TARGET.zip"
+  unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
+else
+  # Build from source
+  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
+  unzip "$PROTOBUF_DIR/protobuf" -d /usr/src/protobuf
+  cd "/usr/src/protobuf/protobuf-$PROTOBUF_VERSION"
+  ./autogen.sh
+  ./configure --disable-shared
+  make
+  make check
+  make install
+  ldconfig
+fi
 
 rm -rf "$PROTOBUF_DIR"
 
