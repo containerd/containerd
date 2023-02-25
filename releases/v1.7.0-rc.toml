@@ -17,8 +17,6 @@ Some functionality in this release may be considered experimental or unstable, b
 This release still adheres to our backwards compability guarantees and users who do not use or enable new functionality should use this release with the same stability expectations.
 The previous 1.6 release has also become a long term stable release for users who prefer releases with mostly stability improvements and wish to wait a few releases for new functionality.
 
-_This is a beta release and includes some functionality which is not yet complete. While most APIs are finalized before merge, they are subject to change until the official release._
-
 ### Highlights
 
 #### Sandbox API _(experimental)_
@@ -47,7 +45,7 @@ See the [Transfer Docs](https://github.com/containerd/containerd/blob/main/docs/
 The Node Resource Interface is a common framework for plugging extensions into OCI-compatible container runtimes. It provides
 basic mechanisms for plugins to track the state of containers and to make limited changes to their configuration.
 
-This release introduces NRI v0.2.0 with an updated plugin interface to cover a wide range of use cases.
+This release introduces NRI v0.3.0 with an updated plugin interface to cover a wide range of use cases.
 
 See the [NRI Docs](https://github.com/containerd/containerd/blob/main/docs/NRI.md)
 
