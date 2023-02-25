@@ -33,6 +33,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/reference/docker"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
@@ -181,7 +182,12 @@ func getPassthroughAnnotations(podAnnotations map[string]string,
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *Controller) runtimeSpec(
+	id string,
+	platform platforms.Platform,
+	baseSpecFile string,
+	opts ...oci.SpecOpts,
+) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := ctrdutil.NamespacedContext()
 	container := &containers.Container{ID: id}
@@ -207,7 +213,13 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 		return &spec, nil
 	}
 
-	spec, err := oci.GenerateSpec(ctx, nil, container, opts...)
+	spec, err := oci.GenerateSpecWithPlatform(
+		ctx,
+		nil,
+		platforms.Format(platform),
+		container,
+		opts...,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate spec: %w", err)
 	}

@@ -28,10 +28,11 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/platforms"
 )
 
-func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
+func (c *Controller) sandboxContainerSpec(id string, platform platforms.Platform, config *runtime.PodSandboxConfig,
+	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (_ *runtimespec.Spec, retErr error) {
 	// Creates a spec Generator with the default spec.
 	specOpts := []oci.SpecOpts{
 		oci.WithEnv(imageConfig.Env),
@@ -85,7 +86,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		annotations.DefaultCRIAnnotations(id, "", "", config, true)...,
 	)
 
-	return c.runtimeSpec(id, "", specOpts...)
+	return c.runtimeSpec(id, platform, "", specOpts...)
 }
 
 // No sandbox container spec options for windows yet.

@@ -165,13 +165,13 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
-	platform, err := controller.Platform(ctx, sandboxID)
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
+		return nil, fmt.Errorf("unable to get sandbox %q metadata: %w", sandboxID, err)
 	}
 
 	spec, err := c.buildContainerSpec(
-		platform,
+		sandboxInfo.Platform,
 		id,
 		sandboxID,
 		sandboxPid,
@@ -260,11 +260,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
-
-	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get sandbox %q metdata: %w", sandboxID, err)
-	}
 
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),

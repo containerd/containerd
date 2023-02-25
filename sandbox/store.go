@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 )
 
@@ -41,6 +42,8 @@ type Sandbox struct {
 	UpdatedAt time.Time
 	// Extensions stores client-specified metadata
 	Extensions map[string]typeurl.Any
+	// Platform stores the platform for this sandbox.
+	Platform platforms.Platform
 }
 
 // RuntimeOpts holds runtime specific information

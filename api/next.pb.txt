@@ -869,6 +869,14 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "options"
     }
+    field {
+      name: "platform"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
   }
   message_type {
     name: "CreateSandboxResponse"
@@ -899,27 +907,6 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       json_name: "createdAt"
-    }
-  }
-  message_type {
-    name: "PlatformRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "PlatformResponse"
-    field {
-      name: "platform"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Platform"
-      json_name: "platform"
     }
   }
   message_type {
@@ -1149,11 +1136,6 @@ file {
       name: "StartSandbox"
       input_type: ".containerd.runtime.sandbox.v1.StartSandboxRequest"
       output_type: ".containerd.runtime.sandbox.v1.StartSandboxResponse"
-    }
-    method {
-      name: "Platform"
-      input_type: ".containerd.runtime.sandbox.v1.PlatformRequest"
-      output_type: ".containerd.runtime.sandbox.v1.PlatformResponse"
     }
     method {
       name: "StopSandbox"
@@ -4752,6 +4734,7 @@ file {
   package: "containerd.types"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
+  dependency: "github.com/containerd/containerd/api/types/platform.proto"
   message_type {
     name: "Sandbox"
     field {
@@ -4808,6 +4791,14 @@ file {
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Sandbox.ExtensionsEntry"
       json_name: "extensions"
+    }
+    field {
+      name: "platform"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
     }
     nested_type {
       name: "Runtime"
@@ -5013,6 +5004,14 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "options"
     }
+    field {
+      name: "platform"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Platform"
+      json_name: "platform"
+    }
   }
   message_type {
     name: "ControllerCreateResponse"
@@ -5085,27 +5084,6 @@ file {
       options {
         map_entry: true
       }
-    }
-  }
-  message_type {
-    name: "ControllerPlatformRequest"
-    field {
-      name: "sandbox_id"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "sandboxId"
-    }
-  }
-  message_type {
-    name: "ControllerPlatformResponse"
-    field {
-      name: "platform"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.types.Platform"
-      json_name: "platform"
     }
   }
   message_type {
@@ -5301,11 +5279,6 @@ file {
       name: "Start"
       input_type: ".containerd.services.sandbox.v1.ControllerStartRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerStartResponse"
-    }
-    method {
-      name: "Platform"
-      input_type: ".containerd.services.sandbox.v1.ControllerPlatformRequest"
-      output_type: ".containerd.services.sandbox.v1.ControllerPlatformResponse"
     }
     method {
       name: "Stop"

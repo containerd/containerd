@@ -41,6 +41,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/platforms"
 	sb "github.com/containerd/containerd/sandbox"
 )
 
@@ -92,8 +93,13 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("unable to get OCI runtime for sandbox %q: %w", id, err)
 	}
-
 	sandboxInfo.Runtime.Name = ociRuntime.Type
+
+	platform, err := platforms.Parse(ociRuntime.Platform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse runtime platform: %w", err)
+	}
+	sandboxInfo.Platform = platform
 
 	// Retrieve runtime options
 	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)

@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/opts"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	"github.com/containerd/containerd/platforms"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -246,7 +247,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			if test.configChange != nil {
 				test.configChange(config)
 			}
-			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
+			spec, err := c.sandboxContainerSpec(testID, platforms.DefaultSpec(), config, imageConfig, nsPath, nil)
 			if test.expectErr {
 				assert.Error(t, err)
 				assert.Nil(t, spec)
@@ -514,7 +515,7 @@ func TestSandboxDisableCgroup(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData()
 	c := newControllerService()
 	c.config.DisableCgroup = true
-	spec, err := c.sandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
+	spec, err := c.sandboxContainerSpec("test-id", platforms.DefaultSpec(), config, imageConfig, "test-cni", []string{})
 	require.NoError(t, err)
 
 	t.Log("resource limit should not be set")

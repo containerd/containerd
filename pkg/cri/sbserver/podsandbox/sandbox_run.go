@@ -102,7 +102,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
 	// it safely.
-	spec, err := c.sandboxContainerSpec(id, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
+	spec, err := c.sandboxContainerSpec(id, sandboxInfo.Platform, config, &image.ImageSpec.Config, metadata.NetNSPath, ociRuntime.PodAnnotations)
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}

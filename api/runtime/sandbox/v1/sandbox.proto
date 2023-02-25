@@ -37,10 +37,6 @@ service Sandbox {
 	// StartSandbox will start previsouly created sandbox.
 	rpc StartSandbox(StartSandboxRequest) returns (StartSandboxResponse);
 
-	// Platform queries the platform the sandbox is going to run containers on.
-	// containerd will use this to generate a proper OCI spec.
-	rpc Platform(PlatformRequest) returns (PlatformResponse);
-
 	// StopSandbox will stop existing sandbox instance
 	rpc StopSandbox(StopSandboxRequest) returns (StopSandboxResponse);
 
@@ -62,6 +58,7 @@ message CreateSandboxRequest {
 	string bundle_path = 2;
 	repeated containerd.types.Mount rootfs = 3;
 	google.protobuf.Any options = 4;
+	containerd.types.Platform platform = 5;
 }
 
 message CreateSandboxResponse {}
@@ -73,14 +70,6 @@ message StartSandboxRequest {
 message StartSandboxResponse {
 	uint32 pid = 1;
 	google.protobuf.Timestamp created_at = 2;
-}
-
-message PlatformRequest {
-	string sandbox_id = 1;
-}
-
-message PlatformResponse {
-	containerd.types.Platform platform = 1;
 }
 
 message StopSandboxRequest {

@@ -20,6 +20,7 @@ package containerd.types;
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/platform.proto";
 
 option go_package = "github.com/containerd/containerd/api/types;types";
 
@@ -48,4 +49,6 @@ message Sandbox {
 	google.protobuf.Timestamp updated_at = 6;
 	// Extensions allow clients to provide optional blobs that can be handled by runtime.
 	map<string, google.protobuf.Any> extensions = 7;
+	// Platform is the platform (OS/Arch/Variant) of the sandbox.
+	containerd.types.Platform platform = 8;
 }

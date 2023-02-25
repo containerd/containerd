@@ -21,10 +21,10 @@ import (
 	"fmt"
 
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
@@ -125,6 +125,11 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		BundlePath: shim.Bundle(),
 		Rootfs:     coptions.Rootfs,
 		Options:    options,
+		Platform: &types.Platform{
+			OS:           info.Platform.OS,
+			Architecture: info.Platform.Architecture,
+			Variant:      info.Platform.Variant,
+		},
 	}); err != nil {
 		// TODO: Delete sandbox shim here.
 		return fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
@@ -154,26 +159,6 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		Pid:       resp.GetPid(),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 	}, nil
-}
-
-func (c *controllerLocal) Platform(ctx context.Context, sandboxID string) (platforms.Platform, error) {
-	svc, err := c.getSandbox(ctx, sandboxID)
-	if err != nil {
-		return platforms.Platform{}, err
-	}
-
-	response, err := svc.Platform(ctx, &runtimeAPI.PlatformRequest{SandboxID: sandboxID})
-	if err != nil {
-		return platforms.Platform{}, fmt.Errorf("failed to get sandbox platform: %w", errdefs.FromGRPC(err))
-	}
-
-	var platform platforms.Platform
-	if p := response.GetPlatform(); p != nil {
-		platform.OS = p.OS
-		platform.Architecture = p.Architecture
-		platform.Variant = p.Variant
-	}
-	return platform, nil
 }
 
 func (c *controllerLocal) Stop(ctx context.Context, sandboxID string, opts ...sandbox.StopOpt) error {

@@ -18,6 +18,7 @@ package sandbox
 
 import (
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/protobuf"
 	gogo_types "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl/v2"
@@ -40,6 +41,11 @@ func ToProto(sandbox *Sandbox) *types.Sandbox {
 		UpdatedAt:  protobuf.ToTimestamp(sandbox.UpdatedAt),
 		Extensions: extensions,
 		Spec:       protobuf.FromAny(sandbox.Spec),
+		Platform: &types.Platform{
+			OS:           sandbox.Platform.OS,
+			Architecture: sandbox.Platform.Architecture,
+			Variant:      sandbox.Platform.Variant,
+		},
 	}
 }
 
@@ -64,5 +70,10 @@ func FromProto(sandboxpb *types.Sandbox) Sandbox {
 		CreatedAt:  protobuf.FromTimestamp(sandboxpb.CreatedAt),
 		UpdatedAt:  protobuf.FromTimestamp(sandboxpb.UpdatedAt),
 		Extensions: extensions,
+		Platform: platforms.Platform{
+			OS:           sandboxpb.Platform.OS,
+			Architecture: sandboxpb.Platform.Architecture,
+			Variant:      sandboxpb.Platform.Variant,
+		},
 	}
 }

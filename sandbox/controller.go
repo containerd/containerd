@@ -32,7 +32,8 @@ type CreateOptions struct {
 	// CRI will use this to pass PodSandboxConfig.
 	// Don't confuse this with Runtime options, which are passed at shim instance start
 	// to setup global shim configuration.
-	Options typeurl.Any
+	Options  typeurl.Any
+	Platform platforms.Platform
 }
 
 type CreateOpt func(*CreateOptions) error
@@ -59,6 +60,14 @@ func WithOptions(options any) CreateOpt {
 	}
 }
 
+// WithPlatform sets the sandbox's target platform.
+func WithPlatform(platform platforms.Platform) CreateOpt {
+	return func(co *CreateOptions) error {
+		co.Platform = platform
+		return nil
+	}
+}
+
 type StopOptions struct {
 	Timeout *time.Duration
 }
@@ -79,9 +88,6 @@ type Controller interface {
 	Create(ctx context.Context, sandboxID string, opts ...CreateOpt) error
 	// Start will start previously created sandbox.
 	Start(ctx context.Context, sandboxID string) (ControllerInstance, error)
-	// Platform returns target sandbox OS that will be used by Controller.
-	// containerd will rely on this to generate proper OCI spec.
-	Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error)
 	// Stop will stop sandbox instance
 	Stop(ctx context.Context, sandboxID string, opts ...StopOpt) error
 	// Wait blocks until sandbox process exits.

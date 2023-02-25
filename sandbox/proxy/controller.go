@@ -20,8 +20,8 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sandbox"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -50,6 +50,11 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, 
 			TypeUrl: options.Options.GetTypeUrl(),
 			Value:   options.Options.GetValue(),
 		},
+		Platform: &types.Platform{
+			OS:           options.Platform.OS,
+			Architecture: options.Platform.Architecture,
+			Variant:      options.Platform.Variant,
+		},
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -69,20 +74,6 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 		Pid:       resp.GetPid(),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 		Labels:    resp.GetLabels(),
-	}, nil
-}
-
-func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string) (platforms.Platform, error) {
-	resp, err := s.client.Platform(ctx, &api.ControllerPlatformRequest{SandboxID: sandboxID})
-	if err != nil {
-		return platforms.Platform{}, errdefs.FromGRPC(err)
-	}
-
-	platform := resp.GetPlatform()
-	return platforms.Platform{
-		Architecture: platform.GetArchitecture(),
-		OS:           platform.GetOS(),
-		Variant:      platform.GetVariant(),
 	}, nil
 }
 

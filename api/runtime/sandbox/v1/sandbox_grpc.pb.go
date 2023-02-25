@@ -27,9 +27,6 @@ type SandboxClient interface {
 	CreateSandbox(ctx context.Context, in *CreateSandboxRequest, opts ...grpc.CallOption) (*CreateSandboxResponse, error)
 	// StartSandbox will start previsouly created sandbox.
 	StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StartSandboxResponse, error)
-	// Platform queries the platform the sandbox is going to run containers on.
-	// containerd will use this to generate a proper OCI spec.
-	Platform(ctx context.Context, in *PlatformRequest, opts ...grpc.CallOption) (*PlatformResponse, error)
 	// StopSandbox will stop existing sandbox instance
 	StopSandbox(ctx context.Context, in *StopSandboxRequest, opts ...grpc.CallOption) (*StopSandboxResponse, error)
 	// WaitSandbox blocks until sanbox exits.
@@ -62,15 +59,6 @@ func (c *sandboxClient) CreateSandbox(ctx context.Context, in *CreateSandboxRequ
 func (c *sandboxClient) StartSandbox(ctx context.Context, in *StartSandboxRequest, opts ...grpc.CallOption) (*StartSandboxResponse, error) {
 	out := new(StartSandboxResponse)
 	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/StartSandbox", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sandboxClient) Platform(ctx context.Context, in *PlatformRequest, opts ...grpc.CallOption) (*PlatformResponse, error) {
-	out := new(PlatformResponse)
-	err := c.cc.Invoke(ctx, "/containerd.runtime.sandbox.v1.Sandbox/Platform", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,9 +119,6 @@ type SandboxServer interface {
 	CreateSandbox(context.Context, *CreateSandboxRequest) (*CreateSandboxResponse, error)
 	// StartSandbox will start previsouly created sandbox.
 	StartSandbox(context.Context, *StartSandboxRequest) (*StartSandboxResponse, error)
-	// Platform queries the platform the sandbox is going to run containers on.
-	// containerd will use this to generate a proper OCI spec.
-	Platform(context.Context, *PlatformRequest) (*PlatformResponse, error)
 	// StopSandbox will stop existing sandbox instance
 	StopSandbox(context.Context, *StopSandboxRequest) (*StopSandboxResponse, error)
 	// WaitSandbox blocks until sanbox exits.
@@ -156,9 +141,6 @@ func (UnimplementedSandboxServer) CreateSandbox(context.Context, *CreateSandboxR
 }
 func (UnimplementedSandboxServer) StartSandbox(context.Context, *StartSandboxRequest) (*StartSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartSandbox not implemented")
-}
-func (UnimplementedSandboxServer) Platform(context.Context, *PlatformRequest) (*PlatformResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Platform not implemented")
 }
 func (UnimplementedSandboxServer) StopSandbox(context.Context, *StopSandboxRequest) (*StopSandboxResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StopSandbox not implemented")
@@ -220,24 +202,6 @@ func _Sandbox_StartSandbox_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SandboxServer).StartSandbox(ctx, req.(*StartSandboxRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Sandbox_Platform_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PlatformRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SandboxServer).Platform(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/containerd.runtime.sandbox.v1.Sandbox/Platform",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SandboxServer).Platform(ctx, req.(*PlatformRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -346,10 +310,6 @@ var Sandbox_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartSandbox",
 			Handler:    _Sandbox_StartSandbox_Handler,
-		},
-		{
-			MethodName: "Platform",
-			Handler:    _Sandbox_Platform_Handler,
 		},
 		{
 			MethodName: "StopSandbox",

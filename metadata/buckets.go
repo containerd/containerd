@@ -159,6 +159,11 @@ var (
 	bucketKeyRef         = []byte("ref")
 	bucketKeyExpireAt    = []byte("expireat")
 	bucketKeySandboxID   = []byte("sandboxid")
+	bucketKeyPlatform    = []byte("platform")
+	bucketKeyOS          = []byte("os")
+	bucketKeyArch        = []byte("arch")
+	bucketKeyVariant     = []byte("variant")
+	bucketKeyOSVersion   = []byte("osVersion")
 
 	deprecatedBucketKeyObjectIngest = []byte("ingest") // stores ingest links, deprecated in v1.2
 )

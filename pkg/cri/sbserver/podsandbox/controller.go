@@ -33,7 +33,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
 )
@@ -88,10 +87,6 @@ func New(
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
-
-func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error) {
-	return platforms.DefaultSpec(), nil
-}
 
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitStatus, error) {
 	status := c.store.Get(sandboxID)

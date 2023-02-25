@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/platforms"
 )
 
 func TestSandboxContainerSpec(t *testing.T) {
@@ -101,7 +102,7 @@ func TestSandboxContainerSpec(t *testing.T) {
 			if test.imageConfigChange != nil {
 				test.imageConfigChange(imageConfig)
 			}
-			spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath,
+			spec, err := c.sandboxContainerSpec(testID, platforms.DefaultSpec(), config, imageConfig, nsPath,
 				test.podAnnotations)
 			if test.expectErr {
 				assert.Error(t, err)

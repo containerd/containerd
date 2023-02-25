@@ -96,7 +96,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		}
 
 		if len(fieldpaths) == 0 {
-			fieldpaths = []string{"labels", "extensions", "spec", "runtime"}
+			fieldpaths = []string{"labels", "extensions", "spec", "runtime", "platform"}
 
 			if updated.Runtime.Name != sandbox.Runtime.Name {
 				return fmt.Errorf("sandbox.Runtime.Name field is immutable: %w", errdefs.ErrInvalidArgument)
@@ -131,6 +131,8 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 				updated.Runtime = sandbox.Runtime
 			case "spec":
 				updated.Spec = sandbox.Spec
+			case "platform":
+				updated.Platform = sandbox.Platform
 			default:
 				return fmt.Errorf("cannot update %q field on sandbox %q: %w", path, sandbox.ID, errdefs.ErrInvalidArgument)
 			}
@@ -307,6 +309,27 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 		return err
 	}
 
+	platformBucket, err := bucket.CreateBucketIfNotExists(bucketKeyPlatform)
+	if err != nil {
+		return err
+	}
+
+	if err := platformBucket.Put(bucketKeyOS, []byte(instance.Platform.OS)); err != nil {
+		return err
+	}
+
+	if err := platformBucket.Put(bucketKeyArch, []byte(instance.Platform.Architecture)); err != nil {
+		return err
+	}
+
+	if err := platformBucket.Put(bucketKeyVariant, []byte(instance.Platform.Variant)); err != nil {
+		return err
+	}
+
+	if err := platformBucket.Put(bucketKeyOSVersion, []byte(instance.Platform.OSVersion)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -352,6 +375,16 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 	if err != nil {
 		return api.Sandbox{}, err
 	}
+
+	platformBucket := bucket.Bucket(bucketKeyPlatform)
+	if runtimeBucket == nil {
+		return api.Sandbox{}, errors.New("no platform bucket")
+	}
+
+	inst.Platform.OS = string(platformBucket.Get(bucketKeyOS))
+	inst.Platform.Architecture = string(platformBucket.Get(bucketKeyArch))
+	inst.Platform.Variant = string(platformBucket.Get(bucketKeyVariant))
+	inst.Platform.OSVersion = string(platformBucket.Get(bucketKeyOSVersion))
 
 	return inst, nil
 }

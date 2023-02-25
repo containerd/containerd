@@ -52,10 +52,6 @@ func (g *grpcBridge) StartSandbox(ctx context.Context, request *api.StartSandbox
 	return g.client.StartSandbox(ctx, request)
 }
 
-func (g *grpcBridge) Platform(ctx context.Context, request *api.PlatformRequest) (*api.PlatformResponse, error) {
-	return g.client.Platform(ctx, request)
-}
-
 func (g *grpcBridge) StopSandbox(ctx context.Context, request *api.StopSandboxRequest) (*api.StopSandboxResponse, error) {
 	return g.client.StopSandbox(ctx, request)
 }
