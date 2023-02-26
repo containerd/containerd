@@ -89,7 +89,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	handler = images.Handlers(handlerFunc)
 
 	// First find suitable platforms to unpack into
-	//If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
+	// If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
 	if iu, ok := is.(transfer.ImageUnpacker); ok {
 		unpacks := iu.UnpackPlatforms()
 		if len(unpacks) > 0 {

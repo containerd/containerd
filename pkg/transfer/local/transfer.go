@@ -39,9 +39,9 @@ type localTransferService struct {
 	leases  leases.Manager
 	content content.Store
 	images  images.Store
-	//limiter for upload
+	// limiter for upload
 	limiterU *semaphore.Weighted
-	//limiter for download operation
+	// limiter for download operation
 	limiterD *semaphore.Weighted
 	config   TransferConfig
 }
@@ -168,7 +168,7 @@ type TransferConfig struct {
 	// handlers.
 	BaseHandlers []images.Handler
 
-	//UnpackPlatforms are used to specify supported combination of platforms and snapshotters
+	// UnpackPlatforms are used to specify supported combination of platforms and snapshotters
 	UnpackPlatforms []unpack.Platform `toml:"unpack_platforms"`
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
