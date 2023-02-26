@@ -130,10 +130,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			}
 
 			var platSpec ocispec.Platform
-			//Only when all-platforms not specified, we will check platform value
-			//Implicitly if the platforms is empty, it means all-platforms
+			// Only when all-platforms not specified, we will check platform value
+			// Implicitly if the platforms is empty, it means all-platforms
 			if !context.Bool("all-platforms") {
-				//If platform specified, use that one, if not use default
+				// If platform specified, use that one, if not use default
 				if platform := context.String("platform"); platform != "" {
 					platSpec, err = platforms.Parse(platform)
 					if err != nil {
@@ -147,12 +147,12 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 			if !context.Bool("no-unpack") {
 				snapshotter := context.String("snapshotter")
-				//If OS field is not empty, it means platSpec was updated in the above block
-				//i.e all-platforms was not specified
+				// If OS field is not empty, it means platSpec was updated in the above block
+				// i.e all-platforms was not specified
 				if platSpec.OS != "" {
 					opts = append(opts, image.WithUnpack(platSpec, snapshotter))
 				} else {
-					//empty spec means all platforms
+					// Empty spec means all platforms
 					var emptySpec ocispec.Platform
 					opts = append(opts, image.WithUnpack(emptySpec, snapshotter))
 				}

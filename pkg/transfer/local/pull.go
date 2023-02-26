@@ -116,7 +116,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		return err
 	}
 
-	//Set up baseHandlers from service configuration if present or create a new one
+	// Set up baseHandlers from service configuration if present or create a new one
 	if ts.config.BaseHandlers != nil {
 		baseHandlers = ts.config.BaseHandlers
 	} else {
@@ -151,12 +151,12 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	)...)
 
 	// First find suitable platforms to unpack into
-	//If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
+	// If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
 	if iu, ok := is.(transfer.ImageUnpacker); ok {
 		unpacks := iu.UnpackPlatforms()
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
-			//Only unpack if requested unpackconfig matches default/supported unpackconfigs
+			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
 				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
 				if matched {
@@ -254,11 +254,11 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (bool, unpack.Platform) {
 	var u unpack.Platform
 	for _, sp := range supportedPlatforms {
-		//If both platform and snapshotter match, return the supportPlatform
-		//If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
-		//use default Snapshotter
+		// If both platform and snapshotter match, return the supportPlatform
+		// If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
+		// use default Snapshotter
 		if sp.Platform.Match(uc.Platform) {
-			//assuming sp.SnapshotterKey is not empty
+			// Assume sp.SnapshotterKey is not empty
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
 			} else if uc.Snapshotter == "" && sp.SnapshotterKey == containerd.DefaultSnapshotter {

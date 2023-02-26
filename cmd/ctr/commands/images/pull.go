@@ -114,7 +114,7 @@ command. As part of this process, we do the following:
 				}
 				sopts = append(sopts, image.WithPlatforms(p...))
 
-				//set unpack configuration
+				// Set unpack configuration
 				for _, platform := range p {
 					sopts = append(sopts, image.WithUnpack(platform, context.String("snapshotter")))
 				}
@@ -125,8 +125,8 @@ command. As part of this process, we do the following:
 			if context.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
 				// Any with an empty set is None
-				// TODO: Specify way to specify not default platorm
-				//config.PlatformMatcher = platforms.Any()
+				// TODO: Specify way to specify not default platform
+				// config.PlatformMatcher = platforms.Any()
 			} else if context.Bool("all-metadata") {
 				sopts = append(sopts, image.WithAllMetadata)
 			}
