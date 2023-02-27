@@ -64,22 +64,21 @@ NRI section should look something like this:
 
 ```toml
   [plugins."io.containerd.nri.v1.nri"]
-    config_file = "/etc/nri/nri.conf"
+    # Enable NRI support in containerd.
     disable = false
+    # Allow connections from externally launched NRI plugins.
+    disable_connections = false
+    # plugin_config_path is the directory to search for plugin-specific configuration.
+    plugin_config_path = "/etc/nri/conf.d"
+    # plugin_path is the directory to search for plugins to launch on startup.
     plugin_path = "/opt/nri/plugins"
-    socket_path = "/var/run/nri.sock"
+    # plugin_registration_timeout is the timeout for a plugin to register after connection.
+    plugin_registration_timeout = "5s"
+    # plugin_requst_timeout is the timeout for a plugin to handle an event/request.
+    plugin_request_timeout = "2s"
+    # socket_path is the path of the NRI socket to create for plugins to connect to.
+    socket_path = "/var/run/nri/nri.sock"
 ```
-
-In addition to this, you need to put a runtime agnostic NRI configuration
-file in place, to let NRI itself know that it is enabled. You can do this
-by creating `/etc/nri/nri.conf` with the following content:
-
-```yaml
-disableConnections: false
-```
-
-This enables externally launched NRI plugins to connect and register
-themselves.
 
 There are two ways how an NRI plugin can be started. Plugins can be
 pre-registered in which case they are automatically started when the NRI
@@ -90,7 +89,7 @@ Pre-registering a plugin happens by placing a symbolic link to the plugin
 executable into a well-known NRI-specific directory, `/opt/nri/plugins`
 by default. A pre-registered plugin is started with a socket pre-connected
 to NRI. Externally launched plugins connect to a well-known NRI-specific
-socket, `/var/run/nri.sock` by default, to register themselves. The only
+socket, `/var/run/nri/nri.sock` by default, to register themselves. The only
 difference between pre-registered and externally launched plugins is how
 they get started and connected to NRI. Once a connection is established
 all plugins are identical.
@@ -102,7 +101,9 @@ enabled regardless of the built-in NRI defaults. This is convenient for
 testing as it allows one to connect, disconnect and reconnect plugins at
 any time.
 
-For more details about pre-registered and externally launched plugins
+Note that you can't run two NRI-enabled runtimes on a single node with the
+same default socket configuration. You need to either disable NRI or change
+the NRI socket path in one of the runtimes.
 
 ## Testing NRI Support in Containerd
 

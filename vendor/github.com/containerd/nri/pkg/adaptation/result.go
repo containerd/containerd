@@ -316,9 +316,7 @@ func (r *result) adjustMounts(mounts []*Mount, plugin string) error {
 	}
 
 	// finally, apply additions/modifications to plugin container creation request
-	for _, m := range add {
-		create.Container.Mounts = append(r.reply.adjust.Mounts, m)
-	}
+	create.Container.Mounts = append(create.Container.Mounts, add...)
 
 	return nil
 }
@@ -376,9 +374,7 @@ func (r *result) adjustDevices(devices []*LinuxDevice, plugin string) error {
 	}
 
 	// finally, apply additions/modifications to plugin container creation request
-	for _, d := range add {
-		create.Container.Linux.Devices = append(r.reply.adjust.Linux.Devices, d)
-	}
+	create.Container.Linux.Devices = append(create.Container.Linux.Devices, add...)
 
 	return nil
 }

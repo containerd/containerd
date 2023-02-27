@@ -123,6 +123,8 @@ func New(cfg *Config) (API, error) {
 		err      error
 	)
 
+	cfg.ConfigureTimeouts()
+
 	l.nri, err = nri.New(name, version, syncFn, updateFn, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize NRI interface: %w", err)
