@@ -40,6 +40,7 @@ TARGET=${TARGET/windows-386/win32}
 # Linux
 TARGET=${TARGET/linux-386/linux-x86_32}
 TARGET=${TARGET/linux-amd64/linux-x86_64}
+TARGET=${TARGET/linux-arm64/linux-aarch_64}
 TARGET=${TARGET/linux-ppc64le/linux-ppcle_64}
 
 if [[ $TARGET != $TARGET_ORIG ]]
