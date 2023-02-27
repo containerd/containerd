@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 	gruntime "runtime"
-	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -120,7 +119,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", out, err)
 	}
-	address := strings.TrimSpace(string(out))
+	response := bytes.TrimSpace(out)
 
 	onCloseWithShimLog := func() {
 		onClose()
@@ -132,7 +131,12 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, err
 	}
 
-	conn, err := makeConnection(ctx, address, onCloseWithShimLog)
+	params, err := parseStartResponse(ctx, response)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := makeConnection(ctx, params, onCloseWithShimLog)
 	if err != nil {
 		return nil, err
 	}

@@ -42,17 +42,26 @@ This command will launch new shims.
 The start command MUST accept the following flags:
 
 * `-namespace` the namespace for the container
-* `-address` the address of the containerd's main socket
+* `-address` the address of the containerd's main grpc socket
 * `-publish-binary` the binary path to publish events back to containerd
 * `-id` the id of the container
 
 The start command, as well as all binary calls to the shim, has the bundle for the container set as the `cwd`.
+
+The start command may have the following containerd specific environment variables set:
+
+* `TTRPC_ADDRESS` the address of containerd's ttrpc API socket
+* `GRPC_ADDRESS` the address of containerd's grpc API socket (1.7+)
+* `MAX_SHIM_VERSION` the maximum shim version supported by the client, always `2` for shim v2 (1.7+)
+* `SCHED_CORE` enable core scheduling if available (1.6+)
+* `NAMESPACE` an optional namespace the shim is operating in or inheriting (1.7+)
 
 The start command MUST write to stdout either the ttrpc address that the shim is serving its API on, or _(experimental)_
 a JSON structure in the following format (where protocol can be either "ttrpc" or "grpc"):
 
 ```json
 {
+	"version": 2,
 	"address": "/address/of/task/service",
 	"protocol": "grpc"
 }
