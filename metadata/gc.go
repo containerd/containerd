@@ -430,6 +430,20 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 			}
 		}
 
+		bbkt := nbkt.Bucket(bucketKeyObjectSandboxes)
+		if bbkt != nil {
+			if err := bbkt.ForEach(func(k, v []byte) error {
+				if v != nil {
+					return nil
+				}
+
+				sbbkt := bbkt.Bucket(k)
+				return c.sendLabelRefs(ns, sbbkt, fn)
+			}); err != nil {
+				return err
+			}
+		}
+
 		c.active(ns, fn)
 	}
 	return cerr
