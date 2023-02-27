@@ -65,7 +65,7 @@ fetch_env() {
   (
     umask 077;
     local -r tmp_env_file="/tmp/${env_file_name}.yaml"
-    tmp_env_content=$(curl -fsSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq "${env_file_name}")")
+    tmp_env_content=$(curl -fsSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq ".${env_file_name}")")
     if [ -z "${tmp_env_content}" ]; then
       echo "No environment variable is specified in ${env_file_name}"
       return
