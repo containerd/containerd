@@ -65,7 +65,7 @@ fetch_env() {
   (
     umask 077;
     local -r tmp_env_file="/tmp/${env_file_name}.yaml"
-    tmp_env_content=$(curl -fsSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq ".${env_file_name}")")
+    tmp_env_content=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq ".${env_file_name}")")
     if [ -z "${tmp_env_content}" ]; then
       echo "No environment variable is specified in ${env_file_name}"
       return
@@ -241,7 +241,7 @@ echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local
 if [ "${CONTAINERD_TEST:-"false"}"  == "true" ]; then
   # EXTRA_INIT_SCRIPT is the name of the extra init script after being downloaded.
   EXTRA_INIT_SCRIPT="containerd-extra-init.sh"
-  extra_init=$(curl -fsSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq .extra_init)")
+  extra_init=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq .extra_init)")
   # Return if containerd-extra-init-sh is not set.
   if [ -z "${extra_init}" ]; then
     exit 0
