@@ -1,0 +1,20 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.18"
+
+pre_release = false
+
+preface = """\
+The nineteenth patch release for containerd 1.6 contains runtime fixes and additions for Windows platforms
+
+### Notable Updates
+
+* **Update hcsshim to v0.9.7 to include fix for graceful termination and pause containers ([#8153](https://github.com/containerd/containerd/pull/8153))
+
+See the changelog for complete list of changes"""
