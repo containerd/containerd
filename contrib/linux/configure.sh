@@ -65,7 +65,7 @@ fetch_env() {
   (
     umask 077;
     local -r tmp_env_file="/tmp/${env_file_name}.yaml"
-    tmp_env_content=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq ".${env_file_name}")")
+    tmp_env_content=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq '."${env_file_name}" // ""' )")
     if [ -z "${tmp_env_content}" ]; then
       echo "No environment variable is specified in ${env_file_name}"
       return
@@ -86,12 +86,12 @@ for k,v in items:
   )
 }
 
-# KUBE_ENV_METADATA is the metadata key for kubernetes envs.
-KUBE_ENV_METADATA="kube-env"
-fetch_env ${KUBE_ENV_METADATA}
-if [ -f "${CONTAINERD_HOME}/${KUBE_ENV_METADATA}" ]; then
-  source "${CONTAINERD_HOME}/${KUBE_ENV_METADATA}"
-fi
+# is_preloaded checks whether a package has been preloaded in the image.
+is_preloaded() {
+  local -r tar=$1
+  local -r sha1=$2
+  grep -qs "${tar},${sha1}" "${KUBE_HOME}/preload_info"
+}
 
 # CONTAINERD_ENV_METADATA is the metadata key for containerd envs.
 CONTAINERD_ENV_METADATA="containerd-env"
@@ -115,12 +115,12 @@ else
 
   # TODO(upodroid) Revisit pull_refs
   # PULL_REFS_METADATA is the metadata key of PULL_REFS from prow.
-  PULL_REFS_METADATA="PULL_REFS"
-  pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
-  if [ ! -z "${pull_refs}" ]; then
-    deploy_dir=$(echo "${pull_refs}" | sha1sum | awk '{print $1}')
-    deploy_path="${deploy_path}/containerd/${deploy_dir}"
-  fi
+  # PULL_REFS_METADATA="PULL_REFS"
+  # pull_refs=$(fetch_metadata "${PULL_REFS_METADATA}")
+  # if [ ! -z "${pull_refs}" ]; then
+  #   deploy_dir=$(echo "${pull_refs}" | sha1sum | awk '{print $1}')
+  #   deploy_path="${deploy_path}/containerd/${deploy_dir}"
+  # fi
 
   # TODO(random-liu): Put version into the metadata instead of
   # deciding it in cloud init. This may cause issue to reboot test.
@@ -241,11 +241,12 @@ echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local
 if [ "${CONTAINERD_TEST:-"false"}"  == "true" ]; then
   # EXTRA_INIT_SCRIPT is the name of the extra init script after being downloaded.
   EXTRA_INIT_SCRIPT="containerd-extra-init.sh"
-  extra_init=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq .extra_init)")
+  extra_init="$(cat /tmp/bootstrap/extra-fetches.yaml | yq '.extra_init // ""')"
   # Return if containerd-extra-init-sh is not set.
   if [ -z "${extra_init}" ]; then
     exit 0
   fi
+  extra_init=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq .extra_init)")
   echo "${extra_init}" > "${EXTRA_INIT_SCRIPT}"
   chmod 544 "${EXTRA_INIT_SCRIPT}"
   ./${EXTRA_INIT_SCRIPT}
