@@ -56,7 +56,7 @@ fetch_metadata() {
 }
 
 # Install yq to parse some yaml
-wget https://github.com/mikefarah/yq/releases/download/v4.31.1/yq_linux_amd64.tar.gz -O - |\
+curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.31.1/yq_linux_amd64.tar.gz |\
   tar xz && mv yq_linux_amd64 /usr/local/bin/yq
 
 # fetch_env fetches environment variables from GCE metadata server
