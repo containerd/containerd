@@ -21,7 +21,7 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/containerd
       ExecStartPre=/bin/mount --bind /home/containerd /home/containerd
       ExecStartPre=/bin/mount -o remount,exec /home/containerd
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -o /home/containerd/configure.sh https://raw.githubusercontent.com/containerd/containerd/main/contrib/gce/configure.sh
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -o /home/containerd/configure.sh https://raw.githubusercontent.com/containerd/containerd/main/contrib/linux/configure.sh
       ExecStartPre=/bin/chmod 544 /home/containerd/configure.sh
       ExecStart=/home/containerd/configure.sh
 
