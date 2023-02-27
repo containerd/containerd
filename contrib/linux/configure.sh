@@ -38,6 +38,8 @@ echo "Version : " $(${PYTHON} -V 2>&1)
 # CONTAINERD_HOME is the directory for containerd.
 CONTAINERD_HOME="/home/containerd"
 cd "${CONTAINERD_HOME}"
+# KUBE_HOME is the directory for kubernetes.
+KUBE_HOME="/home/kubernetes"
 
 # TODO(upodroid) remove this function after you have resolved the pull-refs below
 # fetch_metadata fetches metadata from GCE metadata server.
@@ -65,7 +67,7 @@ fetch_env() {
   (
     umask 077;
     local -r tmp_env_file="/tmp/${env_file_name}.yaml"
-    tmp_env_content=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq '."${env_file_name}" // ""' )")
+    tmp_env_content=$(curl -sSL "$(cat /tmp/bootstrap/extra-fetches.yaml | yq "."${env_file_name}" // \"\"")")
     if [ -z "${tmp_env_content}" ]; then
       echo "No environment variable is specified in ${env_file_name}"
       return
