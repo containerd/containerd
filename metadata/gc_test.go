@@ -101,6 +101,9 @@ func TestGCRoots(t *testing.T) {
 		addLeaseContent("ns3", "l1", dgst(1)),
 		addLeaseSnapshot("ns3", "l1", "overlay", "sn1"),
 		addLeaseIngest("ns3", "l1", "ingest-1"),
+
+		addSandbox("ns3", "sandbox1", nil),
+		addSandbox("ns4", "sandbox1", labelmap(string(labelGCSnapRef)+"overlay", "sn1")),
 	}
 
 	expected := []gc.Node{
@@ -136,6 +139,7 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceIngest, "ns3", "ingest-1"),
 		gcnode(resourceContentFlat, "ns3", dgst(1).String()),
 		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
+		gcnode(ResourceSnapshot, "ns4", "overlay/sn1"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -757,6 +761,16 @@ func addContainer(ns, name, snapshotter, snapshot string, labels map[string]stri
 			return err
 		}
 		return boltutil.WriteLabels(cbkt, labels)
+	}
+}
+
+func addSandbox(ns, name string, labels map[string]string) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		sbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectSandboxes), name)
+		if err != nil {
+			return err
+		}
+		return boltutil.WriteLabels(sbkt, labels)
 	}
 }
 
