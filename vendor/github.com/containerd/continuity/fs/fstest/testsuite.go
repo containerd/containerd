@@ -81,14 +81,14 @@ var (
 	// baseApplier creates a basic filesystem layout
 	// with multiple types of files for basic tests.
 	baseApplier = Apply(
-		CreateDir("/etc/", 0755),
-		CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0644),
+		CreateDir("/etc/", 0o755),
+		CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0o644),
 		Link("/etc/hosts", "/etc/hosts.allow"),
-		CreateDir("/usr/local/lib", 0755),
-		CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0755),
+		CreateDir("/usr/local/lib", 0o755),
+		CreateFile("/usr/local/lib/libnothing.so", []byte{0x00, 0x00}, 0o755),
 		Symlink("libnothing.so", "/usr/local/lib/libnothing.so.2"),
-		CreateDir("/home", 0755),
-		CreateDir("/home/derek", 0700),
+		CreateDir("/home", 0o755),
+		CreateDir("/home/derek", 0o700),
 		// TODO: CreateSocket: how should Sockets be handled in continuity?
 	)
 
@@ -96,10 +96,10 @@ var (
 	basicTest = []Applier{
 		baseApplier,
 		Apply(
-			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0644),
-			CreateFile("/etc/fstab", []byte("/dev/sda1\t/\text4\tdefaults 1 1\n"), 0600),
-			CreateFile("/etc/badfile", []byte(""), 0666),
-			CreateFile("/home/derek/.zshrc", []byte("#ZSH is just better\n"), 0640),
+			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0o644),
+			CreateFile("/etc/fstab", []byte("/dev/sda1\t/\text4\tdefaults 1 1\n"), 0o600),
+			CreateFile("/etc/badfile", []byte(""), 0o666),
+			CreateFile("/home/derek/.zshrc", []byte("#ZSH is just better\n"), 0o640),
 		),
 		Apply(
 			Remove("/etc/badfile"),
@@ -111,8 +111,8 @@ var (
 		),
 		Apply(
 			RemoveAll("/home"),
-			CreateDir("/home/derek", 0700),
-			CreateFile("/home/derek/.bashrc", []byte("#not going away\n"), 0640),
+			CreateDir("/home/derek", 0o700),
+			CreateFile("/home/derek/.bashrc", []byte("#not going away\n"), 0o640),
 			Link("/etc/hosts", "/etc/hosts.allow"),
 		),
 	}
@@ -121,58 +121,58 @@ var (
 	// deletions are properly picked up and applied
 	deletionTest = []Applier{
 		Apply(
-			CreateDir("/test/somedir", 0755),
-			CreateDir("/lib", 0700),
-			CreateFile("/lib/hidden", []byte{}, 0644),
+			CreateDir("/test/somedir", 0o755),
+			CreateDir("/lib", 0o700),
+			CreateFile("/lib/hidden", []byte{}, 0o644),
 		),
 		Apply(
-			CreateFile("/test/a", []byte{}, 0644),
-			CreateFile("/test/b", []byte{}, 0644),
-			CreateDir("/test/otherdir", 0755),
-			CreateFile("/test/otherdir/.empty", []byte{}, 0644),
+			CreateFile("/test/a", []byte{}, 0o644),
+			CreateFile("/test/b", []byte{}, 0o644),
+			CreateDir("/test/otherdir", 0o755),
+			CreateFile("/test/otherdir/.empty", []byte{}, 0o644),
 			RemoveAll("/lib"),
-			CreateDir("/lib", 0700),
-			CreateFile("/lib/not-hidden", []byte{}, 0644),
+			CreateDir("/lib", 0o700),
+			CreateFile("/lib/not-hidden", []byte{}, 0o644),
 		),
 		Apply(
 			Remove("/test/a"),
 			Remove("/test/b"),
 			RemoveAll("/test/otherdir"),
-			CreateFile("/lib/newfile", []byte{}, 0644),
+			CreateFile("/lib/newfile", []byte{}, 0o644),
 		),
 	}
 
 	// updateTest covers file updates for content and permission
 	updateTest = []Applier{
 		Apply(
-			CreateDir("/d1", 0755),
-			CreateDir("/d2", 0700),
-			CreateFile("/d1/f1", []byte("something..."), 0644),
-			CreateFile("/d1/f2", []byte("else..."), 0644),
-			CreateFile("/d1/f3", []byte("entirely..."), 0644),
+			CreateDir("/d1", 0o755),
+			CreateDir("/d2", 0o700),
+			CreateFile("/d1/f1", []byte("something..."), 0o644),
+			CreateFile("/d1/f2", []byte("else..."), 0o644),
+			CreateFile("/d1/f3", []byte("entirely..."), 0o644),
 		),
 		Apply(
-			CreateFile("/d1/f1", []byte("file content of a different length"), 0664),
+			CreateFile("/d1/f1", []byte("file content of a different length"), 0o664),
 			Remove("/d1/f3"),
-			CreateFile("/d1/f3", []byte("updated content"), 0664),
-			Chmod("/d1/f2", 0766),
-			Chmod("/d2", 0777),
+			CreateFile("/d1/f3", []byte("updated content"), 0o664),
+			Chmod("/d1/f2", 0o766),
+			Chmod("/d2", 0o777),
 		),
 	}
 
 	// directoryPermissionsTest covers directory permissions on update
 	directoryPermissionsTest = []Applier{
 		Apply(
-			CreateDir("/d1", 0700),
-			CreateDir("/d2", 0751),
-			CreateDir("/d3", 0777),
+			CreateDir("/d1", 0o700),
+			CreateDir("/d2", 0o751),
+			CreateDir("/d3", 0o777),
 		),
 		Apply(
-			CreateFile("/d1/f", []byte("irrelevant"), 0644),
-			CreateDir("/d1/d", 0700),
-			CreateFile("/d1/d/f", []byte("irrelevant"), 0644),
-			CreateFile("/d2/f", []byte("irrelevant"), 0644),
-			CreateFile("/d3/f", []byte("irrelevant"), 0644),
+			CreateFile("/d1/f", []byte("irrelevant"), 0o644),
+			CreateDir("/d1/d", 0o700),
+			CreateFile("/d1/d/f", []byte("irrelevant"), 0o644),
+			CreateFile("/d2/f", []byte("irrelevant"), 0o644),
+			CreateFile("/d3/f", []byte("irrelevant"), 0o644),
 		),
 	}
 
@@ -180,28 +180,28 @@ var (
 	// files
 	parentDirectoryPermissionsTest = []Applier{
 		Apply(
-			CreateDir("/d1", 0700),
-			CreateDir("/d1/a", 0700),
-			CreateDir("/d1/a/b", 0700),
-			CreateDir("/d1/a/b/c", 0700),
-			CreateFile("/d1/a/b/f", []byte("content1"), 0644),
-			CreateDir("/d2", 0751),
-			CreateDir("/d2/a/b", 0751),
-			CreateDir("/d2/a/b/c", 0751),
-			CreateFile("/d2/a/b/f", []byte("content1"), 0644),
+			CreateDir("/d1", 0o700),
+			CreateDir("/d1/a", 0o700),
+			CreateDir("/d1/a/b", 0o700),
+			CreateDir("/d1/a/b/c", 0o700),
+			CreateFile("/d1/a/b/f", []byte("content1"), 0o644),
+			CreateDir("/d2", 0o751),
+			CreateDir("/d2/a/b", 0o751),
+			CreateDir("/d2/a/b/c", 0o751),
+			CreateFile("/d2/a/b/f", []byte("content1"), 0o644),
 		),
 		Apply(
-			CreateFile("/d1/a/b/f", []byte("content1"), 0644),
-			Chmod("/d1/a/b/c", 0700),
-			CreateFile("/d2/a/b/f", []byte("content2"), 0644),
-			Chmod("/d2/a/b/c", 0751),
+			CreateFile("/d1/a/b/f", []byte("content1"), 0o644),
+			Chmod("/d1/a/b/c", 0o700),
+			CreateFile("/d2/a/b/f", []byte("content2"), 0o644),
+			Chmod("/d2/a/b/c", 0o751),
 		),
 	}
 
 	hardlinkUnmodified = []Applier{
 		baseApplier,
 		Apply(
-			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0644),
+			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0o644),
 		),
 		Apply(
 			Link("/etc/hosts", "/etc/hosts.deny"),
@@ -213,7 +213,7 @@ var (
 	hardlinkBeforeUnmodified = []Applier{
 		baseApplier,
 		Apply(
-			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0644),
+			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0o644),
 		),
 		Apply(
 			Link("/etc/hosts", "/etc/before-hosts"),
@@ -225,11 +225,11 @@ var (
 	hardlinkBeforeModified = []Applier{
 		baseApplier,
 		Apply(
-			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0644),
+			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost.localdomain"), 0o644),
 		),
 		Apply(
 			Remove("/etc/hosts"),
-			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0644),
+			CreateFile("/etc/hosts", []byte("127.0.0.1 localhost"), 0o644),
 			Link("/etc/hosts", "/etc/before-hosts"),
 		),
 	}
