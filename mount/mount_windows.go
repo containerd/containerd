@@ -144,7 +144,7 @@ func Unmount(mount string, flags int) error {
 	}
 
 	if err := bindfilter.RemoveFileBinding(mount); err != nil {
-		if errno, ok := errors.Unwrap(err).(syscall.Errno); ok && errno == windows.ERROR_INVALID_PARAMETER {
+		if errno, ok := errors.Unwrap(err).(syscall.Errno); ok && errno == windows.ERROR_INVALID_PARAMETER || errno == windows.ERROR_NOT_FOUND {
 			// not a mount point
 			return nil
 		}
