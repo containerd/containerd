@@ -21,44 +21,45 @@
 set -eu -o pipefail
 
 PROTOBUF_VERSION=3.20.1
-GOARCH=$(go env GOARCH)
-GOOS=$(go env GOOS)
 PROTOBUF_DIR=$(mktemp -d)
 
-case $GOARCH in
+# Use `go tool dist list` for the full list of targets
+TARGET="$(go env GOOS)-$(go env GOARCH)"
+TARGET_ORIG=$TARGET
 
-arm64)
-	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-aarch_64.zip"
-	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
-	;;
+# Fix up OS/ARCH to get proper download link for https://github.com/protocolbuffers/protobuf/releases
 
-amd64|386)
-	if [ "$GOOS" = windows ]; then
-		wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-win32.zip"
-	elif [ "$GOOS" = linux ]; then
-		wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-x86_64.zip"
-	elif [ "$GOOS" == darwin ]; then
-	  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-osx-x86_64.zip"
-	fi
-	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
-	;;
+# Darwin
+TARGET=${TARGET/darwin-amd64/osx-x86_64}
+TARGET=${TARGET/darwin-arm64/osx-aarch_64}
 
-ppc64le)
-	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-linux-ppcle_64.zip"
-	unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
-	;;
-*)
-	wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
-	unzip "$PROTOBUF_DIR/protobuf" -d /usr/src/protobuf
-	cd "/usr/src/protobuf/protobuf-$PROTOBUF_VERSION"
-	./autogen.sh
-	./configure --disable-shared
-	make
-	make check
-	make install
-	ldconfig
-	;;
-esac
+# Windows
+TARGET=${TARGET/windows-amd64/win64}
+TARGET=${TARGET/windows-386/win32}
+
+# Linux
+TARGET=${TARGET/linux-386/linux-x86_32}
+TARGET=${TARGET/linux-amd64/linux-x86_64}
+TARGET=${TARGET/linux-arm64/linux-aarch_64}
+TARGET=${TARGET/linux-ppc64le/linux-ppcle_64}
+
+if [[ $TARGET != $TARGET_ORIG ]]
+then
+  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protoc-$PROTOBUF_VERSION-$TARGET.zip"
+  unzip "$PROTOBUF_DIR/protobuf" -d /usr/local
+else
+  # Build from source
+  wget -O "$PROTOBUF_DIR/protobuf" "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOBUF_VERSION/protobuf-cpp-$PROTOBUF_VERSION.zip"
+  unzip "$PROTOBUF_DIR/protobuf" -d /usr/src/protobuf
+  cd "/usr/src/protobuf/protobuf-$PROTOBUF_VERSION"
+  ./autogen.sh
+  ./configure --disable-shared
+  make
+  make check
+  make install
+  ldconfig
+fi
+
 rm -rf "$PROTOBUF_DIR"
 
 # Download status.proto. grpc repos' one seems copied from
