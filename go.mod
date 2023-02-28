@@ -14,7 +14,7 @@ require (
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.3.0
 	github.com/containerd/fifo v1.0.0
-	github.com/containerd/go-cni v1.1.9-0.20230211172349-6603d5bd8941
+	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.5-0.20220421044638-8ba028dca028
 	github.com/containerd/nri v0.3.0
