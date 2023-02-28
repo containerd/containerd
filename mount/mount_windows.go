@@ -23,8 +23,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
+	"github.com/Microsoft/go-winio/pkg/bindfilter"
 	"github.com/Microsoft/hcsshim"
+	"golang.org/x/sys/windows"
 )
 
 const sourceStreamName = "containerd.io-source"
@@ -45,7 +48,7 @@ func (m *Mount) mount(target string) error {
 	}
 
 	if m.Type == "bind" {
-		if err := ApplyFileBinding(target, m.Source, readOnly); err != nil {
+		if err := bindfilter.ApplyFileBinding(target, m.Source, readOnly); err != nil {
 			return fmt.Errorf("failed to bind-mount to %s: %w", target, err)
 		}
 		return nil
@@ -89,12 +92,12 @@ func (m *Mount) mount(target string) error {
 		return fmt.Errorf("failed to get volume path for layer %s: %w", m.Source, err)
 	}
 
-	if err = ApplyFileBinding(target, volume, readOnly); err != nil {
+	if err = bindfilter.ApplyFileBinding(target, volume, readOnly); err != nil {
 		return fmt.Errorf("failed to set volume mount path for layer %s: %w", m.Source, err)
 	}
 	defer func() {
 		if err != nil {
-			RemoveFileBinding(target)
+			bindfilter.RemoveFileBinding(target)
 		}
 	}()
 
@@ -128,29 +131,7 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 
 // Unmount the mount at the provided path
 func Unmount(mount string, flags int) error {
-	var err error
 	mount = filepath.Clean(mount)
-	// This should expand paths like ADMINI~1 and PROGRA~1 to long names.
-	mount, err = getFinalPath(mount)
-	if err != nil {
-		return fmt.Errorf("fetching real path: %w", err)
-	}
-	mounts, err := GetBindMappings(mount)
-	if err != nil {
-		return fmt.Errorf("fetching bind mappings: %w", err)
-	}
-	found := false
-	for _, mnt := range mounts {
-		if mnt.MountPoint == mount {
-			found = true
-			break
-		}
-	}
-	if !found {
-		// not a mount point
-		return nil
-	}
-
 	adsFile := mount + ":" + sourceStreamName
 	var layerPath string
 
@@ -162,7 +143,11 @@ func Unmount(mount string, flags int) error {
 		layerPath = string(layerPathb)
 	}
 
-	if err := RemoveFileBinding(mount); err != nil {
+	if err := bindfilter.RemoveFileBinding(mount); err != nil {
+		if errno, ok := errors.Unwrap(err).(syscall.Errno); ok && errno == windows.ERROR_INVALID_PARAMETER {
+			// not a mount point
+			return nil
+		}
 		return fmt.Errorf("removing mount: %w", err)
 	}
 
