@@ -37,8 +37,10 @@ message ImageStore {
 	// extra_references are used to set image names on imports of sub-images from the index
 	repeated ImageReference extra_references = 6;
 
-	// Unpack Configuration, multiple allowed
+	// export_images is a list of names of images to export
+	repeated string export_images = 7;
 
+	// Unpack Configuration, multiple allowed
 	repeated UnpackConfiguration unpacks = 10;
 }
 

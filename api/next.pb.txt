@@ -6765,6 +6765,13 @@ file {
       json_name: "extraReferences"
     }
     field {
+      name: "export_images"
+      number: 7
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "exportImages"
+    }
+    field {
       name: "unpacks"
       number: 10
       label: LABEL_REPEATED
@@ -6897,13 +6904,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "mediaType"
-    }
-    field {
-      name: "images"
-      number: 3
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "images"
     }
     field {
       name: "platforms"

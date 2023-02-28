@@ -41,8 +41,6 @@ message ImageExportStream {
 
 	string media_type = 2;
 
-	// The image names
-	repeated string images = 3;
 	// The specified platforms
 	repeated types.Platform platforms = 4;
 	// Whether to include all platforms
