@@ -98,6 +98,17 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
+			var opts []tarchive.ExportOpt
+			if context.Bool("skip-non-distributable") {
+				opts = append(opts, tarchive.WithSkipNonDistributable())
+			}
+			if context.Bool("skip-manifest-json") {
+				opts = append(opts, tarchive.WithSkipDockerManifest())
+			}
+			if context.Bool("all-platforms") {
+				opts = append(opts, tarchive.WithAllPlatforms())
+			}
+
 			var specified []ocispec.Platform
 			if pss := context.StringSlice("platform"); len(pss) > 0 {
 				for _, ps := range pss {
@@ -107,17 +118,12 @@ When '--all-platforms' is given all images in a manifest list must be available.
 					}
 					specified = append(specified, p)
 				}
+				opts = append(opts, tarchive.WithPlatforms(specified...))
 			}
 
 			err := client.Transfer(ctx,
-				image.NewStore(""), // a dummy image store
-				tarchive.NewImageExportStream(w, "", tarchive.ExportOptions{
-					Images:               images,
-					Platforms:            specified,
-					AllPlatforms:         context.Bool("all-platforms"),
-					SkipNonDistributable: context.Bool("skip-non-distributable"),
-					SkipDockerManifest:   context.Bool("skip-manifest-json"),
-				}),
+				image.NewStore("", image.WithExportImageNames(images)),
+				tarchive.NewImageExportStream(w, "", opts...),
 				transfer.WithProgress(pf),
 			)
 			if err != nil {

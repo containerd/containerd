@@ -64,14 +64,16 @@ type ImageStorer interface {
 	Store(context.Context, ocispec.Descriptor, images.Store) ([]images.Image, error)
 }
 
-// ImageGetter is type which returns an image from an image store
+// ImageGetter is type which returns an image from an image store or
+// returns a list of names of images to be exported.
 type ImageGetter interface {
 	Get(context.Context, images.Store) (images.Image, error)
+	ListExportImageNames() []string
 }
 
 // ImageExporter exports images to a writer
 type ImageExporter interface {
-	Export(ctx context.Context, is images.Store, cs content.Store) error
+	Export(context.Context, []string, images.Store, content.Store) error
 }
 
 // ImageImporter imports an image into a content store

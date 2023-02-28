@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer"
 )
 
-func (ts *localTransferService) exportStream(ctx context.Context, is transfer.ImageExporter, tops *transfer.Config) error {
+func (ts *localTransferService) exportStream(ctx context.Context, ig transfer.ImageGetter, ie transfer.ImageExporter, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (ts *localTransferService) exportStream(ctx context.Context, is transfer.Im
 		})
 	}
 
-	err = is.Export(ctx, ts.images, ts.content)
+	err = ie.Export(ctx, ig.ListExportImageNames(), ts.images, ts.content)
 	if err != nil {
 		return err
 	}

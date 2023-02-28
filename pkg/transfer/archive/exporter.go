@@ -42,32 +42,54 @@ func init() {
 }
 
 type ExportOptions struct {
-	Images               []string
 	Platforms            []v1.Platform
 	AllPlatforms         bool
 	SkipDockerManifest   bool
 	SkipNonDistributable bool
 }
 
+type ExportOpt func(*ImageExportStream)
+
+func WithSkipNonDistributable() ExportOpt {
+	return func(ies *ImageExportStream) {
+		ies.skipNonDistributable = true
+	}
+}
+
+func WithSkipDockerManifest() ExportOpt {
+	return func(ies *ImageExportStream) {
+		ies.skipDockerManifest = true
+	}
+}
+
+func WithAllPlatforms() ExportOpt {
+	return func(ies *ImageExportStream) {
+		ies.allPlatforms = true
+	}
+}
+
+func WithPlatforms(platforms ...v1.Platform) ExportOpt {
+	return func(ies *ImageExportStream) {
+		ies.platforms = platforms
+	}
+}
+
 // NewImageExportStream returns an image exporter via tar stream
-func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ExportOptions) *ImageExportStream {
-	return &ImageExportStream{
+func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ...ExportOpt) *ImageExportStream {
+	ies := &ImageExportStream{
 		stream:    stream,
 		mediaType: mediaType,
-
-		images:               opts.Images,
-		platforms:            opts.Platforms,
-		allPlatforms:         opts.AllPlatforms,
-		skipDockerManifest:   opts.SkipDockerManifest,
-		skipNonDistributable: opts.SkipNonDistributable,
 	}
+	for _, opt := range opts {
+		opt(ies)
+	}
+	return ies
 }
 
 type ImageExportStream struct {
 	stream    io.WriteCloser
 	mediaType string
 
-	images               []string
 	platforms            []v1.Platform
 	allPlatforms         bool
 	skipDockerManifest   bool
@@ -78,9 +100,9 @@ func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, str
 	return iis.stream, iis.mediaType, nil
 }
 
-func (iis *ImageExportStream) Export(ctx context.Context, is images.Store, cs content.Store) error {
+func (iis *ImageExportStream) Export(ctx context.Context, images []string, is images.Store, cs content.Store) error {
 	var opts []archive.ExportOpt
-	for _, img := range iis.images {
+	for _, img := range images {
 		opts = append(opts, archive.WithImage(is, img))
 	}
 	if len(iis.platforms) > 0 {
@@ -126,7 +148,6 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 	s := &transfertypes.ImageExportStream{
 		Stream:               sid,
 		MediaType:            iis.mediaType,
-		Images:               iis.images,
 		Platforms:            specified,
 		AllPlatforms:         iis.allPlatforms,
 		SkipDockerManifest:   iis.skipDockerManifest,
@@ -159,7 +180,6 @@ func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 
 	iis.stream = tstreaming.WriteByteStream(ctx, stream)
 	iis.mediaType = s.MediaType
-	iis.images = s.Images
 	iis.platforms = specified
 	iis.allPlatforms = s.AllPlatforms
 	iis.skipDockerManifest = s.SkipDockerManifest

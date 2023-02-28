@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/typeurl/v2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
@@ -31,8 +34,6 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/plugins"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -52,6 +53,8 @@ type Store struct {
 	extraReferences []Reference
 
 	unpacks []transfer.UnpackConfiguration
+
+	exportImageNames []string
 }
 
 // Reference is used to create or find a reference for an image
@@ -157,6 +160,13 @@ func WithExtraReference(name string) StoreOpt {
 	}
 	return func(s *Store) {
 		s.extraReferences = append(s.extraReferences, ref)
+	}
+}
+
+// WithExportImageNames specifies the image names to export
+func WithExportImageNames(names []string) StoreOpt {
+	return func(s *Store) {
+		s.exportImageNames = names
 	}
 }
 
@@ -325,6 +335,11 @@ func (is *Store) Get(ctx context.Context, store images.Store) (images.Image, err
 	return store.Get(ctx, is.imageName)
 }
 
+// ListExportImageNames returns a list of image names to export
+func (is *Store) ListExportImageNames() []string {
+	return is.exportImageNames
+}
+
 func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	unpacks := make([]transfer.UnpackConfiguration, len(is.unpacks))
 	for i, uc := range is.unpacks {
@@ -335,7 +350,7 @@ func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 }
 
 func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
-	//unpack.Platform
+	// unpack.Platform
 	s := &transfertypes.ImageStore{
 		Name:            is.imageName,
 		Labels:          is.imageLabels,
@@ -344,6 +359,7 @@ func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.A
 		Platforms:       platformsToProto(is.platforms),
 		ExtraReferences: referencesToProto(is.extraReferences),
 		Unpacks:         unpackToProto(is.unpacks),
+		ExportImages:    is.exportImageNames,
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -361,6 +377,7 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.platforms = platformFromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
+	is.exportImageNames = s.ExportImages
 
 	return nil
 }
