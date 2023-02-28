@@ -59,12 +59,12 @@ type StartOpts struct {
 
 // BootstrapParams is a JSON payload returned in stdout from shim.Start call.
 type BootstrapParams struct {
+	// Version is the version of shim parameters (expected 2 for shim v2)
+	Version int `json:"version"`
 	// Address is a address containerd should use to connect to shim.
 	Address string `json:"address"`
 	// Protocol is either TTRPC or GRPC.
 	Protocol string `json:"protocol"`
-	// Caps is a list of capabilities supported by shim implementation (reserved for future)
-	//Caps []string `json:"caps"`
 }
 
 type StopStatus struct {
@@ -147,6 +147,8 @@ var (
 
 const (
 	ttrpcAddressEnv = "TTRPC_ADDRESS"
+	grpcAddressEnv  = "GRPC_ADDRESS"
+	namespaceEnv    = "NAMESPACE"
 )
 
 func parseFlags() {
