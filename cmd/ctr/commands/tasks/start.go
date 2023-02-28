@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -96,7 +97,12 @@ var startCommand = cli.Command{
 		}
 		var statusC <-chan containerd.ExitStatus
 		if !detach {
-			defer task.Delete(ctx)
+			defer func() {
+				if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+					log.L.WithError(err).Error("failed to cleanup task")
+				}
+			}()
+
 			if statusC, err = task.Wait(ctx); err != nil {
 				return err
 			}
