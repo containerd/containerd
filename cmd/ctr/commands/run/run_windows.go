@@ -131,8 +131,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, err
 			}
 			opts = append(opts, oci.WithWindowsNetworkNamespace(ns.GetPath()))
-			cniMeta := &commands.NetworkMetaData{EnableCni: true}
-			cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 		}
 		if context.Bool("isolated") {
 			opts = append(opts, oci.WithWindowsHyperV)
@@ -163,6 +161,11 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			}
 			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}
+	}
+
+	if context.Bool("cni") {
+		cniMeta := &commands.NetworkMetaData{EnableCni: true}
+		cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 	}
 
 	runtime := context.String("runtime")
