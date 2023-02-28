@@ -17,18 +17,16 @@
 package cdi
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"github.com/container-orchestrated-devices/container-device-interface/specs-go"
 	oci "github.com/opencontainers/runtime-spec/specs-go"
 	ocigen "github.com/opencontainers/runtime-tools/generate"
-
-	runc "github.com/opencontainers/runc/libcontainer/devices"
 )
 
 const (
@@ -142,7 +140,7 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 			ensureOCIHooks(spec)
 			spec.Hooks.StartContainer = append(spec.Hooks.StartContainer, h.ToOCI())
 		default:
-			return errors.Errorf("unknown hook name %q", h.HookName)
+			return fmt.Errorf("unknown hook name %q", h.HookName)
 		}
 	}
 
@@ -156,7 +154,7 @@ func (e *ContainerEdits) Validate() error {
 	}
 
 	if err := ValidateEnv(e.Env); err != nil {
-		return errors.Wrap(err, "invalid container edits")
+		return fmt.Errorf("invalid container edits: %w", err)
 	}
 	for _, d := range e.DeviceNodes {
 		if err := (&DeviceNode{d}).Validate(); err != nil {
@@ -211,7 +209,7 @@ func (e *ContainerEdits) isEmpty() bool {
 func ValidateEnv(env []string) error {
 	for _, v := range env {
 		if strings.IndexByte(v, byte('=')) <= 0 {
-			return errors.Errorf("invalid environment variable %q", v)
+			return fmt.Errorf("invalid environment variable %q", v)
 		}
 	}
 	return nil
@@ -236,11 +234,11 @@ func (d *DeviceNode) Validate() error {
 		return errors.New("invalid (empty) device path")
 	}
 	if _, ok := validTypes[d.Type]; !ok {
-		return errors.Errorf("device %q: invalid type %q", d.Path, d.Type)
+		return fmt.Errorf("device %q: invalid type %q", d.Path, d.Type)
 	}
 	for _, bit := range d.Permissions {
 		if bit != 'r' && bit != 'w' && bit != 'm' {
-			return errors.Errorf("device %q: invalid persmissions %q",
+			return fmt.Errorf("device %q: invalid persmissions %q",
 				d.Path, d.Permissions)
 		}
 	}
@@ -255,13 +253,13 @@ type Hook struct {
 // Validate a hook.
 func (h *Hook) Validate() error {
 	if _, ok := validHookNames[h.HookName]; !ok {
-		return errors.Errorf("invalid hook name %q", h.HookName)
+		return fmt.Errorf("invalid hook name %q", h.HookName)
 	}
 	if h.Path == "" {
-		return errors.Errorf("invalid hook %q with empty path", h.HookName)
+		return fmt.Errorf("invalid hook %q with empty path", h.HookName)
 	}
 	if err := ValidateEnv(h.Env); err != nil {
-		return errors.Wrapf(err, "invalid hook %q", h.HookName)
+		return fmt.Errorf("invalid hook %q: %w", h.HookName, err)
 	}
 	return nil
 }
@@ -289,37 +287,6 @@ func ensureOCIHooks(spec *oci.Spec) {
 	}
 }
 
-// fillMissingInfo fills in missing mandatory attributes from the host device.
-func (d *DeviceNode) fillMissingInfo() error {
-	if d.HostPath == "" {
-		d.HostPath = d.Path
-	}
-
-	if d.Type != "" && (d.Major != 0 || d.Type == "p") {
-		return nil
-	}
-
-	hostDev, err := runc.DeviceFromPath(d.HostPath, "rwm")
-	if err != nil {
-		return errors.Wrapf(err, "failed to stat CDI host device %q", d.HostPath)
-	}
-
-	if d.Type == "" {
-		d.Type = string(hostDev.Type)
-	} else {
-		if d.Type != string(hostDev.Type) {
-			return errors.Errorf("CDI device (%q, %q), host type mismatch (%s, %s)",
-				d.Path, d.HostPath, d.Type, string(hostDev.Type))
-		}
-	}
-	if d.Major == 0 && d.Type != "p" {
-		d.Major = hostDev.Major
-		d.Minor = hostDev.Minor
-	}
-
-	return nil
-}
-
 // sortMounts sorts the mounts in the given OCI Spec.
 func sortMounts(specgen *ocigen.Generator) {
 	mounts := specgen.Mounts()
@@ -331,7 +298,8 @@ func sortMounts(specgen *ocigen.Generator) {
 // orderedMounts defines how to sort an OCI Spec Mount slice.
 // This is the almost the same implementation sa used by CRI-O and Docker,
 // with a minor tweak for stable sorting order (easier to test):
-//   https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
+//
+//	https://github.com/moby/moby/blob/17.05.x/daemon/volumes.go#L26
 type orderedMounts []oci.Mount
 
 // Len returns the number of mounts. Used in sorting.

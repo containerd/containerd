@@ -7,7 +7,7 @@ require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/Microsoft/hcsshim v0.10.0-rc.5
-	github.com/container-orchestrated-devices/container-device-interface v0.5.1
+	github.com/container-orchestrated-devices/container-device-interface v0.5.4
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.0
@@ -50,7 +50,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb
 	// ATM the runtime-tools commit we need are beyond the latest tag.
 	// We use a replace to handle that until a new version is tagged.
-	github.com/opencontainers/runtime-tools v0.9.0
+	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626
 	github.com/opencontainers/selinux v1.10.2
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.13.0

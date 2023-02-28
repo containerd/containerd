@@ -17,16 +17,19 @@
 package cdi
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 
+	"github.com/container-orchestrated-devices/container-device-interface/internal/multierror"
 	cdi "github.com/container-orchestrated-devices/container-device-interface/specs-go"
 	"github.com/fsnotify/fsnotify"
-	"github.com/hashicorp/go-multierror"
 	oci "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pkg/errors"
 )
 
 // Option is an option to change some aspect of default CDI behavior.
@@ -93,7 +96,7 @@ func (c *Cache) configure(options ...Option) error {
 
 	for _, o := range options {
 		if err = o(c); err != nil {
-			return errors.Wrapf(err, "failed to apply cache options")
+			return fmt.Errorf("failed to apply cache options: %w", err)
 		}
 	}
 
@@ -123,8 +126,8 @@ func (c *Cache) Refresh() error {
 
 	// collect and return cached errors, much like refresh() does it
 	var result error
-	for _, err := range c.errors {
-		result = multierror.Append(result, err...)
+	for _, errors := range c.errors {
+		result = multierror.Append(result, errors...)
 	}
 	return result
 }
@@ -155,7 +158,7 @@ func (c *Cache) refresh() error {
 			return false
 		case devPrio == oldPrio:
 			devPath, oldPath := devSpec.GetPath(), oldSpec.GetPath()
-			collectError(errors.Errorf("conflicting device %q (specs %q, %q)",
+			collectError(fmt.Errorf("conflicting device %q (specs %q, %q)",
 				name, devPath, oldPath), devPath, oldPath)
 			conflicts[name] = struct{}{}
 		}
@@ -165,7 +168,7 @@ func (c *Cache) refresh() error {
 	_ = scanSpecDirs(c.specDirs, func(path string, priority int, spec *Spec, err error) error {
 		path = filepath.Clean(path)
 		if err != nil {
-			collectError(errors.Wrapf(err, "failed to load CDI Spec"), path)
+			collectError(fmt.Errorf("failed to load CDI Spec %w", err), path)
 			return nil
 		}
 
@@ -194,11 +197,7 @@ func (c *Cache) refresh() error {
 	c.devices = devices
 	c.errors = specErrors
 
-	if len(result) > 0 {
-		return multierror.Append(nil, result...)
-	}
-
-	return nil
+	return multierror.New(result...)
 }
 
 // RefreshIfRequired triggers a refresh if necessary.
@@ -219,7 +218,7 @@ func (c *Cache) InjectDevices(ociSpec *oci.Spec, devices ...string) ([]string, e
 	var unresolved []string
 
 	if ociSpec == nil {
-		return devices, errors.Errorf("can't inject devices, nil OCI Spec")
+		return devices, fmt.Errorf("can't inject devices, nil OCI Spec")
 	}
 
 	c.Lock()
@@ -244,22 +243,33 @@ func (c *Cache) InjectDevices(ociSpec *oci.Spec, devices ...string) ([]string, e
 	}
 
 	if unresolved != nil {
-		return unresolved, errors.Errorf("unresolvable CDI devices %s",
+		return unresolved, fmt.Errorf("unresolvable CDI devices %s",
 			strings.Join(devices, ", "))
 	}
 
 	if err := edits.Apply(ociSpec); err != nil {
-		return nil, errors.Wrap(err, "failed to inject devices")
+		return nil, fmt.Errorf("failed to inject devices: %w", err)
 	}
 
 	return nil, nil
 }
 
-// WriteSpec writes a Spec file with the given content. Priority is used
-// as an index into the list of Spec directories to pick a directory for
-// the file, adjusting for any under- or overflows. If name has a "json"
-// or "yaml" extension it choses the encoding. Otherwise JSON encoding
-// is used with a "json" extension.
+// highestPrioritySpecDir returns the Spec directory with highest priority
+// and its priority.
+func (c *Cache) highestPrioritySpecDir() (string, int) {
+	if len(c.specDirs) == 0 {
+		return "", -1
+	}
+
+	prio := len(c.specDirs) - 1
+	dir := c.specDirs[prio]
+
+	return dir, prio
+}
+
+// WriteSpec writes a Spec file with the given content into the highest
+// priority Spec directory. If name has a "json" or "yaml" extension it
+// choses the encoding. Otherwise the default YAML encoding is used.
 func (c *Cache) WriteSpec(raw *cdi.Spec, name string) error {
 	var (
 		specDir string
@@ -269,23 +279,51 @@ func (c *Cache) WriteSpec(raw *cdi.Spec, name string) error {
 		err     error
 	)
 
-	if len(c.specDirs) == 0 {
+	specDir, prio = c.highestPrioritySpecDir()
+	if specDir == "" {
 		return errors.New("no Spec directories to write to")
 	}
 
-	prio = len(c.specDirs) - 1
-	specDir = c.specDirs[prio]
 	path = filepath.Join(specDir, name)
 	if ext := filepath.Ext(path); ext != ".json" && ext != ".yaml" {
-		path += ".json"
+		path += defaultSpecExt
 	}
 
-	spec, err = NewSpec(raw, path, prio)
+	spec, err = newSpec(raw, path, prio)
 	if err != nil {
 		return err
 	}
 
-	return spec.Write(true)
+	return spec.write(true)
+}
+
+// RemoveSpec removes a Spec with the given name from the highest
+// priority Spec directory. This function can be used to remove a
+// Spec previously written by WriteSpec(). If the file exists and
+// its removal fails RemoveSpec returns an error.
+func (c *Cache) RemoveSpec(name string) error {
+	var (
+		specDir string
+		path    string
+		err     error
+	)
+
+	specDir, _ = c.highestPrioritySpecDir()
+	if specDir == "" {
+		return errors.New("no Spec directories to remove from")
+	}
+
+	path = filepath.Join(specDir, name)
+	if ext := filepath.Ext(path); ext != ".json" && ext != ".yaml" {
+		path += defaultSpecExt
+	}
+
+	err = os.Remove(path)
+	if err != nil && errors.Is(err, fs.ErrNotExist) {
+		err = nil
+	}
+
+	return err
 }
 
 // GetDevice returns the cached device for the given qualified name.
@@ -370,7 +408,17 @@ func (c *Cache) GetVendorSpecs(vendor string) []*Spec {
 // GetSpecErrors returns all errors encountered for the spec during the
 // last cache refresh.
 func (c *Cache) GetSpecErrors(spec *Spec) []error {
-	return c.errors[spec.GetPath()]
+	var errors []error
+
+	c.Lock()
+	defer c.Unlock()
+
+	if errs, ok := c.errors[spec.GetPath()]; ok {
+		errors = make([]error, len(errs))
+		copy(errors, errs)
+	}
+
+	return errors
 }
 
 // GetErrors returns all errors encountered during the last
@@ -436,7 +484,7 @@ func (w *watch) setup(dirs []string, dirErrors map[string]error) {
 	w.watcher, err = fsnotify.NewWatcher()
 	if err != nil {
 		for _, dir := range dirs {
-			dirErrors[dir] = errors.Wrap(err, "failed to create watcher")
+			dirErrors[dir] = fmt.Errorf("failed to create watcher: %w", err)
 		}
 		return
 	}
@@ -519,7 +567,7 @@ func (w *watch) update(dirErrors map[string]error, removed ...string) bool {
 			update = true
 		} else {
 			w.tracked[dir] = false
-			dirErrors[dir] = errors.Wrap(err, "failed to monitor for changes")
+			dirErrors[dir] = fmt.Errorf("failed to monitor for changes: %w", err)
 		}
 	}
 
