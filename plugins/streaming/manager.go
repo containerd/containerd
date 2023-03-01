@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
+
+	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -118,8 +120,8 @@ func (sm *streamManager) Get(ctx context.Context, name string) (streaming.Stream
 	return stream, nil
 }
 
-func (sm *streamManager) StartCollection(context.Context) (metadata.CollectionContext, error) {
-	// lock now and collection will unlock
+func (sm *streamManager) StartCollection(ctx context.Context) (metadata.CollectionContext, error) {
+	// lock now and collection will unlock on cancel or finish
 	sm.rwlock.Lock()
 
 	return &collectionContext{
@@ -225,13 +227,13 @@ func (cc *collectionContext) Cancel() error {
 }
 
 func (cc *collectionContext) Finish() error {
-	defer cc.manager.rwlock.Unlock()
+	var closeStreams []streaming.Stream
 	for _, node := range cc.removed {
 		var lease string
 		if nsMap, ok := cc.manager.streams[node.Namespace]; ok {
 			if ms, ok := nsMap[node.Key]; ok {
 				delete(nsMap, node.Key)
-				ms.Close()
+				closeStreams = append(closeStreams, ms.Stream)
 				lease = ms.lease
 			}
 			if len(nsMap) == 0 {
@@ -252,6 +254,14 @@ func (cc *collectionContext) Finish() error {
 			}
 		}
 	}
+	cc.manager.rwlock.Unlock()
 
-	return nil
+	var errs *multierror.Error
+	for _, s := range closeStreams {
+		if err := s.Close(); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	return errs.ErrorOrNil()
 }

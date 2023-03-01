@@ -359,6 +359,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 	marked, err := m.getMarked(ctx, c) // Pass in gc context
 	if err != nil {
 		m.wlock.Unlock()
+		c.cancel(ctx)
 		return nil, err
 	}
 
