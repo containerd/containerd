@@ -41,14 +41,12 @@ message ImageExportStream {
 
 	string media_type = 2;
 
-	// The image names
-	repeated string images = 3;
 	// The specified platforms
-	repeated types.Platform platforms = 4;
+	repeated types.Platform platforms = 3;
 	// Whether to include all platforms
-	bool all_platforms = 5;
+	bool all_platforms = 4;
 	// Skips the creation of the Docker compatible manifest.json file
-	bool skip_docker_manifest = 6;
+	bool skip_compatibility_manifest = 5;
 	// Excludes non-distributable blobs such as Windows base layers.
-	bool skip_non_distributable = 7;
+	bool skip_non_distributable = 6;
 }
