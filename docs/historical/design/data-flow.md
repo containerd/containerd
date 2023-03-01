@@ -13,7 +13,7 @@ encompassed in prior container engines. In this model, an image defines a
 collection of resources that can be used to create a _bundle_. There is no
 specific format or object called an image. The goal of the pull is to produce a
 set of steps is to resolve the resources that comprise an image, with the
-separation providing lifecycle points in the process. 
+separation providing lifecycle points in the process.
 
 A reference implementation of the complete "pull", performed client-side, will
 be provided as part of containerd, but there may not be a single "pull" API
@@ -47,7 +47,7 @@ containerd will setup the runtime container's filesystem.
 
 While containerd doesn't have the concept of an image, we can effectively build
 this structure from an image, as projected into containerd. Given this, we can
-say that are requirements for running a container are to do the following:
+say that requirements for running a container are to do the following:
 
 1. Convert the configuration from the container image into the target format
    for the containerd runtime.
