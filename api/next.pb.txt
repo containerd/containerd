@@ -6899,15 +6899,8 @@ file {
       json_name: "mediaType"
     }
     field {
-      name: "images"
-      number: 3
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "images"
-    }
-    field {
       name: "platforms"
-      number: 4
+      number: 3
       label: LABEL_REPEATED
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Platform"
@@ -6915,21 +6908,21 @@ file {
     }
     field {
       name: "all_platforms"
-      number: 5
+      number: 4
       label: LABEL_OPTIONAL
       type: TYPE_BOOL
       json_name: "allPlatforms"
     }
     field {
-      name: "skip_docker_manifest"
-      number: 6
+      name: "skip_compatibility_manifest"
+      number: 5
       label: LABEL_OPTIONAL
       type: TYPE_BOOL
-      json_name: "skipDockerManifest"
+      json_name: "skipCompatibilityManifest"
     }
     field {
       name: "skip_non_distributable"
-      number: 7
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_BOOL
       json_name: "skipNonDistributable"
