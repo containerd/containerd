@@ -226,7 +226,7 @@ jobs:
   integration-windows:
     name: Windows Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 50
+    timeout-minutes: 90
     needs: [project, linters, protos, man]
     env:
       GOTEST: gotestsum --
