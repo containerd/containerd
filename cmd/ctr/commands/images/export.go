@@ -98,33 +98,38 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
-			var specified []ocispec.Platform
+			exportOpts := []tarchive.ExportOpt{}
 			if pss := context.StringSlice("platform"); len(pss) > 0 {
 				for _, ps := range pss {
 					p, err := platforms.Parse(ps)
 					if err != nil {
 						return fmt.Errorf("invalid platform %q: %w", ps, err)
 					}
-					specified = append(specified, p)
+					exportOpts = append(exportOpts, tarchive.WithPlatform(p))
 				}
 			}
-
-			err := client.Transfer(ctx,
-				image.NewStore(""), // a dummy image store
-				tarchive.NewImageExportStream(w, "", tarchive.ExportOptions{
-					Images:               images,
-					Platforms:            specified,
-					AllPlatforms:         context.Bool("all-platforms"),
-					SkipNonDistributable: context.Bool("skip-non-distributable"),
-					SkipDockerManifest:   context.Bool("skip-manifest-json"),
-				}),
-				transfer.WithProgress(pf),
-			)
-			if err != nil {
-				return err
+			if context.Bool("all-platforms") {
+				exportOpts = append(exportOpts, tarchive.WithAllPlatforms)
 			}
 
-			return nil
+			if context.Bool("skip-manifest-json") {
+				exportOpts = append(exportOpts, tarchive.WithSkipCompatibilityManifest)
+			}
+
+			if context.Bool("skip-non-distributable") {
+				exportOpts = append(exportOpts, tarchive.WithSkipNonDistributableBlobs)
+			}
+
+			storeOpts := []image.StoreOpt{}
+			for _, img := range images {
+				storeOpts = append(storeOpts, image.WithExtraReference(img))
+			}
+
+			return client.Transfer(ctx,
+				image.NewStore("", storeOpts...),
+				tarchive.NewImageExportStream(w, "", exportOpts...),
+				transfer.WithProgress(pf),
+			)
 		}
 
 		if pss := context.StringSlice("platform"); len(pss) > 0 {

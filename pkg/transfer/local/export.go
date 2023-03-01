@@ -19,10 +19,11 @@ package local
 import (
 	"context"
 
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/transfer"
 )
 
-func (ts *localTransferService) exportStream(ctx context.Context, is transfer.ImageExporter, tops *transfer.Config) error {
+func (ts *localTransferService) exportStream(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageExporter, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err
@@ -35,7 +36,21 @@ func (ts *localTransferService) exportStream(ctx context.Context, is transfer.Im
 		})
 	}
 
-	err = is.Export(ctx, ts.images, ts.content)
+	var imgs []images.Image
+	if il, ok := ig.(transfer.ImageLookup); ok {
+		imgs, err = il.Lookup(ctx, ts.images)
+		if err != nil {
+			return err
+		}
+	} else {
+		img, err := ig.Get(ctx, ts.images)
+		if err != nil {
+			return err
+		}
+		imgs = append(imgs, img)
+	}
+
+	err = is.Export(ctx, ts.content, imgs)
 	if err != nil {
 		return err
 	}
