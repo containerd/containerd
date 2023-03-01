@@ -68,6 +68,7 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 	cmd.Env = append(
 		os.Environ(),
 		"GOMAXPROCS=2",
+		fmt.Sprintf("%s=2", maxVersionEnv),
 		fmt.Sprintf("%s=%s", ttrpcAddressEnv, config.TTRPCAddress),
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.Address),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
