@@ -41,48 +41,57 @@ func init() {
 	plugins.Register(&transfertypes.ImageImportStream{}, &ImageImportStream{})
 }
 
-type ExportOptions struct {
-	Images               []string
-	Platforms            []v1.Platform
-	AllPlatforms         bool
-	SkipDockerManifest   bool
-	SkipNonDistributable bool
+type ExportOpt func(*ImageExportStream)
+
+func WithPlatform(p v1.Platform) ExportOpt {
+	return func(s *ImageExportStream) {
+		s.platforms = append(s.platforms, p)
+	}
+}
+
+func WithAllPlatforms(s *ImageExportStream) {
+	s.allPlatforms = true
+}
+
+func WithSkipCompatibilityManifest(s *ImageExportStream) {
+	s.skipCompatibilityManifest = true
+}
+
+func WithSkipNonDistributableBlobs(s *ImageExportStream) {
+	s.skipNonDistributable = true
 }
 
 // NewImageExportStream returns an image exporter via tar stream
-func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ExportOptions) *ImageExportStream {
-	return &ImageExportStream{
+func NewImageExportStream(stream io.WriteCloser, mediaType string, opts ...ExportOpt) *ImageExportStream {
+	s := &ImageExportStream{
 		stream:    stream,
 		mediaType: mediaType,
-
-		images:               opts.Images,
-		platforms:            opts.Platforms,
-		allPlatforms:         opts.AllPlatforms,
-		skipDockerManifest:   opts.SkipDockerManifest,
-		skipNonDistributable: opts.SkipNonDistributable,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 type ImageExportStream struct {
 	stream    io.WriteCloser
 	mediaType string
 
-	images               []string
-	platforms            []v1.Platform
-	allPlatforms         bool
-	skipDockerManifest   bool
-	skipNonDistributable bool
+	platforms                 []v1.Platform
+	allPlatforms              bool
+	skipCompatibilityManifest bool
+	skipNonDistributable      bool
 }
 
 func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, string, error) {
 	return iis.stream, iis.mediaType, nil
 }
 
-func (iis *ImageExportStream) Export(ctx context.Context, is images.Store, cs content.Store) error {
-	var opts []archive.ExportOpt
-	for _, img := range iis.images {
-		opts = append(opts, archive.WithImage(is, img))
+func (iis *ImageExportStream) Export(ctx context.Context, cs content.Store, imgs []images.Image) error {
+	opts := []archive.ExportOpt{
+		archive.WithImages(imgs),
 	}
+
 	if len(iis.platforms) > 0 {
 		opts = append(opts, archive.WithPlatform(platforms.Ordered(iis.platforms...)))
 	} else {
@@ -91,7 +100,7 @@ func (iis *ImageExportStream) Export(ctx context.Context, is images.Store, cs co
 	if iis.allPlatforms {
 		opts = append(opts, archive.WithAllPlatforms())
 	}
-	if iis.skipDockerManifest {
+	if iis.skipCompatibilityManifest {
 		opts = append(opts, archive.WithSkipDockerManifest())
 	}
 	if iis.skipNonDistributable {
@@ -124,13 +133,12 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 		})
 	}
 	s := &transfertypes.ImageExportStream{
-		Stream:               sid,
-		MediaType:            iis.mediaType,
-		Images:               iis.images,
-		Platforms:            specified,
-		AllPlatforms:         iis.allPlatforms,
-		SkipDockerManifest:   iis.skipDockerManifest,
-		SkipNonDistributable: iis.skipNonDistributable,
+		Stream:                    sid,
+		MediaType:                 iis.mediaType,
+		Platforms:                 specified,
+		AllPlatforms:              iis.allPlatforms,
+		SkipCompatibilityManifest: iis.skipCompatibilityManifest,
+		SkipNonDistributable:      iis.skipNonDistributable,
 	}
 
 	return typeurl.MarshalAny(s)
@@ -159,10 +167,9 @@ func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 
 	iis.stream = tstreaming.WriteByteStream(ctx, stream)
 	iis.mediaType = s.MediaType
-	iis.images = s.Images
 	iis.platforms = specified
 	iis.allPlatforms = s.AllPlatforms
-	iis.skipDockerManifest = s.SkipDockerManifest
+	iis.skipCompatibilityManifest = s.SkipCompatibilityManifest
 	iis.skipNonDistributable = s.SkipNonDistributable
 
 	return nil
