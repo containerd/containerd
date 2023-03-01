@@ -324,7 +324,7 @@ For sync communication catch us in the `#containerd` and `#containerd-dev` Slack
 
 ### Security audit
 
-A third-party security audit was performed by Cure53 in 4Q2018; the [full report](docs/SECURITY_AUDIT.pdf) is available in our docs/ directory.
+Security audits for the containerd project are hosted on our website. Please see the [security page at containerd.io](https://containerd.io/security/) for more information.
 
 ### Reporting security issues
 
