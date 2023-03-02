@@ -38,23 +38,6 @@ import (
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
-// defaultDrainExecIOTimeout is used to drain exec io after exec process exits.
-//
-// By default, the child processes spawned by exec process will inherit standard
-// io file descriptors. The shim server creates a pipe as data channel. Both
-// exec process and its children write data into the write end of the pipe.
-// And the shim server will read data from the pipe. If the write end is still
-// open, the shim server will continue to wait for data from pipe.
-//
-// If the exec command is like `bash -c "sleep 365d &"`, the exec process
-// is bash and quit after create `sleep 365d`. But the `sleep 365d` will hold
-// the write end of the pipe for a year! It doesn't make senses that CRI plugin
-// should wait for it.
-//
-// So, CRI plugin uses 15 seconds to drain the exec io and then deletes exec
-// process to stop copy io in shim side.
-const defaultDrainExecIOTimeout = 15 * time.Second
-
 type cappedWriter struct {
 	w      io.WriteCloser
 	remain int
@@ -134,6 +117,11 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	// forever unless we cancel the context.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	drainExecSyncIOTimeout, err := time.ParseDuration(c.config.DrainExecSyncIOTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse drain_exec_sync_io_timeout %q: %w", c.config.DrainExecSyncIOTimeout, err)
+	}
 
 	spec, err := container.Spec(ctx)
 	if err != nil {
@@ -227,7 +215,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		log.G(ctx).Debugf("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
 
-		if err := drainExecIO(ctx, process, attachDone); err != nil {
+		if err := drainExecSyncIO(ctx, process, drainExecSyncIOTimeout, attachDone); err != nil {
 			log.G(ctx).WithError(err).Warnf("failed to drain exec process %q io", execID)
 		}
 
@@ -239,7 +227,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 			return nil, fmt.Errorf("failed while waiting for exec %q: %w", execID, err)
 		}
 
-		if err := drainExecIO(ctx, process, attachDone); err != nil {
+		if err := drainExecSyncIO(ctx, process, drainExecSyncIOTimeout, attachDone); err != nil {
 			return nil, fmt.Errorf("failed to drain exec process %q io: %w", execID, err)
 		}
 		return &code, nil
@@ -275,12 +263,30 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	return c.execInternal(ctx, cntr.Container, id, opts)
 }
 
-func drainExecIO(ctx context.Context, execProcess containerd.Process, attachDone <-chan struct{}) error {
-	timer := time.NewTimer(defaultDrainExecIOTimeout)
-	defer timer.Stop()
+// drainExecSyncIO drains process IO with timeout after exec init process exits.
+//
+// By default, the child processes spawned by exec process will inherit standard
+// io file descriptors. The shim server creates a pipe as data channel. Both
+// exec process and its children write data into the write end of the pipe.
+// And the shim server will read data from the pipe. If the write end is still
+// open, the shim server will continue to wait for data from pipe.
+//
+// If the exec command is like `bash -c "sleep 365d &"`, the exec process
+// is bash and quit after create `sleep 365d`. But the `sleep 365d` will hold
+// the write end of the pipe for a year! It doesn't make senses that CRI plugin
+// should wait for it.
+func drainExecSyncIO(ctx context.Context, execProcess containerd.Process, drainExecIOTimeout time.Duration, attachDone <-chan struct{}) error {
+	var timerCh <-chan time.Time
+
+	if drainExecIOTimeout != 0 {
+		timer := time.NewTimer(drainExecIOTimeout)
+		defer timer.Stop()
+
+		timerCh = timer.C
+	}
 
 	select {
-	case <-timer.C:
+	case <-timerCh:
 
 	case <-attachDone:
 		log.G(ctx).Debugf("Stream pipe for exec process %q done", execProcess.ID())

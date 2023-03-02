@@ -302,6 +302,13 @@ type PluginConfig struct {
 	// and if it is not overwritten by PodSandboxConfig
 	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
+	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
+	// API' IO EOF event after exec init process exits. A zero value means
+	// there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -443,6 +450,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return fmt.Errorf("invalid stream idle timeout: %w", err)
+		}
+	}
+
+	// Validation for drain_exec_sync_io_timeout
+	if c.DrainExecSyncIOTimeout != "" {
+		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
+			return fmt.Errorf("invalid drain exec sync io timeout: %w", err)
 		}
 	}
 	return nil

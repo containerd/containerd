@@ -62,5 +62,6 @@ func DefaultConfig() PluginConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
+		DrainExecSyncIOTimeout:   "0",
 	}
 }
