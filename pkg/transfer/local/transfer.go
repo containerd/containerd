@@ -22,7 +22,6 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -30,7 +29,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/semaphore"
 )
@@ -153,10 +151,9 @@ func (ts *localTransferService) withLease(ctx context.Context, opts ...leases.Op
 
 type TransferConfig struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
-	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
-
+	MaxConcurrentDownloads int
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
-	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
+	MaxConcurrentUploadedLayers int
 
 	// DuplicationSuppressor is used to make sure that there is only one
 	// in-flight fetch request or unpack handler for a given descriptor's
@@ -169,21 +166,8 @@ type TransferConfig struct {
 	BaseHandlers []images.Handler
 
 	// UnpackPlatforms are used to specify supported combination of platforms and snapshotters
-	UnpackPlatforms []unpack.Platform `toml:"unpack_platforms"`
+	UnpackPlatforms []unpack.Platform
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
-	RegistryConfigPath string `toml:"config_path"`
-}
-
-func DefaultConfig() *TransferConfig {
-	return &TransferConfig{
-		MaxConcurrentDownloads:      3,
-		MaxConcurrentUploadedLayers: 3,
-		UnpackPlatforms: []unpack.Platform{
-			{
-				Platform:       platforms.Only(platforms.DefaultSpec()),
-				SnapshotterKey: containerd.DefaultSnapshotter,
-			},
-		},
-	}
+	RegistryConfigPath string
 }
