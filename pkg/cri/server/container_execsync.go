@@ -287,7 +287,7 @@ func drainExecIO(ctx context.Context, execProcess containerd.Process, attachDone
 		return nil
 	}
 
-	log.G(ctx).Debugf("Exec process %q exits but the io is still hold by other processes. Trying to delete exec process to release io", execProcess.ID())
+	log.G(ctx).Debugf("Exec process %q exits but the io is still held by other processes. Trying to delete exec process to release io", execProcess.ID())
 	_, err := execProcess.Delete(ctx, containerd.WithProcessKill)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -295,5 +295,5 @@ func drainExecIO(ctx context.Context, execProcess containerd.Process, attachDone
 				execProcess.ID(), err)
 		}
 	}
-	return fmt.Errorf("failed to drain exec process %q io because io is still hold by other processes", execProcess.ID())
+	return fmt.Errorf("failed to drain exec process %q io because io is still held by other processes", execProcess.ID())
 }

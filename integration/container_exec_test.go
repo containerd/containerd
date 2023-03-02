@@ -17,6 +17,7 @@
 package integration
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -25,6 +26,11 @@ import (
 )
 
 func TestContainerDrainExecIOAfterExit(t *testing.T) {
+	// FIXME(fuweid): support it for windows container.
+	if runtime.GOOS == "windows" {
+		t.Skip("it seems that windows platform doesn't support detached process. skip it")
+	}
+
 	t.Log("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-exec-drain-io-after-exit")
 
