@@ -351,6 +351,13 @@ type PluginConfig struct {
 	// The string is in the golang duration format, see:
 	//   https://golang.org/pkg/time/#ParseDuration
 	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
+	// API' IO EOF event after exec init process exits. A zero value means
+	// there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -507,6 +514,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	if c.ImagePullProgressTimeout != "" {
 		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
 			return fmt.Errorf("invalid image pull progress timeout: %w", err)
+		}
+	}
+
+	// Validation for drain_exec_sync_io_timeout
+	if c.DrainExecSyncIOTimeout != "" {
+		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
+			return fmt.Errorf("invalid drain exec sync io timeout: %w", err)
 		}
 	}
 	return nil
