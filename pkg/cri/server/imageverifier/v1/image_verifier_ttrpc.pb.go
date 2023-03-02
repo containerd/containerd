@@ -25,17 +25,17 @@ func RegisterImageVerifierService(srv *ttrpc.Server, svc ImageVerifierService) {
 	})
 }
 
-type imageVerifierClient struct {
+type imageverifierClient struct {
 	client *ttrpc.Client
 }
 
 func NewImageVerifierClient(client *ttrpc.Client) ImageVerifierService {
-	return &imageVerifierClient{
+	return &imageverifierClient{
 		client: client,
 	}
 }
 
-func (c *imageVerifierClient) VerifyImage(ctx context.Context, req *VerifyImageRequest) (*VerifyImageResponse, error) {
+func (c *imageverifierClient) VerifyImage(ctx context.Context, req *VerifyImageRequest) (*VerifyImageResponse, error) {
 	var resp VerifyImageResponse
 	if err := c.client.Call(ctx, "containerd.cri.imageverifier.ImageVerifier", "VerifyImage", req, &resp); err != nil {
 		return nil, err
