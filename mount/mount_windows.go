@@ -17,16 +17,17 @@
 package mount
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	"github.com/Microsoft/go-winio/pkg/bindfilter"
 	"github.com/Microsoft/hcsshim"
+	"github.com/containerd/containerd/log"
 	"golang.org/x/sys/windows"
 )
 
@@ -74,16 +75,21 @@ func (m *Mount) mount(target string) error {
 	}
 	defer func() {
 		if err != nil {
-			hcsshim.DeactivateLayer(di, layerID)
+			if layerErr := hcsshim.DeactivateLayer(di, layerID); layerErr != nil {
+				log.G(context.TODO()).WithError(layerErr).Error("failed to deactivate layer during mount failure cleanup")
+			}
 		}
 	}()
 
 	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
 		return fmt.Errorf("failed to prepare layer %s: %w", m.Source, err)
 	}
+
 	defer func() {
 		if err != nil {
-			hcsshim.UnprepareLayer(di, layerID)
+			if layerErr := hcsshim.UnprepareLayer(di, layerID); layerErr != nil {
+				log.G(context.TODO()).WithError(layerErr).Error("failed to unprepare layer during mount failure cleanup")
+			}
 		}
 	}()
 
@@ -97,7 +103,9 @@ func (m *Mount) mount(target string) error {
 	}
 	defer func() {
 		if err != nil {
-			bindfilter.RemoveFileBinding(target)
+			if bindErr := bindfilter.RemoveFileBinding(target); bindErr != nil {
+				log.G(context.TODO()).WithError(bindErr).Error("failed to remove binding during mount failure cleanup")
+			}
 		}
 	}()
 
@@ -144,7 +152,7 @@ func Unmount(mount string, flags int) error {
 	}
 
 	if err := bindfilter.RemoveFileBinding(mount); err != nil {
-		if errno, ok := errors.Unwrap(err).(syscall.Errno); ok && errno == windows.ERROR_INVALID_PARAMETER || errno == windows.ERROR_NOT_FOUND {
+		if errors.Is(err, windows.ERROR_INVALID_PARAMETER) || errors.Is(err, windows.ERROR_NOT_FOUND) {
 			// not a mount point
 			return nil
 		}

@@ -362,7 +362,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
 		if err = os.MkdirAll(snDir, 0700); err != nil {
-			return err
+			return fmt.Errorf("creating snapshot dir: %w", err)
 		}
 
 		if strings.Contains(key, snapshots.UnpackKeyPrefix) {
@@ -372,57 +372,59 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
 			// that will be mounted as the containers scratch. Currently the key for a snapshot
 			// where a layer will be extracted to will have the string `extract-` in it.
-		} else if len(newSnapshot.ParentIDs) == 0 {
+			return nil
+		}
+
+		if len(newSnapshot.ParentIDs) == 0 {
 			// A parentless snapshot is just a bind-mount to a directory named
 			// "Files". When committed, there'll be some post-processing to fill in the rest
 			// of the metadata.
 			filesDir := filepath.Join(snDir, "Files")
 			if err := os.MkdirAll(filesDir, 0700); err != nil {
-				return err
+				return fmt.Errorf("creating Files dir: %w", err)
 			}
-		} else {
-			parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+			return nil
+		}
 
-			var snapshotInfo snapshots.Info
-			for _, o := range opts {
-				o(&snapshotInfo)
+		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+		var snapshotInfo snapshots.Info
+		for _, o := range opts {
+			o(&snapshotInfo)
+		}
+
+		var sizeInBytes uint64
+		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
+			log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
+
+			sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
+			if err != nil {
+				return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
 			}
+			sizeInBytes = sizeInGB * 1024 * 1024 * 1024
+		}
 
-			var sizeInBytes uint64
-			if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
-				log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
-
-				sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
-				if err != nil {
-					return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
-				}
-				sizeInBytes = sizeInGB * 1024 * 1024 * 1024
-			}
-
-			// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
-			if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
-				sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
-				if err != nil {
-					return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
-				}
-			}
-
-			var makeUVMScratch bool
-			if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
-				makeUVMScratch = true
-			}
-
-			// This has to be run first to avoid clashing with the containers sandbox.vhdx.
-			if makeUVMScratch {
-				if err = s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-					return fmt.Errorf("failed to make UVM's scratch layer: %w", err)
-				}
-			}
-			if err = s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
-				return fmt.Errorf("failed to create scratch layer: %w", err)
+		// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
+		if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
+			sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
+			if err != nil {
+				return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
 			}
 		}
 
+		var makeUVMScratch bool
+		if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
+			makeUVMScratch = true
+		}
+
+		// This has to be run first to avoid clashing with the containers sandbox.vhdx.
+		if makeUVMScratch {
+			if err = s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+				return fmt.Errorf("failed to make UVM's scratch layer: %w", err)
+			}
+		}
+		if err = s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
+			return fmt.Errorf("failed to create scratch layer: %w", err)
+		}
 		return nil
 	})
 	if err != nil {
