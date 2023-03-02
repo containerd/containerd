@@ -87,9 +87,9 @@ Services are being refactored to allow ttrpc implementations, which can be serve
 * **Remove all gogoproto extensions** ([#6829](https://github.com/containerd/containerd/pull/6829))
 * **Migrate off from github.com/gogo/protobuf** ([#6841](https://github.com/containerd/containerd/pull/6841))
 * **ttrpc streaming** ([ttrpc#107](https://github.com/containerd/ttrpc/pull/107))
-
 * **Add unpack interface for client** ([#6749](https://github.com/containerd/containerd/pull/6749))
 * **Add collectible resources to metadata gc** ([#6804](https://github.com/containerd/containerd/pull/6804))
+* **Add version to shim protocol** ([#8177](https://github.com/containerd/containerd/pull/8177))
 
 ##### Configuration
 
