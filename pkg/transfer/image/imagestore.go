@@ -325,6 +325,28 @@ func (is *Store) Get(ctx context.Context, store images.Store) (images.Image, err
 	return store.Get(ctx, is.imageName)
 }
 
+func (is *Store) Lookup(ctx context.Context, store images.Store) ([]images.Image, error) {
+	var imgs []images.Image
+	if is.imageName != "" {
+		img, err := store.Get(ctx, is.imageName)
+		if err != nil {
+			return nil, err
+		}
+		imgs = append(imgs, img)
+	}
+	for _, ref := range is.extraReferences {
+		if ref.IsPrefix {
+			return nil, fmt.Errorf("prefix lookup on export not implemented: %w", errdefs.ErrNotImplemented)
+		}
+		img, err := store.Get(ctx, ref.Name)
+		if err != nil {
+			return nil, err
+		}
+		imgs = append(imgs, img)
+	}
+	return imgs, nil
+}
+
 func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	unpacks := make([]transfer.UnpackConfiguration, len(is.unpacks))
 	for i, uc := range is.unpacks {

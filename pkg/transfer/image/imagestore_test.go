@@ -19,6 +19,8 @@ package image
 import (
 	"context"
 	"errors"
+	"sort"
+	"sync"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
@@ -222,7 +224,7 @@ func TestStore(t *testing.T) {
 				desc.Annotations["io.containerd.import.ref-source"] = "annotation"
 			}
 			t.Run(name, func(t *testing.T) {
-				imgs, err := testCase.ImageStore.Store(context.Background(), desc, nopImageStore{})
+				imgs, err := testCase.ImageStore.Store(context.Background(), desc, newSimpleImageStore())
 				if err != nil {
 					if testCase.Err == nil {
 						t.Fatal(err)
@@ -252,24 +254,165 @@ func TestStore(t *testing.T) {
 	}
 }
 
-type nopImageStore struct{}
-
-func (nopImageStore) Get(ctx context.Context, name string) (images.Image, error) {
-	return images.Image{}, errdefs.ErrNotFound
+func TestLookup(t *testing.T) {
+	ctx := context.Background()
+	is := newSimpleImageStore()
+	for _, name := range []string{
+		"registry.io/test1:latest",
+		"registry.io/test1:v1",
+	} {
+		is.Create(ctx, images.Image{
+			Name: name,
+		})
+	}
+	for _, testCase := range []struct {
+		Name       string
+		ImageStore *Store
+		Expected   []string
+		Err        error
+	}{
+		{
+			Name: "SingleImage",
+			ImageStore: &Store{
+				imageName: "registry.io/test1:latest",
+			},
+			Expected: []string{"registry.io/test1:latest"},
+		},
+		{
+			Name: "MultipleReferences",
+			ImageStore: &Store{
+				imageName: "registry.io/test1:latest",
+				extraReferences: []Reference{
+					{
+						Name: "registry.io/test1:v1",
+					},
+				},
+			},
+			Expected: []string{"registry.io/test1:latest", "registry.io/test1:v1"},
+		},
+		{
+			Name: "OnlyReferences",
+			ImageStore: &Store{
+				extraReferences: []Reference{
+					{
+						Name: "registry.io/test1:latest",
+					},
+					{
+						Name: "registry.io/test1:v1",
+					},
+				},
+			},
+			Expected: []string{"registry.io/test1:latest", "registry.io/test1:v1"},
+		},
+		{
+			Name: "UnsupportedPrefix",
+			ImageStore: &Store{
+				extraReferences: []Reference{
+					{
+						Name:     "registry.io/test1:latest",
+						IsPrefix: true,
+					},
+				},
+			},
+			Err: errdefs.ErrNotImplemented,
+		},
+	} {
+		t.Run(testCase.Name, func(t *testing.T) {
+			images, err := testCase.ImageStore.Lookup(ctx, is)
+			if err != nil {
+				if !errors.Is(err, testCase.Err) {
+					t.Errorf("unexpected error %v, expected %v", err, testCase.Err)
+				}
+				return
+			} else if testCase.Err != nil {
+				t.Fatal("expected error")
+			}
+			imageNames := make([]string, len(images))
+			for i, img := range images {
+				imageNames[i] = img.Name
+			}
+			sort.Strings(imageNames)
+			sort.Strings(testCase.Expected)
+			if len(images) != len(testCase.Expected) {
+				t.Fatalf("unexpected images:\n\t%v\nexpected:\n\t%v", imageNames, testCase.Expected)
+			}
+			for i := range imageNames {
+				if imageNames[i] != testCase.Expected[i] {
+					t.Fatalf("unexpected images:\n\t%v\nexpected:\n\t%v", imageNames, testCase.Expected)
+				}
+			}
+		})
+	}
 }
 
-func (nopImageStore) List(ctx context.Context, filters ...string) ([]images.Image, error) {
-	return nil, nil
+// simpleImageStore is for testing images in memory,
+// no filter support
+type simpleImageStore struct {
+	l      sync.Mutex
+	images map[string]images.Image
 }
 
-func (nopImageStore) Create(ctx context.Context, image images.Image) (images.Image, error) {
+func newSimpleImageStore() images.Store {
+	return &simpleImageStore{
+		images: make(map[string]images.Image),
+	}
+}
+
+func (is *simpleImageStore) Get(ctx context.Context, name string) (images.Image, error) {
+	is.l.Lock()
+	defer is.l.Unlock()
+	img, ok := is.images[name]
+	if !ok {
+		return images.Image{}, errdefs.ErrNotFound
+	}
+	return img, nil
+}
+
+func (is *simpleImageStore) List(ctx context.Context, filters ...string) ([]images.Image, error) {
+	is.l.Lock()
+	defer is.l.Unlock()
+	var imgs []images.Image
+
+	// filters not supported, return all
+	for _, img := range is.images {
+		imgs = append(imgs, img)
+	}
+	return imgs, nil
+}
+
+func (is *simpleImageStore) Create(ctx context.Context, image images.Image) (images.Image, error) {
+	is.l.Lock()
+	defer is.l.Unlock()
+
+	if _, ok := is.images[image.Name]; ok {
+		return images.Image{}, errdefs.ErrAlreadyExists
+	}
+	is.images[image.Name] = image
+
 	return image, nil
 }
 
-func (nopImageStore) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
+func (is *simpleImageStore) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
+	is.l.Lock()
+	defer is.l.Unlock()
+
+	if _, ok := is.images[image.Name]; !ok {
+		return images.Image{}, errdefs.ErrNotFound
+	}
+	// fieldpaths no supported, update entire image
+	is.images[image.Name] = image
+
 	return image, nil
 }
 
-func (nopImageStore) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+func (is *simpleImageStore) Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error {
+	is.l.Lock()
+	defer is.l.Unlock()
+
+	if _, ok := is.images[name]; !ok {
+		return errdefs.ErrNotFound
+	}
+	delete(is.images, name)
+
 	return nil
 }

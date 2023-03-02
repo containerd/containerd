@@ -69,6 +69,17 @@ type ImageGetter interface {
 	Get(context.Context, images.Store) (images.Image, error)
 }
 
+// ImageLookup is a type which returns images from an image store
+// based on names or prefixes
+type ImageLookup interface {
+	Lookup(context.Context, images.Store) ([]images.Image, error)
+}
+
+// ImageExporter exports images to a writer
+type ImageExporter interface {
+	Export(context.Context, content.Store, []images.Image) error
+}
+
 // ImageImporter imports an image into a content store
 type ImageImporter interface {
 	Import(context.Context, content.Store) (ocispec.Descriptor, error)
