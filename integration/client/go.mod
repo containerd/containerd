@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1
+	github.com/Microsoft/go-winio v0.6.1-0.20230228163719-dd5de6900b62
 	github.com/Microsoft/hcsshim v0.10.0-rc.7
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.1
@@ -21,8 +22,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.14.0
 	golang.org/x/sys v0.6.0
 )
-
-require github.com/Microsoft/go-winio v0.6.1-0.20230228163719-dd5de6900b62
 
 require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652 // indirect
