@@ -170,7 +170,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	defer func() {
 		deferCtx, deferCancel := util.DeferContext()
 		defer deferCancel()
-		if _, err := process.Delete(deferCtx, containerd.WithProcessKill); err != nil {
+		if _, err := process.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 			log.G(ctx).WithError(err).Errorf("Failed to delete exec process %q for container %q", execID, id)
 		}
 	}()
