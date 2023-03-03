@@ -308,6 +308,8 @@ type PluginConfig struct {
 	//
 	// The string is in the golang duration format, see:
 	//   https://golang.org/pkg/time/#ParseDuration
+	//
+	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
 }
 
