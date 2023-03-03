@@ -36,10 +36,24 @@ func rightAfter(t1, t2 time.Time) bool {
 func TestSourceDateEpoch(t *testing.T) {
 	if s, ok := os.LookupEnv(SourceDateEpochEnv); ok {
 		t.Logf("%s is already set to %q, unsetting", SourceDateEpochEnv, s)
+		// see https://github.com/golang/go/issues/52817#issuecomment-1131339120
 		t.Setenv(SourceDateEpochEnv, "")
+		os.Unsetenv(SourceDateEpochEnv)
 	}
 
 	t.Run("WithoutSourceDateEpoch", func(t *testing.T) {
+		vp, err := SourceDateEpoch()
+		require.NoError(t, err)
+		require.Nil(t, vp)
+
+		now := time.Now()
+		v := SourceDateEpochOrNow()
+		require.True(t, rightAfter(now, v))
+	})
+
+	t.Run("WithEmptySourceDateEpoch", func(t *testing.T) {
+		t.Setenv(SourceDateEpochEnv, "")
+
 		vp, err := SourceDateEpoch()
 		require.NoError(t, err)
 		require.Nil(t, vp)
