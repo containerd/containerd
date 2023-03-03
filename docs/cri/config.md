@@ -227,6 +227,16 @@ version = 2
   # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
 
+  # drain_exec_sync_io_timeout is the maximum duration to wait for ExecSync API'
+  # IO EOF event after exec init process exits. A zero value means there is no
+  # timeout.
+  #
+  # The string is in the golang duration format, see:
+  #    https://golang.org/pkg/time/#ParseDuration
+  #
+  # For example, the value can be '5h', '2h30m', '10s'.
+  drain_exec_sync_io_timeout = "0s"
+
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]
 
