@@ -383,6 +383,20 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled",
 		},
+		"invalid drain_exec_sync_io_timeout input": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type: "default",
+						},
+					},
+				},
+				DrainExecSyncIOTimeout: "10",
+			},
+			expectedErr: "invalid `drain_exec_sync_io_timeout`",
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			err := ValidatePluginConfig(context.Background(), test.config)

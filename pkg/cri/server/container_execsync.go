@@ -117,6 +117,17 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var drainExecSyncIOTimeout time.Duration
+	var err error
+
+	if c.config.DrainExecSyncIOTimeout != "" {
+		drainExecSyncIOTimeout, err = time.ParseDuration(c.config.DrainExecSyncIOTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse drain_exec_sync_io_timeout %q: %w",
+				c.config.DrainExecSyncIOTimeout, err)
+		}
+	}
+
 	spec, err := container.Spec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec: %w", err)
@@ -159,7 +170,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	defer func() {
 		deferCtx, deferCancel := util.DeferContext()
 		defer deferCancel()
-		if _, err := process.Delete(deferCtx, containerd.WithProcessKill); err != nil {
+		if _, err := process.Delete(deferCtx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
 			log.G(ctx).WithError(err).Errorf("Failed to delete exec process %q for container %q", execID, id)
 		}
 	}()
@@ -206,8 +217,11 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		exitRes := <-exitCh
 		log.G(ctx).Debugf("Timeout received while waiting for exec process kill %q code %d and error %v",
 			execID, exitRes.ExitCode(), exitRes.Error())
-		<-attachDone
-		log.G(ctx).Debugf("Stream pipe for exec process %q done", execID)
+
+		if err := drainExecSyncIO(ctx, process, drainExecSyncIOTimeout, attachDone); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to drain exec process %q io", execID)
+		}
+
 		return nil, fmt.Errorf("timeout %v exceeded: %w", opts.timeout, execCtx.Err())
 	case exitRes := <-exitCh:
 		code, _, err := exitRes.Result()
@@ -215,8 +229,10 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 		if err != nil {
 			return nil, fmt.Errorf("failed while waiting for exec %q: %w", execID, err)
 		}
-		<-attachDone
-		log.G(ctx).Debugf("Stream pipe for exec process %q done", execID)
+
+		if err := drainExecSyncIO(ctx, process, drainExecSyncIOTimeout, attachDone); err != nil {
+			return nil, fmt.Errorf("failed to drain exec process %q io: %w", execID, err)
+		}
 		return &code, nil
 	}
 }
@@ -248,4 +264,45 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 	}
 
 	return c.execInternal(ctx, cntr.Container, id, opts)
+}
+
+// drainExecSyncIO drains process IO with timeout after exec init process exits.
+//
+// By default, the child processes spawned by exec process will inherit standard
+// io file descriptors. The shim server creates a pipe as data channel. Both
+// exec process and its children write data into the write end of the pipe.
+// And the shim server will read data from the pipe. If the write end is still
+// open, the shim server will continue to wait for data from pipe.
+//
+// If the exec command is like `bash -c "sleep 365d &"`, the exec process
+// is bash and quit after create `sleep 365d`. But the `sleep 365d` will hold
+// the write end of the pipe for a year! It doesn't make senses that CRI plugin
+// should wait for it.
+func drainExecSyncIO(ctx context.Context, execProcess containerd.Process, drainExecIOTimeout time.Duration, attachDone <-chan struct{}) error {
+	var timerCh <-chan time.Time
+
+	if drainExecIOTimeout != 0 {
+		timer := time.NewTimer(drainExecIOTimeout)
+		defer timer.Stop()
+
+		timerCh = timer.C
+	}
+
+	select {
+	case <-timerCh:
+	case <-attachDone:
+		log.G(ctx).Debugf("Stream pipe for exec process %q done", execProcess.ID())
+		return nil
+	}
+
+	log.G(ctx).Debugf("Exec process %q exits but the io is still held by other processes. Trying to delete exec process to release io", execProcess.ID())
+	_, err := execProcess.Delete(ctx, containerd.WithProcessKill)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to release exec io by deleting exec process %q: %w",
+				execProcess.ID(), err)
+		}
+	}
+	return fmt.Errorf("failed to drain exec process %q io in %s because io is still held by other processes",
+		execProcess.ID(), drainExecIOTimeout)
 }
