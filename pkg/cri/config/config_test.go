@@ -372,7 +372,7 @@ func TestValidateConfig(t *testing.T) {
 				},
 				DrainExecSyncIOTimeout: "10",
 			},
-			expectedErr: "invalid drain exec sync io timeout: time: missing unit in duration \"10\"",
+			expectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
