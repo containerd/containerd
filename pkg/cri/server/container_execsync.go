@@ -118,9 +118,15 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	drainExecSyncIOTimeout, err := time.ParseDuration(c.config.DrainExecSyncIOTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse drain_exec_sync_io_timeout %q: %w", c.config.DrainExecSyncIOTimeout, err)
+	var drainExecSyncIOTimeout time.Duration
+	var err error
+
+	if c.config.DrainExecSyncIOTimeout != "" {
+		drainExecSyncIOTimeout, err = time.ParseDuration(c.config.DrainExecSyncIOTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse drain_exec_sync_io_timeout %q: %w",
+				c.config.DrainExecSyncIOTimeout, err)
+		}
 	}
 
 	spec, err := container.Spec(ctx)
@@ -301,5 +307,6 @@ func drainExecSyncIO(ctx context.Context, execProcess containerd.Process, drainE
 				execProcess.ID(), err)
 		}
 	}
-	return fmt.Errorf("failed to drain exec process %q io because io is still held by other processes", execProcess.ID())
+	return fmt.Errorf("failed to drain exec process %q io in %s because io is still held by other processes",
+		execProcess.ID(), drainExecIOTimeout)
 }
