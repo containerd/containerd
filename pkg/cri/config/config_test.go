@@ -462,6 +462,20 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRICRIUPath},
 		},
+		"invalid drain_exec_sync_io_timeout input": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Type: "default",
+						},
+					},
+				},
+				DrainExecSyncIOTimeout: "10",
+			},
+			expectedErr: "invalid drain exec sync io timeout: time: missing unit in duration \"10\"",
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			w, err := ValidatePluginConfig(context.Background(), test.config)
