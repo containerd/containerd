@@ -480,7 +480,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 	// Validation for drain_exec_sync_io_timeout
 	if c.DrainExecSyncIOTimeout != "" {
 		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
-			return warnings, fmt.Errorf("invalid drain exec sync io timeout: %w", err)
+			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
 	return warnings, nil

@@ -293,7 +293,6 @@ func drainExecSyncIO(ctx context.Context, execProcess containerd.Process, drainE
 
 	select {
 	case <-timerCh:
-
 	case <-attachDone:
 		log.G(ctx).Debugf("Stream pipe for exec process %q done", execProcess.ID())
 		return nil
