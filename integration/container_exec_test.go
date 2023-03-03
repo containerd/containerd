@@ -65,4 +65,8 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 	t.Log("Exec in container")
 	_, _, err = runtimeService.ExecSync(cn, []string{"sh", "-c", "sleep 365d &"}, 5*time.Second)
 	require.ErrorContains(t, err, "failed to drain exec process")
+
+	t.Log("Exec in container")
+	_, _, err = runtimeService.ExecSync(cn, []string{"sh", "-c", "sleep 2s &"}, 10*time.Second)
+	require.NoError(t, err, "should drain IO in time")
 }
