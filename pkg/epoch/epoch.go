@@ -34,7 +34,7 @@ const SourceDateEpochEnv = "SOURCE_DATE_EPOCH"
 // If the env var is not set, SourceDateEpoch returns nil without an error.
 func SourceDateEpoch() (*time.Time, error) {
 	v, ok := os.LookupEnv(SourceDateEpochEnv)
-	if !ok {
+	if !ok || v == "" {
 		return nil, nil // not an error
 	}
 	i64, err := strconv.ParseInt(v, 10, 64)
