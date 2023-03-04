@@ -19,11 +19,13 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"time"
 
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -125,7 +127,22 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		Rootfs:     coptions.Rootfs,
 		Options:    options,
 	}); err != nil {
-		// TODO: Delete sandbox shim here.
+		// Let the shim exit, then we can clean up the bundle after.
+		if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{
+			SandboxID: sandboxID,
+		}); sErr != nil {
+			log.G(ctx).WithError(sErr).WithField("sandboxID", sandboxID).
+				Error("failed to shutdown sandbox after failed create")
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+
+		dErr := c.shims.Delete(ctx, sandboxID)
+		if dErr != nil {
+			log.G(ctx).WithError(dErr).WithField("sandboxID", sandboxID).
+				Error("failed to delete shim after failed sandbox create")
+		}
 		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
 
