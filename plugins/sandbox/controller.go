@@ -102,9 +102,8 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		Runtime:        info.Runtime.Name,
 		TaskOptions:    nil,
 	})
-
 	if err != nil {
-		return fmt.Errorf("failed to start new sandbox: %w", err)
+		return fmt.Errorf("failed to start new shim for sandbox %s: %w", sandboxID, err)
 	}
 
 	svc, err := sandbox.NewClient(shim.Client())
@@ -127,7 +126,7 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		Options:    options,
 	}); err != nil {
 		// TODO: Delete sandbox shim here.
-		return fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
+		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
 
 	return nil
