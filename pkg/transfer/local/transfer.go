@@ -22,6 +22,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/containerd/typeurl/v2"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -29,8 +32,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/typeurl/v2"
-	"golang.org/x/sync/semaphore"
 )
 
 type localTransferService struct {
@@ -74,6 +75,8 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 			return ts.push(ctx, s, d, topts)
 		case transfer.ImageExporter:
 			return ts.exportStream(ctx, s, d, topts)
+		case transfer.ImageStorer:
+			return ts.tag(ctx, s, d, topts)
 		}
 	case transfer.ImageImporter:
 		switch d := dest.(type) {
