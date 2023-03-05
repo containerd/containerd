@@ -24,10 +24,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
@@ -198,4 +200,55 @@ func stateName(v interface{}) string {
 		return "stopped"
 	}
 	panic(fmt.Errorf("invalid state %v", v))
+}
+
+type File struct {
+	*os.File
+	mu     sync.Mutex
+	path   string
+	sighup chan os.Signal
+}
+
+func (lr *File) reopen() (err error) {
+	lr.mu.Lock()
+	defer lr.mu.Unlock()
+	lr.File.Close()
+	lr.File, err = os.OpenFile(lr.path, syscall.O_WRONLY|syscall.O_APPEND|os.O_CREATE, 0644)
+	return
+}
+
+func OpenFile(path string) (*File, error) {
+	lr := &File{
+		mu:     sync.Mutex{},
+		path:   path,
+		sighup: make(chan os.Signal, 1),
+	}
+
+	if err := lr.reopen(); err != nil {
+		return nil, err
+	}
+
+	go func() {
+		signal.Notify(lr.sighup, syscall.SIGUSR2)
+		for _ = range lr.sighup {
+			if err := lr.reopen(); err != nil {
+				fmt.Fprintf(os.Stderr, "%s: Error reopening: %s\n", time.Now(), err)
+			}
+		}
+	}()
+	return lr, nil
+}
+
+func (lr *File) Write(b []byte) (int, error) {
+	lr.mu.Lock()
+	defer lr.mu.Unlock()
+	return lr.File.Write(b)
+}
+
+func (lr *File) Close() error {
+	lr.mu.Lock()
+	defer lr.mu.Unlock()
+	signal.Stop(lr.sighup)
+	close(lr.sighup)
+	return lr.File.Close()
 }
