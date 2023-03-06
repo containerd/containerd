@@ -21,39 +21,39 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containernetworking/plugins/pkg/ns"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-
-	"github.com/vishvananda/netlink"
-
 	"github.com/containerd/containerd/log"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/vishvananda/netlink"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox,
-	stats interface{},
-) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state", meta.ID)
 	}
 
-	var podSandboxStats runtime.PodSandboxStats
-	podSandboxStats.Attributes = &runtime.PodSandboxAttributes{
-		Id:          meta.ID,
-		Metadata:    meta.Config.GetMetadata(),
-		Labels:      meta.Config.GetLabels(),
-		Annotations: meta.Config.GetAnnotations(),
+	stats, err := metricsForSandbox(sandbox)
+	if err != nil {
+		return nil, fmt.Errorf("failed getting metrics for sandbox %s: %w", sandbox.ID, err)
 	}
 
-	podSandboxStats.Linux = &runtime.LinuxPodSandboxStats{}
+	podSandboxStats := &runtime.PodSandboxStats{
+		Linux: &runtime.LinuxPodSandboxStats{},
+		Attributes: &runtime.PodSandboxAttributes{
+			Id:          meta.ID,
+			Metadata:    meta.Config.GetMetadata(),
+			Labels:      meta.Config.GetLabels(),
+			Annotations: meta.Config.GetAnnotations(),
+		},
+	}
 
 	if stats != nil {
 		timestamp := time.Now()
@@ -119,7 +119,7 @@ func (c *criService) podSandboxStats(
 		podSandboxStats.Linux.Containers = resp.GetStats()
 	}
 
-	return &podSandboxStats, nil
+	return podSandboxStats, nil
 }
 
 // https://github.com/cri-o/cri-o/blob/74a5cf8dffd305b311eb1c7f43a4781738c388c1/internal/oci/stats.go#L32
