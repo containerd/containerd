@@ -32,7 +32,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
@@ -179,7 +178,7 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProce
 
 	otel.SetTracerProvider(provider)
 
-	otel.SetTextMapPropagator(propagators())
+	otel.SetTextMapPropagator(tracing.Propagators())
 
 	return &closer{close: func() error {
 		for _, p := range procs {
@@ -190,9 +189,4 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProce
 		return nil
 	}}, nil
 
-}
-
-// Returns a composite TestMap propagator
-func propagators() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
 }

@@ -54,6 +54,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/streaming/portforward"
 	remotecommandserver "github.com/containerd/containerd/pkg/cri/streaming/remotecommand"
+	"github.com/containerd/containerd/tracing"
 )
 
 // Server is the library interface to serve the stream requests.
@@ -160,7 +161,8 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 	}
 	handler := restful.NewContainer()
 	handler.Add(ws)
-	s.handler = handler
+	//Add otel tracing to http requests
+	s.handler = tracing.WithHTTPTracing(handler, "cri.stream.server")
 	s.server = &http.Server{
 		Addr:      s.config.Addr,
 		Handler:   s.handler,

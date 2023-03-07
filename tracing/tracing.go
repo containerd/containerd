@@ -20,13 +20,20 @@ import (
 	"context"
 	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	httpconv "go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// Propagators return a composite TestMap propagator
+func Propagators() propagation.TextMapPropagator {
+	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+}
 
 // StartConfig defines configuration for a new span object.
 type StartConfig struct {
@@ -114,4 +121,15 @@ func Attribute(k string, v interface{}) attribute.KeyValue {
 // specification for a span.
 func HTTPStatusCodeAttributes(code int) []attribute.KeyValue {
 	return []attribute.KeyValue{semconv.HTTPStatusCodeKey.Int(code)}
+}
+
+// WithHTTPTracing adds tracing to http requests
+func WithHTTPTracing(handler http.Handler, name string) http.Handler {
+	// With Noop TracerProvider, the otelhttp still handles context propagation.
+	// https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
+	opts := []otelhttp.Option{
+		otelhttp.WithPropagators(Propagators()),
+		otelhttp.WithTracerProvider(otel.GetTracerProvider()),
+	}
+	return otelhttp.NewHandler(handler, name, opts...)
 }
