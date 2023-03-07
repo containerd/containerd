@@ -14,7 +14,7 @@ preface = """\
 The eighth major release of containerd includes new functionality alongside many improvements.
 This release is intended to be the last major release of containerd 1.x before 2.0.
 Some functionality in this release may be considered experimental or unstable, but will become stable or default in 2.0.
-This release still adheres to our backwards compability guarantees and users who do not use or enable new functionality should use this release with the same stability expectations.
+This release still adheres to our backwards compatibility guarantees and users who do not use or enable new functionality should use this release with the same stability expectations.
 The previous 1.6 release has also become a long term stable release for users who prefer releases with mostly stability improvements and wish to wait a few releases for new functionality.
 
 ### Highlights
@@ -110,6 +110,7 @@ The 2.0 release will remove any feature deprecated in 1.x. Features deprecated i
 * **Add experimental support for runtime specific snapshotters** ([#6899](https://github.com/containerd/containerd/pull/6899))
 * **Pass all TOML runtime configuration options from CRI to the runtime** ([#7764](https://github.com/containerd/containerd/pull/7764))
 * **Support for user namespaces in stateless pods ([KEP-127](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/127-user-namespaces)) _(experimental)_** ([#7679](https://github.com/containerd/containerd/pull/7679))
+* **Add timeout option for drain exec io** ([#7832](https://github.com/containerd/containerd/pull/7832))
 * **Add network plugin metrics** ([#7858](https://github.com/containerd/containerd/pull/7858))
 * **CRI v1alpha2 is deprecated and will be removed from containerd in containerd v2.0; if you are using the CRI API please move up to CRI v1; Kubernetes supports CRI v1 since Kubernetes 1.23** ([#7863](https://github.com/containerd/containerd/pull/7863))
 
