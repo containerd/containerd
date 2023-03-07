@@ -18,27 +18,36 @@ package semconv // import "go.opentelemetry.io/otel/semconv/v1.17.0"
 
 import "go.opentelemetry.io/otel/attribute"
 
-// This document defines the shared attributes used to report a single exception associated with a span or log.
+// The shared attributes used to report a single exception associated with a
+// span or log.
 const (
-	// The type of the exception (its fully-qualified class name, if applicable). The
-	// dynamic type of the exception should be preferred over the static type in
-	// languages that support it.
+	// ExceptionTypeKey is the attribute Key conforming to the "exception.type"
+	// semantic conventions. It represents the type of the exception (its
+	// fully-qualified class name, if applicable). The dynamic type of the
+	// exception should be preferred over the static type in languages that
+	// support it.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'java.net.ConnectException', 'OSError'
 	ExceptionTypeKey = attribute.Key("exception.type")
-	// The exception message.
+
+	// ExceptionMessageKey is the attribute Key conforming to the
+	// "exception.message" semantic conventions. It represents the exception
+	// message.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: 'Division by zero', "Can't convert 'int' object to str implicitly"
+	// Examples: 'Division by zero', "Can't convert 'int' object to str
+	// implicitly"
 	ExceptionMessageKey = attribute.Key("exception.message")
-	// A stacktrace as a string in the natural representation for the language
-	// runtime. The representation is to be determined and documented by each language
-	// SIG.
+
+	// ExceptionStacktraceKey is the attribute Key conforming to the
+	// "exception.stacktrace" semantic conventions. It represents a stacktrace
+	// as a string in the natural representation for the language runtime. The
+	// representation is to be determined and documented by each language SIG.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -51,16 +60,44 @@ const (
 	ExceptionStacktraceKey = attribute.Key("exception.stacktrace")
 )
 
-// This document defines attributes for Events represented using Log Records.
+// ExceptionType returns an attribute KeyValue conforming to the
+// "exception.type" semantic conventions. It represents the type of the
+// exception (its fully-qualified class name, if applicable). The dynamic type
+// of the exception should be preferred over the static type in languages that
+// support it.
+func ExceptionType(val string) attribute.KeyValue {
+	return ExceptionTypeKey.String(val)
+}
+
+// ExceptionMessage returns an attribute KeyValue conforming to the
+// "exception.message" semantic conventions. It represents the exception
+// message.
+func ExceptionMessage(val string) attribute.KeyValue {
+	return ExceptionMessageKey.String(val)
+}
+
+// ExceptionStacktrace returns an attribute KeyValue conforming to the
+// "exception.stacktrace" semantic conventions. It represents a stacktrace as a
+// string in the natural representation for the language runtime. The
+// representation is to be determined and documented by each language SIG.
+func ExceptionStacktrace(val string) attribute.KeyValue {
+	return ExceptionStacktraceKey.String(val)
+}
+
+// Attributes for Events represented using Log Records.
 const (
-	// The name identifies the event.
+	// EventNameKey is the attribute Key conforming to the "event.name"
+	// semantic conventions. It represents the name identifies the event.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'click', 'exception'
 	EventNameKey = attribute.Key("event.name")
-	// The domain identifies the business context for the events.
+
+	// EventDomainKey is the attribute Key conforming to the "event.domain"
+	// semantic conventions. It represents the domain identifies the business
+	// context for the events.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
@@ -79,11 +116,20 @@ var (
 	EventDomainK8S = EventDomainKey.String("k8s")
 )
 
-// Span attributes used by AWS Lambda (in addition to general `faas` attributes).
+// EventName returns an attribute KeyValue conforming to the "event.name"
+// semantic conventions. It represents the name identifies the event.
+func EventName(val string) attribute.KeyValue {
+	return EventNameKey.String(val)
+}
+
+// Span attributes used by AWS Lambda (in addition to general `faas`
+// attributes).
 const (
-	// The full invoked ARN as provided on the `Context` passed to the function
-	// (`Lambda-Runtime-Invoked-Function-ARN` header on the `/runtime/invocation/next`
-	// applicable).
+	// AWSLambdaInvokedARNKey is the attribute Key conforming to the
+	// "aws.lambda.invoked_arn" semantic conventions. It represents the full
+	// invoked ARN as provided on the `Context` passed to the function
+	// (`Lambda-Runtime-Invoked-Function-ARN` header on the
+	// `/runtime/invocation/next` applicable).
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -93,44 +139,72 @@ const (
 	AWSLambdaInvokedARNKey = attribute.Key("aws.lambda.invoked_arn")
 )
 
-// This document defines attributes for CloudEvents. CloudEvents is a specification on how to define event data in a standard way. These attributes can be attached to spans when performing operations with CloudEvents, regardless of the protocol being used.
+// AWSLambdaInvokedARN returns an attribute KeyValue conforming to the
+// "aws.lambda.invoked_arn" semantic conventions. It represents the full
+// invoked ARN as provided on the `Context` passed to the function
+// (`Lambda-Runtime-Invoked-Function-ARN` header on the
+// `/runtime/invocation/next` applicable).
+func AWSLambdaInvokedARN(val string) attribute.KeyValue {
+	return AWSLambdaInvokedARNKey.String(val)
+}
+
+// Attributes for CloudEvents. CloudEvents is a specification on how to define
+// event data in a standard way. These attributes can be attached to spans when
+// performing operations with CloudEvents, regardless of the protocol being
+// used.
 const (
-	// The [event_id](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec
-	// .md#id) uniquely identifies the event.
+	// CloudeventsEventIDKey is the attribute Key conforming to the
+	// "cloudevents.event_id" semantic conventions. It represents the
+	// [event_id](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#id)
+	// uniquely identifies the event.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: '123e4567-e89b-12d3-a456-426614174000', '0001'
 	CloudeventsEventIDKey = attribute.Key("cloudevents.event_id")
-	// The [source](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.m
-	// d#source-1) identifies the context in which an event happened.
+
+	// CloudeventsEventSourceKey is the attribute Key conforming to the
+	// "cloudevents.event_source" semantic conventions. It represents the
+	// [source](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#source-1)
+	// identifies the context in which an event happened.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
-	// Examples: 'https://github.com/cloudevents', '/cloudevents/spec/pull/123', 'my-
-	// service'
+	// Examples: 'https://github.com/cloudevents',
+	// '/cloudevents/spec/pull/123', 'my-service'
 	CloudeventsEventSourceKey = attribute.Key("cloudevents.event_source")
-	// The [version of the CloudEvents specification](https://github.com/cloudevents/s
-	// pec/blob/v1.0.2/cloudevents/spec.md#specversion) which the event uses.
+
+	// CloudeventsEventSpecVersionKey is the attribute Key conforming to the
+	// "cloudevents.event_spec_version" semantic conventions. It represents the
+	// [version of the CloudEvents
+	// specification](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#specversion)
+	// which the event uses.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '1.0'
 	CloudeventsEventSpecVersionKey = attribute.Key("cloudevents.event_spec_version")
-	// The [event_type](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/sp
-	// ec.md#type) contains a value describing the type of event related to the
-	// originating occurrence.
+
+	// CloudeventsEventTypeKey is the attribute Key conforming to the
+	// "cloudevents.event_type" semantic conventions. It represents the
+	// [event_type](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#type)
+	// contains a value describing the type of event related to the originating
+	// occurrence.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: 'com.github.pull_request.opened', 'com.example.object.deleted.v2'
+	// Examples: 'com.github.pull_request.opened',
+	// 'com.example.object.deleted.v2'
 	CloudeventsEventTypeKey = attribute.Key("cloudevents.event_type")
-	// The [subject](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.
-	// md#subject) of the event in the context of the event producer (identified by
+
+	// CloudeventsEventSubjectKey is the attribute Key conforming to the
+	// "cloudevents.event_subject" semantic conventions. It represents the
+	// [subject](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#subject)
+	// of the event in the context of the event producer (identified by
 	// source).
 	//
 	// Type: string
@@ -140,9 +214,53 @@ const (
 	CloudeventsEventSubjectKey = attribute.Key("cloudevents.event_subject")
 )
 
-// This document defines semantic conventions for the OpenTracing Shim
+// CloudeventsEventID returns an attribute KeyValue conforming to the
+// "cloudevents.event_id" semantic conventions. It represents the
+// [event_id](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#id)
+// uniquely identifies the event.
+func CloudeventsEventID(val string) attribute.KeyValue {
+	return CloudeventsEventIDKey.String(val)
+}
+
+// CloudeventsEventSource returns an attribute KeyValue conforming to the
+// "cloudevents.event_source" semantic conventions. It represents the
+// [source](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#source-1)
+// identifies the context in which an event happened.
+func CloudeventsEventSource(val string) attribute.KeyValue {
+	return CloudeventsEventSourceKey.String(val)
+}
+
+// CloudeventsEventSpecVersion returns an attribute KeyValue conforming to
+// the "cloudevents.event_spec_version" semantic conventions. It represents the
+// [version of the CloudEvents
+// specification](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#specversion)
+// which the event uses.
+func CloudeventsEventSpecVersion(val string) attribute.KeyValue {
+	return CloudeventsEventSpecVersionKey.String(val)
+}
+
+// CloudeventsEventType returns an attribute KeyValue conforming to the
+// "cloudevents.event_type" semantic conventions. It represents the
+// [event_type](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#type)
+// contains a value describing the type of event related to the originating
+// occurrence.
+func CloudeventsEventType(val string) attribute.KeyValue {
+	return CloudeventsEventTypeKey.String(val)
+}
+
+// CloudeventsEventSubject returns an attribute KeyValue conforming to the
+// "cloudevents.event_subject" semantic conventions. It represents the
+// [subject](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md#subject)
+// of the event in the context of the event producer (identified by source).
+func CloudeventsEventSubject(val string) attribute.KeyValue {
+	return CloudeventsEventSubjectKey.String(val)
+}
+
+// Semantic conventions for the OpenTracing Shim
 const (
-	// Parent-child Reference type
+	// OpentracingRefTypeKey is the attribute Key conforming to the
+	// "opentracing.ref_type" semantic conventions. It represents the
+	// parent-child Reference type
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
@@ -158,16 +276,21 @@ var (
 	OpentracingRefTypeFollowsFrom = OpentracingRefTypeKey.String("follows_from")
 )
 
-// This document defines the attributes used to perform database client calls.
+// The attributes used to perform database client calls.
 const (
-	// An identifier for the database management system (DBMS) product being used. See
-	// below for a list of well-known identifiers.
+	// DBSystemKey is the attribute Key conforming to the "db.system" semantic
+	// conventions. It represents an identifier for the database management
+	// system (DBMS) product being used. See below for a list of well-known
+	// identifiers.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
 	// Stability: stable
 	DBSystemKey = attribute.Key("db.system")
-	// The connection string used to connect to the database. It is recommended to
+
+	// DBConnectionStringKey is the attribute Key conforming to the
+	// "db.connection_string" semantic conventions. It represents the
+	// connection string used to connect to the database. It is recommended to
 	// remove embedded credentials.
 	//
 	// Type: string
@@ -175,16 +298,21 @@ const (
 	// Stability: stable
 	// Examples: 'Server=(localdb)\\v11.0;Integrated Security=true;'
 	DBConnectionStringKey = attribute.Key("db.connection_string")
-	// Username for accessing the database.
+
+	// DBUserKey is the attribute Key conforming to the "db.user" semantic
+	// conventions. It represents the username for accessing the database.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'readonly_user', 'reporting_user'
 	DBUserKey = attribute.Key("db.user")
-	// The fully-qualified class name of the [Java Database Connectivity
-	// (JDBC)](https://docs.oracle.com/javase/8/docs/technotes/guides/jdbc/) driver
-	// used to connect.
+
+	// DBJDBCDriverClassnameKey is the attribute Key conforming to the
+	// "db.jdbc.driver_classname" semantic conventions. It represents the
+	// fully-qualified class name of the [Java Database Connectivity
+	// (JDBC)](https://docs.oracle.com/javase/8/docs/technotes/guides/jdbc/)
+	// driver used to connect.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -192,41 +320,52 @@ const (
 	// Examples: 'org.postgresql.Driver',
 	// 'com.microsoft.sqlserver.jdbc.SQLServerDriver'
 	DBJDBCDriverClassnameKey = attribute.Key("db.jdbc.driver_classname")
-	// This attribute is used to report the name of the database being accessed. For
-	// commands that switch the database, this should be set to the target database
-	// (even if the command fails).
+
+	// DBNameKey is the attribute Key conforming to the "db.name" semantic
+	// conventions. It represents the this attribute is used to report the name
+	// of the database being accessed. For commands that switch the database,
+	// this should be set to the target database (even if the command fails).
 	//
 	// Type: string
 	// RequirementLevel: ConditionallyRequired (If applicable.)
 	// Stability: stable
 	// Examples: 'customers', 'main'
-	// Note: In some SQL databases, the database name to be used is called "schema
-	// name". In case there are multiple layers that could be considered for database
-	// name (e.g. Oracle instance name and schema name), the database name to be used
-	// is the more specific layer (e.g. Oracle schema name).
+	// Note: In some SQL databases, the database name to be used is called
+	// "schema name". In case there are multiple layers that could be
+	// considered for database name (e.g. Oracle instance name and schema
+	// name), the database name to be used is the more specific layer (e.g.
+	// Oracle schema name).
 	DBNameKey = attribute.Key("db.name")
-	// The database statement being executed.
+
+	// DBStatementKey is the attribute Key conforming to the "db.statement"
+	// semantic conventions. It represents the database statement being
+	// executed.
 	//
 	// Type: string
-	// RequirementLevel: ConditionallyRequired (If applicable and not explicitly
-	// disabled via instrumentation configuration.)
+	// RequirementLevel: ConditionallyRequired (If applicable and not
+	// explicitly disabled via instrumentation configuration.)
 	// Stability: stable
 	// Examples: 'SELECT * FROM wuser_table', 'SET mykey "WuValue"'
 	// Note: The value may be sanitized to exclude sensitive information.
 	DBStatementKey = attribute.Key("db.statement")
-	// The name of the operation being executed, e.g. the [MongoDB command
+
+	// DBOperationKey is the attribute Key conforming to the "db.operation"
+	// semantic conventions. It represents the name of the operation being
+	// executed, e.g. the [MongoDB command
 	// name](https://docs.mongodb.com/manual/reference/command/#database-operations)
 	// such as `findAndModify`, or the SQL keyword.
 	//
 	// Type: string
-	// RequirementLevel: ConditionallyRequired (If `db.statement` is not applicable.)
+	// RequirementLevel: ConditionallyRequired (If `db.statement` is not
+	// applicable.)
 	// Stability: stable
 	// Examples: 'findAndModify', 'HMSET', 'SELECT'
-	// Note: When setting this to an SQL keyword, it is not recommended to attempt any
-	// client-side parsing of `db.statement` just to get this property, but it should
-	// be set if the operation name is provided by the library being instrumented. If
-	// the SQL statement has an ambiguous operation, or performs more than one
-	// operation, this value may be omitted.
+	// Note: When setting this to an SQL keyword, it is not recommended to
+	// attempt any client-side parsing of `db.statement` just to get this
+	// property, but it should be set if the operation name is provided by the
+	// library being instrumented. If the SQL statement has an ambiguous
+	// operation, or performs more than one operation, this value may be
+	// omitted.
 	DBOperationKey = attribute.Key("db.operation")
 )
 
@@ -331,73 +470,152 @@ var (
 	DBSystemClickhouse = DBSystemKey.String("clickhouse")
 )
 
+// DBConnectionString returns an attribute KeyValue conforming to the
+// "db.connection_string" semantic conventions. It represents the connection
+// string used to connect to the database. It is recommended to remove embedded
+// credentials.
+func DBConnectionString(val string) attribute.KeyValue {
+	return DBConnectionStringKey.String(val)
+}
+
+// DBUser returns an attribute KeyValue conforming to the "db.user" semantic
+// conventions. It represents the username for accessing the database.
+func DBUser(val string) attribute.KeyValue {
+	return DBUserKey.String(val)
+}
+
+// DBJDBCDriverClassname returns an attribute KeyValue conforming to the
+// "db.jdbc.driver_classname" semantic conventions. It represents the
+// fully-qualified class name of the [Java Database Connectivity
+// (JDBC)](https://docs.oracle.com/javase/8/docs/technotes/guides/jdbc/) driver
+// used to connect.
+func DBJDBCDriverClassname(val string) attribute.KeyValue {
+	return DBJDBCDriverClassnameKey.String(val)
+}
+
+// DBName returns an attribute KeyValue conforming to the "db.name" semantic
+// conventions. It represents the this attribute is used to report the name of
+// the database being accessed. For commands that switch the database, this
+// should be set to the target database (even if the command fails).
+func DBName(val string) attribute.KeyValue {
+	return DBNameKey.String(val)
+}
+
+// DBStatement returns an attribute KeyValue conforming to the
+// "db.statement" semantic conventions. It represents the database statement
+// being executed.
+func DBStatement(val string) attribute.KeyValue {
+	return DBStatementKey.String(val)
+}
+
+// DBOperation returns an attribute KeyValue conforming to the
+// "db.operation" semantic conventions. It represents the name of the operation
+// being executed, e.g. the [MongoDB command
+// name](https://docs.mongodb.com/manual/reference/command/#database-operations)
+// such as `findAndModify`, or the SQL keyword.
+func DBOperation(val string) attribute.KeyValue {
+	return DBOperationKey.String(val)
+}
+
 // Connection-level attributes for Microsoft SQL Server
 const (
-	// The Microsoft SQL Server [instance name](https://docs.microsoft.com/en-
-	// us/sql/connect/jdbc/building-the-connection-url?view=sql-server-ver15)
-	// connecting to. This name is used to determine the port of a named instance.
+	// DBMSSQLInstanceNameKey is the attribute Key conforming to the
+	// "db.mssql.instance_name" semantic conventions. It represents the
+	// Microsoft SQL Server [instance
+	// name](https://docs.microsoft.com/en-us/sql/connect/jdbc/building-the-connection-url?view=sql-server-ver15)
+	// connecting to. This name is used to determine the port of a named
+	// instance.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'MSSQLSERVER'
-	// Note: If setting a `db.mssql.instance_name`, `net.peer.port` is no longer
-	// required (but still recommended if non-standard).
+	// Note: If setting a `db.mssql.instance_name`, `net.peer.port` is no
+	// longer required (but still recommended if non-standard).
 	DBMSSQLInstanceNameKey = attribute.Key("db.mssql.instance_name")
 )
 
+// DBMSSQLInstanceName returns an attribute KeyValue conforming to the
+// "db.mssql.instance_name" semantic conventions. It represents the Microsoft
+// SQL Server [instance
+// name](https://docs.microsoft.com/en-us/sql/connect/jdbc/building-the-connection-url?view=sql-server-ver15)
+// connecting to. This name is used to determine the port of a named instance.
+func DBMSSQLInstanceName(val string) attribute.KeyValue {
+	return DBMSSQLInstanceNameKey.String(val)
+}
+
 // Call-level attributes for Cassandra
 const (
-	// The fetch size used for paging, i.e. how many rows will be returned at once.
+	// DBCassandraPageSizeKey is the attribute Key conforming to the
+	// "db.cassandra.page_size" semantic conventions. It represents the fetch
+	// size used for paging, i.e. how many rows will be returned at once.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 5000
 	DBCassandraPageSizeKey = attribute.Key("db.cassandra.page_size")
-	// The consistency level of the query. Based on consistency values from
-	// [CQL](https://docs.datastax.com/en/cassandra-
-	// oss/3.0/cassandra/dml/dmlConfigConsistency.html).
+
+	// DBCassandraConsistencyLevelKey is the attribute Key conforming to the
+	// "db.cassandra.consistency_level" semantic conventions. It represents the
+	// consistency level of the query. Based on consistency values from
+	// [CQL](https://docs.datastax.com/en/cassandra-oss/3.0/cassandra/dml/dmlConfigConsistency.html).
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	DBCassandraConsistencyLevelKey = attribute.Key("db.cassandra.consistency_level")
-	// The name of the primary table that the operation is acting upon, including the
-	// keyspace name (if applicable).
+
+	// DBCassandraTableKey is the attribute Key conforming to the
+	// "db.cassandra.table" semantic conventions. It represents the name of the
+	// primary table that the operation is acting upon, including the keyspace
+	// name (if applicable).
 	//
 	// Type: string
 	// RequirementLevel: Recommended
 	// Stability: stable
 	// Examples: 'mytable'
-	// Note: This mirrors the db.sql.table attribute but references cassandra rather
-	// than sql. It is not recommended to attempt any client-side parsing of
-	// `db.statement` just to get this property, but it should be set if it is
-	// provided by the library being instrumented. If the operation is acting upon an
-	// anonymous table, or more than one table, this value MUST NOT be set.
+	// Note: This mirrors the db.sql.table attribute but references cassandra
+	// rather than sql. It is not recommended to attempt any client-side
+	// parsing of `db.statement` just to get this property, but it should be
+	// set if it is provided by the library being instrumented. If the
+	// operation is acting upon an anonymous table, or more than one table,
+	// this value MUST NOT be set.
 	DBCassandraTableKey = attribute.Key("db.cassandra.table")
-	// Whether or not the query is idempotent.
+
+	// DBCassandraIdempotenceKey is the attribute Key conforming to the
+	// "db.cassandra.idempotence" semantic conventions. It represents the
+	// whether or not the query is idempotent.
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
 	// Stability: stable
 	DBCassandraIdempotenceKey = attribute.Key("db.cassandra.idempotence")
-	// The number of times a query was speculatively executed. Not set or `0` if the
-	// query was not executed speculatively.
+
+	// DBCassandraSpeculativeExecutionCountKey is the attribute Key conforming
+	// to the "db.cassandra.speculative_execution_count" semantic conventions.
+	// It represents the number of times a query was speculatively executed.
+	// Not set or `0` if the query was not executed speculatively.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 0, 2
 	DBCassandraSpeculativeExecutionCountKey = attribute.Key("db.cassandra.speculative_execution_count")
-	// The ID of the coordinating node for a query.
+
+	// DBCassandraCoordinatorIDKey is the attribute Key conforming to the
+	// "db.cassandra.coordinator.id" semantic conventions. It represents the ID
+	// of the coordinating node for a query.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'be13faa2-8574-4d71-926d-27f16cf8a7af'
 	DBCassandraCoordinatorIDKey = attribute.Key("db.cassandra.coordinator.id")
-	// The data center of the coordinating node for a query.
+
+	// DBCassandraCoordinatorDCKey is the attribute Key conforming to the
+	// "db.cassandra.coordinator.dc" semantic conventions. It represents the
+	// data center of the coordinating node for a query.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -431,23 +649,80 @@ var (
 	DBCassandraConsistencyLevelLocalSerial = DBCassandraConsistencyLevelKey.String("local_serial")
 )
 
+// DBCassandraPageSize returns an attribute KeyValue conforming to the
+// "db.cassandra.page_size" semantic conventions. It represents the fetch size
+// used for paging, i.e. how many rows will be returned at once.
+func DBCassandraPageSize(val int) attribute.KeyValue {
+	return DBCassandraPageSizeKey.Int(val)
+}
+
+// DBCassandraTable returns an attribute KeyValue conforming to the
+// "db.cassandra.table" semantic conventions. It represents the name of the
+// primary table that the operation is acting upon, including the keyspace name
+// (if applicable).
+func DBCassandraTable(val string) attribute.KeyValue {
+	return DBCassandraTableKey.String(val)
+}
+
+// DBCassandraIdempotence returns an attribute KeyValue conforming to the
+// "db.cassandra.idempotence" semantic conventions. It represents the whether
+// or not the query is idempotent.
+func DBCassandraIdempotence(val bool) attribute.KeyValue {
+	return DBCassandraIdempotenceKey.Bool(val)
+}
+
+// DBCassandraSpeculativeExecutionCount returns an attribute KeyValue
+// conforming to the "db.cassandra.speculative_execution_count" semantic
+// conventions. It represents the number of times a query was speculatively
+// executed. Not set or `0` if the query was not executed speculatively.
+func DBCassandraSpeculativeExecutionCount(val int) attribute.KeyValue {
+	return DBCassandraSpeculativeExecutionCountKey.Int(val)
+}
+
+// DBCassandraCoordinatorID returns an attribute KeyValue conforming to the
+// "db.cassandra.coordinator.id" semantic conventions. It represents the ID of
+// the coordinating node for a query.
+func DBCassandraCoordinatorID(val string) attribute.KeyValue {
+	return DBCassandraCoordinatorIDKey.String(val)
+}
+
+// DBCassandraCoordinatorDC returns an attribute KeyValue conforming to the
+// "db.cassandra.coordinator.dc" semantic conventions. It represents the data
+// center of the coordinating node for a query.
+func DBCassandraCoordinatorDC(val string) attribute.KeyValue {
+	return DBCassandraCoordinatorDCKey.String(val)
+}
+
 // Call-level attributes for Redis
 const (
-	// The index of the database being accessed as used in the [`SELECT`
-	// command](https://redis.io/commands/select), provided as an integer. To be used
-	// instead of the generic `db.name` attribute.
+	// DBRedisDBIndexKey is the attribute Key conforming to the
+	// "db.redis.database_index" semantic conventions. It represents the index
+	// of the database being accessed as used in the [`SELECT`
+	// command](https://redis.io/commands/select), provided as an integer. To
+	// be used instead of the generic `db.name` attribute.
 	//
 	// Type: int
-	// RequirementLevel: ConditionallyRequired (If other than the default database
-	// (`0`).)
+	// RequirementLevel: ConditionallyRequired (If other than the default
+	// database (`0`).)
 	// Stability: stable
 	// Examples: 0, 1, 15
 	DBRedisDBIndexKey = attribute.Key("db.redis.database_index")
 )
 
+// DBRedisDBIndex returns an attribute KeyValue conforming to the
+// "db.redis.database_index" semantic conventions. It represents the index of
+// the database being accessed as used in the [`SELECT`
+// command](https://redis.io/commands/select), provided as an integer. To be
+// used instead of the generic `db.name` attribute.
+func DBRedisDBIndex(val int) attribute.KeyValue {
+	return DBRedisDBIndexKey.Int(val)
+}
+
 // Call-level attributes for MongoDB
 const (
-	// The collection being accessed within the database stated in `db.name`.
+	// DBMongoDBCollectionKey is the attribute Key conforming to the
+	// "db.mongodb.collection" semantic conventions. It represents the
+	// collection being accessed within the database stated in `db.name`.
 	//
 	// Type: string
 	// RequirementLevel: Required
@@ -456,10 +731,19 @@ const (
 	DBMongoDBCollectionKey = attribute.Key("db.mongodb.collection")
 )
 
+// DBMongoDBCollection returns an attribute KeyValue conforming to the
+// "db.mongodb.collection" semantic conventions. It represents the collection
+// being accessed within the database stated in `db.name`.
+func DBMongoDBCollection(val string) attribute.KeyValue {
+	return DBMongoDBCollectionKey.String(val)
+}
+
 // Call-level attributes for SQL databases
 const (
-	// The name of the primary table that the operation is acting upon, including the
-	// database name (if applicable).
+	// DBSQLTableKey is the attribute Key conforming to the "db.sql.table"
+	// semantic conventions. It represents the name of the primary table that
+	// the operation is acting upon, including the database name (if
+	// applicable).
 	//
 	// Type: string
 	// RequirementLevel: Recommended
@@ -467,21 +751,35 @@ const (
 	// Examples: 'public.users', 'customers'
 	// Note: It is not recommended to attempt any client-side parsing of
 	// `db.statement` just to get this property, but it should be set if it is
-	// provided by the library being instrumented. If the operation is acting upon an
-	// anonymous table, or more than one table, this value MUST NOT be set.
+	// provided by the library being instrumented. If the operation is acting
+	// upon an anonymous table, or more than one table, this value MUST NOT be
+	// set.
 	DBSQLTableKey = attribute.Key("db.sql.table")
 )
 
-// Span attributes used by non-OTLP exporters to represent OpenTelemetry Span's concepts.
+// DBSQLTable returns an attribute KeyValue conforming to the "db.sql.table"
+// semantic conventions. It represents the name of the primary table that the
+// operation is acting upon, including the database name (if applicable).
+func DBSQLTable(val string) attribute.KeyValue {
+	return DBSQLTableKey.String(val)
+}
+
+// Span attributes used by non-OTLP exporters to represent OpenTelemetry Span's
+// concepts.
 const (
-	// Name of the code, either "OK" or "ERROR". MUST NOT be set if the status code is
+	// OtelStatusCodeKey is the attribute Key conforming to the
+	// "otel.status_code" semantic conventions. It represents the name of the
+	// code, either "OK" or "ERROR". MUST NOT be set if the status code is
 	// UNSET.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	OtelStatusCodeKey = attribute.Key("otel.status_code")
-	// Description of the Status if it has a value, otherwise not set.
+
+	// OtelStatusDescriptionKey is the attribute Key conforming to the
+	// "otel.status_description" semantic conventions. It represents the
+	// description of the Status if it has a value, otherwise not set.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -497,16 +795,27 @@ var (
 	OtelStatusCodeError = OtelStatusCodeKey.String("ERROR")
 )
 
-// This semantic convention describes an instance of a function that runs without provisioning or managing of servers (also known as serverless functions or Function as a Service (FaaS)) with spans.
+// OtelStatusDescription returns an attribute KeyValue conforming to the
+// "otel.status_description" semantic conventions. It represents the
+// description of the Status if it has a value, otherwise not set.
+func OtelStatusDescription(val string) attribute.KeyValue {
+	return OtelStatusDescriptionKey.String(val)
+}
+
+// This semantic convention describes an instance of a function that runs
+// without provisioning or managing of servers (also known as serverless
+// functions or Function as a Service (FaaS)) with spans.
 const (
-	// Type of the trigger which caused this function execution.
+	// FaaSTriggerKey is the attribute Key conforming to the "faas.trigger"
+	// semantic conventions. It represents the type of the trigger which caused
+	// this function execution.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Note: For the server/consumer span on the incoming side,
 	// `faas.trigger` MUST be set.
-
+	//
 	// Clients invoking FaaS instances usually cannot set `faas.trigger`,
 	// since they would typically need to look in the payload to determine
 	// the event type. If clients set it, it should be the same as the
@@ -514,7 +823,10 @@ const (
 	// nothing to do with the underlying transport used to make the API
 	// call to invoke the lambda, which is often HTTP).
 	FaaSTriggerKey = attribute.Key("faas.trigger")
-	// The execution ID of the current function execution.
+
+	// FaaSExecutionKey is the attribute Key conforming to the "faas.execution"
+	// semantic conventions. It represents the execution ID of the current
+	// function execution.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -536,34 +848,53 @@ var (
 	FaaSTriggerOther = FaaSTriggerKey.String("other")
 )
 
-// Semantic Convention for FaaS triggered as a response to some data source operation such as a database or filesystem read/write.
+// FaaSExecution returns an attribute KeyValue conforming to the
+// "faas.execution" semantic conventions. It represents the execution ID of the
+// current function execution.
+func FaaSExecution(val string) attribute.KeyValue {
+	return FaaSExecutionKey.String(val)
+}
+
+// Semantic Convention for FaaS triggered as a response to some data source
+// operation such as a database or filesystem read/write.
 const (
-	// The name of the source on which the triggering operation was performed. For
-	// example, in Cloud Storage or S3 corresponds to the bucket name, and in Cosmos
-	// DB to the database name.
+	// FaaSDocumentCollectionKey is the attribute Key conforming to the
+	// "faas.document.collection" semantic conventions. It represents the name
+	// of the source on which the triggering operation was performed. For
+	// example, in Cloud Storage or S3 corresponds to the bucket name, and in
+	// Cosmos DB to the database name.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'myBucketName', 'myDBName'
 	FaaSDocumentCollectionKey = attribute.Key("faas.document.collection")
-	// Describes the type of the operation that was performed on the data.
+
+	// FaaSDocumentOperationKey is the attribute Key conforming to the
+	// "faas.document.operation" semantic conventions. It represents the
+	// describes the type of the operation that was performed on the data.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
 	// Stability: stable
 	FaaSDocumentOperationKey = attribute.Key("faas.document.operation")
-	// A string containing the time when the data was accessed in the [ISO
-	// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format expressed
-	// in [UTC](https://www.w3.org/TR/NOTE-datetime).
+
+	// FaaSDocumentTimeKey is the attribute Key conforming to the
+	// "faas.document.time" semantic conventions. It represents a string
+	// containing the time when the data was accessed in the [ISO
+	// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format
+	// expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '2020-01-23T13:47:06Z'
 	FaaSDocumentTimeKey = attribute.Key("faas.document.time")
-	// The document name/table subjected to the operation. For example, in Cloud
-	// Storage or S3 is the name of the file, and in Cosmos DB the table name.
+
+	// FaaSDocumentNameKey is the attribute Key conforming to the
+	// "faas.document.name" semantic conventions. It represents the document
+	// name/table subjected to the operation. For example, in Cloud Storage or
+	// S3 is the name of the file, and in Cosmos DB the table name.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -581,19 +912,50 @@ var (
 	FaaSDocumentOperationDelete = FaaSDocumentOperationKey.String("delete")
 )
 
+// FaaSDocumentCollection returns an attribute KeyValue conforming to the
+// "faas.document.collection" semantic conventions. It represents the name of
+// the source on which the triggering operation was performed. For example, in
+// Cloud Storage or S3 corresponds to the bucket name, and in Cosmos DB to the
+// database name.
+func FaaSDocumentCollection(val string) attribute.KeyValue {
+	return FaaSDocumentCollectionKey.String(val)
+}
+
+// FaaSDocumentTime returns an attribute KeyValue conforming to the
+// "faas.document.time" semantic conventions. It represents a string containing
+// the time when the data was accessed in the [ISO
+// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format
+// expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).
+func FaaSDocumentTime(val string) attribute.KeyValue {
+	return FaaSDocumentTimeKey.String(val)
+}
+
+// FaaSDocumentName returns an attribute KeyValue conforming to the
+// "faas.document.name" semantic conventions. It represents the document
+// name/table subjected to the operation. For example, in Cloud Storage or S3
+// is the name of the file, and in Cosmos DB the table name.
+func FaaSDocumentName(val string) attribute.KeyValue {
+	return FaaSDocumentNameKey.String(val)
+}
+
 // Semantic Convention for FaaS scheduled to be executed regularly.
 const (
-	// A string containing the function invocation time in the [ISO
-	// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format expressed
-	// in [UTC](https://www.w3.org/TR/NOTE-datetime).
+	// FaaSTimeKey is the attribute Key conforming to the "faas.time" semantic
+	// conventions. It represents a string containing the function invocation
+	// time in the [ISO
+	// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format
+	// expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '2020-01-23T13:47:06Z'
 	FaaSTimeKey = attribute.Key("faas.time")
-	// A string containing the schedule period as [Cron Expression](https://docs.oracl
-	// e.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm).
+
+	// FaaSCronKey is the attribute Key conforming to the "faas.cron" semantic
+	// conventions. It represents a string containing the schedule period as
+	// [Cron
+	// Expression](https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm).
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -602,10 +964,28 @@ const (
 	FaaSCronKey = attribute.Key("faas.cron")
 )
 
+// FaaSTime returns an attribute KeyValue conforming to the "faas.time"
+// semantic conventions. It represents a string containing the function
+// invocation time in the [ISO
+// 8601](https://www.iso.org/iso-8601-date-and-time-format.html) format
+// expressed in [UTC](https://www.w3.org/TR/NOTE-datetime).
+func FaaSTime(val string) attribute.KeyValue {
+	return FaaSTimeKey.String(val)
+}
+
+// FaaSCron returns an attribute KeyValue conforming to the "faas.cron"
+// semantic conventions. It represents a string containing the schedule period
+// as [Cron
+// Expression](https://docs.oracle.com/cd/E12058_01/doc/doc.1014/e12030/cron_expressions.htm).
+func FaaSCron(val string) attribute.KeyValue {
+	return FaaSCronKey.String(val)
+}
+
 // Contains additional attributes for incoming FaaS spans.
 const (
-	// A boolean that is true if the serverless function is executed for the first
-	// time (aka cold-start).
+	// FaaSColdstartKey is the attribute Key conforming to the "faas.coldstart"
+	// semantic conventions. It represents a boolean that is true if the
+	// serverless function is executed for the first time (aka cold-start).
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
@@ -613,39 +993,54 @@ const (
 	FaaSColdstartKey = attribute.Key("faas.coldstart")
 )
 
+// FaaSColdstart returns an attribute KeyValue conforming to the
+// "faas.coldstart" semantic conventions. It represents a boolean that is true
+// if the serverless function is executed for the first time (aka cold-start).
+func FaaSColdstart(val bool) attribute.KeyValue {
+	return FaaSColdstartKey.Bool(val)
+}
+
 // Contains additional attributes for outgoing FaaS spans.
 const (
-	// The name of the invoked function.
+	// FaaSInvokedNameKey is the attribute Key conforming to the
+	// "faas.invoked_name" semantic conventions. It represents the name of the
+	// invoked function.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'my-function'
-	// Note: SHOULD be equal to the `faas.name` resource attribute of the invoked
-	// function.
+	// Note: SHOULD be equal to the `faas.name` resource attribute of the
+	// invoked function.
 	FaaSInvokedNameKey = attribute.Key("faas.invoked_name")
-	// The cloud provider of the invoked function.
+
+	// FaaSInvokedProviderKey is the attribute Key conforming to the
+	// "faas.invoked_provider" semantic conventions. It represents the cloud
+	// provider of the invoked function.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
 	// Stability: stable
-	// Note: SHOULD be equal to the `cloud.provider` resource attribute of the invoked
-	// function.
+	// Note: SHOULD be equal to the `cloud.provider` resource attribute of the
+	// invoked function.
 	FaaSInvokedProviderKey = attribute.Key("faas.invoked_provider")
-	// The cloud region of the invoked function.
+
+	// FaaSInvokedRegionKey is the attribute Key conforming to the
+	// "faas.invoked_region" semantic conventions. It represents the cloud
+	// region of the invoked function.
 	//
 	// Type: string
-	// RequirementLevel: ConditionallyRequired (For some cloud providers, like AWS or
-	// GCP, the region in which a function is hosted is essential to uniquely identify
-	// the function and also part of its endpoint. Since it's part of the endpoint
-	// being called, the region is always known to clients. In these cases,
-	// `faas.invoked_region` MUST be set accordingly. If the region is unknown to the
-	// client or not required for identifying the invoked function, setting
-	// `faas.invoked_region` is optional.)
+	// RequirementLevel: ConditionallyRequired (For some cloud providers, like
+	// AWS or GCP, the region in which a function is hosted is essential to
+	// uniquely identify the function and also part of its endpoint. Since it's
+	// part of the endpoint being called, the region is always known to
+	// clients. In these cases, `faas.invoked_region` MUST be set accordingly.
+	// If the region is unknown to the client or not required for identifying
+	// the invoked function, setting `faas.invoked_region` is optional.)
 	// Stability: stable
 	// Examples: 'eu-central-1'
-	// Note: SHOULD be equal to the `cloud.region` resource attribute of the invoked
-	// function.
+	// Note: SHOULD be equal to the `cloud.region` resource attribute of the
+	// invoked function.
 	FaaSInvokedRegionKey = attribute.Key("faas.invoked_region")
 )
 
@@ -662,50 +1057,82 @@ var (
 	FaaSInvokedProviderTencentCloud = FaaSInvokedProviderKey.String("tencent_cloud")
 )
 
+// FaaSInvokedName returns an attribute KeyValue conforming to the
+// "faas.invoked_name" semantic conventions. It represents the name of the
+// invoked function.
+func FaaSInvokedName(val string) attribute.KeyValue {
+	return FaaSInvokedNameKey.String(val)
+}
+
+// FaaSInvokedRegion returns an attribute KeyValue conforming to the
+// "faas.invoked_region" semantic conventions. It represents the cloud region
+// of the invoked function.
+func FaaSInvokedRegion(val string) attribute.KeyValue {
+	return FaaSInvokedRegionKey.String(val)
+}
+
 // These attributes may be used for any network related operation.
 const (
-	// Transport protocol used. See note below.
+	// NetTransportKey is the attribute Key conforming to the "net.transport"
+	// semantic conventions. It represents the transport protocol used. See
+	// note below.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	NetTransportKey = attribute.Key("net.transport")
-	// Application layer protocol used. The value SHOULD be normalized to lowercase.
+
+	// NetAppProtocolNameKey is the attribute Key conforming to the
+	// "net.app.protocol.name" semantic conventions. It represents the
+	// application layer protocol used. The value SHOULD be normalized to
+	// lowercase.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'amqp', 'http', 'mqtt'
 	NetAppProtocolNameKey = attribute.Key("net.app.protocol.name")
-	// Version of the application layer protocol used. See note below.
+
+	// NetAppProtocolVersionKey is the attribute Key conforming to the
+	// "net.app.protocol.version" semantic conventions. It represents the
+	// version of the application layer protocol used. See note below.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '3.1.1'
-	// Note: `net.app.protocol.version` refers to the version of the protocol used and
-	// might be different from the protocol client's version. If the HTTP client used
-	// has a version of `0.27.2`, but sends HTTP version `1.1`, this attribute should
-	// be set to `1.1`.
+	// Note: `net.app.protocol.version` refers to the version of the protocol
+	// used and might be different from the protocol client's version. If the
+	// HTTP client used has a version of `0.27.2`, but sends HTTP version
+	// `1.1`, this attribute should be set to `1.1`.
 	NetAppProtocolVersionKey = attribute.Key("net.app.protocol.version")
-	// Remote socket peer name.
+
+	// NetSockPeerNameKey is the attribute Key conforming to the
+	// "net.sock.peer.name" semantic conventions. It represents the remote
+	// socket peer name.
 	//
 	// Type: string
-	// RequirementLevel: Recommended (If available and different from `net.peer.name`
-	// and if `net.sock.peer.addr` is set.)
+	// RequirementLevel: Recommended (If available and different from
+	// `net.peer.name` and if `net.sock.peer.addr` is set.)
 	// Stability: stable
 	// Examples: 'proxy.example.com'
 	NetSockPeerNameKey = attribute.Key("net.sock.peer.name")
-	// Remote socket peer address: IPv4 or IPv6 for internet protocols, path for local
-	// communication, [etc](https://man7.org/linux/man-
-	// pages/man7/address_families.7.html).
+
+	// NetSockPeerAddrKey is the attribute Key conforming to the
+	// "net.sock.peer.addr" semantic conventions. It represents the remote
+	// socket peer address: IPv4 or IPv6 for internet protocols, path for local
+	// communication,
+	// [etc](https://man7.org/linux/man-pages/man7/address_families.7.html).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '127.0.0.1', '/tmp/mysql.sock'
 	NetSockPeerAddrKey = attribute.Key("net.sock.peer.addr")
-	// Remote socket peer port.
+
+	// NetSockPeerPortKey is the attribute Key conforming to the
+	// "net.sock.peer.port" semantic conventions. It represents the remote
+	// socket peer port.
 	//
 	// Type: int
 	// RequirementLevel: Recommended (If defined for the address family and if
@@ -713,56 +1140,77 @@ const (
 	// Stability: stable
 	// Examples: 16456
 	NetSockPeerPortKey = attribute.Key("net.sock.peer.port")
-	// Protocol [address family](https://man7.org/linux/man-
-	// pages/man7/address_families.7.html) which is used for communication.
+
+	// NetSockFamilyKey is the attribute Key conforming to the
+	// "net.sock.family" semantic conventions. It represents the protocol
+	// [address
+	// family](https://man7.org/linux/man-pages/man7/address_families.7.html)
+	// which is used for communication.
 	//
 	// Type: Enum
-	// RequirementLevel: ConditionallyRequired (If different than `inet` and if any of
-	// `net.sock.peer.addr` or `net.sock.host.addr` are set. Consumers of telemetry
-	// SHOULD accept both IPv4 and IPv6 formats for the address in
+	// RequirementLevel: ConditionallyRequired (If different than `inet` and if
+	// any of `net.sock.peer.addr` or `net.sock.host.addr` are set. Consumers
+	// of telemetry SHOULD accept both IPv4 and IPv6 formats for the address in
 	// `net.sock.peer.addr` if `net.sock.family` is not set. This is to support
 	// instrumentations that follow previous versions of this document.)
 	// Stability: stable
 	// Examples: 'inet6', 'bluetooth'
 	NetSockFamilyKey = attribute.Key("net.sock.family")
-	// Logical remote hostname, see note below.
+
+	// NetPeerNameKey is the attribute Key conforming to the "net.peer.name"
+	// semantic conventions. It represents the logical remote hostname, see
+	// note below.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'example.com'
-	// Note: `net.peer.name` SHOULD NOT be set if capturing it would require an extra
-	// DNS lookup.
+	// Note: `net.peer.name` SHOULD NOT be set if capturing it would require an
+	// extra DNS lookup.
 	NetPeerNameKey = attribute.Key("net.peer.name")
-	// Logical remote port number
+
+	// NetPeerPortKey is the attribute Key conforming to the "net.peer.port"
+	// semantic conventions. It represents the logical remote port number
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 80, 8080, 443
 	NetPeerPortKey = attribute.Key("net.peer.port")
-	// Logical local hostname or similar, see note below.
+
+	// NetHostNameKey is the attribute Key conforming to the "net.host.name"
+	// semantic conventions. It represents the logical local hostname or
+	// similar, see note below.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'localhost'
 	NetHostNameKey = attribute.Key("net.host.name")
-	// Logical local port number, preferably the one that the peer used to connect
+
+	// NetHostPortKey is the attribute Key conforming to the "net.host.port"
+	// semantic conventions. It represents the logical local port number,
+	// preferably the one that the peer used to connect
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 8080
 	NetHostPortKey = attribute.Key("net.host.port")
-	// Local socket address. Useful in case of a multi-IP host.
+
+	// NetSockHostAddrKey is the attribute Key conforming to the
+	// "net.sock.host.addr" semantic conventions. It represents the local
+	// socket address. Useful in case of a multi-IP host.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '192.168.0.1'
 	NetSockHostAddrKey = attribute.Key("net.sock.host.addr")
-	// Local socket port number.
+
+	// NetSockHostPortKey is the attribute Key conforming to the
+	// "net.sock.host.port" semantic conventions. It represents the local
+	// socket port number.
 	//
 	// Type: int
 	// RequirementLevel: Recommended (If defined for the address family and if
@@ -770,44 +1218,62 @@ const (
 	// Stability: stable
 	// Examples: 35555
 	NetSockHostPortKey = attribute.Key("net.sock.host.port")
-	// The internet connection type currently being used by the host.
+
+	// NetHostConnectionTypeKey is the attribute Key conforming to the
+	// "net.host.connection.type" semantic conventions. It represents the
+	// internet connection type currently being used by the host.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'wifi'
 	NetHostConnectionTypeKey = attribute.Key("net.host.connection.type")
-	// This describes more details regarding the connection.type. It may be the type
-	// of cell technology connection, but it could be used for describing details
-	// about a wifi connection.
+
+	// NetHostConnectionSubtypeKey is the attribute Key conforming to the
+	// "net.host.connection.subtype" semantic conventions. It represents the
+	// this describes more details regarding the connection.type. It may be the
+	// type of cell technology connection, but it could be used for describing
+	// details about a wifi connection.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'LTE'
 	NetHostConnectionSubtypeKey = attribute.Key("net.host.connection.subtype")
-	// The name of the mobile carrier.
+
+	// NetHostCarrierNameKey is the attribute Key conforming to the
+	// "net.host.carrier.name" semantic conventions. It represents the name of
+	// the mobile carrier.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'sprint'
 	NetHostCarrierNameKey = attribute.Key("net.host.carrier.name")
-	// The mobile carrier country code.
+
+	// NetHostCarrierMccKey is the attribute Key conforming to the
+	// "net.host.carrier.mcc" semantic conventions. It represents the mobile
+	// carrier country code.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '310'
 	NetHostCarrierMccKey = attribute.Key("net.host.carrier.mcc")
-	// The mobile carrier network code.
+
+	// NetHostCarrierMncKey is the attribute Key conforming to the
+	// "net.host.carrier.mnc" semantic conventions. It represents the mobile
+	// carrier network code.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '001'
 	NetHostCarrierMncKey = attribute.Key("net.host.carrier.mnc")
-	// The ISO 3166-1 alpha-2 2-character country code associated with the mobile
+
+	// NetHostCarrierIccKey is the attribute Key conforming to the
+	// "net.host.carrier.icc" semantic conventions. It represents the ISO
+	// 3166-1 alpha-2 2-character country code associated with the mobile
 	// carrier network.
 	//
 	// Type: string
@@ -897,11 +1363,120 @@ var (
 	NetHostConnectionSubtypeLteCa = NetHostConnectionSubtypeKey.String("lte_ca")
 )
 
+// NetAppProtocolName returns an attribute KeyValue conforming to the
+// "net.app.protocol.name" semantic conventions. It represents the application
+// layer protocol used. The value SHOULD be normalized to lowercase.
+func NetAppProtocolName(val string) attribute.KeyValue {
+	return NetAppProtocolNameKey.String(val)
+}
+
+// NetAppProtocolVersion returns an attribute KeyValue conforming to the
+// "net.app.protocol.version" semantic conventions. It represents the version
+// of the application layer protocol used. See note below.
+func NetAppProtocolVersion(val string) attribute.KeyValue {
+	return NetAppProtocolVersionKey.String(val)
+}
+
+// NetSockPeerName returns an attribute KeyValue conforming to the
+// "net.sock.peer.name" semantic conventions. It represents the remote socket
+// peer name.
+func NetSockPeerName(val string) attribute.KeyValue {
+	return NetSockPeerNameKey.String(val)
+}
+
+// NetSockPeerAddr returns an attribute KeyValue conforming to the
+// "net.sock.peer.addr" semantic conventions. It represents the remote socket
+// peer address: IPv4 or IPv6 for internet protocols, path for local
+// communication,
+// [etc](https://man7.org/linux/man-pages/man7/address_families.7.html).
+func NetSockPeerAddr(val string) attribute.KeyValue {
+	return NetSockPeerAddrKey.String(val)
+}
+
+// NetSockPeerPort returns an attribute KeyValue conforming to the
+// "net.sock.peer.port" semantic conventions. It represents the remote socket
+// peer port.
+func NetSockPeerPort(val int) attribute.KeyValue {
+	return NetSockPeerPortKey.Int(val)
+}
+
+// NetPeerName returns an attribute KeyValue conforming to the
+// "net.peer.name" semantic conventions. It represents the logical remote
+// hostname, see note below.
+func NetPeerName(val string) attribute.KeyValue {
+	return NetPeerNameKey.String(val)
+}
+
+// NetPeerPort returns an attribute KeyValue conforming to the
+// "net.peer.port" semantic conventions. It represents the logical remote port
+// number
+func NetPeerPort(val int) attribute.KeyValue {
+	return NetPeerPortKey.Int(val)
+}
+
+// NetHostName returns an attribute KeyValue conforming to the
+// "net.host.name" semantic conventions. It represents the logical local
+// hostname or similar, see note below.
+func NetHostName(val string) attribute.KeyValue {
+	return NetHostNameKey.String(val)
+}
+
+// NetHostPort returns an attribute KeyValue conforming to the
+// "net.host.port" semantic conventions. It represents the logical local port
+// number, preferably the one that the peer used to connect
+func NetHostPort(val int) attribute.KeyValue {
+	return NetHostPortKey.Int(val)
+}
+
+// NetSockHostAddr returns an attribute KeyValue conforming to the
+// "net.sock.host.addr" semantic conventions. It represents the local socket
+// address. Useful in case of a multi-IP host.
+func NetSockHostAddr(val string) attribute.KeyValue {
+	return NetSockHostAddrKey.String(val)
+}
+
+// NetSockHostPort returns an attribute KeyValue conforming to the
+// "net.sock.host.port" semantic conventions. It represents the local socket
+// port number.
+func NetSockHostPort(val int) attribute.KeyValue {
+	return NetSockHostPortKey.Int(val)
+}
+
+// NetHostCarrierName returns an attribute KeyValue conforming to the
+// "net.host.carrier.name" semantic conventions. It represents the name of the
+// mobile carrier.
+func NetHostCarrierName(val string) attribute.KeyValue {
+	return NetHostCarrierNameKey.String(val)
+}
+
+// NetHostCarrierMcc returns an attribute KeyValue conforming to the
+// "net.host.carrier.mcc" semantic conventions. It represents the mobile
+// carrier country code.
+func NetHostCarrierMcc(val string) attribute.KeyValue {
+	return NetHostCarrierMccKey.String(val)
+}
+
+// NetHostCarrierMnc returns an attribute KeyValue conforming to the
+// "net.host.carrier.mnc" semantic conventions. It represents the mobile
+// carrier network code.
+func NetHostCarrierMnc(val string) attribute.KeyValue {
+	return NetHostCarrierMncKey.String(val)
+}
+
+// NetHostCarrierIcc returns an attribute KeyValue conforming to the
+// "net.host.carrier.icc" semantic conventions. It represents the ISO 3166-1
+// alpha-2 2-character country code associated with the mobile carrier network.
+func NetHostCarrierIcc(val string) attribute.KeyValue {
+	return NetHostCarrierIccKey.String(val)
+}
+
 // Operations that access some remote service.
 const (
-	// The [`service.name`](../../resource/semantic_conventions/README.md#service) of
-	// the remote service. SHOULD be equal to the actual `service.name` resource
-	// attribute of the remote service if any.
+	// PeerServiceKey is the attribute Key conforming to the "peer.service"
+	// semantic conventions. It represents the
+	// [`service.name`](../../resource/semantic_conventions/README.md#service)
+	// of the remote service. SHOULD be equal to the actual `service.name`
+	// resource attribute of the remote service if any.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -910,31 +1485,49 @@ const (
 	PeerServiceKey = attribute.Key("peer.service")
 )
 
-// These attributes may be used for any operation with an authenticated and/or authorized enduser.
+// PeerService returns an attribute KeyValue conforming to the
+// "peer.service" semantic conventions. It represents the
+// [`service.name`](../../resource/semantic_conventions/README.md#service) of
+// the remote service. SHOULD be equal to the actual `service.name` resource
+// attribute of the remote service if any.
+func PeerService(val string) attribute.KeyValue {
+	return PeerServiceKey.String(val)
+}
+
+// These attributes may be used for any operation with an authenticated and/or
+// authorized enduser.
 const (
-	// Username or client_id extracted from the access token or
-	// [Authorization](https://tools.ietf.org/html/rfc7235#section-4.2) header in the
-	// inbound request from outside the system.
+	// EnduserIDKey is the attribute Key conforming to the "enduser.id"
+	// semantic conventions. It represents the username or client_id extracted
+	// from the access token or
+	// [Authorization](https://tools.ietf.org/html/rfc7235#section-4.2) header
+	// in the inbound request from outside the system.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'username'
 	EnduserIDKey = attribute.Key("enduser.id")
-	// Actual/assumed role the client is making the request under extracted from token
-	// or application security context.
+
+	// EnduserRoleKey is the attribute Key conforming to the "enduser.role"
+	// semantic conventions. It represents the actual/assumed role the client
+	// is making the request under extracted from token or application security
+	// context.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'admin'
 	EnduserRoleKey = attribute.Key("enduser.role")
-	// Scopes or granted authorities the client currently possesses extracted from
-	// token or application security context. The value would come from the scope
-	// associated with an [OAuth 2.0 Access
-	// Token](https://tools.ietf.org/html/rfc6749#section-3.3) or an attribute value
-	// in a [SAML 2.0 Assertion](http://docs.oasis-
-	// open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html).
+
+	// EnduserScopeKey is the attribute Key conforming to the "enduser.scope"
+	// semantic conventions. It represents the scopes or granted authorities
+	// the client currently possesses extracted from token or application
+	// security context. The value would come from the scope associated with an
+	// [OAuth 2.0 Access
+	// Token](https://tools.ietf.org/html/rfc6749#section-3.3) or an attribute
+	// value in a [SAML 2.0
+	// Assertion](http://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html).
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -943,16 +1536,50 @@ const (
 	EnduserScopeKey = attribute.Key("enduser.scope")
 )
 
-// These attributes may be used for any operation to store information about a thread that started a span.
+// EnduserID returns an attribute KeyValue conforming to the "enduser.id"
+// semantic conventions. It represents the username or client_id extracted from
+// the access token or
+// [Authorization](https://tools.ietf.org/html/rfc7235#section-4.2) header in
+// the inbound request from outside the system.
+func EnduserID(val string) attribute.KeyValue {
+	return EnduserIDKey.String(val)
+}
+
+// EnduserRole returns an attribute KeyValue conforming to the
+// "enduser.role" semantic conventions. It represents the actual/assumed role
+// the client is making the request under extracted from token or application
+// security context.
+func EnduserRole(val string) attribute.KeyValue {
+	return EnduserRoleKey.String(val)
+}
+
+// EnduserScope returns an attribute KeyValue conforming to the
+// "enduser.scope" semantic conventions. It represents the scopes or granted
+// authorities the client currently possesses extracted from token or
+// application security context. The value would come from the scope associated
+// with an [OAuth 2.0 Access
+// Token](https://tools.ietf.org/html/rfc6749#section-3.3) or an attribute
+// value in a [SAML 2.0
+// Assertion](http://docs.oasis-open.org/security/saml/Post2.0/sstc-saml-tech-overview-2.0.html).
+func EnduserScope(val string) attribute.KeyValue {
+	return EnduserScopeKey.String(val)
+}
+
+// These attributes may be used for any operation to store information about a
+// thread that started a span.
 const (
-	// Current "managed" thread ID (as opposed to OS thread ID).
+	// ThreadIDKey is the attribute Key conforming to the "thread.id" semantic
+	// conventions. It represents the current "managed" thread ID (as opposed
+	// to OS thread ID).
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 42
 	ThreadIDKey = attribute.Key("thread.id")
-	// Current thread name.
+
+	// ThreadNameKey is the attribute Key conforming to the "thread.name"
+	// semantic conventions. It represents the current thread name.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -961,43 +1588,70 @@ const (
 	ThreadNameKey = attribute.Key("thread.name")
 )
 
-// These attributes allow to report this unit of code and therefore to provide more context about the span.
+// ThreadID returns an attribute KeyValue conforming to the "thread.id"
+// semantic conventions. It represents the current "managed" thread ID (as
+// opposed to OS thread ID).
+func ThreadID(val int) attribute.KeyValue {
+	return ThreadIDKey.Int(val)
+}
+
+// ThreadName returns an attribute KeyValue conforming to the "thread.name"
+// semantic conventions. It represents the current thread name.
+func ThreadName(val string) attribute.KeyValue {
+	return ThreadNameKey.String(val)
+}
+
+// These attributes allow to report this unit of code and therefore to provide
+// more context about the span.
 const (
-	// The method or function name, or equivalent (usually rightmost part of the code
-	// unit's name).
+	// CodeFunctionKey is the attribute Key conforming to the "code.function"
+	// semantic conventions. It represents the method or function name, or
+	// equivalent (usually rightmost part of the code unit's name).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'serveRequest'
 	CodeFunctionKey = attribute.Key("code.function")
-	// The "namespace" within which `code.function` is defined. Usually the qualified
-	// class or module name, such that `code.namespace` + some separator +
-	// `code.function` form a unique identifier for the code unit.
+
+	// CodeNamespaceKey is the attribute Key conforming to the "code.namespace"
+	// semantic conventions. It represents the "namespace" within which
+	// `code.function` is defined. Usually the qualified class or module name,
+	// such that `code.namespace` + some separator + `code.function` form a
+	// unique identifier for the code unit.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'com.example.MyHTTPService'
 	CodeNamespaceKey = attribute.Key("code.namespace")
-	// The source code file name that identifies the code unit as uniquely as possible
-	// (preferably an absolute file path).
+
+	// CodeFilepathKey is the attribute Key conforming to the "code.filepath"
+	// semantic conventions. It represents the source code file name that
+	// identifies the code unit as uniquely as possible (preferably an absolute
+	// file path).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '/usr/local/MyApplication/content_root/app/index.php'
 	CodeFilepathKey = attribute.Key("code.filepath")
-	// The line number in `code.filepath` best representing the operation. It SHOULD
-	// point within the code unit named in `code.function`.
+
+	// CodeLineNumberKey is the attribute Key conforming to the "code.lineno"
+	// semantic conventions. It represents the line number in `code.filepath`
+	// best representing the operation. It SHOULD point within the code unit
+	// named in `code.function`.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 42
 	CodeLineNumberKey = attribute.Key("code.lineno")
-	// The column number in `code.filepath` best representing the operation. It SHOULD
-	// point within the code unit named in `code.function`.
+
+	// CodeColumnKey is the attribute Key conforming to the "code.column"
+	// semantic conventions. It represents the column number in `code.filepath`
+	// best representing the operation. It SHOULD point within the code unit
+	// named in `code.function`.
 	//
 	// Type: int
 	// RequirementLevel: Optional
@@ -1006,42 +1660,98 @@ const (
 	CodeColumnKey = attribute.Key("code.column")
 )
 
-// This document defines semantic conventions for HTTP client and server Spans.
+// CodeFunction returns an attribute KeyValue conforming to the
+// "code.function" semantic conventions. It represents the method or function
+// name, or equivalent (usually rightmost part of the code unit's name).
+func CodeFunction(val string) attribute.KeyValue {
+	return CodeFunctionKey.String(val)
+}
+
+// CodeNamespace returns an attribute KeyValue conforming to the
+// "code.namespace" semantic conventions. It represents the "namespace" within
+// which `code.function` is defined. Usually the qualified class or module
+// name, such that `code.namespace` + some separator + `code.function` form a
+// unique identifier for the code unit.
+func CodeNamespace(val string) attribute.KeyValue {
+	return CodeNamespaceKey.String(val)
+}
+
+// CodeFilepath returns an attribute KeyValue conforming to the
+// "code.filepath" semantic conventions. It represents the source code file
+// name that identifies the code unit as uniquely as possible (preferably an
+// absolute file path).
+func CodeFilepath(val string) attribute.KeyValue {
+	return CodeFilepathKey.String(val)
+}
+
+// CodeLineNumber returns an attribute KeyValue conforming to the "code.lineno"
+// semantic conventions. It represents the line number in `code.filepath` best
+// representing the operation. It SHOULD point within the code unit named in
+// `code.function`.
+func CodeLineNumber(val int) attribute.KeyValue {
+	return CodeLineNumberKey.Int(val)
+}
+
+// CodeColumn returns an attribute KeyValue conforming to the "code.column"
+// semantic conventions. It represents the column number in `code.filepath`
+// best representing the operation. It SHOULD point within the code unit named
+// in `code.function`.
+func CodeColumn(val int) attribute.KeyValue {
+	return CodeColumnKey.Int(val)
+}
+
+// Semantic conventions for HTTP client and server Spans.
 const (
-	// HTTP request method.
+	// HTTPMethodKey is the attribute Key conforming to the "http.method"
+	// semantic conventions. It represents the hTTP request method.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'GET', 'POST', 'HEAD'
 	HTTPMethodKey = attribute.Key("http.method")
-	// [HTTP response status code](https://tools.ietf.org/html/rfc7231#section-6).
+
+	// HTTPStatusCodeKey is the attribute Key conforming to the
+	// "http.status_code" semantic conventions. It represents the [HTTP
+	// response status code](https://tools.ietf.org/html/rfc7231#section-6).
 	//
 	// Type: int
-	// RequirementLevel: ConditionallyRequired (If and only if one was received/sent.)
+	// RequirementLevel: ConditionallyRequired (If and only if one was
+	// received/sent.)
 	// Stability: stable
 	// Examples: 200
 	HTTPStatusCodeKey = attribute.Key("http.status_code")
-	// Kind of HTTP protocol used.
+
+	// HTTPFlavorKey is the attribute Key conforming to the "http.flavor"
+	// semantic conventions. It represents the kind of HTTP protocol used.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Note: If `net.transport` is not specified, it can be assumed to be `IP.TCP`
-	// except if `http.flavor` is `QUIC`, in which case `IP.UDP` is assumed.
+	// Note: If `net.transport` is not specified, it can be assumed to be
+	// `IP.TCP` except if `http.flavor` is `QUIC`, in which case `IP.UDP` is
+	// assumed.
 	HTTPFlavorKey = attribute.Key("http.flavor")
-	// Value of the [HTTP User-Agent](https://www.rfc-
-	// editor.org/rfc/rfc9110.html#field.user-agent) header sent by the client.
+
+	// HTTPUserAgentKey is the attribute Key conforming to the
+	// "http.user_agent" semantic conventions. It represents the value of the
+	// [HTTP
+	// User-Agent](https://www.rfc-editor.org/rfc/rfc9110.html#field.user-agent)
+	// header sent by the client.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'CERN-LineMode/2.15 libwww/2.17b3'
 	HTTPUserAgentKey = attribute.Key("http.user_agent")
-	// The size of the request payload body in bytes. This is the number of bytes
-	// transferred excluding headers and is often, but not always, present as the
-	// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-
-	// length) header. For requests using transport encoding, this should be the
+
+	// HTTPRequestContentLengthKey is the attribute Key conforming to the
+	// "http.request_content_length" semantic conventions. It represents the
+	// size of the request payload body in bytes. This is the number of bytes
+	// transferred excluding headers and is often, but not always, present as
+	// the
+	// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length)
+	// header. For requests using transport encoding, this should be the
 	// compressed size.
 	//
 	// Type: int
@@ -1049,10 +1759,14 @@ const (
 	// Stability: stable
 	// Examples: 3495
 	HTTPRequestContentLengthKey = attribute.Key("http.request_content_length")
-	// The size of the response payload body in bytes. This is the number of bytes
-	// transferred excluding headers and is often, but not always, present as the
-	// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-
-	// length) header. For requests using transport encoding, this should be the
+
+	// HTTPResponseContentLengthKey is the attribute Key conforming to the
+	// "http.response_content_length" semantic conventions. It represents the
+	// size of the response payload body in bytes. This is the number of bytes
+	// transferred excluding headers and is often, but not always, present as
+	// the
+	// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length)
+	// header. For requests using transport encoding, this should be the
 	// compressed size.
 	//
 	// Type: int
@@ -1077,74 +1791,149 @@ var (
 	HTTPFlavorQUIC = HTTPFlavorKey.String("QUIC")
 )
 
+// HTTPMethod returns an attribute KeyValue conforming to the "http.method"
+// semantic conventions. It represents the hTTP request method.
+func HTTPMethod(val string) attribute.KeyValue {
+	return HTTPMethodKey.String(val)
+}
+
+// HTTPStatusCode returns an attribute KeyValue conforming to the
+// "http.status_code" semantic conventions. It represents the [HTTP response
+// status code](https://tools.ietf.org/html/rfc7231#section-6).
+func HTTPStatusCode(val int) attribute.KeyValue {
+	return HTTPStatusCodeKey.Int(val)
+}
+
+// HTTPUserAgent returns an attribute KeyValue conforming to the
+// "http.user_agent" semantic conventions. It represents the value of the [HTTP
+// User-Agent](https://www.rfc-editor.org/rfc/rfc9110.html#field.user-agent)
+// header sent by the client.
+func HTTPUserAgent(val string) attribute.KeyValue {
+	return HTTPUserAgentKey.String(val)
+}
+
+// HTTPRequestContentLength returns an attribute KeyValue conforming to the
+// "http.request_content_length" semantic conventions. It represents the size
+// of the request payload body in bytes. This is the number of bytes
+// transferred excluding headers and is often, but not always, present as the
+// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length)
+// header. For requests using transport encoding, this should be the compressed
+// size.
+func HTTPRequestContentLength(val int) attribute.KeyValue {
+	return HTTPRequestContentLengthKey.Int(val)
+}
+
+// HTTPResponseContentLength returns an attribute KeyValue conforming to the
+// "http.response_content_length" semantic conventions. It represents the size
+// of the response payload body in bytes. This is the number of bytes
+// transferred excluding headers and is often, but not always, present as the
+// [Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#field.content-length)
+// header. For requests using transport encoding, this should be the compressed
+// size.
+func HTTPResponseContentLength(val int) attribute.KeyValue {
+	return HTTPResponseContentLengthKey.Int(val)
+}
+
 // Semantic Convention for HTTP Client
 const (
-	// Full HTTP request URL in the form `scheme://host[:port]/path?query[#fragment]`.
-	// Usually the fragment is not transmitted over HTTP, but if it is known, it
-	// should be included nevertheless.
+	// HTTPURLKey is the attribute Key conforming to the "http.url" semantic
+	// conventions. It represents the full HTTP request URL in the form
+	// `scheme://host[:port]/path?query[#fragment]`. Usually the fragment is
+	// not transmitted over HTTP, but if it is known, it should be included
+	// nevertheless.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'https://www.foo.bar/search?q=OpenTelemetry#SemConv'
 	// Note: `http.url` MUST NOT contain credentials passed via URL in form of
-	// `https://username:password@www.example.com/`. In such case the attribute's
-	// value should be `https://www.example.com/`.
+	// `https://username:password@www.example.com/`. In such case the
+	// attribute's value should be `https://www.example.com/`.
 	HTTPURLKey = attribute.Key("http.url")
-	// The ordinal number of request resending attempt (for any reason, including
+
+	// HTTPResendCountKey is the attribute Key conforming to the
+	// "http.resend_count" semantic conventions. It represents the ordinal
+	// number of request resending attempt (for any reason, including
 	// redirects).
 	//
 	// Type: int
 	// RequirementLevel: Recommended (if and only if request was retried.)
 	// Stability: stable
 	// Examples: 3
-	// Note: The resend count SHOULD be updated each time an HTTP request gets resent
-	// by the client, regardless of what was the cause of the resending (e.g.
-	// redirection, authorization failure, 503 Server Unavailable, network issues, or
-	// any other).
+	// Note: The resend count SHOULD be updated each time an HTTP request gets
+	// resent by the client, regardless of what was the cause of the resending
+	// (e.g. redirection, authorization failure, 503 Server Unavailable,
+	// network issues, or any other).
 	HTTPResendCountKey = attribute.Key("http.resend_count")
 )
 
+// HTTPURL returns an attribute KeyValue conforming to the "http.url"
+// semantic conventions. It represents the full HTTP request URL in the form
+// `scheme://host[:port]/path?query[#fragment]`. Usually the fragment is not
+// transmitted over HTTP, but if it is known, it should be included
+// nevertheless.
+func HTTPURL(val string) attribute.KeyValue {
+	return HTTPURLKey.String(val)
+}
+
+// HTTPResendCount returns an attribute KeyValue conforming to the
+// "http.resend_count" semantic conventions. It represents the ordinal number
+// of request resending attempt (for any reason, including redirects).
+func HTTPResendCount(val int) attribute.KeyValue {
+	return HTTPResendCountKey.Int(val)
+}
+
 // Semantic Convention for HTTP Server
 const (
-	// The URI scheme identifying the used protocol.
+	// HTTPSchemeKey is the attribute Key conforming to the "http.scheme"
+	// semantic conventions. It represents the URI scheme identifying the used
+	// protocol.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'http', 'https'
 	HTTPSchemeKey = attribute.Key("http.scheme")
-	// The full request target as passed in a HTTP request line or equivalent.
+
+	// HTTPTargetKey is the attribute Key conforming to the "http.target"
+	// semantic conventions. It represents the full request target as passed in
+	// a HTTP request line or equivalent.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: '/path/12314/?q=ddds'
 	HTTPTargetKey = attribute.Key("http.target")
-	// The matched route (path template in the format used by the respective server
-	// framework). See note below
+
+	// HTTPRouteKey is the attribute Key conforming to the "http.route"
+	// semantic conventions. It represents the matched route (path template in
+	// the format used by the respective server framework). See note below
 	//
 	// Type: string
 	// RequirementLevel: ConditionallyRequired (If and only if it's available)
 	// Stability: stable
 	// Examples: '/users/:userID?', '{controller}/{action}/{id?}'
-	// Note: 'http.route' MUST NOT be populated when this is not supported by the HTTP
-	// server framework as the route attribute should have low-cardinality and the URI
-	// path can NOT substitute it.
+	// Note: 'http.route' MUST NOT be populated when this is not supported by
+	// the HTTP server framework as the route attribute should have
+	// low-cardinality and the URI path can NOT substitute it.
 	HTTPRouteKey = attribute.Key("http.route")
-	// The IP address of the original client behind all proxies, if known (e.g. from
-	// [X-Forwarded-For](https://developer.mozilla.org/en-
-	// US/docs/Web/HTTP/Headers/X-Forwarded-For)).
+
+	// HTTPClientIPKey is the attribute Key conforming to the "http.client_ip"
+	// semantic conventions. It represents the IP address of the original
+	// client behind all proxies, if known (e.g. from
+	// [X-Forwarded-For](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For)).
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '83.164.160.102'
-	// Note: This is not necessarily the same as `net.sock.peer.addr`, which would
+	// Note: This is not necessarily the same as `net.sock.peer.addr`, which
+	// would
 	// identify the network-level peer, which may be a proxy.
-
+	//
 	// This attribute should be set when a source of information different
-	// from the one used for `net.sock.peer.addr`, is available even if that other
+	// from the one used for `net.sock.peer.addr`, is available even if that
+	// other
 	// source just confirms the same value as `net.sock.peer.addr`.
 	// Rationale: For `net.sock.peer.addr`, one typically does not know if it
 	// comes from a proxy, reverse proxy, or the actual client. Setting
@@ -1154,89 +1943,155 @@ const (
 	HTTPClientIPKey = attribute.Key("http.client_ip")
 )
 
+// HTTPScheme returns an attribute KeyValue conforming to the "http.scheme"
+// semantic conventions. It represents the URI scheme identifying the used
+// protocol.
+func HTTPScheme(val string) attribute.KeyValue {
+	return HTTPSchemeKey.String(val)
+}
+
+// HTTPTarget returns an attribute KeyValue conforming to the "http.target"
+// semantic conventions. It represents the full request target as passed in a
+// HTTP request line or equivalent.
+func HTTPTarget(val string) attribute.KeyValue {
+	return HTTPTargetKey.String(val)
+}
+
+// HTTPRoute returns an attribute KeyValue conforming to the "http.route"
+// semantic conventions. It represents the matched route (path template in the
+// format used by the respective server framework). See note below
+func HTTPRoute(val string) attribute.KeyValue {
+	return HTTPRouteKey.String(val)
+}
+
+// HTTPClientIP returns an attribute KeyValue conforming to the
+// "http.client_ip" semantic conventions. It represents the IP address of the
+// original client behind all proxies, if known (e.g. from
+// [X-Forwarded-For](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For)).
+func HTTPClientIP(val string) attribute.KeyValue {
+	return HTTPClientIPKey.String(val)
+}
+
 // Attributes that exist for multiple DynamoDB request types.
 const (
-	// The keys in the `RequestItems` object field.
+	// AWSDynamoDBTableNamesKey is the attribute Key conforming to the
+	// "aws.dynamodb.table_names" semantic conventions. It represents the keys
+	// in the `RequestItems` object field.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'Users', 'Cats'
 	AWSDynamoDBTableNamesKey = attribute.Key("aws.dynamodb.table_names")
-	// The JSON-serialized value of each item in the `ConsumedCapacity` response
+
+	// AWSDynamoDBConsumedCapacityKey is the attribute Key conforming to the
+	// "aws.dynamodb.consumed_capacity" semantic conventions. It represents the
+	// JSON-serialized value of each item in the `ConsumedCapacity` response
 	// field.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: '{ "CapacityUnits": number, "GlobalSecondaryIndexes": { "string" : {
-	// "CapacityUnits": number, "ReadCapacityUnits": number, "WriteCapacityUnits":
-	// number } }, "LocalSecondaryIndexes": { "string" : { "CapacityUnits": number,
-	// "ReadCapacityUnits": number, "WriteCapacityUnits": number } },
-	// "ReadCapacityUnits": number, "Table": { "CapacityUnits": number,
-	// "ReadCapacityUnits": number, "WriteCapacityUnits": number }, "TableName":
-	// "string", "WriteCapacityUnits": number }'
+	// Examples: '{ "CapacityUnits": number, "GlobalSecondaryIndexes": {
+	// "string" : { "CapacityUnits": number, "ReadCapacityUnits": number,
+	// "WriteCapacityUnits": number } }, "LocalSecondaryIndexes": { "string" :
+	// { "CapacityUnits": number, "ReadCapacityUnits": number,
+	// "WriteCapacityUnits": number } }, "ReadCapacityUnits": number, "Table":
+	// { "CapacityUnits": number, "ReadCapacityUnits": number,
+	// "WriteCapacityUnits": number }, "TableName": "string",
+	// "WriteCapacityUnits": number }'
 	AWSDynamoDBConsumedCapacityKey = attribute.Key("aws.dynamodb.consumed_capacity")
-	// The JSON-serialized value of the `ItemCollectionMetrics` response field.
+
+	// AWSDynamoDBItemCollectionMetricsKey is the attribute Key conforming to
+	// the "aws.dynamodb.item_collection_metrics" semantic conventions. It
+	// represents the JSON-serialized value of the `ItemCollectionMetrics`
+	// response field.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: '{ "string" : [ { "ItemCollectionKey": { "string" : { "B": blob,
-	// "BOOL": boolean, "BS": [ blob ], "L": [ "AttributeValue" ], "M": { "string" :
-	// "AttributeValue" }, "N": "string", "NS": [ "string" ], "NULL": boolean, "S":
-	// "string", "SS": [ "string" ] } }, "SizeEstimateRangeGB": [ number ] } ] }'
+	// Examples: '{ "string" : [ { "ItemCollectionKey": { "string" : { "B":
+	// blob, "BOOL": boolean, "BS": [ blob ], "L": [ "AttributeValue" ], "M": {
+	// "string" : "AttributeValue" }, "N": "string", "NS": [ "string" ],
+	// "NULL": boolean, "S": "string", "SS": [ "string" ] } },
+	// "SizeEstimateRangeGB": [ number ] } ] }'
 	AWSDynamoDBItemCollectionMetricsKey = attribute.Key("aws.dynamodb.item_collection_metrics")
-	// The value of the `ProvisionedThroughput.ReadCapacityUnits` request parameter.
+
+	// AWSDynamoDBProvisionedReadCapacityKey is the attribute Key conforming to
+	// the "aws.dynamodb.provisioned_read_capacity" semantic conventions. It
+	// represents the value of the `ProvisionedThroughput.ReadCapacityUnits`
+	// request parameter.
 	//
 	// Type: double
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 1.0, 2.0
 	AWSDynamoDBProvisionedReadCapacityKey = attribute.Key("aws.dynamodb.provisioned_read_capacity")
-	// The value of the `ProvisionedThroughput.WriteCapacityUnits` request parameter.
+
+	// AWSDynamoDBProvisionedWriteCapacityKey is the attribute Key conforming
+	// to the "aws.dynamodb.provisioned_write_capacity" semantic conventions.
+	// It represents the value of the
+	// `ProvisionedThroughput.WriteCapacityUnits` request parameter.
 	//
 	// Type: double
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 1.0, 2.0
 	AWSDynamoDBProvisionedWriteCapacityKey = attribute.Key("aws.dynamodb.provisioned_write_capacity")
-	// The value of the `ConsistentRead` request parameter.
+
+	// AWSDynamoDBConsistentReadKey is the attribute Key conforming to the
+	// "aws.dynamodb.consistent_read" semantic conventions. It represents the
+	// value of the `ConsistentRead` request parameter.
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
 	// Stability: stable
 	AWSDynamoDBConsistentReadKey = attribute.Key("aws.dynamodb.consistent_read")
-	// The value of the `ProjectionExpression` request parameter.
+
+	// AWSDynamoDBProjectionKey is the attribute Key conforming to the
+	// "aws.dynamodb.projection" semantic conventions. It represents the value
+	// of the `ProjectionExpression` request parameter.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: 'Title', 'Title, Price, Color', 'Title, Description, RelatedItems,
-	// ProductReviews'
+	// Examples: 'Title', 'Title, Price, Color', 'Title, Description,
+	// RelatedItems, ProductReviews'
 	AWSDynamoDBProjectionKey = attribute.Key("aws.dynamodb.projection")
-	// The value of the `Limit` request parameter.
+
+	// AWSDynamoDBLimitKey is the attribute Key conforming to the
+	// "aws.dynamodb.limit" semantic conventions. It represents the value of
+	// the `Limit` request parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 10
 	AWSDynamoDBLimitKey = attribute.Key("aws.dynamodb.limit")
-	// The value of the `AttributesToGet` request parameter.
+
+	// AWSDynamoDBAttributesToGetKey is the attribute Key conforming to the
+	// "aws.dynamodb.attributes_to_get" semantic conventions. It represents the
+	// value of the `AttributesToGet` request parameter.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'lives', 'id'
 	AWSDynamoDBAttributesToGetKey = attribute.Key("aws.dynamodb.attributes_to_get")
-	// The value of the `IndexName` request parameter.
+
+	// AWSDynamoDBIndexNameKey is the attribute Key conforming to the
+	// "aws.dynamodb.index_name" semantic conventions. It represents the value
+	// of the `IndexName` request parameter.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'name_to_group'
 	AWSDynamoDBIndexNameKey = attribute.Key("aws.dynamodb.index_name")
-	// The value of the `Select` request parameter.
+
+	// AWSDynamoDBSelectKey is the attribute Key conforming to the
+	// "aws.dynamodb.select" semantic conventions. It represents the value of
+	// the `Select` request parameter.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -1245,42 +2100,148 @@ const (
 	AWSDynamoDBSelectKey = attribute.Key("aws.dynamodb.select")
 )
 
+// AWSDynamoDBTableNames returns an attribute KeyValue conforming to the
+// "aws.dynamodb.table_names" semantic conventions. It represents the keys in
+// the `RequestItems` object field.
+func AWSDynamoDBTableNames(val ...string) attribute.KeyValue {
+	return AWSDynamoDBTableNamesKey.StringSlice(val)
+}
+
+// AWSDynamoDBConsumedCapacity returns an attribute KeyValue conforming to
+// the "aws.dynamodb.consumed_capacity" semantic conventions. It represents the
+// JSON-serialized value of each item in the `ConsumedCapacity` response field.
+func AWSDynamoDBConsumedCapacity(val ...string) attribute.KeyValue {
+	return AWSDynamoDBConsumedCapacityKey.StringSlice(val)
+}
+
+// AWSDynamoDBItemCollectionMetrics returns an attribute KeyValue conforming
+// to the "aws.dynamodb.item_collection_metrics" semantic conventions. It
+// represents the JSON-serialized value of the `ItemCollectionMetrics` response
+// field.
+func AWSDynamoDBItemCollectionMetrics(val string) attribute.KeyValue {
+	return AWSDynamoDBItemCollectionMetricsKey.String(val)
+}
+
+// AWSDynamoDBProvisionedReadCapacity returns an attribute KeyValue
+// conforming to the "aws.dynamodb.provisioned_read_capacity" semantic
+// conventions. It represents the value of the
+// `ProvisionedThroughput.ReadCapacityUnits` request parameter.
+func AWSDynamoDBProvisionedReadCapacity(val float64) attribute.KeyValue {
+	return AWSDynamoDBProvisionedReadCapacityKey.Float64(val)
+}
+
+// AWSDynamoDBProvisionedWriteCapacity returns an attribute KeyValue
+// conforming to the "aws.dynamodb.provisioned_write_capacity" semantic
+// conventions. It represents the value of the
+// `ProvisionedThroughput.WriteCapacityUnits` request parameter.
+func AWSDynamoDBProvisionedWriteCapacity(val float64) attribute.KeyValue {
+	return AWSDynamoDBProvisionedWriteCapacityKey.Float64(val)
+}
+
+// AWSDynamoDBConsistentRead returns an attribute KeyValue conforming to the
+// "aws.dynamodb.consistent_read" semantic conventions. It represents the value
+// of the `ConsistentRead` request parameter.
+func AWSDynamoDBConsistentRead(val bool) attribute.KeyValue {
+	return AWSDynamoDBConsistentReadKey.Bool(val)
+}
+
+// AWSDynamoDBProjection returns an attribute KeyValue conforming to the
+// "aws.dynamodb.projection" semantic conventions. It represents the value of
+// the `ProjectionExpression` request parameter.
+func AWSDynamoDBProjection(val string) attribute.KeyValue {
+	return AWSDynamoDBProjectionKey.String(val)
+}
+
+// AWSDynamoDBLimit returns an attribute KeyValue conforming to the
+// "aws.dynamodb.limit" semantic conventions. It represents the value of the
+// `Limit` request parameter.
+func AWSDynamoDBLimit(val int) attribute.KeyValue {
+	return AWSDynamoDBLimitKey.Int(val)
+}
+
+// AWSDynamoDBAttributesToGet returns an attribute KeyValue conforming to
+// the "aws.dynamodb.attributes_to_get" semantic conventions. It represents the
+// value of the `AttributesToGet` request parameter.
+func AWSDynamoDBAttributesToGet(val ...string) attribute.KeyValue {
+	return AWSDynamoDBAttributesToGetKey.StringSlice(val)
+}
+
+// AWSDynamoDBIndexName returns an attribute KeyValue conforming to the
+// "aws.dynamodb.index_name" semantic conventions. It represents the value of
+// the `IndexName` request parameter.
+func AWSDynamoDBIndexName(val string) attribute.KeyValue {
+	return AWSDynamoDBIndexNameKey.String(val)
+}
+
+// AWSDynamoDBSelect returns an attribute KeyValue conforming to the
+// "aws.dynamodb.select" semantic conventions. It represents the value of the
+// `Select` request parameter.
+func AWSDynamoDBSelect(val string) attribute.KeyValue {
+	return AWSDynamoDBSelectKey.String(val)
+}
+
 // DynamoDB.CreateTable
 const (
-	// The JSON-serialized value of each item of the `GlobalSecondaryIndexes` request
-	// field
+	// AWSDynamoDBGlobalSecondaryIndexesKey is the attribute Key conforming to
+	// the "aws.dynamodb.global_secondary_indexes" semantic conventions. It
+	// represents the JSON-serialized value of each item of the
+	// `GlobalSecondaryIndexes` request field
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: '{ "IndexName": "string", "KeySchema": [ { "AttributeName": "string",
-	// "KeyType": "string" } ], "Projection": { "NonKeyAttributes": [ "string" ],
-	// "ProjectionType": "string" }, "ProvisionedThroughput": { "ReadCapacityUnits":
-	// number, "WriteCapacityUnits": number } }'
+	// Examples: '{ "IndexName": "string", "KeySchema": [ { "AttributeName":
+	// "string", "KeyType": "string" } ], "Projection": { "NonKeyAttributes": [
+	// "string" ], "ProjectionType": "string" }, "ProvisionedThroughput": {
+	// "ReadCapacityUnits": number, "WriteCapacityUnits": number } }'
 	AWSDynamoDBGlobalSecondaryIndexesKey = attribute.Key("aws.dynamodb.global_secondary_indexes")
-	// The JSON-serialized value of each item of the `LocalSecondaryIndexes` request
-	// field.
+
+	// AWSDynamoDBLocalSecondaryIndexesKey is the attribute Key conforming to
+	// the "aws.dynamodb.local_secondary_indexes" semantic conventions. It
+	// represents the JSON-serialized value of each item of the
+	// `LocalSecondaryIndexes` request field.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
-	// Examples: '{ "IndexARN": "string", "IndexName": "string", "IndexSizeBytes":
-	// number, "ItemCount": number, "KeySchema": [ { "AttributeName": "string",
-	// "KeyType": "string" } ], "Projection": { "NonKeyAttributes": [ "string" ],
-	// "ProjectionType": "string" } }'
+	// Examples: '{ "IndexARN": "string", "IndexName": "string",
+	// "IndexSizeBytes": number, "ItemCount": number, "KeySchema": [ {
+	// "AttributeName": "string", "KeyType": "string" } ], "Projection": {
+	// "NonKeyAttributes": [ "string" ], "ProjectionType": "string" } }'
 	AWSDynamoDBLocalSecondaryIndexesKey = attribute.Key("aws.dynamodb.local_secondary_indexes")
 )
 
+// AWSDynamoDBGlobalSecondaryIndexes returns an attribute KeyValue
+// conforming to the "aws.dynamodb.global_secondary_indexes" semantic
+// conventions. It represents the JSON-serialized value of each item of the
+// `GlobalSecondaryIndexes` request field
+func AWSDynamoDBGlobalSecondaryIndexes(val ...string) attribute.KeyValue {
+	return AWSDynamoDBGlobalSecondaryIndexesKey.StringSlice(val)
+}
+
+// AWSDynamoDBLocalSecondaryIndexes returns an attribute KeyValue conforming
+// to the "aws.dynamodb.local_secondary_indexes" semantic conventions. It
+// represents the JSON-serialized value of each item of the
+// `LocalSecondaryIndexes` request field.
+func AWSDynamoDBLocalSecondaryIndexes(val ...string) attribute.KeyValue {
+	return AWSDynamoDBLocalSecondaryIndexesKey.StringSlice(val)
+}
+
 // DynamoDB.ListTables
 const (
-	// The value of the `ExclusiveStartTableName` request parameter.
+	// AWSDynamoDBExclusiveStartTableKey is the attribute Key conforming to the
+	// "aws.dynamodb.exclusive_start_table" semantic conventions. It represents
+	// the value of the `ExclusiveStartTableName` request parameter.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'Users', 'CatsTable'
 	AWSDynamoDBExclusiveStartTableKey = attribute.Key("aws.dynamodb.exclusive_start_table")
-	// The the number of items in the `TableNames` response parameter.
+
+	// AWSDynamoDBTableCountKey is the attribute Key conforming to the
+	// "aws.dynamodb.table_count" semantic conventions. It represents the the
+	// number of items in the `TableNames` response parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
@@ -1289,9 +2250,25 @@ const (
 	AWSDynamoDBTableCountKey = attribute.Key("aws.dynamodb.table_count")
 )
 
+// AWSDynamoDBExclusiveStartTable returns an attribute KeyValue conforming
+// to the "aws.dynamodb.exclusive_start_table" semantic conventions. It
+// represents the value of the `ExclusiveStartTableName` request parameter.
+func AWSDynamoDBExclusiveStartTable(val string) attribute.KeyValue {
+	return AWSDynamoDBExclusiveStartTableKey.String(val)
+}
+
+// AWSDynamoDBTableCount returns an attribute KeyValue conforming to the
+// "aws.dynamodb.table_count" semantic conventions. It represents the the
+// number of items in the `TableNames` response parameter.
+func AWSDynamoDBTableCount(val int) attribute.KeyValue {
+	return AWSDynamoDBTableCountKey.Int(val)
+}
+
 // DynamoDB.Query
 const (
-	// The value of the `ScanIndexForward` request parameter.
+	// AWSDynamoDBScanForwardKey is the attribute Key conforming to the
+	// "aws.dynamodb.scan_forward" semantic conventions. It represents the
+	// value of the `ScanIndexForward` request parameter.
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
@@ -1299,30 +2276,48 @@ const (
 	AWSDynamoDBScanForwardKey = attribute.Key("aws.dynamodb.scan_forward")
 )
 
+// AWSDynamoDBScanForward returns an attribute KeyValue conforming to the
+// "aws.dynamodb.scan_forward" semantic conventions. It represents the value of
+// the `ScanIndexForward` request parameter.
+func AWSDynamoDBScanForward(val bool) attribute.KeyValue {
+	return AWSDynamoDBScanForwardKey.Bool(val)
+}
+
 // DynamoDB.Scan
 const (
-	// The value of the `Segment` request parameter.
+	// AWSDynamoDBSegmentKey is the attribute Key conforming to the
+	// "aws.dynamodb.segment" semantic conventions. It represents the value of
+	// the `Segment` request parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 10
 	AWSDynamoDBSegmentKey = attribute.Key("aws.dynamodb.segment")
-	// The value of the `TotalSegments` request parameter.
+
+	// AWSDynamoDBTotalSegmentsKey is the attribute Key conforming to the
+	// "aws.dynamodb.total_segments" semantic conventions. It represents the
+	// value of the `TotalSegments` request parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 100
 	AWSDynamoDBTotalSegmentsKey = attribute.Key("aws.dynamodb.total_segments")
-	// The value of the `Count` response parameter.
+
+	// AWSDynamoDBCountKey is the attribute Key conforming to the
+	// "aws.dynamodb.count" semantic conventions. It represents the value of
+	// the `Count` response parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 10
 	AWSDynamoDBCountKey = attribute.Key("aws.dynamodb.count")
-	// The value of the `ScannedCount` response parameter.
+
+	// AWSDynamoDBScannedCountKey is the attribute Key conforming to the
+	// "aws.dynamodb.scanned_count" semantic conventions. It represents the
+	// value of the `ScannedCount` response parameter.
 	//
 	// Type: int
 	// RequirementLevel: Optional
@@ -1331,18 +2326,51 @@ const (
 	AWSDynamoDBScannedCountKey = attribute.Key("aws.dynamodb.scanned_count")
 )
 
+// AWSDynamoDBSegment returns an attribute KeyValue conforming to the
+// "aws.dynamodb.segment" semantic conventions. It represents the value of the
+// `Segment` request parameter.
+func AWSDynamoDBSegment(val int) attribute.KeyValue {
+	return AWSDynamoDBSegmentKey.Int(val)
+}
+
+// AWSDynamoDBTotalSegments returns an attribute KeyValue conforming to the
+// "aws.dynamodb.total_segments" semantic conventions. It represents the value
+// of the `TotalSegments` request parameter.
+func AWSDynamoDBTotalSegments(val int) attribute.KeyValue {
+	return AWSDynamoDBTotalSegmentsKey.Int(val)
+}
+
+// AWSDynamoDBCount returns an attribute KeyValue conforming to the
+// "aws.dynamodb.count" semantic conventions. It represents the value of the
+// `Count` response parameter.
+func AWSDynamoDBCount(val int) attribute.KeyValue {
+	return AWSDynamoDBCountKey.Int(val)
+}
+
+// AWSDynamoDBScannedCount returns an attribute KeyValue conforming to the
+// "aws.dynamodb.scanned_count" semantic conventions. It represents the value
+// of the `ScannedCount` response parameter.
+func AWSDynamoDBScannedCount(val int) attribute.KeyValue {
+	return AWSDynamoDBScannedCountKey.Int(val)
+}
+
 // DynamoDB.UpdateTable
 const (
-	// The JSON-serialized value of each item in the `AttributeDefinitions` request
-	// field.
+	// AWSDynamoDBAttributeDefinitionsKey is the attribute Key conforming to
+	// the "aws.dynamodb.attribute_definitions" semantic conventions. It
+	// represents the JSON-serialized value of each item in the
+	// `AttributeDefinitions` request field.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '{ "AttributeName": "string", "AttributeType": "string" }'
 	AWSDynamoDBAttributeDefinitionsKey = attribute.Key("aws.dynamodb.attribute_definitions")
-	// The JSON-serialized value of each item in the the `GlobalSecondaryIndexUpdates`
-	// request field.
+
+	// AWSDynamoDBGlobalSecondaryIndexUpdatesKey is the attribute Key
+	// conforming to the "aws.dynamodb.global_secondary_index_updates" semantic
+	// conventions. It represents the JSON-serialized value of each item in the
+	// the `GlobalSecondaryIndexUpdates` request field.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
@@ -1350,28 +2378,53 @@ const (
 	// Examples: '{ "Create": { "IndexName": "string", "KeySchema": [ {
 	// "AttributeName": "string", "KeyType": "string" } ], "Projection": {
 	// "NonKeyAttributes": [ "string" ], "ProjectionType": "string" },
-	// "ProvisionedThroughput": { "ReadCapacityUnits": number, "WriteCapacityUnits":
-	// number } }'
+	// "ProvisionedThroughput": { "ReadCapacityUnits": number,
+	// "WriteCapacityUnits": number } }'
 	AWSDynamoDBGlobalSecondaryIndexUpdatesKey = attribute.Key("aws.dynamodb.global_secondary_index_updates")
 )
 
-// This document defines semantic conventions to apply when instrumenting the GraphQL implementation. They map GraphQL operations to attributes on a Span.
+// AWSDynamoDBAttributeDefinitions returns an attribute KeyValue conforming
+// to the "aws.dynamodb.attribute_definitions" semantic conventions. It
+// represents the JSON-serialized value of each item in the
+// `AttributeDefinitions` request field.
+func AWSDynamoDBAttributeDefinitions(val ...string) attribute.KeyValue {
+	return AWSDynamoDBAttributeDefinitionsKey.StringSlice(val)
+}
+
+// AWSDynamoDBGlobalSecondaryIndexUpdates returns an attribute KeyValue
+// conforming to the "aws.dynamodb.global_secondary_index_updates" semantic
+// conventions. It represents the JSON-serialized value of each item in the the
+// `GlobalSecondaryIndexUpdates` request field.
+func AWSDynamoDBGlobalSecondaryIndexUpdates(val ...string) attribute.KeyValue {
+	return AWSDynamoDBGlobalSecondaryIndexUpdatesKey.StringSlice(val)
+}
+
+// Semantic conventions to apply when instrumenting the GraphQL implementation.
+// They map GraphQL operations to attributes on a Span.
 const (
-	// The name of the operation being executed.
+	// GraphqlOperationNameKey is the attribute Key conforming to the
+	// "graphql.operation.name" semantic conventions. It represents the name of
+	// the operation being executed.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'findBookByID'
 	GraphqlOperationNameKey = attribute.Key("graphql.operation.name")
-	// The type of the operation being executed.
+
+	// GraphqlOperationTypeKey is the attribute Key conforming to the
+	// "graphql.operation.type" semantic conventions. It represents the type of
+	// the operation being executed.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'query', 'mutation', 'subscription'
 	GraphqlOperationTypeKey = attribute.Key("graphql.operation.type")
-	// The GraphQL document being executed.
+
+	// GraphqlDocumentKey is the attribute Key conforming to the
+	// "graphql.document" semantic conventions. It represents the GraphQL
+	// document being executed.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -1390,34 +2443,62 @@ var (
 	GraphqlOperationTypeSubscription = GraphqlOperationTypeKey.String("subscription")
 )
 
-// Semantic convention describing per-message attributes populated on messaging spans or links.
+// GraphqlOperationName returns an attribute KeyValue conforming to the
+// "graphql.operation.name" semantic conventions. It represents the name of the
+// operation being executed.
+func GraphqlOperationName(val string) attribute.KeyValue {
+	return GraphqlOperationNameKey.String(val)
+}
+
+// GraphqlDocument returns an attribute KeyValue conforming to the
+// "graphql.document" semantic conventions. It represents the GraphQL document
+// being executed.
+func GraphqlDocument(val string) attribute.KeyValue {
+	return GraphqlDocumentKey.String(val)
+}
+
+// Semantic convention describing per-message attributes populated on messaging
+// spans or links.
 const (
-	// A value used by the messaging system as an identifier for the message,
-	// represented as a string.
+	// MessagingMessageIDKey is the attribute Key conforming to the
+	// "messaging.message.id" semantic conventions. It represents a value used
+	// by the messaging system as an identifier for the message, represented as
+	// a string.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '452a7c7c7c7048c2f887f61572b18fc2'
 	MessagingMessageIDKey = attribute.Key("messaging.message.id")
-	// The [conversation ID](#conversations) identifying the conversation to which the
-	// message belongs, represented as a string. Sometimes called "Correlation ID".
+
+	// MessagingMessageConversationIDKey is the attribute Key conforming to the
+	// "messaging.message.conversation_id" semantic conventions. It represents
+	// the [conversation ID](#conversations) identifying the conversation to
+	// which the message belongs, represented as a string. Sometimes called
+	// "Correlation ID".
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'MyConversationID'
 	MessagingMessageConversationIDKey = attribute.Key("messaging.message.conversation_id")
-	// The (uncompressed) size of the message payload in bytes. Also use this
-	// attribute if it is unknown whether the compressed or uncompressed payload size
-	// is reported.
+
+	// MessagingMessagePayloadSizeBytesKey is the attribute Key conforming to
+	// the "messaging.message.payload_size_bytes" semantic conventions. It
+	// represents the (uncompressed) size of the message payload in bytes. Also
+	// use this attribute if it is unknown whether the compressed or
+	// uncompressed payload size is reported.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 2738
 	MessagingMessagePayloadSizeBytesKey = attribute.Key("messaging.message.payload_size_bytes")
-	// The compressed size of the message payload in bytes.
+
+	// MessagingMessagePayloadCompressedSizeBytesKey is the attribute Key
+	// conforming to the "messaging.message.payload_compressed_size_bytes"
+	// semantic conventions. It represents the compressed size of the message
+	// payload in bytes.
 	//
 	// Type: int
 	// RequirementLevel: Optional
@@ -1426,44 +2507,94 @@ const (
 	MessagingMessagePayloadCompressedSizeBytesKey = attribute.Key("messaging.message.payload_compressed_size_bytes")
 )
 
-// Semantic convention for attributes that describe messaging destination on broker
+// MessagingMessageID returns an attribute KeyValue conforming to the
+// "messaging.message.id" semantic conventions. It represents a value used by
+// the messaging system as an identifier for the message, represented as a
+// string.
+func MessagingMessageID(val string) attribute.KeyValue {
+	return MessagingMessageIDKey.String(val)
+}
+
+// MessagingMessageConversationID returns an attribute KeyValue conforming
+// to the "messaging.message.conversation_id" semantic conventions. It
+// represents the [conversation ID](#conversations) identifying the
+// conversation to which the message belongs, represented as a string.
+// Sometimes called "Correlation ID".
+func MessagingMessageConversationID(val string) attribute.KeyValue {
+	return MessagingMessageConversationIDKey.String(val)
+}
+
+// MessagingMessagePayloadSizeBytes returns an attribute KeyValue conforming
+// to the "messaging.message.payload_size_bytes" semantic conventions. It
+// represents the (uncompressed) size of the message payload in bytes. Also use
+// this attribute if it is unknown whether the compressed or uncompressed
+// payload size is reported.
+func MessagingMessagePayloadSizeBytes(val int) attribute.KeyValue {
+	return MessagingMessagePayloadSizeBytesKey.Int(val)
+}
+
+// MessagingMessagePayloadCompressedSizeBytes returns an attribute KeyValue
+// conforming to the "messaging.message.payload_compressed_size_bytes" semantic
+// conventions. It represents the compressed size of the message payload in
+// bytes.
+func MessagingMessagePayloadCompressedSizeBytes(val int) attribute.KeyValue {
+	return MessagingMessagePayloadCompressedSizeBytesKey.Int(val)
+}
+
+// Semantic convention for attributes that describe messaging destination on
+// broker
 const (
-	// The message destination name
+	// MessagingDestinationNameKey is the attribute Key conforming to the
+	// "messaging.destination.name" semantic conventions. It represents the
+	// message destination name
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'MyQueue', 'MyTopic'
-	// Note: Destination name SHOULD uniquely identify a specific queue, topic or
-	// other entity within the broker. If
-	// the broker does not have such notion, the destination name SHOULD uniquely
-	// identify the broker.
+	// Note: Destination name SHOULD uniquely identify a specific queue, topic
+	// or other entity within the broker. If
+	// the broker does not have such notion, the destination name SHOULD
+	// uniquely identify the broker.
 	MessagingDestinationNameKey = attribute.Key("messaging.destination.name")
-	// The kind of message destination
+
+	// MessagingDestinationKindKey is the attribute Key conforming to the
+	// "messaging.destination.kind" semantic conventions. It represents the
+	// kind of message destination
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	MessagingDestinationKindKey = attribute.Key("messaging.destination.kind")
-	// Low cardinality representation of the messaging destination name
+
+	// MessagingDestinationTemplateKey is the attribute Key conforming to the
+	// "messaging.destination.template" semantic conventions. It represents the
+	// low cardinality representation of the messaging destination name
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '/customers/{customerID}'
-	// Note: Destination names could be constructed from templates. An example would
-	// be a destination name involving a user name or product id. Although the
-	// destination name in this case is of high cardinality, the underlying template
-	// is of low cardinality and can be effectively used for grouping and aggregation.
+	// Note: Destination names could be constructed from templates. An example
+	// would be a destination name involving a user name or product id.
+	// Although the destination name in this case is of high cardinality, the
+	// underlying template is of low cardinality and can be effectively used
+	// for grouping and aggregation.
 	MessagingDestinationTemplateKey = attribute.Key("messaging.destination.template")
-	// A boolean that is true if the message destination is temporary and might not
-	// exist anymore after messages are processed.
+
+	// MessagingDestinationTemporaryKey is the attribute Key conforming to the
+	// "messaging.destination.temporary" semantic conventions. It represents a
+	// boolean that is true if the message destination is temporary and might
+	// not exist anymore after messages are processed.
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
 	// Stability: stable
 	MessagingDestinationTemporaryKey = attribute.Key("messaging.destination.temporary")
-	// A boolean that is true if the message destination is anonymous (could be
+
+	// MessagingDestinationAnonymousKey is the attribute Key conforming to the
+	// "messaging.destination.anonymous" semantic conventions. It represents a
+	// boolean that is true if the message destination is anonymous (could be
 	// unnamed or have auto-generated name).
 	//
 	// Type: boolean
@@ -1479,45 +2610,90 @@ var (
 	MessagingDestinationKindTopic = MessagingDestinationKindKey.String("topic")
 )
 
+// MessagingDestinationName returns an attribute KeyValue conforming to the
+// "messaging.destination.name" semantic conventions. It represents the message
+// destination name
+func MessagingDestinationName(val string) attribute.KeyValue {
+	return MessagingDestinationNameKey.String(val)
+}
+
+// MessagingDestinationTemplate returns an attribute KeyValue conforming to
+// the "messaging.destination.template" semantic conventions. It represents the
+// low cardinality representation of the messaging destination name
+func MessagingDestinationTemplate(val string) attribute.KeyValue {
+	return MessagingDestinationTemplateKey.String(val)
+}
+
+// MessagingDestinationTemporary returns an attribute KeyValue conforming to
+// the "messaging.destination.temporary" semantic conventions. It represents a
+// boolean that is true if the message destination is temporary and might not
+// exist anymore after messages are processed.
+func MessagingDestinationTemporary(val bool) attribute.KeyValue {
+	return MessagingDestinationTemporaryKey.Bool(val)
+}
+
+// MessagingDestinationAnonymous returns an attribute KeyValue conforming to
+// the "messaging.destination.anonymous" semantic conventions. It represents a
+// boolean that is true if the message destination is anonymous (could be
+// unnamed or have auto-generated name).
+func MessagingDestinationAnonymous(val bool) attribute.KeyValue {
+	return MessagingDestinationAnonymousKey.Bool(val)
+}
+
 // Semantic convention for attributes that describe messaging source on broker
 const (
-	// The message source name
+	// MessagingSourceNameKey is the attribute Key conforming to the
+	// "messaging.source.name" semantic conventions. It represents the message
+	// source name
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'MyQueue', 'MyTopic'
-	// Note: Source name SHOULD uniquely identify a specific queue, topic, or other
-	// entity within the broker. If
-	// the broker does not have such notion, the source name SHOULD uniquely identify
-	// the broker.
+	// Note: Source name SHOULD uniquely identify a specific queue, topic, or
+	// other entity within the broker. If
+	// the broker does not have such notion, the source name SHOULD uniquely
+	// identify the broker.
 	MessagingSourceNameKey = attribute.Key("messaging.source.name")
-	// The kind of message source
+
+	// MessagingSourceKindKey is the attribute Key conforming to the
+	// "messaging.source.kind" semantic conventions. It represents the kind of
+	// message source
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	MessagingSourceKindKey = attribute.Key("messaging.source.kind")
-	// Low cardinality representation of the messaging source name
+
+	// MessagingSourceTemplateKey is the attribute Key conforming to the
+	// "messaging.source.template" semantic conventions. It represents the low
+	// cardinality representation of the messaging source name
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '/customers/{customerID}'
-	// Note: Source names could be constructed from templates. An example would be a
-	// source name involving a user name or product id. Although the source name in
-	// this case is of high cardinality, the underlying template is of low cardinality
-	// and can be effectively used for grouping and aggregation.
+	// Note: Source names could be constructed from templates. An example would
+	// be a source name involving a user name or product id. Although the
+	// source name in this case is of high cardinality, the underlying template
+	// is of low cardinality and can be effectively used for grouping and
+	// aggregation.
 	MessagingSourceTemplateKey = attribute.Key("messaging.source.template")
-	// A boolean that is true if the message source is temporary and might not exist
-	// anymore after messages are processed.
+
+	// MessagingSourceTemporaryKey is the attribute Key conforming to the
+	// "messaging.source.temporary" semantic conventions. It represents a
+	// boolean that is true if the message source is temporary and might not
+	// exist anymore after messages are processed.
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
 	// Stability: stable
 	MessagingSourceTemporaryKey = attribute.Key("messaging.source.temporary")
-	// A boolean that is true if the message source is anonymous (could be unnamed or
-	// have auto-generated name).
+
+	// MessagingSourceAnonymousKey is the attribute Key conforming to the
+	// "messaging.source.anonymous" semantic conventions. It represents a
+	// boolean that is true if the message source is anonymous (could be
+	// unnamed or have auto-generated name).
 	//
 	// Type: boolean
 	// RequirementLevel: Optional
@@ -1532,36 +2708,74 @@ var (
 	MessagingSourceKindTopic = MessagingSourceKindKey.String("topic")
 )
 
-// This document defines general attributes used in messaging systems.
+// MessagingSourceName returns an attribute KeyValue conforming to the
+// "messaging.source.name" semantic conventions. It represents the message
+// source name
+func MessagingSourceName(val string) attribute.KeyValue {
+	return MessagingSourceNameKey.String(val)
+}
+
+// MessagingSourceTemplate returns an attribute KeyValue conforming to the
+// "messaging.source.template" semantic conventions. It represents the low
+// cardinality representation of the messaging source name
+func MessagingSourceTemplate(val string) attribute.KeyValue {
+	return MessagingSourceTemplateKey.String(val)
+}
+
+// MessagingSourceTemporary returns an attribute KeyValue conforming to the
+// "messaging.source.temporary" semantic conventions. It represents a boolean
+// that is true if the message source is temporary and might not exist anymore
+// after messages are processed.
+func MessagingSourceTemporary(val bool) attribute.KeyValue {
+	return MessagingSourceTemporaryKey.Bool(val)
+}
+
+// MessagingSourceAnonymous returns an attribute KeyValue conforming to the
+// "messaging.source.anonymous" semantic conventions. It represents a boolean
+// that is true if the message source is anonymous (could be unnamed or have
+// auto-generated name).
+func MessagingSourceAnonymous(val bool) attribute.KeyValue {
+	return MessagingSourceAnonymousKey.Bool(val)
+}
+
+// General attributes used in messaging systems.
 const (
-	// A string identifying the messaging system.
+	// MessagingSystemKey is the attribute Key conforming to the
+	// "messaging.system" semantic conventions. It represents a string
+	// identifying the messaging system.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'kafka', 'rabbitmq', 'rocketmq', 'activemq', 'AmazonSQS'
 	MessagingSystemKey = attribute.Key("messaging.system")
-	// A string identifying the kind of messaging operation as defined in the
-	// [Operation names](#operation-names) section above.
+
+	// MessagingOperationKey is the attribute Key conforming to the
+	// "messaging.operation" semantic conventions. It represents a string
+	// identifying the kind of messaging operation as defined in the [Operation
+	// names](#operation-names) section above.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
 	// Stability: stable
 	// Note: If a custom value is used, it MUST be of low cardinality.
 	MessagingOperationKey = attribute.Key("messaging.operation")
-	// The number of messages sent, received, or processed in the scope of the
+
+	// MessagingBatchMessageCountKey is the attribute Key conforming to the
+	// "messaging.batch.message_count" semantic conventions. It represents the
+	// number of messages sent, received, or processed in the scope of the
 	// batching operation.
 	//
 	// Type: int
-	// RequirementLevel: ConditionallyRequired (If the span describes an operation on
-	// a batch of messages.)
+	// RequirementLevel: ConditionallyRequired (If the span describes an
+	// operation on a batch of messages.)
 	// Stability: stable
 	// Examples: 0, 1, 2
-	// Note: Instrumentations SHOULD NOT set `messaging.batch.message_count` on spans
-	// that operate with a single message. When a messaging client library supports
-	// both batch and single-message API for the same operation, instrumentations
-	// SHOULD use `messaging.batch.message_count` for batching APIs and SHOULD NOT use
-	// it for single-message APIs.
+	// Note: Instrumentations SHOULD NOT set `messaging.batch.message_count` on
+	// spans that operate with a single message. When a messaging client
+	// library supports both batch and single-message API for the same
+	// operation, instrumentations SHOULD use `messaging.batch.message_count`
+	// for batching APIs and SHOULD NOT use it for single-message APIs.
 	MessagingBatchMessageCountKey = attribute.Key("messaging.batch.message_count")
 )
 
@@ -1574,13 +2788,31 @@ var (
 	MessagingOperationProcess = MessagingOperationKey.String("process")
 )
 
-// Semantic convention for a consumer of messages received from a messaging system
+// MessagingSystem returns an attribute KeyValue conforming to the
+// "messaging.system" semantic conventions. It represents a string identifying
+// the messaging system.
+func MessagingSystem(val string) attribute.KeyValue {
+	return MessagingSystemKey.String(val)
+}
+
+// MessagingBatchMessageCount returns an attribute KeyValue conforming to
+// the "messaging.batch.message_count" semantic conventions. It represents the
+// number of messages sent, received, or processed in the scope of the batching
+// operation.
+func MessagingBatchMessageCount(val int) attribute.KeyValue {
+	return MessagingBatchMessageCountKey.Int(val)
+}
+
+// Semantic convention for a consumer of messages received from a messaging
+// system
 const (
-	// The identifier for the consumer receiving a message. For Kafka, set it to
-	// `{messaging.kafka.consumer.group} - {messaging.kafka.client_id}`, if both are
-	// present, or only `messaging.kafka.consumer.group`. For brokers, such as
-	// RabbitMQ and Artemis, set it to the `client_id` of the client consuming the
-	// message.
+	// MessagingConsumerIDKey is the attribute Key conforming to the
+	// "messaging.consumer.id" semantic conventions. It represents the
+	// identifier for the consumer receiving a message. For Kafka, set it to
+	// `{messaging.kafka.consumer.group} - {messaging.kafka.client_id}`, if
+	// both are present, or only `messaging.kafka.consumer.group`. For brokers,
+	// such as RabbitMQ and Artemis, set it to the `client_id` of the client
+	// consuming the message.
 	//
 	// Type: string
 	// RequirementLevel: Optional
@@ -1589,9 +2821,22 @@ const (
 	MessagingConsumerIDKey = attribute.Key("messaging.consumer.id")
 )
 
+// MessagingConsumerID returns an attribute KeyValue conforming to the
+// "messaging.consumer.id" semantic conventions. It represents the identifier
+// for the consumer receiving a message. For Kafka, set it to
+// `{messaging.kafka.consumer.group} - {messaging.kafka.client_id}`, if both
+// are present, or only `messaging.kafka.consumer.group`. For brokers, such as
+// RabbitMQ and Artemis, set it to the `client_id` of the client consuming the
+// message.
+func MessagingConsumerID(val string) attribute.KeyValue {
+	return MessagingConsumerIDKey.String(val)
+}
+
 // Attributes for RabbitMQ
 const (
-	// RabbitMQ message routing key.
+	// MessagingRabbitmqDestinationRoutingKeyKey is the attribute Key
+	// conforming to the "messaging.rabbitmq.destination.routing_key" semantic
+	// conventions. It represents the rabbitMQ message routing key.
 	//
 	// Type: string
 	// RequirementLevel: ConditionallyRequired (If not empty.)
@@ -1600,68 +2845,151 @@ const (
 	MessagingRabbitmqDestinationRoutingKeyKey = attribute.Key("messaging.rabbitmq.destination.routing_key")
 )
 
+// MessagingRabbitmqDestinationRoutingKey returns an attribute KeyValue
+// conforming to the "messaging.rabbitmq.destination.routing_key" semantic
+// conventions. It represents the rabbitMQ message routing key.
+func MessagingRabbitmqDestinationRoutingKey(val string) attribute.KeyValue {
+	return MessagingRabbitmqDestinationRoutingKeyKey.String(val)
+}
+
 // Attributes for Apache Kafka
 const (
-	// Message keys in Kafka are used for grouping alike messages to ensure they're
-	// processed on the same partition. They differ from `messaging.message.id` in
-	// that they're not unique. If the key is `null`, the attribute MUST NOT be set.
+	// MessagingKafkaMessageKeyKey is the attribute Key conforming to the
+	// "messaging.kafka.message.key" semantic conventions. It represents the
+	// message keys in Kafka are used for grouping alike messages to ensure
+	// they're processed on the same partition. They differ from
+	// `messaging.message.id` in that they're not unique. If the key is `null`,
+	// the attribute MUST NOT be set.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'myKey'
-	// Note: If the key type is not string, it's string representation has to be
-	// supplied for the attribute. If the key has no unambiguous, canonical string
-	// form, don't include its value.
+	// Note: If the key type is not string, it's string representation has to
+	// be supplied for the attribute. If the key has no unambiguous, canonical
+	// string form, don't include its value.
 	MessagingKafkaMessageKeyKey = attribute.Key("messaging.kafka.message.key")
-	// Name of the Kafka Consumer Group that is handling the message. Only applies to
-	// consumers, not producers.
+
+	// MessagingKafkaConsumerGroupKey is the attribute Key conforming to the
+	// "messaging.kafka.consumer.group" semantic conventions. It represents the
+	// name of the Kafka Consumer Group that is handling the message. Only
+	// applies to consumers, not producers.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'my-group'
 	MessagingKafkaConsumerGroupKey = attribute.Key("messaging.kafka.consumer.group")
-	// Client ID for the Consumer or Producer that is handling the message.
+
+	// MessagingKafkaClientIDKey is the attribute Key conforming to the
+	// "messaging.kafka.client_id" semantic conventions. It represents the
+	// client ID for the Consumer or Producer that is handling the message.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'client-5'
 	MessagingKafkaClientIDKey = attribute.Key("messaging.kafka.client_id")
-	// Partition the message is sent to.
+
+	// MessagingKafkaDestinationPartitionKey is the attribute Key conforming to
+	// the "messaging.kafka.destination.partition" semantic conventions. It
+	// represents the partition the message is sent to.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 2
 	MessagingKafkaDestinationPartitionKey = attribute.Key("messaging.kafka.destination.partition")
-	// Partition the message is received from.
+
+	// MessagingKafkaSourcePartitionKey is the attribute Key conforming to the
+	// "messaging.kafka.source.partition" semantic conventions. It represents
+	// the partition the message is received from.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 2
 	MessagingKafkaSourcePartitionKey = attribute.Key("messaging.kafka.source.partition")
-	// The offset of a record in the corresponding Kafka partition.
+
+	// MessagingKafkaMessageOffsetKey is the attribute Key conforming to the
+	// "messaging.kafka.message.offset" semantic conventions. It represents the
+	// offset of a record in the corresponding Kafka partition.
 	//
 	// Type: int
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 42
 	MessagingKafkaMessageOffsetKey = attribute.Key("messaging.kafka.message.offset")
-	// A boolean that is true if the message is a tombstone.
+
+	// MessagingKafkaMessageTombstoneKey is the attribute Key conforming to the
+	// "messaging.kafka.message.tombstone" semantic conventions. It represents
+	// a boolean that is true if the message is a tombstone.
 	//
 	// Type: boolean
-	// RequirementLevel: ConditionallyRequired (If value is `true`. When missing, the
-	// value is assumed to be `false`.)
+	// RequirementLevel: ConditionallyRequired (If value is `true`. When
+	// missing, the value is assumed to be `false`.)
 	// Stability: stable
 	MessagingKafkaMessageTombstoneKey = attribute.Key("messaging.kafka.message.tombstone")
 )
 
+// MessagingKafkaMessageKey returns an attribute KeyValue conforming to the
+// "messaging.kafka.message.key" semantic conventions. It represents the
+// message keys in Kafka are used for grouping alike messages to ensure they're
+// processed on the same partition. They differ from `messaging.message.id` in
+// that they're not unique. If the key is `null`, the attribute MUST NOT be
+// set.
+func MessagingKafkaMessageKey(val string) attribute.KeyValue {
+	return MessagingKafkaMessageKeyKey.String(val)
+}
+
+// MessagingKafkaConsumerGroup returns an attribute KeyValue conforming to
+// the "messaging.kafka.consumer.group" semantic conventions. It represents the
+// name of the Kafka Consumer Group that is handling the message. Only applies
+// to consumers, not producers.
+func MessagingKafkaConsumerGroup(val string) attribute.KeyValue {
+	return MessagingKafkaConsumerGroupKey.String(val)
+}
+
+// MessagingKafkaClientID returns an attribute KeyValue conforming to the
+// "messaging.kafka.client_id" semantic conventions. It represents the client
+// ID for the Consumer or Producer that is handling the message.
+func MessagingKafkaClientID(val string) attribute.KeyValue {
+	return MessagingKafkaClientIDKey.String(val)
+}
+
+// MessagingKafkaDestinationPartition returns an attribute KeyValue
+// conforming to the "messaging.kafka.destination.partition" semantic
+// conventions. It represents the partition the message is sent to.
+func MessagingKafkaDestinationPartition(val int) attribute.KeyValue {
+	return MessagingKafkaDestinationPartitionKey.Int(val)
+}
+
+// MessagingKafkaSourcePartition returns an attribute KeyValue conforming to
+// the "messaging.kafka.source.partition" semantic conventions. It represents
+// the partition the message is received from.
+func MessagingKafkaSourcePartition(val int) attribute.KeyValue {
+	return MessagingKafkaSourcePartitionKey.Int(val)
+}
+
+// MessagingKafkaMessageOffset returns an attribute KeyValue conforming to
+// the "messaging.kafka.message.offset" semantic conventions. It represents the
+// offset of a record in the corresponding Kafka partition.
+func MessagingKafkaMessageOffset(val int) attribute.KeyValue {
+	return MessagingKafkaMessageOffsetKey.Int(val)
+}
+
+// MessagingKafkaMessageTombstone returns an attribute KeyValue conforming
+// to the "messaging.kafka.message.tombstone" semantic conventions. It
+// represents a boolean that is true if the message is a tombstone.
+func MessagingKafkaMessageTombstone(val bool) attribute.KeyValue {
+	return MessagingKafkaMessageTombstoneKey.Bool(val)
+}
+
 // Attributes for Apache RocketMQ
 const (
-	// Namespace of RocketMQ resources, resources in different namespaces are
+	// MessagingRocketmqNamespaceKey is the attribute Key conforming to the
+	// "messaging.rocketmq.namespace" semantic conventions. It represents the
+	// namespace of RocketMQ resources, resources in different namespaces are
 	// individual.
 	//
 	// Type: string
@@ -1669,68 +2997,97 @@ const (
 	// Stability: stable
 	// Examples: 'myNamespace'
 	MessagingRocketmqNamespaceKey = attribute.Key("messaging.rocketmq.namespace")
-	// Name of the RocketMQ producer/consumer group that is handling the message. The
-	// client type is identified by the SpanKind.
+
+	// MessagingRocketmqClientGroupKey is the attribute Key conforming to the
+	// "messaging.rocketmq.client_group" semantic conventions. It represents
+	// the name of the RocketMQ producer/consumer group that is handling the
+	// message. The client type is identified by the SpanKind.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'myConsumerGroup'
 	MessagingRocketmqClientGroupKey = attribute.Key("messaging.rocketmq.client_group")
-	// The unique identifier for each client.
+
+	// MessagingRocketmqClientIDKey is the attribute Key conforming to the
+	// "messaging.rocketmq.client_id" semantic conventions. It represents the
+	// unique identifier for each client.
 	//
 	// Type: string
 	// RequirementLevel: Required
 	// Stability: stable
 	// Examples: 'myhost@8742@s8083jm'
 	MessagingRocketmqClientIDKey = attribute.Key("messaging.rocketmq.client_id")
-	// The timestamp in milliseconds that the delay message is expected to be
-	// delivered to consumer.
+
+	// MessagingRocketmqMessageDeliveryTimestampKey is the attribute Key
+	// conforming to the "messaging.rocketmq.message.delivery_timestamp"
+	// semantic conventions. It represents the timestamp in milliseconds that
+	// the delay message is expected to be delivered to consumer.
 	//
 	// Type: int
-	// RequirementLevel: ConditionallyRequired (If the message type is delay and delay
-	// time level is not specified.)
+	// RequirementLevel: ConditionallyRequired (If the message type is delay
+	// and delay time level is not specified.)
 	// Stability: stable
 	// Examples: 1665987217045
 	MessagingRocketmqMessageDeliveryTimestampKey = attribute.Key("messaging.rocketmq.message.delivery_timestamp")
-	// The delay time level for delay message, which determines the message delay
-	// time.
+
+	// MessagingRocketmqMessageDelayTimeLevelKey is the attribute Key
+	// conforming to the "messaging.rocketmq.message.delay_time_level" semantic
+	// conventions. It represents the delay time level for delay message, which
+	// determines the message delay time.
 	//
 	// Type: int
-	// RequirementLevel: ConditionallyRequired (If the message type is delay and
-	// delivery timestamp is not specified.)
+	// RequirementLevel: ConditionallyRequired (If the message type is delay
+	// and delivery timestamp is not specified.)
 	// Stability: stable
 	// Examples: 3
 	MessagingRocketmqMessageDelayTimeLevelKey = attribute.Key("messaging.rocketmq.message.delay_time_level")
-	// It is essential for FIFO message. Messages that belong to the same message
-	// group are always processed one by one within the same consumer group.
+
+	// MessagingRocketmqMessageGroupKey is the attribute Key conforming to the
+	// "messaging.rocketmq.message.group" semantic conventions. It represents
+	// the it is essential for FIFO message. Messages that belong to the same
+	// message group are always processed one by one within the same consumer
+	// group.
 	//
 	// Type: string
 	// RequirementLevel: ConditionallyRequired (If the message type is FIFO.)
 	// Stability: stable
 	// Examples: 'myMessageGroup'
 	MessagingRocketmqMessageGroupKey = attribute.Key("messaging.rocketmq.message.group")
-	// Type of message.
+
+	// MessagingRocketmqMessageTypeKey is the attribute Key conforming to the
+	// "messaging.rocketmq.message.type" semantic conventions. It represents
+	// the type of message.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
 	// Stability: stable
 	MessagingRocketmqMessageTypeKey = attribute.Key("messaging.rocketmq.message.type")
-	// The secondary classifier of message besides topic.
+
+	// MessagingRocketmqMessageTagKey is the attribute Key conforming to the
+	// "messaging.rocketmq.message.tag" semantic conventions. It represents the
+	// secondary classifier of message besides topic.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'tagA'
 	MessagingRocketmqMessageTagKey = attribute.Key("messaging.rocketmq.message.tag")
-	// Key(s) of message, another way to mark message besides message id.
+
+	// MessagingRocketmqMessageKeysKey is the attribute Key conforming to the
+	// "messaging.rocketmq.message.keys" semantic conventions. It represents
+	// the key(s) of message, another way to mark message besides message id.
 	//
 	// Type: string[]
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: 'keyA', 'keyB'
 	MessagingRocketmqMessageKeysKey = attribute.Key("messaging.rocketmq.message.keys")
-	// Model of message consumption. This only applies to consumer spans.
+
+	// MessagingRocketmqConsumptionModelKey is the attribute Key conforming to
+	// the "messaging.rocketmq.consumption_model" semantic conventions. It
+	// represents the model of message consumption. This only applies to
+	// consumer spans.
 	//
 	// Type: Enum
 	// RequirementLevel: Optional
@@ -1756,31 +3113,98 @@ var (
 	MessagingRocketmqConsumptionModelBroadcasting = MessagingRocketmqConsumptionModelKey.String("broadcasting")
 )
 
-// This document defines semantic conventions for remote procedure calls.
+// MessagingRocketmqNamespace returns an attribute KeyValue conforming to
+// the "messaging.rocketmq.namespace" semantic conventions. It represents the
+// namespace of RocketMQ resources, resources in different namespaces are
+// individual.
+func MessagingRocketmqNamespace(val string) attribute.KeyValue {
+	return MessagingRocketmqNamespaceKey.String(val)
+}
+
+// MessagingRocketmqClientGroup returns an attribute KeyValue conforming to
+// the "messaging.rocketmq.client_group" semantic conventions. It represents
+// the name of the RocketMQ producer/consumer group that is handling the
+// message. The client type is identified by the SpanKind.
+func MessagingRocketmqClientGroup(val string) attribute.KeyValue {
+	return MessagingRocketmqClientGroupKey.String(val)
+}
+
+// MessagingRocketmqClientID returns an attribute KeyValue conforming to the
+// "messaging.rocketmq.client_id" semantic conventions. It represents the
+// unique identifier for each client.
+func MessagingRocketmqClientID(val string) attribute.KeyValue {
+	return MessagingRocketmqClientIDKey.String(val)
+}
+
+// MessagingRocketmqMessageDeliveryTimestamp returns an attribute KeyValue
+// conforming to the "messaging.rocketmq.message.delivery_timestamp" semantic
+// conventions. It represents the timestamp in milliseconds that the delay
+// message is expected to be delivered to consumer.
+func MessagingRocketmqMessageDeliveryTimestamp(val int) attribute.KeyValue {
+	return MessagingRocketmqMessageDeliveryTimestampKey.Int(val)
+}
+
+// MessagingRocketmqMessageDelayTimeLevel returns an attribute KeyValue
+// conforming to the "messaging.rocketmq.message.delay_time_level" semantic
+// conventions. It represents the delay time level for delay message, which
+// determines the message delay time.
+func MessagingRocketmqMessageDelayTimeLevel(val int) attribute.KeyValue {
+	return MessagingRocketmqMessageDelayTimeLevelKey.Int(val)
+}
+
+// MessagingRocketmqMessageGroup returns an attribute KeyValue conforming to
+// the "messaging.rocketmq.message.group" semantic conventions. It represents
+// the it is essential for FIFO message. Messages that belong to the same
+// message group are always processed one by one within the same consumer
+// group.
+func MessagingRocketmqMessageGroup(val string) attribute.KeyValue {
+	return MessagingRocketmqMessageGroupKey.String(val)
+}
+
+// MessagingRocketmqMessageTag returns an attribute KeyValue conforming to
+// the "messaging.rocketmq.message.tag" semantic conventions. It represents the
+// secondary classifier of message besides topic.
+func MessagingRocketmqMessageTag(val string) attribute.KeyValue {
+	return MessagingRocketmqMessageTagKey.String(val)
+}
+
+// MessagingRocketmqMessageKeys returns an attribute KeyValue conforming to
+// the "messaging.rocketmq.message.keys" semantic conventions. It represents
+// the key(s) of message, another way to mark message besides message id.
+func MessagingRocketmqMessageKeys(val ...string) attribute.KeyValue {
+	return MessagingRocketmqMessageKeysKey.StringSlice(val)
+}
+
+// Semantic conventions for remote procedure calls.
 const (
-	// A string identifying the remoting system. See below for a list of well-known
-	// identifiers.
+	// RPCSystemKey is the attribute Key conforming to the "rpc.system"
+	// semantic conventions. It represents a string identifying the remoting
+	// system. See below for a list of well-known identifiers.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
 	// Stability: stable
 	RPCSystemKey = attribute.Key("rpc.system")
-	// The full (logical) name of the service being called, including its package
-	// name, if applicable.
+
+	// RPCServiceKey is the attribute Key conforming to the "rpc.service"
+	// semantic conventions. It represents the full (logical) name of the
+	// service being called, including its package name, if applicable.
 	//
 	// Type: string
 	// RequirementLevel: Recommended
 	// Stability: stable
 	// Examples: 'myservice.EchoService'
 	// Note: This is the logical name of the service from the RPC interface
-	// perspective, which can be different from the name of any implementing class.
-	// The `code.namespace` attribute may be used to store the latter (despite the
-	// attribute name, it may include a class name; e.g., class with method actually
-	// executing the call on the server side, RPC client stub class on the client
-	// side).
+	// perspective, which can be different from the name of any implementing
+	// class. The `code.namespace` attribute may be used to store the latter
+	// (despite the attribute name, it may include a class name; e.g., class
+	// with method actually executing the call on the server side, RPC client
+	// stub class on the client side).
 	RPCServiceKey = attribute.Key("rpc.service")
-	// The name of the (logical) method being called, must be equal to the $method
-	// part in the span name.
+
+	// RPCMethodKey is the attribute Key conforming to the "rpc.method"
+	// semantic conventions. It represents the name of the (logical) method
+	// being called, must be equal to the $method part in the span name.
 	//
 	// Type: string
 	// RequirementLevel: Recommended
@@ -1788,9 +3212,9 @@ const (
 	// Examples: 'exampleMethod'
 	// Note: This is the logical name of the method from the RPC interface
 	// perspective, which can be different from the name of any implementing
-	// method/function. The `code.function` attribute may be used to store the latter
-	// (e.g., method actually executing the call on the server side, RPC client stub
-	// method on the client side).
+	// method/function. The `code.function` attribute may be used to store the
+	// latter (e.g., method actually executing the call on the server side, RPC
+	// client stub method on the client side).
 	RPCMethodKey = attribute.Key("rpc.method")
 )
 
@@ -1805,11 +3229,27 @@ var (
 	RPCSystemApacheDubbo = RPCSystemKey.String("apache_dubbo")
 )
 
+// RPCService returns an attribute KeyValue conforming to the "rpc.service"
+// semantic conventions. It represents the full (logical) name of the service
+// being called, including its package name, if applicable.
+func RPCService(val string) attribute.KeyValue {
+	return RPCServiceKey.String(val)
+}
+
+// RPCMethod returns an attribute KeyValue conforming to the "rpc.method"
+// semantic conventions. It represents the name of the (logical) method being
+// called, must be equal to the $method part in the span name.
+func RPCMethod(val string) attribute.KeyValue {
+	return RPCMethodKey.String(val)
+}
+
 // Tech-specific attributes for gRPC.
 const (
-	// The [numeric status
-	// code](https://github.com/grpc/grpc/blob/v1.33.2/doc/statuscodes.md) of the gRPC
-	// request.
+	// RPCGRPCStatusCodeKey is the attribute Key conforming to the
+	// "rpc.grpc.status_code" semantic conventions. It represents the [numeric
+	// status
+	// code](https://github.com/grpc/grpc/blob/v1.33.2/doc/statuscodes.md) of
+	// the gRPC request.
 	//
 	// Type: Enum
 	// RequirementLevel: Required
@@ -1856,25 +3296,33 @@ var (
 
 // Tech-specific attributes for [JSON RPC](https://www.jsonrpc.org/).
 const (
-	// Protocol version as in `jsonrpc` property of request/response. Since JSON-RPC
-	// 1.0 does not specify this, the value can be omitted.
+	// RPCJsonrpcVersionKey is the attribute Key conforming to the
+	// "rpc.jsonrpc.version" semantic conventions. It represents the protocol
+	// version as in `jsonrpc` property of request/response. Since JSON-RPC 1.0
+	// does not specify this, the value can be omitted.
 	//
 	// Type: string
-	// RequirementLevel: ConditionallyRequired (If other than the default version
-	// (`1.0`))
+	// RequirementLevel: ConditionallyRequired (If other than the default
+	// version (`1.0`))
 	// Stability: stable
 	// Examples: '2.0', '1.0'
 	RPCJsonrpcVersionKey = attribute.Key("rpc.jsonrpc.version")
-	// `id` property of request or response. Since protocol allows id to be int,
-	// string, `null` or missing (for notifications), value is expected to be cast to
-	// string for simplicity. Use empty string in case of `null` value. Omit entirely
-	// if this is a notification.
+
+	// RPCJsonrpcRequestIDKey is the attribute Key conforming to the
+	// "rpc.jsonrpc.request_id" semantic conventions. It represents the `id`
+	// property of request or response. Since protocol allows id to be int,
+	// string, `null` or missing (for notifications), value is expected to be
+	// cast to string for simplicity. Use empty string in case of `null` value.
+	// Omit entirely if this is a notification.
 	//
 	// Type: string
 	// RequirementLevel: Optional
 	// Stability: stable
 	// Examples: '10', 'request-7', ''
 	RPCJsonrpcRequestIDKey = attribute.Key("rpc.jsonrpc.request_id")
+
+	// RPCJsonrpcErrorCodeKey is the attribute Key conforming to the
+	// "rpc.jsonrpc.error_code" semantic conventions. It represents the
 	// `error.code` property of response if it is an error response.
 	//
 	// Type: int
@@ -1882,6 +3330,9 @@ const (
 	// Stability: stable
 	// Examples: -32700, 100
 	RPCJsonrpcErrorCodeKey = attribute.Key("rpc.jsonrpc.error_code")
+
+	// RPCJsonrpcErrorMessageKey is the attribute Key conforming to the
+	// "rpc.jsonrpc.error_message" semantic conventions. It represents the
 	// `error.message` property of response if it is an error response.
 	//
 	// Type: string
@@ -1890,3 +3341,35 @@ const (
 	// Examples: 'Parse error', 'User already exists'
 	RPCJsonrpcErrorMessageKey = attribute.Key("rpc.jsonrpc.error_message")
 )
+
+// RPCJsonrpcVersion returns an attribute KeyValue conforming to the
+// "rpc.jsonrpc.version" semantic conventions. It represents the protocol
+// version as in `jsonrpc` property of request/response. Since JSON-RPC 1.0
+// does not specify this, the value can be omitted.
+func RPCJsonrpcVersion(val string) attribute.KeyValue {
+	return RPCJsonrpcVersionKey.String(val)
+}
+
+// RPCJsonrpcRequestID returns an attribute KeyValue conforming to the
+// "rpc.jsonrpc.request_id" semantic conventions. It represents the `id`
+// property of request or response. Since protocol allows id to be int, string,
+// `null` or missing (for notifications), value is expected to be cast to
+// string for simplicity. Use empty string in case of `null` value. Omit
+// entirely if this is a notification.
+func RPCJsonrpcRequestID(val string) attribute.KeyValue {
+	return RPCJsonrpcRequestIDKey.String(val)
+}
+
+// RPCJsonrpcErrorCode returns an attribute KeyValue conforming to the
+// "rpc.jsonrpc.error_code" semantic conventions. It represents the
+// `error.code` property of response if it is an error response.
+func RPCJsonrpcErrorCode(val int) attribute.KeyValue {
+	return RPCJsonrpcErrorCodeKey.Int(val)
+}
+
+// RPCJsonrpcErrorMessage returns an attribute KeyValue conforming to the
+// "rpc.jsonrpc.error_message" semantic conventions. It represents the
+// `error.message` property of response if it is an error response.
+func RPCJsonrpcErrorMessage(val string) attribute.KeyValue {
+	return RPCJsonrpcErrorMessageKey.String(val)
+}

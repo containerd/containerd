@@ -59,7 +59,7 @@ func (fromEnv) Detect(context.Context) (*Resource, error) {
 	var res *Resource
 
 	if svcName != "" {
-		res = NewSchemaless(semconv.ServiceNameKey.String(svcName))
+		res = NewSchemaless(semconv.ServiceName(svcName))
 	}
 
 	r2, err := constructOTResources(attrs)
