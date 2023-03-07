@@ -18,12 +18,14 @@ package encryption
 
 import "github.com/gogo/protobuf/types"
 
-type any interface {
+// pbAny takes proto-generated Any type.
+// https://developers.google.com/protocol-buffers/docs/proto3#any
+type pbAny interface {
 	GetTypeUrl() string
 	GetValue() []byte
 }
 
-func fromAny(from any) *types.Any {
+func fromAny(from pbAny) *types.Any {
 	if from == nil {
 		return nil
 	}

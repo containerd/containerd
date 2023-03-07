@@ -38,7 +38,7 @@ func clearProcessorPayloads(c *diff.ApplyConfig) {
 	reflect.ValueOf(&c.ProcessorPayloads).Elem().Set(empty)
 }
 
-func setProcessorPayload(c *diff.ApplyConfig, id string, value any) {
+func setProcessorPayload(c *diff.ApplyConfig, id string, value pbAny) {
 	if c.ProcessorPayloads == nil {
 		clearProcessorPayloads(c)
 	}
