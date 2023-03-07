@@ -51,7 +51,7 @@ require (
 	// ATM the runtime-tools commit we need are beyond the latest tag.
 	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626
-	github.com/opencontainers/selinux v1.10.2
+	github.com/opencontainers/selinux v1.11.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sirupsen/logrus v1.9.0
