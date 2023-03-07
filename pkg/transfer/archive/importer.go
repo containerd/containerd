@@ -20,14 +20,15 @@ import (
 	"context"
 	"io"
 
+	"github.com/containerd/typeurl/v2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
-	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ImportOpt func(*ImageImportStream)
