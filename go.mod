@@ -13,7 +13,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.0.1
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.3.0
-	github.com/containerd/fifo v1.0.0
+	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.7
