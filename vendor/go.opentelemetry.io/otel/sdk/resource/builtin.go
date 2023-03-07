@@ -60,9 +60,9 @@ var (
 func (telemetrySDK) Detect(context.Context) (*Resource, error) {
 	return NewWithAttributes(
 		semconv.SchemaURL,
-		semconv.TelemetrySDKNameKey.String("opentelemetry"),
-		semconv.TelemetrySDKLanguageKey.String("go"),
-		semconv.TelemetrySDKVersionKey.String(otel.Version()),
+		semconv.TelemetrySDKName("opentelemetry"),
+		semconv.TelemetrySDKLanguageGo,
+		semconv.TelemetrySDKVersion(otel.Version()),
 	), nil
 }
 

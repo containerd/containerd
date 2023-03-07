@@ -63,7 +63,7 @@ func (osDescriptionDetector) Detect(ctx context.Context) (*Resource, error) {
 
 	return NewWithAttributes(
 		semconv.SchemaURL,
-		semconv.OSDescriptionKey.String(description),
+		semconv.OSDescription(description),
 	), nil
 }
 
