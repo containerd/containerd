@@ -19,7 +19,6 @@ package cgroup1
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -180,7 +179,7 @@ func parseKV(raw string) (string, uint64, error) {
 // etc.
 //
 // The resulting map does not have an element for cgroup v2 unified hierarchy.
-// Use ParseCgroupFileUnified to get the unified path.
+// Use [cgroups.ParseCgroupFileUnified] to get the unified path.
 func ParseCgroupFile(path string) (map[string]string, error) {
 	x, _, err := ParseCgroupFileUnified(path)
 	return x, err
@@ -188,41 +187,10 @@ func ParseCgroupFile(path string) (map[string]string, error) {
 
 // ParseCgroupFileUnified returns legacy subsystem paths as the first value,
 // and returns the unified path as the second value.
+//
+// Deprecated: use [cgroups.ParseCgroupFileUnified] instead .
 func ParseCgroupFileUnified(path string) (map[string]string, string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, "", err
-	}
-	defer f.Close()
-	return parseCgroupFromReaderUnified(f)
-}
-
-func parseCgroupFromReaderUnified(r io.Reader) (map[string]string, string, error) {
-	var (
-		cgroups = make(map[string]string)
-		unified = ""
-		s       = bufio.NewScanner(r)
-	)
-	for s.Scan() {
-		var (
-			text  = s.Text()
-			parts = strings.SplitN(text, ":", 3)
-		)
-		if len(parts) < 3 {
-			return nil, unified, fmt.Errorf("invalid cgroup entry: %q", text)
-		}
-		for _, subs := range strings.Split(parts[1], ",") {
-			if subs == "" {
-				unified = parts[2]
-			} else {
-				cgroups[subs] = parts[2]
-			}
-		}
-	}
-	if err := s.Err(); err != nil {
-		return nil, unified, err
-	}
-	return cgroups, unified, nil
+	return cgroups.ParseCgroupFileUnified(path)
 }
 
 func getCgroupDestination(subsystem string) (string, error) {
