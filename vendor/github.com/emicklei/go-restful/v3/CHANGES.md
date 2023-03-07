@@ -1,5 +1,30 @@
 # Change history of go-restful
 
+## [v3.10.1] - 2022-11-19
+
+- fix broken 3.10.0 by using path package for joining paths
+
+## [v3.10.0] - 2022-10-11 - BROKEN
+
+- changed tokenizer to match std route match behavior; do not trimright the path (#511)
+- Add MIME_ZIP (#512)
+- Add MIME_ZIP and HEADER_ContentDisposition (#513)
+- Changed how to get query parameter issue #510
+
+## [v3.9.0] - 2022-07-21
+
+- add support for http.Handler implementations to work as FilterFunction, issue #504 (thanks to https://github.com/ggicci)
+
+## [v3.8.0] - 2022-06-06
+
+- use exact matching of allowed domain entries, issue #489 (#493)
+	- this changes fixes [security] Authorization Bypass Through User-Controlled Key
+	  by changing the behaviour of the AllowedDomains setting in the CORS filter.
+	  To support the previous behaviour, the CORS filter type now has a AllowedDomainFunc
+	  callback mechanism which is called when a simple domain match fails. 
+- add test and fix for POST without body and Content-type, issue #492 (#496)
+- [Minor] Bad practice to have a mix of Receiver types. (#491)
+
 ## [v3.7.2] - 2021-11-24
 
 - restored FilterChain (#482 by SVilgelm)
