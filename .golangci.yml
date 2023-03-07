@@ -29,6 +29,9 @@ issues:
       text: "blank-imports:"
     - path: 'contrib[\\/]fuzz[\\/]'
       text: "exported: func name will be used as fuzz.Fuzz"
+    - path: 'archive[\\/]tarheader[\\/]'
+      # conversion is necessary on Linux, unnecessary on macOS
+      text: "unnecessary conversion"
 
 linters-settings:
   gosec:
