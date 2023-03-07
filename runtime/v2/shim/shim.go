@@ -245,7 +245,7 @@ func (stm shimToManager) Stop(ctx context.Context, id string) (StopStatus, error
 	}, nil
 }
 
-// RunManager initialzes and runs a shim server
+// RunManager initializes and runs a shim server.
 // TODO(2.0): Rename to Run
 func RunManager(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 	var config Config
