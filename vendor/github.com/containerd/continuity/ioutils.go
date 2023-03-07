@@ -37,26 +37,32 @@ func atomicWriteFile(filename string, r io.Reader, dataSize int64, perm os.FileM
 	if err != nil {
 		return err
 	}
+	needClose := true
+	defer func() {
+		if needClose {
+			f.Close()
+		}
+	}()
+
 	err = os.Chmod(f.Name(), perm)
 	if err != nil {
-		f.Close()
 		return err
 	}
 	n, err := io.Copy(f, r)
 	if err == nil && n < dataSize {
-		f.Close()
 		return io.ErrShortWrite
 	}
 	if err != nil {
-		f.Close()
 		return err
 	}
-	if err := f.Sync(); err != nil {
-		f.Close()
+	if err = f.Sync(); err != nil {
 		return err
 	}
+
+	needClose = false
 	if err := f.Close(); err != nil {
 		return err
 	}
+
 	return os.Rename(f.Name(), filename)
 }
