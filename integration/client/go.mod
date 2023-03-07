@@ -6,7 +6,7 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1
 	github.com/Microsoft/hcsshim v0.10.0-rc.7
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
-	github.com/containerd/cgroups/v3 v3.0.0
+	github.com/containerd/cgroups/v3 v3.0.1
 	github.com/containerd/containerd v1.7.0-beta.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	go.opentelemetry.io/otel v1.12.0
 	go.opentelemetry.io/otel/sdk v1.12.0
-	golang.org/x/sys v0.5.0
+	golang.org/x/sys v0.6.0
 )
 
 require (

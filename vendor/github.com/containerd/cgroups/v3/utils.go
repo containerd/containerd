@@ -19,8 +19,10 @@ package cgroups
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -104,4 +106,45 @@ func RunningInUserNS() bool {
 		inUserNS = true
 	})
 	return inUserNS
+}
+
+// ParseCgroupFileUnified returns legacy subsystem paths as the first value,
+// and returns the unified path as the second value.
+func ParseCgroupFileUnified(path string) (map[string]string, string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer f.Close()
+	return ParseCgroupFromReaderUnified(f)
+}
+
+// ParseCgroupFromReaderUnified returns legacy subsystem paths as the first value,
+// and returns the unified path as the second value.
+func ParseCgroupFromReaderUnified(r io.Reader) (map[string]string, string, error) {
+	var (
+		cgroups = make(map[string]string)
+		unified = ""
+		s       = bufio.NewScanner(r)
+	)
+	for s.Scan() {
+		var (
+			text  = s.Text()
+			parts = strings.SplitN(text, ":", 3)
+		)
+		if len(parts) < 3 {
+			return nil, unified, fmt.Errorf("invalid cgroup entry: %q", text)
+		}
+		for _, subs := range strings.Split(parts[1], ",") {
+			if subs == "" {
+				unified = parts[2]
+			} else {
+				cgroups[subs] = parts[2]
+			}
+		}
+	}
+	if err := s.Err(); err != nil {
+		return nil, unified, err
+	}
+	return cgroups, unified, nil
 }
