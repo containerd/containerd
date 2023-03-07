@@ -443,7 +443,7 @@ func KillProcess(name string, signal syscall.Signal) error {
 }
 
 // KillPid kills the process by pid. kill is used.
-func KillPid(pid int) error { //nolint:unused
+func KillPid(pid int) error {
 	output, err := exec.Command("kill", strconv.Itoa(pid)).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to kill %d - error: %v, output: %q", pid, err, output)
