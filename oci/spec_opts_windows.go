@@ -35,6 +35,16 @@ func escapeAndCombineArgs(args []string) string {
 	return strings.Join(escaped, " ")
 }
 
+// WithProcessCommandLine replaces the command line on the generated spec
+func WithProcessCommandLine(cmdLine string) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		setProcess(s)
+		s.Process.Args = nil
+		s.Process.CommandLine = cmdLine
+		return nil
+	}
+}
+
 // WithHostDevices adds all the hosts device nodes to the container's spec
 //
 // Not supported on windows
