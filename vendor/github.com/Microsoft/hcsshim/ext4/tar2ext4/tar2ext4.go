@@ -249,6 +249,7 @@ func ConvertAndComputeRootDigest(r io.Reader) (string, error) {
 	defer func() {
 		_ = os.Remove(out.Name())
 	}()
+	defer out.Close()
 
 	options := []Option{
 		ConvertWhiteout,
