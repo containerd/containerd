@@ -28,7 +28,6 @@ import (
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
@@ -51,7 +50,7 @@ func SwapControllerAvailable() bool {
 		p := "/sys/fs/cgroup/memory/memory.memsw.limit_in_bytes"
 		if cgroups.Mode() == cgroups.Unified {
 			// memory.swap.max does not exist in the cgroup root, so we check /sys/fs/cgroup/<SELF>/memory.swap.max
-			_, unified, err := cgroup1.ParseCgroupFileUnified("/proc/self/cgroup")
+			_, unified, err := cgroups.ParseCgroupFileUnified("/proc/self/cgroup")
 			if err != nil {
 				err = fmt.Errorf("failed to parse /proc/self/cgroup: %w", err)
 				logrus.WithError(err).Warn(warn)

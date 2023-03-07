@@ -6,19 +6,19 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 	github.com/Microsoft/go-winio v0.6.0
-	github.com/Microsoft/hcsshim v0.10.0-rc.5
+	github.com/Microsoft/hcsshim v0.10.0-rc.7
 	github.com/container-orchestrated-devices/container-device-interface v0.5.4
 	github.com/containerd/aufs v1.0.0
 	github.com/containerd/btrfs/v2 v2.0.0
-	github.com/containerd/cgroups/v3 v3.0.0
+	github.com/containerd/cgroups/v3 v3.0.1
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.3.0
-	github.com/containerd/fifo v1.0.0
+	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.7
 	github.com/containerd/nri v0.3.0
-	github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
+	github.com/containerd/ttrpc v1.2.0
 	github.com/containerd/typeurl/v2 v2.1.0
 	github.com/containerd/zfs v1.0.0
 	github.com/containernetworking/cni v1.1.2
@@ -28,16 +28,16 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.5.0
-	github.com/emicklei/go-restful/v3 v3.9.0
+	github.com/emicklei/go-restful/v3 v3.10.1
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/imdario/mergo v0.3.12
+	github.com/imdario/mergo v0.3.13
 	github.com/intel/goresctrl v0.3.0
-	github.com/klauspost/compress v1.15.11
+	github.com/klauspost/compress v1.16.0
 	github.com/minio/sha256-simd v1.0.0
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.6.2
@@ -47,15 +47,15 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runc v1.1.4
-	github.com/opencontainers/runtime-spec v1.0.3-0.20220825212826-86290f6a00fb
+	github.com/opencontainers/runtime-spec v1.1.0-rc.1
 	// ATM the runtime-tools commit we need are beyond the latest tag.
 	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626
-	github.com/opencontainers/selinux v1.10.2
+	github.com/opencontainers/selinux v1.11.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.14.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli v1.22.12
 	github.com/vishvananda/netlink v1.2.1-beta.2
@@ -68,9 +68,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.12.0
 	go.opentelemetry.io/otel/trace v1.12.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.5.0
-	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
-	google.golang.org/grpc v1.52.3
+	golang.org/x/sys v0.6.0
+	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4
+	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.1
 	k8s.io/api v0.26.2
 	k8s.io/apimachinery v0.26.2
@@ -86,7 +86,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.2.0 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
@@ -128,7 +128,7 @@ require (
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
+	golang.org/x/oauth2 v0.4.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect

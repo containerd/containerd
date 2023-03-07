@@ -99,8 +99,10 @@ func MerkleTree(r io.Reader) ([]byte, error) {
 			nextLevel.Write(h)
 		}
 
-		padding := bytes.Repeat([]byte{0}, blockSize-(nextLevel.Len()%blockSize))
-		nextLevel.Write(padding)
+		if nextLevel.Len()%blockSize != 0 {
+			padding := bytes.Repeat([]byte{0}, blockSize-(nextLevel.Len()%blockSize))
+			nextLevel.Write(padding)
+		}
 
 		layers = append(layers, nextLevel.Bytes())
 		currentLevel = bufio.NewReaderSize(nextLevel, MerkleTreeBufioSize)
