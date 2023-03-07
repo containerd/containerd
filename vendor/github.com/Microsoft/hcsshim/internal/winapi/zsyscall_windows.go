@@ -47,6 +47,7 @@ var (
 	modkernel32   = windows.NewLazySystemDLL("kernel32.dll")
 	modnetapi32   = windows.NewLazySystemDLL("netapi32.dll")
 	modntdll      = windows.NewLazySystemDLL("ntdll.dll")
+	modoffreg     = windows.NewLazySystemDLL("offreg.dll")
 
 	procLogonUserW                             = modadvapi32.NewProc("LogonUserW")
 	procBfSetupFilter                          = modbindfltapi.NewProc("BfSetupFilter")
@@ -82,6 +83,9 @@ var (
 	procNtQuerySystemInformation               = modntdll.NewProc("NtQuerySystemInformation")
 	procNtSetInformationFile                   = modntdll.NewProc("NtSetInformationFile")
 	procRtlNtStatusToDosError                  = modntdll.NewProc("RtlNtStatusToDosError")
+	procORCloseHive                            = modoffreg.NewProc("ORCloseHive")
+	procORCreateHive                           = modoffreg.NewProc("ORCreateHive")
+	procORSaveHive                             = modoffreg.NewProc("ORSaveHive")
 )
 
 func LogonUser(username *uint16, domain *uint16, password *uint16, logonType uint32, logonProvider uint32, token *windows.Token) (err error) {
@@ -373,6 +377,39 @@ func RtlNtStatusToDosError(status uint32) (winerr error) {
 	r0, _, _ := syscall.Syscall(procRtlNtStatusToDosError.Addr(), 1, uintptr(status), 0, 0)
 	if r0 != 0 {
 		winerr = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORCloseHive(key syscall.Handle) (regerrno error) {
+	r0, _, _ := syscall.Syscall(procORCloseHive.Addr(), 1, uintptr(key), 0, 0)
+	if r0 != 0 {
+		regerrno = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORCreateHive(key *syscall.Handle) (regerrno error) {
+	r0, _, _ := syscall.Syscall(procORCreateHive.Addr(), 1, uintptr(unsafe.Pointer(key)), 0, 0)
+	if r0 != 0 {
+		regerrno = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORSaveHive(key syscall.Handle, file string, OsMajorVersion uint32, OsMinorVersion uint32) (regerrno error) {
+	var _p0 *uint16
+	_p0, regerrno = syscall.UTF16PtrFromString(file)
+	if regerrno != nil {
+		return
+	}
+	return _ORSaveHive(key, _p0, OsMajorVersion, OsMinorVersion)
+}
+
+func _ORSaveHive(key syscall.Handle, file *uint16, OsMajorVersion uint32, OsMinorVersion uint32) (regerrno error) {
+	r0, _, _ := syscall.Syscall6(procORSaveHive.Addr(), 4, uintptr(key), uintptr(unsafe.Pointer(file)), uintptr(OsMajorVersion), uintptr(OsMinorVersion), 0, 0)
+	if r0 != 0 {
+		regerrno = syscall.Errno(r0)
 	}
 	return
 }
