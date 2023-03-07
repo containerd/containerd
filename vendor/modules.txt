@@ -64,7 +64,7 @@ github.com/blang/semver/v4
 # github.com/cenkalti/backoff/v4 v4.2.0
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
-# github.com/cespare/xxhash/v2 v2.1.2
+# github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
 # github.com/cilium/ebpf v0.9.1
@@ -137,7 +137,7 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
-# github.com/containerd/ttrpc v1.1.1-0.20230127163717-32fab2374638
+# github.com/containerd/ttrpc v1.2.0
 ## explicit; go 1.13
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl v1.0.2
@@ -524,7 +524,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783
+# golang.org/x/oauth2 v0.4.0
 ## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
@@ -581,14 +581,14 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
+# google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.52.3
+# google.golang.org/grpc v1.53.0
 ## explicit; go 1.17
 google.golang.org/grpc
 google.golang.org/grpc/attributes
