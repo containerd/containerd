@@ -57,10 +57,12 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		status.CreatedAt = sandboxInfo.CreatedAt.UnixNano()
 	}
 
-	return &runtime.PodSandboxStatusResponse{
-		Status: status,
-		Info:   cstatus.Info,
-	}, nil
+	resp := &runtime.PodSandboxStatusResponse{Status: status}
+	if r.GetVerbose() {
+		resp.Info = cstatus.Info
+	}
+
+	return resp, nil
 }
 
 func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, error) {
