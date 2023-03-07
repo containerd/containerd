@@ -76,21 +76,21 @@ func (c Config) RequestFunc(evaluate EvaluateFunc) RequestFunc {
 		}
 	}
 
-	// Do not use NewExponentialBackOff since it calls Reset and the code here
-	// must call Reset after changing the InitialInterval (this saves an
-	// unnecessary call to Now).
-	b := &backoff.ExponentialBackOff{
-		InitialInterval:     c.InitialInterval,
-		RandomizationFactor: backoff.DefaultRandomizationFactor,
-		Multiplier:          backoff.DefaultMultiplier,
-		MaxInterval:         c.MaxInterval,
-		MaxElapsedTime:      c.MaxElapsedTime,
-		Stop:                backoff.Stop,
-		Clock:               backoff.SystemClock,
-	}
-	b.Reset()
-
 	return func(ctx context.Context, fn func(context.Context) error) error {
+		// Do not use NewExponentialBackOff since it calls Reset and the code here
+		// must call Reset after changing the InitialInterval (this saves an
+		// unnecessary call to Now).
+		b := &backoff.ExponentialBackOff{
+			InitialInterval:     c.InitialInterval,
+			RandomizationFactor: backoff.DefaultRandomizationFactor,
+			Multiplier:          backoff.DefaultMultiplier,
+			MaxInterval:         c.MaxInterval,
+			MaxElapsedTime:      c.MaxElapsedTime,
+			Stop:                backoff.Stop,
+			Clock:               backoff.SystemClock,
+		}
+		b.Reset()
+
 		for {
 			err := fn(ctx)
 			if err == nil {
