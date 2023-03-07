@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/reference"
 )
 
@@ -69,7 +70,7 @@ func TestAppendDistributionLabel(t *testing.T) {
 }
 
 func TestDistributionSourceLabelKey(t *testing.T) {
-	expected := "containerd.io/distribution.source.testsource"
+	expected := labels.LabelDistributionSource + ".testsource"
 	if got := distributionSourceLabelKey("testsource"); !reflect.DeepEqual(got, expected) {
 		t.Fatalf("expected %v, but got %v", expected, got)
 	}
@@ -116,12 +117,12 @@ func TestSelectRepositoryMountCandidate(t *testing.T) {
 		},
 		{
 			refspec:  reference.Spec{Locator: "user@host/path"},
-			source:   map[string]string{"containerd.io/distribution.source.host": "foo,path,bar"},
+			source:   map[string]string{labels.LabelDistributionSource + ".host": "foo,path,bar"},
 			expected: "bar",
 		},
 		{
 			refspec:  reference.Spec{Locator: "user@host/path"},
-			source:   map[string]string{"containerd.io/distribution.source.host": "foo,bar,path"},
+			source:   map[string]string{labels.LabelDistributionSource + ".host": "foo,bar,path"},
 			expected: "bar",
 		},
 	} {
