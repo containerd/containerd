@@ -136,8 +136,8 @@ func isFUSE(dir string) bool {
 // https://github.com/containerd/containerd/pull/3765#discussion_r342083514
 func unmountFUSE(target string) error {
 	var err error
-	for _, helperBinary := range []string{"fusermount3", "fusermount"} {
-		cmd := exec.Command(helperBinary, "-u", target)
+	for _, helperBinary := range []string{"fusermount3", "fusermount", "fuser"} {
+		cmd := exec.Command(helperBinary, "-u -k", target)
 		err = cmd.Run()
 		if err == nil {
 			return nil
