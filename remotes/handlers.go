@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -367,7 +368,7 @@ func annotateDistributionSourceHandler(f images.HandlerFunc, manager content.Man
 			}
 
 			for k, v := range info.Labels {
-				if !strings.HasPrefix(k, "containerd.io/distribution.source.") {
+				if !strings.HasPrefix(k, labels.LabelDistributionSource+".") {
 					continue
 				}
 
