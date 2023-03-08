@@ -63,7 +63,7 @@ func RemoveCniNetworkIfExist(ctx context.Context, container containerd.Container
 
 var killCommand = cli.Command{
 	Name:      "kill",
-	Usage:     "signal a container (default: SIGTERM)",
+	Usage:     "Signal a container (default: SIGTERM)",
 	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
 		cli.StringFlag{

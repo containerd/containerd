@@ -25,7 +25,7 @@ import (
 // Command to install binary packages
 var Command = cli.Command{
 	Name:        "install",
-	Usage:       "install a new package",
+	Usage:       "Install a new package",
 	ArgsUsage:   "<ref>",
 	Description: "install a new package",
 	Flags: []cli.Flag{

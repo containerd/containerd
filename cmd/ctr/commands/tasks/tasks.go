@@ -29,7 +29,7 @@ type resizer interface {
 // Command is the cli command for managing tasks
 var Command = cli.Command{
 	Name:    "tasks",
-	Usage:   "manage tasks",
+	Usage:   "Manage tasks",
 	Aliases: []string{"t", "task"},
 	Subcommands: []cli.Command{
 		attachCommand,

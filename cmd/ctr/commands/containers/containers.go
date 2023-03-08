@@ -37,7 +37,7 @@ import (
 // Command is the cli command for managing containers
 var Command = cli.Command{
 	Name:    "containers",
-	Usage:   "manage containers",
+	Usage:   "Manage containers",
 	Aliases: []string{"c", "container"},
 	Subcommands: []cli.Command{
 		createCommand,
@@ -52,7 +52,7 @@ var Command = cli.Command{
 
 var createCommand = cli.Command{
 	Name:           "create",
-	Usage:          "create container",
+	Usage:          "Create container",
 	ArgsUsage:      "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
 	SkipArgReorder: true,
 	Flags:          append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...),
@@ -94,7 +94,7 @@ var createCommand = cli.Command{
 var listCommand = cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
-	Usage:     "list containers",
+	Usage:     "List containers",
 	ArgsUsage: "[flags] [<filter>, ...]",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
@@ -147,7 +147,7 @@ var listCommand = cli.Command{
 
 var deleteCommand = cli.Command{
 	Name:      "delete",
-	Usage:     "delete one or more existing containers",
+	Usage:     "Delete one or more existing containers",
 	ArgsUsage: "[flags] CONTAINER [CONTAINER, ...]",
 	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
@@ -208,7 +208,7 @@ func deleteContainer(ctx context.Context, client *containerd.Client, id string, 
 
 var setLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "set and clear labels for a container",
+	Usage:       "Set and clear labels for a container",
 	ArgsUsage:   "[flags] CONTAINER [<key>=<value>, ...]",
 	Description: "set and clear labels for a container",
 	Flags:       []cli.Flag{},
@@ -246,7 +246,7 @@ var setLabelsCommand = cli.Command{
 
 var infoCommand = cli.Command{
 	Name:      "info",
-	Usage:     "get info about a container",
+	Usage:     "Get info about a container",
 	ArgsUsage: "CONTAINER",
 	Flags: []cli.Flag{
 		cli.BoolFlag{

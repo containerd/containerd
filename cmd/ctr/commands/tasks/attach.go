@@ -26,7 +26,7 @@ import (
 
 var attachCommand = cli.Command{
 	Name:      "attach",
-	Usage:     "attach to the IO of a running container",
+	Usage:     "Attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)

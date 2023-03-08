@@ -46,7 +46,7 @@ import (
 
 var pushCommand = cli.Command{
 	Name:      "push",
-	Usage:     "push an image to a remote",
+	Usage:     "Push an image to a remote",
 	ArgsUsage: "[flags] <remote> [<local>]",
 	Description: `Pushes an image reference from containerd.
 

@@ -41,7 +41,7 @@ import (
 
 var pullCommand = cli.Command{
 	Name:      "pull",
-	Usage:     "pull an image from a remote",
+	Usage:     "Pull an image from a remote",
 	ArgsUsage: "[flags] <ref>",
 	Description: `Fetch and prepare an image for use in containerd.
 

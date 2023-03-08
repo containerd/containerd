@@ -34,7 +34,7 @@ import (
 var Command = cli.Command{
 	Name:    "events",
 	Aliases: []string{"event"},
-	Usage:   "display containerd events",
+	Usage:   "Display containerd events",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {

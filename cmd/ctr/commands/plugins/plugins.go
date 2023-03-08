@@ -36,7 +36,7 @@ import (
 var Command = cli.Command{
 	Name:    "plugins",
 	Aliases: []string{"plugin"},
-	Usage:   "provides information about containerd plugins",
+	Usage:   "Provides information about containerd plugins",
 	Subcommands: []cli.Command{
 		listCommand,
 	},
@@ -45,7 +45,7 @@ var Command = cli.Command{
 var listCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "lists containerd plugins",
+	Usage:   "Lists containerd plugins",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "quiet,q",

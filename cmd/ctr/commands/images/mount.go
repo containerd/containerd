@@ -32,7 +32,7 @@ import (
 
 var mountCommand = cli.Command{
 	Name:      "mount",
-	Usage:     "mount an image to a target path",
+	Usage:     "Mount an image to a target path",
 	ArgsUsage: "[flags] <ref> <target>",
 	Description: `Mount an image rootfs to a specified path.
 

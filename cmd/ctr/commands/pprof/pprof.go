@@ -133,7 +133,7 @@ var pprofProfileCommand = cli.Command{
 
 var pprofTraceCommand = cli.Command{
 	Name:  "trace",
-	Usage: "collect execution trace",
+	Usage: "Collect execution trace",
 	Flags: []cli.Flag{
 		cli.DurationFlag{
 			Name:  "seconds,s",
@@ -164,7 +164,7 @@ var pprofTraceCommand = cli.Command{
 
 var pprofBlockCommand = cli.Command{
 	Name:  "block",
-	Usage: "goroutine blocking profile",
+	Usage: "Goroutine blocking profile",
 	Flags: []cli.Flag{
 		cli.UintFlag{
 			Name:  "debug",
