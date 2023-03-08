@@ -61,23 +61,19 @@ func TestPoolDevice(t *testing.T) {
 	logrus.SetLevel(logrus.DebugLevel)
 	ctx := context.Background()
 
-	tempDir, err := os.MkdirTemp("", "pool-device-test-")
-	assert.NilError(t, err, "couldn't get temp directory for testing")
+	tempDir := t.TempDir()
 
 	_, loopDataDevice := createLoopbackDevice(t, tempDir)
 	_, loopMetaDevice := createLoopbackDevice(t, tempDir)
 
 	poolName := fmt.Sprintf("test-pool-device-%d", time.Now().Nanosecond())
-	err = dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
+	err := dmsetup.CreatePool(poolName, loopDataDevice, loopMetaDevice, 64*1024/dmsetup.SectorSize)
 	assert.NilError(t, err, "failed to create pool %q", poolName)
 
 	defer func() {
 		// Detach loop devices and remove images
 		err := mount.DetachLoopDevice(loopDataDevice, loopMetaDevice)
 		assert.NilError(t, err)
-
-		err = os.RemoveAll(tempDir)
-		assert.NilError(t, err, "couldn't cleanup temp directory")
 	}()
 
 	config := &Config{
@@ -176,8 +172,8 @@ func TestPoolDevice(t *testing.T) {
 }
 
 func TestPoolDeviceMarkFaulty(t *testing.T) {
-	tempDir, store := createStore(t)
-	defer cleanupStore(t, tempDir, store)
+	store := createStore(t)
+	defer cleanupStore(t, store)
 
 	err := store.AddDevice(testCtx, &DeviceInfo{Name: "1", State: Unknown})
 	assert.NilError(t, err)

@@ -21,8 +21,6 @@ package cio
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -65,11 +63,7 @@ func TestOpenFifosWithTerminal(t *testing.T) {
 	var ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	ioFifoDir, err := os.MkdirTemp("", fmt.Sprintf("cio-%s", t.Name()))
-	if err != nil {
-		t.Fatalf("unexpected error during creating temp dir: %v", err)
-	}
-	defer os.RemoveAll(ioFifoDir)
+	ioFifoDir := t.TempDir()
 
 	cfg := Config{
 		Stdout: filepath.Join(ioFifoDir, "test-stdout"),

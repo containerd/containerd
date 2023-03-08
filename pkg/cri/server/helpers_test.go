@@ -492,10 +492,7 @@ func TestEnsureRemoveAllNotExist(t *testing.T) {
 }
 
 func TestEnsureRemoveAllWithDir(t *testing.T) {
-	dir, err := os.MkdirTemp("", "test-ensure-removeall-with-dir")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dir := t.TempDir()
 	if err := ensureRemoveAll(context.Background(), dir); err != nil {
 		t.Fatal(err)
 	}

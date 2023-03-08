@@ -25,6 +25,7 @@ func containersToProto(containers []containers.Container) []api.Container {
 	var containerspb []api.Container
 
 	for _, image := range containers {
+		image := image
 		containerspb = append(containerspb, containerToProto(&image))
 	}
 

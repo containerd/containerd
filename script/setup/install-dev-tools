@@ -14,7 +14,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
 #
 # Install developer tools to $GOBIN (or $GOPATH/bin if unset)
 #
@@ -23,7 +22,7 @@ set -eu -o pipefail
 # install `protobuild` and other commands
 go install github.com/stevvooe/protobuild@v0.1.0
 go install github.com/cpuguy83/go-md2man/v2@v2.0.1
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.49.0
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.50.1
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during

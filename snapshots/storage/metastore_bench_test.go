@@ -19,7 +19,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/containerd/containerd/snapshots"
@@ -42,16 +41,15 @@ func Benchmarks(b *testing.B, name string, metaFn metaFactory) {
 func makeBench(b *testing.B, name string, metaFn metaFactory, fn func(context.Context, *testing.B, *MetaStore)) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
-		tmpDir, err := os.MkdirTemp("", "metastore-bench-"+name+"-")
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(tmpDir)
+		ms, err := metaFn(b.TempDir())
 		if err != nil {
 			b.Fatal(err)
 		}
+
+		b.Cleanup(func() {
+			ms.Close()
+		})
 
 		ctx, t, err := ms.TransactionContext(ctx, true)
 		if err != nil {
@@ -67,13 +65,8 @@ func makeBench(b *testing.B, name string, metaFn metaFactory, fn func(context.Co
 func openCloseWritable(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
-		tmpDir, err := os.MkdirTemp("", "metastore-bench-"+name+"-")
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(tmpDir)
+		ms, err := metaFn(b.TempDir())
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -95,13 +88,8 @@ func openCloseWritable(b *testing.B, name string, metaFn metaFactory) func(b *te
 func openCloseReadonly(b *testing.B, name string, metaFn metaFactory) func(b *testing.B) {
 	return func(b *testing.B) {
 		ctx := context.Background()
-		tmpDir, err := os.MkdirTemp("", "metastore-bench-"+name+"-")
-		if err != nil {
-			b.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
 
-		ms, err := metaFn(tmpDir)
+		ms, err := metaFn(b.TempDir())
 		if err != nil {
 			b.Fatal(err)
 		}

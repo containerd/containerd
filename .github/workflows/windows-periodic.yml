@@ -162,7 +162,11 @@ jobs:
 
       - name: RunIntegrationTests
         run: |
-          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cd /c/containerd && (make integration | tee /c/Logs/integration.log)'"
+          ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" << EOF
+            cd /c/containerd
+            export EXTRA_TESTFLAGS="-timeout=20m"
+            make integration | tee /c/Logs/integration.log
+          EOF
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -c 'cat /c/Logs/integration.log | go-junit-report.exe > /c/Logs/junit_00.xml'"
 
       - name: PrepareRepoList
@@ -185,7 +189,6 @@ jobs:
            ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
              cd c:/containerd
              ./script/setup/install-cni-windows
-             mkdir /c/tmp
              export TEST_IMAGE_LIST=c:/repolist.toml
              make cri-integration | tee c:/Logs/cri-integration.log
            EOF

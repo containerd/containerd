@@ -82,13 +82,8 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 	} {
 		testCase := testCase // capture range variable
 		t.Run(name, func(t *testing.T) {
-			testPodLogDir, err := os.MkdirTemp("", "symlink-test")
-			require.NoError(t, err)
-			defer os.RemoveAll(testPodLogDir)
-
-			testVolDir, err := os.MkdirTemp("", "symlink-test-vol")
-			require.NoError(t, err)
-			defer os.RemoveAll(testVolDir)
+			testPodLogDir := t.TempDir()
+			testVolDir := t.TempDir()
 
 			content := "hello there\n"
 			regularFile, err := createRegularFile(testVolDir, content)

@@ -156,6 +156,6 @@ func (s *Store) Delete(id string) {
 		return
 	}
 	s.labels.Release(s.sandboxes[id].ProcessLabel)
-	s.idIndex.Delete(id) //nolint:errcheck
+	s.idIndex.Delete(id)
 	delete(s.sandboxes, id)
 }

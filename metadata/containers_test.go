@@ -20,10 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -152,6 +150,7 @@ func TestContainersList(t *testing.T) {
 			}
 
 			for _, result := range results {
+				result := result
 				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})
@@ -714,10 +713,7 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	ctx = logtest.WithT(ctx, t)
 
-	dirname, err := os.MkdirTemp("", strings.Replace(t.Name(), "/", "_", -1)+"-")
-	if err != nil {
-		t.Fatal(err)
-	}
+	dirname := t.TempDir()
 
 	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
 	if err != nil {
@@ -726,9 +722,6 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {
 
 	return ctx, db, func() {
 		db.Close()
-		if err := os.RemoveAll(dirname); err != nil {
-			t.Log("failed removing temp dir", err)
-		}
 		cancel()
 	}
 }

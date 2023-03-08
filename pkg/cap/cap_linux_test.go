@@ -89,6 +89,7 @@ func TestFromBitmap(t *testing.T) {
 }
 
 func TestParseProcPIDStatus(t *testing.T) {
+	//nolint:dupword
 	procPIDStatus := `Name:   cat
 Umask:  0022
 State:  R (running)
