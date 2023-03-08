@@ -44,7 +44,7 @@ var listCommand = cli.Command{
 
 	Name:        "list",
 	Aliases:     []string{"ls"},
-	Usage:       "list all active leases",
+	Usage:       "List all active leases",
 	ArgsUsage:   "[flags] <filter>",
 	Description: "list active leases by containerd",
 	Flags: []cli.Flag{
@@ -101,7 +101,7 @@ var listCommand = cli.Command{
 
 var createCommand = cli.Command{
 	Name:        "create",
-	Usage:       "create lease",
+	Usage:       "Create lease",
 	ArgsUsage:   "[flags] <label>=<value> ...",
 	Description: "create a new lease",
 	Flags: []cli.Flag{
@@ -155,7 +155,7 @@ var createCommand = cli.Command{
 var deleteCommand = cli.Command{
 	Name:        "delete",
 	Aliases:     []string{"del", "remove", "rm"},
-	Usage:       "delete a lease",
+	Usage:       "Delete a lease",
 	ArgsUsage:   "[flags] <lease id> ...",
 	Description: "delete a lease",
 	Flags: []cli.Flag{

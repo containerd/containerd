@@ -29,7 +29,7 @@ import (
 
 var psCommand = cli.Command{
 	Name:      "ps",
-	Usage:     "list processes for container",
+	Usage:     "List processes for container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		id := context.Args().First()

@@ -32,7 +32,7 @@ var (
 	SnapshotterFlags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "snapshotter",
-			Usage:  "snapshotter name. Empty value stands for the default value.",
+			Usage:  "Snapshotter name. Empty value stands for the default value.",
 			EnvVar: "CONTAINERD_SNAPSHOTTER",
 		},
 	}

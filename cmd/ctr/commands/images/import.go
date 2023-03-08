@@ -37,7 +37,7 @@ import (
 
 var importCommand = cli.Command{
 	Name:      "import",
-	Usage:     "import images",
+	Usage:     "Import images",
 	ArgsUsage: "[flags] <in>",
 	Description: `Import images from a tar stream.
 Implemented formats:

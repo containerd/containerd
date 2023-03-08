@@ -40,7 +40,7 @@ const (
 
 var metricsCommand = cli.Command{
 	Name:      "metrics",
-	Usage:     "get a single data point of metrics for a task with the built-in Linux runtime",
+	Usage:     "Get a single data point of metrics for a task with the built-in Linux runtime",
 	ArgsUsage: "CONTAINER",
 	Aliases:   []string{"metric"},
 	Flags: []cli.Flag{

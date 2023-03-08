@@ -36,7 +36,7 @@ import (
 var platformRunFlags = []cli.Flag{
 	cli.BoolFlag{
 		Name:  "isolated",
-		Usage: "run the container with vm isolation",
+		Usage: "Run the container with vm isolation",
 	},
 }
 

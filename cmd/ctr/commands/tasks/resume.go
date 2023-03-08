@@ -23,7 +23,7 @@ import (
 
 var resumeCommand = cli.Command{
 	Name:      "resume",
-	Usage:     "resume a paused container",
+	Usage:     "Resume a paused container",
 	ArgsUsage: "CONTAINER",
 	Action: func(context *cli.Context) error {
 		client, ctx, cancel, err := commands.NewClient(context)

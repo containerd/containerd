@@ -82,7 +82,7 @@ containerd CLI
 		},
 		cli.StringFlag{
 			Name:   "address, a",
-			Usage:  "address for containerd's GRPC server",
+			Usage:  "Address for containerd's GRPC server",
 			Value:  defaults.DefaultAddress,
 			EnvVar: "CONTAINERD_ADDRESS",
 		},
@@ -96,7 +96,7 @@ containerd CLI
 		},
 		cli.StringFlag{
 			Name:   "namespace, n",
-			Usage:  "namespace to use with commands",
+			Usage:  "Namespace to use with commands",
 			Value:  namespaces.Default,
 			EnvVar: namespaces.NamespaceEnvVar,
 		},

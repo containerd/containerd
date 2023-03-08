@@ -31,7 +31,7 @@ import (
 
 var restoreCommand = cli.Command{
 	Name:      "restore",
-	Usage:     "restore a container from checkpoint",
+	Usage:     "Restore a container from checkpoint",
 	ArgsUsage: "CONTAINER REF",
 	Flags: []cli.Flag{
 		cli.BoolFlag{

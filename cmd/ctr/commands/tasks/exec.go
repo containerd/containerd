@@ -33,7 +33,7 @@ import (
 
 var execCommand = cli.Command{
 	Name:           "exec",
-	Usage:          "execute additional processes in an existing container",
+	Usage:          "Execute additional processes in an existing container",
 	ArgsUsage:      "[flags] CONTAINER CMD [ARG...]",
 	SkipArgReorder: true,
 	Flags: []cli.Flag{

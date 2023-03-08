@@ -28,7 +28,7 @@ import (
 
 var unmountCommand = cli.Command{
 	Name:        "unmount",
-	Usage:       "unmount the image from the target",
+	Usage:       "Unmount the image from the target",
 	ArgsUsage:   "[flags] <target>",
 	Description: "Unmount the image rootfs from the specified target.",
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),

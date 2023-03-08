@@ -35,7 +35,7 @@ import (
 
 var exportCommand = cli.Command{
 	Name:      "export",
-	Usage:     "export images",
+	Usage:     "Export images",
 	ArgsUsage: "[flags] <out> <image> ...",
 	Description: `Export images to an OCI tar archive.
 
@@ -64,7 +64,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		},
 		cli.BoolTFlag{
 			Name:  "local",
-			Usage: "run export locally rather than through transfer API",
+			Usage: "Run export locally rather than through transfer API",
 		},
 	},
 	Action: func(context *cli.Context) error {

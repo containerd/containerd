@@ -37,7 +37,7 @@ import (
 var Command = cli.Command{
 	Name:    "images",
 	Aliases: []string{"image", "i"},
-	Usage:   "manage images",
+	Usage:   "Manage images",
 	Subcommands: cli.Commands{
 		checkCommand,
 		exportCommand,
@@ -59,7 +59,7 @@ var Command = cli.Command{
 var listCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
-	Usage:       "list images known to containerd",
+	Usage:       "List images known to containerd",
 	ArgsUsage:   "[flags] [<filter>, ...]",
 	Description: "list images registered with containerd",
 	Flags: []cli.Flag{
@@ -142,7 +142,7 @@ var listCommand = cli.Command{
 
 var setLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "set and clear labels for an image",
+	Usage:       "Set and clear labels for an image",
 	ArgsUsage:   "[flags] <name> [<key>=<value>, ...]",
 	Description: "set and clear labels for an image",
 	Flags: []cli.Flag{
@@ -201,7 +201,7 @@ var setLabelsCommand = cli.Command{
 
 var checkCommand = cli.Command{
 	Name:        "check",
-	Usage:       "check existing images to ensure all content is available locally",
+	Usage:       "Check existing images to ensure all content is available locally",
 	ArgsUsage:   "[flags] [<filter>, ...]",
 	Description: "check existing images to ensure all content is available locally",
 	Flags: append([]cli.Flag{
@@ -315,7 +315,7 @@ var checkCommand = cli.Command{
 var removeCommand = cli.Command{
 	Name:        "delete",
 	Aliases:     []string{"del", "remove", "rm"},
-	Usage:       "remove one or more images by reference",
+	Usage:       "Remove one or more images by reference",
 	ArgsUsage:   "[flags] <ref> [<ref>, ...]",
 	Description: "remove one or more images by reference",
 	Flags: []cli.Flag{

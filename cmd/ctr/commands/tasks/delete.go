@@ -28,7 +28,7 @@ import (
 
 var deleteCommand = cli.Command{
 	Name:      "delete",
-	Usage:     "delete one or more tasks",
+	Usage:     "Delete one or more tasks",
 	ArgsUsage: "CONTAINER [CONTAINER, ...]",
 	Aliases:   []string{"del", "remove", "rm"},
 	Flags: []cli.Flag{
