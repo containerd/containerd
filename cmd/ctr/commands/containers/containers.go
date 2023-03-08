@@ -102,16 +102,17 @@ var listCommand = cli.Command{
 			Usage: "Print only the container id",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			filters = context.Args()
-			quiet   = context.Bool("quiet")
+			filters = cliContext.Args()
+			quiet   = cliContext.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
+		ctx = context.WithValue(ctx, "list_container_quiet", quiet)
 		containers, err := client.Containers(ctx, filters...)
 		if err != nil {
 			return err
