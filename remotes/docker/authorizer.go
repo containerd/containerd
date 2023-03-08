@@ -304,7 +304,16 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 				// As of September 2017, GCR is known to return 404.
 				// As of February 2018, JFrog Artifactory is known to return 401.
 				// As of January 2022, ACR is known to return 400.
-				if (errStatus.StatusCode == 405 && to.Username != "") || errStatus.StatusCode == 404 || errStatus.StatusCode == 401 || errStatus.StatusCode == 400 {
+				switch status := errStatus.StatusCode; status {
+				case http.StatusMethodNotAllowed:
+					if to.Username != "" {
+						resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
+						if err != nil {
+							return "", "", err
+						}
+						return resp.Token, resp.RefreshToken, nil
+					}
+				case http.StatusNotFound, http.StatusUnauthorized, http.StatusBadRequest:
 					resp, err := auth.FetchToken(ctx, ah.client, ah.header, to)
 					if err != nil {
 						return "", "", err
