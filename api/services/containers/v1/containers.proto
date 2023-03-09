@@ -138,6 +138,7 @@ message ListContainersRequest {
 	//
 	// If filters is zero-length or nil, all items will be returned.
 	repeated string filters = 1;
+	bool quiet = 2;
 }
 
 message ListContainersResponse {

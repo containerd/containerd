@@ -40,6 +40,8 @@ type containerStore struct {
 	db *DB
 }
 
+const QuietListKey = "list_container_quiet"
+
 // NewContainerStore returns a Store backed by an underlying bolt DB
 func NewContainerStore(db *DB) containers.Store {
 	return &containerStore{
@@ -74,7 +76,7 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 }
 
 func (s *containerStore) ListIds(ctx context.Context) ([]containers.Container, error) {
-	ctx = context.WithValue(ctx, "list_container_quiet", true)
+	ctx = context.WithValue(ctx, QuietListKey, true)
 	return s.List(ctx)
 }
 

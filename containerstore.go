@@ -19,6 +19,7 @@ package containerd
 import (
 	"context"
 	"errors"
+	"github.com/containerd/containerd/metadata"
 	"io"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
@@ -56,7 +57,7 @@ func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Conta
 }
 
 func (r *remoteContainers) ListIds(ctx context.Context) ([]containers.Container, error) {
-	ctx = context.WithValue(ctx, "list_container_quiet", true)
+	ctx = context.WithValue(ctx, metadata.QuietListKey, true)
 	return r.List(ctx)
 }
 
@@ -84,8 +85,14 @@ func (r *remoteContainers) list(ctx context.Context, filters ...string) ([]conta
 var errStreamNotAvailable = errors.New("streaming api not available")
 
 func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]containers.Container, error) {
+	//  TODO backend grpc endpoint support list ids
+	quiet, ok := ctx.Value("list_container_quiet").(*bool)
+	if !ok {
+		*quiet = false
+	}
 	session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{
 		Filters: filters,
+		Quiet:   *quiet,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -109,8 +116,7 @@ func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]con
 			return containers, ctx.Err()
 		default:
 			fromProtoFunc := containerFromProto
-			quiet, ok := ctx.Value("list_container_quiet").(*bool)
-			if !ok || !*quiet {
+			if *quiet {
 				fromProtoFunc = containerFromProtoWithIdOnly
 			}
 			containers = append(containers, fromProtoFunc(c.Container))
@@ -218,7 +224,7 @@ func containersFromProto(ctx context.Context, containerspb []*containersapi.Cont
 	var containers []containers.Container
 
 	fromProtoFunc := containerFromProto
-	quiet, ok := ctx.Value("list_container_quiet").(*bool)
+	quiet, ok := ctx.Value(metadata.QuietListKey).(*bool)
 	if !ok || !*quiet {
 		fromProtoFunc = containerFromProtoWithIdOnly
 	}

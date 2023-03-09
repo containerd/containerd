@@ -19,6 +19,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"github.com/containerd/containerd/metadata"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -112,7 +113,7 @@ var listCommand = cli.Command{
 			return err
 		}
 		defer cancel()
-		ctx = context.WithValue(ctx, "list_container_quiet", quiet)
+		ctx = context.WithValue(ctx, metadata.QuietListKey, quiet)
 		containers, err := client.Containers(ctx, filters...)
 		if err != nil {
 			return err

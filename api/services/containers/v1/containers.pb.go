@@ -314,6 +314,7 @@ type ListContainersRequest struct {
 	//
 	// If filters is zero-length or nil, all items will be returned.
 	Filters []string `protobuf:"bytes,1,rep,name=filters,proto3" json:"filters,omitempty"`
+	Quiet	bool	 `protobuf:"bytes,2,name=quiet,proto3" json:"quiet,omitempty"`
 }
 
 func (x *ListContainersRequest) Reset() {

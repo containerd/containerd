@@ -17,22 +17,35 @@
 package containers
 
 import (
+	"context"
 	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl/v2"
 )
 
-func containersToProto(containers []containers.Container) []*api.Container {
+func containersToProto(ctx context.Context, containers []containers.Container) []*api.Container {
+	toProtoFunc := containerToProto
+	quiet, ok := ctx.Value(metadata.QuietListKey).(*bool)
+	if !ok || !*quiet {
+		toProtoFunc = containerToProtoWithIdOnly
+	}
 	var containerspb []*api.Container
 
 	for _, image := range containers {
 		image := image
-		containerspb = append(containerspb, containerToProto(&image))
+		containerspb = append(containerspb, toProtoFunc(&image))
 	}
 
 	return containerspb
+}
+
+func containerToProtoWithIdOnly(container *containers.Container) *api.Container {
+	return &api.Container{
+		ID: container.ID,
+	}
 }
 
 func containerToProto(container *containers.Container) *api.Container {

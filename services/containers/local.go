@@ -88,13 +88,16 @@ func (l *local) Get(ctx context.Context, req *api.GetContainerRequest, _ ...grpc
 }
 
 func (l *local) List(ctx context.Context, req *api.ListContainersRequest, _ ...grpc.CallOption) (*api.ListContainersResponse, error) {
+	if req.Quiet {
+		ctx = context.WithValue(ctx, metadata.QuietListKey, true)
+	}
 	var resp api.ListContainersResponse
 	return &resp, errdefs.ToGRPC(l.withStoreView(ctx, func(ctx context.Context) error {
 		containers, err := l.Store.List(ctx, req.Filters...)
 		if err != nil {
 			return err
 		}
-		resp.Containers = containersToProto(containers)
+		resp.Containers = containersToProto(ctx, containers)
 		return nil
 	}))
 }
@@ -104,11 +107,14 @@ func (l *local) ListStream(ctx context.Context, req *api.ListContainersRequest, 
 		ctx: ctx,
 	}
 	return stream, errdefs.ToGRPC(l.withStoreView(ctx, func(ctx context.Context) error {
+		if req.Quiet {
+			ctx = context.WithValue(ctx, metadata.QuietListKey, true)
+		}
 		containers, err := l.Store.List(ctx, req.Filters...)
 		if err != nil {
 			return err
 		}
-		stream.containers = containersToProto(containers)
+		stream.containers = containersToProto(ctx, containers)
 		return nil
 	}))
 }
