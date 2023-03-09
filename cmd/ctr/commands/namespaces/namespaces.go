@@ -34,7 +34,7 @@ import (
 var Command = cli.Command{
 	Name:    "namespaces",
 	Aliases: []string{"namespace", "ns"},
-	Usage:   "manage namespaces",
+	Usage:   "Manage namespaces",
 	Subcommands: cli.Commands{
 		createCommand,
 		listCommand,
@@ -46,7 +46,7 @@ var Command = cli.Command{
 var createCommand = cli.Command{
 	Name:        "create",
 	Aliases:     []string{"c"},
-	Usage:       "create a new namespace",
+	Usage:       "Create a new namespace",
 	ArgsUsage:   "<name> [<key>=<value>]",
 	Description: "create a new namespace. it must be unique",
 	Action: func(context *cli.Context) error {
@@ -66,7 +66,7 @@ var createCommand = cli.Command{
 
 var setLabelsCommand = cli.Command{
 	Name:        "label",
-	Usage:       "set and clear labels for a namespace",
+	Usage:       "Set and clear labels for a namespace",
 	ArgsUsage:   "<name> [<key>=<value>, ...]",
 	Description: "set and clear labels for a namespace. empty value clears the label",
 	Action: func(context *cli.Context) error {
@@ -92,7 +92,7 @@ var setLabelsCommand = cli.Command{
 var listCommand = cli.Command{
 	Name:        "list",
 	Aliases:     []string{"ls"},
-	Usage:       "list namespaces",
+	Usage:       "List namespaces",
 	ArgsUsage:   "[flags]",
 	Description: "list namespaces",
 	Flags: []cli.Flag{
@@ -144,7 +144,7 @@ var listCommand = cli.Command{
 var removeCommand = cli.Command{
 	Name:        "remove",
 	Aliases:     []string{"rm"},
-	Usage:       "remove one or more namespaces",
+	Usage:       "Remove one or more namespaces",
 	ArgsUsage:   "<name> [<name>, ...]",
 	Description: "remove one or more namespaces. for now, the namespace must be empty",
 	Flags: []cli.Flag{

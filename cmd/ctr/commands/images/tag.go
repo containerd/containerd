@@ -28,7 +28,7 @@ import (
 
 var tagCommand = cli.Command{
 	Name:        "tag",
-	Usage:       "tag an image",
+	Usage:       "Tag an image",
 	ArgsUsage:   "[flags] <source_ref> <target_ref> [<target_ref>, ...]",
 	Description: `Tag an image for use in containerd.`,
 	Flags: []cli.Flag{
@@ -38,7 +38,7 @@ var tagCommand = cli.Command{
 		},
 		cli.BoolTFlag{
 			Name:  "local",
-			Usage: "run tag locally rather than through transfer API",
+			Usage: "Run tag locally rather than through transfer API",
 		},
 	},
 	Action: func(context *cli.Context) error {

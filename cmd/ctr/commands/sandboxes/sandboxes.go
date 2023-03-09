@@ -34,7 +34,7 @@ import (
 var Command = cli.Command{
 	Name:    "sandboxes",
 	Aliases: []string{"sandbox", "sb", "s"},
-	Usage:   "manage sandboxes",
+	Usage:   "Manage sandboxes",
 	Subcommands: cli.Commands{
 		runCommand,
 		listCommand,
@@ -45,7 +45,7 @@ var Command = cli.Command{
 var runCommand = cli.Command{
 	Name:      "run",
 	Aliases:   []string{"create", "c", "r"},
-	Usage:     "run a new sandbox",
+	Usage:     "Run a new sandbox",
 	ArgsUsage: "[flags] <pod-config.json> <sandbox-id>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
@@ -100,7 +100,7 @@ var runCommand = cli.Command{
 var listCommand = cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "list sandboxes",
+	Usage:   "List sandboxes",
 	Flags: []cli.Flag{
 		cli.StringSliceFlag{
 			Name:  "filters",
@@ -147,7 +147,7 @@ var removeCommand = cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm"},
 	ArgsUsage: "<id> [<id>, ...]",
-	Usage:     "remove sandboxes",
+	Usage:     "Remove sandboxes",
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name:  "force, f",

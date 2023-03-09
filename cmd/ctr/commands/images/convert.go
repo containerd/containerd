@@ -30,7 +30,7 @@ import (
 
 var convertCommand = cli.Command{
 	Name:      "convert",
-	Usage:     "convert an image",
+	Usage:     "Convert an image",
 	ArgsUsage: "[flags] <source_ref> <target_ref>",
 	Description: `Convert an image format.
 

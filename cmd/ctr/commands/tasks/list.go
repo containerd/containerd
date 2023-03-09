@@ -28,7 +28,7 @@ import (
 
 var listCommand = cli.Command{
 	Name:      "list",
-	Usage:     "list tasks",
+	Usage:     "List tasks",
 	Aliases:   []string{"ls"},
 	ArgsUsage: "[flags]",
 	Flags: []cli.Flag{
