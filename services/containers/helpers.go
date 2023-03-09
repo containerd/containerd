@@ -28,8 +28,8 @@ import (
 
 func containersToProto(ctx context.Context, containers []containers.Container) []*api.Container {
 	toProtoFunc := containerToProto
-	quiet, ok := ctx.Value(metadata.QuietListKey).(*bool)
-	if !ok || !*quiet {
+	quietPtr, ok := ctx.Value(metadata.QuietListKey).(*bool)
+	if !ok || !*quietPtr {
 		toProtoFunc = containerToProtoWithIdOnly
 	}
 	var containerspb []*api.Container

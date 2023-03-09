@@ -85,14 +85,14 @@ func (r *remoteContainers) list(ctx context.Context, filters ...string) ([]conta
 var errStreamNotAvailable = errors.New("streaming api not available")
 
 func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]containers.Container, error) {
-	//  TODO backend grpc endpoint support list ids
-	quiet, ok := ctx.Value("list_container_quiet").(*bool)
-	if !ok {
-		*quiet = false
+	var quiet = false
+	quietPtr, ok := ctx.Value(metadata.QuietListKey).(*bool)
+	if ok {
+		quiet = *quietPtr
 	}
 	session, err := r.client.ListStream(ctx, &containersapi.ListContainersRequest{
 		Filters: filters,
-		Quiet:   *quiet,
+		Quiet:   quiet,
 	})
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
@@ -116,7 +116,7 @@ func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]con
 			return containers, ctx.Err()
 		default:
 			fromProtoFunc := containerFromProto
-			if *quiet {
+			if quiet {
 				fromProtoFunc = containerFromProtoWithIdOnly
 			}
 			containers = append(containers, fromProtoFunc(c.Container))
@@ -224,8 +224,8 @@ func containersFromProto(ctx context.Context, containerspb []*containersapi.Cont
 	var containers []containers.Container
 
 	fromProtoFunc := containerFromProto
-	quiet, ok := ctx.Value(metadata.QuietListKey).(*bool)
-	if !ok || !*quiet {
+	quietPtr, ok := ctx.Value(metadata.QuietListKey).(*bool)
+	if !ok || !*quietPtr {
 		fromProtoFunc = containerFromProtoWithIdOnly
 	}
 
