@@ -12,7 +12,7 @@ pre_release = true
 
 preface = """\
 The eighth major release of containerd includes new functionality alongside many improvements.
-This release is intended to be the last major release of containerd 1.x before 2.0.
+This release is the last major release of containerd 1.x before 2.0.
 Some functionality in this release may be considered experimental or unstable, but will become stable or default in 2.0.
 This release still adheres to our backwards compatibility guarantees and users who do not use or enable new functionality should use this release with the same stability expectations.
 The previous 1.6 release has also become a long term stable release for users who prefer releases with mostly stability improvements and wish to wait a few releases for new functionality.
