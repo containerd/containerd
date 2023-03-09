@@ -97,8 +97,8 @@ type Store interface {
 	// store, an error will be returned.
 	Get(ctx context.Context, id string) (Container, error)
 
-	// ListQuietly returns containers with id only.
-	ListQuietly(ctx context.Context) ([]Container, error)
+	// ListIds returns containers with id only.
+	ListIds(ctx context.Context) ([]Container, error)
 
 	// List returns containers that match one or more of the provided filters.
 	List(ctx context.Context, filters ...string) ([]Container, error)

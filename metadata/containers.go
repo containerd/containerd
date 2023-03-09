@@ -73,7 +73,7 @@ func (s *containerStore) Get(ctx context.Context, id string) (containers.Contain
 	return container, nil
 }
 
-func (s *containerStore) ListQuietly(ctx context.Context) ([]containers.Container, error) {
+func (s *containerStore) ListIds(ctx context.Context) ([]containers.Container, error) {
 	ctx = context.WithValue(ctx, "list_container_quiet", true)
 	return s.List(ctx)
 }

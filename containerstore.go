@@ -55,6 +55,11 @@ func (r *remoteContainers) Get(ctx context.Context, id string) (containers.Conta
 	return containerFromProto(resp.Container), nil
 }
 
+func (r *remoteContainers) ListIds(ctx context.Context) ([]containers.Container, error) {
+	ctx = context.WithValue(ctx, "list_container_quiet", true)
+	return r.List(ctx)
+}
+
 func (r *remoteContainers) List(ctx context.Context, filters ...string) ([]containers.Container, error) {
 	containers, err := r.stream(ctx, filters...)
 	if err != nil {
@@ -73,7 +78,7 @@ func (r *remoteContainers) list(ctx context.Context, filters ...string) ([]conta
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return containersFromProto(resp.Containers), nil
+	return containersFromProto(ctx, resp.Containers), nil
 }
 
 var errStreamNotAvailable = errors.New("streaming api not available")
@@ -103,7 +108,12 @@ func (r *remoteContainers) stream(ctx context.Context, filters ...string) ([]con
 		case <-ctx.Done():
 			return containers, ctx.Err()
 		default:
-			containers = append(containers, containerFromProto(c.Container))
+			fromProtoFunc := containerFromProto
+			quiet, ok := ctx.Value("list_container_quiet").(*bool)
+			if !ok || !*quiet {
+				fromProtoFunc = containerFromProtoWithIdOnly
+			}
+			containers = append(containers, fromProtoFunc(c.Container))
 		}
 	}
 }
@@ -170,6 +180,12 @@ func containerToProto(container *containers.Container) *containersapi.Container 
 	}
 }
 
+func containerFromProtoWithIdOnly(containerpb *containersapi.Container) containers.Container {
+	return containers.Container{
+		ID: containerpb.ID,
+	}
+}
+
 func containerFromProto(containerpb *containersapi.Container) containers.Container {
 	var runtime containers.RuntimeInfo
 	if containerpb.Runtime != nil {
@@ -198,12 +214,18 @@ func containerFromProto(containerpb *containersapi.Container) containers.Contain
 	}
 }
 
-func containersFromProto(containerspb []*containersapi.Container) []containers.Container {
+func containersFromProto(ctx context.Context, containerspb []*containersapi.Container) []containers.Container {
 	var containers []containers.Container
+
+	fromProtoFunc := containerFromProto
+	quiet, ok := ctx.Value("list_container_quiet").(*bool)
+	if !ok || !*quiet {
+		fromProtoFunc = containerFromProtoWithIdOnly
+	}
 
 	for _, container := range containerspb {
 		container := container
-		containers = append(containers, containerFromProto(container))
+		containers = append(containers, fromProtoFunc(container))
 	}
 
 	return containers
