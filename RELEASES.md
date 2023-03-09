@@ -372,15 +372,64 @@ against total impact.
 
 The deprecated features are shown in the following table:
 
-| Component                                                                        | Deprecation release | Target release for removal | Recommendation                    |
-|----------------------------------------------------------------------------------|---------------------|----------------------------|-----------------------------------|
-| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
-| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`       |
-| config.toml `version = 1`                                                        | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`     |
-| Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter       |
-| `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles |
-| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images        |
-| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0            | Use CRI `v1`                      |
+| Component                                                                        | Deprecation release | Target release for removal | Recommendation                           |
+|----------------------------------------------------------------------------------|---------------------|----------------------------|------------------------------------------|
+| Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`              |
+| Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0            | Use `io.containerd.runc.v2`              |
+| config.toml `version = 1`                                                        | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`            |
+| Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter              |
+| Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0            | Use `containerd.io/restart.loguri` label |
+| `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles        |
+| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images               |
+| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0            | Use CRI `v1`                             |
+
+### Deprecated config properties
+The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:
+
+| Property Group                                                       | Property                     | Deprecation release | Target release for removal | Recommendation                                  |
+|----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|-------------------------------------------------|
+|`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0            | Use `SystemdCgroup` in runc options (see below) |
+|`[plugins."io.containerd.grpc.v1.cri".cni]`                           | `conf_template`              | containerd v1.?     | containerd v2.0            | Create a CNI config in `/etc/cni/net.d`         |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0            | Create `untrusted` runtime in `runtimes`        |
+|`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0            | Use `default_runtime_name`                      |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0            | Use runtime v2                                  |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_root`               | containerd v1.3     | containerd v2.0            | Use `options.Root`                              |
+|`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*.options]` | `CriuPath`                   | containerd v1.7     | containerd v2.0            | Set `$PATH` to the `criu` binary                |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `auths`                      | containerd v1.3     | containerd v2.0            | Use [`ImagePullSecrets`](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/). See also [#8228](https://github.com/containerd/containerd/issues/8228). |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `configs`                    | containerd v1.5     | containerd v2.0            | Use [`config_path`](./docs/hosts.md)            |
+|`[plugins."io.containerd.grpc.v1.cri".registry]`                      | `mirrors`                    | containerd v1.5     | containerd v2.0            | Use [`config_path`](./docs/hosts.md)            |
+
+<details><summary>Example: runc option <code>SystemdCgroup</code></summary><p>
+
+```toml
+version = 2
+
+# OLD
+# [plugins."io.containerd.grpc.v1.cri"]
+#   systemd_cgroup = true
+
+# NEW
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
+
+</p></details>
+
+<details><summary>Example: runc option <code>Root</code></summary><p>
+
+```toml
+version = 2
+
+# OLD
+# [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+#   runtime_root = "/path/to/runc/root"
+
+# NEW
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  Root = "/path/to/runc/root"
+```
+
+</p></details>
 
 ## Experimental features
 

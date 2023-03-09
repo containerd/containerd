@@ -156,7 +156,7 @@ type CniConfig struct {
 	// (https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
 	// today, who don't have a cni daemonset in production. NetworkPluginConfTemplate is
 	// a temporary backward-compatible solution for them.
-	// TODO(random-liu): Deprecate this option when kubenet is deprecated.
+	// DEPRECATED: use CNI configs
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
 	//
@@ -210,7 +210,7 @@ type Registry struct {
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// This option will be fully deprecated for ConfigPath in the future.
+	// DEPRECATED: Use ConfigPath instead.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
