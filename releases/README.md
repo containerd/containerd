@@ -20,7 +20,7 @@ verified:
 
    2. Update the version file at `https://github.com/containerd/containerd/blob/main/version/version.go`
 
-   3. Update RELEASES.md to refer to the new release and dates.
+   3. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
 
    4. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
       If it is not clear which email or name the contributor might want used in the release notes, reach
@@ -51,21 +51,27 @@ verified:
 3. Push tag and Github release
 
    1. Push the tag to `git@github.com:containerd/containerd.git`.
-      NOTE: this will kick off CI building of the release binaries.
+      NOTE: this will kick off CI to prepare the Github release and binaries.
 
-   2. Create the Github release using the `Tag version` which was just pushed. Use the first
-      line outputted from the release tool as the `Release title` and the remainder of the
-      output for the description. No alteration of the release output should be needed.
-      Ensure `pre-release` is checked if an `-rc`.
-      NOTE: This should be done immediately after pushing the tag, otherwise CI may create the release
-      when the binaries are pushed.
+   2. Verify release job has started in the actions tab and wait for release job to complete
+      successfully. If the job fails, attempt to restart it. If the job continuously fails,
+      delete the tag from GitHub as soon as possible and fix the issue before restarting the
+      release process.
 
-   3. Check CI has completed and uploaded the binaries. Remove any binaries which get
-      uploaded but are not intended as part of the release (e.g. Darwin binaries).
+   3. Check the Github release, ensure the content matches what is expected and all the
+      release binaries are included.
 
-4. Update [`config.toml`](https://github.com/containerd/containerd.io/blob/f827d53826a426cb48f24cc08e43cc8722ad6d01/config.toml#L35) with latest release in the [containerd/containerd.io project](https://github.com/containerd/containerd.io); open PR to
+4. (major/minor release only) Create `release/x.y` branch from tag and push to `git@github.com:containerd/containerd.git`.
+
+5. (patch release only) Update RELEASES.md in main branch to refer to the new patch release.
+
+6. (major/minor release only) Create `cherry-pick/x.y.x` and `cherry-picked/x.y.x` labels
+
+7. Close any milestones associated with the release.
+
+8. Update [`config.toml`](https://github.com/containerd/containerd.io/blob/f827d53826a426cb48f24cc08e43cc8722ad6d01/config.toml#L35) with latest release in the [containerd/containerd.io project](https://github.com/containerd/containerd.io); open PR to
    force website downloads update.
 
-5. Update Kubernetes test infrastructure to test against any new release branches, see example from https://github.com/kubernetes/test-infra/pull/25476
+9. Update Kubernetes test infrastructure to test against any new release branches, see example from https://github.com/kubernetes/test-infra/pull/25476
 
-6. Promote on Slack, Twitter, mailing lists, etc
+10. Promote on Slack, Twitter, mailing lists, etc
