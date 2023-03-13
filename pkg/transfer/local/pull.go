@@ -54,6 +54,36 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		return fmt.Errorf("schema 1 image manifests are no longer supported: %w", errdefs.ErrInvalidArgument)
 	}
 
+	// Verify image before pulling.
+	digest := desc.Digest.String()
+
+	for vfName, vf := range ts.verifiers {
+		log := log.G(ctx).WithFields(logrus.Fields{
+			"name":     name,
+			"digest":   digest,
+			"verifier": vfName,
+		})
+		log.Info("Verifying image pull")
+
+		jdg, err := vf.VerifyImage(ctx, name, digest)
+		if err != nil {
+			// TODO: fail open option?
+			log.WithError(err).Error("Failed to verify image, blocking pull")
+			return fmt.Errorf("failed to verify image pull: %w", err)
+		}
+
+		log = log.WithFields(logrus.Fields{
+			"ok":     jdg.OK,
+			"reason": jdg.Reason,
+		})
+
+		if !jdg.OK {
+			log.Warn("Image verifier blocked pull")
+			return fmt.Errorf("image verifier blocked pull of %v with digest %v for reason: %v", name, digest, jdg.Reason)
+		}
+		log.Info("Image verifier allowed pull")
+	}
+
 	// TODO: Handle already exists
 	if tops.Progress != nil {
 		tops.Progress(transfer.Progress{

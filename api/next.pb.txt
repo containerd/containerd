@@ -5965,6 +5965,56 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/services/verifier/v1/verifier.proto"
+  package: "containerd.services.verifier.v1"
+  message_type {
+    name: "VerifyImageRequest"
+    field {
+      name: "image_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "imageName"
+    }
+    field {
+      name: "image_digest"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "imageDigest"
+    }
+  }
+  message_type {
+    name: "VerifyImageResponse"
+    field {
+      name: "ok"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "ok"
+    }
+    field {
+      name: "reason"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "reason"
+    }
+  }
+  service {
+    name: "Verifier"
+    method {
+      name: "VerifyImage"
+      input_type: ".containerd.services.verifier.v1.VerifyImageRequest"
+      output_type: ".containerd.services.verifier.v1.VerifyImageResponse"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/verifier/v1;verifier"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/services/version/v1/version.proto"
   package: "containerd.services.version.v1"
   dependency: "google/protobuf/empty.proto"

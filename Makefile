@@ -179,7 +179,7 @@ protos: bin/protoc-gen-go-fieldpath
 	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${NON_API_PACKAGES})
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR}
-	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ runtime/ -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os|Ok)$$' $(shell find api/ runtime/ -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"

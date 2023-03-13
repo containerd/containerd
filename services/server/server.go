@@ -35,6 +35,7 @@ import (
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	vfapi "github.com/containerd/containerd/api/services/verifier/v1"
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
@@ -47,6 +48,7 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
+	vfproxy "github.com/containerd/containerd/verifier/proxy"
 	"github.com/containerd/ttrpc"
 	"github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -413,6 +415,13 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			f = func(conn *grpc.ClientConn) interface{} {
 				return csproxy.NewContentStore(csapi.NewContentClient(conn))
 			}
+
+		case string(plugin.VerifierPlugin), "verifier":
+			t = plugin.VerifierPlugin
+			f = func(conn *grpc.ClientConn) interface{} {
+				return vfproxy.NewVerifier(vfapi.NewVerifierClient(conn))
+			}
+
 		default:
 			log.G(ctx).WithField("type", pp.Type).Warn("unknown proxy plugin type")
 		}

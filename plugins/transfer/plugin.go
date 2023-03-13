@@ -21,6 +21,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/verifier"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/pkg/transfer/archive"
@@ -34,6 +35,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
+			plugin.VerifierPlugin,
 		},
 		Config: &transferConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -47,7 +49,21 @@ func init() {
 				return nil, err
 			}
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms)), nil
+			verifiers := make(map[string]verifier.Verifier)
+			vfs, err := ic.GetByType(plugin.VerifierPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			for name, vf := range vfs {
+				inst, err := vf.Instance()
+				if err != nil {
+					return nil, err
+				}
+				verifiers[name] = inst.(verifier.Verifier)
+			}
+
+			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), verifiers), nil
 		},
 	})
 }

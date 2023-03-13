@@ -1,0 +1,6 @@
+version = 2
+
+[proxy_plugins]
+  [proxy_plugins.exampleverifier]
+    type = "verifier"
+    address = "/run/example-verifier.sock"

@@ -27,14 +27,16 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/verifier"
 	"github.com/containerd/typeurl"
 	"golang.org/x/sync/semaphore"
 )
 
 type localTransferService struct {
-	leases  leases.Manager
-	content content.Store
-	images  images.Store
+	leases    leases.Manager
+	content   content.Store
+	images    images.Store
+	verifiers map[string]verifier.Verifier
 
 	// semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloads))
 	limiter *semaphore.Weighted
@@ -49,11 +51,12 @@ type localTransferService struct {
 	//  - Platform -> snapshotter defaults?
 }
 
-func NewTransferService(lm leases.Manager, cs content.Store, is images.Store) transfer.Transferrer {
+func NewTransferService(lm leases.Manager, cs content.Store, is images.Store, vfs map[string]verifier.Verifier) transfer.Transferrer {
 	return &localTransferService{
-		leases:  lm,
-		content: cs,
-		images:  is,
+		leases:    lm,
+		content:   cs,
+		images:    is,
+		verifiers: vfs,
 	}
 }
 
@@ -80,6 +83,7 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 		case transfer.ImageExportStreamer:
 			return ts.echo(ctx, s, d, topts)
 		case transfer.ImageStorer:
+			// TODO: verify imports?
 			return ts.importStream(ctx, s, d, topts)
 		}
 	}
