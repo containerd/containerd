@@ -33,7 +33,7 @@ func runTestSnapshotterClient(t *testing.T) {
 	// The SeBackupPrivilege and SeRestorePrivilege gives us access to system files inside the container mount points
 	// (and everywhere on the system), without having to explicitly set DACLs on each location inside the mount point.
 	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	defer winio.DisableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege})
 	testsuite.SnapshotterSuite(t, "SnapshotterClient", newSnapshotter)
