@@ -375,16 +375,9 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 
 	// After we restarted containerd we write some messages to the log pipes, simulating shim writing stuff there.
 	// Then we make sure that these messages are available on the containerd log thus proving that the server reconnected to the log pipes
-	runtimeVersion := getRuntimeVersion()
-	logDirPath := getLogDirPath(runtimeVersion, id)
+	logDirPath := getLogDirPath("v2", id)
 
-	switch runtimeVersion {
-	case "v1":
-		writeToFile(t, filepath.Join(logDirPath, "shim.stdout.log"), fmt.Sprintf("%s writing to stdout\n", id))
-		writeToFile(t, filepath.Join(logDirPath, "shim.stderr.log"), fmt.Sprintf("%s writing to stderr\n", id))
-	case "v2":
-		writeToFile(t, filepath.Join(logDirPath, "log"), fmt.Sprintf("%s writing to log\n", id))
-	}
+	writeToFile(t, filepath.Join(logDirPath, "log"), fmt.Sprintf("%s writing to log\n", id))
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
@@ -402,18 +395,8 @@ func TestDaemonReconnectsToShimIOPipesOnRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	switch runtimeVersion {
-	case "v1":
-		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to stdout", id)) {
-			t.Fatal("containerd did not connect to the shim stdout pipe")
-		}
-		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to stderr", id)) {
-			t.Fatal("containerd did not connect to the shim stderr pipe")
-		}
-	case "v2":
-		if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to log", id)) {
-			t.Fatal("containerd did not connect to the shim log pipe")
-		}
+	if !strings.Contains(string(stdioContents), fmt.Sprintf("%s writing to log", id)) {
+		t.Fatal("containerd did not connect to the shim log pipe")
 	}
 }
 
@@ -438,15 +421,6 @@ func getLogDirPath(runtimeVersion, id string) string {
 		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
 		panic(fmt.Errorf("Unsupported runtime version %s", runtimeVersion))
-	}
-}
-
-func getRuntimeVersion() string {
-	switch rt := os.Getenv("TEST_RUNTIME"); rt {
-	case plugin.RuntimeLinuxV1:
-		return "v1"
-	default:
-		return "v2"
 	}
 }
 

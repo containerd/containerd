@@ -22,7 +22,7 @@ For each `containerd` release, we'll publish a release tarball specifically for 
 ### Content
 As shown below, the release tarball contains:
 
-- `containerd`, `containerd-shim`, `containerd-shim-runc-v1`, `containerd-shim-runc-v2`, `ctr`: binaries for containerd.
+- `containerd`, `containerd-shim-runc-v2`, `ctr`: binaries for containerd.
 - `runc`: runc binary.
 - `/opt/cni/bin`: binaries for [Container Network Interface](https://github.com/containernetworking/cni)
 - `crictl`, `crictl.yaml`: command line tools for CRI container runtime and its config file.
@@ -45,8 +45,6 @@ usr/local/
 usr/local/bin/
 usr/local/bin/containerd-shim-runc-v2
 usr/local/bin/ctr
-usr/local/bin/containerd-shim
-usr/local/bin/containerd-shim-runc-v1
 usr/local/bin/crictl
 usr/local/bin/critest
 usr/local/bin/containerd
