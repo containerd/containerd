@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -100,10 +99,5 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 
 // No sandbox files needed for windows.
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
-
-// No task options needed for windows.
-func (c *Controller) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
 }

@@ -19,7 +19,6 @@
 package podsandbox
 
 import (
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -48,9 +47,4 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 // remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
-}
-
-// taskOpts generates task options for a (sandbox) container.
-func (c *Controller) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return []containerd.NewTaskOpts{}
 }
