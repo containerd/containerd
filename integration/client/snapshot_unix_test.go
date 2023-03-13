@@ -22,6 +22,7 @@ package client
 import (
 	"testing"
 
+    . "github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
@@ -30,5 +31,5 @@ func runTestSnapshotterClient(t *testing.T) {
 		t.Skip()
 	}
 
-	testsuite.SnapshotterSuite(t, "SnapshotterClient", newSnapshotter)
+	testsuite.SnapshotterSuite(t, DefaultSnapshotter, newSnapshotter)
 }
