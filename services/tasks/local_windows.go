@@ -18,7 +18,6 @@ package tasks
 
 import (
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime"
 )
 
 var tasksServiceRequires = []plugin.Type{
@@ -26,9 +25,4 @@ var tasksServiceRequires = []plugin.Type{
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
-}
-
-// loadV1Runtimes on Windows V2 returns an empty map. There are no v1 runtimes
-func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {
-	return make(map[string]runtime.PlatformRuntime), nil
 }

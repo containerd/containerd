@@ -41,7 +41,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/rootfs"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 	digest "github.com/opencontainers/go-digest"
@@ -691,13 +690,8 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 	}
 
 	switch runtime {
-	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
+	case plugin.RuntimeRuncV2:
 		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
-			return true
-		}
-
-	case plugin.RuntimeLinuxV1:
-		if opts, ok := v.(*runctypes.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}
 	}

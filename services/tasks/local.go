@@ -23,7 +23,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -47,7 +46,6 @@ import (
 	"github.com/containerd/containerd/protobuf/proto"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl/v2"
@@ -89,10 +87,6 @@ func init() {
 
 func initFunc(ic *plugin.InitContext) (interface{}, error) {
 	config := ic.Config.(*Config)
-	runtimes, err := loadV1Runtimes(ic)
-	if err != nil {
-		return nil, err
-	}
 
 	v2r, err := ic.GetByID(plugin.RuntimePluginV2, "task")
 	if err != nil {
@@ -119,22 +113,13 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 
 	db := m.(*metadata.DB)
 	l := &local{
-		runtimes:   runtimes,
 		containers: metadata.NewContainerStore(db),
 		store:      db.ContentStore(),
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(runtime.PlatformRuntime),
 	}
-	for _, r := range runtimes {
-		tasks, err := r.Tasks(ic.Context, true)
-		if err != nil {
-			return nil, err
-		}
-		for _, t := range tasks {
-			l.monitor.Monitor(t, nil)
-		}
-	}
+
 	v2Tasks, err := l.v2Runtime.Tasks(ic.Context, true)
 	if err != nil {
 		return nil, err
@@ -154,7 +139,6 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 }
 
 type local struct {
-	runtimes   map[string]runtime.PlatformRuntime
 	containers containers.Store
 	store      content.Store
 	publisher  events.Publisher
@@ -221,15 +205,9 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			Options: m.Options,
 		})
 	}
-	if strings.HasPrefix(container.Runtime.Name, "io.containerd.runtime.v1.") {
-		log.G(ctx).Warn("runtime v1 is deprecated since containerd v1.4, consider using runtime v2")
-	} else if container.Runtime.Name == plugin.RuntimeRuncV1 {
-		log.G(ctx).Warnf("%q is deprecated since containerd v1.4, consider using %q", plugin.RuntimeRuncV1, plugin.RuntimeRuncV2)
-	}
-	rtime, err := l.getRuntime(container.Runtime.Name)
-	if err != nil {
-		return nil, err
-	}
+
+	rtime := l.v2Runtime
+
 	_, err = rtime.Get(ctx, r.ContainerID)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, errdefs.ToGRPC(err)
@@ -284,14 +262,8 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 		return nil, err
 	}
 
-	// Find runtime manager
-	rtime, err := l.getRuntime(container.Runtime.Name)
-	if err != nil {
-		return nil, err
-	}
-
 	// Get task object
-	t, err := rtime.Get(ctx, container.ID)
+	t, err := l.v2Runtime.Get(ctx, container.ID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task %v not found", container.ID)
 	}
@@ -300,7 +272,7 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 		return nil, err
 	}
 
-	exit, err := rtime.Delete(ctx, r.ContainerID)
+	exit, err := l.v2Runtime.Delete(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -394,13 +366,11 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 
 func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.CallOption) (*api.ListTasksResponse, error) {
 	resp := &api.ListTasksResponse{}
-	for _, r := range l.allRuntimes() {
-		tasks, err := r.Tasks(ctx, false)
-		if err != nil {
-			return nil, errdefs.ToGRPC(err)
-		}
-		addTasks(ctx, resp, tasks)
+	tasks, err := l.v2Runtime.Tasks(ctx, false)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
 	}
+	addTasks(ctx, resp, tasks)
 	return resp, nil
 }
 
@@ -623,13 +593,11 @@ func (l *local) Metrics(ctx context.Context, r *api.MetricsRequest, _ ...grpc.Ca
 		return nil, err
 	}
 	var resp api.MetricsResponse
-	for _, r := range l.allRuntimes() {
-		tasks, err := r.Tasks(ctx, false)
-		if err != nil {
-			return nil, err
-		}
-		getTasksMetrics(ctx, filter, tasks, &resp)
+	tasks, err := l.v2Runtime.Tasks(ctx, false)
+	if err != nil {
+		return nil, err
 	}
+	getTasksMetrics(ctx, filter, tasks, &resp)
 	return &resp, nil
 }
 
@@ -725,32 +693,11 @@ func (l *local) getTask(ctx context.Context, id string) (runtime.Task, error) {
 }
 
 func (l *local) getTaskFromContainer(ctx context.Context, container *containers.Container) (runtime.Task, error) {
-	runtime, err := l.getRuntime(container.Runtime.Name)
-	if err != nil {
-		return nil, errdefs.ToGRPCf(err, "runtime for task %s", container.Runtime.Name)
-	}
-	t, err := runtime.Get(ctx, container.ID)
+	t, err := l.v2Runtime.Get(ctx, container.ID)
 	if err != nil {
 		return nil, status.Errorf(codes.NotFound, "task %v not found", container.ID)
 	}
 	return t, nil
-}
-
-func (l *local) getRuntime(name string) (runtime.PlatformRuntime, error) {
-	runtime, ok := l.runtimes[name]
-	if !ok {
-		// one runtime to rule them all
-		return l.v2Runtime, nil
-	}
-	return runtime, nil
-}
-
-func (l *local) allRuntimes() (o []runtime.PlatformRuntime) {
-	for _, r := range l.runtimes {
-		o = append(o, r)
-	}
-	o = append(o, l.v2Runtime)
-	return o
 }
 
 // getCheckpointPath only suitable for runc runtime now
@@ -760,29 +707,15 @@ func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
 	}
 
 	var checkpointPath string
-	switch {
-	case checkRuntime(runtime, "io.containerd.runc"):
-		v, err := typeurl.UnmarshalAny(option)
-		if err != nil {
-			return "", err
-		}
-		opts, ok := v.(*options.CheckpointOptions)
-		if !ok {
-			return "", fmt.Errorf("invalid task checkpoint option for %s", runtime)
-		}
-		checkpointPath = opts.ImagePath
-
-	case runtime == plugin.RuntimeLinuxV1:
-		v, err := typeurl.UnmarshalAny(option)
-		if err != nil {
-			return "", err
-		}
-		opts, ok := v.(*runctypes.CheckpointOptions)
-		if !ok {
-			return "", fmt.Errorf("invalid task checkpoint option for %s", runtime)
-		}
-		checkpointPath = opts.ImagePath
+	v, err := typeurl.UnmarshalAny(option)
+	if err != nil {
+		return "", err
 	}
+	opts, ok := v.(*options.CheckpointOptions)
+	if !ok {
+		return "", fmt.Errorf("invalid task checkpoint option for %s", runtime)
+	}
+	checkpointPath = opts.ImagePath
 
 	return checkpointPath, nil
 }
@@ -794,45 +727,15 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 	}
 
 	var restorePath string
-	switch {
-	case checkRuntime(runtime, "io.containerd.runc"):
-		v, err := typeurl.UnmarshalAny(option)
-		if err != nil {
-			return "", err
-		}
-		opts, ok := v.(*options.Options)
-		if !ok {
-			return "", fmt.Errorf("invalid task create option for %s", runtime)
-		}
-		restorePath = opts.CriuImagePath
-	case runtime == plugin.RuntimeLinuxV1:
-		v, err := typeurl.UnmarshalAny(option)
-		if err != nil {
-			return "", err
-		}
-		opts, ok := v.(*runctypes.CreateOptions)
-		if !ok {
-			return "", fmt.Errorf("invalid task create option for %s", runtime)
-		}
-		restorePath = opts.CriuImagePath
+	v, err := typeurl.UnmarshalAny(option)
+	if err != nil {
+		return "", err
 	}
+	opts, ok := v.(*options.Options)
+	if !ok {
+		return "", fmt.Errorf("invalid task create option for %s", runtime)
+	}
+	restorePath = opts.CriuImagePath
 
 	return restorePath, nil
-}
-
-// checkRuntime returns true if the current runtime matches the expected
-// runtime. Providing various parts of the runtime schema will match those
-// parts of the expected runtime
-func checkRuntime(current, expected string) bool {
-	cp := strings.Split(current, ".")
-	l := len(cp)
-	for i, p := range strings.Split(expected, ".") {
-		if i > l {
-			return false
-		}
-		if p != cp[i] {
-			return false
-		}
-	}
-	return true
 }
