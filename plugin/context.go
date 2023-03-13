@@ -80,7 +80,7 @@ type Plugin struct {
 }
 
 // Err returns the errors during initialization.
-// returns nil if not error was encountered
+// returns nil if no error was encountered
 func (p *Plugin) Err() error {
 	return p.err
 }
