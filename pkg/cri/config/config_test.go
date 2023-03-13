@@ -18,10 +18,8 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/plugin"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -31,81 +29,6 @@ func TestValidateConfig(t *testing.T) {
 		expectedErr string
 		expected    *PluginConfig
 	}{
-		"deprecated untrusted_workload_runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					UntrustedWorkloadRuntime: Runtime{
-						Type: "untrusted",
-					},
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					UntrustedWorkloadRuntime: Runtime{
-						Type: "untrusted",
-					},
-					Runtimes: map[string]Runtime{
-						RuntimeUntrusted: {
-							Type:        "untrusted",
-							SandboxMode: string(ModePodSandbox),
-						},
-						RuntimeDefault: {
-							Type:        "default",
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
-		"both untrusted_workload_runtime and runtime[untrusted]": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					UntrustedWorkloadRuntime: Runtime{
-						Type: "untrusted-1",
-					},
-					Runtimes: map[string]Runtime{
-						RuntimeUntrusted: {
-							Type: "untrusted-2",
-						},
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
-			},
-			expectedErr: fmt.Sprintf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted),
-		},
-		"deprecated default_runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntime: Runtime{
-						Type: "default",
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntime: Runtime{
-						Type: "default",
-					},
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type:        "default",
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
 		"no default_runtime_name": {
 			config:      &PluginConfig{},
 			expectedErr: "`default_runtime_name` is empty",
@@ -118,170 +41,13 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
-		"deprecated systemd_cgroup for v1 runtime": {
-			config: &PluginConfig{
-				SystemdCgroup: true,
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeLinuxV1,
-						},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				SystemdCgroup: true,
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type:        plugin.RuntimeLinuxV1,
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
-		"deprecated systemd_cgroup for v2 runtime": {
-			config: &PluginConfig{
-				SystemdCgroup: true,
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeRuncV1,
-						},
-					},
-				},
-			},
-			expectedErr: fmt.Sprintf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1),
-		},
-		"no_pivot for v1 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					NoPivot:            true,
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeLinuxV1,
-						},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					NoPivot:            true,
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type:        plugin.RuntimeLinuxV1,
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
-		"no_pivot for v2 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					NoPivot:            true,
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeRuncV1,
-						},
-					},
-				},
-			},
-			expectedErr: fmt.Sprintf("`no_pivot` only works for runtime %s", plugin.RuntimeLinuxV1),
-		},
-		"deprecated runtime_engine for v1 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Engine: "runc",
-							Type:   plugin.RuntimeLinuxV1,
-						},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Engine:      "runc",
-							Type:        plugin.RuntimeLinuxV1,
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
-		"deprecated runtime_engine for v2 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Engine: "runc",
-							Type:   plugin.RuntimeRuncV1,
-						},
-					},
-				},
-			},
-			expectedErr: fmt.Sprintf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1),
-		},
-		"deprecated runtime_root for v1 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Root: "/run/containerd/runc",
-							Type: plugin.RuntimeLinuxV1,
-						},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Root:        "/run/containerd/runc",
-							Type:        plugin.RuntimeLinuxV1,
-							SandboxMode: string(ModePodSandbox),
-						},
-					},
-				},
-			},
-		},
-		"deprecated runtime_root for v2 runtime": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Root: "/run/containerd/runc",
-							Type: plugin.RuntimeRuncV1,
-						},
-					},
-				},
-			},
-			expectedErr: fmt.Sprintf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1),
-		},
+
 		"deprecated auths": {
 			config: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: plugin.RuntimeRuncV1,
-						},
+						RuntimeDefault: {},
 					},
 				},
 				Registry: Registry{
@@ -295,7 +61,6 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							Type:        plugin.RuntimeRuncV1,
 							SandboxMode: string(ModePodSandbox),
 						},
 					},

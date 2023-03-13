@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -415,8 +414,6 @@ func writeToFile(t *testing.T, filePath, message string) {
 
 func getLogDirPath(runtimeVersion, id string) string {
 	switch runtimeVersion {
-	case "v1":
-		return filepath.Join(defaultRoot, plugin.RuntimeLinuxV1, testNamespace, id)
 	case "v2":
 		return filepath.Join(defaultState, "io.containerd.runtime.v2.task", testNamespace, id)
 	default:
@@ -1005,49 +1002,6 @@ func TestDaemonRestartWithRunningShim(t *testing.T) {
 	}
 }
 
-func TestContainerRuntimeOptionsv1(t *testing.T) {
-	t.Parallel()
-
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	var (
-		image       Image
-		ctx, cancel = testContext(t)
-		id          = t.Name()
-	)
-	defer cancel()
-
-	image, err = client.GetImage(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	container, err := client.NewContainer(
-		ctx, id,
-		WithNewSnapshot(id, image),
-		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime(plugin.RuntimeLinuxV1, &runctypes.RuncOptions{Runtime: "no-runc"}),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer container.Delete(ctx, WithSnapshotCleanup)
-
-	task, err := container.NewTask(ctx, empty())
-	if err == nil {
-		t.Errorf("task creation should have failed")
-		task.Delete(ctx)
-		return
-	}
-	if !strings.Contains(err.Error(), `"no-runc"`) {
-		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
-	}
-}
-
 func TestContainerRuntimeOptionsv2(t *testing.T) {
 	t.Parallel()
 
@@ -1073,7 +1027,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 		ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime(plugin.RuntimeRuncV1, &options.Options{BinaryName: "no-runc"}),
+		WithRuntime(plugin.RuntimeRuncV2, &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1161,17 +1115,9 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	var copts interface{}
-	if CheckRuntime(client.Runtime(), "io.containerd.runc") {
-		copts = &options.Options{
-			IoUid: 1000,
-			IoGid: 2000,
-		}
-	} else {
-		copts = &runctypes.CreateOptions{
-			IoUid: 1000,
-			IoGid: 2000,
-		}
+	copts := &options.Options{
+		IoUid: 1000,
+		IoGid: 2000,
 	}
 
 	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), func(_ context.Context, client *Client, r *TaskInfo) error {
