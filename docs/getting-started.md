@@ -18,9 +18,7 @@ verify its sha256sum, and extract it under `/usr/local`:
 $ tar Cxzvf /usr/local containerd-1.6.2-linux-amd64.tar.gz
 bin/
 bin/containerd-shim-runc-v2
-bin/containerd-shim
 bin/ctr
-bin/containerd-shim-runc-v1
 bin/containerd
 bin/containerd-stress
 ```
