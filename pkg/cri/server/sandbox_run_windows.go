@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -101,11 +100,6 @@ func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 
 // No sandbox files needed for windows.
 func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
-	return nil
-}
-
-// No task options needed for windows.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
 	return nil
 }
 

@@ -19,7 +19,6 @@
 package server
 
 import (
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/snapshots"
@@ -49,11 +48,6 @@ func (c *criService) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 // remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
 func (c *criService) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
-}
-
-// taskOpts generates task options for a (sandbox) container.
-func (c *criService) taskOpts(runtimeType string) []containerd.NewTaskOpts {
-	return []containerd.NewTaskOpts{}
 }
 
 func (c *criService) updateNetNamespacePath(spec *runtimespec.Spec, nsPath string) {

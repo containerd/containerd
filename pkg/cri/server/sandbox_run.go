@@ -352,7 +352,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).",
 		id, name)
 
-	taskOpts := c.taskOpts(ociRuntime.Type)
+	var taskOpts []containerd.NewTaskOpts
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}

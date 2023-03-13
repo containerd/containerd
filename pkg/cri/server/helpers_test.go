@@ -236,7 +236,7 @@ systemd_cgroup = true
 	require.NoError(t, err)
 	err = tree.Unmarshal(&nilOptsConfig)
 	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 3)
+	require.Len(t, nilOptsConfig.Runtimes, 1)
 
 	tree, err = toml.Load(nonNilOpts)
 	require.NoError(t, err)
