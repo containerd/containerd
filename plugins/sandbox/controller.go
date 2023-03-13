@@ -276,7 +276,9 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 		SandboxID: resp.GetSandboxID(),
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
-		ExitedAt:  resp.GetCreatedAt().AsTime(),
+		Info:      resp.GetInfo(),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 	}, nil
 }
