@@ -23,6 +23,8 @@ import (
 	"testing"
 
 	winio "github.com/Microsoft/go-winio"
+
+	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
@@ -36,5 +38,5 @@ func runTestSnapshotterClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer winio.DisableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege})
-	testsuite.SnapshotterSuite(t, "SnapshotterClient", newSnapshotter)
+	testsuite.SnapshotterSuite(t, DefaultSnapshotter, newSnapshotter)
 }
