@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/typeurl/v2"
+	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -143,6 +144,9 @@ version = 2
 
 	t.Run("Always", func(t *testing.T) {
 		testRestartMonitorAlways(t, client, interval)
+	})
+	t.Run("Paused Task", func(t *testing.T) {
+		testRestartMonitorPausedTaskWithAlways(t, client, interval)
 	})
 	t.Run("Failure Policy", func(t *testing.T) {
 		testRestartMonitorWithOnFailurePolicy(t, client, interval)
@@ -252,6 +256,84 @@ func testRestartMonitorAlways(t *testing.T, client *Client, interval time.Durati
 		t.Fatalf("%v: the task was restarted, but it must be before %v", lastCheck, expected)
 	}
 	t.Logf("%v: the task was restarted since %v", time.Now(), lastCheck)
+}
+
+func testRestartMonitorPausedTaskWithAlways(t *testing.T, client *Client, interval time.Duration) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Pause task is not supported on Windows")
+	}
+
+	const (
+		epsilon = 1 * time.Second
+		count   = 20
+	)
+
+	var (
+		ctx, cancel = testContext(t)
+		id          = strings.ReplaceAll(t.Name(), "/", "_")
+	)
+	defer cancel()
+
+	image, err := client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(
+			oci.WithImageConfig(image),
+			longCommand,
+		),
+		restart.WithStatus(Running),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := container.Delete(ctx, WithSnapshotCleanup); err != nil {
+			t.Logf("failed to delete container: %v", err)
+		}
+	}()
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+			t.Logf("failed to delete task: %v", err)
+		}
+	}()
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log("pause the task")
+	require.NoError(t, task.Pause(ctx))
+	defer func() {
+		require.NoError(t, task.Resume(ctx))
+	}()
+
+	select {
+	case <-statusC:
+		t.Fatal("the paused task is killed")
+	case <-time.After(30 * time.Second):
+	}
+
+	status, err := task.Status(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Status != Paused {
+		t.Fatalf("the paused task's status is changed to %s", status.Status)
+	}
 }
 
 // testRestartMonitorWithOnFailurePolicy restarts its container with `on-failure:1`
