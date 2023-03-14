@@ -205,7 +205,6 @@ func TestLocalResolve(t *testing.T) {
 
 func TestGenerateRuntimeOptions(t *testing.T) {
 	nilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"
@@ -213,7 +212,6 @@ systemd_cgroup = true
   runtime_type = "` + plugin.RuntimeRuncV2 + `"
 `
 	nonNilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"

@@ -45,6 +45,8 @@ usr/local/
 usr/local/bin/
 usr/local/bin/containerd-shim-runc-v2
 usr/local/bin/ctr
+usr/local/bin/containerd-shim
+usr/local/bin/containerd-shim-runc-v1
 usr/local/bin/crictl
 usr/local/bin/critest
 usr/local/bin/containerd
