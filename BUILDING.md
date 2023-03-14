@@ -110,7 +110,7 @@ make generate
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
 > * snapshotters (alphabetical order)
->   * `no_aufs`: A build tag disables building the aufs snapshot driver.
+>   * `no_aufs`: A build tag disables building the aufs snapshot driver. (Ignored since containerd v2.0, as the aufs snapshot driver is no longer supported)
 >   * `no_btrfs`: A build tag disables building the Btrfs snapshot driver.
 >   * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
 >   * `no_zfs`: A build tag disables building the ZFS snapshot driver.

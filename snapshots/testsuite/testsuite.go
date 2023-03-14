@@ -885,9 +885,6 @@ func checkRootPermission(ctx context.Context, t *testing.T, snapshotter snapshot
 
 func check128LayersMount(name string) func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	return func(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
-		if name == "Aufs" {
-			t.Skip("aufs tests have issues with whiteouts here on some CI kernels")
-		}
 		lowestApply := fstest.Apply(
 			fstest.CreateFile("/bottom", []byte("way at the bottom\n"), 0777),
 			fstest.CreateFile("/overwriteme", []byte("FIRST!\n"), 0777),

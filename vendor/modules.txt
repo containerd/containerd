@@ -81,10 +81,6 @@ github.com/cilium/ebpf/link
 github.com/container-orchestrated-devices/container-device-interface/internal/multierror
 github.com/container-orchestrated-devices/container-device-interface/pkg/cdi
 github.com/container-orchestrated-devices/container-device-interface/specs-go
-# github.com/containerd/aufs v1.0.0
-## explicit; go 1.13
-github.com/containerd/aufs
-github.com/containerd/aufs/plugin
 # github.com/containerd/btrfs/v2 v2.0.0
 ## explicit; go 1.19
 github.com/containerd/btrfs/v2
