@@ -372,8 +372,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	} else if securityContext.GetRunAsUser() != nil {
 		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
 	} else if imageConfig.User != "" {
-		parts := strings.Split(imageConfig.User, ":")
-		userstr = parts[0]
+		userstr, _, _ = strings.Cut(imageConfig.User, ":")
 	}
 	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr),
 		customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
