@@ -36,7 +36,7 @@ The table specifies whether the feature/component is in or out of scope.
 | Name | Description | In/Out | Reason |
 |------------------------------|--------------------------------------------------------------------------------------------------------|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | execution | Provide an extensible execution layer for executing a container | in | Create,start, stop pause, resume exec, signal, delete |
-| cow filesystem | Built in functionality for overlay, aufs, and other copy on write filesystems for containers | in |  |
+| cow filesystem | Built in functionality for overlay and other copy on write filesystems for containers | in |  |
 | distribution | Having the ability to push and pull images as well as operations on images as a first class API object | in | containerd will fully support the management and retrieval of images |
 | metrics | container-level metrics, cgroup stats, and OOM events | in |
 | networking | creation and management of network interfaces | out | Networking will be handled and provided to containerd via higher level systems. |

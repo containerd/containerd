@@ -16,7 +16,7 @@ Filesystem-specific:
 - `devmapper`: ext4/xfs device mapper. See [`devmapper.md`](./devmapper.md).
 
 [Deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features):
-- `aufs`: AUFS. Deprecated since containerd 1.5. Planned to be removed in containerd 2.0. See also https://github.com/containerd/aufs .
+- `aufs`: AUFS. Deprecated since containerd 1.5. Removed in containerd 2.0. See also https://github.com/containerd/aufs .
 
 ## Non-core snapshotter plugins
 
