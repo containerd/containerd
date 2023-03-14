@@ -22,16 +22,14 @@ import (
 
 func setRlimit() error {
 	rlimit := int64(100000)
-	if rlimit > 0 {
-		var limit syscall.Rlimit
-		if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+	var limit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		return err
+	}
+	if limit.Cur < rlimit {
+		limit.Cur = rlimit
+		if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
 			return err
-		}
-		if limit.Cur < rlimit {
-			limit.Cur = rlimit
-			if err := syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
-				return err
-			}
 		}
 	}
 	return nil
