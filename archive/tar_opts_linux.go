@@ -25,11 +25,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// AufsConvertWhiteout converts whiteout files for aufs.
-func AufsConvertWhiteout(_ *tar.Header, _ string) (bool, error) {
-	return true, nil
-}
-
 // OverlayConvertWhiteout converts whiteout files for overlay.
 func OverlayConvertWhiteout(hdr *tar.Header, path string) (bool, error) {
 	base := filepath.Base(path)

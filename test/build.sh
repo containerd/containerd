@@ -32,7 +32,7 @@ cd "${ROOT}"
 make clean
 
 # Build CRI+CNI release
-make BUILDTAGS="seccomp no_aufs no_btrfs no_devmapper no_zfs" cri-cni-release
+make BUILDTAGS="seccomp no_btrfs no_devmapper no_zfs" cri-cni-release
 
 BUILDDIR=$(mktemp -d)
 cleanup() {
