@@ -326,7 +326,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 			// Match the calling binaries (containerd) path and see
 			// if they are side by side. If so, execute the shim
 			// found there.
-			cmdPath := filepath.Join(filepath.Dir(self), name)
+			cmdPath = filepath.Join(filepath.Dir(self), name)
 			if _, serr := os.Stat(cmdPath); serr != nil {
 				return "", fmt.Errorf("runtime %q binary not installed %q: %w", runtime, name, os.ErrNotExist)
 			}
