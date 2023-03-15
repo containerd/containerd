@@ -8,6 +8,7 @@ require (
 	github.com/containerd/cgroups v1.0.4
 	// the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/containerd v1.6.1
+	github.com/containerd/continuity v0.3.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.1
 	github.com/containerd/typeurl v1.0.2
