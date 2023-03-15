@@ -158,8 +158,13 @@ func criCleanup(ctx context.Context, client internalapi.RuntimeService) error {
 	}
 
 	for _, sb := range sandboxes {
-		client.StopPodSandbox(sb.Id)
-		client.RemovePodSandbox(sb.Id)
+		if err := client.StopPodSandbox(sb.Id); err != nil {
+			return err
+		}
+
+		if err := client.RemovePodSandbox(sb.Id); err != nil {
+			return err
+		}
 	}
 
 	return nil
