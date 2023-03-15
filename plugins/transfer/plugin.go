@@ -20,16 +20,19 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/snapshots"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/pkg/transfer/archive"
 	_ "github.com/containerd/containerd/pkg/transfer/image"
+	_ "github.com/containerd/containerd/pkg/transfer/registry"
 )
 
 // Register local transfer service plugin
@@ -40,6 +43,8 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
+			plugin.SnapshotPlugin,
+			plugin.DiffPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -54,6 +59,11 @@ func init() {
 				return nil, err
 			}
 
+			d, err := ic.Get(plugin.DiffPlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			// Set configuration based on default or user input
 			var lc local.TransferConfig
 			lc.MaxConcurrentDownloads = config.maxConcurrentDownloads
@@ -64,9 +74,16 @@ func init() {
 					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugin.TransferPlugin, uc.platform)
 				}
 
+				s, err := ic.GetByID(plugin.SnapshotPlugin, uc.snapshotter)
+				if err != nil {
+					return nil, err
+				}
+
 				up := unpack.Platform{
 					Platform:       platforms.OnlyStrict(p),
 					SnapshotterKey: uc.snapshotter,
+					Snapshotter:    s.(snapshots.Snapshotter),
+					Applier:        d.(diff.Applier),
 				}
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
