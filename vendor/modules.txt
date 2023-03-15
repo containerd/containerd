@@ -174,12 +174,16 @@ github.com/docker/go-metrics
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/emicklei/go-restful/v3 v3.7.3
+# github.com/emicklei/go-restful v2.9.5+incompatible
 ## explicit
+github.com/emicklei/go-restful
+github.com/emicklei/go-restful/log
+# github.com/emicklei/go-restful/v3 v3.7.3
+## explicit; go 1.13
 github.com/emicklei/go-restful/v3
 github.com/emicklei/go-restful/v3/log
-## explicit; go 1.13
 # github.com/fsnotify/fsnotify v1.4.9
+## explicit; go 1.13
 github.com/fsnotify/fsnotify
 # github.com/go-logr/logr v1.2.2
 ## explicit; go 1.16
