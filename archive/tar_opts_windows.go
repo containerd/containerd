@@ -18,7 +18,6 @@ package archive
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/Microsoft/go-winio"
@@ -31,12 +30,12 @@ func applyWindowsLayer(ctx context.Context, root string, r io.Reader, options Ap
 	// It seems that in certain situations, like having the containerd root and state on a file system hosted on a
 	// mounted VHDX, we need SeSecurityPrivilege when opening a file with winio.ACCESS_SYSTEM_SECURITY. This happens
 	// in the base layer writer in hcsshim when adding a new file.
-	if err := winio.EnableProcessPrivileges([]string{winio.SeSecurityPrivilege}); err != nil {
-		return 0, fmt.Errorf("enabling privileges: %w", err)
-	}
-	defer winio.DisableProcessPrivileges([]string{winio.SeSecurityPrivilege})
-
-	return ociwclayer.ImportLayerFromTar(ctx, r, root, options.Parents)
+	err = winio.RunWithPrivileges([]string{winio.SeSecurityPrivilege}, func() error {
+		var innerErr error
+		size, innerErr = ociwclayer.ImportLayerFromTar(ctx, r, root, options.Parents)
+		return innerErr
+	})
+	return
 }
 
 // AsWindowsContainerLayer indicates that the tar stream to apply is that of
