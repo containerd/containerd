@@ -481,12 +481,10 @@ func (s *snapshotter) convertScratchToReadOnlyLayer(ctx context.Context, snapsho
 	// It seems that in certain situations, like having the containerd root and state on a file system hosted on a
 	// mounted VHDX, we need SeSecurityPrivilege when opening a file with winio.ACCESS_SYSTEM_SECURITY. This happens
 	// in the base layer writer in hcsshim when adding a new file.
-	if err := winio.EnableProcessPrivileges([]string{winio.SeSecurityPrivilege}); err != nil {
-		return fmt.Errorf("enabling privileges: %w", err)
-	}
-	defer winio.DisableProcessPrivileges([]string{winio.SeSecurityPrivilege})
-
-	if _, err := ociwclayer.ImportLayerFromTar(ctx, reader, path, parentLayerPaths); err != nil {
+	if err := winio.RunWithPrivileges([]string{winio.SeSecurityPrivilege}, func() error {
+		_, err := ociwclayer.ImportLayerFromTar(ctx, reader, path, parentLayerPaths)
+		return err
+	}); err != nil {
 		return fmt.Errorf("failed to reimport snapshot: %w", err)
 	}
 
