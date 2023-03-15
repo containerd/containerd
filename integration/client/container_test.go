@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -39,9 +40,11 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
 	gogotypes "github.com/containerd/containerd/protobuf/types"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/continuity/fs"
 	"github.com/containerd/go-runc"
 	"github.com/containerd/typeurl/v2"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -137,6 +140,130 @@ func TestContainerStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if runtime.GOOS != "windows" {
+		// task.Pid not implemented on Windows
+		if pid := task.Pid(); pid < 1 {
+			t.Errorf("invalid task pid %d", pid)
+		}
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		task.Delete(ctx)
+		return
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", code)
+	}
+
+	deleteStatus, err := task.Delete(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ec := deleteStatus.ExitCode(); ec != 7 {
+		t.Errorf("expected status 7 from delete but received %d", ec)
+	}
+}
+
+func readShimPath(taskID string) (string, error) {
+	runtime := fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
+	shimBinaryNamePath := filepath.Join(defaultState, runtime, testNamespace, taskID, "shim-binary-path")
+
+	shimPath, err := os.ReadFile(shimBinaryNamePath)
+	if err != nil {
+		return "", err
+	}
+	return string(shimPath), nil
+}
+
+func copyShim(shimPath string) (string, error) {
+	tempPath := filepath.Join(os.TempDir(), filepath.Base(shimPath))
+	if err := fs.CopyFile(tempPath, shimPath); err != nil {
+		return "", err
+	}
+
+	fi, err := os.Stat(shimPath)
+	if err != nil {
+		return "", err
+	}
+	if err := os.Chmod(tempPath, fi.Mode().Perm()); err != nil {
+		return "", err
+	}
+
+	return tempPath, nil
+}
+
+func TestContainerStartWithAbsRuntimePath(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	// create a temp task to read the default shim path
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defaultShimPath, err := readShimPath(task.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// remove the temp task
+	if _, err := task.Delete(ctx, WithProcessKill); err != nil {
+		t.Fatal(err)
+	}
+
+	tempShimPath, err := copyShim(defaultShimPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(tempShimPath)
+
+	task, err = container.NewTask(ctx, empty(), WithRuntimePath(tempShimPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	shimPath, err := readShimPath(task.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if shimPath != tempShimPath {
+		t.Fatalf("The task's shim path is %s, does not used the specified runtime path: %s", shimPath, tempShimPath)
+	}
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
