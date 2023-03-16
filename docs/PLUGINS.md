@@ -253,7 +253,7 @@ If you want to get the configuration combined with your configuration, run `cont
 
 containerd has two configuration versions:
 - Version 2 (Recommended): Introduced in containerd 1.3.
-- Version 1 (Default): Introduced in containerd 1.0. Deprecated and will be removed in containerd 2.0.
+- Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
 
 A configuration with Version 2 must have `version = 2` header, and must have
 fully qualified plugin IDs in the `[plugins]` section:
