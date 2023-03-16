@@ -22,12 +22,14 @@ import (
 	"github.com/containerd/go-cni"
 )
 
-// initPlatform handles linux specific initialization for the CRI service.
+// initPlatform handles initialization of the CRI service for non-windows
+// and non-linux platforms.
 func (c *criService) initPlatform() error {
 	return nil
 }
 
-// cniLoadOptions returns cni load options for the linux.
+// cniLoadOptions returns cni load options for non-windows and non-linux
+// platforms.
 func (c *criService) cniLoadOptions() []cni.Opt {
 	return []cni.Opt{}
 }
