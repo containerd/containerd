@@ -372,9 +372,6 @@ version = 2
         # Root is the runc root directory.
         Root = ""
 
-        # CriuPath is the criu binary path.
-        CriuPath = ""
-
         # SystemdCgroup enables systemd cgroups.
         SystemdCgroup = false
 

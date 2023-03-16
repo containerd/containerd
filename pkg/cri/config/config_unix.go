@@ -47,9 +47,6 @@ func DefaultConfig() PluginConfig {
 	# Root is the runc root directory.
 	Root = ""
 
-	# CriuPath is the criu binary path.
-	CriuPath = ""
-
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
