@@ -163,6 +163,9 @@ RuntimeVersion:  v1.7.0
 RuntimeApiVersion:  v1
 ```
 ## Display Status & Configuration Information about Containerd & The CRI Plugin
+<details>
+<p>
+
 ```console
 $ crictl info
 {
@@ -326,6 +329,10 @@ $ crictl info
   "lastCNILoadStatus.default": "OK"
 }
 ```
+
+</p>
+</details>
+
 ## More Information
 See [here](https://github.com/kubernetes-sigs/cri-tools/blob/master/docs/crictl.md)
 for information about crictl.
