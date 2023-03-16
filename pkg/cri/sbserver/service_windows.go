@@ -26,7 +26,7 @@ import (
 // attaches to
 const windowsNetworkAttachCount = 1
 
-// initPlatform handles linux specific initialization for the CRI service.
+// initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,

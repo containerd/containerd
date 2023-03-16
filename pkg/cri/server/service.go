@@ -237,10 +237,17 @@ func (c *criService) Run() error {
 			netSyncGroup.Done()
 		}(h)
 	}
-	go func() {
-		netSyncGroup.Wait()
-		close(cniNetConfMonitorErrCh)
-	}()
+	// For platforms that may not support CNI (darwin etc.) there's no
+	// use in launching this as `Wait` will return immediately. Further
+	// down we select on this channel along with some others to determine
+	// if we should Close() the CRI service, so closing this preemptively
+	// isn't good.
+	if len(c.cniNetConfMonitor) > 0 {
+		go func() {
+			netSyncGroup.Wait()
+			close(cniNetConfMonitorErrCh)
+		}()
+	}
 
 	// Start streaming server.
 	logrus.Info("Start streaming server")
