@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
-	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -348,11 +347,6 @@ func (c *criService) register(s *grpc.Server) error {
 	instrumented := instrument.NewService(c)
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
-
-	instrumentedAlpha := instrument.NewAlphaService(c)
-	runtime_alpha.RegisterRuntimeServiceServer(s, instrumentedAlpha)
-	runtime_alpha.RegisterImageServiceServer(s, instrumentedAlpha)
-
 	return nil
 }
 

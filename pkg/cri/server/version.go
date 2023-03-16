@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 
-	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/containerd/version"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -40,15 +39,5 @@ func (c *criService) Version(ctx context.Context, r *runtime.VersionRequest) (*r
 		RuntimeName:       containerName,
 		RuntimeVersion:    version.Version,
 		RuntimeApiVersion: constants.CRIVersion,
-	}, nil
-}
-
-// Version returns the runtime name, runtime version and runtime API version.
-func (c *criService) AlphaVersion(ctx context.Context, r *runtime_alpha.VersionRequest) (*runtime_alpha.VersionResponse, error) {
-	return &runtime_alpha.VersionResponse{
-		Version:           kubeAPIVersion,
-		RuntimeName:       containerName,
-		RuntimeVersion:    version.Version,
-		RuntimeApiVersion: constants.CRIVersionAlpha,
 	}, nil
 }
