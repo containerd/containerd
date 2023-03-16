@@ -202,10 +202,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	}
 	for _, p := range plugins {
 		id := p.URI()
-		reqID := id
-		if config.GetVersion() == 1 {
-			reqID = p.ID
-		}
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
 
 		initContext := plugin.NewContext(
@@ -239,13 +235,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			} else {
 				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
 			}
-			if _, ok := required[reqID]; ok {
+			if _, ok := required[id]; ok {
 				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
 			}
 			continue
 		}
 
-		delete(required, reqID)
+		delete(required, id)
 		// check for grpc services that should be registered with the server
 		if src, ok := instance.(grpcService); ok {
 			grpcServices = append(grpcServices, src)
@@ -433,9 +429,6 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 	}
 
 	filter := srvconfig.V2DisabledFilter
-	if config.GetVersion() == 1 {
-		filter = srvconfig.V1DisabledFilter
-	}
 	// return the ordered graph for plugins
 	return plugin.Graph(filter(config.DisabledPlugins)), nil
 }

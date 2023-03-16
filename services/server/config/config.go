@@ -17,13 +17,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/imdario/mergo"
 	"github.com/pelletier/go-toml"
-	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
@@ -97,11 +97,14 @@ func (c *Config) GetVersion() int {
 
 // ValidateV2 validates the config for a v2 file
 func (c *Config) ValidateV2() error {
-	version := c.GetVersion()
-	if version < 2 {
-		logrus.Warnf("containerd config version `%d` has been deprecated and will be removed in containerd v2.0, please switch to version `2`, "+
-			"see https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md#version-header", version)
-		return nil
+	switch version := c.GetVersion(); version {
+	case 1:
+		return errors.New("containerd config version `1` is no longer supported since containerd v2.0, please switch to version `2`, " +
+			"see https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md#version-header")
+	case 2:
+		// NOP
+	default:
+		return fmt.Errorf("expected containerd config version `2`, got `%d`", version)
 	}
 	for _, p := range c.DisabledPlugins {
 		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
@@ -171,9 +174,6 @@ type ProxyPlugin struct {
 // Decode unmarshals a plugin specific configuration by plugin id
 func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 	id := p.URI()
-	if c.GetVersion() == 1 {
-		id = p.ID
-	}
 	data, ok := c.Plugins[id]
 	if !ok {
 		return p.Config, nil
@@ -311,18 +311,6 @@ func mergeConfig(to, from *Config) error {
 	}
 
 	return nil
-}
-
-// V1DisabledFilter matches based on ID
-func V1DisabledFilter(list []string) plugin.DisableFilter {
-	set := make(map[string]struct{}, len(list))
-	for _, l := range list {
-		set[l] = struct{}{}
-	}
-	return func(r *plugin.Registration) bool {
-		_, ok := set[r.ID]
-		return ok
-	}
 }
 
 // V2DisabledFilter matches based on URI

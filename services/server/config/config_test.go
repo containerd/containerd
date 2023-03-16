@@ -226,10 +226,5 @@ func TestDecodePluginInV1Config(t *testing.T) {
 
 	var out Config
 	err = LoadConfig(path, &out)
-	assert.NoError(t, err)
-
-	pluginConfig := map[string]interface{}{}
-	_, err = out.Decode(&plugin.Registration{ID: "linux", Config: &pluginConfig})
-	assert.NoError(t, err)
-	assert.Equal(t, true, pluginConfig["shim_debug"])
+	assert.ErrorContains(t, err, "config version `1` is no longer supported")
 }
