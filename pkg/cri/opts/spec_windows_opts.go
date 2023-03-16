@@ -67,9 +67,10 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 			}
 		}
 		var err error
+		originalSrc := src
 		src, err = osi.ResolveSymbolicLink(src)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve symlink %q: %w", src, err)
+			return nil, fmt.Errorf("failed to resolve symlink %q: %w", originalSrc, err)
 		}
 		// hcsshim requires clean path, especially '/' -> '\'. Additionally,
 		// for the destination, absolute paths should have the C: prefix.
