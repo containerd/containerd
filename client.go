@@ -818,23 +818,6 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 	return s, nil
 }
 
-// CheckRuntime returns true if the current runtime matches the expected
-// runtime. Providing various parts of the runtime schema will match those
-// parts of the expected runtime
-func CheckRuntime(current, expected string) bool {
-	cp := strings.Split(current, ".")
-	l := len(cp)
-	for i, p := range strings.Split(expected, ".") {
-		if i > l {
-			return false
-		}
-		if p != cp[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // GetSnapshotterSupportedPlatforms returns a platform matchers which represents the
 // supported platforms for the given snapshotters
 func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshotterName string) (platforms.MatchComparer, error) {

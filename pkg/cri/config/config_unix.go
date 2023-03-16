@@ -29,9 +29,6 @@ import (
 // DefaultConfig returns default configurations of cri plugin.
 func DefaultConfig() PluginConfig {
 	defaultRuncV2Opts := `
-	# NoPivotRoot disables pivot root when creating a container.
-	NoPivotRoot = false
-
 	# NoNewKeyring disables new keyring for the container.
 	NoNewKeyring = false
 
@@ -53,9 +50,6 @@ func DefaultConfig() PluginConfig {
 	# CriuPath is the criu binary path.
 	CriuPath = ""
 
-	# SystemdCgroup enables systemd cgroups.
-	SystemdCgroup = false
-
 	# CriuImagePath is the criu image path
 	CriuImagePath = ""
 
@@ -74,7 +68,6 @@ func DefaultConfig() PluginConfig {
 		ContainerdConfig: ContainerdConfig{
 			Snapshotter:        containerd.DefaultSnapshotter,
 			DefaultRuntimeName: "runc",
-			NoPivot:            false,
 			Runtimes: map[string]Runtime{
 				"runc": {
 					Type:        "io.containerd.runc.v2",
@@ -97,7 +90,6 @@ func DefaultConfig() PluginConfig {
 		},
 		SandboxImage:                     "registry.k8s.io/pause:3.8",
 		StatsCollectPeriod:               10,
-		SystemdCgroup:                    false,
 		MaxContainerLogLineSize:          16 * 1024,
 		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,

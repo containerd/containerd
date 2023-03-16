@@ -22,8 +22,6 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/urfave/cli"
 )
@@ -86,38 +84,21 @@ func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTa
 		imagePath := context.String("image-path")
 		workPath := context.String("work-path")
 
-		switch rt {
-		case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2:
-			if r.Options == nil {
-				r.Options = &options.CheckpointOptions{}
-			}
-			opts, _ := r.Options.(*options.CheckpointOptions)
-
-			if context.Bool("exit") {
-				opts.Exit = true
-			}
-			if imagePath != "" {
-				opts.ImagePath = imagePath
-			}
-			if workPath != "" {
-				opts.WorkPath = workPath
-			}
-		case plugin.RuntimeLinuxV1:
-			if r.Options == nil {
-				r.Options = &runctypes.CheckpointOptions{}
-			}
-			opts, _ := r.Options.(*runctypes.CheckpointOptions)
-
-			if context.Bool("exit") {
-				opts.Exit = true
-			}
-			if imagePath != "" {
-				opts.ImagePath = imagePath
-			}
-			if workPath != "" {
-				opts.WorkPath = workPath
-			}
+		if r.Options == nil {
+			r.Options = &options.CheckpointOptions{}
 		}
+		opts, _ := r.Options.(*options.CheckpointOptions)
+
+		if context.Bool("exit") {
+			opts.Exit = true
+		}
+		if imagePath != "" {
+			opts.ImagePath = imagePath
+		}
+		if workPath != "" {
+			opts.WorkPath = workPath
+		}
+
 		return nil
 	}
 }

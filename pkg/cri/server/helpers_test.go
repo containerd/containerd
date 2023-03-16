@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 
@@ -206,29 +205,19 @@ func TestLocalResolve(t *testing.T) {
 
 func TestGenerateRuntimeOptions(t *testing.T) {
 	nilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"
-[containerd.runtimes.legacy]
-  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
-[containerd.runtimes.runc]
-  runtime_type = "` + plugin.RuntimeRuncV1 + `"
 [containerd.runtimes.runcv2]
   runtime_type = "` + plugin.RuntimeRuncV2 + `"
 `
 	nonNilOpts := `
-systemd_cgroup = true
 [containerd]
   no_pivot = true
   default_runtime_name = "default"
-[containerd.runtimes.legacy]
-  runtime_type = "` + plugin.RuntimeLinuxV1 + `"
 [containerd.runtimes.legacy.options]
   Runtime = "legacy"
   RuntimeRoot = "/legacy"
-[containerd.runtimes.runc]
-  runtime_type = "` + plugin.RuntimeRuncV1 + `"
 [containerd.runtimes.runc.options]
   BinaryName = "runc"
   Root = "/runc"
@@ -245,7 +234,7 @@ systemd_cgroup = true
 	require.NoError(t, err)
 	err = tree.Unmarshal(&nilOptsConfig)
 	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 3)
+	require.Len(t, nilOptsConfig.Runtimes, 1)
 
 	tree, err = toml.Load(nonNilOpts)
 	require.NoError(t, err)
@@ -258,31 +247,10 @@ systemd_cgroup = true
 		c               criconfig.Config
 		expectedOptions interface{}
 	}{
-		"when options is nil, should return nil option for io.containerd.runc.v1": {
-			r:               nilOptsConfig.Runtimes["runc"],
-			c:               nilOptsConfig,
-			expectedOptions: nil,
-		},
 		"when options is nil, should return nil option for io.containerd.runc.v2": {
 			r:               nilOptsConfig.Runtimes["runcv2"],
 			c:               nilOptsConfig,
 			expectedOptions: nil,
-		},
-		"when options is nil, should use legacy fields for legacy runtime": {
-			r: nilOptsConfig.Runtimes["legacy"],
-			c: nilOptsConfig,
-			expectedOptions: &runctypes.RuncOptions{
-				SystemdCgroup: true,
-			},
-		},
-		"when options is not nil, should be able to decode for io.containerd.runc.v1": {
-			r: nonNilOptsConfig.Runtimes["runc"],
-			c: nonNilOptsConfig,
-			expectedOptions: &runcoptions.Options{
-				BinaryName:   "runc",
-				Root:         "/runc",
-				NoNewKeyring: true,
-			},
 		},
 		"when options is not nil, should be able to decode for io.containerd.runc.v2": {
 			r: nonNilOptsConfig.Runtimes["runcv2"],
@@ -291,14 +259,6 @@ systemd_cgroup = true
 				BinaryName:   "runc",
 				Root:         "/runcv2",
 				NoNewKeyring: true,
-			},
-		},
-		"when options is not nil, should be able to decode for legacy runtime": {
-			r: nonNilOptsConfig.Runtimes["legacy"],
-			c: nonNilOptsConfig,
-			expectedOptions: &runctypes.RuncOptions{
-				Runtime:     "legacy",
-				RuntimeRoot: "/legacy",
 			},
 		},
 	} {

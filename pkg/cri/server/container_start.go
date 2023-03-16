@@ -110,17 +110,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return cntr.IO, nil
 	}
 
-	ctrInfo, err := container.Info(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container info: %w", err)
-	}
-
 	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 
-	taskOpts := c.taskOpts(ctrInfo.Runtime.Name)
+	var taskOpts []containerd.NewTaskOpts
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}

@@ -390,16 +390,9 @@ jobs:
       fail-fast: false
       matrix:
         runtime:
-          - io.containerd.runtime.v1.linux
-          - io.containerd.runc.v1
           - io.containerd.runc.v2
         runc: [runc, crun]
         enable_cri_sandboxes: ["", "sandboxed"]
-        exclude:
-          - runtime: io.containerd.runc.v1
-            runc: crun
-          - runtime: io.containerd.runtime.v1.linux
-            runc: crun
 
     env:
       GOTEST: gotestsum --
