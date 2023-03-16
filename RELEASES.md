@@ -378,7 +378,7 @@ The deprecated features are shown in the following table:
 | Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0 ✅         | Use `containerd.io/restart.loguri` label |
 | `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles        |
 | Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images               |
-| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0            | Use CRI `v1`                             |
+| CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅         | Use CRI `v1`                             |
 
 ### Deprecated config properties
 The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in the following table:
