@@ -83,6 +83,25 @@ type controllerLocal struct {
 
 var _ sandbox.Controller = (*controllerLocal)(nil)
 
+func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc runtimeAPI.TTRPCSandboxService) {
+	// Let the shim exit, then we can clean up the bundle after.
+	if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{
+		SandboxID: sandboxID,
+	}); sErr != nil {
+		log.G(ctx).WithError(sErr).WithField("sandboxID", sandboxID).
+			Error("failed to shutdown sandbox")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	dErr := c.shims.Delete(ctx, sandboxID)
+	if dErr != nil {
+		log.G(ctx).WithError(dErr).WithField("sandboxID", sandboxID).
+			Error("failed to delete shim")
+	}
+}
+
 func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...sandbox.CreateOpt) error {
 	var coptions sandbox.CreateOptions
 	for _, opt := range opts {
@@ -128,22 +147,7 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 		Options:    options,
 		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
-		// Let the shim exit, then we can clean up the bundle after.
-		if _, sErr := svc.ShutdownSandbox(ctx, &runtimeAPI.ShutdownSandboxRequest{
-			SandboxID: sandboxID,
-		}); sErr != nil {
-			log.G(ctx).WithError(sErr).WithField("sandboxID", sandboxID).
-				Error("failed to shutdown sandbox after failed create")
-		}
-
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-
-		dErr := c.shims.Delete(ctx, sandboxID)
-		if dErr != nil {
-			log.G(ctx).WithError(dErr).WithField("sandboxID", sandboxID).
-				Error("failed to delete shim after failed sandbox create")
-		}
+		c.cleanupShim(ctx, sandboxID, svc)
 		return fmt.Errorf("failed to create sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
 
@@ -163,6 +167,7 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 
 	resp, err := svc.StartSandbox(ctx, &runtimeAPI.StartSandboxRequest{SandboxID: sandboxID})
 	if err != nil {
+		c.cleanupShim(ctx, sandboxID, svc)
 		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
 
@@ -271,7 +276,9 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 		SandboxID: resp.GetSandboxID(),
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
-		ExitedAt:  resp.GetCreatedAt().AsTime(),
+		Info:      resp.GetInfo(),
+		CreatedAt: resp.GetCreatedAt().AsTime(),
+		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 	}, nil
 }
