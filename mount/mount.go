@@ -18,6 +18,7 @@ package mount
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/containerd/continuity/fs"
 )
@@ -74,4 +75,47 @@ func (m *Mount) Mount(target string) error {
 		return fmt.Errorf("failed to join path %q with root %q: %w", m.Target, target, err)
 	}
 	return m.mount(target)
+}
+
+// readonlyMounts modifies the received mount options
+// to make them readonly
+func readonlyMounts(mounts []Mount) []Mount {
+	for i, m := range mounts {
+		if m.Type == "overlay" {
+			mounts[i].Options = readonlyOverlay(m.Options)
+			continue
+		}
+		opts := make([]string, 0, len(m.Options))
+		for _, opt := range m.Options {
+			if opt != "rw" && opt != "ro" { // skip `ro` too so we don't append it twice
+				opts = append(opts, opt)
+			}
+		}
+		opts = append(opts, "ro")
+		mounts[i].Options = opts
+	}
+	return mounts
+}
+
+// readonlyOverlay takes mount options for overlay mounts and makes them readonly by
+// removing workdir and upperdir (and appending the upperdir layer to lowerdir) - see:
+// https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#multiple-lower-layers
+func readonlyOverlay(opt []string) []string {
+	out := make([]string, 0, len(opt))
+	upper := ""
+	for _, o := range opt {
+		if strings.HasPrefix(o, "upperdir=") {
+			upper = strings.TrimPrefix(o, "upperdir=")
+		} else if !strings.HasPrefix(o, "workdir=") {
+			out = append(out, o)
+		}
+	}
+	if upper != "" {
+		for i, o := range out {
+			if strings.HasPrefix(o, "lowerdir=") {
+				out[i] = "lowerdir=" + upper + ":" + strings.TrimPrefix(o, "lowerdir=")
+			}
+		}
+	}
+	return out
 }
