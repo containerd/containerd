@@ -35,6 +35,14 @@ type StartConfig struct {
 
 type SpanOpt func(config *StartConfig)
 
+// WithAttribute appends attributes to a new created span.
+func WithAttribute(k string, v interface{}) SpanOpt {
+	return func(config *StartConfig) {
+		config.spanOpts = append(config.spanOpts,
+			trace.WithAttributes(Attribute(k, v)))
+	}
+}
+
 // WithHTTPRequest marks span as a HTTP request operation from client to server.
 // It'll append attributes from the HTTP request object and mark it with `SpanKindClient` type.
 func WithHTTPRequest(request *http.Request) SpanOpt {
@@ -80,8 +88,13 @@ func (s *Span) End() {
 }
 
 // AddEvent adds an event with provided name and options.
-func (s *Span) AddEvent(name string, options ...trace.EventOption) {
-	s.otelSpan.AddEvent(name, options...)
+func (s *Span) AddEvent(name string, attributes ...attribute.KeyValue) {
+	s.otelSpan.AddEvent(name, trace.WithAttributes(attributes...))
+}
+
+// RecordError will record err as an exception span event for this span
+func (s *Span) RecordError(err error, options ...trace.EventOption) {
+	s.otelSpan.RecordError(err, options...)
 }
 
 // SetStatus sets the status of the current span.

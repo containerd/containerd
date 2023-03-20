@@ -27,6 +27,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/tracing"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -39,12 +40,13 @@ import (
 
 // StartContainer starts the container.
 func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContainerRequest) (retRes *runtime.StartContainerResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	cntr, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
-
+	span.SetAttributes(tracing.Attribute("container.id", cntr.ID))
 	info, err := cntr.Container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get container info: %w", err)
@@ -88,6 +90,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
 		return nil, fmt.Errorf("sandbox container %q is not running", sandboxID)
 	}
+	span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 
 	// Recheck target container validity in Linux namespace options.
 	if linux := config.GetLinux(); linux != nil {
@@ -181,6 +184,10 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 
 	containerStartTimer.WithValues(info.Runtime.Name).UpdateSince(start)
+
+	span.AddEvent("container started",
+		tracing.Attribute("container.start.duration", time.Since(start).String()),
+	)
 
 	return &runtime.StartContainerResponse{}, nil
 }

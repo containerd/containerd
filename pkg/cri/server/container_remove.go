@@ -26,12 +26,14 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/containerd/tracing"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // RemoveContainer removes the container.
 func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveContainerRequest) (_ *runtime.RemoveContainerResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
@@ -43,6 +45,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return &runtime.RemoveContainerResponse{}, nil
 	}
 	id := container.ID
+	span.SetAttributes(tracing.Attribute("container.id", id))
 	i, err := container.Container.Info(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("get container info: %w", err)
@@ -119,6 +122,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	c.generateAndSendContainerEvent(ctx, id, container.SandboxID, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	containerRemoveTimer.WithValues(i.Runtime.Name).UpdateSince(start)
+
+	span.AddEvent("container removed",
+		tracing.Attribute("container.id", container.ID),
+		tracing.Attribute("container.remove.duration", time.Since(start).String()),
+	)
 
 	return &runtime.RemoveContainerResponse{}, nil
 }
