@@ -377,24 +377,28 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 // - Non abs path is relative to parent config file directory
 // - Abs paths returned as is
 func resolveImports(parent string, imports []string) ([]string, error) {
-	var out []string
+	paths := make(map[string]struct{})
 
 	for _, path := range imports {
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(filepath.Dir(parent), path)
+		}
 		if strings.Contains(path, "*") {
 			matches, err := filepath.Glob(path)
 			if err != nil {
 				return nil, err
 			}
 
-			out = append(out, matches...)
-		} else {
-			path = filepath.Clean(path)
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(filepath.Dir(parent), path)
+			for _, match := range matches {
+				paths[filepath.Clean(match)] = struct{}{}
 			}
-
-			out = append(out, path)
+		} else {
+			paths[filepath.Clean(path)] = struct{}{}
 		}
+	}
+	out := make([]string, 0, len(paths))
+	for path := range paths {
+		out = append(out, path)
 	}
 
 	return out, nil
