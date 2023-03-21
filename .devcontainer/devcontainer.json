@@ -1,0 +1,32 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	"name": "containerd",
+	"build": {
+		"context": "..",
+		"dockerfile": "Dockerfile"
+	},
+	"workspaceFolder": "/go/src/github.com/containerd/containerd",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/containerd/containerd,type=bind,consistency=cached",
+
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	"features": {
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.20"
+		}
+	},
+
+	"onCreateCommand": "sudo PATH=$PATH bash .devcontainer/setup.sh",
+	"postAttachCommand": {
+		"Runs all non-integration tests that do not require `root` privileges": "make test",
+		"Runs non-integration tests which require `root`": "sudo PATH=$PATH  make root-test"
+	},
+
+	"remoteUser": "root",
+	"runArgs": [
+		"--ipc=host",
+		"--volume=/dev:/dev",
+		"--volume=/run/udev:/run/udev",
+		"--privileged"
+	]
+}
