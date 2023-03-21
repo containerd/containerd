@@ -59,41 +59,47 @@ const (
 	MediaTypeImageLayerGzipEncrypted = ocispec.MediaTypeImageLayerGzip + "+encrypted"
 )
 
+var diffCompressionMap = map[string]string{
+	// These media types may have been compressed but failed to
+	// use the correct media type. The decompression function
+	// should detect and handle this case.
+	MediaTypeDockerSchema2Layer:        "unknown",
+	MediaTypeDockerSchema2LayerForeign: "unknown",
+
+	MediaTypeDockerSchema2LayerGzip:             "gzip",
+	MediaTypeDockerSchema2LayerForeignGzip:      "gzip",
+	ocispec.MediaTypeImageLayer:                 "",
+	ocispec.MediaTypeImageLayerNonDistributable: "",
+}
+
 // DiffCompression returns the compression as defined by the layer diff media
 // type. For Docker media types without compression, "unknown" is returned to
 // indicate that the media type may be compressed. If the media type is not
 // recognized as a layer diff, then it returns errdefs.ErrNotImplemented
 func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 	base, ext := parseMediaTypes(mediaType)
-	switch base {
-	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerForeign:
-		if len(ext) > 0 {
-			// Type is wrapped
-			return "", nil
-		}
-		// These media types may have been compressed but failed to
-		// use the correct media type. The decompression function
-		// should detect and handle this case.
-		return "unknown", nil
-	case MediaTypeDockerSchema2LayerGzip, MediaTypeDockerSchema2LayerForeignGzip:
-		if len(ext) > 0 {
-			// Type is wrapped
-			return "", nil
-		}
-		return "gzip", nil
-	case ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerNonDistributable:
-		if len(ext) > 0 {
-			switch ext[len(ext)-1] {
-			case "gzip":
-				return "gzip", nil
-			case "zstd":
-				return "zstd", nil
-			}
-		}
-		return "", nil
-	default:
-		return "", fmt.Errorf("unrecognised mediatype %s: %w", mediaType, errdefs.ErrNotImplemented)
+	if base == "" {
+		return "", fmt.Errorf("unrecognized media type %s: %w", mediaType, errdefs.ErrNotImplemented)
 	}
+
+	compression, ok := diffCompressionMap[base]
+	if !ok {
+		return "", fmt.Errorf("unrecognized media type %s: %w", mediaType, errdefs.ErrNotImplemented)
+	}
+	if len(ext) > 0 {
+		if compression != "" {
+			// Type is wrapped
+			return "", nil
+		}
+		switch ext[len(ext)-1] {
+		case "gzip":
+			compression = "gzip"
+		case "zstd":
+			compression = "zstd"
+		}
+	}
+
+	return compression, nil
 }
 
 // parseMediaTypes splits the media type into the base type and
