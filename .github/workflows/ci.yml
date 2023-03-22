@@ -296,7 +296,7 @@ jobs:
         shell: powershell
         run: |
           # Get critctl tool. Used for cri-integration tests
-          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.21.0/crictl-v1.21.0-windows-amd64.tar.gz"
+          $CRICTL_DOWNLOAD_URL="https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.26.0/crictl-v1.26.0-windows-amd64.tar.gz"
           curl.exe -L $CRICTL_DOWNLOAD_URL -o c:\crictl.tar.gz
           tar -xvf c:\crictl.tar.gz
           mv crictl.exe "${{ github.workspace }}/bin/crictl.exe" # Move crictl somewhere in path
