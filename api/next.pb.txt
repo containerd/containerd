@@ -6004,6 +6004,13 @@ file {
       type: TYPE_STRING
       json_name: "runtimePath"
     }
+    field {
+      name: "restore_path"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "restorePath"
+    }
   }
   message_type {
     name: "CreateTaskResponse"
@@ -6363,6 +6370,13 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "options"
+    }
+    field {
+      name: "checkpoint_path"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "checkpointPath"
     }
   }
   message_type {

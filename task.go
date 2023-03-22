@@ -41,7 +41,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/rootfs"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 	digest "github.com/opencontainers/go-digest"
 	is "github.com/opencontainers/image-spec/specs-go"
@@ -113,7 +112,8 @@ func WithStdinCloser(r *IOCloseInfo) {
 
 // CheckpointTaskInfo allows specific checkpoint information to be set for the task
 type CheckpointTaskInfo struct {
-	Name string
+	Name           string
+	CheckpointPath string
 	// ParentCheckpoint is the digest of a parent checkpoint
 	ParentCheckpoint digest.Digest
 	// Options hold runtime specific settings for checkpointing a task
@@ -132,6 +132,7 @@ type CheckpointTaskOpts func(*CheckpointTaskInfo) error
 
 // TaskInfo sets options for task creation
 type TaskInfo struct {
+	RestorePath string
 	// Checkpoint is the Descriptor for an existing checkpoint that can be used
 	// to restore a task's runtime and memory state
 	Checkpoint *types.Descriptor
@@ -449,6 +450,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if i.Name == "" {
 		i.Name = fmt.Sprintf(checkpointNameFormat, t.id, time.Now().Format(checkpointDateFormat))
 	}
+	request.CheckpointPath = i.CheckpointPath
 	request.ParentCheckpoint = i.ParentCheckpoint.String()
 	if i.Options != nil {
 		any, err := protobuf.MarshalAnyToProto(i.Options)
@@ -480,9 +482,10 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if err := t.checkpointTask(ctx, &index, request); err != nil {
 		return nil, err
 	}
+
 	// if checkpoint image path passed, jump checkpoint image,
 	// return an empty image
-	if isCheckpointPathExist(cr.Runtime.Name, i.Options) {
+	if i.CheckpointPath != "" {
 		return NewImage(t.client, images.Image{}), nil
 	}
 
@@ -681,20 +684,4 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 		Digest:    writer.Digest(),
 		Size:      size,
 	}, nil
-}
-
-// isCheckpointPathExist only suitable for runc runtime now
-func isCheckpointPathExist(runtime string, v interface{}) bool {
-	if v == nil {
-		return false
-	}
-
-	switch runtime {
-	case plugin.RuntimeRuncV2:
-		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
-			return true
-		}
-	}
-
-	return false
 }

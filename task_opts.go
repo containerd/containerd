@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -49,6 +48,14 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
 		info.runtime = absRuntimePath
+		return nil
+	}
+}
+
+// WithRestoreImagePath sets image path for create option
+func WithRestoreImagePath(path string) NewTaskOpts {
+	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+		ti.RestorePath = path
 		return nil
 	}
 }
@@ -103,29 +110,7 @@ func WithCheckpointName(name string) CheckpointTaskOpts {
 // WithCheckpointImagePath sets image path for checkpoint option
 func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {
-		if r.Options == nil {
-			r.Options = &options.CheckpointOptions{}
-		}
-		opts, ok := r.Options.(*options.CheckpointOptions)
-		if !ok {
-			return errors.New("invalid v2 shim checkpoint options format")
-		}
-		opts.ImagePath = path
-		return nil
-	}
-}
-
-// WithRestoreImagePath sets image path for create option
-func WithRestoreImagePath(path string) NewTaskOpts {
-	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
-		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid v2 shim create options format")
-		}
-		opts.CriuImagePath = path
+		r.CheckpointPath = path
 		return nil
 	}
 }

@@ -152,9 +152,13 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	checkpointPath, err := getRestorePath(container.Runtime.Name, r.Options)
-	if err != nil {
-		return nil, err
+
+	checkpointPath := r.RestorePath
+	if checkpointPath == "" {
+		// v1.x client sets the checkpoint path in *options.Options
+		if checkpointPath, err = getRestorePath(r.Options); err != nil {
+			return nil, err
+		}
 	}
 	// jump get checkpointPath from checkpoint image
 	if checkpointPath == "" && r.Checkpoint != nil {
@@ -526,10 +530,15 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	if err != nil {
 		return nil, err
 	}
-	image, err := getCheckpointPath(container.Runtime.Name, r.Options)
-	if err != nil {
-		return nil, err
+
+	image := r.CheckpointPath
+	if image == "" {
+		// v1.x client sets the checkpoint path in *options.Options
+		if image, err = getCheckpointPath(r.Options); err != nil {
+			return nil, err
+		}
 	}
+
 	checkpointImageExists := false
 	if image == "" {
 		checkpointImageExists = true
@@ -700,42 +709,36 @@ func (l *local) getTaskFromContainer(ctx context.Context, container *containers.
 	return t, nil
 }
 
-// getCheckpointPath only suitable for runc runtime now
-func getCheckpointPath(runtime string, option *ptypes.Any) (string, error) {
+// getCheckpointPath only suitable for *options.Options
+func getCheckpointPath(option *ptypes.Any) (string, error) {
 	if option == nil {
 		return "", nil
 	}
 
-	var checkpointPath string
 	v, err := typeurl.UnmarshalAny(option)
 	if err != nil {
 		return "", err
 	}
 	opts, ok := v.(*options.CheckpointOptions)
 	if !ok {
-		return "", fmt.Errorf("invalid task checkpoint option for %s", runtime)
+		return "", nil
 	}
-	checkpointPath = opts.ImagePath
-
-	return checkpointPath, nil
+	return opts.ImagePath, nil
 }
 
-// getRestorePath only suitable for runc runtime now
-func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
+// getRestorePath only suitable for *options.Options
+func getRestorePath(option *ptypes.Any) (string, error) {
 	if option == nil {
 		return "", nil
 	}
 
-	var restorePath string
 	v, err := typeurl.UnmarshalAny(option)
 	if err != nil {
 		return "", err
 	}
 	opts, ok := v.(*options.Options)
 	if !ok {
-		return "", fmt.Errorf("invalid task create option for %s", runtime)
+		return "", nil
 	}
-	restorePath = opts.CriuImagePath
-
-	return restorePath, nil
+	return opts.CriuImagePath, nil
 }

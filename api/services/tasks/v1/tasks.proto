@@ -89,6 +89,8 @@ message CreateTaskRequest {
 	google.protobuf.Any options = 9;
 
 	string runtime_path = 10;
+
+	string restore_path = 11;
 }
 
 message CreateTaskResponse {
@@ -196,6 +198,7 @@ message CheckpointTaskRequest {
 	string container_id = 1;
 	string parent_checkpoint = 2;
 	google.protobuf.Any options = 3;
+	string checkpoint_path = 4;
 }
 
 message CheckpointTaskResponse {

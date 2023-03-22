@@ -66,13 +66,19 @@ var checkpointCommand = cli.Command{
 		if err != nil {
 			return err
 		}
+
 		opts := []containerd.CheckpointTaskOpts{withCheckpointOpts(info.Runtime.Name, context)}
-		checkpoint, err := task.Checkpoint(ctx, opts...)
+		imagePath := context.String("image-path")
+		if imagePath != "" {
+			opts = append(opts, containerd.WithCheckpointImagePath(imagePath))
+		}
+
+		image, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
 			return err
 		}
-		if context.String("image-path") == "" {
-			fmt.Println(checkpoint.Name())
+		if imagePath == "" {
+			fmt.Println(image.Name())
 		}
 		return nil
 	},
@@ -81,9 +87,6 @@ var checkpointCommand = cli.Command{
 // withCheckpointOpts only suitable for runc runtime now
 func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
-		imagePath := context.String("image-path")
-		workPath := context.String("work-path")
-
 		if r.Options == nil {
 			r.Options = &options.CheckpointOptions{}
 		}
@@ -92,10 +95,7 @@ func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTa
 		if context.Bool("exit") {
 			opts.Exit = true
 		}
-		if imagePath != "" {
-			opts.ImagePath = imagePath
-		}
-		if workPath != "" {
+		if workPath := context.String("work-path"); workPath != "" {
 			opts.WorkPath = workPath
 		}
 
