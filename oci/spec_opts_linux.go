@@ -153,3 +153,7 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 		return nil
 	}
 }
+
+func escapeAndCombineArgs(args []string) string {
+	panic("not supported")
+}
