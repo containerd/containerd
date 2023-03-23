@@ -68,24 +68,20 @@ var metricsCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		anydata, err := typeurl.UnmarshalAny(metric.Data)
-		if err != nil {
-			return err
-		}
-		var (
-			data         *v1.Metrics
-			data2        *v2.Metrics
-			windowsStats *wstats.Statistics
-		)
-		switch v := anydata.(type) {
-		case *v1.Metrics:
-			data = v
-		case *v2.Metrics:
-			data2 = v
-		case *wstats.Statistics:
-			windowsStats = v
+
+		var data interface{}
+		switch {
+		case typeurl.Is(metric.Data, (*v1.Metrics)(nil)):
+			data = &v1.Metrics{}
+		case typeurl.Is(metric.Data, (*v2.Metrics)(nil)):
+			data = &v2.Metrics{}
+		case typeurl.Is(metric.Data, (*wstats.Statistics)(nil)):
+			data = &wstats.Statistics{}
 		default:
 			return errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+		}
+		if err := typeurl.UnmarshalTo(metric.Data, data); err != nil {
+			return err
 		}
 
 		switch context.String(formatFlag) {
@@ -93,19 +89,19 @@ var metricsCommand = cli.Command{
 			w := tabwriter.NewWriter(os.Stdout, 1, 8, 4, ' ', 0)
 			fmt.Fprintf(w, "ID\tTIMESTAMP\t\n")
 			fmt.Fprintf(w, "%s\t%s\t\n\n", metric.ID, metric.Timestamp)
-			if data != nil {
-				printCgroupMetricsTable(w, data)
-			} else if data2 != nil {
-				printCgroup2MetricsTable(w, data2)
-			} else {
-				err := printWindowsStats(w, windowsStats)
-				if err != nil {
+			switch v := data.(type) {
+			case *v1.Metrics:
+				printCgroupMetricsTable(w, v)
+			case *v2.Metrics:
+				printCgroup2MetricsTable(w, v)
+			case *wstats.Statistics:
+				if err := printWindowsStats(w, v); err != nil {
 					return fmt.Errorf("cannot convert metrics data from windows.Statistics: %w", err)
 				}
 			}
 			return w.Flush()
 		case formatJSON:
-			marshaledJSON, err := json.MarshalIndent(anydata, "", "  ")
+			marshaledJSON, err := json.MarshalIndent(data, "", "  ")
 			if err != nil {
 				return err
 			}
