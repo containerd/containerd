@@ -133,7 +133,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			Source:      c.getResolvPath(id),
 			Destination: resolvConfPath,
 			Type:        "bind",
-			Options:     []string{"rbind", "ro"},
+			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
 		},
 	}))
 
