@@ -112,7 +112,7 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit; go 1.14
 github.com/containerd/nri
 github.com/containerd/nri/types/v1
-# github.com/containerd/ttrpc v1.1.0
+# github.com/containerd/ttrpc v1.1.1
 ## explicit; go 1.13
 github.com/containerd/ttrpc
 github.com/containerd/ttrpc/plugin
