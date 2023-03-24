@@ -1,0 +1,27 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.6.19"
+
+pre_release = false
+
+preface = """\
+The twentieth patch release for containerd 1.6 contains various fixes and updates.
+
+### Notable Updates
+
+* **Disable looking up usernames and groupnames on host** ([#8230](https://github.com/containerd/containerd/pull/8230))
+* **Add support for Windows ArgsEscaped images** ([#8273](https://github.com/containerd/containerd/pull/8273))
+* **Update hcsshim to v0.9.8** ([#8274](https://github.com/containerd/containerd/pull/8274))
+* **Fix debug flag in shim** ([#8288](https://github.com/containerd/containerd/pull/8288))
+* **Add `WithReadonlyTempMount` to support readonly temporary mounts** ([#8299](https://github.com/containerd/containerd/pull/8299))
+* **Update ttrpc to fix file descriptor leak** ([#8308](https://github.com/containerd/containerd/pull/8308))
+* **Update runc binary to v1.1.5** ([#8324](https://github.com/containerd/containerd/pull/8324))
+* **Update image config to support ArgsEscaped** ([#8306](https://github.com/containerd/containerd/pull/8306))
+
+See the changelog for complete list of changes"""
