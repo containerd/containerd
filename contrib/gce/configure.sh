@@ -110,6 +110,7 @@ GCS_BUCKET_TOKEN_METADATA="GCS_BUCKET_TOKEN"
 # GCS_BUCKET_TOKEN should have read access to the bucket from which
 # containerd artifacts need to be downloaded
 GCS_BUCKET_TOKEN=$(fetch_metadata "${GCS_BUCKET_TOKEN_METADATA}")
+declare -a HEADERS
 if [[ -n "${GCS_BUCKET_TOKEN}" ]]; then
   HEADERS=(-H "Authorization: Bearer ${GCS_BUCKET_TOKEN}")
 fi
