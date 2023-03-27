@@ -607,7 +607,9 @@ func WithUser(userstr string) SpecOpts {
 		// The `Username` field on the runtime spec is marked by Platform as only for Windows, and in this case it
 		// *is* being set on a Windows host at least, but will be used as a temporary holding spot until the guest
 		// can use the string to perform these same operations to grab the uid:gid inside.
-		if s.Windows != nil && s.Linux != nil {
+		//
+		// Mounts are not supported on Darwin, so using the same workaround.
+		if (s.Windows != nil && s.Linux != nil) || runtime.GOOS == "darwin" {
 			s.Process.User.Username = userstr
 			return nil
 		}
