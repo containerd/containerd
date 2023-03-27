@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -43,7 +44,6 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 
-	"github.com/containerd/containerd/pkg/atomic"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -138,7 +138,6 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		snapshotStore:               snapshotstore.NewStore(),
 		sandboxNameIndex:            registrar.NewRegistrar(),
 		containerNameIndex:          registrar.NewRegistrar(),
-		initialized:                 atomic.NewBool(false),
 		netPlugin:                   make(map[string]cni.CNI),
 		unpackDuplicationSuppressor: kmutex.New(),
 		sandboxControllers:          make(map[criconfig.SandboxControllerMode]sandbox.Controller),
@@ -288,7 +287,7 @@ func (c *criService) Run() error {
 	}
 
 	// Set the server as initialized. GRPC services could start serving traffic.
-	c.initialized.Set()
+	c.initialized.Store(true)
 
 	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr error
 	// Stop the whole CRI service if any of the critical service exits.
@@ -340,7 +339,7 @@ func (c *criService) Close() error {
 
 // IsInitialized indicates whether CRI service has finished initialization.
 func (c *criService) IsInitialized() bool {
-	return c.initialized.IsSet()
+	return c.initialized.Load()
 }
 
 func (c *criService) register(s *grpc.Server) error {
