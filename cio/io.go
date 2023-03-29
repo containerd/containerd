@@ -166,6 +166,15 @@ func NewAttach(opts ...Opt) Attach {
 		if fifos == nil {
 			return nil, fmt.Errorf("cannot attach, missing fifos")
 		}
+		if streams.Stdin == nil {
+			fifos.Stdin = ""
+		}
+		if streams.Stdout == nil {
+			fifos.Stdout = ""
+		}
+		if streams.Stderr == nil {
+			fifos.Stderr = ""
+		}
 		return copyIO(fifos, streams)
 	}
 }
