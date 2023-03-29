@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
@@ -80,7 +81,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	// Ensure sandbox container image snapshot.
-	image, err := c.cri.EnsureImageExists(ctx, c.config.SandboxImage, config)
+	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
 	}
@@ -270,6 +271,28 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 func (c *Controller) Create(ctx context.Context, _id string, _ ...sandbox.CreateOpt) error {
 	// Not used by pod-sandbox implementation as there is no need to split pause containers logic.
 	return nil
+}
+
+func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
+	image, err := c.imageService.LocalResolve(ref)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
+	}
+	if err == nil {
+		return &image, nil
+	}
+	// Pull image to ensure the image exists
+	resp, err := c.imageService.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
+	if err != nil {
+		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
+	}
+	imageID := resp.GetImageRef()
+	newImage, err := c.imageService.GetImage(imageID)
+	if err != nil {
+		// It's still possible that someone removed the image right after it is pulled.
+		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
+	}
+	return &newImage, nil
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.

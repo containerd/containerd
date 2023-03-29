@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
 // TODO(windows): Usage for windows is always 0 right now. Support this for windows.
-func (c *criService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
+func (c *CRIImageService) ImageFsInfo(ctx context.Context, r *runtime.ImageFsInfoRequest) (*runtime.ImageFsInfoResponse, error) {
 	snapshots := c.snapshotStore.List()
 	timestamp := time.Now().UnixNano()
 	var usedBytes, inodesUsed uint64

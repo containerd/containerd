@@ -41,11 +41,9 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/reference/docker"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
-	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/pelletier/go-toml"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -83,10 +81,7 @@ const (
 	containerKindSandbox = "sandbox"
 	// containerKindContainer is a label value indicating container is application container
 	containerKindContainer = "container"
-	// imageLabelKey is the label key indicating the image is managed by cri plugin.
-	imageLabelKey = criContainerdPrefix + ".image"
-	// imageLabelValue is the label value indicating the image is managed by cri plugin.
-	imageLabelValue = "managed"
+
 	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
 	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
@@ -140,51 +135,6 @@ func criContainerStateToString(state runtime.ContainerState) string {
 	return runtime.ContainerState_name[int32(state)]
 }
 
-// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
-	var repoTag, repoDigest string
-	if _, ok := namedRef.(docker.NamedTagged); ok {
-		repoTag = namedRef.String()
-	}
-	if _, ok := namedRef.(docker.Canonical); ok {
-		repoDigest = namedRef.String()
-	} else if !schema1 {
-		// digest is not actual repo digest for schema1 image.
-		repoDigest = namedRef.Name() + "@" + digest.String()
-	}
-	return repoDigest, repoTag
-}
-
-// localResolve resolves image reference locally and returns corresponding image metadata. It
-// returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
-		if _, err := imagedigest.Parse(refOrID); err == nil {
-			return refOrID
-		}
-		return func(ref string) string {
-			// ref is not image id, try to resolve it locally.
-			// TODO(random-liu): Handle this error better for debugging.
-			normalized, err := docker.ParseDockerRef(ref)
-			if err != nil {
-				return ""
-			}
-			id, err := c.imageStore.Resolve(normalized.String())
-			if err != nil {
-				return ""
-			}
-			return id
-		}(refOrID)
-	}
-
-	imageID := getImageID(refOrID)
-	if imageID == "" {
-		// Try to treat ref as imageID
-		imageID = refOrID
-	}
-	return c.imageStore.Get(imageID)
-}
-
 // toContainerdImage converts an image object in image store to containerd image handler.
 func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
 	// image should always have at least one reference.
@@ -211,30 +161,6 @@ func getUserFromImage(user string) (*int64, string) {
 	}
 	// If user is a numeric uid.
 	return &uid, ""
-}
-
-// EnsureImageExists returns corresponding metadata of the image reference, if image is not
-// pulled yet, the function will pull the image.
-func (c *criService) EnsureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
-	image, err := c.localResolve(ref)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
-	}
-	if err == nil {
-		return &image, nil
-	}
-	// Pull image to ensure the image exists
-	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
-	if err != nil {
-		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
-	}
-	imageID := resp.GetImageRef()
-	newImage, err := c.imageStore.Get(imageID)
-	if err != nil {
-		// It's still possible that someone removed the image right after it is pulled.
-		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
-	}
-	return &newImage, nil
 }
 
 // validateTargetContainer checks that a container is a valid
@@ -296,34 +222,6 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	}
 	labels[containerKindLabel] = containerType
 	return labels
-}
-
-// toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
-func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
-	return &runtime.AuthConfig{
-		Username:      a.Username,
-		Password:      a.Password,
-		Auth:          a.Auth,
-		IdentityToken: a.IdentityToken,
-	}
-}
-
-// parseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
-func parseImageReferences(refs []string) ([]string, []string) {
-	var tags, digests []string
-	for _, ref := range refs {
-		parsed, err := docker.ParseAnyReference(ref)
-		if err != nil {
-			continue
-		}
-		if _, ok := parsed.(docker.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(docker.Tagged); ok {
-			tags = append(tags, parsed.String())
-		}
-	}
-	return tags, digests
 }
 
 // generateRuntimeOptions generates runtime options from cri plugin config.

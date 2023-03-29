@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
@@ -101,25 +99,6 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
 	return c.client.GetImage(ctx, image.References[0])
-}
-
-// getUserFromImage gets uid or user name of the image user.
-// If user is numeric, it will be treated as uid; or else, it is treated as user name.
-func getUserFromImage(user string) (*int64, string) {
-	// return both empty if user is not specified in the image.
-	if user == "" {
-		return nil, ""
-	}
-	// split instances where the id may contain user:group
-	user = strings.Split(user, ":")[0]
-	// user could be either uid or user name. Try to interpret as numeric uid.
-	uid, err := strconv.ParseInt(user, 10, 64)
-	if err != nil {
-		// If user is non numeric, assume it's user name.
-		return nil, user
-	}
-	// If user is a numeric uid.
-	return &uid, ""
 }
 
 // buildLabel builds the labels from config to be passed to containerd

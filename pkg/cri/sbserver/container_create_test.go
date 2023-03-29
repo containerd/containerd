@@ -435,35 +435,3 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }
-
-func TestRuntimeSnapshotter(t *testing.T) {
-	defaultRuntime := config.Runtime{
-		Snapshotter: "",
-	}
-
-	fooRuntime := config.Runtime{
-		Snapshotter: "devmapper",
-	}
-
-	for desc, test := range map[string]struct {
-		runtime           config.Runtime
-		expectSnapshotter string
-	}{
-		"should return default snapshotter when runtime.Snapshotter is not set": {
-			runtime:           defaultRuntime,
-			expectSnapshotter: config.DefaultConfig().Snapshotter,
-		},
-		"should return overridden snapshotter when runtime.Snapshotter is set": {
-			runtime:           fooRuntime,
-			expectSnapshotter: "devmapper",
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			cri := newTestCRIService()
-			cri.config = config.Config{
-				PluginConfig: config.DefaultConfig(),
-			}
-			assert.Equal(t, test.expectSnapshotter, cri.runtimeSnapshotter(context.Background(), test.runtime))
-		})
-	}
-}

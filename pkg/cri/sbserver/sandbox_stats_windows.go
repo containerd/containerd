@@ -151,7 +151,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		// If snapshotstore doesn't have cached snapshot information
 		// set WritableLayer usage to zero
 		var usedBytes uint64
-		sn, err := c.snapshotStore.Get(cntr.ID)
+		sn, err := c.GetSnapshot(cntr.ID)
 		if err == nil {
 			usedBytes = sn.Size
 		}

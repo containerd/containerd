@@ -34,7 +34,7 @@ func (c *criService) containerMetrics(
 ) (*runtime.ContainerStats, error) {
 	var cs runtime.ContainerStats
 	var usedBytes, inodesUsed uint64
-	sn, err := c.snapshotStore.Get(meta.ID)
+	sn, err := c.GetSnapshot(meta.ID)
 	// If snapshotstore doesn't have cached snapshot information
 	// set WritableLayer usage to zero
 	if err == nil {
