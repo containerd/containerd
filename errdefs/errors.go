@@ -17,7 +17,7 @@
 // Package errdefs defines the common errors used throughout containerd
 // packages.
 //
-// Use with fmt.Errorf to add context to an error.
+// Use with fmt.Errorf to add context to an error
 //
 // To detect an error class, use the IsXXX functions to tell whether an error
 // is of a certain type.
