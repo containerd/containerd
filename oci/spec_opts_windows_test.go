@@ -18,13 +18,11 @@ package oci
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 
-	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -114,36 +112,6 @@ func TestWithWindowNetworksAllowUnqualifiedDNSQuery(t *testing.T) {
 	}
 }
 
-func newFakeArgsEscapedImage(config ocispec.ImageConfig) (Image, error) {
-	type imageExtended struct {
-		Config struct {
-			ocispec.ImageConfig
-			ArgsEscaped bool `json:"ArgsEscaped,omitempty"`
-		}
-	}
-
-	// Copy to extended format.
-	configExtended := imageExtended{}
-	configExtended.Config.ImageConfig = config
-	configExtended.Config.ArgsEscaped = true
-
-	configBlob, err := json.Marshal(configExtended)
-	if err != nil {
-		return nil, err
-	}
-	configDescriptor := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageConfig,
-		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
-	}
-
-	return fakeImage{
-		config: configDescriptor,
-		blobs: map[string]blob{
-			configDescriptor.Digest.String(): configBlob,
-		},
-	}, nil
-}
-
 // TestWithProcessArgsOverwritesWithImage verifies that when calling
 // WithImageConfig followed by WithProcessArgs when `ArgsEscaped==false` that
 // the process args overwrite the image args.
@@ -152,8 +120,9 @@ func TestWithProcessArgsOverwritesWithImage(t *testing.T) {
 
 	img, err := newFakeImage(ocispec.Image{
 		Config: ocispec.ImageConfig{
-			Entrypoint: []string{"powershell.exe", "-Command", "Write-Host Hello"},
-			Cmd:        []string{"cmd.exe", "/S", "/C", "echo Hello"},
+			Entrypoint:  []string{"powershell.exe", "-Command", "Write-Host Hello"},
+			Cmd:         []string{"cmd.exe", "/S", "/C", "echo Hello"},
+			ArgsEscaped: false,
 		},
 	})
 	if err != nil {
@@ -192,9 +161,12 @@ func TestWithProcessArgsOverwritesWithImage(t *testing.T) {
 func TestWithProcessArgsOverwritesWithImageArgsEscaped(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeArgsEscapedImage(ocispec.ImageConfig{
-		Entrypoint: []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
-		Cmd:        []string{`cmd.exe /S /C "C:\test path\test.exe"`},
+	img, err := newFakeImage(ocispec.Image{
+		Config: ocispec.ImageConfig{
+			Entrypoint:  []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
+			Cmd:         []string{`cmd.exe /S /C "C:\test path\test.exe"`},
+			ArgsEscaped: true,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -274,9 +246,12 @@ func TestWithImageOverwritesWithProcessArgs(t *testing.T) {
 func TestWithImageArgsEscapedOverwritesWithProcessArgs(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeArgsEscapedImage(ocispec.ImageConfig{
-		Entrypoint: []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
-		Cmd:        []string{`cmd.exe /S /C "C:\test path\test.exe"`},
+	img, err := newFakeImage(ocispec.Image{
+		Config: ocispec.ImageConfig{
+			Entrypoint:  []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
+			Cmd:         []string{`cmd.exe /S /C "C:\test path\test.exe"`},
+			ArgsEscaped: true,
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -510,9 +485,12 @@ func TestWithImageConfigArgsEscapedWindows(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			img, err := newFakeArgsEscapedImage(ocispec.ImageConfig{
-				Entrypoint: tc.entrypoint,
-				Cmd:        tc.cmd,
+			img, err := newFakeImage(ocispec.Image{
+				Config: ocispec.ImageConfig{
+					Entrypoint:  tc.entrypoint,
+					Cmd:         tc.cmd,
+					ArgsEscaped: true,
+				},
 			})
 			if err != nil {
 				t.Fatal(err)
