@@ -91,6 +91,14 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 			assert.NotEqual(t, "", spec.Process.SelinuxLabel)
 			assert.NotEqual(t, "", spec.Linux.MountLabel)
 		}
+
+		assert.Contains(t, spec.Mounts, runtimespec.Mount{
+			Source:      "/test/root/sandboxes/test-id/resolv.conf",
+			Destination: resolvConfPath,
+			Type:        "bind",
+			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
+		})
+
 	}
 	return config, imageConfig, specCheck
 }
