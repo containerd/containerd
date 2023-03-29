@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 // ListImages lists existing images.
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
-func (c *criService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
+func (c *CRIImageService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
 	imagesInStore := c.imageStore.List()
 
 	var images []*runtime.Image

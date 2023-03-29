@@ -41,8 +41,6 @@ import (
 // CRIService interface contains things required by controller, but not yet refactored from criService.
 // TODO: this will be removed in subsequent iterations.
 type CRIService interface {
-	EnsureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error)
-
 	// TODO: we should implement Event backoff in Controller.
 	BackOffEvent(id string, event interface{})
 
@@ -51,11 +49,21 @@ type CRIService interface {
 	GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType)
 }
 
+// ImageService specifies dependencies to CRI image service.
+type ImageService interface {
+	runtime.ImageServiceServer
+
+	LocalResolve(refOrID string) (imagestore.Image, error)
+	GetImage(id string) (imagestore.Image, error)
+}
+
 type Controller struct {
 	// config contains all configurations.
 	config criconfig.Config
 	// client is an instance of the containerd client
 	client *containerd.Client
+	// imageService is a dependency to CRI image service.
+	imageService ImageService
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// os is an interface for all required os operations.
@@ -74,11 +82,13 @@ func New(
 	sandboxStore *sandboxstore.Store,
 	os osinterface.OS,
 	cri CRIService,
+	imageService ImageService,
 	baseOCISpecs map[string]*oci.Spec,
 ) *Controller {
 	return &Controller{
 		config:       config,
 		client:       client,
+		imageService: imageService,
 		sandboxStore: sandboxStore,
 		os:           os,
 		cri:          cri,

@@ -27,18 +27,14 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/reference/docker"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 
-	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
@@ -85,46 +81,6 @@ func TestGetUserFromImage(t *testing.T) {
 	}
 }
 
-func TestGetRepoDigestAndTag(t *testing.T) {
-	digest := imagedigest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
-	for desc, test := range map[string]struct {
-		ref                string
-		schema1            bool
-		expectedRepoDigest string
-		expectedRepoTag    string
-	}{
-		"repo tag should be empty if original ref has no tag": {
-			ref:                "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-		},
-		"repo tag should not be empty if original ref has tag": {
-			ref:                "gcr.io/library/busybox:latest",
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		"repo digest should be empty if original ref is schema1 and has no digest": {
-			ref:                "gcr.io/library/busybox:latest",
-			schema1:            true,
-			expectedRepoDigest: "",
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		"repo digest should not be empty if original ref is schema1 but has digest": {
-			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			schema1:            true,
-			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			expectedRepoTag:    "",
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			named, err := docker.ParseDockerRef(test.ref)
-			assert.NoError(t, err)
-			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
-			assert.Equal(t, test.expectedRepoDigest, repoDigest)
-			assert.Equal(t, test.expectedRepoTag, repoTag)
-		})
-	}
-}
-
 func TestBuildLabels(t *testing.T) {
 	imageConfigLabels := map[string]string{
 		"a":          "z",
@@ -146,61 +102,6 @@ func TestBuildLabels(t *testing.T) {
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
-}
-
-func TestParseImageReferences(t *testing.T) {
-	refs := []string{
-		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"gcr.io/library/busybox:1.2",
-		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"arbitrary-ref",
-	}
-	expectedTags := []string{
-		"gcr.io/library/busybox:1.2",
-	}
-	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
-	tags, digests := parseImageReferences(refs)
-	assert.Equal(t, expectedTags, tags)
-	assert.Equal(t, expectedDigests, digests)
-}
-
-func TestLocalResolve(t *testing.T) {
-	image := imagestore.Image{
-		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
-		ChainID: "test-chain-id-1",
-		References: []string{
-			"docker.io/library/busybox:latest",
-			"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		},
-		Size: 10,
-	}
-	c := newTestCRIService()
-	var err error
-	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
-	assert.NoError(t, err)
-
-	for _, ref := range []string{
-		"sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
-		"busybox",
-		"busybox:latest",
-		"busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"library/busybox",
-		"library/busybox:latest",
-		"library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"docker.io/busybox",
-		"docker.io/busybox:latest",
-		"docker.io/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"docker.io/library/busybox",
-		"docker.io/library/busybox:latest",
-		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-	} {
-		img, err := c.localResolve(ref)
-		assert.NoError(t, err)
-		assert.Equal(t, image, img)
-	}
-	img, err := c.localResolve("randomid")
-	assert.Equal(t, errdefs.IsNotFound(err), true)
-	assert.Equal(t, imagestore.Image{}, img)
 }
 
 func TestGenerateRuntimeOptions(t *testing.T) {

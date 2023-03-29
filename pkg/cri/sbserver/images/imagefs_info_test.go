@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"

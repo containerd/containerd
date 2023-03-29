@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"
@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/containerd/reference/docker"
+	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -392,6 +394,46 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
 			assert.Equal(t, tt.expectErr, err)
+		})
+	}
+}
+
+func TestGetRepoDigestAndTag(t *testing.T) {
+	digest := digest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
+	for desc, test := range map[string]struct {
+		ref                string
+		schema1            bool
+		expectedRepoDigest string
+		expectedRepoTag    string
+	}{
+		"repo tag should be empty if original ref has no tag": {
+			ref:                "gcr.io/library/busybox@" + digest.String(),
+			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
+		},
+		"repo tag should not be empty if original ref has tag": {
+			ref:                "gcr.io/library/busybox:latest",
+			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
+			expectedRepoTag:    "gcr.io/library/busybox:latest",
+		},
+		"repo digest should be empty if original ref is schema1 and has no digest": {
+			ref:                "gcr.io/library/busybox:latest",
+			schema1:            true,
+			expectedRepoDigest: "",
+			expectedRepoTag:    "gcr.io/library/busybox:latest",
+		},
+		"repo digest should not be empty if original ref is schema1 but has digest": {
+			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
+			schema1:            true,
+			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
+			expectedRepoTag:    "",
+		},
+	} {
+		t.Run(desc, func(t *testing.T) {
+			named, err := docker.ParseDockerRef(test.ref)
+			assert.NoError(t, err)
+			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
+			assert.Equal(t, test.expectedRepoDigest, repoDigest)
+			assert.Equal(t, test.expectedRepoTag, repoTag)
 		})
 	}
 }
