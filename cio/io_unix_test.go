@@ -138,40 +138,88 @@ func TestNewFIFOSetInDir(t *testing.T) {
 }
 
 func TestNewAttach(t *testing.T) {
-	var (
-		expectedStdin  = "this is the stdin"
-		expectedStdout = "this is the stdout"
-		expectedStderr = "this is the stderr"
-		stdin          = bytes.NewBufferString(expectedStdin)
-		stdout         = new(bytes.Buffer)
-		stderr         = new(bytes.Buffer)
-	)
-
-	withBytesBuffers := func(streams *Streams) {
-		*streams = Streams{Stdin: stdin, Stdout: stdout, Stderr: stderr}
+	testCases := []struct {
+		name                                          string
+		expectedStdin, expectedStdout, expectedStderr string
+	}{
+		{
+			name:           "attach to all streams (stdin, stdout, and stderr)",
+			expectedStdin:  "this is the stdin",
+			expectedStdout: "this is the stdout",
+			expectedStderr: "this is the stderr",
+		},
+		{
+			name:           "don't attach to stdin",
+			expectedStdout: "this is the stdout",
+			expectedStderr: "this is the stderr",
+		},
+		{
+			name:           "don't attach to stdout",
+			expectedStdin:  "this is the stdin",
+			expectedStderr: "this is the stderr",
+		},
+		{
+			name:           "don't attach to stderr",
+			expectedStdin:  "this is the stdin",
+			expectedStdout: "this is the stdout",
+		},
 	}
-	attacher := NewAttach(withBytesBuffers)
 
-	fifos, err := NewFIFOSetInDir("", "theid", false)
-	assert.NoError(t, err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				stdin  = bytes.NewBufferString(tc.expectedStdin)
+				stdout = new(bytes.Buffer)
+				stderr = new(bytes.Buffer)
 
-	attachedFifos, err := attacher(fifos)
-	assert.NoError(t, err)
-	defer attachedFifos.Close()
+				// The variables below have to be of the interface type (i.e., io.Reader/io.Writer)
+				// instead of the concrete type (i.e., *bytes.Buffer) *before* being passed to NewAttach.
+				// Otherwise, in NewAttach, the interface value won't be nil
+				// (it's just that the concrete value inside the interface itself is nil. [1]),
+				// which means that the corresponding FIFO path won't be set to be an empty string,
+				// and that's not what we want.
+				//
+				// [1] https://go.dev/tour/methods/12
+				stdinArg             io.Reader
+				stdoutArg, stderrArg io.Writer
+			)
+			if tc.expectedStdin != "" {
+				stdinArg = stdin
+			}
+			if tc.expectedStdout != "" {
+				stdoutArg = stdout
+			}
+			if tc.expectedStderr != "" {
+				stderrArg = stderr
+			}
 
-	producers := setupFIFOProducers(t, attachedFifos.Config())
-	initProducers(t, producers, expectedStdout, expectedStderr)
+			attacher := NewAttach(WithStreams(stdinArg, stdoutArg, stderrArg))
 
-	actualStdin, err := io.ReadAll(producers.Stdin)
-	assert.NoError(t, err)
+			fifos, err := NewFIFOSetInDir("", "theid", false)
+			assert.NoError(t, err)
 
-	attachedFifos.Wait()
-	attachedFifos.Cancel()
-	assert.Nil(t, attachedFifos.Close())
+			attachedFifos, err := attacher(fifos)
+			assert.NoError(t, err)
+			defer attachedFifos.Close()
 
-	assert.Equal(t, expectedStdout, stdout.String())
-	assert.Equal(t, expectedStderr, stderr.String())
-	assert.Equal(t, expectedStdin, string(actualStdin))
+			producers := setupFIFOProducers(t, attachedFifos.Config())
+			initProducers(t, producers, tc.expectedStdout, tc.expectedStderr)
+
+			var actualStdin []byte
+			if producers.Stdin != nil {
+				actualStdin, err = io.ReadAll(producers.Stdin)
+				assert.NoError(t, err)
+			}
+
+			attachedFifos.Wait()
+			attachedFifos.Cancel()
+			assert.Nil(t, attachedFifos.Close())
+
+			assert.Equal(t, tc.expectedStdout, stdout.String())
+			assert.Equal(t, tc.expectedStderr, stderr.String())
+			assert.Equal(t, tc.expectedStdin, string(actualStdin))
+		})
+	}
 }
 
 type producers struct {
@@ -187,26 +235,36 @@ func setupFIFOProducers(t *testing.T, fifos Config) producers {
 		ctx   = context.Background()
 	)
 
-	pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
-	assert.NoError(t, err)
+	if fifos.Stdin != "" {
+		pipes.Stdin, err = fifo.OpenFifo(ctx, fifos.Stdin, syscall.O_RDONLY, 0)
+		assert.NoError(t, err)
+	}
 
-	pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
-	assert.NoError(t, err)
+	if fifos.Stdout != "" {
+		pipes.Stdout, err = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY, 0)
+		assert.NoError(t, err)
+	}
 
-	pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
-	assert.NoError(t, err)
+	if fifos.Stderr != "" {
+		pipes.Stderr, err = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY, 0)
+		assert.NoError(t, err)
+	}
 
 	return pipes
 }
 
 func initProducers(t *testing.T, producers producers, stdout, stderr string) {
-	_, err := producers.Stdout.Write([]byte(stdout))
-	assert.NoError(t, err)
-	assert.Nil(t, producers.Stdout.Close())
+	if producers.Stdout != nil {
+		_, err := producers.Stdout.Write([]byte(stdout))
+		assert.NoError(t, err)
+		assert.Nil(t, producers.Stdout.Close())
+	}
 
-	_, err = producers.Stderr.Write([]byte(stderr))
-	assert.NoError(t, err)
-	assert.Nil(t, producers.Stderr.Close())
+	if producers.Stderr != nil {
+		_, err := producers.Stderr.Write([]byte(stderr))
+		assert.NoError(t, err)
+		assert.Nil(t, producers.Stderr.Close())
+	}
 }
 
 func TestLogURIGenerator(t *testing.T) {
