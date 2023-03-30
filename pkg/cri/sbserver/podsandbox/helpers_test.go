@@ -29,46 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestGetUserFromImage tests the logic of getting image uid or user name of image user.
-func TestGetUserFromImage(t *testing.T) {
-	newI64 := func(i int64) *int64 { return &i }
-	for c, test := range map[string]struct {
-		user string
-		uid  *int64
-		name string
-	}{
-		"no gid": {
-			user: "0",
-			uid:  newI64(0),
-		},
-		"uid/gid": {
-			user: "0:1",
-			uid:  newI64(0),
-		},
-		"empty user": {
-			user: "",
-		},
-		"multiple separators": {
-			user: "1:2:3",
-			uid:  newI64(1),
-		},
-		"root username": {
-			user: "root:root",
-			name: "root",
-		},
-		"username": {
-			user: "test:test",
-			name: "test",
-		},
-	} {
-		t.Run(c, func(t *testing.T) {
-			actualUID, actualName := getUserFromImage(test.user)
-			assert.Equal(t, test.uid, actualUID)
-			assert.Equal(t, test.name, actualName)
-		})
-	}
-}
-
 func TestGetRepoDigestAndTag(t *testing.T) {
 	digest := imagedigest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
 	for desc, test := range map[string]struct {

@@ -14,13 +14,14 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,6 +37,7 @@ import (
 
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
+	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -94,7 +96,7 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
+func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
 	span := tracing.SpanFromContext(ctx)
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
@@ -224,6 +226,21 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	return &runtime.PullImageResponse{ImageRef: imageID}, nil
 }
 
+// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
+func getRepoDigestAndTag(namedRef distribution.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
+	var repoTag, repoDigest string
+	if _, ok := namedRef.(distribution.NamedTagged); ok {
+		repoTag = namedRef.String()
+	}
+	if _, ok := namedRef.(distribution.Canonical); ok {
+		repoDigest = namedRef.String()
+	} else if !schema1 {
+		// digest is not actual repo digest for schema1 image.
+		repoDigest = namedRef.Name() + "@" + digest.String()
+	}
+	return repoDigest, repoTag
+}
+
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
 func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 	if auth == nil {
@@ -267,7 +284,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *criService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
+func (c *CRIImageService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -287,10 +304,10 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	return err
 }
 
-// updateImage updates image store to reflect the newest state of an image reference
+// UpdateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
-func (c *criService) updateImage(ctx context.Context, r string) error {
+func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image by reference: %w", err)
@@ -323,7 +340,7 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 }
 
 // getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
-func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
+func (c *CRIImageService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
 	var (
 		tlsConfig = &tls.Config{}
 		cert      tls.Certificate
@@ -380,7 +397,7 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 }
 
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
+func (c *CRIImageService) registryHosts(ctx context.Context, auth *runtime.AuthConfig, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
 		hostOptions := config.HostOptions{
@@ -468,6 +485,16 @@ func (c *criService) registryHosts(ctx context.Context, auth *runtime.AuthConfig
 	}
 }
 
+// toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
+func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
+	return &runtime.AuthConfig{
+		Username:      a.Username,
+		Password:      a.Password,
+		Auth:          a.Auth,
+		IdentityToken: a.IdentityToken,
+	}
+}
+
 // defaultScheme returns the default scheme for a registry host.
 func defaultScheme(host string) string {
 	if docker.IsLocalhost(host) {
@@ -492,7 +519,7 @@ func addDefaultScheme(endpoint string) (string, error) {
 // registryEndpoints returns endpoints for a given host.
 // It adds default registry endpoint if it does not exist in the passed-in endpoint list.
 // It also supports wildcard host matching with `*`.
-func (c *criService) registryEndpoints(host string) ([]string, error) {
+func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 	var endpoints []string
 	_, ok := c.config.Registry.Mirrors[host]
 	if ok {
@@ -543,7 +570,7 @@ func newTransport() *http.Transport {
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
-func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
+func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
 	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
 		ltdd := imgcrypt.Payload{}
 		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
@@ -740,7 +767,7 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
 // Once we know the runtime, try to override default snapshotter if it is set for this runtime.
 // See https://github.com/containerd/containerd/issues/6657
-func (c *criService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
+func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
 	s *runtime.PodSandboxConfig) (string, error) {
 	snapshotter := c.config.ContainerdConfig.Snapshotter
 	if s == nil || s.Annotations == nil {
@@ -752,12 +779,65 @@ func (c *criService) snapshotterFromPodSandboxConfig(ctx context.Context, imageR
 		return snapshotter, nil
 	}
 
+	// TODO: Find other way to retrieve sandbox runtime, this must belong to the Runtime part of the CRI.
 	ociRuntime, err := c.getSandboxRuntime(s, runtimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s, err: %+v", runtimeHandler, err)
 	}
 
-	snapshotter = c.runtimeSnapshotter(context.Background(), ociRuntime)
+	snapshotter = c.RuntimeSnapshotter(context.Background(), ociRuntime)
 	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	return snapshotter, nil
+}
+
+// TODO: copy-pasted from the runtime service implementation. This should not be in image service.
+func (c *CRIImageService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtimeHandler string) (criconfig.Runtime, error) {
+	if untrustedWorkload(config) {
+		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
+		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
+			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
+		}
+
+		//  If the untrusted workload is requesting access to the host/node, this request will fail.
+		//
+		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
+		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
+		// is a supported option, granting the workload to access the entire guest VM instead of host.
+		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
+		if hostAccessingSandbox(config) {
+			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
+		}
+
+		runtimeHandler = criconfig.RuntimeUntrusted
+	}
+
+	if runtimeHandler == "" {
+		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
+	}
+
+	handler, ok := c.config.ContainerdConfig.Runtimes[runtimeHandler]
+	if !ok {
+		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
+	}
+	return handler, nil
+}
+
+// untrustedWorkload returns true if the sandbox contains untrusted workload.
+func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
+	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
+}
+
+// hostAccessingSandbox returns true if the sandbox configuration
+// requires additional host access for the sandbox.
+func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
+	securityContext := config.GetLinux().GetSecurityContext()
+
+	namespaceOptions := securityContext.GetNamespaceOptions()
+	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
+		return true
+	}
+
+	return false
 }

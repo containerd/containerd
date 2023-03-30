@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package sbserver
+package images
 
 import (
 	"context"
@@ -33,9 +33,9 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec.
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
-func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
+func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	image, err := c.localResolve(r.GetImage().GetImage())
+	image, err := c.LocalResolve(r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
