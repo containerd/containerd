@@ -51,63 +51,6 @@ const (
 	seccompDefaultProfile = dockerDefault
 )
 
-// containerMounts sets up necessary container system file mounts
-// including /dev/shm, /etc/hosts and /etc/resolv.conf.
-func (c *criService) containerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
-	var mounts []*runtime.Mount
-	securityContext := config.GetLinux().GetSecurityContext()
-	if !isInCRIMounts(etcHostname, config.GetMounts()) {
-		// /etc/hostname is added since 1.1.6, 1.2.4 and 1.3.
-		// For in-place upgrade, the old sandbox doesn't have the hostname file,
-		// do not mount this in that case.
-		// TODO(random-liu): Remove the check and always mount this when
-		// containerd 1.1 and 1.2 are deprecated.
-		hostpath := c.getSandboxHostname(sandboxID)
-		if _, err := c.os.Stat(hostpath); err == nil {
-			mounts = append(mounts, &runtime.Mount{
-				ContainerPath:  etcHostname,
-				HostPath:       hostpath,
-				Readonly:       securityContext.GetReadonlyRootfs(),
-				SelinuxRelabel: true,
-			})
-		}
-	}
-
-	if !isInCRIMounts(etcHosts, config.GetMounts()) {
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  etcHosts,
-			HostPath:       c.getSandboxHosts(sandboxID),
-			Readonly:       securityContext.GetReadonlyRootfs(),
-			SelinuxRelabel: true,
-		})
-	}
-
-	// Mount sandbox resolv.config.
-	// TODO: Need to figure out whether we should always mount it as read-only
-	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  resolvConfPath,
-			HostPath:       c.getResolvPath(sandboxID),
-			Readonly:       securityContext.GetReadonlyRootfs(),
-			SelinuxRelabel: true,
-		})
-	}
-
-	if !isInCRIMounts(devShm, config.GetMounts()) {
-		sandboxDevShm := c.getSandboxDevShm(sandboxID)
-		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
-			sandboxDevShm = devShm
-		}
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  devShm,
-			HostPath:       sandboxDevShm,
-			Readonly:       false,
-			SelinuxRelabel: sandboxDevShm != devShm,
-		})
-	}
-	return mounts
-}
-
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	var specOpts []oci.SpecOpts
 	securityContext := config.GetLinux().GetSecurityContext()
