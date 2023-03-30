@@ -39,7 +39,7 @@ var (
 )
 
 // Mount to the provided target.
-func (m *Mount) mount(target string) error {
+func (m *Mount) mount(target string) (retErr error) {
 	readOnly := false
 	for _, option := range m.Options {
 		if option == "ro" {
@@ -70,23 +70,23 @@ func (m *Mount) mount(target string) error {
 		HomeDir: home,
 	}
 
-	if err = hcsshim.ActivateLayer(di, layerID); err != nil {
+	if err := hcsshim.ActivateLayer(di, layerID); err != nil {
 		return fmt.Errorf("failed to activate layer %s: %w", m.Source, err)
 	}
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			if layerErr := hcsshim.DeactivateLayer(di, layerID); layerErr != nil {
 				log.G(context.TODO()).WithError(layerErr).Error("failed to deactivate layer during mount failure cleanup")
 			}
 		}
 	}()
 
-	if err = hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
+	if err := hcsshim.PrepareLayer(di, layerID, parentLayerPaths); err != nil {
 		return fmt.Errorf("failed to prepare layer %s: %w", m.Source, err)
 	}
 
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			if layerErr := hcsshim.UnprepareLayer(di, layerID); layerErr != nil {
 				log.G(context.TODO()).WithError(layerErr).Error("failed to unprepare layer during mount failure cleanup")
 			}
@@ -98,11 +98,11 @@ func (m *Mount) mount(target string) error {
 		return fmt.Errorf("failed to get volume path for layer %s: %w", m.Source, err)
 	}
 
-	if err = bindfilter.ApplyFileBinding(target, volume, readOnly); err != nil {
+	if err := bindfilter.ApplyFileBinding(target, volume, readOnly); err != nil {
 		return fmt.Errorf("failed to set volume mount path for layer %s: %w", m.Source, err)
 	}
 	defer func() {
-		if err != nil {
+		if retErr != nil {
 			if bindErr := bindfilter.RemoveFileBinding(target); bindErr != nil {
 				log.G(context.TODO()).WithError(bindErr).Error("failed to remove binding during mount failure cleanup")
 			}
@@ -112,7 +112,7 @@ func (m *Mount) mount(target string) error {
 	// Add an Alternate Data Stream to record the layer source.
 	// See https://docs.microsoft.com/en-au/archive/blogs/askcore/alternate-data-streams-in-ntfs
 	// for details on Alternate Data Streams.
-	if err = os.WriteFile(filepath.Clean(target)+":"+sourceStreamName, []byte(m.Source), 0666); err != nil {
+	if err := os.WriteFile(filepath.Clean(target)+":"+sourceStreamName, []byte(m.Source), 0666); err != nil {
 		return fmt.Errorf("failed to record source for layer %s: %w", m.Source, err)
 	}
 

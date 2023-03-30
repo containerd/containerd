@@ -820,13 +820,13 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 	}
 
 	testfile := filepath.Join(viewMountPoint, "testfile")
-	if err := os.WriteFile(testfile, []byte("testcontent"), 0777); err != nil {
+	err = os.WriteFile(testfile, []byte("testcontent"), 0777)
+	testutil.Unmount(t, viewMountPoint)
+	if err != nil {
 		t.Logf("write to %q failed with %v (EROFS is expected but can be other error code)", testfile, err)
 	} else {
-		testutil.Unmount(t, viewMountPoint)
 		t.Fatalf("write to %q should fail (EROFS) but did not fail", testfile)
 	}
-	testutil.Unmount(t, viewMountPoint)
 	assert.Nil(t, snapshotter.Remove(ctx, view))
 	assert.Nil(t, snapshotter.Remove(ctx, committed))
 }
