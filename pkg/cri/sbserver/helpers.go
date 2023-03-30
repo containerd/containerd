@@ -98,7 +98,48 @@ const (
 
 	// runtimeRunhcsV1 is the runtime type for runhcs.
 	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
+
+	// devShm is the default path of /dev/shm.
+	devShm = "/dev/shm"
+	// etcHosts is the default path of /etc/hosts file.
+	etcHosts = "/etc/hosts"
+	// etcHostname is the default path of /etc/hostname file.
+	etcHostname = "/etc/hostname"
+	// resolvConfPath is the abs path of resolv.conf on host or container.
+	resolvConfPath = "/etc/resolv.conf"
 )
+
+// getSandboxRootDir returns the root directory for managing sandbox files,
+// e.g. hosts files.
+func (c *criService) getSandboxRootDir(id string) string {
+	return filepath.Join(c.config.RootDir, sandboxesDir, id)
+}
+
+// getVolatileSandboxRootDir returns the root directory for managing volatile sandbox files,
+// e.g. named pipes.
+func (c *criService) getVolatileSandboxRootDir(id string) string {
+	return filepath.Join(c.config.StateDir, sandboxesDir, id)
+}
+
+// getSandboxHostname returns the hostname file path inside the sandbox root directory.
+func (c *criService) getSandboxHostname(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "hostname")
+}
+
+// getSandboxHosts returns the hosts file path inside the sandbox root directory.
+func (c *criService) getSandboxHosts(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "hosts")
+}
+
+// getResolvPath returns resolv.conf filepath for specified sandbox.
+func (c *criService) getResolvPath(id string) string {
+	return filepath.Join(c.getSandboxRootDir(id), "resolv.conf")
+}
+
+// getSandboxDevShm returns the shm file path inside the sandbox root directory.
+func (c *criService) getSandboxDevShm(id string) string {
+	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
+}
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
 // generated is unique as long as sandbox metadata is unique.

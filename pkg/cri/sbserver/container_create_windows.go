@@ -26,11 +26,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 )
 
-// No container mounts for windows.
-func (c *criService) containerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
-	return nil
-}
-
 // No extra spec options needed for windows.
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil

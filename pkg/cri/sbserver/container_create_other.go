@@ -26,12 +26,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 )
 
-// containerMounts sets up necessary container system file mounts
-// including /dev/shm, /etc/hosts and /etc/resolv.conf.
-func (c *criService) containerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
-	return []*runtime.Mount{}
-}
-
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
 	return []oci.SpecOpts{}, nil
 }
