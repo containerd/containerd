@@ -22,6 +22,7 @@ import (
 
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
 func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
@@ -39,5 +40,9 @@ func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, fu
 }
 
 func TestSnapshotterClient(t *testing.T) {
-	runTestSnapshotterClient(t)
+	if testing.Short() {
+		t.Skip()
+	}
+
+	testsuite.SnapshotterSuite(t, DefaultSnapshotter, newSnapshotter)
 }
