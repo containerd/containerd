@@ -1,5 +1,14 @@
 ## containerd release process
 
+### containerd CI signal
+The [testgrid dashboard](https://testgrid.k8s.io/containerd-periodic) for containerd shows the current state of the
+containerd periodic build and test jobs. For cutting a release from branch `release/1.x`, the following should be
+verified:
+- `containerd-build-1.x` in [containerd-periodics](https://testgrid.k8s.io/containerd-periodic) should be passing.
+- [CI](https://github.com/containerd/containerd/actions/workflows/ci.yml) should be green for `release/1.x` branch.
+
+### Steps for making the release
+
 1. Create release pull request with release notes and updated versions.
 
    1. Compile release notes detailing features added since the last release and
