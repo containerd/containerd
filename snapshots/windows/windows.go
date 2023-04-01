@@ -333,15 +333,19 @@ func (s *snapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
 	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
 	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
 
-	var mounts []mount.Mount
-	mounts = append(mounts, mount.Mount{
-		Source: source,
-		Type:   mountType,
-		Options: []string{
-			roFlag,
-			parentLayersOption,
+	options := []string{
+		roFlag,
+	}
+	if mountType != "bind" {
+		options = append(options, parentLayersOption)
+	}
+	mounts := []mount.Mount{
+		{
+			Source:  source,
+			Type:    mountType,
+			Options: options,
 		},
-	})
+	}
 
 	return mounts
 }
