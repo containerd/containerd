@@ -38,18 +38,19 @@ var (
 	ErrNotImplementOnWindows = errors.New("not implemented under windows")
 )
 
-// Mount to the provided target.
-func (m *Mount) mount(target string) (retErr error) {
-	readOnly := false
+func (m *Mount) ReadOnly() bool {
 	for _, option := range m.Options {
 		if option == "ro" {
-			readOnly = true
-			break
+			return true
 		}
 	}
+	return false
+}
 
+// Mount to the provided target.
+func (m *Mount) mount(target string) (retErr error) {
 	if m.Type == "bind" {
-		if err := bindfilter.ApplyFileBinding(target, m.Source, readOnly); err != nil {
+		if err := bindfilter.ApplyFileBinding(target, m.Source, m.ReadOnly()); err != nil {
 			return fmt.Errorf("failed to bind-mount to %s: %w", target, err)
 		}
 		return nil
@@ -98,7 +99,7 @@ func (m *Mount) mount(target string) (retErr error) {
 		return fmt.Errorf("failed to get volume path for layer %s: %w", m.Source, err)
 	}
 
-	if err := bindfilter.ApplyFileBinding(target, volume, readOnly); err != nil {
+	if err := bindfilter.ApplyFileBinding(target, volume, m.ReadOnly()); err != nil {
 		return fmt.Errorf("failed to set volume mount path for layer %s: %w", m.Source, err)
 	}
 	defer func() {
