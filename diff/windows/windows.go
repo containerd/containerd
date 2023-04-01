@@ -335,15 +335,7 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 		return "", nil, err
 	}
 
-	isView := false
-	for _, o := range mnt.Options {
-		if o == "ro" {
-			isView = true
-			break
-		}
-	}
-
-	if isView {
+	if mnt.ReadOnly() {
 		if mnt.Type == "bind" && len(parentLayerPaths) != 0 {
 			return "", nil, fmt.Errorf("unexpected bind-mount View with parents: %w", errdefs.ErrInvalidArgument)
 		} else if mnt.Type == "bind" {
