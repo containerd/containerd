@@ -99,6 +99,14 @@ func (m *Mount) mount(target string) (retErr error) {
 		return fmt.Errorf("failed to get volume path for layer %s: %w", m.Source, err)
 	}
 
+	if len(parentLayerPaths) == 0 {
+		// this is a base layer. It gets mounted without going through WCIFS. We need to mount the Files
+		// folder, not the actual source, or the client may inadvertently remove metadata files.
+		volume = filepath.Join(volume, "Files")
+		if _, err := os.Stat(volume); err != nil {
+			return fmt.Errorf("no Files folder in layer %s", layerID)
+		}
+	}
 	if err := bindfilter.ApplyFileBinding(target, volume, m.ReadOnly()); err != nil {
 		return fmt.Errorf("failed to set volume mount path for layer %s: %w", m.Source, err)
 	}
