@@ -319,16 +319,6 @@ func (s *snapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
 
 	mountType := "windows-layer"
 
-	if len(sn.ParentIDs) == 0 {
-		// A mount of a parentless snapshot is a bind-mount.
-		mountType = "bind"
-		// If not being extracted into, then the bind-target is the
-		// "Files" subdirectory.
-		if !strings.Contains(key, snapshots.UnpackKeyPrefix) {
-			source = filepath.Join(source, "Files")
-		}
-	}
-
 	// error is not checked here, as a string array will never fail to Marshal
 	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
 	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
@@ -336,7 +326,7 @@ func (s *snapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
 	options := []string{
 		roFlag,
 	}
-	if mountType != "bind" {
+	if len(sn.ParentIDs) != 0 {
 		options = append(options, parentLayersOption)
 	}
 	mounts := []mount.Mount{
