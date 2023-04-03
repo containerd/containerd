@@ -321,12 +321,10 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 	}
 	mnt := mounts[0]
 
-	if mnt.Type != "windows-layer" && mnt.Type != "bind" {
+	if mnt.Type != "windows-layer" {
 		// This is a special case error. When this is received the diff service
 		// will attempt the next differ in the chain which for Windows is the
 		// lcow differ that we want.
-		// TODO: Is there any situation where we actually wanted a "bind" mount to
-		// fall through to the lcow differ?
 		return "", nil, fmt.Errorf("windowsDiff does not support layer type %s: %w", mnt.Type, errdefs.ErrNotImplemented)
 	}
 
@@ -336,21 +334,16 @@ func mountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
 	}
 
 	if mnt.ReadOnly() {
-		if mnt.Type == "bind" && len(parentLayerPaths) != 0 {
-			return "", nil, fmt.Errorf("unexpected bind-mount View with parents: %w", errdefs.ErrInvalidArgument)
-		} else if mnt.Type == "bind" {
+		if len(parentLayerPaths) == 0 {
 			// rootfs.CreateDiff creates a new, empty View to diff against,
 			// when diffing something with no parent.
 			// This makes perfect sense for a walking Diff, but for WCOW,
 			// we have to recognise this as "diff against nothing"
 			return "", nil, nil
-		} else if len(parentLayerPaths) == 0 {
-			return "", nil, fmt.Errorf("unexpected windows-layer View with no parent: %w", errdefs.ErrInvalidArgument)
 		}
 		// Ignore the dummy sandbox.
 		return parentLayerPaths[0], parentLayerPaths[1:], nil
 	}
-
 	return mnt.Source, parentLayerPaths, nil
 }
 
@@ -367,7 +360,7 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 
 	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
 	if errdefs.IsNotImplemented(err) {
-		// Upper was a windows-layer or bind, lower is not. We can't handle that.
+		// Upper was a windows-layer, lower is not. We can't handle that.
 		return nil, fmt.Errorf("windowsDiff cannot diff a windows-layer against a non-windows-layer: %w", errdefs.ErrInvalidArgument)
 	} else if err != nil {
 		return nil, fmt.Errorf("Lower mount invalid: %w", err)
