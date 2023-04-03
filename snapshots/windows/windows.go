@@ -370,8 +370,8 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 
 		if len(newSnapshot.ParentIDs) == 0 {
-			// A parentless snapshot is just a bind-mount to a directory named
-			// "Files". When committed, there'll be some post-processing to fill in the rest
+			// A parentless snapshot a new base layer. Valid base layers must have a "Files" folder.
+			// When committed, there'll be some post-processing to fill in the rest
 			// of the metadata.
 			filesDir := filepath.Join(snDir, "Files")
 			if err := os.MkdirAll(filesDir, 0700); err != nil {

@@ -148,6 +148,14 @@ func (m *Mount) GetParentPaths() ([]string, error) {
 
 // Unmount the mount at the provided path
 func Unmount(mount string, flags int) error {
+	if _, err := os.Stat(mount); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+
+		return fmt.Errorf("failed to access mount point %s: %w", mount, err)
+	}
+
 	mount = filepath.Clean(mount)
 	adsFile := mount + ":" + sourceStreamName
 	var layerPath string
