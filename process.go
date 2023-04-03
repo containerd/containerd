@@ -82,13 +82,13 @@ func (s ExitStatus) Result() (uint32, time.Time, error) {
 }
 
 // ExitCode returns the exit code of the process.
-// This is only valid is Error() returns nil
+// This is only valid if Error() returns nil.
 func (s ExitStatus) ExitCode() uint32 {
 	return s.code
 }
 
 // ExitTime returns the exit time of the process
-// This is only valid is Error() returns nil
+// This is only valid if Error() returns nil.
 func (s ExitStatus) ExitTime() time.Time {
 	return s.exitedAt
 }
