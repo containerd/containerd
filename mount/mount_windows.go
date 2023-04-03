@@ -49,13 +49,6 @@ func (m *Mount) ReadOnly() bool {
 
 // Mount to the provided target.
 func (m *Mount) mount(target string) (retErr error) {
-	if m.Type == "bind" {
-		if err := bindfilter.ApplyFileBinding(target, m.Source, m.ReadOnly()); err != nil {
-			return fmt.Errorf("failed to bind-mount to %s: %w", target, err)
-		}
-		return nil
-	}
-
 	if m.Type != "windows-layer" {
 		return fmt.Errorf("invalid windows mount type: '%s'", m.Type)
 	}
