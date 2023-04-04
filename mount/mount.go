@@ -68,6 +68,17 @@ func UnmountMounts(mounts []Mount, target string, flags int) error {
 	return nil
 }
 
+// ReadOnly returns a boolean value indicating whether this mount has the "ro"
+// option set.
+func (m *Mount) ReadOnly() bool {
+	for _, option := range m.Options {
+		if option == "ro" {
+			return true
+		}
+	}
+	return false
+}
+
 // Mount to the provided target path.
 func (m *Mount) Mount(target string) error {
 	target, err := fs.RootPath(target, m.Target)
