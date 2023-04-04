@@ -177,6 +177,9 @@ func UnmountAll(mount string, flags int) error {
 		// This isn't an error, per the EINVAL handling in the Linux version
 		return nil
 	}
+	if _, err := os.Stat(mount); os.IsNotExist(err) {
+		return nil
+	}
 
 	return Unmount(mount, flags)
 }
