@@ -38,15 +38,6 @@ var (
 	ErrNotImplementOnWindows = errors.New("not implemented under windows")
 )
 
-func (m *Mount) ReadOnly() bool {
-	for _, option := range m.Options {
-		if option == "ro" {
-			return true
-		}
-	}
-	return false
-}
-
 // Mount to the provided target.
 func (m *Mount) mount(target string) (retErr error) {
 	if m.Type != "windows-layer" {
