@@ -322,6 +322,7 @@ jobs:
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
+          EXTRA_TESTFLAGS: "-timeout=20m"
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
