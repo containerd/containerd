@@ -877,7 +877,7 @@ func closeTwice(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsho
 
 func checkRootPermission(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Filesystem permissions are not supported on WCOW")
+		t.Skip("Filesystem permissions are not supported on Windows")
 	}
 
 	preparing, err := snapshotterPrepareMount(ctx, snapshotter, "preparing", "", work)

@@ -96,7 +96,7 @@ func checkRemoveDirectoryInLowerLayer(ctx context.Context, t *testing.T, sn snap
 // see https://github.com/docker/docker/issues/28391 overlay2
 func checkChown(ctx context.Context, t *testing.T, sn snapshots.Snapshotter, work string) {
 	if runtime.GOOS == "windows" {
-		t.Skip("Chown is not supported on WCOW")
+		t.Skip("Chown is not supported on Windows")
 	}
 	l1Init := fstest.Apply(
 		fstest.CreateDir("/opt", 0700),
