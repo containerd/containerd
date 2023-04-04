@@ -356,7 +356,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		// Create the new snapshot dir
 		snDir := s.getSnapshotDir(newSnapshot.ID)
 		if err = os.MkdirAll(snDir, 0700); err != nil {
-			return fmt.Errorf("creating snapshot dir: %w", err)
+			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
 		}
 
 		if strings.Contains(key, snapshots.UnpackKeyPrefix) {
