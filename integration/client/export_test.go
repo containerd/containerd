@@ -18,13 +18,18 @@ package client
 
 import (
 	"archive/tar"
+	"context"
+	"encoding/json"
 	"io"
 	"os"
 	"testing"
 
 	. "github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TestExport exports testImage as a tar stream
@@ -61,14 +66,103 @@ func TestExport(t *testing.T) {
 
 	// Seek to beginning of file before passing it to assertOCITar()
 	dstFile.Seek(0, 0)
-	assertOCITar(t, dstFile)
+	assertOCITar(t, dstFile, true)
 }
 
-func assertOCITar(t *testing.T, r io.Reader) {
+// TestExportDockerManifest exports testImage as a tar stream, using the
+// WithSkipDockerManifest option
+func TestExportDockerManifest(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	client, err := New(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	_, err = client.Fetch(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dstFile, err := os.CreateTemp("", "export-import-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		dstFile.Close()
+		os.Remove(dstFile.Name())
+	}()
+
+	img, err := client.ImageService().Get(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// test multi-platform export
+	err = client.Export(ctx, dstFile, archive.WithManifest(img.Target), archive.WithSkipDockerManifest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dstFile.Seek(0, 0)
+	assertOCITar(t, dstFile, false)
+
+	// reset to beginning
+	dstFile.Seek(0, 0)
+
+	// test single-platform export
+	var result ocispec.Descriptor
+	err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		switch desc.MediaType {
+		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
+			if err != nil {
+				return nil, err
+			}
+
+			var manifest ocispec.Manifest
+			if err := json.Unmarshal(p, &manifest); err != nil {
+				return nil, err
+			}
+
+			if desc.Platform == nil || platforms.Default().Match(platforms.Normalize(*desc.Platform)) {
+				result = desc
+			}
+			return nil, nil
+		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
+			if err != nil {
+				return nil, err
+			}
+
+			var idx ocispec.Index
+			if err := json.Unmarshal(p, &idx); err != nil {
+				return nil, err
+			}
+			return idx.Manifests, nil
+		}
+		return nil, nil
+	}), img.Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Export(ctx, dstFile, archive.WithManifest(result), archive.WithSkipDockerManifest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	dstFile.Seek(0, 0)
+	assertOCITar(t, dstFile, false)
+}
+
+func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 	// TODO: add more assertion
 	tr := tar.NewReader(r)
 	foundOCILayout := false
 	foundIndexJSON := false
+	foundManifestJSON := false
 	for {
 		h, err := tr.Next()
 		if err == io.EOF {
@@ -84,11 +178,19 @@ func assertOCITar(t *testing.T, r io.Reader) {
 		if h.Name == "index.json" {
 			foundIndexJSON = true
 		}
+		if h.Name == "manifest.json" {
+			foundManifestJSON = true
+		}
 	}
 	if !foundOCILayout {
 		t.Error("oci-layout not found")
 	}
 	if !foundIndexJSON {
 		t.Error("index.json not found")
+	}
+	if docker && !foundManifestJSON {
+		t.Error("manifest.json not found")
+	} else if !docker && foundManifestJSON {
+		t.Error("manifest.json found")
 	}
 }
