@@ -324,7 +324,7 @@ $ crictl info
     "rootDir": "/var/lib/containerd/io.containerd.grpc.v1.cri",
     "stateDir": "/run/containerd/io.containerd.grpc.v1.cri"
   },
-  "golang": "go1.20.2",
+  "golang": "go1.20.3",
   "lastCNILoadStatus": "OK",
   "lastCNILoadStatus.default": "OK"
 }
