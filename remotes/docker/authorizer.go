@@ -159,7 +159,7 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			// challenge information, including realm and service.
 			// and the resource scope is only different part
 			// which can be provided by each request.
-			if _, ok := a.handlers[host]; ok {
+			if h, ok := a.handlers[host]; ok && h.scheme == auth.BearerAuth {
 				return nil
 			}
 
@@ -192,7 +192,15 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 					Secret:   secret,
 				}
 
-				a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
+				// Harbor registry compatibility workaround
+				var scheme auth.AuthenticationScheme
+				if repeatedAuthenticationRequest(responses) {
+					scheme = auth.NoAuth
+				} else {
+					scheme = c.Scheme
+				}
+
+				a.handlers[host] = newAuthHandler(a.client, a.header, scheme, common)
 				return nil
 			}
 		}
@@ -243,9 +251,15 @@ func (ah *authHandler) authorize(ctx context.Context) (string, string, error) {
 		return ah.doBasicAuth(ctx)
 	case auth.BearerAuth:
 		return ah.doBearerAuth(ctx)
+	case auth.NoAuth:
+		return ah.doNoAuth(ctx)
 	default:
 		return "", "", fmt.Errorf("failed to find supported auth scheme: %s: %w", string(ah.scheme), errdefs.ErrNotImplemented)
 	}
+}
+
+func (ah *authHandler) doNoAuth(ctx context.Context) (string, string, error) {
+	return "", "", nil
 }
 
 func (ah *authHandler) doBasicAuth(ctx context.Context) (string, string, error) {
@@ -350,4 +364,33 @@ func sameRequest(r1, r2 *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func repeatedAuthenticationRequest(responses []*http.Response) bool {
+	n := len(responses)
+	// Skip detection of auth loop if last request did not fail on authentication.
+	if n > 0 && responses[n-1].StatusCode != http.StatusUnauthorized {
+		return false
+	}
+	// If both responses has the same challenge, it's the first infinite auth loop.
+	if n == 2 && sameChallengeResponse(responses[n-2], responses[n-1]) {
+		return true
+	}
+	// If the last two responses have the same challenge, but it's different from
+	// the previous responses, there could be a chance to break from this infinite
+	// auth loop by unsetting credentials from the next request.
+	//
+	// If the next request gets the same challenge as these two, assume no workaround
+	// is possible and do not modify the following requests.
+	if n > 2 && sameChallengeResponse(responses[n-2], responses[n-1]) && !sameChallengeResponse(responses[n-3], responses[n-2]) {
+		return true
+	}
+	return false
+}
+
+func sameChallengeResponse(r1, r2 *http.Response) bool {
+	if !sameRequest(r1.Request, r2.Request) {
+		return false
+	}
+	return r1.Header.Get("WWW-Authenticate") == r2.Header.Get("WWW-Authenticate")
 }

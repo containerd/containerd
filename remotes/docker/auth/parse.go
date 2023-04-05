@@ -32,6 +32,8 @@ const (
 	DigestAuth
 	// BearerAuth is scheme for OAuth 2.0 Bearer Tokens RFC 6750
 	BearerAuth
+	// NoAuth represents no authentication
+	NoAuth
 )
 
 // Challenge carries information from a WWW-Authenticate response header.
