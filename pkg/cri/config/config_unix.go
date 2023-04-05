@@ -19,14 +19,14 @@
 package config
 
 import (
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/pelletier/go-toml/v2"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
-		Snapshotter:                containerd.DefaultSnapshotter,
+		Snapshotter:                defaults.DefaultSnapshotter,
 		DisableSnapshotAnnotations: true,
 		MaxConcurrentDownloads:     3,
 		ImageDecryption: ImageDecryption{

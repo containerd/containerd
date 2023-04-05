@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/pkg/transfer"
@@ -286,7 +286,7 @@ func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []
 			// Assume sp.SnapshotterKey is not empty
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
-			} else if uc.Snapshotter == "" && sp.SnapshotterKey == containerd.DefaultSnapshotter {
+			} else if uc.Snapshotter == "" && sp.SnapshotterKey == defaults.DefaultSnapshotter {
 				return true, sp
 			}
 		}

@@ -20,13 +20,13 @@ import (
 	"os"
 	"path/filepath"
 
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
-		Snapshotter:            containerd.DefaultSnapshotter,
+		Snapshotter:            defaults.DefaultSnapshotter,
 		StatsCollectPeriod:     10,
 		MaxConcurrentDownloads: 3,
 		ImageDecryption: ImageDecryption{

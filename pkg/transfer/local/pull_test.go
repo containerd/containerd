@@ -19,7 +19,7 @@ package local
 import (
 	"testing"
 
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/unpack"
 	"github.com/containerd/containerd/v2/platforms"
@@ -45,7 +45,7 @@ func TestGetSupportedPlatform(t *testing.T) {
 		},
 		{
 			Platform:       platforms.DefaultStrict(),
-			SnapshotterKey: containerd.DefaultSnapshotter,
+			SnapshotterKey: defaults.DefaultSnapshotter,
 		},
 	}
 
@@ -116,7 +116,7 @@ func TestGetSupportedPlatform(t *testing.T) {
 			Match:              true,
 			ExpectedPlatform: transfer.UnpackConfiguration{
 				Platform:    platforms.DefaultSpec(),
-				Snapshotter: containerd.DefaultSnapshotter,
+				Snapshotter: defaults.DefaultSnapshotter,
 			},
 		},
 	} {
