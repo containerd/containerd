@@ -208,23 +208,20 @@ func MatchAllHosts(string) (bool, error) {
 // Note: this does not handle matching of ip addresses in octal,
 // decimal or hex form.
 func MatchLocalhost(host string) (bool, error) {
-	switch {
-	case host == "::1":
-		return true, nil
-	case host == "[::1]":
+	if host == "::1" || host == "[::1]" || host == "127.0.0.1" || host == "localhost" {
 		return true, nil
 	}
-	h, p, err := net.SplitHostPort(host)
 
-	// addrError helps distinguish between errors of form
-	// "no colon in address" and "too many colons in address".
-	// The former is fine as the host string need not have a
-	// port. Latter needs to be handled.
-	addrError := &net.AddrError{
-		Err:  "missing port in address",
-		Addr: host,
-	}
+	h, p, err := net.SplitHostPort(host)
 	if err != nil {
+		// addrError helps distinguish between errors of form
+		// "no colon in address" and "too many colons in address".
+		// The former is fine as the host string need not have a
+		// port. Latter needs to be handled.
+		addrError := &net.AddrError{
+			Err:  "missing port in address",
+			Addr: host,
+		}
 		if err.Error() != addrError.Error() {
 			return false, err
 		}
@@ -234,11 +231,9 @@ func MatchLocalhost(host string) (bool, error) {
 		return false, errors.New("invalid host name format")
 	}
 
-	// use ipv4 dotted decimal for further checking
-	if h == "localhost" {
-		h = "127.0.0.1"
+	if h == "127.0.0.1" || h == "localhost" {
+		return true, nil
 	}
-	ip := net.ParseIP(h)
 
-	return ip.IsLoopback(), nil
+	return net.ParseIP(h).IsLoopback(), nil
 }
