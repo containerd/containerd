@@ -40,6 +40,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
@@ -476,7 +477,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 	containerdRootDir := filepath.Join(tmpDir, "root")
 
 	cfg := criconfig.ImageConfig{
-		Snapshotter:              containerd.DefaultSnapshotter,
+		Snapshotter:              defaults.DefaultSnapshotter,
 		Registry:                 registryCfg,
 		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
 		StatsCollectPeriod:       10,
@@ -484,7 +485,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 
 	return images.NewService(cfg, &images.CRIImageServiceOptions{
 		ImageFSPaths: map[string]string{
-			containerd.DefaultSnapshotter: containerdRootDir,
+			defaults.DefaultSnapshotter: containerdRootDir,
 		},
 		RuntimePlatforms: map[string]images.ImagePlatform{},
 		Content:          client.ContentStore(),

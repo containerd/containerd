@@ -129,7 +129,7 @@ func TestMain(m *testing.M) {
 		"snapshotter": os.Getenv("TEST_SNAPSHOTTER"),
 	}).Info("running tests against containerd")
 
-	snapshotter := DefaultSnapshotter
+	snapshotter := defaults.DefaultSnapshotter
 	if ss := os.Getenv("TEST_SNAPSHOTTER"); ss != "" {
 		snapshotter = ss
 	}

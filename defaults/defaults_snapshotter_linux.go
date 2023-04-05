@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package client
+package defaults
 
 const (
 	// DefaultSnapshotter will set the default snapshotter for the platform.

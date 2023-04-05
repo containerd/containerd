@@ -626,7 +626,7 @@ func (c *Client) ContentStore() content.Store {
 func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	snapshotterName, err := c.resolveSnapshotterName(context.Background(), snapshotterName)
 	if err != nil {
-		snapshotterName = DefaultSnapshotter
+		snapshotterName = defaults.DefaultSnapshotter
 	}
 	if c.snapshotters != nil {
 		return c.snapshotters[snapshotterName]
@@ -801,7 +801,7 @@ func (c *Client) resolveSnapshotterName(ctx context.Context, name string) (strin
 		if label != "" {
 			name = label
 		} else {
-			name = DefaultSnapshotter
+			name = defaults.DefaultSnapshotter
 		}
 	}
 

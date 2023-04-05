@@ -19,7 +19,7 @@ package transfer
 import (
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/leases"
@@ -172,7 +172,7 @@ func defaultConfig() *transferConfig {
 		UnpackConfiguration: []unpackConfiguration{
 			{
 				Platform:    platforms.Format(platforms.DefaultSpec()),
-				Snapshotter: containerd.DefaultSnapshotter,
+				Snapshotter: defaults.DefaultSnapshotter,
 			},
 		},
 	}
