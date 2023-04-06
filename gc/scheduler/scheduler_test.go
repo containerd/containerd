@@ -148,10 +148,11 @@ func TestTrigger(t *testing.T) {
 
 func TestStartupDelay(t *testing.T) {
 	var (
-		cfg = &config{
+		startupDelay = time.Millisecond * 20
+		cfg          = &config{
 			// Prevent GC from scheduling again before check
 			PauseThreshold: 0.001,
-			StartupDelay:   duration(time.Millisecond),
+			StartupDelay:   duration(startupDelay),
 		}
 		tc = &testCollector{
 			d: time.Second,
@@ -160,13 +161,23 @@ func TestStartupDelay(t *testing.T) {
 		scheduler   = newScheduler(tc, cfg)
 	)
 	defer cancel()
-	go scheduler.run(ctx)
 
-	time.Sleep(time.Millisecond * 30)
+	t1 := time.Now()
+	go scheduler.run(ctx)
+	_, err := scheduler.wait(ctx, false)
+	if err != nil {
+		t.Fatalf("gc failed with error: %s", err)
+	}
+	d := time.Since(t1)
 
 	if c := tc.runCount(); c != 1 {
 		t.Fatalf("unexpected gc run count %d, expected 1", c)
 	}
+
+	if d < startupDelay {
+		t.Fatalf("expected startup delay to be longer than %s, actual %s", startupDelay, d)
+	}
+
 }
 
 type testCollector struct {
