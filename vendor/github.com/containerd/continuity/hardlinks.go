@@ -21,9 +21,7 @@ import (
 	"os"
 )
 
-var (
-	errNotAHardLink = fmt.Errorf("invalid hardlink")
-)
+var errNotAHardLink = fmt.Errorf("invalid hardlink")
 
 type hardlinkManager struct {
 	hardlinks map[hardlinkKey][]Resource

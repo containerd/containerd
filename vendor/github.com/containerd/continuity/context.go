@@ -18,6 +18,7 @@ package continuity
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -151,7 +152,7 @@ func (c *context) Resource(p string, fi os.FileInfo) (Resource, error) {
 	}
 
 	base.xattrs, err = c.resolveXAttrs(fp, fi, base)
-	if err != nil && err != ErrNotSupported {
+	if err != nil && !errors.Is(err, ErrNotSupported) {
 		return nil, err
 	}
 
@@ -410,7 +411,7 @@ func (c *context) Apply(resource Resource) error {
 		return fmt.Errorf("resource %v escapes root", resource)
 	}
 
-	var chmod = true
+	chmod := true
 	fi, err := c.driver.Lstat(fp)
 	if err != nil {
 		if !os.IsNotExist(err) {

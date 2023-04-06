@@ -129,7 +129,6 @@ func compareResource(r1, r2 continuity.Resource) bool {
 	// TODO(dmcgowan): Check if is XAttrer
 
 	return compareResourceTypes(r1, r2)
-
 }
 
 func compareResourceTypes(r1, r2 continuity.Resource) bool {
