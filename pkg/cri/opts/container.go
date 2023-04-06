@@ -97,6 +97,12 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		}()
 
 		for host, volume := range volumeMounts {
+			// On Windows, volumes may be defined as different drive letters than C:. For non-C: volumes
+			// we need to skip trying to copy existing contents, as an image can only hold files
+			// destined for volumes hosted on drive C:.
+			if len(volume) >= 2 && string(volume[1]) == ":" && !strings.EqualFold(string(volume[0]), "c") {
+				continue
+			}
 			// The volume may have been defined with a C: prefix, which we can't use here.
 			volume = strings.TrimPrefix(volume, "C:")
 			src, err := fs.RootPath(root, volume)
