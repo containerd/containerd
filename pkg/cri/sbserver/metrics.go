@@ -42,13 +42,18 @@ var (
 
 	imagePulls           metrics.LabeledCounter
 	inProgressImagePulls metrics.Gauge
-	//  pull duration / (image size / 1MBi)
+	// image size in MB / image pull duration in seconds
 	imagePullThroughput prom.Histogram
 )
 
 func init() {
+	const (
+		namespace = "containerd"
+		subsystem = "cri_sandboxed"
+	)
+
 	// these CRI metrics record latencies for successful operations around a sandbox and container's lifecycle.
-	ns := metrics.NewNamespace("containerd", "cri_sandboxed", nil)
+	ns := metrics.NewNamespace(namespace, subsystem, nil)
 
 	sandboxListTimer = ns.NewTimer("sandbox_list", "time to list sandboxes")
 	sandboxCreateNetworkTimer = ns.NewTimer("sandbox_create_network", "time to create the network for a sandbox")
@@ -72,12 +77,14 @@ func init() {
 	inProgressImagePulls = ns.NewGauge("in_progress_image_pulls", "in progress pulls", metrics.Total)
 	imagePullThroughput = prom.NewHistogram(
 		prom.HistogramOpts{
-			Name:    "image_pulling_throughput",
-			Help:    "image pull throughput",
-			Buckets: prom.DefBuckets,
+			Namespace: namespace,
+			Subsystem: subsystem,
+			Name:      "image_pulling_throughput",
+			Help:      "image pull throughput",
+			Buckets:   prom.DefBuckets,
 		},
 	)
-
+	ns.Add(imagePullThroughput)
 	metrics.Register(ns)
 }
 
