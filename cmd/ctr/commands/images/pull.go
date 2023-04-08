@@ -67,6 +67,10 @@ command. As part of this process, we do the following:
 			Usage: "Pull metadata for all platforms",
 		},
 		cli.BoolFlag{
+			Name:  "no-unpack",
+			Usage: "Skip unpacking the images",
+		},
+		cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
@@ -180,24 +184,26 @@ command. As part of this process, we do the following:
 			p = append(p, platforms.DefaultSpec())
 		}
 
-		start := time.Now()
-		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
-			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
-			if err != nil {
-				return err
-			}
-			if context.Bool("print-chainid") {
-				diffIDs, err := i.RootFS(ctx)
+		if !context.Bool("no-unpack") {
+			start := time.Now()
+			for _, platform := range p {
+				fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+				i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
+				err = i.Unpack(ctx, context.String("snapshotter"))
 				if err != nil {
 					return err
 				}
-				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
+				if context.Bool("print-chainid") {
+					diffIDs, err := i.RootFS(ctx)
+					if err != nil {
+						return err
+					}
+					chainID := identity.ChainID(diffIDs).String()
+					fmt.Printf("image chain ID: %s\n", chainID)
+				}
 			}
+			fmt.Printf("done: %s\t\n", time.Since(start))
 		}
-		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
 	},
 }
