@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -42,12 +43,32 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
+	var (
+		createdAt time.Time
+		state     string
+		info      map[string]string
+	)
 	cstatus, err := controller.Status(ctx, sandbox.ID, r.GetVerbose())
 	if err != nil {
-		return nil, fmt.Errorf("failed to query controller status: %w", err)
+		// If the shim died unexpectedly (segfault etc.) let's set the state as
+		// NOTREADY and not just error out to make k8s and clients like crictl
+		// happy. If we get back ErrNotFound from controller.Status above while
+		// we're using the shim-mode controller, this is a decent indicator it
+		// exited unexpectedly. We can use the fact that we successfully retrieved
+		// the sandbox object from the store above to tell that this is true, otherwise
+		// if we followed the normal k8s convention of StopPodSandbox -> RemovePodSandbox,
+		// we wouldn't have that object in the store anymore.
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to query controller status: %w", err)
+		}
+		state = runtime.PodSandboxState_SANDBOX_NOTREADY.String()
+	} else {
+		state = cstatus.State
+		createdAt = cstatus.CreatedAt
+		info = cstatus.Info
 	}
 
-	status := toCRISandboxStatus(sandbox.Metadata, cstatus.State, cstatus.CreatedAt, ip, additionalIPs)
+	status := toCRISandboxStatus(sandbox.Metadata, state, createdAt, ip, additionalIPs)
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
 		sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandbox.ID)
@@ -59,7 +80,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 
 	return &runtime.PodSandboxStatusResponse{
 		Status: status,
-		Info:   cstatus.Info,
+		Info:   info,
 	}, nil
 }
 
