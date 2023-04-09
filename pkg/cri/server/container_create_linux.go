@@ -366,12 +366,13 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, oci.WithUser(userstr))
 	}
 
+	userstr = "0" // runtime default
 	if securityContext.GetRunAsUsername() != "" {
 		userstr = securityContext.GetRunAsUsername()
-	} else {
-		// Even if RunAsUser is not set, we still call `GetValue` to get uid 0.
-		// Because it is still useful to get additional gids for uid 0.
+	} else if securityContext.GetRunAsUser() != nil {
 		userstr = strconv.FormatInt(securityContext.GetRunAsUser().GetValue(), 10)
+	} else if imageConfig.User != "" {
+		userstr, _, _ = strings.Cut(imageConfig.User, ":")
 	}
 	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr),
 		customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
