@@ -1388,6 +1388,7 @@ additional-group-for-root:x:22222:root
 			expected: runtimespec.User{UID: 0, GID: 0, AdditionalGids: []uint32{0, 22222}},
 		},
 	} {
+		desc := desc
 		t.Run(desc, func(t *testing.T) {
 			containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 			containerConfig.Linux.SecurityContext = test.securityContext
