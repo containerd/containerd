@@ -1346,11 +1346,7 @@ alice:x:1000:
 additional-group-for-alice:x:11111:alice
 additional-group-for-root:x:22222:root
 `
-	tempRootDir, err := os.MkdirTemp("", "TestContainerUser-")
-	require.NoError(t, err)
-	if tempRootDir != "" {
-		defer os.RemoveAll(tempRootDir)
-	}
+	tempRootDir := t.TempDir()
 	require.NoError(t,
 		os.MkdirAll(filepath.Join(tempRootDir, "etc"), 0755),
 	)
