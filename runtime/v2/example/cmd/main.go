@@ -19,11 +19,14 @@
 package main
 
 import (
-	"github.com/containerd/containerd/runtime/v2/example"
+	"context"
+
+	_ "github.com/containerd/containerd/runtime/v2/example"
+	"github.com/containerd/containerd/runtime/v2/runc/manager"
 	"github.com/containerd/containerd/runtime/v2/shim"
 )
 
 func main() {
 	// init and execute the shim
-	shim.Run("io.containerd.example.v1", example.New)
+	shim.Run(context.Background(), manager.NewShimManager("io.containerd.example.v1"))
 }
