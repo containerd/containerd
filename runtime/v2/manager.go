@@ -300,14 +300,14 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 
 	// Check if relative path to runtime binary provided
 	if strings.Contains(runtime, "/") {
-		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v1` or a full path to the binary", runtime)
+		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v2` or a full path to the binary", runtime)
 	}
 
 	// Preserve existing logic and resolve runtime path from runtime name.
 
 	name := shimbinary.BinaryName(runtime)
 	if name == "" {
-		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v1` or a full path to the binary", runtime)
+		return "", fmt.Errorf("invalid runtime name %s, correct runtime name should be either format like `io.containerd.runc.v2` or a full path to the binary", runtime)
 	}
 
 	if path, ok := m.runtimePaths.Load(name); ok {
