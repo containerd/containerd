@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256" // required by go-digest
-	"fmt"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -42,7 +42,7 @@ func TestCopy(t *testing.T) {
 	cf1 := func(buf *bytes.Buffer, st Status) commitFunction {
 		i := 0
 		return func() error {
-			// function resets the first time
+			// function resets the first time, but then succeeds after
 			if i == 0 {
 				// this is the case where, the pipewriter to which the data was being written has
 				// changed. which means we need to clear the buffer
@@ -55,11 +55,28 @@ func TestCopy(t *testing.T) {
 		}
 	}
 
+	cf2err := errors.New("commit failed")
 	cf2 := func(buf *bytes.Buffer, st Status) commitFunction {
 		i := 0
 		return func() error {
-			// function resets for more than the maxReset value
-			if i < maxResets+1 {
+			// function resets a lot of times, and eventually fails
+			if i < 10 {
+				// this is the case where, the pipewriter to which the data was being written has
+				// changed. which means we need to clear the buffer
+				i++
+				buf.Reset()
+				st.Offset = 0
+				return ErrReset
+			}
+			return cf2err
+		}
+	}
+
+	cf3 := func(buf *bytes.Buffer, st Status) commitFunction {
+		i := 0
+		return func() error {
+			// function resets a lot of times, and eventually succeeds
+			if i < 10 {
 				// this is the case where, the pipewriter to which the data was being written has
 				// changed. which means we need to clear the buffer
 				i++
@@ -73,8 +90,10 @@ func TestCopy(t *testing.T) {
 
 	s1 := Status{}
 	s2 := Status{}
+	s3 := Status{}
 	b1 := bytes.Buffer{}
 	b2 := bytes.Buffer{}
+	b3 := bytes.Buffer{}
 
 	var testcases = []struct {
 		name        string
@@ -130,7 +149,7 @@ func TestCopy(t *testing.T) {
 			expected: "content to copy",
 		},
 		{
-			name:   "write fails more than maxReset times due to reset",
+			name:   "write fails after lots of resets",
 			source: newCopySource("content to copy"),
 			writer: fakeWriter{
 				Buffer:     &b2,
@@ -138,7 +157,17 @@ func TestCopy(t *testing.T) {
 				commitFunc: cf2(&b2, s2),
 			},
 			expected:    "",
-			expectedErr: fmt.Errorf("failed to copy after %d retries", maxResets),
+			expectedErr: cf2err,
+		},
+		{
+			name:   "write succeeds after lots of resets",
+			source: newCopySource("content to copy"),
+			writer: fakeWriter{
+				Buffer:     &b3,
+				status:     s3,
+				commitFunc: cf3(&b3, s3),
+			},
+			expected: "content to copy",
 		},
 	}
 
@@ -153,7 +182,7 @@ func TestCopy(t *testing.T) {
 
 			// if an error is expected then further comparisons are not required
 			if testcase.expectedErr != nil {
-				assert.Equal(t, testcase.expectedErr, err)
+				assert.ErrorIs(t, err, testcase.expectedErr)
 				return
 			}
 
