@@ -9,18 +9,18 @@ Users specify the runtime they wish to use when creating a container.
 The runtime can also be changed via a container update.
 
 ```bash
-> ctr run --runtime io.containerd.runc.v1
+> ctr run --runtime io.containerd.runc.v2
 ```
 
-When a user specifies a runtime name, `io.containerd.runc.v1`, they will specify the name and version of the runtime.
+When a user specifies a runtime name, `io.containerd.runc.v2`, they will specify the name and version of the runtime.
 This will be translated by containerd into a binary name for the shim.
 
-`io.containerd.runc.v1` -> `containerd-shim-runc-v1`
+`io.containerd.runc.v2` -> `containerd-shim-runc-v2`
 
 Since 1.6 release, it's also possible to specify absolute runtime path:
 
 ```bash
-> ctr run --runtime /usr/local/bin/containerd-shim-runc-v1
+> ctr run --runtime /usr/local/bin/containerd-shim-runc-v2
 ```
 
 containerd keeps the `containerd-shim-*` prefix so that users can `ps aux | grep containerd-shim` to see running shims on their system.
@@ -218,7 +218,7 @@ sequenceDiagram
 
     %% Start shim
     containerd-->shim: Prepare bundle
-    containerd->>shim: Execute binary: containerd-shim-runc-v1 start
+    containerd->>shim: Execute binary: containerd-shim-runc-v2 start
     shim->shim: Start TTRPC server
     shim-->>containerd: Respond with address: unix://containerd/container.sock
 
@@ -276,7 +276,7 @@ sequenceDiagram
     shim-->>containerd: OK
 
     containerd-->shim: Close client
-    containerd->>shim: Execute binary: containerd-shim-runc-v1 delete
+    containerd->>shim: Execute binary: containerd-shim-runc-v2 delete
     containerd-->shim: Delete bundle
 
     containerd-->>ctr: Exit code
