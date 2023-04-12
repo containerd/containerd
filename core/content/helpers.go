@@ -31,9 +31,6 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// maxResets is the no.of times the Copy() method can tolerate a reset of the body
-const maxResets = 5
-
 var ErrReset = errors.New("writer has been reset")
 
 var bufPool = sync.Pool{
@@ -149,7 +146,7 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 // Copy is buffered, so no need to wrap reader in buffered io.
 func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected digest.Digest, opts ...Opt) error {
 	r := or
-	for i := 0; i < maxResets; i++ {
+	for i := 0; ; i++ {
 		if i >= 1 {
 			log.G(ctx).WithField("digest", expected).Debugf("retrying copy due to reset")
 		}
@@ -189,9 +186,6 @@ func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected dig
 		}
 		return nil
 	}
-
-	log.G(ctx).WithField("digest", expected).Errorf("failed to copy after %d retries", maxResets)
-	return fmt.Errorf("failed to copy after %d retries", maxResets)
 }
 
 // CopyReaderAt copies to a writer from a given reader at for the given
