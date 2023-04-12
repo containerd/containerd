@@ -34,11 +34,13 @@ import (
 	"time"
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
+	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/content/local"
 	csproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
+	diffproxy "github.com/containerd/containerd/diff/proxy"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/dialer"
@@ -425,6 +427,11 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			t = plugin.ContentPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
 				return csproxy.NewContentStore(csapi.NewContentClient(conn))
+			}
+		case string(plugin.DiffPlugin), "diff":
+			t = plugin.DiffPlugin
+			f = func(conn *grpc.ClientConn) interface{} {
+				return diffproxy.NewDiffApplier(diffapi.NewDiffClient(conn))
 			}
 		default:
 			log.G(ctx).WithField("type", pp.Type).Warn("unknown proxy plugin type")
