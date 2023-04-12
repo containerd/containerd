@@ -280,7 +280,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	req.body = func() (io.ReadCloser, error) {
 		pr, pw := io.Pipe()
 		pushw.setPipe(pw)
-		return io.NopCloser(pr), nil
+		return pr, nil
 	}
 	req.size = desc.Size
 
