@@ -41,13 +41,14 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: "1.20.3"
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "1.20.3"
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - name: Set env
         shell: bash

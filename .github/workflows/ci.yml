@@ -34,11 +34,11 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2019]
 
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.51.1
@@ -55,14 +55,15 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - uses: containerd/project-checks@v1.1.0
         with:
@@ -88,13 +89,14 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - name: Set env
         shell: bash
@@ -120,10 +122,10 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -153,10 +155,10 @@ jobs:
             goarm: "7"
 
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
       - run: |
           set -e -x
 
@@ -209,11 +211,11 @@ jobs:
         os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.3", "1.19.8"]
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go-version }}
-
-      - uses: actions/checkout@v3
 
       - name: Make
         run: |
@@ -243,13 +245,14 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - uses: actions/checkout@v3
         with:
@@ -398,11 +401,11 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
+      - uses: actions/checkout@v3
+
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-
-      - uses: actions/checkout@v3
 
       - name: Install containerd dependencies
         env:
@@ -522,10 +525,10 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests

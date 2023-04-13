@@ -23,13 +23,14 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - name: Set env
         shell: bash
@@ -156,13 +157,14 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v3
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: src/github.com/containerd/containerd
 
       - name: Set env
         shell: bash
