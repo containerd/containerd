@@ -288,7 +288,6 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		resp, err := req.doWithRetries(ctx, nil)
 		if err != nil {
 			pushw.setError(err)
-			pushw.Close()
 			return
 		}
 
@@ -298,7 +297,6 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
 			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
 			pushw.setError(err)
-			pushw.Close()
 		}
 		pushw.setResponse(resp)
 	}()
@@ -431,6 +429,7 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		select {
 		case <-pw.done:
 		case err = <-pw.errC:
+			pw.Close()
 		case p := <-pw.pipeC:
 			return 0, pw.replacePipe(p)
 		}
@@ -488,6 +487,7 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 	case <-pw.done:
 		return io.ErrClosedPipe
 	case err := <-pw.errC:
+		pw.Close()
 		return err
 	case resp = <-pw.respC:
 		defer resp.Body.Close()
