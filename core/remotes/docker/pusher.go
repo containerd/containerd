@@ -420,9 +420,22 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 		// if the pipe is closed, we might have the original error on the error
 		// channel - so we should try and get it
 		select {
-		case err2 := <-pw.errC:
-			err = err2
-		default:
+		case <-pw.done:
+		case err = <-pw.errC:
+		case p := <-pw.pipeC:
+			pw.pipe.CloseWithError(content.ErrReset)
+			pw.pipe = p
+
+			// If content has already been written, the bytes
+			// cannot be written again and the caller must reset
+			status, err := pw.tracker.GetStatus(pw.ref)
+			if err != nil {
+				return 0, err
+			}
+			status.Offset = 0
+			status.UpdatedAt = time.Now()
+			pw.tracker.SetStatus(pw.ref, status)
+			return 0, content.ErrReset
 		}
 	}
 	status.Offset += int64(n)
