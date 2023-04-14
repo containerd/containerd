@@ -470,13 +470,12 @@ func (c *Container) Checkpoint(ctx context.Context, r *task.CheckpointTaskReques
 	if err != nil {
 		return err
 	}
-	var opts *options.CheckpointOptions
+
+	var opts options.CheckpointOptions
 	if r.Options != nil {
-		v, err := typeurl.UnmarshalAny(r.Options)
-		if err != nil {
+		if err := typeurl.UnmarshalTo(r.Options, &opts); err != nil {
 			return err
 		}
-		opts = v.(*options.CheckpointOptions)
 	}
 	return p.(*process.Init).Checkpoint(ctx, &process.CheckpointConfig{
 		Path:                     r.Path,
