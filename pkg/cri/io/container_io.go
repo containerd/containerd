@@ -108,7 +108,7 @@ func (c *ContainerIO) Pipe() {
 	if c.stdout != nil {
 		wg.Add(1)
 		go func() {
-			if _, err := io.Copy(c.stdoutGroup, c.stdout); err != nil {
+			if _, err := cio.Copy(c.stdoutGroup, c.stdout); err != nil {
 				logrus.WithError(err).Errorf("Failed to pipe stdout of container %q", c.id)
 			}
 			c.stdout.Close()
@@ -121,7 +121,7 @@ func (c *ContainerIO) Pipe() {
 	if !c.fifos.Terminal && c.stderr != nil {
 		wg.Add(1)
 		go func() {
-			if _, err := io.Copy(c.stderrGroup, c.stderr); err != nil {
+			if _, err := cio.Copy(c.stderrGroup, c.stderr); err != nil {
 				logrus.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
 			}
 			c.stderr.Close()
@@ -144,12 +144,12 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 	var stdinStreamRC io.ReadCloser
 	if c.stdin != nil && opts.Stdin != nil {
 		// Create a wrapper of stdin which could be closed. Note that the
-		// wrapper doesn't close the actual stdin, it only stops io.Copy.
+		// wrapper doesn't close the actual stdin, it only stops Copy.
 		// The actual stdin will be closed by stream server.
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		wg.Add(1)
 		go func() {
-			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
+			if _, err := cio.Copy(c.stdin, stdinStreamRC); err != nil {
 				logrus.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
 			logrus.Infof("Attach stream %q closed", stdinKey)

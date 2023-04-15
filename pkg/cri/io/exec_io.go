@@ -67,7 +67,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 		stdinStreamRC = cioutil.NewWrapReadCloser(opts.Stdin)
 		wg.Add(1)
 		go func() {
-			if _, err := io.Copy(e.stdin, stdinStreamRC); err != nil {
+			if _, err := cio.Copy(e.stdin, stdinStreamRC); err != nil {
 				logrus.WithError(err).Errorf("Failed to redirect stdin for container exec %q", e.id)
 			}
 			logrus.Infof("Container exec %q stdin closed", e.id)
@@ -89,7 +89,7 @@ func (e *ExecIO) Attach(opts AttachOptions) <-chan struct{} {
 	}
 
 	attachOutput := func(t StreamType, stream io.WriteCloser, out io.ReadCloser) {
-		if _, err := io.Copy(stream, out); err != nil {
+		if _, err := cio.Copy(stream, out); err != nil {
 			logrus.WithError(err).Errorf("Failed to pipe %q for container exec %q", t, e.id)
 		}
 		out.Close()
