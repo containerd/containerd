@@ -29,18 +29,21 @@ func TestInitSelinuxOpts(t *testing.T) {
 		t.Skip("selinux is not enabled")
 	}
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc         string
 		selinuxOpt   *runtime.SELinuxOption
 		processLabel string
 		mountLabel   string
 		expectErr    bool
 	}{
-		"Should return empty strings for processLabel and mountLabel when selinuxOpt is nil": {
+		{
+			desc:         "Should return empty strings for processLabel and mountLabel when selinuxOpt is nil",
 			selinuxOpt:   nil,
 			processLabel: ".*:c[0-9]{1,3},c[0-9]{1,3}",
 			mountLabel:   ".*:c[0-9]{1,3},c[0-9]{1,3}",
 		},
-		"Should overlay fields on processLabel when selinuxOpt has been initialized partially": {
+		{
+			desc: "Should overlay fields on processLabel when selinuxOpt has been initialized partially",
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "",
 				Role:  "user_r",
@@ -50,7 +53,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 			processLabel: "system_u:user_r:(container_file_t|svirt_lxc_net_t):s0:c1,c2",
 			mountLabel:   "system_u:object_r:(container_file_t|svirt_sandbox_file_t):s0:c1,c2",
 		},
-		"Should be resolved correctly when selinuxOpt has been initialized completely": {
+		{
+			desc: "Should be resolved correctly when selinuxOpt has been initialized completely",
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "user_u",
 				Role:  "user_r",
@@ -60,7 +64,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 			processLabel: "user_u:user_r:user_t:s0:c1,c2",
 			mountLabel:   "user_u:object_r:(container_file_t|svirt_sandbox_file_t):s0:c1,c2",
 		},
-		"Should be resolved correctly when selinuxOpt has been initialized with level=''": {
+		{
+			desc: "Should be resolved correctly when selinuxOpt has been initialized with level=''",
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "user_u",
 				Role:  "user_r",
@@ -70,7 +75,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 			processLabel: "user_u:user_r:user_t:s0:c[0-9]{1,3},c[0-9]{1,3}",
 			mountLabel:   "user_u:object_r:(container_file_t|svirt_sandbox_file_t):s0",
 		},
-		"Should return error when the format of 'level' is not correct": {
+		{
+			desc: "Should return error when the format of 'level' is not correct",
 			selinuxOpt: &runtime.SELinuxOption{
 				User:  "user_u",
 				Role:  "user_r",
@@ -80,7 +86,8 @@ func TestInitSelinuxOpts(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			processLabel, mountLabel, err := initLabelsFromOpt(test.selinuxOpt)
 			if test.expectErr {
 				assert.Error(t, err)
@@ -93,59 +100,75 @@ func TestInitSelinuxOpts(t *testing.T) {
 }
 
 func TestCheckSelinuxLevel(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc          string
 		level         string
 		expectNoMatch bool
 	}{
-		"s0": {
+		{
+			desc:  "s0",
 			level: "s0",
 		},
-		"s0-s0": {
+		{
+			desc:  "s0-s0",
 			level: "s0-s0",
 		},
-		"s0:c0": {
+		{
+			desc:  "s0:c0",
 			level: "s0:c0",
 		},
-		"s0:c0.c3": {
+		{
+			desc:  "s0:c0.c3",
 			level: "s0:c0.c3",
 		},
-		"s0:c0,c3": {
+		{
+			desc:  "s0:c0,c3",
 			level: "s0:c0,c3",
 		},
-		"s0-s0:c0,c3": {
+		{
+			desc:  "s0-s0:c0,c3",
 			level: "s0-s0:c0,c3",
 		},
-		"s0-s0:c0,c3.c6": {
+		{
+			desc:  "s0-s0:c0,c3.c6",
 			level: "s0-s0:c0,c3.c6",
 		},
-		"s0-s0:c0,c3.c6,c8.c10": {
+		{
+			desc:  "s0-s0:c0,c3.c6,c8.c10",
 			level: "s0-s0:c0,c3.c6,c8.c10",
 		},
-		"s0-s0:c0,c3.c6,c8,c10": {
+		{
+			desc:  "s0-s0:c0,c3.c6,c8,c10",
 			level: "s0-s0:c0,c3.c6",
 		},
-		"s0,c0,c3": {
+		{
+			desc:          "s0,c0,c3",
 			level:         "s0,c0,c3",
 			expectNoMatch: true,
 		},
-		"s0:c0.c3.c6": {
+		{
+			desc:          "s0:c0.c3.c6",
 			level:         "s0:c0.c3.c6",
 			expectNoMatch: true,
 		},
-		"s0-s0,c0,c3": {
+		{
+			desc:          "s0-s0,c0,c3",
 			level:         "s0-s0,c0,c3",
 			expectNoMatch: true,
 		},
-		"s0-s0:c0.c3.c6": {
+		{
+			desc:          "s0-s0:c0.c3.c6",
 			level:         "s0-s0:c0.c3.c6",
 			expectNoMatch: true,
 		},
-		"s0-s0:c0,c3.c6.c8": {
+		{
+			desc:          "s0-s0:c0,c3.c6.c8",
 			level:         "s0-s0:c0,c3.c6.c8",
 			expectNoMatch: true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			err := checkSelinuxLevel(test.level)
 			if test.expectNoMatch {
 				assert.Error(t, err)

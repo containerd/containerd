@@ -104,20 +104,24 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		Snapshotter: "devmapper",
 	}
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc              string
 		runtime           criconfig.Runtime
 		expectSnapshotter string
 	}{
-		"should return default snapshotter when runtime.Snapshotter is not set": {
+		{
+			desc:              "should return default snapshotter when runtime.Snapshotter is not set",
 			runtime:           defaultRuntime,
 			expectSnapshotter: criconfig.DefaultConfig().Snapshotter,
 		},
-		"should return overridden snapshotter when runtime.Snapshotter is set": {
+		{
+			desc:              "should return overridden snapshotter when runtime.Snapshotter is set",
 			runtime:           fooRuntime,
 			expectSnapshotter: "devmapper",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			cri := newTestCRIService()
 			cri.config = criconfig.Config{
 				PluginConfig: criconfig.DefaultConfig(),

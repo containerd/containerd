@@ -38,27 +38,31 @@ func TestSandboxContainerSpec(t *testing.T) {
 	}
 	testID := "test-id"
 	nsPath := "test-cni"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc              string
 		configChange      func(*runtime.PodSandboxConfig)
 		podAnnotations    []string
 		imageConfigChange func(*imagespec.ImageConfig)
 		specCheck         func(*testing.T, *runtimespec.Spec)
 		expectErr         bool
 	}{
-		"should return error when entrypoint and cmd are empty": {
+		{
+			desc: "should return error when entrypoint and cmd are empty",
 			imageConfigChange: func(c *imagespec.ImageConfig) {
 				c.Entrypoint = nil
 				c.Cmd = nil
 			},
 			expectErr: true,
 		},
-		"a passthrough annotation should be passed as an OCI annotation": {
+		{
+			desc:           "a passthrough annotation should be passed as an OCI annotation",
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				assert.Equal(t, spec.Annotations["c"], "d")
 			},
 		},
-		"a non-passthrough annotation should not be passed as an OCI annotation": {
+		{
+			desc: "a non-passthrough annotation should not be passed as an OCI annotation",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["d"] = "e"
 			},
@@ -69,7 +73,8 @@ func TestSandboxContainerSpec(t *testing.T) {
 				assert.False(t, ok)
 			},
 		},
-		"passthrough annotations should support wildcard match": {
+		{
+			desc: "passthrough annotations should support wildcard match",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["t.f"] = "j"
 				c.Annotations["z.g"] = "o"
@@ -89,7 +94,8 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
 			config, imageConfig, specCheck := getRunPodSandboxTestData()
 			if test.configChange != nil {
@@ -117,11 +123,15 @@ func TestSandboxContainerSpec(t *testing.T) {
 }
 
 func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc         string
 		configChange func(*runtime.PodSandboxConfig)
 	}{
-		"should marshal original config": {},
-		"should marshal Linux": {
+		{
+			desc: "should marshal original config",
+		},
+		{
+			desc: "should marshal Linux",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				if c.Linux == nil {
 					c.Linux = &runtime.LinuxPodSandboxConfig{}
@@ -137,7 +147,8 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			meta := &sandboxstore.Metadata{
 				ID:        "1",
 				Name:      "sandbox_1",
@@ -198,6 +209,7 @@ func TestHostAccessingSandbox(t *testing.T) {
 		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := hostAccessingSandbox(tt.config); got != tt.want {
 				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)

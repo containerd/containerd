@@ -208,33 +208,39 @@ func TestHostProcessRequirements(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                 string
 		containerHostProcess bool
 		sandboxHostProcess   bool
 		expectError          bool
 	}{
-		"hostprocess container in non-hostprocess sandbox should fail": {
+		{
+			desc:                 "hostprocess container in non-hostprocess sandbox should fail",
 			containerHostProcess: true,
 			sandboxHostProcess:   false,
 			expectError:          true,
 		},
-		"hostprocess container in hostprocess sandbox should be fine": {
+		{
+			desc:                 "hostprocess container in hostprocess sandbox should be fine",
 			containerHostProcess: true,
 			sandboxHostProcess:   true,
 			expectError:          false,
 		},
-		"non-hostprocess container in hostprocess sandbox should fail": {
+		{
+			desc:                 "non-hostprocess container in hostprocess sandbox should fail",
 			containerHostProcess: false,
 			sandboxHostProcess:   true,
 			expectError:          true,
 		},
-		"non-hostprocess container in non-hostprocess sandbox should be fine": {
+		{
+			desc:                 "non-hostprocess container in non-hostprocess sandbox should be fine",
 			containerHostProcess: false,
 			sandboxHostProcess:   false,
 			expectError:          false,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Windows.SecurityContext.HostProcess = test.containerHostProcess
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
 				HostProcess: test.sandboxHostProcess,
