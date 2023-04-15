@@ -88,7 +88,8 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 }
 
 func TestToCRIContainerStatus(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc           string
 		startedAt      int64
 		finishedAt     int64
 		exitCode       int32
@@ -97,14 +98,17 @@ func TestToCRIContainerStatus(t *testing.T) {
 		expectedState  runtime.ContainerState
 		expectedReason string
 	}{
-		"container created": {
+		{
+			desc:          "container created",
 			expectedState: runtime.ContainerState_CONTAINER_CREATED,
 		},
-		"container running": {
+		{
+			desc:          "container running",
 			startedAt:     time.Now().UnixNano(),
 			expectedState: runtime.ContainerState_CONTAINER_RUNNING,
 		},
-		"container exited with reason": {
+		{
+			desc:           "container exited with reason",
 			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       1,
@@ -113,7 +117,8 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedState:  runtime.ContainerState_CONTAINER_EXITED,
 			expectedReason: "test-reason",
 		},
-		"container exited with exit code 0 without reason": {
+		{
+			desc:           "container exited with exit code 0 without reason",
 			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       0,
@@ -121,7 +126,8 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedState:  runtime.ContainerState_CONTAINER_EXITED,
 			expectedReason: completeExitReason,
 		},
-		"container exited with non-zero exit code without reason": {
+		{
+			desc:           "container exited with non-zero exit code without reason",
 			startedAt:      time.Now().UnixNano(),
 			finishedAt:     time.Now().UnixNano(),
 			exitCode:       1,
@@ -130,7 +136,8 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 
 			metadata, status, _, expected := getContainerStatusTestData()
 			// Update status with test case.
@@ -154,7 +161,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			containerStatus := toCRIContainerStatus(container,
 				expected.Image,
 				expected.ImageRef)
-			assert.Equal(t, expected, containerStatus, desc)
+			assert.Equal(t, expected, containerStatus, test.desc)
 		})
 	}
 }
@@ -176,7 +183,8 @@ func TestToCRIContainerInfo(t *testing.T) {
 }
 
 func TestContainerStatus(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc          string
 		exist         bool
 		imageExist    bool
 		startedAt     int64
@@ -185,18 +193,21 @@ func TestContainerStatus(t *testing.T) {
 		expectedState runtime.ContainerState
 		expectErr     bool
 	}{
-		"container created": {
+		{
+			desc:          "container created",
 			exist:         true,
 			imageExist:    true,
 			expectedState: runtime.ContainerState_CONTAINER_CREATED,
 		},
-		"container running": {
+		{
+			desc:          "container running",
 			exist:         true,
 			imageExist:    true,
 			startedAt:     time.Now().UnixNano(),
 			expectedState: runtime.ContainerState_CONTAINER_RUNNING,
 		},
-		"container exited": {
+		{
+			desc:          "container exited",
 			exist:         true,
 			imageExist:    true,
 			startedAt:     time.Now().UnixNano(),
@@ -204,18 +215,21 @@ func TestContainerStatus(t *testing.T) {
 			reason:        "test-reason",
 			expectedState: runtime.ContainerState_CONTAINER_EXITED,
 		},
-		"container not exist": {
+		{
+			desc:       "container not exist",
 			exist:      false,
 			imageExist: true,
 			expectErr:  true,
 		},
-		"image not exist": {
+		{
+			desc:       "image not exist",
 			exist:      false,
 			imageExist: false,
 			expectErr:  true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			metadata, status, image, expected := getContainerStatusTestData()
 			// Update status with test case.

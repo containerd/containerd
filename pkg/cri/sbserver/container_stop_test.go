@@ -28,13 +28,15 @@ import (
 
 func TestWaitContainerStop(t *testing.T) {
 	id := "test-id"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc      string
 		status    *containerstore.Status
 		cancel    bool
 		timeout   time.Duration
 		expectErr bool
 	}{
-		"should return error if timeout exceeds": {
+		{
+			desc: "should return error if timeout exceeds",
 			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
@@ -42,7 +44,8 @@ func TestWaitContainerStop(t *testing.T) {
 			timeout:   200 * time.Millisecond,
 			expectErr: true,
 		},
-		"should return error if context is cancelled": {
+		{
+			desc: "should return error if context is cancelled",
 			status: &containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
@@ -51,7 +54,8 @@ func TestWaitContainerStop(t *testing.T) {
 			cancel:    true,
 			expectErr: true,
 		},
-		"should not return error if container is stopped before timeout": {
+		{
+			desc: "should not return error if container is stopped before timeout",
 			status: &containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
@@ -61,7 +65,8 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: id},
@@ -81,7 +86,7 @@ func TestWaitContainerStop(t *testing.T) {
 				ctx = timeoutCtx
 			}
 			err = c.waitContainerStop(ctx, container)
-			assert.Equal(t, test.expectErr, err != nil, desc)
+			assert.Equal(t, test.expectErr, err != nil, test.desc)
 		})
 	}
 }

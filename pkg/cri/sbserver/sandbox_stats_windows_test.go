@@ -33,20 +33,23 @@ func TestGetUsageNanoCores(t *testing.T) {
 	secondAfterTimeStamp := timestamp.Add(time.Second)
 	ID := "ID"
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                        string
 		firstCPUValue               uint64
 		secondCPUValue              uint64
 		expectedNanoCoreUsageFirst  uint64
 		expectedNanoCoreUsageSecond uint64
 	}{
-		"metrics": {
+		{
+			desc:                        "metrics",
 			firstCPUValue:               50,
 			secondCPUValue:              500,
 			expectedNanoCoreUsageFirst:  0,
 			expectedNanoCoreUsageSecond: 450,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: ID},
 			)
@@ -85,7 +88,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 		UsageNanoCores       uint64
 		WorkingSetBytes      uint64
 	}
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                   string
 		metrics                map[string]*wstats.Statistics
 		sandbox                sandboxstore.Sandbox
 		containers             []containerstore.Container
@@ -93,7 +97,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 		expectedContainerStats []expectedStats
 		expectError            bool
 	}{
-		"no metrics found should return error": {
+		{
+			desc:                   "no metrics found should return error",
 			metrics:                map[string]*wstats.Statistics{},
 			sandbox:                sandboxstore.Sandbox{},
 			containers:             []containerstore.Container{},
@@ -101,7 +106,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedContainerStats: []expectedStats{},
 			expectError:            true,
 		},
-		"pod stats will include the container stats": {
+		{
+			desc: "pod stats will include the container stats",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
 					Container: windowsStat(currentStatsTimestamp, 200, 20),
@@ -128,7 +134,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			},
 			expectError: false,
 		},
-		"pod with existing stats will have usagenanocores totalled across pods and containers": {
+		{
+			desc: "pod with existing stats will have usagenanocores totalled across pods and containers",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
 					Container: windowsStat(currentStatsTimestamp, 400, 20),
@@ -161,7 +168,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			},
 			expectError: false,
 		},
-		"pod sandbox with nil stats still works (hostprocess container scenario)": {
+		{
+			desc: "pod sandbox with nil stats still works (hostprocess container scenario)",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
 					Container: windowsStat(currentStatsTimestamp, 400, 20),
@@ -193,7 +201,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectError: false,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			actualPodStats, actualContainerStats, err := c.toPodSandboxStats(test.sandbox, test.metrics, test.containers, currentStatsTimestamp)
 			if test.expectError {
 				assert.NotNil(t, err)
@@ -240,25 +249,29 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 	timestamp := time.Now()
 	containerID := "c1"
 	sandboxID := "s1"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                   string
 		sandboxStats           *runtime.PodSandboxStats
 		expectError            bool
 		expectedSandboxvalue   *stats.ContainerStats
 		expectedContainervalue *stats.ContainerStats
 	}{
-		"if sandboxstats is nil then skip ": {
+		{
+			desc:                 "if sandboxstats is nil then skip ",
 			sandboxStats:         nil,
 			expectError:          false,
 			expectedSandboxvalue: nil,
 		},
-		"if sandboxstats.windows is nil then skip": {
+		{
+			desc: "if sandboxstats.windows is nil then skip",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: nil,
 			},
 			expectError:          false,
 			expectedSandboxvalue: nil,
 		},
-		"if sandboxstats.windows.cpu is nil then skip": {
+		{
+			desc: "if sandboxstats.windows.cpu is nil then skip",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: &runtime.WindowsPodSandboxStats{
 					Cpu: nil,
@@ -267,7 +280,8 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 			expectError:          false,
 			expectedSandboxvalue: nil,
 		},
-		"if sandboxstats.windows.cpu.UsageCoreNanoSeconds is nil then skip": {
+		{
+			desc: "if sandboxstats.windows.cpu.UsageCoreNanoSeconds is nil then skip",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: &runtime.WindowsPodSandboxStats{
 					Cpu: &runtime.WindowsCpuUsage{
@@ -278,7 +292,8 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 			expectError:          false,
 			expectedSandboxvalue: nil,
 		},
-		"Stats for containers that have cpu nil are skipped": {
+		{
+			desc: "Stats for containers that have cpu nil are skipped",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: &runtime.WindowsPodSandboxStats{
 					Cpu: &runtime.WindowsCpuUsage{
@@ -300,7 +315,8 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 			},
 			expectedContainervalue: nil,
 		},
-		"Stats for containers that have UsageCoreNanoSeconds nil are skipped": {
+		{
+			desc: "Stats for containers that have UsageCoreNanoSeconds nil are skipped",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: &runtime.WindowsPodSandboxStats{
 					Cpu: &runtime.WindowsCpuUsage{
@@ -324,7 +340,8 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 			},
 			expectedContainervalue: nil,
 		},
-		"Stats are updated for sandbox and containers": {
+		{
+			desc: "Stats are updated for sandbox and containers",
 			sandboxStats: &runtime.PodSandboxStats{
 				Windows: &runtime.WindowsPodSandboxStats{
 					Cpu: &runtime.WindowsCpuUsage{
@@ -353,7 +370,8 @@ func Test_criService_saveSandBoxMetrics(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.sandboxStore.Add(sandboxstore.Sandbox{
 				Metadata: sandboxstore.Metadata{ID: sandboxID},
