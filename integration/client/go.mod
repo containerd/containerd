@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/hcsshim v0.10.0-rc.7
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.1
-	github.com/containerd/containerd v1.7.0-beta.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
+	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/continuity v0.3.1-0.20230307035957-72c70feb3081
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.2.1
