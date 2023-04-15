@@ -1,7 +1,7 @@
 //go:build !linux
 // +build !linux
 
-package validate
+package capabilities
 
 import (
 	"github.com/syndtr/gocapability/capability"

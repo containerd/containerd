@@ -71,12 +71,6 @@ require (
 // IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
 // in the "require" section above are still taken into account for version
 // resolution if newer.
-replace (
-	github.com/containerd/containerd => ../../
-
-	// ATM the runtime-tools commit we need are beyond the latest tag.
-	// We use a replace to handle that until a new version is tagged.
-	github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
-)
+replace github.com/containerd/containerd => ../../
 
 replace github.com/AdaLogics/go-fuzz-headers => github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230111232327-1f10f66a31bf
