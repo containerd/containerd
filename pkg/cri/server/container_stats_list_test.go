@@ -30,20 +30,23 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 	secondAfterTimeStamp := timestamp.Add(time.Second)
 	ID := "ID"
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                        string
 		firstCPUValue               uint64
 		secondCPUValue              uint64
 		expectedNanoCoreUsageFirst  uint64
 		expectedNanoCoreUsageSecond uint64
 	}{
-		"metrics": {
+		{
+			desc:                        "metrics",
 			firstCPUValue:               50,
 			secondCPUValue:              500,
 			expectedNanoCoreUsageFirst:  0,
 			expectedNanoCoreUsageSecond: 450,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: ID},
 			)

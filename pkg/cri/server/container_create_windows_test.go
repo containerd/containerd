@@ -213,33 +213,39 @@ func TestHostProcessRequirements(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                 string
 		containerHostProcess bool
 		sandboxHostProcess   bool
 		expectError          bool
 	}{
-		"hostprocess container in non-hostprocess sandbox should fail": {
+		{
+			desc:                 "hostprocess container in non-hostprocess sandbox should fail",
 			containerHostProcess: true,
 			sandboxHostProcess:   false,
 			expectError:          true,
 		},
-		"hostprocess container in hostprocess sandbox should be fine": {
+		{
+			desc:                 "hostprocess container in hostprocess sandbox should be fine",
 			containerHostProcess: true,
 			sandboxHostProcess:   true,
 			expectError:          false,
 		},
-		"non-hostprocess container in hostprocess sandbox should fail": {
+		{
+			desc:                 "non-hostprocess container in hostprocess sandbox should fail",
 			containerHostProcess: false,
 			sandboxHostProcess:   true,
 			expectError:          true,
 		},
-		"non-hostprocess container in non-hostprocess sandbox should be fine": {
+		{
+			desc:                 "non-hostprocess container in non-hostprocess sandbox should be fine",
 			containerHostProcess: false,
 			sandboxHostProcess:   false,
 			expectError:          false,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Windows.SecurityContext.HostProcess = test.containerHostProcess
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
 				HostProcess: test.sandboxHostProcess,
@@ -262,7 +268,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 	nsPath := "test-ns"
 	c := newTestCRIService()
 
-	for name, test := range map[string]struct {
+	for _, test := range []struct {
+		name                string
 		imgEntrypoint       []string
 		imgCmd              []string
 		command             []string
@@ -272,7 +279,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 		ArgsEscaped         bool
 	}{
 		// override image entrypoint and cmd in shell form with container args and verify expected runtime spec
-		"TestShellFormImgEntrypointCmdWithCtrArgs": {
+		{
+			name:                "TestShellFormImgEntrypointCmdWithCtrArgs",
 			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
 			imgCmd:              []string{`cmd -args "hello world"`},
 			command:             nil,
@@ -282,7 +290,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 			ArgsEscaped:         true,
 		},
 		// check image entrypoint and cmd in shell form without overriding with container command and args and verify expected runtime spec
-		"TestShellFormImgEntrypointCmdWithoutCtrArgs": {
+		{
+			name:                "TestShellFormImgEntrypointCmdWithoutCtrArgs",
 			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
 			imgCmd:              []string{`cmd -args "hello world"`},
 			command:             nil,
@@ -292,7 +301,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 			ArgsEscaped:         true,
 		},
 		// override image entrypoint and cmd by container command and args in shell form and verify expected runtime spec
-		"TestShellFormImgEntrypointCmdWithCtrEntrypointAndArgs": {
+		{
+			name:                "TestShellFormImgEntrypointCmdWithCtrEntrypointAndArgs",
 			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
 			imgCmd:              []string{`cmd -args "hello world"`},
 			command:             []string{`C:\My Folder\MyProcess.exe`, "-arg1", "additional test value"},
@@ -302,7 +312,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 			ArgsEscaped:         true,
 		},
 		// override image cmd by container args in exec form and verify expected runtime spec
-		"TestExecFormImgEntrypointCmdWithCtrArgs": {
+		{
+			name:                "TestExecFormImgEntrypointCmdWithCtrArgs",
 			imgEntrypoint:       []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value"},
 			imgCmd:              []string{"cmd", "-args", "hello world"},
 			command:             nil,
@@ -312,7 +323,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 			ArgsEscaped:         false,
 		},
 		// check image entrypoint and cmd in exec form without overriding with container command and args and verify expected runtime spec
-		"TestExecFormImgEntrypointCmdWithoutCtrArgs": {
+		{
+			name:                "TestExecFormImgEntrypointCmdWithoutCtrArgs",
 			imgEntrypoint:       []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value"},
 			imgCmd:              []string{"cmd", "-args", "hello world"},
 			command:             nil,
@@ -322,7 +334,8 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 			ArgsEscaped:         false,
 		},
 	} {
-		t.Run(name, func(t *testing.T) {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
 			imageConfig := &imagespec.ImageConfig{
 				Entrypoint:  test.imgEntrypoint,
 				Cmd:         test.imgCmd,

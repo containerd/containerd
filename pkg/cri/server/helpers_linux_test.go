@@ -29,32 +29,38 @@ import (
 
 func TestGetCgroupsPath(t *testing.T) {
 	testID := "test-id"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc          string
 		cgroupsParent string
 		expected      string
 	}{
-		"should support regular cgroup path": {
+		{
+			desc:          "should support regular cgroup path",
 			cgroupsParent: "/a/b",
 			expected:      "/a/b/test-id",
 		},
-		"should support systemd cgroup path": {
+		{
+			desc:          "should support systemd cgroup path",
 			cgroupsParent: "/a.slice/b.slice",
-			expected:      "b.slice:cri-containerd:test-id",
-		},
-		"should support tailing slash for regular cgroup path": {
+			expected:      "b.slice:cri-containerd:test-id"},
+		{
+			desc:          "should support tailing slash for regular cgroup path",
 			cgroupsParent: "/a/b/",
 			expected:      "/a/b/test-id",
 		},
-		"should support tailing slash for systemd cgroup path": {
+		{
+			desc:          "should support tailing slash for systemd cgroup path",
 			cgroupsParent: "/a.slice/b.slice/",
 			expected:      "b.slice:cri-containerd:test-id",
 		},
-		"should treat root cgroup as regular cgroup path": {
+		{
+			desc:          "should treat root cgroup as regular cgroup path",
 			cgroupsParent: "/",
 			expected:      "/test-id",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			got := getCgroupsPath(test.cgroupsParent, testID)
 			assert.Equal(t, test.expected, got)
 		})

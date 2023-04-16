@@ -41,27 +41,31 @@ func TestSandboxContainerSpec(t *testing.T) {
 	}
 	testID := "test-id"
 	nsPath := "test-cni"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc              string
 		configChange      func(*runtime.PodSandboxConfig)
 		podAnnotations    []string
 		imageConfigChange func(*imagespec.ImageConfig)
 		specCheck         func(*testing.T, *runtimespec.Spec)
 		expectErr         bool
 	}{
-		"should return error when entrypoint and cmd are empty": {
+		{
+			desc: "should return error when entrypoint and cmd are empty",
 			imageConfigChange: func(c *imagespec.ImageConfig) {
 				c.Entrypoint = nil
 				c.Cmd = nil
 			},
 			expectErr: true,
 		},
-		"a passthrough annotation should be passed as an OCI annotation": {
+		{
+			desc:           "a passthrough annotation should be passed as an OCI annotation",
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				assert.Equal(t, spec.Annotations["c"], "d")
 			},
 		},
-		"a non-passthrough annotation should not be passed as an OCI annotation": {
+		{
+			desc: "a non-passthrough annotation should not be passed as an OCI annotation",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["d"] = "e"
 			},
@@ -72,7 +76,8 @@ func TestSandboxContainerSpec(t *testing.T) {
 				assert.False(t, ok)
 			},
 		},
-		"passthrough annotations should support wildcard match": {
+		{
+			desc: "passthrough annotations should support wildcard match",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["t.f"] = "j"
 				c.Annotations["z.g"] = "o"
@@ -92,7 +97,8 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			config, imageConfig, specCheck := getRunPodSandboxTestData()
 			if test.configChange != nil {
@@ -120,11 +126,15 @@ func TestSandboxContainerSpec(t *testing.T) {
 }
 
 func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc         string
 		configChange func(*runtime.PodSandboxConfig)
 	}{
-		"should marshal original config": {},
-		"should marshal Linux": {
+		{
+			desc: "should marshal original config",
+		},
+		{
+			desc: "should marshal Linux",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				if c.Linux == nil {
 					c.Linux = &runtime.LinuxPodSandboxConfig{}
@@ -140,7 +150,8 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			meta := &sandboxstore.Metadata{
 				ID:        "1",
 				Name:      "sandbox_1",
@@ -164,12 +175,16 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 }
 
 func TestToCNIPortMappings(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc            string
 		criPortMappings []*runtime.PortMapping
 		cniPortMappings []cni.PortMapping
 	}{
-		"empty CRI port mapping should map to empty CNI port mapping": {},
-		"CRI port mapping should be converted to CNI port mapping properly": {
+		{
+			desc: "empty CRI port mapping should map to empty CNI port mapping",
+		},
+		{
+			desc: "CRI port mapping should be converted to CNI port mapping properly",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_UDP,
@@ -211,7 +226,8 @@ func TestToCNIPortMappings(t *testing.T) {
 				},
 			},
 		},
-		"CRI port mapping without host port should be skipped": {
+		{
+			desc: "CRI port mapping without host port should be skipped",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_UDP,
@@ -234,7 +250,8 @@ func TestToCNIPortMappings(t *testing.T) {
 				},
 			},
 		},
-		"CRI port mapping with unsupported protocol should be skipped": {
+		{
+			desc: "CRI port mapping with unsupported protocol should be skipped",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_TCP,
@@ -253,54 +270,63 @@ func TestToCNIPortMappings(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
 		})
 	}
 }
 
 func TestSelectPodIP(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                  string
 		ips                   []string
 		expectedIP            string
 		expectedAdditionalIPs []string
 		pref                  string
 	}{
-		"ipv4 should be picked even if ipv6 comes first": {
+		{
+			desc:                  "ipv4 should be picked even if ipv6 comes first",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334"},
 		},
-		"ipv6 should be picked even if ipv4 comes first": {
+		{
+			desc:                  "ipv6 should be picked even if ipv4 comes first",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: []string{"192.168.17.43"},
 			pref:                  "ipv6",
 		},
-		"order should reflect ip selection": {
+		{
+			desc:                  "order should reflect ip selection",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: []string{"192.168.17.43"},
 			pref:                  "cni",
 		},
 
-		"ipv4 should be picked when there is only ipv4": {
+		{
+			desc:                  "ipv4 should be picked when there is only ipv4",
 			ips:                   []string{"192.168.17.43"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: nil,
 		},
-		"ipv6 should be picked when there is no ipv4": {
+		{
+			desc:                  "ipv6 should be picked when there is no ipv4",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: nil,
 		},
-		"the first ipv4 should be picked when there are multiple ipv4": { // unlikely to happen
+		{
+			desc:                  "the first ipv4 should be picked when there are multiple ipv4", // unlikely to happen
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			var ipConfigs []*cni.IPConfig
 			for _, ip := range test.ips {
 				ipConfigs = append(ipConfigs, &cni.IPConfig{
