@@ -53,31 +53,36 @@ func TestToCRISandbox(t *testing.T) {
 		Annotations:    config.GetAnnotations(),
 		RuntimeHandler: "test-runtime-handler",
 	}
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc          string
 		state         sandboxstore.State
 		expectedState runtime.PodSandboxState
 	}{
-		"sandbox state ready": {
+		{
+			desc:          "sandbox state ready",
 			state:         sandboxstore.StateReady,
 			expectedState: runtime.PodSandboxState_SANDBOX_READY,
 		},
-		"sandbox state not ready": {
+		{
+			desc:          "sandbox state not ready",
 			state:         sandboxstore.StateNotReady,
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
-		"sandbox state unknown": {
+		{
+			desc:          "sandbox state unknown",
 			state:         sandboxstore.StateUnknown,
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			status := sandboxstore.Status{
 				CreatedAt: createdAt,
 				State:     test.state,
 			}
 			expect.State = test.expectedState
 			s := toCRISandbox(meta, status)
-			assert.Equal(t, expect, s, desc)
+			assert.Equal(t, expect, s, test.desc)
 		})
 	}
 }
@@ -157,22 +162,27 @@ func TestFilterSandboxes(t *testing.T) {
 		assert.NoError(t, c.sandboxStore.Add(sb))
 	}
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc   string
 		filter *runtime.PodSandboxFilter
 		expect []*runtime.PodSandbox
 	}{
-		"no filter": {
+		{
+			desc:   "no filter",
 			expect: testSandboxes,
 		},
-		"id filter": {
+		{
+			desc:   "id filter",
 			filter: &runtime.PodSandboxFilter{Id: "2abcdef"},
 			expect: []*runtime.PodSandbox{testSandboxes[1]},
 		},
-		"truncid filter": {
+		{
+			desc:   "truncid filter",
 			filter: &runtime.PodSandboxFilter{Id: "2"},
 			expect: []*runtime.PodSandbox{testSandboxes[1]},
 		},
-		"state filter": {
+		{
+			desc: "state filter",
 			filter: &runtime.PodSandboxFilter{
 				State: &runtime.PodSandboxStateValue{
 					State: runtime.PodSandboxState_SANDBOX_READY,
@@ -180,20 +190,23 @@ func TestFilterSandboxes(t *testing.T) {
 			},
 			expect: []*runtime.PodSandbox{testSandboxes[0], testSandboxes[2]},
 		},
-		"label filter": {
+		{
+			desc: "label filter",
 			filter: &runtime.PodSandboxFilter{
 				LabelSelector: map[string]string{"a": "b"},
 			},
 			expect: []*runtime.PodSandbox{testSandboxes[1]},
 		},
-		"mixed filter not matched": {
+		{
+			desc: "mixed filter not matched",
 			filter: &runtime.PodSandboxFilter{
 				Id:            "1",
 				LabelSelector: map[string]string{"a": "b"},
 			},
 			expect: []*runtime.PodSandbox{},
 		},
-		"mixed filter matched": {
+		{
+			desc: "mixed filter matched",
 			filter: &runtime.PodSandboxFilter{
 				State: &runtime.PodSandboxStateValue{
 					State: runtime.PodSandboxState_SANDBOX_READY,
@@ -203,9 +216,10 @@ func TestFilterSandboxes(t *testing.T) {
 			expect: []*runtime.PodSandbox{testSandboxes[2]},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			filtered := c.filterCRISandboxes(testSandboxes, test.filter)
-			assert.Equal(t, test.expect, filtered, desc)
+			assert.Equal(t, test.expect, filtered, test.desc)
 		})
 	}
 }
