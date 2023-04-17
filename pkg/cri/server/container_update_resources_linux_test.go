@@ -38,13 +38,15 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		}
 		return nil
 	}
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc      string
 		spec      *runtimespec.Spec
 		request   *runtime.UpdateContainerResourcesRequest
 		expected  *runtimespec.Spec
 		expectErr bool
 	}{
-		"should be able to update each resource": {
+		{
+			desc: "should be able to update each resource",
 			spec: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
@@ -93,7 +95,8 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				},
 			},
 		},
-		"should skip empty fields": {
+		{
+			desc: "should skip empty fields",
 			spec: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
@@ -139,7 +142,8 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				},
 			},
 		},
-		"should be able to fill empty fields": {
+		{
+			desc: "should be able to fill empty fields",
 			spec: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
@@ -180,7 +184,8 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 				},
 			},
 		},
-		"should be able to patch the unified map": {
+		{
+			desc: "should be able to patch the unified map",
 			spec: &runtimespec.Spec{
 				Process: &runtimespec.Process{OOMScoreAdj: oomscoreadj},
 				Linux: &runtimespec.Linux{
@@ -230,7 +235,8 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			config := criconfig.Config{
 				PluginConfig: criconfig.PluginConfig{
 					TolerateMissingHugetlbController: true,

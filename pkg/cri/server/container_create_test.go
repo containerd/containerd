@@ -81,18 +81,21 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 	testContainerName := "container-name"
 	testPid := uint32(1234)
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc           string
 		podAnnotations []string
 		configChange   func(*runtime.PodSandboxConfig)
 		specCheck      func(*testing.T, *runtimespec.Spec)
 	}{
-		"a passthrough annotation should be passed as an OCI annotation": {
+		{
+			desc:           "a passthrough annotation should be passed as an OCI annotation",
 			podAnnotations: []string{"c"},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				assert.Equal(t, spec.Annotations["c"], "d")
 			},
 		},
-		"a non-passthrough annotation should not be passed as an OCI annotation": {
+		{
+			desc: "a non-passthrough annotation should not be passed as an OCI annotation",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["d"] = "e"
 			},
@@ -103,7 +106,8 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 				assert.False(t, ok)
 			},
 		},
-		"passthrough annotations should support wildcard match": {
+		{
+			desc: "passthrough annotations should support wildcard match",
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Annotations["t.f"] = "j"
 				c.Annotations["z.g"] = "o"
@@ -124,7 +128,8 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 			if test.configChange != nil {
@@ -147,7 +152,8 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 }
 
 func TestContainerSpecCommand(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc            string
 		criEntrypoint   []string
 		criArgs         []string
 		imageEntrypoint []string
@@ -155,42 +161,49 @@ func TestContainerSpecCommand(t *testing.T) {
 		expected        []string
 		expectErr       bool
 	}{
-		"should use cri entrypoint if it's specified": {
+		{
+			desc:            "should use cri entrypoint if it's specified",
 			criEntrypoint:   []string{"a", "b"},
 			imageEntrypoint: []string{"c", "d"},
 			imageArgs:       []string{"e", "f"},
 			expected:        []string{"a", "b"},
 		},
-		"should use cri entrypoint if it's specified even if it's empty": {
+		{
+			desc:            "should use cri entrypoint if it's specified even if it's empty",
 			criEntrypoint:   []string{},
 			criArgs:         []string{"a", "b"},
 			imageEntrypoint: []string{"c", "d"},
 			imageArgs:       []string{"e", "f"},
 			expected:        []string{"a", "b"},
 		},
-		"should use cri entrypoint and args if they are specified": {
+		{
+			desc:            "should use cri entrypoint and args if they are specified",
 			criEntrypoint:   []string{"a", "b"},
 			criArgs:         []string{"c", "d"},
 			imageEntrypoint: []string{"e", "f"},
 			imageArgs:       []string{"g", "h"},
 			expected:        []string{"a", "b", "c", "d"},
 		},
-		"should use image entrypoint if cri entrypoint is not specified": {
+		{
+			desc:            "should use image entrypoint if cri entrypoint is not specified",
 			criArgs:         []string{"a", "b"},
 			imageEntrypoint: []string{"c", "d"},
 			imageArgs:       []string{"e", "f"},
 			expected:        []string{"c", "d", "a", "b"},
 		},
-		"should use image args if both cri entrypoint and args are not specified": {
+		{
+			desc:            "should use image args if both cri entrypoint and args are not specified",
 			imageEntrypoint: []string{"c", "d"},
 			imageArgs:       []string{"e", "f"},
 			expected:        []string{"c", "d", "e", "f"},
 		},
-		"should return error if both entrypoint and args are empty": {
+		{
+			desc:      "should return error if both entrypoint and args are empty",
 			expectErr: true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			config, _, imageConfig, _ := getCreateContainerTestData()
 			config.Command = test.criEntrypoint
 			config.Args = test.criArgs
@@ -204,19 +217,21 @@ func TestContainerSpecCommand(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, test.expected, spec.Process.Args, desc)
+			assert.Equal(t, test.expected, spec.Process.Args, test.desc)
 		})
 	}
 }
 
 func TestVolumeMounts(t *testing.T) {
 	testContainerRootDir := "test-container-root"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc              string
 		criMounts         []*runtime.Mount
 		imageVolumes      map[string]struct{}
 		expectedMountDest []string
 	}{
-		"should setup rw mount for image volumes": {
+		{
+			desc: "should setup rw mount for image volumes",
 			imageVolumes: map[string]struct{}{
 				"/test-volume-1": {},
 				"/test-volume-2": {},
@@ -226,7 +241,8 @@ func TestVolumeMounts(t *testing.T) {
 				"/test-volume-2",
 			},
 		},
-		"should skip image volumes if already mounted by CRI": {
+		{
+			desc: "should skip image volumes if already mounted by CRI",
 			criMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/test-volume-1",
@@ -241,7 +257,8 @@ func TestVolumeMounts(t *testing.T) {
 				"/test-volume-2",
 			},
 		},
-		"should compare and return cleanpath": {
+		{
+			desc: "should compare and return cleanpath",
 			criMounts: []*runtime.Mount{
 				{
 					ContainerPath: "/test-volume-1",
@@ -257,7 +274,8 @@ func TestVolumeMounts(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			config := &imagespec.ImageConfig{
 				Volumes: test.imageVolumes,
 			}
@@ -294,14 +312,16 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 	testContainerName := "container-name"
 	testPid := uint32(1234)
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                 string
 		podAnnotations       []string
 		containerAnnotations []string
 		podConfigChange      func(*runtime.PodSandboxConfig)
 		configChange         func(*runtime.ContainerConfig)
 		specCheck            func(*testing.T, *runtimespec.Spec)
 	}{
-		"passthrough annotations from pod and container should be passed as an OCI annotation": {
+		{
+			desc: "passthrough annotations from pod and container should be passed as an OCI annotation",
 			podConfigChange: func(p *runtime.PodSandboxConfig) {
 				p.Annotations["pod.annotation.1"] = "1"
 				p.Annotations["pod.annotation.2"] = "2"
@@ -327,7 +347,8 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				assert.False(t, ok)
 			},
 		},
-		"passthrough annotations from pod and container should support wildcard": {
+		{
+			desc: "passthrough annotations from pod and container should support wildcard",
 			podConfigChange: func(p *runtime.PodSandboxConfig) {
 				p.Annotations["pod.annotation.1"] = "1"
 				p.Annotations["pod.annotation.2"] = "2"
@@ -349,7 +370,8 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				assert.Equal(t, "3", spec.Annotations["pod.annotation.3"])
 			},
 		},
-		"annotations should not pass through if no passthrough annotations are configured": {
+		{
+			desc: "annotations should not pass through if no passthrough annotations are configured",
 			podConfigChange: func(p *runtime.PodSandboxConfig) {
 				p.Annotations["pod.annotation.1"] = "1"
 				p.Annotations["pod.annotation.2"] = "2"
@@ -378,7 +400,8 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 			if test.configChange != nil {
@@ -440,20 +463,24 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		Snapshotter: "devmapper",
 	}
 
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc              string
 		runtime           config.Runtime
 		expectSnapshotter string
 	}{
-		"should return default snapshotter when runtime.Snapshotter is not set": {
+		{
+			desc:              "should return default snapshotter when runtime.Snapshotter is not set",
 			runtime:           defaultRuntime,
 			expectSnapshotter: config.DefaultConfig().Snapshotter,
 		},
-		"should return overridden snapshotter when runtime.Snapshotter is set": {
+		{
+			desc:              "should return overridden snapshotter when runtime.Snapshotter is set",
 			runtime:           fooRuntime,
 			expectSnapshotter: "devmapper",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			cri := newTestCRIService()
 			cri.config = config.Config{
 				PluginConfig: config.DefaultConfig(),

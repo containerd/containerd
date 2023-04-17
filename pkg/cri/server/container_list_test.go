@@ -101,18 +101,22 @@ func TestFilterContainers(t *testing.T) {
 			Labels:       map[string]string{"c": "d"},
 		},
 	}
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc   string
 		filter *runtime.ContainerFilter
 		expect []*runtime.Container
 	}{
-		"no filter": {
+		{
+			desc:   "no filter",
 			expect: testContainers,
 		},
-		"id filter": {
+		{
+			desc:   "id filter",
 			filter: &runtime.ContainerFilter{Id: "2"},
 			expect: []*runtime.Container{testContainers[1]},
 		},
-		"state filter": {
+		{
+			desc: "state filter",
 			filter: &runtime.ContainerFilter{
 				State: &runtime.ContainerStateValue{
 					State: runtime.ContainerState_CONTAINER_EXITED,
@@ -120,17 +124,20 @@ func TestFilterContainers(t *testing.T) {
 			},
 			expect: []*runtime.Container{testContainers[1]},
 		},
-		"label filter": {
+		{
+			desc: "label filter",
 			filter: &runtime.ContainerFilter{
 				LabelSelector: map[string]string{"a": "b"},
 			},
 			expect: []*runtime.Container{testContainers[1]},
 		},
-		"sandbox id filter": {
+		{
+			desc:   "sandbox id filter",
 			filter: &runtime.ContainerFilter{PodSandboxId: "s-2"},
 			expect: []*runtime.Container{testContainers[1], testContainers[2]},
 		},
-		"mixed filter not matched": {
+		{
+			desc: "mixed filter not matched",
 			filter: &runtime.ContainerFilter{
 				Id:            "1",
 				PodSandboxId:  "s-2",
@@ -138,7 +145,8 @@ func TestFilterContainers(t *testing.T) {
 			},
 			expect: []*runtime.Container{},
 		},
-		"mixed filter matched": {
+		{
+			desc: "mixed filter matched",
 			filter: &runtime.ContainerFilter{
 				PodSandboxId: "s-2",
 				State: &runtime.ContainerStateValue{
@@ -149,9 +157,10 @@ func TestFilterContainers(t *testing.T) {
 			expect: []*runtime.Container{testContainers[2]},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			filtered := c.filterCRIContainers(testContainers, test.filter)
-			assert.Equal(t, test.expect, filtered, desc)
+			assert.Equal(t, test.expect, filtered, test.desc)
 		})
 	}
 }
@@ -287,46 +296,54 @@ func TestListContainers(t *testing.T) {
 		assert.NoError(t, c.containerStore.Add(container))
 	}
 
-	for testdesc, testdata := range map[string]struct {
+	for _, testdata := range []struct {
+		desc   string
 		filter *runtime.ContainerFilter
 		expect []*runtime.Container
 	}{
-		"test without filter": {
+		{
+			desc:   "test without filter",
 			filter: &runtime.ContainerFilter{},
 			expect: expectedContainers,
 		},
-		"test filter by sandboxid": {
+		{
+			desc: "test filter by sandboxid",
 			filter: &runtime.ContainerFilter{
 				PodSandboxId: "s-1abcdef1234",
 			},
 			expect: expectedContainers[:3],
 		},
-		"test filter by truncated sandboxid": {
+		{
+			desc: "test filter by truncated sandboxid",
 			filter: &runtime.ContainerFilter{
 				PodSandboxId: "s-1",
 			},
 			expect: expectedContainers[:3],
 		},
-		"test filter by containerid": {
+		{
+			desc: "test filter by containerid",
 			filter: &runtime.ContainerFilter{
 				Id: "c-1container",
 			},
 			expect: expectedContainers[:1],
 		},
-		"test filter by truncated containerid": {
+		{
+			desc: "test filter by truncated containerid",
 			filter: &runtime.ContainerFilter{
 				Id: "c-1",
 			},
 			expect: expectedContainers[:1],
 		},
-		"test filter by containerid and sandboxid": {
+		{
+			desc: "test filter by containerid and sandboxid",
 			filter: &runtime.ContainerFilter{
 				Id:           "c-1container",
 				PodSandboxId: "s-1abcdef1234",
 			},
 			expect: expectedContainers[:1],
 		},
-		"test filter by truncated containerid and truncated sandboxid": {
+		{
+			desc: "test filter by truncated containerid and truncated sandboxid",
 			filter: &runtime.ContainerFilter{
 				Id:           "c-1",
 				PodSandboxId: "s-1",
@@ -334,7 +351,8 @@ func TestListContainers(t *testing.T) {
 			expect: expectedContainers[:1],
 		},
 	} {
-		t.Run(testdesc, func(t *testing.T) {
+		testdata := testdata
+		t.Run(testdata.desc, func(t *testing.T) {
 			resp, err := c.ListContainers(context.Background(), &runtime.ListContainersRequest{Filter: testdata.filter})
 			assert.NoError(t, err)
 			require.NotNil(t, resp)
