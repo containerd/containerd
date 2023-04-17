@@ -664,7 +664,7 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 	if err != nil {
 		return nil, err
 	}
-	if err := writer.Commit(ctx, 0, ""); err != nil {
+	if err := writer.Commit(ctx, 0, ""); err != nil && !errdefs.IsAlreadyExists(err) {
 		return nil, err
 	}
 	return &types.Descriptor{
