@@ -36,6 +36,42 @@ const (
 	tmpfsMagic = 0x01021994
 )
 
+// SupportsVolatileMount checks if the system supports the volatile mount option with the overlay filesystem.
+// This function creates a temporary directory, mounts an overlay filesystem on it with the volatile mount option enabled,
+// and then unmounts it.
+func SupportsVolatileMount(d string) error {
+	td, err := os.MkdirTemp(d, "volatile-check")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := os.RemoveAll(td); err != nil {
+			log.L.WithError(err).Warnf("Failed to remove volatile check directory %v", td)
+		}
+	}()
+
+	for _, dir := range []string{"lower", "upper", "work", "merged"} {
+		if err := os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+			return err
+		}
+	}
+
+	opts := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,volatile", filepath.Join(td, "lower"), filepath.Join(td, "upper"), filepath.Join(td, "work"))
+	m := mount.Mount{
+		Type:    "overlay",
+		Source:  "overlay",
+		Options: []string{opts},
+	}
+	dest := filepath.Join(td, "merged")
+	if err := m.Mount(dest); err != nil {
+		return fmt.Errorf("failed to mount volatile overlay: %w", err)
+	}
+	if err := mount.UnmountAll(dest, 0); err != nil {
+		log.L.WithError(err).Warnf("Failed to unmount volatile check directory %v", dest)
+	}
+	return nil
+}
+
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
 // which is required for the overlay snapshotter. On 4.x kernels, multiple lowerdirs
 // are always available (so this check isn't needed), and backported to RHEL and

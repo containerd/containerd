@@ -44,6 +44,7 @@ const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
 type SnapshotterConfig struct {
 	asyncRemove   bool
 	upperdirLabel bool
+	volatile      bool
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -67,6 +68,13 @@ func WithUpperdirLabel(config *SnapshotterConfig) error {
 	return nil
 }
 
+// Volatile enables the volatile option of overlayfs to omit all
+// forms of sync calls to the upper layer filesystem.
+func Volatile(config *SnapshotterConfig) error {
+	config.volatile = true
+	return nil
+}
+
 type snapshotter struct {
 	root          string
 	ms            *storage.MetaStore
@@ -74,6 +82,7 @@ type snapshotter struct {
 	upperdirLabel bool
 	indexOff      bool
 	userxattr     bool // whether to enable "userxattr" mount option
+	volatile      bool
 }
 
 // NewSnapshotter returns a Snapshotter which uses overlayfs. The overlayfs
@@ -111,6 +120,13 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		logrus.WithError(err).Warnf("cannot detect whether \"userxattr\" option needs to be used, assuming to be %v", userxattr)
 	}
 
+	// check volatile option
+	if config.volatile {
+		if err := overlayutils.SupportsVolatileMount(root); err != nil {
+			return nil, err
+		}
+	}
+
 	return &snapshotter{
 		root:          root,
 		ms:            ms,
@@ -118,6 +134,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		upperdirLabel: config.upperdirLabel,
 		indexOff:      supportsIndex(),
 		userxattr:     userxattr,
+		volatile:      config.volatile,
 	}, nil
 }
 
@@ -462,6 +479,10 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 
 	if o.userxattr {
 		options = append(options, "userxattr")
+	}
+
+	if o.volatile {
+		options = append(options, "volatile")
 	}
 
 	if s.Kind == snapshots.KindActive {

@@ -31,6 +31,7 @@ type Config struct {
 	// Root directory for the plugin
 	RootPath      string `toml:"root_path"`
 	UpperdirLabel bool   `toml:"upperdir_label"`
+	Volatile      bool   `toml:"volatile"`
 }
 
 func init() {
@@ -54,6 +55,10 @@ func init() {
 			var oOpts []overlay.Opt
 			if config.UpperdirLabel {
 				oOpts = append(oOpts, overlay.WithUpperdirLabel)
+			}
+
+			if config.Volatile {
+				oOpts = append(oOpts, overlay.Volatile)
 			}
 
 			ic.Meta.Exports["root"] = root
