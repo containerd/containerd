@@ -22,8 +22,6 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 )
 
-var errNotImplementedOnWindows = errors.New("not implemented on windows")
-
 // NetNS holds network namespace for sandbox
 type NetNS struct {
 	path string
@@ -42,7 +40,13 @@ func NewNetNS(baseDir string) (*NetNS, error) {
 
 // NewNetNS returns the netns from pid or a new netns if pid is 0.
 func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
-	return nil, errNotImplementedOnWindows
+	temp := hcn.HostComputeNamespace{}
+	hcnNamespace, err := temp.Create()
+	if err != nil {
+		return nil, err
+	}
+
+	return &NetNS{path: hcnNamespace.Id}, nil
 }
 
 // LoadNetNS loads existing network namespace.
