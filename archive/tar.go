@@ -350,8 +350,11 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 
 		_, err = copyBuffered(ctx, file, reader)
-		if err1 := file.Close(); err == nil {
-			err = err1
+
+		for _, op := range []func() error{file.Sync, file.Close} {
+			if opErr := op(); err == nil {
+				err = opErr
+			}
 		}
 		if err != nil {
 			return err
