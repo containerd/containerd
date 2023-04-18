@@ -27,12 +27,16 @@ import (
 )
 
 func TestToCNIPortMappings(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc            string
 		criPortMappings []*runtime.PortMapping
 		cniPortMappings []cni.PortMapping
 	}{
-		"empty CRI port mapping should map to empty CNI port mapping": {},
-		"CRI port mapping should be converted to CNI port mapping properly": {
+		{
+			desc: "empty CRI port mapping should map to empty CNI port mapping",
+		},
+		{
+			desc: "CRI port mapping should be converted to CNI port mapping properly",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_UDP,
@@ -74,7 +78,8 @@ func TestToCNIPortMappings(t *testing.T) {
 				},
 			},
 		},
-		"CRI port mapping without host port should be skipped": {
+		{
+			desc: "CRI port mapping without host port should be skipped",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_UDP,
@@ -97,7 +102,8 @@ func TestToCNIPortMappings(t *testing.T) {
 				},
 			},
 		},
-		"CRI port mapping with unsupported protocol should be skipped": {
+		{
+			desc: "CRI port mapping with unsupported protocol should be skipped",
 			criPortMappings: []*runtime.PortMapping{
 				{
 					Protocol:      runtime.Protocol_TCP,
@@ -116,54 +122,62 @@ func TestToCNIPortMappings(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
 		})
 	}
 }
 
 func TestSelectPodIP(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                  string
 		ips                   []string
 		expectedIP            string
 		expectedAdditionalIPs []string
 		pref                  string
 	}{
-		"ipv4 should be picked even if ipv6 comes first": {
+		{
+			desc:                  "ipv4 should be picked even if ipv6 comes first",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334"},
 		},
-		"ipv6 should be picked even if ipv4 comes first": {
+		{
+			desc:                  "ipv6 should be picked even if ipv4 comes first",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: []string{"192.168.17.43"},
 			pref:                  "ipv6",
 		},
-		"order should reflect ip selection": {
+		{
+			desc:                  "order should reflect ip selection",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: []string{"192.168.17.43"},
 			pref:                  "cni",
 		},
-
-		"ipv4 should be picked when there is only ipv4": {
+		{
+			desc:                  "ipv4 should be picked when there is only ipv4",
 			ips:                   []string{"192.168.17.43"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: nil,
 		},
-		"ipv6 should be picked when there is no ipv4": {
+		{
+			desc:                  "ipv6 should be picked when there is no ipv4",
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: nil,
 		},
-		"the first ipv4 should be picked when there are multiple ipv4": { // unlikely to happen
+		{
+			desc:                  "the first ipv4 should be picked when there are multiple ipv4", // unlikely to happen
 			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 			expectedIP:            "192.168.17.43",
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			var ipConfigs []*cni.IPConfig
 			for _, ip := range test.ips {
 				ipConfigs = append(ipConfigs, &cni.IPConfig{

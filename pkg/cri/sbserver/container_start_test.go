@@ -29,25 +29,28 @@ import (
 // state correctly.
 func TestSetContainerStarting(t *testing.T) {
 	testID := "test-id"
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc      string
 		status    containerstore.Status
 		expectErr bool
 	}{
-
-		"should not return error when container is in created state": {
+		{
+			desc: "should not return error when container is in created state",
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 			},
 			expectErr: false,
 		},
-		"should return error when container is in running state": {
+		{
+			desc: "should return error when container is in running state",
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				StartedAt: time.Now().UnixNano(),
 			},
 			expectErr: true,
 		},
-		"should return error when container is in exited state": {
+		{
+			desc: "should return error when container is in exited state",
 			status: containerstore.Status{
 				CreatedAt:  time.Now().UnixNano(),
 				StartedAt:  time.Now().UnixNano(),
@@ -55,7 +58,8 @@ func TestSetContainerStarting(t *testing.T) {
 			},
 			expectErr: true,
 		},
-		"should return error when container is in unknown state": {
+		{
+			desc: "should return error when container is in unknown state",
 			status: containerstore.Status{
 				CreatedAt:  0,
 				StartedAt:  0,
@@ -63,14 +67,16 @@ func TestSetContainerStarting(t *testing.T) {
 			},
 			expectErr: true,
 		},
-		"should return error when container is in starting state": {
+		{
+			desc: "should return error when container is in starting state",
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				Starting:  true,
 			},
 			expectErr: true,
 		},
-		"should return error when container is in removing state": {
+		{
+			desc: "should return error when container is in removing state",
 			status: containerstore.Status{
 				CreatedAt: time.Now().UnixNano(),
 				Removing:  true,
@@ -78,7 +84,8 @@ func TestSetContainerStarting(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: testID},
 				containerstore.WithFakeStatus(test.status),

@@ -39,23 +39,29 @@ func TestParseAuth(t *testing.T) {
 	base64.StdEncoding.Encode(testAuth, []byte(testUser+":"+testPasswd))
 	invalidAuth := make([]byte, testAuthLen)
 	base64.StdEncoding.Encode(invalidAuth, []byte(testUser+"@"+testPasswd))
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc           string
 		auth           *runtime.AuthConfig
 		host           string
 		expectedUser   string
 		expectedSecret string
 		expectErr      bool
 	}{
-		"should not return error if auth config is nil": {},
-		"should not return error if empty auth is provided for access to anonymous registry": {
+		{
+			desc: "should not return error if auth config is nil",
+		},
+		{
+			desc:      "should not return error if empty auth is provided for access to anonymous registry",
 			auth:      &runtime.AuthConfig{},
 			expectErr: false,
 		},
-		"should support identity token": {
+		{
+			desc:           "should support identity token",
 			auth:           &runtime.AuthConfig{IdentityToken: "abcd"},
 			expectedSecret: "abcd",
 		},
-		"should support username and password": {
+		{
+			desc: "should support username and password",
 			auth: &runtime.AuthConfig{
 				Username: testUser,
 				Password: testPasswd,
@@ -63,16 +69,19 @@ func TestParseAuth(t *testing.T) {
 			expectedUser:   testUser,
 			expectedSecret: testPasswd,
 		},
-		"should support auth": {
+		{
+			desc:           "should support auth",
 			auth:           &runtime.AuthConfig{Auth: string(testAuth)},
 			expectedUser:   testUser,
 			expectedSecret: testPasswd,
 		},
-		"should return error for invalid auth": {
+		{
+			desc:      "should return error for invalid auth",
 			auth:      &runtime.AuthConfig{Auth: string(invalidAuth)},
 			expectErr: true,
 		},
-		"should return empty auth if server address doesn't match": {
+		{
+			desc: "should return empty auth if server address doesn't match",
 			auth: &runtime.AuthConfig{
 				Username:      testUser,
 				Password:      testPasswd,
@@ -82,7 +91,8 @@ func TestParseAuth(t *testing.T) {
 			expectedUser:   "",
 			expectedSecret: "",
 		},
-		"should return auth if server address matches": {
+		{
+			desc: "should return auth if server address matches",
 			auth: &runtime.AuthConfig{
 				Username:      testUser,
 				Password:      testPasswd,
@@ -92,7 +102,8 @@ func TestParseAuth(t *testing.T) {
 			expectedUser:   testUser,
 			expectedSecret: testPasswd,
 		},
-		"should return auth if server address is not specified": {
+		{
+			desc: "should return auth if server address is not specified",
 			auth: &runtime.AuthConfig{
 				Username: testUser,
 				Password: testPasswd,
@@ -102,7 +113,8 @@ func TestParseAuth(t *testing.T) {
 			expectedSecret: testPasswd,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			u, s, err := ParseAuth(test.auth, test.host)
 			assert.Equal(t, test.expectErr, err != nil)
 			assert.Equal(t, test.expectedUser, u)
@@ -112,12 +124,14 @@ func TestParseAuth(t *testing.T) {
 }
 
 func TestRegistryEndpoints(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc     string
 		mirrors  map[string]criconfig.Mirror
 		host     string
 		expected []string
 	}{
-		"no mirror configured": {
+		{
+			desc: "no mirror configured",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-1.io": {
 					Endpoints: []string{
@@ -131,7 +145,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"mirror configured": {
+		{
+			desc: "mirror configured",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-3.io": {
 					Endpoints: []string{
@@ -147,7 +162,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"wildcard mirror configured": {
+		{
+			desc: "wildcard mirror configured",
 			mirrors: map[string]criconfig.Mirror{
 				"*": {
 					Endpoints: []string{
@@ -163,7 +179,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"host should take precedence if both host and wildcard mirrors are configured": {
+		{
+			desc: "host should take precedence if both host and wildcard mirrors are configured",
 			mirrors: map[string]criconfig.Mirror{
 				"*": {
 					Endpoints: []string{
@@ -182,7 +199,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"default endpoint in list with http": {
+		{
+			desc: "default endpoint in list with http",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-3.io": {
 					Endpoints: []string{
@@ -199,7 +217,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"http://registry-3.io",
 			},
 		},
-		"default endpoint in list with https": {
+		{
+			desc: "default endpoint in list with https",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-3.io": {
 					Endpoints: []string{
@@ -216,7 +235,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io",
 			},
 		},
-		"default endpoint in list with path": {
+		{
+			desc: "default endpoint in list with path",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-3.io": {
 					Endpoints: []string{
@@ -233,7 +253,8 @@ func TestRegistryEndpoints(t *testing.T) {
 				"https://registry-3.io/path",
 			},
 		},
-		"miss scheme endpoint in list with path": {
+		{
+			desc: "miss scheme endpoint in list with path",
 			mirrors: map[string]criconfig.Mirror{
 				"registry-3.io": {
 					Endpoints: []string{
@@ -251,7 +272,8 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
 			got, err := c.registryEndpoints(test.host)
@@ -262,52 +284,64 @@ func TestRegistryEndpoints(t *testing.T) {
 }
 
 func TestDefaultScheme(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc     string
 		host     string
 		expected string
 	}{
-		"should use http by default for localhost": {
+		{
+			desc:     "should use http by default for localhost",
 			host:     "localhost",
 			expected: "http",
 		},
-		"should use http by default for localhost with port": {
+		{
+			desc:     "should use http by default for localhost with port",
 			host:     "localhost:8080",
 			expected: "http",
 		},
-		"should use http by default for 127.0.0.1": {
+		{
+			desc:     "should use http by default for 127.0.0.1",
 			host:     "127.0.0.1",
 			expected: "http",
 		},
-		"should use http by default for 127.0.0.1 with port": {
+		{
+			desc:     "should use http by default for 127.0.0.1 with port",
 			host:     "127.0.0.1:8080",
 			expected: "http",
 		},
-		"should use http by default for ::1": {
+		{
+			desc:     "should use http by default for ::1",
 			host:     "::1",
 			expected: "http",
 		},
-		"should use http by default for ::1 with port": {
+		{
+			desc:     "should use http by default for ::1 with port",
 			host:     "[::1]:8080",
 			expected: "http",
 		},
-		"should use https by default for remote host": {
+		{
+			desc:     "should use https by default for remote host",
 			host:     "remote",
 			expected: "https",
 		},
-		"should use https by default for remote host with port": {
+		{
+			desc:     "should use https by default for remote host with port",
 			host:     "remote:8080",
 			expected: "https",
 		},
-		"should use https by default for remote ip": {
+		{
+			desc:     "should use https by default for remote ip",
 			host:     "8.8.8.8",
 			expected: "https",
 		},
-		"should use https by default for remote ip with port": {
+		{
+			desc:     "should use https by default for remote ip with port",
 			host:     "8.8.8.8:8080",
 			expected: "https",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			got := defaultScheme(test.host)
 			assert.Equal(t, test.expected, got)
 		})
@@ -315,20 +349,24 @@ func TestDefaultScheme(t *testing.T) {
 }
 
 func TestEncryptedImagePullOpts(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc         string
 		keyModel     string
 		expectedOpts int
 	}{
-		"node key model should return one unpack opt": {
+		{
+			desc:         "node key model should return one unpack opt",
 			keyModel:     criconfig.KeyModelNode,
 			expectedOpts: 1,
 		},
-		"no key model selected should default to node key model": {
+		{
+			desc:         "no key model selected should default to node key model",
 			keyModel:     "",
 			expectedOpts: 0,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.config.ImageDecryption.KeyModel = test.keyModel
 			got := len(c.encryptedImagesPullOpts())
@@ -400,35 +438,41 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 
 func TestGetRepoDigestAndTag(t *testing.T) {
 	digest := digest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc               string
 		ref                string
 		schema1            bool
 		expectedRepoDigest string
 		expectedRepoTag    string
 	}{
-		"repo tag should be empty if original ref has no tag": {
+		{
+			desc:               "repo tag should be empty if original ref has no tag",
 			ref:                "gcr.io/library/busybox@" + digest.String(),
 			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
 		},
-		"repo tag should not be empty if original ref has tag": {
+		{
+			desc:               "repo tag should not be empty if original ref has tag",
 			ref:                "gcr.io/library/busybox:latest",
 			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		"repo digest should be empty if original ref is schema1 and has no digest": {
+		{
+			desc:               "repo digest should be empty if original ref is schema1 and has no digest",
 			ref:                "gcr.io/library/busybox:latest",
 			schema1:            true,
 			expectedRepoDigest: "",
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		"repo digest should not be empty if original ref is schema1 but has digest": {
+		{
+			desc:               "repo digest should not be empty if original ref is schema1 but has digest",
 			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
 			schema1:            true,
 			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
 			expectedRepoTag:    "",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			named, err := docker.ParseDockerRef(test.ref)
 			assert.NoError(t, err)
 			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)

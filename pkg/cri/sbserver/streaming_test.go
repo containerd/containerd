@@ -24,12 +24,14 @@ import (
 )
 
 func TestValidateStreamServer(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc string
 		*criService
 		tlsMode   streamListenerMode
 		expectErr bool
 	}{
-		"should pass with default withoutTLS": {
+		{
+			desc: "should pass with default withoutTLS",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.DefaultConfig(),
@@ -38,7 +40,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   withoutTLS,
 			expectErr: false,
 		},
-		"should pass with x509KeyPairTLS": {
+		{
+			desc: "should pass with x509KeyPairTLS",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -53,7 +56,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   x509KeyPairTLS,
 			expectErr: false,
 		},
-		"should pass with selfSign": {
+		{
+			desc: "should pass with selfSign",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -64,7 +68,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   selfSignTLS,
 			expectErr: false,
 		},
-		"should return error with X509 keypair but not EnableTLSStreaming": {
+		{
+			desc: "should return error with X509 keypair but not EnableTLSStreaming",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -79,7 +84,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   -1,
 			expectErr: true,
 		},
-		"should return error with X509 TLSCertFile empty": {
+		{
+			desc: "should return error with X509 TLSCertFile empty",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -94,7 +100,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   -1,
 			expectErr: true,
 		},
-		"should return error with X509 TLSKeyFile empty": {
+		{
+			desc: "should return error with X509 TLSKeyFile empty",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -109,7 +116,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   -1,
 			expectErr: true,
 		},
-		"should return error without EnableTLSStreaming and only TLSCertFile set": {
+		{
+			desc: "should return error without EnableTLSStreaming and only TLSCertFile set",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -124,7 +132,8 @@ func TestValidateStreamServer(t *testing.T) {
 			tlsMode:   -1,
 			expectErr: true,
 		},
-		"should return error without EnableTLSStreaming and only TLSKeyFile set": {
+		{
+			desc: "should return error without EnableTLSStreaming and only TLSKeyFile set",
 			criService: &criService{
 				config: config.Config{
 					PluginConfig: config.PluginConfig{
@@ -140,7 +149,8 @@ func TestValidateStreamServer(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			tlsMode, err := getStreamListenerMode(test.criService)
 			if test.expectErr {
 				assert.Error(t, err)

@@ -31,35 +31,41 @@ import (
 
 func TestGetRepoDigestAndTag(t *testing.T) {
 	digest := imagedigest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc               string
 		ref                string
 		schema1            bool
 		expectedRepoDigest string
 		expectedRepoTag    string
 	}{
-		"repo tag should be empty if original ref has no tag": {
+		{
+			desc:               "repo tag should be empty if original ref has no tag",
 			ref:                "gcr.io/library/busybox@" + digest.String(),
 			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
 		},
-		"repo tag should not be empty if original ref has tag": {
+		{
+			desc:               "repo tag should not be empty if original ref has tag",
 			ref:                "gcr.io/library/busybox:latest",
 			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		"repo digest should be empty if original ref is schema1 and has no digest": {
+		{
+			desc:               "repo digest should be empty if original ref is schema1 and has no digest",
 			ref:                "gcr.io/library/busybox:latest",
 			schema1:            true,
 			expectedRepoDigest: "",
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		"repo digest should not be empty if original ref is schema1 but has digest": {
+		{
+			desc:               "repo digest should not be empty if original ref is schema1 but has digest",
 			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
 			schema1:            true,
 			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
 			expectedRepoTag:    "",
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			named, err := docker.ParseDockerRef(test.ref)
 			assert.NoError(t, err)
 			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
@@ -109,18 +115,21 @@ func TestParseImageReferences(t *testing.T) {
 }
 
 func TestEnvDeduplication(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc     string
 		existing []string
 		kv       [][2]string
 		expected []string
 	}{
-		"single env": {
+		{
+			desc: "single env",
 			kv: [][2]string{
 				{"a", "b"},
 			},
 			expected: []string{"a=b"},
 		},
-		"multiple envs": {
+		{
+			desc: "multiple envs",
 			kv: [][2]string{
 				{"a", "b"},
 				{"c", "d"},
@@ -132,7 +141,8 @@ func TestEnvDeduplication(t *testing.T) {
 				"e=f",
 			},
 		},
-		"env override": {
+		{
+			desc: "env override",
 			kv: [][2]string{
 				{"k1", "v1"},
 				{"k2", "v2"},
@@ -148,7 +158,8 @@ func TestEnvDeduplication(t *testing.T) {
 				"k4=v6",
 			},
 		},
-		"existing env": {
+		{
+			desc: "existing env",
 			existing: []string{
 				"k1=v1",
 				"k2=v2",
@@ -167,7 +178,8 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {
 				spec.Process = &runtimespec.Process{
@@ -183,17 +195,20 @@ func TestEnvDeduplication(t *testing.T) {
 }
 
 func TestPassThroughAnnotationsFilter(t *testing.T) {
-	for desc, test := range map[string]struct {
+	for _, test := range []struct {
+		desc                   string
 		podAnnotations         map[string]string
 		runtimePodAnnotations  []string
 		passthroughAnnotations map[string]string
 	}{
-		"should support direct match": {
+		{
+			desc:                   "should support direct match",
 			podAnnotations:         map[string]string{"c": "d", "d": "e"},
 			runtimePodAnnotations:  []string{"c"},
 			passthroughAnnotations: map[string]string{"c": "d"},
 		},
-		"should support wildcard match": {
+		{
+			desc: "should support wildcard match",
 			podAnnotations: map[string]string{
 				"t.f":  "j",
 				"z.g":  "o",
@@ -208,7 +223,8 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 				"y.ca": "b",
 			},
 		},
-		"should support wildcard match all": {
+		{
+			desc: "should support wildcard match all",
 			podAnnotations: map[string]string{
 				"t.f":  "j",
 				"z.g":  "o",
@@ -225,7 +241,8 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 				"y":    "b",
 			},
 		},
-		"should support match including path separator": {
+		{
+			desc: "should support match including path separator",
 			podAnnotations: map[string]string{
 				"matchend.com/end":    "1",
 				"matchend.com/end1":   "2",
@@ -284,7 +301,8 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(desc, func(t *testing.T) {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
 			passthroughAnnotations := getPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
