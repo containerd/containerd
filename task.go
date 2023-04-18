@@ -487,7 +487,7 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	}
 	// if checkpoint image path passed, jump checkpoint image,
 	// return an empty image
-	if isCheckpointPathExist(cr.Runtime.Name, i.Options) {
+	if isCheckpointPathExist(i.Options) {
 		return NewImage(t.client, images.Image{}), nil
 	}
 
@@ -688,18 +688,10 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 	}, nil
 }
 
-// isCheckpointPathExist only suitable for runc runtime now
-func isCheckpointPathExist(runtime string, v interface{}) bool {
-	if v == nil {
-		return false
+func isCheckpointPathExist(v interface{}) bool {
+	switch opts := v.(type) {
+	case *options.CheckpointOptions:
+		return opts != nil && opts.ImagePath != ""
 	}
-
-	switch runtime {
-	case plugin.RuntimeRuncV2:
-		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
-			return true
-		}
-	}
-
 	return false
 }
