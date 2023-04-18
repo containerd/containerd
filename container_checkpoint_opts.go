@@ -27,12 +27,10 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -60,41 +58,13 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	any, err := protobuf.MarshalAnyToProto(copts)
 	if err != nil {
-		return nil
+		return err
 	}
-	task, err := client.TaskService().Checkpoint(ctx, &tasks.CheckpointTaskRequest{
+	request := &tasks.CheckpointTaskRequest{
 		ContainerID: c.ID,
 		Options:     any,
-	})
-	if err != nil {
-		return err
 	}
-	for _, d := range task.Descriptors {
-		platformSpec := platforms.DefaultSpec()
-		index.Manifests = append(index.Manifests, imagespec.Descriptor{
-			MediaType:   d.MediaType,
-			Size:        d.Size,
-			Digest:      digest.Digest(d.Digest),
-			Platform:    &platformSpec,
-			Annotations: d.Annotations,
-		})
-	}
-	// save copts
-	data, err := proto.Marshal(any)
-	if err != nil {
-		return err
-	}
-	r := bytes.NewReader(data)
-	desc, err := writeContent(ctx, client.ContentStore(), images.MediaTypeContainerd1CheckpointOptions, c.ID+"-checkpoint-options", r)
-	if err != nil {
-		return err
-	}
-	desc.Platform = &imagespec.Platform{
-		OS:           runtime.GOOS,
-		Architecture: runtime.GOARCH,
-	}
-	index.Manifests = append(index.Manifests, desc)
-	return nil
+	return checkpointTask(ctx, client, c, index, request)
 }
 
 // WithCheckpointRuntime includes the container runtime info
@@ -132,7 +102,6 @@ func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Contain
 	)
 	if err != nil {
 		return err
-
 	}
 	rw.Platform = &imagespec.Platform{
 		OS:           runtime.GOOS,

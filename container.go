@@ -378,6 +378,9 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	i := images.Image{
 		Name:   ref,
 		Target: desc,
+		Labels: map[string]string{
+			"containerd.io/checkpoint": "true",
+		},
 	}
 	checkpoint, err := c.client.ImageService().Create(ctx, i)
 	if err != nil {

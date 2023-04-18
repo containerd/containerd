@@ -19,11 +19,10 @@ package containerd
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	goruntime "runtime"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -31,20 +30,21 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 	digest "github.com/opencontainers/go-digest"
-	is "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -125,6 +125,39 @@ type CheckpointTaskInfo struct {
 // Runtime name for the container
 func (i *CheckpointTaskInfo) Runtime() string {
 	return i.runtime
+}
+
+// WithCheckpointOptions includes the running task
+func (i *CheckpointTaskInfo) WithCheckpointOptions(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+	opts, ok := i.Options.(*options.CheckpointOptions)
+	if !ok {
+		return nil
+	}
+	any, err := protobuf.MarshalAnyToProto(opts)
+	if err != nil {
+		return err
+	}
+	copts.Reset()
+	return typeurl.UnmarshalTo(any, copts)
+}
+
+// WithCheckpointTask includes the running task
+func (i *CheckpointTaskInfo) WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+	var options interface{} = copts
+	if i.Options != nil {
+		options = i.Options
+	}
+	any, err := protobuf.MarshalAnyToProto(options)
+	if err != nil {
+		return err
+	}
+
+	request := &tasks.CheckpointTaskRequest{
+		ContainerID:      c.ID,
+		ParentCheckpoint: i.ParentCheckpoint.String(),
+		Options:          any,
+	}
+	return checkpointTask(ctx, client, c, index, request)
 }
 
 // CheckpointTaskOpts allows the caller to set checkpoint options
@@ -434,14 +467,15 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		return nil, err
 	}
 	defer done(ctx)
-	cr, err := t.client.ContainerService().Get(ctx, t.id)
+	container, err := t.client.LoadContainer(ctx, t.id)
+	if err != nil {
+		return nil, err
+	}
+	cr, err := container.Info(ctx, func(i *InfoConfig) { i.Refresh = false })
 	if err != nil {
 		return nil, err
 	}
 
-	request := &tasks.CheckpointTaskRequest{
-		ContainerID: t.id,
-	}
 	i := CheckpointTaskInfo{
 		runtime: cr.Runtime.Name,
 	}
@@ -454,20 +488,11 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	if i.Name == "" {
 		i.Name = fmt.Sprintf(checkpointNameFormat, t.id, time.Now().Format(checkpointDateFormat))
 	}
-	request.ParentCheckpoint = i.ParentCheckpoint.String()
-	if i.Options != nil {
-		any, err := protobuf.MarshalAnyToProto(i.Options)
-		if err != nil {
-			return nil, err
-		}
-		request.Options = any
-	}
 
 	status, err := t.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
-
 	if status.Status != Paused {
 		// make sure we pause it and resume after all other filesystem operations are completed
 		if err := t.Pause(ctx); err != nil {
@@ -476,47 +501,44 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		defer t.Resume(ctx)
 	}
 
-	index := v1.Index{
-		Versioned: is.Versioned{
-			SchemaVersion: 2,
-		},
-		Annotations: make(map[string]string),
-	}
-	if err := t.checkpointTask(ctx, &index, request); err != nil {
-		return nil, err
-	}
 	// if checkpoint image path passed, jump checkpoint image,
 	// return an empty image
 	if isCheckpointPathExist(i.Options) {
+		request := &tasks.CheckpointTaskRequest{
+			ContainerID:      cr.ID,
+			ParentCheckpoint: i.ParentCheckpoint.String(),
+		}
+		if i.Options != nil {
+			options, err := protobuf.MarshalAnyToProto(i.Options)
+			if err != nil {
+				return nil, err
+			}
+			request.Options = options
+		}
+		if _, err := t.client.TaskService().Checkpoint(ctx, request); err != nil {
+			return nil, errdefs.FromGRPC(err)
+		}
 		return NewImage(t.client, images.Image{}), nil
 	}
 
+	copts := []CheckpointOpts{
+		i.WithCheckpointOptions,
+		WithCheckpointRuntime,
+		i.WithCheckpointTask,
+	}
 	if cr.Image != "" {
-		if err := t.checkpointImage(ctx, &index, cr.Image); err != nil {
-			return nil, err
-		}
-		index.Annotations["image.name"] = cr.Image
+		copts = append(copts,
+			WithCheckpointImage,
+			func(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+				// compatible with annotation of 1.x checkpoint images
+				index.Annotations["image.name"] = cr.Image
+				return nil
+			})
 	}
 	if cr.SnapshotKey != "" {
-		if err := t.checkpointRWSnapshot(ctx, &index, cr.Snapshotter, cr.SnapshotKey); err != nil {
-			return nil, err
-		}
+		copts = append(copts, WithCheckpointRW)
 	}
-	desc, err := t.writeIndex(ctx, &index)
-	if err != nil {
-		return nil, err
-	}
-	im := images.Image{
-		Name:   i.Name,
-		Target: desc,
-		Labels: map[string]string{
-			"containerd.io/checkpoint": "true",
-		},
-	}
-	if im, err = t.client.ImageService().Create(ctx, im); err != nil {
-		return nil, err
-	}
-	return NewImage(t.client, im), nil
+	return container.Checkpoint(ctx, i.Name, copts...)
 }
 
 // UpdateTaskInfo allows updated specific settings to be changed on a task
@@ -603,66 +625,39 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 	return response.Metrics[0], nil
 }
 
-func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
-	response, err := t.client.TaskService().Checkpoint(ctx, request)
+func checkpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, request *tasks.CheckpointTaskRequest) error {
+	task, err := client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return err
 	}
 	// NOTE: response.Descriptors can be an empty slice if checkpoint image is jumped
 	// add the checkpoint descriptors to the index
-	for _, d := range response.Descriptors {
-		index.Manifests = append(index.Manifests, v1.Descriptor{
-			MediaType: d.MediaType,
-			Size:      d.Size,
-			Digest:    digest.Digest(d.Digest),
-			Platform: &v1.Platform{
-				OS:           goruntime.GOOS,
-				Architecture: goruntime.GOARCH,
-			},
+	for _, d := range task.Descriptors {
+		platformSpec := platforms.DefaultSpec()
+		index.Manifests = append(index.Manifests, imagespec.Descriptor{
+			MediaType:   d.MediaType,
+			Size:        d.Size,
+			Digest:      digest.Digest(d.Digest),
+			Platform:    &platformSpec,
 			Annotations: d.Annotations,
 		})
 	}
-	return nil
-}
 
-func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
-	opts := []diff.Opt{
-		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
-	}
-	rw, err := rootfs.CreateDiff(ctx, id, t.client.SnapshotService(snapshotterName), t.client.DiffService(), opts...)
+	// save copts
+	data, err := proto.Marshal(request.Options)
 	if err != nil {
 		return err
 	}
-	rw.Platform = &v1.Platform{
-		OS:           goruntime.GOOS,
-		Architecture: goruntime.GOARCH,
-	}
-	index.Manifests = append(index.Manifests, rw)
-	return nil
-}
-
-func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
-	if image == "" {
-		return fmt.Errorf("cannot checkpoint image with empty name")
-	}
-	ir, err := t.client.ImageService().Get(ctx, image)
+	desc, err := writeContent(ctx, client.ContentStore(), images.MediaTypeContainerd1CheckpointOptions, c.ID+"-checkpoint-options", bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
-	index.Manifests = append(index.Manifests, ir.Target)
+	desc.Platform = &imagespec.Platform{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+	}
+	index.Manifests = append(index.Manifests, desc)
 	return nil
-}
-
-func (t *task) writeIndex(ctx context.Context, index *v1.Index) (d v1.Descriptor, err error) {
-	labels := map[string]string{}
-	for i, m := range index.Manifests {
-		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
-	}
-	buf := bytes.NewBuffer(nil)
-	if err := json.NewEncoder(buf).Encode(index); err != nil {
-		return v1.Descriptor{}, err
-	}
-	return writeContent(ctx, t.client.ContentStore(), v1.MediaTypeImageIndex, t.id, buf, content.WithLabels(labels))
 }
 
 func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d v1.Descriptor, err error) {
