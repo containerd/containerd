@@ -102,6 +102,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		spec  containerd.NewContainerOpts
 	)
 
+	if sandbox := context.String("sandbox"); sandbox != "" {
+		cOpts = append(cOpts, containerd.WithSandbox(sandbox))
+	}
+
 	if config {
 		cOpts = append(cOpts, containerd.WithContainerLabels(commands.LabelArgs(context.StringSlice("label"))))
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))
