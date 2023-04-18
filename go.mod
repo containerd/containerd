@@ -3,7 +3,7 @@ module github.com/containerd/containerd
 go 1.19
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1 // replaced; see replace rules for actual version used.
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 	github.com/Microsoft/go-winio v0.6.0
 	github.com/Microsoft/hcsshim v0.10.0-rc.7
@@ -48,8 +48,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runc v1.1.5
 	github.com/opencontainers/runtime-spec v1.1.0-rc.1
-	// ATM the runtime-tools commit we need are beyond the latest tag.
-	// We use a replace to handle that until a new version is tagged.
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626
 	github.com/opencontainers/selinux v1.11.0
 	github.com/pelletier/go-toml v1.9.5
@@ -143,6 +141,6 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
-replace github.com/opencontainers/runtime-tools => github.com/opencontainers/runtime-tools v0.0.0-20221026201742-946c877fa809
-
+// Fork will be merged later but may impact other go-fuzz-headers consumers:
+// https://github.com/containerd/containerd/pull/7957#pullrequestreview-1244814968
 replace github.com/AdaLogics/go-fuzz-headers => github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230111232327-1f10f66a31bf
