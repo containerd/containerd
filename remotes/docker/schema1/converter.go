@@ -48,6 +48,8 @@ import (
 const (
 	manifestSizeLimit            = 8e6 // 8MB
 	labelDockerSchema1EmptyLayer = "containerd.io/docker.schema1.empty-layer"
+
+	ManifestDigest = "manifest-digest"
 )
 
 type blobState struct {
@@ -60,7 +62,8 @@ type Converter struct {
 	contentStore content.Store
 	fetcher      remotes.Fetcher
 
-	pulledManifest *manifest
+	pulledManifest       *manifest
+	pulledManifestDigest digest.Digest
 
 	mu         sync.Mutex
 	blobMap    map[digest.Digest]blobState
@@ -205,9 +208,10 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 	}
 
 	desc := ocispec.Descriptor{
-		MediaType: co.ManifestMediaType,
-		Digest:    digest.Canonical.FromBytes(mb),
-		Size:      int64(len(mb)),
+		MediaType:   co.ManifestMediaType,
+		Digest:      digest.Canonical.FromBytes(mb),
+		Size:        int64(len(mb)),
+		Annotations: map[string]string{ManifestDigest: c.pulledManifestDigest.String()},
 	}
 
 	labels := map[string]string{}
@@ -262,6 +266,7 @@ func (c *Converter) fetchManifest(ctx context.Context, desc ocispec.Descriptor) 
 		return errors.New("converter: expected schema1 document but found extra keys")
 	}
 	c.pulledManifest = &m
+	c.pulledManifestDigest = desc.Digest
 
 	return nil
 }

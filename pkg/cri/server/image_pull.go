@@ -49,6 +49,7 @@ import (
 	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
+	"github.com/containerd/containerd/remotes/docker/schema1"
 	"github.com/containerd/containerd/tracing"
 )
 
@@ -194,6 +195,11 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageID := configDesc.Digest.String()
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	if isSchema1 && repoDigest == "" {
+		if manifestDigest, ok := image.Target().Annotations[schema1.ManifestDigest]; ok && manifestDigest != "" {
+			repoDigest = namedRef.Name() + "@" + manifestDigest
+		}
+	}
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
