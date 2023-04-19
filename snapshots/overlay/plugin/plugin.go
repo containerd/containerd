@@ -24,6 +24,11 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/overlay"
+	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
+)
+
+const (
+	capaRemapIds = "remap-ids"
 )
 
 // Config represents configuration for the overlay plugin.
@@ -65,6 +70,10 @@ func init() {
 
 			if len(config.MountOptions) > 0 {
 				oOpts = append(oOpts, overlay.WithMountOptions(config.MountOptions))
+			}
+			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
+				oOpts = append(oOpts, overlay.WithRemapIds)
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIds)
 			}
 
 			ic.Meta.Exports["root"] = root
