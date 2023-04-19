@@ -186,8 +186,9 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				opts = append(opts,
 					oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}))
 				// use snapshotter opts or the remapped snapshot support to shift the filesystem
-				// currently the only snapshotter known to support the labels is fuse-overlayfs:
-				// https://github.com/AkihiroSuda/containerd-fuse-overlayfs
+				// currently the snapshotters known to support the labels are:
+				// fuse-overlayfs - https://github.com/containerd/fuse-overlayfs-snapshotter
+				// overlay - in case of idmapped mount points are supported by host kernel (Linux kernel 5.19)
 				if context.Bool("remap-labels") {
 					cOpts = append(cOpts, containerd.WithNewSnapshot(id, image,
 						containerd.WithRemapperLabels(0, uidMap.HostID, 0, gidMap.HostID, uidMap.Size)))
