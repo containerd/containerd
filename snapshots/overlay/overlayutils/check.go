@@ -198,3 +198,14 @@ func NeedsUserXAttr(d string) (bool, error) {
 	}
 	return true, nil
 }
+
+// SupportsIDMappedMounts tells if this kernel supports idmapped mounts for overlayfs
+// or not.
+func SupportsIDMappedMounts() (bool, error) {
+	// Fast path
+	fiveDotNineteen := kernel.KernelVersion{Kernel: 5, Major: 19}
+	if ok, err := kernel.GreaterEqualThan(fiveDotNineteen); err == nil && ok {
+		return true, nil
+	}
+	return false, nil
+}
