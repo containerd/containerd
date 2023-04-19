@@ -153,6 +153,11 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 				return err
 			}
 
+			if c.Parameters["error"] == "invalid_token" {
+				log.G(ctx).Debug("caught invalid token, cleanup auth handler and try again")
+				delete(a.handlers, host)
+			}
+
 			// reuse existing handler
 			//
 			// assume that one registry will return the common
