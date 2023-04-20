@@ -51,6 +51,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		config = context.IsSet("config")
 	)
 
+	if sandbox := context.String("sandbox"); sandbox != "" {
+		cOpts = append(cOpts, containerd.WithSandbox(sandbox))
+	}
+
 	if config {
 		id = context.Args().First()
 		opts = append(opts, oci.WithSpecFromFile(context.String("config")))

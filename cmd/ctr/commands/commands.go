@@ -142,6 +142,10 @@ var (
 			Value: defaults.DefaultRuntime,
 		},
 		cli.StringFlag{
+			Name:  "sandbox",
+			Usage: "Create the container in the given sandbox",
+		},
+		cli.StringFlag{
 			Name:  "runtime-config-path",
 			Usage: "Optional runtime config path",
 		},

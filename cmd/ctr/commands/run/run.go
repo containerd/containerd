@@ -164,6 +164,7 @@ var Command = cli.Command{
 			return err
 		}
 		defer cancel()
+
 		container, err := NewContainer(ctx, client, context)
 		if err != nil {
 			return err
