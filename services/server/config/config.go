@@ -164,8 +164,9 @@ type CgroupConfig struct {
 
 // ProxyPlugin provides a proxy plugin configuration
 type ProxyPlugin struct {
-	Type    string `toml:"type"`
-	Address string `toml:"address"`
+	Type     string `toml:"type"`
+	Address  string `toml:"address"`
+	Platform string `toml:"platform"`
 }
 
 // BoltConfig defines the configuration values for the bolt plugin, which is
