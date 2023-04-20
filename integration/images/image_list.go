@@ -54,7 +54,7 @@ func initImages(imageListFile string) {
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
-		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:latest",
+		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
 	}
 
 	if imageListFile != "" {

@@ -127,12 +127,14 @@ func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction
 	action(t, cn, containerConfig)
 }
 
-func startAndTestContainer(t *testing.T, sb string, sbConfig *runtime.PodSandboxConfig, cnConfig *runtime.ContainerConfig) {
+func runAndRemoveContainer(t *testing.T, sb string, sbConfig *runtime.PodSandboxConfig, cnConfig *runtime.ContainerConfig) {
 	t.Log("Create the container")
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
 	t.Log("Start the container")
 	require.NoError(t, runtimeService.StartContainer(cn))
+	// Wait few seconds for the container to be completely initialized
+	time.Sleep(5 * time.Second)
 
 	t.Log("Stop the container")
 	require.NoError(t, runtimeService.StopContainer(cn, 0))
@@ -185,6 +187,6 @@ func TestArgsEscapedImagesOnWindows(t *testing.T) {
 		localSystemUsername,
 	)
 
-	startAndTestContainer(t, sb, sbConfig, cnConfigWithCtrCmd)
-	startAndTestContainer(t, sb, sbConfig, cnConfigNoCtrCmd)
+	runAndRemoveContainer(t, sb, sbConfig, cnConfigWithCtrCmd)
+	runAndRemoveContainer(t, sb, sbConfig, cnConfigNoCtrCmd)
 }
