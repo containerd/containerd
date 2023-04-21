@@ -36,6 +36,7 @@ type ImageList struct {
 	ResourceConsumer string
 	VolumeCopyUp     string
 	VolumeOwnership  string
+	ArgsEscaped      string
 }
 
 var (
@@ -53,6 +54,7 @@ func initImages(imageListFile string) {
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
 		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
+		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
 	}
 
 	if imageListFile != "" {
@@ -88,6 +90,8 @@ const (
 	VolumeCopyUp
 	// VolumeOwnership image
 	VolumeOwnership
+	// Test image for ArgsEscaped windows bug
+	ArgsEscaped
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -98,6 +102,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[ResourceConsumer] = imageList.ResourceConsumer
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
 	images[VolumeOwnership] = imageList.VolumeOwnership
+	images[ArgsEscaped] = imageList.ArgsEscaped
 	return images
 }
 
