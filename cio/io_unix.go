@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
@@ -120,7 +121,11 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (f pipes, retErr error) {
 		}()
 	}
 	if fifos.Stdout != "" {
-		if f.Stdout, retErr = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+		uriStdout, err := url.Parse(fifos.Stdout)
+		if err != nil {
+			return f, fmt.Errorf("unable to parse stdout uri: %w", err)
+		}
+		if f.Stdout, retErr = fifo.OpenFifo(ctx, uriStdout.Path, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
 			return f, fmt.Errorf("failed to open stdout fifo: %w", retErr)
 		}
 		defer func() {
@@ -130,7 +135,11 @@ func openFifos(ctx context.Context, fifos *FIFOSet) (f pipes, retErr error) {
 		}()
 	}
 	if !fifos.Terminal && fifos.Stderr != "" {
-		if f.Stderr, retErr = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+		uriStderr, err := url.Parse(fifos.Stderr)
+		if err != nil {
+			return f, fmt.Errorf("unable to parse stderr uri: %w", err)
+		}
+		if f.Stderr, retErr = fifo.OpenFifo(ctx, uriStderr.Path, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
 			return f, fmt.Errorf("failed to open stderr fifo: %w", retErr)
 		}
 	}
