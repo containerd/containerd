@@ -58,6 +58,13 @@ Binaries are generated from `main` branch every night for `Linux` and `Windows`.
 
 Please be aware: nightly builds might have critical bugs, it's not recommended for use in production and no support provided.
 
+## Kubernetes (k8s) CI Dashboard Group
+
+The [k8s CI dashboard group for containerd](https://testgrid.k8s.io/containerd) contains test results regarding
+the health of kubernetes when run against main and a number of containerd release branches.
+
+- [containerd-periodics](https://testgrid.k8s.io/containerd-periodic)
+
 ## Runtime Requirements
 
 Runtime requirements for containerd are very minimal. Most interactions with
