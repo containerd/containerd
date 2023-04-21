@@ -234,8 +234,8 @@ func LogURI(uri *url.URL) Creator {
 	return func(_ string) (IO, error) {
 		return &logURI{
 			config: Config{
-				Stdout: uri.String(),
-				Stderr: uri.String(),
+				Stdout: uri.Path,
+				Stderr: uri.Path,
 			},
 		}, nil
 	}
