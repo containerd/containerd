@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"github.com/cilium/ebpf"
@@ -270,7 +270,11 @@ func unsafeStringPtr(str string) (unsafe.Pointer, error) {
 // can pass a raw symbol name, e.g. a kernel symbol containing dots.
 func getTraceEventID(group, name string) (uint64, error) {
 	name = sanitizeSymbol(name)
-	tid, err := uint64FromFile(tracefsPath, "events", group, name, "id")
+	path, err := sanitizePath(tracefsPath, "events", group, name, "id")
+	if err != nil {
+		return 0, err
+	}
+	tid, err := readUint64FromFile("%d\n", path)
 	if errors.Is(err, os.ErrNotExist) {
 		return 0, fmt.Errorf("trace event %s/%s: %w", group, name, os.ErrNotExist)
 	}
@@ -279,22 +283,6 @@ func getTraceEventID(group, name string) (uint64, error) {
 	}
 
 	return tid, nil
-}
-
-// getPMUEventType reads a Performance Monitoring Unit's type (numeric identifier)
-// from /sys/bus/event_source/devices/<pmu>/type.
-//
-// Returns ErrNotSupported if the pmu type is not supported.
-func getPMUEventType(typ probeType) (uint64, error) {
-	et, err := uint64FromFile("/sys/bus/event_source/devices", typ.String(), "type")
-	if errors.Is(err, os.ErrNotExist) {
-		return 0, fmt.Errorf("pmu type %s: %w", typ, ErrNotSupported)
-	}
-	if err != nil {
-		return 0, fmt.Errorf("reading pmu type %s: %w", typ, err)
-	}
-
-	return et, nil
 }
 
 // openTracepointPerfEvent opens a tracepoint-type perf event. System-wide
@@ -317,23 +305,75 @@ func openTracepointPerfEvent(tid uint64, pid int) (*sys.FD, error) {
 	return sys.NewFD(fd)
 }
 
-// uint64FromFile reads a uint64 from a file. All elements of path are sanitized
-// and joined onto base. Returns error if base no longer prefixes the path after
-// joining all components.
-func uint64FromFile(base string, path ...string) (uint64, error) {
+func sanitizePath(base string, path ...string) (string, error) {
 	l := filepath.Join(path...)
 	p := filepath.Join(base, l)
 	if !strings.HasPrefix(p, base) {
-		return 0, fmt.Errorf("path '%s' attempts to escape base path '%s': %w", l, base, errInvalidInput)
+		return "", fmt.Errorf("path '%s' attempts to escape base path '%s': %w", l, base, errInvalidInput)
 	}
+	return p, nil
+}
 
-	data, err := os.ReadFile(p)
+// readUint64FromFile reads a uint64 from a file.
+//
+// format specifies the contents of the file in fmt.Scanf syntax.
+func readUint64FromFile(format string, path ...string) (uint64, error) {
+	filename := filepath.Join(path...)
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return 0, fmt.Errorf("reading file %s: %w", p, err)
+		return 0, fmt.Errorf("reading file %q: %w", filename, err)
 	}
 
-	et := bytes.TrimSpace(data)
-	return strconv.ParseUint(string(et), 10, 64)
+	var value uint64
+	n, err := fmt.Fscanf(bytes.NewReader(data), format, &value)
+	if err != nil {
+		return 0, fmt.Errorf("parsing file %q: %w", filename, err)
+	}
+	if n != 1 {
+		return 0, fmt.Errorf("parsing file %q: expected 1 item, got %d", filename, n)
+	}
+
+	return value, nil
+}
+
+type uint64FromFileKey struct {
+	format, path string
+}
+
+var uint64FromFileCache = struct {
+	sync.RWMutex
+	values map[uint64FromFileKey]uint64
+}{
+	values: map[uint64FromFileKey]uint64{},
+}
+
+// readUint64FromFileOnce is like readUint64FromFile but memoizes the result.
+func readUint64FromFileOnce(format string, path ...string) (uint64, error) {
+	filename := filepath.Join(path...)
+	key := uint64FromFileKey{format, filename}
+
+	uint64FromFileCache.RLock()
+	if value, ok := uint64FromFileCache.values[key]; ok {
+		uint64FromFileCache.RUnlock()
+		return value, nil
+	}
+	uint64FromFileCache.RUnlock()
+
+	value, err := readUint64FromFile(format, filename)
+	if err != nil {
+		return 0, err
+	}
+
+	uint64FromFileCache.Lock()
+	defer uint64FromFileCache.Unlock()
+
+	if value, ok := uint64FromFileCache.values[key]; ok {
+		// Someone else got here before us, use what is cached.
+		return value, nil
+	}
+
+	uint64FromFileCache.values[key] = value
+	return value, nil
 }
 
 // Probe BPF perf link.
