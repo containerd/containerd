@@ -301,7 +301,7 @@ version = 2
       #
       # For the naming convention of annotation keys, please reference:
       # * Kubernetes: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/#syntax-and-character-set
-      # * OCI: https://github.com/opencontainers/image-spec/blob/master/annotations.md
+      # * OCI: https://github.com/opencontainers/image-spec/blob/main/annotations.md
       pod_annotations = []
 
       # container_annotations is a list of container annotations passed through to the OCI config of the containers.

@@ -46,7 +46,7 @@ import (
 )
 
 // Some of the following functions are migrated from
-// https://github.com/containernetworking/plugins/blob/master/pkg/testutils/netns_linux.go
+// https://github.com/containernetworking/plugins/blob/main/pkg/testutils/netns_linux.go
 
 // newNS creates a new persistent (bind-mounted) network namespace and returns the
 // path to the network namespace.

@@ -15,7 +15,7 @@ $ containerd-rootless-setuptool.sh install
 $ nerdctl run -d --restart=always --name nginx -p 8080:80 nginx:alpine
 ```
 
-See https://github.com/containerd/nerdctl/blob/master/docs/rootless.md for the further information.
+See [nerdctl/docs/rootless.md](https://github.com/containerd/nerdctl/blob/main/docs/rootless.md) for further information.
 
 ## "Hard way"
 
@@ -33,7 +33,7 @@ $ rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run \
 ```
 
 * `--net=slirp4netns --copy-up=/etc` is only required when you want to unshare network namespaces.
-  See [RootlessKit documentation](https://github.com/rootless-containers/rootlesskit/blob/v0.14.1/docs/network.md) for the further information about the network drivers.
+  See [RootlessKit documentation](https://github.com/rootless-containers/rootlesskit/blob/v0.14.1/docs/network.md) for further information about the network drivers.
 * `--copy-up=/DIR` mounts a writable tmpfs on `/DIR` with symbolic links to the files under the `/DIR` on the parent namespace
   so that the user can add/remove files under `/DIR` in the mount namespace.
   `--copy-up=/etc` and `--copy-up=/run` are needed on typical setup.
