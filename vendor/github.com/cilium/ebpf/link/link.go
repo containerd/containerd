@@ -177,7 +177,7 @@ func AttachRawLink(opts RawLinkOptions) (*RawLink, error) {
 	}
 	fd, err := sys.LinkCreate(&attr)
 	if err != nil {
-		return nil, fmt.Errorf("can't create link: %s", err)
+		return nil, fmt.Errorf("create link: %w", err)
 	}
 
 	return &RawLink{fd, ""}, nil
@@ -280,27 +280,24 @@ func (l *RawLink) Info() (*Info, error) {
 	switch info.Type {
 	case CgroupType:
 		extra = &CgroupInfo{}
-	case IterType:
-		// not supported
 	case NetNsType:
 		extra = &NetNsInfo{}
-	case RawTracepointType:
-		// not supported
 	case TracingType:
 		extra = &TracingInfo{}
 	case XDPType:
 		extra = &XDPInfo{}
-	case PerfEventType:
-		// no extra
+	case RawTracepointType, IterType,
+		PerfEventType, KprobeMultiType:
+		// Extra metadata not supported.
 	default:
 		return nil, fmt.Errorf("unknown link info type: %d", info.Type)
 	}
 
-	if info.Type != RawTracepointType && info.Type != IterType && info.Type != PerfEventType {
+	if extra != nil {
 		buf := bytes.NewReader(info.Extra[:])
 		err := binary.Read(buf, internal.NativeEndian, extra)
 		if err != nil {
-			return nil, fmt.Errorf("can not read extra link info: %w", err)
+			return nil, fmt.Errorf("cannot read extra link info: %w", err)
 		}
 	}
 

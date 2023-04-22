@@ -138,7 +138,7 @@ func (cg *progAttachCgroup) Pin(string) error {
 }
 
 func (cg *progAttachCgroup) Unpin() error {
-	return fmt.Errorf("can't pin cgroup: %w", ErrNotSupported)
+	return fmt.Errorf("can't unpin cgroup: %w", ErrNotSupported)
 }
 
 func (cg *progAttachCgroup) Info() (*Info, error) {

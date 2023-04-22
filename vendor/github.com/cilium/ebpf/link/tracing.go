@@ -1,6 +1,7 @@
 package link
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cilium/ebpf"
@@ -70,6 +71,10 @@ func AttachFreplace(targetProg *ebpf.Program, name string, prog *ebpf.Program) (
 		Attach:  ebpf.AttachNone,
 		BTF:     typeID,
 	})
+	if errors.Is(err, sys.ENOTSUPP) {
+		// This may be returned by bpf_tracing_prog_attach via bpf_arch_text_poke.
+		return nil, fmt.Errorf("create raw tracepoint: %w", ErrNotSupported)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +104,12 @@ func attachBTFID(program *ebpf.Program) (Link, error) {
 	fd, err := sys.RawTracepointOpen(&sys.RawTracepointOpenAttr{
 		ProgFd: uint32(program.FD()),
 	})
+	if errors.Is(err, sys.ENOTSUPP) {
+		// This may be returned by bpf_tracing_prog_attach via bpf_arch_text_poke.
+		return nil, fmt.Errorf("create raw tracepoint: %w", ErrNotSupported)
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create raw tracepoint: %w", err)
 	}
 
 	raw := RawLink{fd: fd}

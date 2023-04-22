@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/internal"
@@ -15,12 +14,6 @@ import (
 
 var (
 	uprobeEventsPath = filepath.Join(tracefsPath, "uprobe_events")
-
-	uprobeRetprobeBit = struct {
-		once  sync.Once
-		value uint64
-		err   error
-	}{}
 
 	uprobeRefCtrOffsetPMUPath = "/sys/bus/event_source/devices/uprobe/format/ref_ctr_offset"
 	// elixir.bootlin.com/linux/v5.15-rc7/source/kernel/events/core.c#L9799
@@ -81,7 +74,7 @@ type UprobeOptions struct {
 
 // To open a new Executable, use:
 //
-//  OpenExecutable("/bin/bash")
+//	OpenExecutable("/bin/bash")
 //
 // The returned value can then be used to open Uprobe(s).
 func OpenExecutable(path string) (*Executable, error) {
@@ -194,13 +187,13 @@ func (ex *Executable) address(symbol string, opts *UprobeOptions) (uint64, error
 // given symbol starts executing in the given Executable.
 // For example, /bin/bash::main():
 //
-//  ex, _ = OpenExecutable("/bin/bash")
-//  ex.Uprobe("main", prog, nil)
+//	ex, _ = OpenExecutable("/bin/bash")
+//	ex.Uprobe("main", prog, nil)
 //
 // When using symbols which belongs to shared libraries,
 // an offset must be provided via options:
 //
-//  up, err := ex.Uprobe("main", prog, &UprobeOptions{Offset: 0x123})
+//	up, err := ex.Uprobe("main", prog, &UprobeOptions{Offset: 0x123})
 //
 // Note: Setting the Offset field in the options supersedes the symbol's offset.
 //
@@ -228,13 +221,13 @@ func (ex *Executable) Uprobe(symbol string, prog *ebpf.Program, opts *UprobeOpti
 // Uretprobe attaches the given eBPF program to a perf event that fires right
 // before the given symbol exits. For example, /bin/bash::main():
 //
-//  ex, _ = OpenExecutable("/bin/bash")
-//  ex.Uretprobe("main", prog, nil)
+//	ex, _ = OpenExecutable("/bin/bash")
+//	ex.Uretprobe("main", prog, nil)
 //
 // When using symbols which belongs to shared libraries,
 // an offset must be provided via options:
 //
-//  up, err := ex.Uretprobe("main", prog, &UprobeOptions{Offset: 0x123})
+//	up, err := ex.Uretprobe("main", prog, &UprobeOptions{Offset: 0x123})
 //
 // Note: Setting the Offset field in the options supersedes the symbol's offset.
 //
@@ -363,11 +356,4 @@ func uprobeToken(args probeArgs) string {
 	}
 
 	return po
-}
-
-func uretprobeBit() (uint64, error) {
-	uprobeRetprobeBit.once.Do(func() {
-		uprobeRetprobeBit.value, uprobeRetprobeBit.err = determineRetprobeBit(uprobeType)
-	})
-	return uprobeRetprobeBit.value, uprobeRetprobeBit.err
 }

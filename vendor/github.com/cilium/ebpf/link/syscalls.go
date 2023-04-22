@@ -23,6 +23,7 @@ const (
 	NetNsType         = sys.BPF_LINK_TYPE_NETNS
 	XDPType           = sys.BPF_LINK_TYPE_XDP
 	PerfEventType     = sys.BPF_LINK_TYPE_PERF_EVENT
+	KprobeMultiType   = sys.BPF_LINK_TYPE_KPROBE_MULTI
 )
 
 var haveProgAttach = internal.FeatureTest("BPF_PROG_ATTACH", "4.10", func() error {
