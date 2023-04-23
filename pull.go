@@ -139,7 +139,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		return nil, err
 	}
 
-	// NOTE(fuweid): unpacker defers blobs download. before create image
+	// NOTE(fuweid): unpacker defers blobs download. before creating image
 	// record in ImageService, should wait for unpacking(including blobs
 	// download).
 	var ur unpack.Result
