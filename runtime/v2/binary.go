@@ -25,8 +25,6 @@ import (
 	"path/filepath"
 	gruntime "runtime"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
@@ -64,8 +62,8 @@ type binary struct {
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
-	switch logrus.GetLevel() {
-	case logrus.DebugLevel, logrus.TraceLevel:
+	switch log.GetLevel() {
+	case log.DebugLevel, log.TraceLevel:
 		args = append(args, "-debug")
 	}
 	args = append(args, "start")
@@ -163,8 +161,8 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 		"-id", b.bundle.ID,
 		"-bundle", b.bundle.Path,
 	}
-	switch logrus.GetLevel() {
-	case logrus.DebugLevel, logrus.TraceLevel:
+	switch log.GetLevel() {
+	case log.DebugLevel, log.TraceLevel:
 		args = append(args, "-debug")
 	}
 	args = append(args, "delete")
