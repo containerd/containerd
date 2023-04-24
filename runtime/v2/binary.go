@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/types"
-	"github.com/sirupsen/logrus"
 )
 
 type shimBinaryConfig struct {
@@ -63,8 +62,8 @@ type binary struct {
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {
 	args := []string{"-id", b.bundle.ID}
-	switch logrus.GetLevel() {
-	case logrus.DebugLevel, logrus.TraceLevel:
+	switch log.GetLevel() {
+	case log.DebugLevel, log.TraceLevel:
 		args = append(args, "-debug")
 	}
 	args = append(args, "start")
