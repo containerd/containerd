@@ -1,4 +1,4 @@
-//go:build !windows && !darwin
+//go:build !windows
 
 /*
    Copyright The containerd Authors.
@@ -28,6 +28,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -359,13 +360,14 @@ func TestBreakouts(t *testing.T) {
 		}
 	}
 
-	breakouts := []struct {
+	type breakoutTest struct {
 		name      string
 		w         tartest.WriterToTar
 		apply     fstest.Applier
 		validator func(string) error
 		err       error
-	}{
+	}
+	breakouts := []breakoutTest{
 		{
 			name: "SymlinkAbsolute",
 			w: tartest.TarAll(
@@ -497,42 +499,7 @@ func TestBreakouts(t *testing.T) {
 			),
 			validator: sameFile("localpasswd", "/etc/passwd"),
 		},
-		{
-			name: "HardlinkSymlinkBeforeCreateTarget",
-			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.Symlink("/etc/passwd", "localpasswd"),
-				tc.Link("localpasswd", "localpasswd-dup"),
-				tc.File("/etc/passwd", []byte("after"), 0644),
-			),
-			validator: sameFile("localpasswd-dup", "/etc/passwd"),
-		},
-		{
-			name: "HardlinkSymlinkRelative",
-			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
-				tc.Symlink("../../../../../etc/passwd", "passwdlink"),
-				tc.Link("/passwdlink", "localpasswd"),
-			),
-			validator: all(
-				sameSymlinkFile("/localpasswd", "/passwdlink"),
-				sameFile("/localpasswd", "/etc/passwd"),
-			),
-		},
-		{
-			name: "HardlinkSymlinkAbsolute",
-			w: tartest.TarAll(
-				tc.Dir("etc", 0770),
-				tc.File("/etc/passwd", []byte("inside"), 0644),
-				tc.Symlink("/etc/passwd", "passwdlink"),
-				tc.Link("/passwdlink", "localpasswd"),
-			),
-			validator: all(
-				sameSymlinkFile("/localpasswd", "/passwdlink"),
-				sameFile("/localpasswd", "/etc/passwd"),
-			),
-		},
+
 		{
 			name: "SymlinkParentDirectory",
 			w: tartest.TarAll(
@@ -745,36 +712,77 @@ func TestBreakouts(t *testing.T) {
 			// resolution ends up just removing etc
 			validator: fileNotExists("etc/passwd"),
 		},
-		{
+	}
 
-			name: "HardlinkSymlinkChmod",
-			w: func() tartest.WriterToTar {
-				p := filepath.Join(td, "perm400")
-				if err := os.WriteFile(p, []byte("..."), 0400); err != nil {
-					t.Fatal(err)
-				}
-				ep := filepath.Join(td, "also-exists-outside-root")
-				if err := os.WriteFile(ep, []byte("..."), 0640); err != nil {
-					t.Fatal(err)
-				}
-
-				return tartest.TarAll(
-					tc.Symlink(p, ep),
-					tc.Link(ep, "sketchylink"),
-				)
-			}(),
-			validator: func(string) error {
-				p := filepath.Join(td, "perm400")
-				fi, err := os.Lstat(p)
-				if err != nil {
-					return err
-				}
-				if perm := fi.Mode() & os.ModePerm; perm != 0400 {
-					return fmt.Errorf("%s perm changed from 0400 to %04o", p, perm)
-				}
-				return nil
+	// The follow tests perform operations not permitted on Darwin
+	if runtime.GOOS != "darwin" {
+		breakouts = append(breakouts, []breakoutTest{
+			{
+				name: "HardlinkSymlinkBeforeCreateTarget",
+				w: tartest.TarAll(
+					tc.Dir("etc", 0770),
+					tc.Symlink("/etc/passwd", "localpasswd"),
+					tc.Link("localpasswd", "localpasswd-dup"),
+					tc.File("/etc/passwd", []byte("after"), 0644),
+				),
+				validator: sameFile("localpasswd-dup", "/etc/passwd"),
 			},
-		},
+			{
+				name: "HardlinkSymlinkRelative",
+				w: tartest.TarAll(
+					tc.Dir("etc", 0770),
+					tc.File("/etc/passwd", []byte("inside"), 0644),
+					tc.Symlink("../../../../../etc/passwd", "passwdlink"),
+					tc.Link("/passwdlink", "localpasswd"),
+				),
+				validator: all(
+					sameSymlinkFile("/localpasswd", "/passwdlink"),
+					sameFile("/localpasswd", "/etc/passwd"),
+				),
+			},
+			{
+				name: "HardlinkSymlinkAbsolute",
+				w: tartest.TarAll(
+					tc.Dir("etc", 0770),
+					tc.File("/etc/passwd", []byte("inside"), 0644),
+					tc.Symlink("/etc/passwd", "passwdlink"),
+					tc.Link("/passwdlink", "localpasswd"),
+				),
+				validator: all(
+					sameSymlinkFile("/localpasswd", "/passwdlink"),
+					sameFile("/localpasswd", "/etc/passwd"),
+				),
+			},
+			{
+				name: "HardlinkSymlinkChmod",
+				w: func() tartest.WriterToTar {
+					p := filepath.Join(td, "perm400")
+					if err := os.WriteFile(p, []byte("..."), 0400); err != nil {
+						t.Fatal(err)
+					}
+					ep := filepath.Join(td, "also-exists-outside-root")
+					if err := os.WriteFile(ep, []byte("..."), 0640); err != nil {
+						t.Fatal(err)
+					}
+
+					return tartest.TarAll(
+						tc.Symlink(p, ep),
+						tc.Link(ep, "sketchylink"),
+					)
+				}(),
+				validator: func(string) error {
+					p := filepath.Join(td, "perm400")
+					fi, err := os.Lstat(p)
+					if err != nil {
+						return err
+					}
+					if perm := fi.Mode() & os.ModePerm; perm != 0400 {
+						return fmt.Errorf("%s perm changed from 0400 to %04o", p, perm)
+					}
+					return nil
+				},
+			},
+		}...)
 	}
 
 	for _, bo := range breakouts {
