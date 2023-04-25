@@ -20,8 +20,11 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/namespaces"
@@ -29,7 +32,14 @@ import (
 
 func TestNewBinaryIO(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
-	uri, _ := url.Parse("binary:///bin/echo?test")
+
+	echo := filepath.Join(t.TempDir(), "echo.sh")
+	err := os.WriteFile(echo, []byte("#!/bin/bash\necho $1 >&5"), 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uri, _ := url.Parse(fmt.Sprintf("binary://%s?test", echo))
 
 	before := descriptorCount(t)
 
@@ -39,7 +49,7 @@ func TestNewBinaryIO(t *testing.T) {
 	}
 
 	err = io.Close()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "signal: terminated") {
 		t.Fatal(err)
 	}
 

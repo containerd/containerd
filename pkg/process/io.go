@@ -296,7 +296,7 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 
 	// wait for the logging binary to be ready
 	b := make([]byte, 1)
-	if _, err := r.Read(b); err != nil && err != io.EOF {
+	if _, err := r.Read(b); err != nil {
 		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
 	}
 

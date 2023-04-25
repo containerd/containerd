@@ -46,7 +46,10 @@ func Run(fn LoggerFunc) {
 	signal.Notify(sigCh, unix.SIGTERM)
 
 	go func() {
-		errCh <- fn(ctx, config, wait.Close)
+		errCh <- fn(ctx, config, func() error {
+			wait.Write([]byte{0})
+			return wait.Close()
+		})
 	}()
 
 	for {

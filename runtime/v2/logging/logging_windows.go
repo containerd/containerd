@@ -83,7 +83,10 @@ func runInternal(fn LoggerFunc) error {
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		errCh <- fn(ctx, config, wait.Close)
+		errCh <- fn(ctx, config, func() error {
+			wait.Write([]byte{0})
+			return wait.Close()
+		})
 	}()
 
 	for {
