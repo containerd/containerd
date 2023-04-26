@@ -41,7 +41,7 @@ import (
 // UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
 type UpdateClientFunc func(client *http.Client) error
 
-type hostConfig struct {
+type HostConfig struct {
 	scheme string
 	host   string
 	path   string
@@ -55,6 +55,7 @@ type hostConfig struct {
 	header http.Header
 
 	// TODO: Add credential configuration (domain alias, username)
+	credentialPlugin string
 }
 
 // HostOptions is used to configure registry hosts
@@ -74,7 +75,7 @@ type HostOptions struct {
 // If a `HostDir` function is not required, defaults are used.
 func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHosts {
 	return func(host string) ([]docker.RegistryHost, error) {
-		var hosts []hostConfig
+		var hosts []HostConfig
 		if options.HostDir != nil {
 			dir, err := options.HostDir(host)
 			if err != nil && !errdefs.IsNotFound(err) {
@@ -82,7 +83,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			}
 			if dir != "" {
 				log.G(ctx).WithField("dir", dir).Debug("loading host directory")
-				hosts, err = loadHostDir(ctx, dir)
+				hosts, err = LoadHostDir(ctx, dir)
 				if err != nil {
 					return nil, err
 				}
@@ -93,7 +94,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		// NOTE: Check nil here and not empty, the host may be
 		// intentionally configured to not have any endpoints
 		if hosts == nil {
-			hosts = make([]hostConfig, 1)
+			hosts = make([]HostConfig, 1)
 		}
 		if len(hosts) > 0 && hosts[len(hosts)-1].host == "" {
 			if host == "docker.io" {
@@ -263,7 +264,7 @@ func hostDirectory(host string) string {
 	return host
 }
 
-func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
+func LoadHostDir(ctx context.Context, hostsDir string) ([]HostConfig, error) {
 	b, err := os.ReadFile(filepath.Join(hostsDir, "hosts.toml"))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
@@ -322,9 +323,10 @@ type hostFileConfig struct {
 	OverridePath bool `toml:"override_path"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
+	CredentialPlugin string `toml:"credential"`
 }
 
-func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
+func parseHostsFile(baseDir string, b []byte) ([]HostConfig, error) {
 	tree, err := toml.LoadBytes(b)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse TOML: %w", err)
@@ -350,7 +352,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	}
 
 	var (
-		hosts []hostConfig
+		hosts []HostConfig
 	)
 
 	if err := tree.Unmarshal(&c); err != nil {
@@ -378,9 +380,9 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	return hosts, nil
 }
 
-func parseHostConfig(server string, baseDir string, config hostFileConfig) (hostConfig, error) {
+func parseHostConfig(server string, baseDir string, config hostFileConfig) (HostConfig, error) {
 	var (
-		result = hostConfig{}
+		result = HostConfig{}
 		err    error
 	)
 
@@ -390,7 +392,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		}
 		u, err := url.Parse(server)
 		if err != nil {
-			return hostConfig{}, fmt.Errorf("unable to parse server %v: %w", server, err)
+			return HostConfig{}, fmt.Errorf("unable to parse server %v: %w", server, err)
 		}
 		result.scheme = u.Scheme
 		result.host = u.Host
@@ -417,7 +419,7 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			case "push":
 				result.capabilities |= docker.HostCapabilityPush
 			default:
-				return hostConfig{}, fmt.Errorf("unknown capability %v", c)
+				return HostConfig{}, fmt.Errorf("unknown capability %v", c)
 			}
 		}
 	} else {
@@ -433,10 +435,10 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 				return makeAbsPath(p, baseDir)
 			})
 			if err != nil {
-				return hostConfig{}, err
+				return HostConfig{}, err
 			}
 		default:
-			return hostConfig{}, fmt.Errorf("invalid type %v for \"ca\"", cert)
+			return HostConfig{}, fmt.Errorf("invalid type %v for \"ca\"", cert)
 		}
 	}
 
@@ -455,21 +457,21 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 						return makeAbsPath(s, baseDir)
 					})
 					if err != nil {
-						return hostConfig{}, err
+						return HostConfig{}, err
 					}
 					if len(slice) != 2 {
-						return hostConfig{}, fmt.Errorf("invalid pair %v for \"client\"", p)
+						return HostConfig{}, fmt.Errorf("invalid pair %v for \"client\"", p)
 					}
 
 					var pair [2]string
 					copy(pair[:], slice)
 					result.clientPairs = append(result.clientPairs, pair)
 				default:
-					return hostConfig{}, fmt.Errorf("invalid type %T for \"client\"", p)
+					return HostConfig{}, fmt.Errorf("invalid type %T for \"client\"", p)
 				}
 			}
 		default:
-			return hostConfig{}, fmt.Errorf("invalid type %v for \"client\"", client)
+			return HostConfig{}, fmt.Errorf("invalid type %v for \"client\"", client)
 		}
 	}
 
@@ -482,14 +484,15 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			case []interface{}:
 				header[key], err = makeStringSlice(value, nil)
 				if err != nil {
-					return hostConfig{}, err
+					return HostConfig{}, err
 				}
 			default:
-				return hostConfig{}, fmt.Errorf("invalid type %v for header %q", ty, key)
+				return HostConfig{}, fmt.Errorf("invalid type %v for header %q", ty, key)
 			}
 		}
 		result.header = header
 	}
+	result.credentialPlugin = config.CredentialPlugin
 
 	return result, nil
 }
@@ -549,12 +552,12 @@ func makeAbsPath(p string, base string) string {
 //     NOTE: If a ".key" file is missing, this function will just return
 //     the ".cert", which may contain the private key. If the ".cert" file
 //     does not contain the private key, the caller should detect and error.
-func loadCertFiles(ctx context.Context, certsDir string) ([]hostConfig, error) {
+func loadCertFiles(ctx context.Context, certsDir string) ([]HostConfig, error) {
 	fs, err := os.ReadDir(certsDir)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	hosts := make([]hostConfig, 1)
+	hosts := make([]HostConfig, 1)
 	for _, f := range fs {
 		if f.IsDir() {
 			continue

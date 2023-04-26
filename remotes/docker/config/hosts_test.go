@@ -112,7 +112,7 @@ ca = "/etc/path/default"
   override_path = true
 `
 	var tb, fb = true, false
-	expected := []hostConfig{
+	expected := []HostConfig{
 		{
 			scheme:       "https",
 			host:         "mirror.registry",
@@ -211,14 +211,14 @@ func TestLoadCertFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	type testCase struct {
-		input hostConfig
+		input HostConfig
 	}
 	cases := map[string]testCase{
 		"crt only": {
-			input: hostConfig{host: "testing.io", caCerts: []string{filepath.Join(dir, "testing.io", "ca.crt")}},
+			input: HostConfig{host: "testing.io", caCerts: []string{filepath.Join(dir, "testing.io", "ca.crt")}},
 		},
 		"crt and cert pair": {
-			input: hostConfig{
+			input: HostConfig{
 				host:    "testing.io",
 				caCerts: []string{filepath.Join(dir, "testing.io", "ca.crt")},
 				clientPairs: [][2]string{
@@ -230,7 +230,7 @@ func TestLoadCertFiles(t *testing.T) {
 			},
 		},
 		"cert pair only": {
-			input: hostConfig{
+			input: HostConfig{
 				host: "testing.io",
 				clientPairs: [][2]string{
 					{
@@ -266,7 +266,7 @@ func TestLoadCertFiles(t *testing.T) {
 				}
 			}
 
-			configs, err := loadHostDir(context.Background(), hostDir)
+			configs, err := LoadHostDir(context.Background(), hostDir)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -301,7 +301,7 @@ func compareRegistryHost(j, k docker.RegistryHost) bool {
 	return true
 }
 
-func compareHostConfig(j, k hostConfig) bool {
+func compareHostConfig(j, k HostConfig) bool {
 	if j.scheme != k.scheme {
 		return false
 	}
@@ -359,7 +359,7 @@ func compareHostConfig(j, k hostConfig) bool {
 	return true
 }
 
-func printHostConfig(hc []hostConfig) string {
+func printHostConfig(hc []HostConfig) string {
 	b := bytes.NewBuffer(nil)
 	for i := range hc {
 		fmt.Fprintf(b, "\t[%d]\tscheme: %q\n", i, hc[i].scheme)

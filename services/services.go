@@ -35,4 +35,6 @@ const (
 	IntrospectionService = "introspection-service"
 	// Streaming service is the id of the streaming service
 	StreamingService = "streaming-service"
+	// RegistryService is id of registry service.
+	RegistryService = "registry-service"
 )
