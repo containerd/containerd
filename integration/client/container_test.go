@@ -213,6 +213,10 @@ func TestContainerStartWithAbsRuntimePath(t *testing.T) {
 	}
 	defer client.Close()
 
+	if client.Runtime() == plugin.RuntimeLinuxV1 {
+		t.Skip("test relies on runtime v2")
+	}
+
 	var (
 		image       Image
 		ctx, cancel = testContext(t)
