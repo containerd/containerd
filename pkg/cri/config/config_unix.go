@@ -74,6 +74,9 @@ func DefaultConfig() PluginConfig {
 			},
 			DisableSnapshotAnnotations: true,
 		},
+		Registry: Registry{
+			ConfigPath: "/etc/containerd/certs.d:/etc/docker/certs.d",
+		},
 		DisableTCPService:    true,
 		StreamServerAddress:  "127.0.0.1",
 		StreamServerPort:     "0",

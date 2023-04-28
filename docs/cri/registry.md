@@ -10,6 +10,10 @@ should now use the form
    config_path = "/etc/containerd/certs.d"
 ```
 
+If no registry-specific options are set, `config_path` will default to
+`/etc/containerd/certs.d:/etc/docker/certs.d`, which enables compatibility with
+[the docker method of adding registry configuration](https://docs.docker.com/registry/insecure/#use-self-signed-certificates).
+
 - - -
 <!-- TODO: remove in containerd 2.0 -->
 

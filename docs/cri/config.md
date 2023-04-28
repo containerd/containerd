@@ -442,14 +442,15 @@ version = 2
     # config_path specifies a directory to look for the registry hosts configuration.
     #
     # The cri plugin will look for and use config_path/host-namespace/hosts.toml
-    #   configs if present OR load certificate files as laid out in the Docker/Moby
-    #   specific layout https://docs.docker.com/engine/security/certificates/
+    # configs if present OR load certificate files as laid out in the Docker/Moby
+    # specific layout https://docs.docker.com/engine/security/certificates/
     #
     # If config_path is not provided defaults are used.
     #
     # *** registry.configs and registry.mirrors that were a part of containerd 1.4
     # are now DEPRECATED and will only be used if the config_path is not specified.
-    config_path = ""
+    # It is an error to specify both config_path and the deprecated configs or mirrors
+    config_path = "/etc/containerd/certs.d:/etc/docker/certs.d"
 ```
 
 </p>
