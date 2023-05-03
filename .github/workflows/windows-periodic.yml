@@ -230,7 +230,7 @@ jobs:
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "sh.exe -s" <<EOF
             sleep 5
             set -o pipefail
-            c:/cri-tools/build/bin/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
+            C:/cri-tools/build/bin/windows/amd64/critest.exe $SKIP --runtime-endpoint='npipe://./pipe/containerd-containerd' --test-images-file='c:/cri-test-images.yaml' --report-dir='c:/Logs' -ginkgo.junit-report="C:\Logs\junit_critest.xml" | tee c:/Logs/critest.log
           EOF
           echo 'SUCCEEDED=1' >> $GITHUB_OUTPUT
 
