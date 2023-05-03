@@ -8,6 +8,8 @@ has extremely broad production usage as a component of the [Docker engine](https
 stack. Note that this includes any use of the open source [Moby engine project](https://github.com/moby/moby);
 including the Balena project listed below.
 
+**[faasd by OpenFaaS](https://github.com/openfaas/faasd)** - faasd in an Open Source project for serverless functions. It takes the same OpenFaaS components that usually run on Kubernetes and instead launches containers directly on a single host using CNI for networking. It's ideal for edge and for deploying functions without having to think about managing and maintaining Kubernetes.
+
 **_[IBM Cloud Kubernetes Service (IKS)](https://www.ibm.com/cloud/container-service)_** - offers containerd as the CRI runtime for v1.11 and higher versions.
 
 **_[IBM Cloud Private (ICP)](https://www.ibm.com/cloud/private)_** - IBM's on-premises cloud offering has containerd as a "tech preview" CRI runtime for the Kubernetes offered within this product for the past two releases, and plans to fully migrate to containerd in a future release.
@@ -55,6 +57,8 @@ including the Balena project listed below.
 **_[Talos Linux](https://www.talos.dev/)_** - Talos Linux is Linux designed for Kubernetes – secure, immutable, and minimal. Talos Linux is using containerd as the core system runtime and CRI implementation.
 
 **_Deckhouse_** - [Deckhouse Kubernetes Platform](https://deckhouse.io/) from Flant allows you to manage Kubernetes clusters anywhere in a fully automatic and uniform fashion. It uses containerd as the default CRI runtime.
+
+**_[Actuated](https://actuated.dev)** - Actuated is a platform for running self-hosted CI in securely-isolated Firecracker VMs. Actuated uses containerd's image pulling facility to distribute and update the root filesystem for VMs for CI agents.
 
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
