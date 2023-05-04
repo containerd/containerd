@@ -4,32 +4,19 @@ This guide is useful if you intend to contribute on containerd. Thanks for your
 effort. Every contribution is very appreciated.
 
 This doc includes:
-* [Getting started with GitHub Codespaces](#getting-started-with-gitHub-codespaces)
 * [Build requirements](#build-requirements)
 * [Build the development environment](#build-the-development-environment)
 * [Build containerd](#build-containerd)
 * [Via docker container](#via-docker-container)
 * [Testing](#testing-containerd)
 
-## Getting started with GitHub Codespaces
-
-To get started, create a codespace for this repository by clicking this 👇
-
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=46089560)
-
-A codespace will open in a web-based version of Visual Studio Code. The [dev container](.devcontainer/devcontainer.json) is fully configured with software needed for this project and the containerd built. If you use a codespace, then you can directly skip to the [testing](#testing-containerd) section of this document.
-
-**Note**: Dev containers is an open spec which is supported by [GitHub Codespaces](https://github.com/codespaces) and [other tools](https://containers.dev/supporting).
-
 ## Build requirements
 
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.19.x or above
+* Go 1.13.x or above except 1.14.x
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
-
-> *Note*: On macOS, you need a third party runtime to run containers on containerd
 
 ## Build the development environment
 
@@ -50,16 +37,12 @@ wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/pr
 sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
 ```
 
-To enable optional [Btrfs](https://en.wikipedia.org/wiki/Btrfs) snapshotter, you should have the headers from the Linux kernel 4.12 or later.
-The dependency on the kernel headers only affects users building containerd from source.
-Users on older kernels may opt to not compile the btrfs support (see `BUILDTAGS=no_btrfs` below),
-or to provide headers from a newer kernel.
+`containerd` uses [Btrfs](https://en.wikipedia.org/wiki/Btrfs) it means that you
+need to satisfy these dependencies in your system:
 
-> **Note**
-> The dependency on the Linux kernel headers 4.12 was introduced in containerd 1.7.0-beta.4.
->
-> containerd 1.6 has different set of dependencies for enabling btrfs.
-> containerd 1.6 users should refer to https://github.com/containerd/containerd/blob/release/1.6/BUILDING.md#build-the-development-environment
+* CentOS/Fedora: `yum install btrfs-progs-devel`
+* Debian/Ubuntu: `apt-get install btrfs-progs libbtrfs-dev`
+  * Debian(before Buster)/Ubuntu(before 19.10): `apt-get install btrfs-tools`
 
 At this point you are ready to build `containerd` yourself!
 
@@ -70,8 +53,6 @@ run containerd. While it is okay to download a `runc` binary and install that on
 the system, sometimes it is necessary to build runc directly when working with
 container runtime development. Make sure to follow the guidelines for versioning
 in [RUNC.md](/docs/RUNC.md) for the best results.
-
-> *Note*: Runc only supports Linux
 
 ## Build containerd
 
@@ -121,7 +102,7 @@ make generate
 > * `no_cri`: A build tag disables building Kubernetes [CRI](http://blog.kubernetes.io/2016/12/container-runtime-interface-cri-in-kubernetes.html) support into containerd.
 > See [here](https://github.com/containerd/cri-containerd#build-tags) for build tags of CRI plugin.
 > * snapshotters (alphabetical order)
->   * `no_aufs`: A build tag disables building the aufs snapshot driver. (Ignored since containerd v2.0, as the aufs snapshot driver is no longer supported)
+>   * `no_aufs`: A build tag disables building the aufs snapshot driver.
 >   * `no_btrfs`: A build tag disables building the Btrfs snapshot driver.
 >   * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
 >   * `no_zfs`: A build tag disables building the ZFS snapshot driver.
@@ -135,8 +116,6 @@ and `go mod vendor` to ensure the `go.mod`, `go.sum` files and `vendor` director
 Changes to these files should become a single commit for a PR which relies on vendored updates.
 
 Please refer to [RUNC.md](/docs/RUNC.md) for the currently supported version of `runc` that is used by containerd.
-
-> *Note*: On macOS, the containerd daemon can be built and run natively. However, as stated above, runc only supports linux.
 
 ### Static binaries
 
@@ -162,6 +141,9 @@ You can build an image from this `Dockerfile`:
 
 ```dockerfile
 FROM golang
+
+RUN apt-get update && \
+    apt-get install -y libbtrfs-dev
 ```
 
 Let's suppose that you built an image called `containerd/build`. From the
@@ -198,7 +180,7 @@ We can build an image from this `Dockerfile`:
 FROM golang
 
 RUN apt-get update && \
-    apt-get install -y libseccomp-dev
+    apt-get install -y libbtrfs-dev libseccomp-dev
 ```
 
 In our Docker container we will build `runc` build, which includes
@@ -254,7 +236,6 @@ During the automated CI the unit tests and integration tests are run as part of 
  - `make test`: run all non-integration tests that do not require `root` privileges
  - `make root-test`: run all non-integration tests which require `root`
  - `make integration`: run all tests, including integration tests and those which require `root`. `TESTFLAGS_PARALLEL` can be used to control parallelism. For example, `TESTFLAGS_PARALLEL=1 make integration` will lead a non-parallel execution. The default value of `TESTFLAGS_PARALLEL` is **8**.
- - `make cri-integration`: [CRI Integration Tests](https://github.com/containerd/containerd/blob/main/docs/cri/testing.md#cri-integration-test) run cri integration tests
 
 To execute a specific test or set of tests you can use the `go test` capabilities
 without using the `Makefile` targets. The following examples show how to specify a test
@@ -290,7 +271,7 @@ In addition to `go test`-based testing executed via the `Makefile` targets, the 
 With this tool you can stress a running containerd daemon for a specified period of time, selecting a concurrency level to generate stress against the daemon. The following command is an example of having five workers running for two hours against a default containerd gRPC socket address:
 
 ```sh
-containerd-stress -c 5 -d 120m
+containerd-stress -c 5 -t 120
 ```
 
 For more information on this tool's options please run `containerd-stress --help`.

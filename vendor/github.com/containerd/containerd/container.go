@@ -24,18 +24,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/api/types"
-	tasktypes "github.com/containerd/containerd/v2/api/types/task"
-	"github.com/containerd/containerd/v2/cio"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types"
+	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/fifo"
-	"github.com/containerd/typeurl/v2"
+	"github.com/containerd/typeurl"
+	prototypes "github.com/gogo/protobuf/types"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -74,7 +74,7 @@ type Container interface {
 	// SetLabels sets the provided labels for the container and returns the final label set
 	SetLabels(context.Context, map[string]string) (map[string]string, error)
 	// Extensions returns the extensions set on the container
-	Extensions(context.Context) (map[string]typeurl.Any, error)
+	Extensions(context.Context) (map[string]prototypes.Any, error)
 	// Update a container
 	Update(context.Context, ...UpdateContainerOpts) error
 	// Checkpoint creates a checkpoint image of the current container
@@ -120,7 +120,7 @@ func (c *container) Info(ctx context.Context, opts ...InfoOpts) (containers.Cont
 	return c.metadata, nil
 }
 
-func (c *container) Extensions(ctx context.Context) (map[string]typeurl.Any, error) {
+func (c *container) Extensions(ctx context.Context) (map[string]prototypes.Any, error) {
 	r, err := c.get(ctx)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (c *container) Spec(ctx context.Context) (*oci.Spec, error) {
 		return nil, err
 	}
 	var s oci.Spec
-	if err := json.Unmarshal(r.Spec.GetValue(), &s); err != nil {
+	if err := json.Unmarshal(r.Spec.Value, &s); err != nil {
 		return nil, err
 	}
 	return &s, nil
@@ -258,7 +258,6 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			request.Rootfs = append(request.Rootfs, &types.Mount{
 				Type:    m.Type,
 				Source:  m.Source,
-				Target:  m.Target,
 				Options: m.Options,
 			})
 		}
@@ -276,18 +275,16 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			request.Rootfs = append(request.Rootfs, &types.Mount{
 				Type:    m.Type,
 				Source:  m.Source,
-				Target:  m.Target,
 				Options: m.Options,
 			})
 		}
 	}
-	request.RuntimePath = info.RuntimePath
 	if info.Options != nil {
 		any, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
 			return nil, err
 		}
-		request.Options = protobuf.FromAny(any)
+		request.Options = any
 	}
 	t := &task{
 		client: c.client,
@@ -399,7 +396,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 		return nil, err
 	}
 	var i cio.IO
-	if ioAttach != nil && response.Process.Status != tasktypes.Status_UNKNOWN {
+	if ioAttach != nil && response.Process.Status != tasktypes.StatusUnknown {
 		// Do not attach IO for task in unknown state, because there
 		// are no fifo paths anyway.
 		if i, err = attachExistingIO(response, ioAttach); err != nil {

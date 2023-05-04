@@ -21,11 +21,11 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/platforms"
 
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/containers"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
@@ -66,19 +66,15 @@ func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s
 		return err
 	}
 
-	switch plat.OS {
-	case "windows":
+	if plat.OS == "windows" {
 		err = populateDefaultWindowsSpec(ctx, s, id)
-	case "darwin":
-		err = populateDefaultDarwinSpec(s)
-	default:
+	} else {
 		err = populateDefaultUnixSpec(ctx, s, id)
 		if err == nil && runtime.GOOS == "windows" {
 			// To run LCOW we have a Linux and Windows section. Add an empty one now.
 			s.Windows = &specs.Windows{}
 		}
 	}
-
 	return err
 }
 
@@ -208,15 +204,6 @@ func populateDefaultWindowsSpec(ctx context.Context, s *Spec, id string) error {
 			Cwd: `C:\`,
 		},
 		Windows: &specs.Windows{},
-	}
-	return nil
-}
-
-func populateDefaultDarwinSpec(s *Spec) error {
-	*s = Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Process: &specs.Process{Cwd: "/"},
 	}
 	return nil
 }

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
 	"strings"
 	"time"
 
@@ -42,7 +41,7 @@ func init() {
 //
 // If m.Type starts with "fuse." or "fuse3.", "mount.fuse" or "mount.fuse3"
 // helper binary is called.
-func (m *Mount) mount(target string) (err error) {
+func (m *Mount) Mount(target string) (err error) {
 	for _, helperBinary := range allowedHelperBinaries {
 		// helperBinary = "mount.fuse", typePrefix = "fuse."
 		typePrefix := strings.TrimPrefix(helperBinary, "mount.") + "."
@@ -364,29 +363,24 @@ func mountAt(chdir string, source, target, fstype string, flags uintptr, data st
 		return unix.Mount(source, target, fstype, flags, data)
 	}
 
-	ch := make(chan error, 1)
-	go func() {
-		runtime.LockOSThread()
+	f, err := os.Open(chdir)
+	if err != nil {
+		return fmt.Errorf("failed to mountat: %w", err)
+	}
+	defer f.Close()
 
-		// Do not unlock this thread.
-		// If the thread is unlocked go will try to use it for other goroutines.
-		// However it is not possible to restore the thread state after CLONE_FS.
-		//
-		// Once the goroutine exits the thread should eventually be terminated by go.
+	fs, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to mountat: %w", err)
+	}
 
-		if err := unix.Unshare(unix.CLONE_FS); err != nil {
-			ch <- err
-			return
-		}
-
-		if err := unix.Chdir(chdir); err != nil {
-			ch <- err
-			return
-		}
-
-		ch <- unix.Mount(source, target, fstype, flags, data)
-	}()
-	return <-ch
+	if !fs.IsDir() {
+		return fmt.Errorf("failed to mountat: %s is not dir", chdir)
+	}
+	if err := fMountat(f.Fd(), source, target, fstype, flags, data); err != nil {
+		return fmt.Errorf("failed to mountat: %w", err)
+	}
+	return nil
 }
 
 func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {

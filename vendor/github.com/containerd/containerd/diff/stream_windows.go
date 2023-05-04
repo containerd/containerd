@@ -27,9 +27,8 @@ import (
 	"sync"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/protobuf/proto"
-	"github.com/containerd/typeurl/v2"
+	"github.com/gogo/protobuf/proto"
+	"github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"
 )
@@ -37,14 +36,13 @@ import (
 const processorPipe = "STREAM_PROCESSOR_PIPE"
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams
-func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args, env []string, payload typeurl.Any) (StreamProcessor, error) {
+func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProcessor, name string, args, env []string, payload *types.Any) (StreamProcessor, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, env...)
 
 	if payload != nil {
-		pb := protobuf.FromAny(payload)
-		data, err := proto.Marshal(pb)
+		data, err := proto.Marshal(payload)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +96,6 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 		r:      r,
 		mt:     rmt,
 		stderr: stderr,
-		done:   make(chan struct{}),
 	}
 	go p.wait()
 
@@ -118,11 +115,6 @@ type binaryProcessor struct {
 
 	mu  sync.Mutex
 	err error
-
-	// There is a race condition between waiting on c.cmd.Wait() and setting c.err within
-	// c.wait(), and reading that value from c.Err().
-	// Use done to wait for the returned error to be captured and set.
-	done chan struct{}
 }
 
 func (c *binaryProcessor) Err() error {
@@ -138,16 +130,6 @@ func (c *binaryProcessor) wait() {
 			c.err = errors.New(c.stderr.String())
 			c.mu.Unlock()
 		}
-	}
-	close(c.done)
-}
-
-func (c *binaryProcessor) Wait(ctx context.Context) error {
-	select {
-	case <-c.done:
-		return c.Err()
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 }
 

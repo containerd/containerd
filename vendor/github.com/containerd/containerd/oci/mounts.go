@@ -1,4 +1,5 @@
 //go:build !freebsd
+// +build !freebsd
 
 /*
    Copyright The containerd Authors.
@@ -68,6 +69,3 @@ func defaultMounts() []specs.Mount {
 		},
 	}
 }
-
-// appendOSMounts is only used on FreeBSD, and a no-op on other platforms.
-func appendOSMounts(_ *Spec, _ string) {}

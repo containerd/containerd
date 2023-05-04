@@ -22,15 +22,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/typeurl/v2"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/typeurl"
+	"github.com/gogo/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -58,7 +57,7 @@ type InfoConfig struct {
 func WithRuntime(name string, options interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		var (
-			any typeurl.Any
+			any *types.Any
 			err error
 		)
 		if options != nil {
@@ -71,15 +70,6 @@ func WithRuntime(name string, options interface{}) NewContainerOpts {
 			Name:    name,
 			Options: any,
 		}
-		return nil
-	}
-}
-
-// WithSandbox joins the container to a container group (aka sandbox) from the given ID
-// Note: shim runtime must support sandboxes environments.
-func WithSandbox(sandboxID string) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		c.SandboxID = sandboxID
 		return nil
 	}
 }
@@ -224,11 +214,6 @@ func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts
 		if err != nil {
 			return err
 		}
-
-		parent, err = resolveSnapshotOptions(ctx, client, c.Snapshotter, s, parent, opts...)
-		if err != nil {
-			return err
-		}
 		if _, err := s.Prepare(ctx, id, parent, opts...); err != nil {
 			return err
 		}
@@ -273,11 +258,6 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		if err != nil {
 			return err
 		}
-
-		parent, err = resolveSnapshotOptions(ctx, client, c.Snapshotter, s, parent, opts...)
-		if err != nil {
-			return err
-		}
 		if _, err := s.View(ctx, id, parent, opts...); err != nil {
 			return err
 		}
@@ -308,9 +288,9 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 		}
 
 		if c.Extensions == nil {
-			c.Extensions = make(map[string]typeurl.Any)
+			c.Extensions = make(map[string]types.Any)
 		}
-		c.Extensions[name] = any
+		c.Extensions[name] = *any
 		return nil
 	}
 }
@@ -318,9 +298,6 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 // WithNewSpec generates a new spec for a new container
 func WithNewSpec(opts ...oci.SpecOpts) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		if _, ok := namespaces.Namespace(ctx); !ok {
-			ctx = namespaces.WithNamespace(ctx, client.DefaultNamespace())
-		}
 		s, err := oci.GenerateSpec(ctx, client, c, opts...)
 		if err != nil {
 			return err
@@ -338,7 +315,7 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		}
 
 		var err error
-		c.Spec, err = protobuf.MarshalAnyToProto(s)
+		c.Spec, err = typeurl.MarshalAny(s)
 		return err
 	}
 }

@@ -1,4 +1,5 @@
 //go:build go1.8 && !windows && amd64 && !static_build && !gccgo
+// +build go1.8,!windows,amd64,!static_build,!gccgo
 
 /*
    Copyright The containerd Authors.

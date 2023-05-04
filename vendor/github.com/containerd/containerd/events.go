@@ -19,11 +19,10 @@ package containerd
 import (
 	"context"
 
-	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/events"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/typeurl/v2"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/typeurl"
 )
 
 // EventService handles the publish, forward and subscribe of events.
@@ -52,7 +51,7 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 	}
 	req := &eventsapi.PublishRequest{
 		Topic: topic,
-		Event: protobuf.FromAny(any),
+		Event: any,
 	}
 	if _, err := e.client.Publish(ctx, req); err != nil {
 		return errdefs.FromGRPC(err)
@@ -63,10 +62,10 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 func (e *eventRemote) Forward(ctx context.Context, envelope *events.Envelope) error {
 	req := &eventsapi.ForwardRequest{
 		Envelope: &eventsapi.Envelope{
-			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
+			Timestamp: envelope.Timestamp,
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
-			Event:     protobuf.FromAny(envelope.Event),
+			Event:     envelope.Event,
 		},
 	}
 	if _, err := e.client.Forward(ctx, req); err != nil {
@@ -105,7 +104,7 @@ func (e *eventRemote) Subscribe(ctx context.Context, filters ...string) (ch <-ch
 
 			select {
 			case evq <- &events.Envelope{
-				Timestamp: protobuf.FromTimestamp(ev.Timestamp),
+				Timestamp: ev.Timestamp,
 				Namespace: ev.Namespace,
 				Topic:     ev.Topic,
 				Event:     ev.Event,

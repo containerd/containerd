@@ -21,12 +21,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/log"
-	"github.com/containerd/containerd/v2/pkg/randutil"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -43,26 +43,16 @@ var bufPool = sync.Pool{
 	},
 }
 
-type reader interface {
-	Reader() io.Reader
-}
-
 // NewReader returns a io.Reader from a ReaderAt
 func NewReader(ra ReaderAt) io.Reader {
-	if rd, ok := ra.(reader); ok {
-		return rd.Reader()
-	}
-	return io.NewSectionReader(ra, 0, ra.Size())
+	rd := io.NewSectionReader(ra, 0, ra.Size())
+	return rd
 }
 
 // ReadBlob retrieves the entire contents of the blob from the provider.
 //
 // Avoid using this for large blobs, such as layers.
 func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) ([]byte, error) {
-	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
-		return desc.Data, nil
-	}
-
 	ra, err := provider.ReaderAt(ctx, desc)
 	if err != nil {
 		return nil, err
@@ -123,7 +113,7 @@ func OpenWriter(ctx context.Context, cs Ingester, opts ...WriterOpt) (Writer, er
 			// error or abort. Requires asserting for an ingest manager
 
 			select {
-			case <-time.After(time.Millisecond * time.Duration(randutil.Intn(retry))):
+			case <-time.After(time.Millisecond * time.Duration(rand.Intn(retry))):
 				if retry < 2048 {
 					retry = retry << 1
 				}

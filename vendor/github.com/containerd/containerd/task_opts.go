@@ -23,12 +23,13 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
+	"github.com/containerd/containerd/runtime/v2/runc/options"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -48,7 +49,7 @@ func WithRootFS(mounts []mount.Mount) NewTaskOpts {
 // instead of resolving it from runtime name.
 func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
-		info.RuntimePath = absRuntimePath
+		info.runtime = absRuntimePath
 		return nil
 	}
 }
@@ -68,8 +69,8 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 			if m.MediaType == images.MediaTypeContainerd1Checkpoint {
 				info.Checkpoint = &types.Descriptor{
 					MediaType:   m.MediaType,
-					Size:        m.Size,
-					Digest:      m.Digest.String(),
+					Size_:       m.Size,
+					Digest:      m.Digest,
 					Annotations: m.Annotations,
 				}
 				return nil
@@ -103,14 +104,25 @@ func WithCheckpointName(name string) CheckpointTaskOpts {
 // WithCheckpointImagePath sets image path for checkpoint option
 func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 	return func(r *CheckpointTaskInfo) error {
-		if r.Options == nil {
-			r.Options = &options.CheckpointOptions{}
+		if CheckRuntime(r.Runtime(), "io.containerd.runc") {
+			if r.Options == nil {
+				r.Options = &options.CheckpointOptions{}
+			}
+			opts, ok := r.Options.(*options.CheckpointOptions)
+			if !ok {
+				return errors.New("invalid v2 shim checkpoint options format")
+			}
+			opts.ImagePath = path
+		} else {
+			if r.Options == nil {
+				r.Options = &runctypes.CheckpointOptions{}
+			}
+			opts, ok := r.Options.(*runctypes.CheckpointOptions)
+			if !ok {
+				return errors.New("invalid v1 shim checkpoint options format")
+			}
+			opts.ImagePath = path
 		}
-		opts, ok := r.Options.(*options.CheckpointOptions)
-		if !ok {
-			return errors.New("invalid v2 shim checkpoint options format")
-		}
-		opts.ImagePath = path
 		return nil
 	}
 }
@@ -118,14 +130,25 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 // WithRestoreImagePath sets image path for create option
 func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
+		if CheckRuntime(ti.Runtime(), "io.containerd.runc") {
+			if ti.Options == nil {
+				ti.Options = &options.Options{}
+			}
+			opts, ok := ti.Options.(*options.Options)
+			if !ok {
+				return errors.New("invalid v2 shim create options format")
+			}
+			opts.CriuImagePath = path
+		} else {
+			if ti.Options == nil {
+				ti.Options = &runctypes.CreateOptions{}
+			}
+			opts, ok := ti.Options.(*runctypes.CreateOptions)
+			if !ok {
+				return errors.New("invalid v1 shim create options format")
+			}
+			opts.CriuImagePath = path
 		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid v2 shim create options format")
-		}
-		opts.CriuImagePath = path
 		return nil
 	}
 }
