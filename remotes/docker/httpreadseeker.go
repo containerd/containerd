@@ -28,13 +28,13 @@ import (
 const maxRetry = 3
 
 type httpReadSeeker struct {
-	size   int64
-	offset int64
 	rc     io.ReadCloser
 	open   func(offset int64) (io.ReadCloser, error)
-	closed bool
+	size   int64
+	offset int64
 
 	errsWithNoProgress int
+	closed             bool
 }
 
 func newHTTPReadSeeker(size int64, open func(offset int64) (io.ReadCloser, error)) (io.ReadCloser, error) {

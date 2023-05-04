@@ -49,8 +49,8 @@ func init() {
 }
 
 type service struct {
-	manager streaming.StreamManager
 	api.UnimplementedStreamingServer
+	manager streaming.StreamManager
 }
 
 func (s *service) Register(server *grpc.Server) error {

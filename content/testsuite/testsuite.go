@@ -177,9 +177,9 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 
 	smallbuf := make([]byte, 32)
 	for _, s := range []struct {
-		content []byte
-		digest  digest.Digest
 		writer  content.Writer
+		digest  digest.Digest
+		content []byte
 	}{
 		{
 			content: c1,

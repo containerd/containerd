@@ -132,17 +132,18 @@ func init() {
 }
 
 type transferConfig struct {
+
+	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
+	RegistryConfigPath string `toml:"config_path"`
+
+	// UnpackConfiguration is used to read config from toml
+	UnpackConfiguration []unpackConfiguration `toml:"unpack_config"`
+
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
-
-	// UnpackConfiguration is used to read config from toml
-	UnpackConfiguration []unpackConfiguration `toml:"unpack_config"`
-
-	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
-	RegistryConfigPath string `toml:"config_path"`
 }
 
 type unpackConfiguration struct {

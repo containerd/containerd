@@ -40,8 +40,8 @@ type Snapshot struct {
 
 // Store stores all snapshots.
 type Store struct {
-	lock      sync.RWMutex
 	snapshots map[string]Snapshot
+	lock      sync.RWMutex
 }
 
 // NewStore creates a snapshot store.

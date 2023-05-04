@@ -69,8 +69,8 @@ type DecompressReadCloser interface {
 
 type readCloserWrapper struct {
 	io.Reader
-	compression Compression
 	closer      func() error
+	compression Compression
 }
 
 func (r *readCloserWrapper) Close() error {

@@ -47,8 +47,8 @@ func init() {
 var empty = &ptypes.Empty{}
 
 type service struct {
-	ss map[string]snapshots.Snapshotter
 	snapshotsapi.UnimplementedSnapshotsServer
+	ss map[string]snapshots.Snapshotter
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {

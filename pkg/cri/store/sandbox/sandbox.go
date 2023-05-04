@@ -31,8 +31,6 @@ import (
 // Sandbox contains all resources associated with the sandbox. All methods to
 // mutate the internal state are thread safe.
 type Sandbox struct {
-	// Metadata is the metadata of the sandbox, it is immutable after created.
-	Metadata
 	// Status stores the status of the sandbox.
 	Status StatusStorage
 	// Container is the containerd sandbox container client.
@@ -45,6 +43,8 @@ type Sandbox struct {
 	*store.StopCh
 	// Stats contains (mutable) stats for the (pause) sandbox container
 	Stats *stats.ContainerStats
+	// Metadata is the metadata of the sandbox, it is immutable after created.
+	Metadata
 }
 
 // NewSandbox creates an internally used sandbox type. This functions reminds
@@ -63,10 +63,10 @@ func NewSandbox(metadata Metadata, status Status) Sandbox {
 
 // Store stores all sandboxes.
 type Store struct {
-	lock      sync.RWMutex
 	sandboxes map[string]Sandbox
 	idIndex   *truncindex.TruncIndex
 	labels    *label.Store
+	lock      sync.RWMutex
 }
 
 // NewStore creates a sandbox store.

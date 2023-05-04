@@ -48,8 +48,8 @@ func init() {
 }
 
 type sandboxService struct {
-	store sandbox.Store
 	api.UnimplementedStoreServer
+	store sandbox.Store
 }
 
 var _ api.StoreServer = (*sandboxService)(nil)

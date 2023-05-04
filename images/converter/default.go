@@ -71,12 +71,12 @@ func IndexConvertFuncWithHook(layerConvertFunc ConvertFunc, docker2oci bool, pla
 }
 
 type defaultConverter struct {
-	layerConvertFunc ConvertFunc
-	docker2oci       bool
 	platformMC       platforms.MatchComparer
+	layerConvertFunc ConvertFunc
 	diffIDMap        map[digest.Digest]digest.Digest // key: old diffID, value: new diffID
-	diffIDMapMu      sync.RWMutex
 	hooks            ConvertHooks
+	diffIDMapMu      sync.RWMutex
+	docker2oci       bool
 }
 
 // convert dispatches desc.MediaType and calls c.convert{Layer,Manifest,Index,Config}.

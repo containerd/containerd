@@ -89,15 +89,15 @@ type Credentials struct {
 
 // OCI
 type OCIRegistry struct {
-	reference string
-
-	headers http.Header
-	creds   CredentialHelper
+	creds CredentialHelper
 
 	resolver remotes.Resolver
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
+
+	headers   http.Header
+	reference string
 }
 
 func (r *OCIRegistry) String() string {
@@ -249,8 +249,8 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 }
 
 type credCallback struct {
-	sync.Mutex
 	stream streaming.Stream
+	sync.Mutex
 }
 
 func (cc *credCallback) GetCredentials(ctx context.Context, ref, host string) (Credentials, error) {

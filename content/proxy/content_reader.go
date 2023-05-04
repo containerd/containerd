@@ -25,9 +25,9 @@ import (
 
 type remoteReaderAt struct {
 	ctx    context.Context
+	client contentapi.ContentClient
 	digest digest.Digest
 	size   int64
-	client contentapi.ContentClient
 }
 
 func (ra *remoteReaderAt) Size() int64 {

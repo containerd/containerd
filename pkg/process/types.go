@@ -30,37 +30,37 @@ type Mount struct {
 
 // CreateConfig hold task creation configuration
 type CreateConfig struct {
+	Options          *google_protobuf.Any
 	ID               string
 	Bundle           string
 	Runtime          string
-	Rootfs           []Mount
-	Terminal         bool
 	Stdin            string
 	Stdout           string
 	Stderr           string
 	Checkpoint       string
 	ParentCheckpoint string
-	Options          *google_protobuf.Any
+	Rootfs           []Mount
+	Terminal         bool
 }
 
 // ExecConfig holds exec creation configuration
 type ExecConfig struct {
+	Spec     *google_protobuf.Any
 	ID       string
-	Terminal bool
 	Stdin    string
 	Stdout   string
 	Stderr   string
-	Spec     *google_protobuf.Any
+	Terminal bool
 }
 
 // CheckpointConfig holds task checkpoint configuration
 type CheckpointConfig struct {
 	WorkDir                  string
 	Path                     string
+	EmptyNamespaces          []string
 	Exit                     bool
 	AllowOpenTCP             bool
 	AllowExternalUnixSockets bool
 	AllowTerminal            bool
 	FileLocks                bool
-	EmptyNamespaces          []string
 }

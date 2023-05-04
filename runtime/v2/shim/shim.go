@@ -59,18 +59,18 @@ type StartOpts struct {
 
 // BootstrapParams is a JSON payload returned in stdout from shim.Start call.
 type BootstrapParams struct {
-	// Version is the version of shim parameters (expected 2 for shim v2)
-	Version int `json:"version"`
 	// Address is a address containerd should use to connect to shim.
 	Address string `json:"address"`
 	// Protocol is either TTRPC or GRPC.
 	Protocol string `json:"protocol"`
+	// Version is the version of shim parameters (expected 2 for shim v2)
+	Version int `json:"version"`
 }
 
 type StopStatus struct {
+	ExitedAt   time.Time
 	Pid        int
 	ExitStatus int
-	ExitedAt   time.Time
 }
 
 // Init func for the creation of a shim server

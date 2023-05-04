@@ -26,8 +26,8 @@ import (
 )
 
 var register = struct {
-	sync.RWMutex
 	r map[string]reflect.Type
+	sync.RWMutex
 }{}
 
 func Register(apiObject, transferObject interface{}) {

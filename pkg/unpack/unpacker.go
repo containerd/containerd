@@ -58,12 +58,12 @@ type Result struct {
 }
 
 type unpackerConfig struct {
-	platforms []*Platform
-
 	content content.Store
 
-	limiter               *semaphore.Weighted
 	duplicationSuppressor kmutex.KeyedLocker
+
+	limiter   *semaphore.Weighted
+	platforms []*Platform
 }
 
 // Platform represents a platform-specific unpack configuration which includes
@@ -125,9 +125,10 @@ func WithDuplicationSuppressor(d kmutex.KeyedLocker) UnpackerOpt {
 type Unpacker struct {
 	unpackerConfig
 
+	ctx context.Context
+	eg  *errgroup.Group
+
 	unpacks int32
-	ctx     context.Context
-	eg      *errgroup.Group
 }
 
 // NewUnpacker creates a new instance of the unpacker which can be used to wrap an

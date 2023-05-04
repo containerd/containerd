@@ -60,10 +60,10 @@ func (t token) GoString() string {
 
 type scanner struct {
 	input string
+	err   string
 	pos   int
 	ppos  int // bounds the current rune in the string
 	value bool
-	err   string
 }
 
 func (s *scanner) init(input string) {

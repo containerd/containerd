@@ -33,8 +33,16 @@ import (
 
 // Config provides containerd configuration data for the server
 type Config struct {
-	// Version of the config file
-	Version int `toml:"version"`
+	// Plugins provides plugin specific configuration for the initialization of a plugin
+	Plugins map[string]toml.Tree `toml:"plugins"`
+	// StreamProcessors configuration
+	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+	// Timeouts specified as a duration
+	Timeouts map[string]string `toml:"timeouts"`
+	// ProxyPlugins configures plugins which are communicated to over GRPC
+	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
+	// Debug and profiling settings
+	Debug Debug `toml:"debug"`
 	// Root is the path to a directory where containerd will store persistent data
 	Root string `toml:"root"`
 	// State is the path to a directory where containerd will store transient data
@@ -43,34 +51,26 @@ type Config struct {
 	TempDir string `toml:"temp"`
 	// PluginDir is the directory for dynamic plugins to be stored
 	PluginDir string `toml:"plugin_dir"`
-	// GRPC configuration settings
-	GRPC GRPCConfig `toml:"grpc"`
-	// TTRPC configuration settings
-	TTRPC TTRPCConfig `toml:"ttrpc"`
-	// Debug and profiling settings
-	Debug Debug `toml:"debug"`
+	// Cgroup specifies cgroup information for the containerd daemon process
+	Cgroup CgroupConfig `toml:"cgroup"`
 	// Metrics and monitoring settings
 	Metrics MetricsConfig `toml:"metrics"`
-	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
-	// initialized and started.
-	DisabledPlugins []string `toml:"disabled_plugins"`
 	// RequiredPlugins are IDs of required plugins. Containerd exits if any
 	// required plugin doesn't exist or fails to be initialized or started.
 	RequiredPlugins []string `toml:"required_plugins"`
-	// Plugins provides plugin specific configuration for the initialization of a plugin
-	Plugins map[string]toml.Tree `toml:"plugins"`
-	// OOMScore adjust the containerd's oom score
-	OOMScore int `toml:"oom_score"`
-	// Cgroup specifies cgroup information for the containerd daemon process
-	Cgroup CgroupConfig `toml:"cgroup"`
-	// ProxyPlugins configures plugins which are communicated to over GRPC
-	ProxyPlugins map[string]ProxyPlugin `toml:"proxy_plugins"`
-	// Timeouts specified as a duration
-	Timeouts map[string]string `toml:"timeouts"`
+	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
+	// initialized and started.
+	DisabledPlugins []string `toml:"disabled_plugins"`
 	// Imports are additional file path list to config files that can overwrite main config file fields
 	Imports []string `toml:"imports"`
-	// StreamProcessors configuration
-	StreamProcessors map[string]StreamProcessor `toml:"stream_processors"`
+	// TTRPC configuration settings
+	TTRPC TTRPCConfig `toml:"ttrpc"`
+	// GRPC configuration settings
+	GRPC GRPCConfig `toml:"grpc"`
+	// OOMScore adjust the containerd's oom score
+	OOMScore int `toml:"oom_score"`
+	// Version of the config file
+	Version int `toml:"version"`
 }
 
 // StreamProcessor provides configuration for diff content processors
@@ -147,11 +147,11 @@ type TTRPCConfig struct {
 // Debug provides debug configuration
 type Debug struct {
 	Address string `toml:"address"`
-	UID     int    `toml:"uid"`
-	GID     int    `toml:"gid"`
 	Level   string `toml:"level"`
 	// Format represents the logging format. Supported values are 'text' and 'json'.
 	Format string `toml:"format"`
+	UID    int    `toml:"uid"`
+	GID    int    `toml:"gid"`
 }
 
 // MetricsConfig provides metrics configuration

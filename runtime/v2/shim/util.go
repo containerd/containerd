@@ -38,13 +38,13 @@ import (
 )
 
 type CommandConfig struct {
+	Opts         *types.Any
 	Runtime      string
 	Address      string
 	TTRPCAddress string
 	Path         string
-	SchedCore    bool
 	Args         []string
-	Opts         *types.Any
+	SchedCore    bool
 }
 
 // Command returns the shim command with the provided args and configuration

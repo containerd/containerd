@@ -32,8 +32,8 @@ func WithFakeStatus(status Status) Opts {
 
 // fakeStatusStorage is a fake status storage for testing.
 type fakeStatusStorage struct {
-	sync.RWMutex
 	status Status
+	sync.RWMutex
 }
 
 func (f *fakeStatusStorage) Get() Status {

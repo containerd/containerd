@@ -62,9 +62,10 @@ type Converter struct {
 
 	pulledManifest *manifest
 
-	mu         sync.Mutex
 	blobMap    map[digest.Digest]blobState
 	layerBlobs map[digest.Digest]ocispec.Descriptor
+
+	mu sync.Mutex
 }
 
 // NewConverter returns a new converter
@@ -525,8 +526,8 @@ type jsParsedSignature struct {
 }
 
 type protectedBlock struct {
-	Length int    `json:"formatLength"`
 	Tail   string `json:"formatTail"`
+	Length int    `json:"formatLength"`
 }
 
 // joseBase64UrlDecode decodes the given string using the standard base64 url
@@ -577,8 +578,8 @@ func stripSignature(b []byte) ([]byte, error) {
 }
 
 type blobStateCalculator struct {
-	empty    bool
 	digester digest.Digester
+	empty    bool
 }
 
 func newBlobStateCalculator() *blobStateCalculator {

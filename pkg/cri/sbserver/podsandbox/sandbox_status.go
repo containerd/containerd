@@ -35,23 +35,23 @@ import (
 // SandboxInfo is extra information for sandbox.
 // TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
 type SandboxInfo struct {
-	Pid         uint32 `json:"pid"`
-	Status      string `json:"processStatus"`
-	NetNSClosed bool   `json:"netNamespaceClosed"`
-	Image       string `json:"image"`
-	SnapshotKey string `json:"snapshotKey"`
-	Snapshotter string `json:"snapshotter"`
+	RuntimeOptions interface{}            `json:"runtimeOptions"`
+	Metadata       *sandboxstore.Metadata `json:"sandboxMetadata"`
+	CNIResult      *cni.Result            `json:"cniResult"`
+	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
+	RuntimeSpec *runtimespec.Spec         `json:"runtimeSpec"`
+	Config      *runtime.PodSandboxConfig `json:"config"`
+	Image       string                    `json:"image"`
 	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
 	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
 	// in https://github.com/containerd/cri/issues/1064).
-	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
-	RuntimeType    string                    `json:"runtimeType"`
-	RuntimeOptions interface{}               `json:"runtimeOptions"`
-	Config         *runtime.PodSandboxConfig `json:"config"`
-	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
-	RuntimeSpec *runtimespec.Spec      `json:"runtimeSpec"`
-	CNIResult   *cni.Result            `json:"cniResult"`
-	Metadata    *sandboxstore.Metadata `json:"sandboxMetadata"`
+	RuntimeHandler string `json:"runtimeHandler"` // see the Note above
+	RuntimeType    string `json:"runtimeType"`
+	Snapshotter    string `json:"snapshotter"`
+	SnapshotKey    string `json:"snapshotKey"`
+	Status         string `json:"processStatus"`
+	Pid            uint32 `json:"pid"`
+	NetNSClosed    bool   `json:"netNamespaceClosed"`
 }
 
 func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {

@@ -70,9 +70,10 @@ func GenerateTokenOptions(ctx context.Context, host, username, secret string, c 
 type TokenOptions struct {
 	Realm    string
 	Service  string
-	Scopes   []string
 	Username string
 	Secret   string
+
+	Scopes []string
 
 	// FetchRefreshToken enables fetching a refresh token (aka "identity token", "offline token") along with the bearer token.
 	//
@@ -86,11 +87,11 @@ type TokenOptions struct {
 
 // OAuthTokenResponse is response from fetching token with a OAuth POST request
 type OAuthTokenResponse struct {
+	IssuedAt     time.Time `json:"issued_at"`
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
-	ExpiresIn    int       `json:"expires_in"`
-	IssuedAt     time.Time `json:"issued_at"`
 	Scope        string    `json:"scope"`
+	ExpiresIn    int       `json:"expires_in"`
 }
 
 // FetchTokenWithOAuth fetches a token using a POST request
@@ -152,11 +153,11 @@ func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.
 
 // FetchTokenResponse is response from fetching token with GET request
 type FetchTokenResponse struct {
+	IssuedAt     time.Time `json:"issued_at"`
 	Token        string    `json:"token"`
 	AccessToken  string    `json:"access_token"`
-	ExpiresIn    int       `json:"expires_in"`
-	IssuedAt     time.Time `json:"issued_at"`
 	RefreshToken string    `json:"refresh_token"`
+	ExpiresIn    int       `json:"expires_in"`
 }
 
 // FetchToken fetches a token using a GET request

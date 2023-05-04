@@ -213,12 +213,12 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 // using a uniform interface
 type Client struct {
 	services
-	connMu    sync.Mutex
+	platform  platforms.MatchComparer
 	conn      *grpc.ClientConn
+	connector func() (*grpc.ClientConn, error)
 	runtime   string
 	defaultns string
-	platform  platforms.MatchComparer
-	connector func() (*grpc.ClientConn, error)
+	connMu    sync.Mutex
 }
 
 // Reconnect re-establishes the GRPC connection to the containerd daemon
@@ -314,37 +314,22 @@ func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error
 // RemoteContext is used to configure object resolutions and transfers with
 // remote content stores and image providers.
 type RemoteContext struct {
-	// Resolver is used to resolve names to objects, fetchers, and pushers.
-	// If no resolver is provided, defaults to Docker registry resolver.
-	Resolver remotes.Resolver
 
 	// PlatformMatcher is used to match the platforms for an image
 	// operation and define the preference when a single match is required
 	// from multiple platforms.
 	PlatformMatcher platforms.MatchComparer
 
-	// Unpack is done after an image is pulled to extract into a snapshotter.
-	// It is done simultaneously for schema 2 images when they are pulled.
-	// If an image is not unpacked on pull, it can be unpacked any time
-	// afterwards. Unpacking is required to run an image.
-	Unpack bool
-
-	// UnpackOpts handles options to the unpack call.
-	UnpackOpts []UnpackOpt
-
-	// Snapshotter used for unpacking
-	Snapshotter string
-
-	// SnapshotterOpts are additional options to be passed to a snapshotter during pull
-	SnapshotterOpts []snapshots.Opt
+	// Resolver is used to resolve names to objects, fetchers, and pushers.
+	// If no resolver is provided, defaults to Docker registry resolver.
+	Resolver remotes.Resolver
 
 	// Labels to be applied to the created image
 	Labels map[string]string
 
-	// BaseHandlers are a set of handlers which get are called on dispatch.
-	// These handlers always get called before any operation specific
-	// handlers.
-	BaseHandlers []images.Handler
+	// ChildLabelMap sets the labels used to reference child objects in the content
+	// store. By default, all GC reference labels will be set for all fetched content.
+	ChildLabelMap func(ocispec.Descriptor) []string
 
 	// HandlerWrapper wraps the handler which gets sent to dispatch.
 	// Unlike BaseHandlers, this can run before and after the built
@@ -352,12 +337,19 @@ type RemoteContext struct {
 	// after it has completed transferring.
 	HandlerWrapper func(images.Handler) images.Handler
 
-	// ConvertSchema1 is whether to convert Docker registry schema 1
-	// manifests. If this option is false then any image which resolves
-	// to schema 1 will return an error since schema 1 is not supported.
-	//
-	// Deprecated: use Schema 2 or OCI images.
-	ConvertSchema1 bool
+	// Snapshotter used for unpacking
+	Snapshotter string
+
+	// UnpackOpts handles options to the unpack call.
+	UnpackOpts []UnpackOpt
+
+	// BaseHandlers are a set of handlers which get are called on dispatch.
+	// These handlers always get called before any operation specific
+	// handlers.
+	BaseHandlers []images.Handler
+
+	// SnapshotterOpts are additional options to be passed to a snapshotter during pull
+	SnapshotterOpts []snapshots.Opt
 
 	// Platforms defines which platforms to handle when doing the image operation.
 	// Platforms is ignored when a PlatformMatcher is set, otherwise the
@@ -371,12 +363,21 @@ type RemoteContext struct {
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
 
+	// ConvertSchema1 is whether to convert Docker registry schema 1
+	// manifests. If this option is false then any image which resolves
+	// to schema 1 will return an error since schema 1 is not supported.
+	//
+	// Deprecated: use Schema 2 or OCI images.
+	ConvertSchema1 bool
+
 	// AllMetadata downloads all manifests and known-configuration files
 	AllMetadata bool
 
-	// ChildLabelMap sets the labels used to reference child objects in the content
-	// store. By default, all GC reference labels will be set for all fetched content.
-	ChildLabelMap func(ocispec.Descriptor) []string
+	// Unpack is done after an image is pulled to extract into a snapshotter.
+	// It is done simultaneously for schema 2 images when they are pulled.
+	// If an image is not unpacked on pull, it can be unpacked any time
+	// afterwards. Unpacking is required to run an image.
+	Unpack bool
 }
 
 func defaultRemoteContext() *RemoteContext {

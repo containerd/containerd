@@ -24,8 +24,6 @@ import (
 
 // Config data for NRI.
 type Config struct {
-	// Disable this NRI plugin and containerd NRI functionality altogether.
-	Disable bool `toml:"disable" json:"disable"`
 	// SocketPath is the path to the NRI socket to create for NRI plugins to connect to.
 	SocketPath string `toml:"socket_path" json:"socketPath"`
 	// PluginPath is the path to search for NRI plugins to launch on startup.
@@ -36,6 +34,8 @@ type Config struct {
 	PluginRegistrationTimeout time.Duration `toml:"plugin_registration_timeout" json:"pluginRegistrationTimeout"`
 	// PluginRequestTimeout is the timeout for a plugin to handle a request.
 	PluginRequestTimeout time.Duration `toml:"plugin_request_timeout" json:"pluginRequestTimeout"`
+	// Disable this NRI plugin and containerd NRI functionality altogether.
+	Disable bool `toml:"disable" json:"disable"`
 	// DisableConnections disables connections from externally launched plugins.
 	DisableConnections bool `toml:"disable_connections" json:"disableConnections"`
 }

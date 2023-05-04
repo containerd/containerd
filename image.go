@@ -304,6 +304,10 @@ func (i *image) Spec(ctx context.Context) (ocispec.Image, error) {
 
 // UnpackConfig provides configuration for the unpack of an image
 type UnpackConfig struct {
+	// DuplicationSuppressor is used to make sure that there is only one
+	// in-flight fetch request or unpack handler for a given descriptor's
+	// digest or chain ID.
+	DuplicationSuppressor kmutex.KeyedLocker
 	// ApplyOpts for applying a diff to a snapshotter
 	ApplyOpts []diff.ApplyOpt
 	// SnapshotOpts for configuring a snapshotter
@@ -311,10 +315,6 @@ type UnpackConfig struct {
 	// CheckPlatformSupported is whether to validate that a snapshotter
 	// supports an image's platform before unpacking
 	CheckPlatformSupported bool
-	// DuplicationSuppressor is used to make sure that there is only one
-	// in-flight fetch request or unpack handler for a given descriptor's
-	// digest or chain ID.
-	DuplicationSuppressor kmutex.KeyedLocker
 }
 
 // UnpackOpt provides configuration for unpack

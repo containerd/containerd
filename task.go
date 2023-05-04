@@ -61,21 +61,21 @@ const (
 
 // Status returns process status and exit information
 type Status struct {
+	// ExitedTime is the time at which the process died
+	ExitTime time.Time
 	// Status of the process
 	Status ProcessStatus
 	// ExitStatus returned by the process
 	ExitStatus uint32
-	// ExitedTime is the time at which the process died
-	ExitTime time.Time
 }
 
 // ProcessInfo provides platform specific process information
 type ProcessInfo struct {
-	// Pid is the process ID
-	Pid uint32
 	// Info includes additional process information
 	// Info varies by platform
 	Info *google_protobuf.Any
+	// Pid is the process ID
+	Pid uint32
 }
 
 // ProcessStatus returns a human readable status for the Process representing its current status
@@ -132,19 +132,19 @@ type CheckpointTaskOpts func(*CheckpointTaskInfo) error
 
 // TaskInfo sets options for task creation
 type TaskInfo struct {
+	// Options hold runtime specific settings for task creation
+	Options interface{}
 	// Checkpoint is the Descriptor for an existing checkpoint that can be used
 	// to restore a task's runtime and memory state
 	Checkpoint *types.Descriptor
-	// RootFS is a list of mounts to use as the task's root filesystem
-	RootFS []mount.Mount
-	// Options hold runtime specific settings for task creation
-	Options interface{}
 	// RuntimePath is an absolute path that can be used to overwrite path
 	// to a shim runtime binary.
 	RuntimePath string
 
 	// runtime is the runtime name for the container, and cannot be changed.
 	runtime string
+	// RootFS is a list of mounts to use as the task's root filesystem
+	RootFS []mount.Mount
 }
 
 // Runtime name for the container

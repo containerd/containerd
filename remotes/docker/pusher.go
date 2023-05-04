@@ -38,11 +38,11 @@ import (
 )
 
 type dockerPusher struct {
-	*dockerBase
-	object string
 
 	// TODO: namespace tracker
 	tracker StatusTracker
+	*dockerBase
+	object string
 }
 
 // Writer implements Ingester API of content store. This allows the client
@@ -316,20 +316,21 @@ func getManifestPath(object string, dgst digest.Digest) []string {
 }
 
 type pushWriter struct {
-	base *dockerBase
-	ref  string
+	tracker StatusTracker
+	base    *dockerBase
 
 	pipe *io.PipeWriter
 
-	pipeC     chan *io.PipeWriter
-	respC     chan *http.Response
+	pipeC chan *io.PipeWriter
+	respC chan *http.Response
+	errC  chan error
+
+	ref string
+
+	expected  digest.Digest
 	closeOnce sync.Once
-	errC      chan error
 
 	isManifest bool
-
-	expected digest.Digest
-	tracker  StatusTracker
 }
 
 func newPushWriter(db *dockerBase, ref string, expected digest.Digest, tracker StatusTracker, isManifest bool) *pushWriter {

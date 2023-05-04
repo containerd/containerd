@@ -85,17 +85,15 @@ type Runtime interface {
 
 // Config defines the options used for running the stream server.
 type Config struct {
-	// The host:port address the server will listen on.
-	Addr string
 	// The optional base URL for constructing streaming URLs. If empty, the baseURL will be
 	// constructed from the serve address.
 	// Note that for port "0", the URL port will be set to actual port in use.
 	BaseURL *url.URL
 
-	// How long to leave idle connections open for.
-	StreamIdleTimeout time.Duration
-	// How long to wait for clients to create streams. Only used for SPDY streaming.
-	StreamCreationTimeout time.Duration
+	// The config for serving over TLS. If nil, TLS will not be used.
+	TLSConfig *tls.Config
+	// The host:port address the server will listen on.
+	Addr string
 
 	// The streaming protocols the server supports (understands and permits).  See
 	// k8s.io/kubernetes/pkg/kubelet/server/remotecommand/constants.go for available protocols.
@@ -107,8 +105,10 @@ type Config struct {
 	// Only used for SPDY streaming.
 	SupportedPortForwardProtocols []string
 
-	// The config for serving over TLS. If nil, TLS will not be used.
-	TLSConfig *tls.Config
+	// How long to leave idle connections open for.
+	StreamIdleTimeout time.Duration
+	// How long to wait for clients to create streams. Only used for SPDY streaming.
+	StreamCreationTimeout time.Duration
 }
 
 // DefaultConfig provides default values for server Config. The DefaultConfig is partial, so
@@ -141,12 +141,12 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 
 	ws := &restful.WebService{}
 	endpoints := []struct {
-		path    string
 		handler restful.RouteFunction
+		path    string
 	}{
-		{"/exec/{token}", s.serveExec},
-		{"/attach/{token}", s.serveAttach},
-		{"/portforward/{token}", s.servePortForward},
+		{s.serveExec, "/exec/{token}"},
+		{s.serveAttach, "/attach/{token}"},
+		{s.servePortForward, "/portforward/{token}"},
 	}
 	// If serving relative to a base path, set that here.
 	pathPrefix := path.Dir(s.config.BaseURL.Path)

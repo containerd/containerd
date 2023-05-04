@@ -235,9 +235,9 @@ var pushCommand = cli.Command{
 }
 
 type pushjobs struct {
+	tracker docker.StatusTracker
 	jobs    map[string]struct{}
 	ordered []string
-	tracker docker.StatusTracker
 	mu      sync.Mutex
 }
 

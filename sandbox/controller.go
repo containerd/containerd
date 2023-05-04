@@ -27,13 +27,13 @@ import (
 )
 
 type CreateOptions struct {
-	Rootfs []*types.Mount
 	// Options are used to pass arbitrary options to the shim when creating a new sandbox.
 	// CRI will use this to pass PodSandboxConfig.
 	// Don't confuse this with Runtime options, which are passed at shim instance start
 	// to setup global shim configuration.
 	Options   typeurl.Any
 	NetNSPath string
+	Rootfs    []*types.Mount
 }
 
 type CreateOpt func(*CreateOptions) error
@@ -103,23 +103,23 @@ type Controller interface {
 }
 
 type ControllerInstance struct {
-	SandboxID string
-	Pid       uint32
 	CreatedAt time.Time
 	Labels    map[string]string
+	SandboxID string
+	Pid       uint32
 }
 
 type ExitStatus struct {
-	ExitStatus uint32
 	ExitedAt   time.Time
+	ExitStatus uint32
 }
 
 type ControllerStatus struct {
-	SandboxID string
-	Pid       uint32
-	State     string
-	Info      map[string]string
 	CreatedAt time.Time
 	ExitedAt  time.Time
 	Extra     typeurl.Any
+	Info      map[string]string
+	SandboxID string
+	State     string
+	Pid       uint32
 }

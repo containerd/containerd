@@ -28,10 +28,10 @@ import (
 
 // ExecIO holds the exec io.
 type ExecIO struct {
-	id    string
 	fifos *cio.FIFOSet
 	*stdioPipes
 	closer *wgCloser
+	id     string
 }
 
 var _ cio.IO = &ExecIO{}

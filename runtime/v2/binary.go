@@ -53,11 +53,11 @@ func shimBinary(bundle *Bundle, config shimBinaryConfig) *binary {
 }
 
 type binary struct {
+	bundle                 *Bundle
 	runtime                string
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
-	bundle                 *Bundle
 }
 
 func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ *shim, err error) {

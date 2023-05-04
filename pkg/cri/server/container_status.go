@@ -126,16 +126,16 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 
 // ContainerInfo is extra information for a container.
 type ContainerInfo struct {
-	// TODO(random-liu): Add sandboxID in CRI container status.
-	SandboxID      string                   `json:"sandboxID"`
-	Pid            uint32                   `json:"pid"`
-	Removing       bool                     `json:"removing"`
-	SnapshotKey    string                   `json:"snapshotKey"`
-	Snapshotter    string                   `json:"snapshotter"`
-	RuntimeType    string                   `json:"runtimeType"`
 	RuntimeOptions interface{}              `json:"runtimeOptions"`
 	Config         *runtime.ContainerConfig `json:"config"`
 	RuntimeSpec    *runtimespec.Spec        `json:"runtimeSpec"`
+	// TODO(random-liu): Add sandboxID in CRI container status.
+	SandboxID   string `json:"sandboxID"`
+	SnapshotKey string `json:"snapshotKey"`
+	Snapshotter string `json:"snapshotter"`
+	RuntimeType string `json:"runtimeType"`
+	Pid         uint32 `json:"pid"`
+	Removing    bool   `json:"removing"`
 }
 
 // toCRIContainerInfo converts internal container object information to CRI container status response info map.

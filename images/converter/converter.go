@@ -27,10 +27,10 @@ import (
 )
 
 type convertOpts struct {
-	layerConvertFunc ConvertFunc
-	docker2oci       bool
-	indexConvertFunc ConvertFunc
 	platformMC       platforms.MatchComparer
+	layerConvertFunc ConvertFunc
+	indexConvertFunc ConvertFunc
+	docker2oci       bool
 }
 
 // Opt is an option for Convert()

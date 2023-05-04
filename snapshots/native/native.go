@@ -31,8 +31,8 @@ import (
 )
 
 type snapshotter struct {
-	root string
 	ms   *storage.MetaStore
+	root string
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying

@@ -265,8 +265,8 @@ func (p *parser) unquote(pos int, s string, allowAlts bool) (string, error) {
 
 type parseError struct {
 	input string
-	pos   int
 	msg   string
+	pos   int
 }
 
 func (pe parseError) Error() string {

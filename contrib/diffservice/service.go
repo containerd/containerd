@@ -30,9 +30,9 @@ import (
 )
 
 type service struct {
+	diffapi.UnimplementedDiffServer
 	applier  diff.Applier
 	comparer diff.Comparer
-	diffapi.UnimplementedDiffServer
 }
 
 func FromApplierAndComparer(a diff.Applier, c diff.Comparer) diffapi.DiffServer {

@@ -91,21 +91,21 @@ type IngestManager interface {
 // TODO(stevvooe): Consider a very different name for this struct. Info is way
 // to general. It also reads very weird in certain context, like pluralization.
 type Info struct {
-	Digest    digest.Digest
-	Size      int64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Labels    map[string]string
+	Digest    digest.Digest
+	Size      int64
 }
 
 // Status of a content operation (i.e. an ingestion)
 type Status struct {
-	Ref       string
-	Offset    int64
-	Total     int64
-	Expected  digest.Digest
 	StartedAt time.Time
 	UpdatedAt time.Time
+	Ref       string
+	Expected  digest.Digest
+	Offset    int64
+	Total     int64
 }
 
 // WalkFunc defines the callback for a blob walk.

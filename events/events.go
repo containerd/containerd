@@ -26,9 +26,9 @@ import (
 // Envelope provides the packaging for an event.
 type Envelope struct {
 	Timestamp time.Time
+	Event     typeurl.Any
 	Namespace string
 	Topic     string
-	Event     typeurl.Any
 }
 
 // Field returns the value for the given fieldpath as a string, if defined.

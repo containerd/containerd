@@ -28,8 +28,8 @@ import (
 // readerat implements io.ReaderAt in a completely stateless manner by opening
 // the referenced file for each call to ReadAt.
 type sizeReaderAt struct {
-	size int64
 	fp   *os.File
+	size int64
 }
 
 // OpenReader creates ReaderAt from a file

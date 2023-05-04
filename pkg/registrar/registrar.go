@@ -25,9 +25,9 @@ import (
 // Names and keys must be unique.
 // Registrar is safe for concurrent access.
 type Registrar struct {
-	lock      sync.Mutex
 	nameToKey map[string]string
 	keyToName map[string]string
+	lock      sync.Mutex
 }
 
 // NewRegistrar creates a new Registrar with the empty indexes.

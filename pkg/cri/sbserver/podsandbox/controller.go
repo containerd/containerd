@@ -58,22 +58,22 @@ type ImageService interface {
 }
 
 type Controller struct {
-	// config contains all configurations.
-	config criconfig.Config
-	// client is an instance of the containerd client
-	client *containerd.Client
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
-	// sandboxStore stores all resources associated with sandboxes.
-	sandboxStore *sandboxstore.Store
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// cri is CRI service that provides missing gaps needed by controller.
 	cri CRIService
+	// client is an instance of the containerd client
+	client *containerd.Client
+	// sandboxStore stores all resources associated with sandboxes.
+	sandboxStore *sandboxstore.Store
 	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	baseOCISpecs map[string]*oci.Spec
 
 	store *Store
+	// config contains all configurations.
+	config criconfig.Config
 }
 
 func New(

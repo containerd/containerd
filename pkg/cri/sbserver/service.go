@@ -84,15 +84,16 @@ type imageService interface {
 
 // criService implements CRIService.
 type criService struct {
-	imageService
-	// config contains all configurations.
-	config criconfig.Config
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
 	// os is an interface for all required os operations.
 	os osinterface.OS
-	// sandboxStore stores all resources associated with sandboxes.
-	sandboxStore *sandboxstore.Store
+	// streamServer is the streaming server serves container streaming request.
+	streamServer streaming.Server
+	imageService
+	// containerNameIndex stores all container names and make sure each
+	// name is unique.
+	containerNameIndex *registrar.Registrar
+	// client is an instance of the containerd client
+	client *containerd.Client
 	// sandboxNameIndex stores all sandbox names and make sure each name
 	// is unique.
 	sandboxNameIndex *registrar.Registrar
@@ -101,33 +102,32 @@ type criService struct {
 	// sandboxControllers contains different sandbox controller type,
 	// every controller controls sandbox lifecycle (and hides implementation details behind).
 	sandboxControllers map[criconfig.SandboxControllerMode]sandbox.Controller
-	// containerNameIndex stores all container names and make sure each
-	// name is unique.
-	containerNameIndex *registrar.Registrar
+	// nri is used to hook NRI into CRI request processing.
+	nri *nri.API
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin map[string]cni.CNI
-	// client is an instance of the containerd client
-	client *containerd.Client
-	// streamServer is the streaming server serves container streaming request.
-	streamServer streaming.Server
-	// eventMonitor is the monitor monitors containerd events.
-	eventMonitor *eventMonitor
-	// initialized indicates whether the server is initialized. All GRPC services
-	// should return error before the server is initialized.
-	initialized atomic.Bool
-	// cniNetConfMonitor is used to reload cni network conf if there is
-	// any valid fs change events from cni network conf dir.
-	cniNetConfMonitor map[string]*cniNetConfSyncer
-	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	baseOCISpecs map[string]*oci.Spec
-	// allCaps is the list of the capabilities.
-	// When nil, parsed from CapEff of /proc/self/status.
-	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
+	// sandboxStore stores all resources associated with sandboxes.
+	sandboxStore *sandboxstore.Store
 	// containerEventsChan is used to capture container events and send them
 	// to the caller of GetContainerEvents.
 	containerEventsChan chan runtime.ContainerEventResponse
-	// nri is used to hook NRI into CRI request processing.
-	nri *nri.API
+	// eventMonitor is the monitor monitors containerd events.
+	eventMonitor *eventMonitor
+	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
+	baseOCISpecs map[string]*oci.Spec
+	// cniNetConfMonitor is used to reload cni network conf if there is
+	// any valid fs change events from cni network conf dir.
+	cniNetConfMonitor map[string]*cniNetConfSyncer
+	// config contains all configurations.
+	config criconfig.Config
+	// imageFSPath is the path to image filesystem.
+	imageFSPath string
+	// allCaps is the list of the capabilities.
+	// When nil, parsed from CapEff of /proc/self/status.
+	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
+	// initialized indicates whether the server is initialized. All GRPC services
+	// should return error before the server is initialized.
+	initialized atomic.Bool
 }
 
 // NewCRIService returns a new instance of CRIService

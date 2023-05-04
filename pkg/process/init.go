@@ -42,8 +42,34 @@ import (
 
 // Init represents an initial process for a container
 type Init struct {
-	wg        sync.WaitGroup
+	exited    time.Time
 	initState initState
+
+	stdin    io.Closer
+	console  console.Console
+	Platform stdio.Platform
+	io       *processIO
+
+	waitBlock chan struct{}
+
+	// pausing preserves the pausing state.
+	pausing *atomicBool
+	runtime *runc.Runc
+	Rootfs  string
+
+	id           string
+	CriuWorkPath string
+
+	WorkDir string
+
+	Bundle  string
+	stdio   stdio.Stdio
+	closers []io.Closer
+	wg      sync.WaitGroup
+	IoUID   int
+	pid     int
+	IoGID   int
+	status  int
 
 	// mu is used to ensure that `Start()` and `Exited()` calls return in
 	// the right order when invoked in separate goroutines.
@@ -51,30 +77,8 @@ type Init struct {
 	// the reaper interface.
 	mu sync.Mutex
 
-	waitBlock chan struct{}
-
-	WorkDir string
-
-	id       string
-	Bundle   string
-	console  console.Console
-	Platform stdio.Platform
-	io       *processIO
-	runtime  *runc.Runc
-	// pausing preserves the pausing state.
-	pausing      *atomicBool
-	status       int
-	exited       time.Time
-	pid          int
-	closers      []io.Closer
-	stdin        io.Closer
-	stdio        stdio.Stdio
-	Rootfs       string
-	IoUID        int
-	IoGID        int
 	NoPivotRoot  bool
 	NoNewKeyring bool
-	CriuWorkPath string
 }
 
 // NewRunc returns a new runc instance for a process

@@ -112,11 +112,11 @@ func writeMap(bkt *bolt.Bucket, bucketName []byte, labels map[string]string) err
 // Uses keys "createdat" and "updatedat"
 func ReadTimestamps(bkt *bolt.Bucket, created, updated *time.Time) error {
 	for _, f := range []struct {
-		b []byte
 		t *time.Time
+		b []byte
 	}{
-		{bucketKeyCreatedAt, created},
-		{bucketKeyUpdatedAt, updated},
+		{created, bucketKeyCreatedAt},
+		{updated, bucketKeyUpdatedAt},
 	} {
 		v := bkt.Get(f.b)
 		if v != nil {

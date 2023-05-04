@@ -573,8 +573,8 @@ var unpackCommand = cli.Command{
 }
 
 type snapshotTree struct {
-	nodes []*snapshotTreeNode
 	index map[string]*snapshotTreeNode
+	nodes []*snapshotTreeNode
 }
 
 func newSnapshotTree() *snapshotTree {

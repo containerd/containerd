@@ -101,8 +101,8 @@ func newTemplateContext(state *specs.State, spec *hookSpec) *templateContext {
 
 type templateContext struct {
 	state *specs.State
-	root  string
 	funcs template.FuncMap
+	root  string
 }
 
 func (t *templateContext) id() string {

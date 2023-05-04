@@ -23,10 +23,10 @@ import (
 
 // Config of the container logs
 type Config struct {
-	ID        string
-	Namespace string
 	Stdout    io.Reader
 	Stderr    io.Reader
+	ID        string
+	Namespace string
 }
 
 // LoggerFunc is implemented by custom v2 logging binaries.

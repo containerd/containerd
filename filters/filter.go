@@ -144,10 +144,10 @@ func (op operator) String() string {
 }
 
 type selector struct {
+	re        *regexp.Regexp
+	value     string
 	fieldpath []string
 	operator  operator
-	value     string
-	re        *regexp.Regexp
 }
 
 func (m selector) Match(adaptor Adaptor) bool {

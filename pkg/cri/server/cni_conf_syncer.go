@@ -30,14 +30,15 @@ import (
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change
 // events.
 type cniNetConfSyncer struct {
-	// only used for lastSyncStatus
-	sync.RWMutex
 	lastSyncStatus error
 
-	watcher   *fsnotify.Watcher
-	confDir   string
 	netPlugin cni.CNI
-	loadOpts  []cni.Opt
+
+	watcher  *fsnotify.Watcher
+	confDir  string
+	loadOpts []cni.Opt
+	// only used for lastSyncStatus
+	sync.RWMutex
 }
 
 // newCNINetConfSyncer creates cni network conf syncer.

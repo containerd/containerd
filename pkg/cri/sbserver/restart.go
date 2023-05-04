@@ -171,9 +171,9 @@ func (c *criService) recover(ctx context.Context) error {
 
 	// Cleanup orphaned sandbox and container directories without corresponding containerd container.
 	for _, cleanup := range []struct {
-		cntrs  []containerd.Container
 		base   string
 		errMsg string
+		cntrs  []containerd.Container
 	}{
 		{
 			cntrs:  sandboxes,

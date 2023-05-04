@@ -73,11 +73,10 @@ type worker interface {
 }
 
 type run struct {
+	started  time.Time
+	ended    time.Time
 	total    int
 	failures int
-
-	started time.Time
-	ended   time.Time
 }
 
 func (r *run) start() {
@@ -217,16 +216,16 @@ func main() {
 }
 
 type config struct {
-	Concurrency int
-	CRI         bool
-	Duration    time.Duration
 	Address     string
-	Exec        bool
 	Image       string
-	JSON        bool
 	Metrics     string
 	Runtime     string
 	Snapshotter string
+	Concurrency int
+	Duration    time.Duration
+	CRI         bool
+	Exec        bool
+	JSON        bool
 }
 
 func (c config) newClient() (*containerd.Client, error) {

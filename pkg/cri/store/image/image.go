@@ -37,25 +37,25 @@ import (
 type Image struct {
 	// Id of the image. Normally the digest of image config.
 	ID string
-	// References are references to the image, e.g. RepoTag and RepoDigest.
-	References []string
 	// ChainID is the chainID of the image.
 	ChainID string
-	// Size is the compressed size of the image.
-	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
 	ImageSpec imagespec.Image
+	// References are references to the image, e.g. RepoTag and RepoDigest.
+	References []string
+	// Size is the compressed size of the image.
+	Size int64
 }
 
 // Store stores all images.
 type Store struct {
-	lock sync.RWMutex
 	// refCache is a containerd image reference to image id cache.
 	refCache map[string]string
 	// client is the containerd client.
 	client *containerd.Client
 	// store is the internal image store indexed by image id.
 	store *store
+	lock  sync.RWMutex
 }
 
 // NewStore creates an image store.
@@ -172,9 +172,9 @@ func (s *Store) List() []Image {
 }
 
 type store struct {
-	lock      sync.RWMutex
 	images    map[string]Image
 	digestSet *digestset.Set
+	lock      sync.RWMutex
 }
 
 func (s *store) list() []Image {

@@ -29,8 +29,8 @@ import (
 )
 
 type process struct {
-	id   string
 	shim *shimTask
+	id   string
 }
 
 func (p *process) ID() string {

@@ -48,9 +48,9 @@ func init() {
 }
 
 type service struct {
-	transferrers  []transfer.Transferrer
-	streamManager streaming.StreamManager
 	transferapi.UnimplementedTransferServer
+	streamManager streaming.StreamManager
+	transferrers  []transfer.Transferrer
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {

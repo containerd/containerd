@@ -54,9 +54,9 @@ func (e ErrAmbiguousPrefix) Error() string {
 // TruncIndex allows the retrieval of string identifiers by any of their unique prefixes.
 // This is used to retrieve image and container IDs by more convenient shorthand prefixes.
 type TruncIndex struct {
-	sync.RWMutex
 	trie *patricia.Trie
 	ids  map[string]struct{}
+	sync.RWMutex
 }
 
 // NewTruncIndex creates a new TruncIndex and initializes with a list of IDs.

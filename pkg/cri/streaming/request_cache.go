@@ -72,9 +72,9 @@ type requestCache struct {
 type request interface{}
 
 type cacheEntry struct {
-	token      string
-	req        request
 	expireTime time.Time
+	req        request
+	token      string
 }
 
 func newRequestCache() *requestCache {
@@ -100,7 +100,7 @@ func (c *requestCache) Insert(req request) (token string, err error) {
 	if err != nil {
 		return "", err
 	}
-	ele := c.ll.PushFront(&cacheEntry{token, req, c.clock.Now().Add(cacheTTL)})
+	ele := c.ll.PushFront(&cacheEntry{c.clock.Now().Add(cacheTTL), req, token})
 
 	c.tokens[token] = ele
 	return token, nil

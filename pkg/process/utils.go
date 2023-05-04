@@ -83,9 +83,9 @@ func getLastRuntimeError(r *runc.Runc) (string, error) {
 	var (
 		errMsg string
 		log    struct {
+			Time  time.Time
 			Level string
 			Msg   string
-			Time  time.Time
 		}
 	)
 

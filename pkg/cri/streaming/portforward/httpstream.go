@@ -120,13 +120,13 @@ func httpStreamReceived(streams chan httpstream.Stream) func(httpstream.Stream, 
 // requests over a single httpstream.Connection.
 type httpStreamHandler struct {
 	conn                  httpstream.Connection
+	forwarder             PortForwarder
 	streamChan            chan httpstream.Stream
-	streamPairsLock       sync.RWMutex
 	streamPairs           map[string]*httpStreamPair
-	streamCreationTimeout time.Duration
 	pod                   string
 	uid                   types.UID
-	forwarder             PortForwarder
+	streamCreationTimeout time.Duration
+	streamPairsLock       sync.RWMutex
 }
 
 // getStreamPair returns a httpStreamPair for requestID. This creates a
@@ -262,11 +262,11 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 // httpStreamPair represents the error and data streams for a port
 // forwarding request.
 type httpStreamPair struct {
-	lock        sync.RWMutex
-	requestID   string
 	dataStream  httpstream.Stream
 	errorStream httpstream.Stream
 	complete    chan struct{}
+	requestID   string
+	lock        sync.RWMutex
 }
 
 // newPortForwardPair creates a new httpStreamPair.

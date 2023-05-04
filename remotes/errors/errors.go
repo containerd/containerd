@@ -27,9 +27,9 @@ var _ error = ErrUnexpectedStatus{}
 // ErrUnexpectedStatus is returned if a registry API request returned with unexpected HTTP status
 type ErrUnexpectedStatus struct {
 	Status                    string
-	StatusCode                int
-	Body                      []byte
 	RequestURL, RequestMethod string
+	Body                      []byte
+	StatusCode                int
 }
 
 func (e ErrUnexpectedStatus) Error() string {

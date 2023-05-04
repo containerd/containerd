@@ -34,15 +34,15 @@ import (
 
 // writer represents a write transaction against the blob store.
 type writer struct {
+	startedAt time.Time
+	updatedAt time.Time
+	digester  digest.Digester
 	s         *store
 	fp        *os.File // opened data file
 	path      string   // path to writer dir
 	ref       string   // ref key
 	offset    int64
 	total     int64
-	digester  digest.Digester
-	startedAt time.Time
-	updatedAt time.Time
 }
 
 func (w *writer) Status() (content.Status, error) {

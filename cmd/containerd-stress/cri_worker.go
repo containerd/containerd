@@ -31,15 +31,16 @@ import (
 )
 
 type criWorker struct {
-	id       int
-	wg       *sync.WaitGroup
-	count    int
-	failures int
-	client   internalapi.RuntimeService
+	client internalapi.RuntimeService
+
+	wg *sync.WaitGroup
 
 	commit         string
 	runtimeHandler string
 	snapshotter    string
+	id             int
+	count          int
+	failures       int
 }
 
 const podNamespaceLabel = "pod.namespace"

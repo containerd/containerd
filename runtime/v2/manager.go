@@ -120,14 +120,14 @@ func init() {
 }
 
 type ManagerConfig struct {
+	Store        containers.Store
+	SandboxStore sandbox.Store
+	Events       *exchange.Exchange
 	Root         string
 	State        string
-	Store        containers.Store
-	Events       *exchange.Exchange
 	Address      string
 	TTRPCAddress string
 	SchedCore    bool
-	SandboxStore sandbox.Store
 }
 
 // NewShimManager creates a manager for v2 shims
@@ -162,17 +162,17 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 // The manager is unaware of the underlying services shim provides and lets higher level services consume them,
 // but don't care about lifecycle management.
 type ShimManager struct {
+	containers   containers.Store
+	sandboxStore sandbox.Store
+	shims        *runtime.NSMap[ShimInstance]
+	events       *exchange.Exchange
+	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
+	runtimePaths           sync.Map
 	root                   string
 	state                  string
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
-	shims                  *runtime.NSMap[ShimInstance]
-	events                 *exchange.Exchange
-	containers             containers.Store
-	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
-	runtimePaths sync.Map
-	sandboxStore sandbox.Store
 }
 
 // ID of the shim manager

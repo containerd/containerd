@@ -287,8 +287,8 @@ var infoCommand = cli.Command{
 				return err
 			}
 			commands.PrintAsJSON(struct {
-				containers.Container
 				Spec interface{} `json:"Spec,omitempty"`
+				containers.Container
 			}{
 				Container: info,
 				Spec:      v,

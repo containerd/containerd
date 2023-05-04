@@ -95,12 +95,12 @@ func (s State) String() string {
 
 // Status is the status of a sandbox.
 type Status struct {
-	// Pid is the init process id of the sandbox container.
-	Pid uint32
 	// CreatedAt is the created timestamp.
 	CreatedAt time.Time
 	// ExitedAt is the stop timestamp
 	ExitedAt time.Time
+	// Pid is the init process id of the sandbox container.
+	Pid uint32
 	// ExitStatus is the stop sandbox status
 	ExitStatus uint32
 	// State is the state of the sandbox.
@@ -131,8 +131,8 @@ func StoreStatus(status Status) StatusStorage {
 }
 
 type statusStorage struct {
-	sync.RWMutex
 	status Status
+	sync.RWMutex
 }
 
 // Get a copy of sandbox status.

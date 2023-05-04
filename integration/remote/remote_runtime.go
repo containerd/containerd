@@ -53,10 +53,10 @@ import (
 
 // RuntimeService is a gRPC implementation of internalapi.RuntimeService.
 type RuntimeService struct {
-	timeout       time.Duration
 	runtimeClient runtimeapi.RuntimeServiceClient
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+	timeout      time.Duration
 }
 
 const (

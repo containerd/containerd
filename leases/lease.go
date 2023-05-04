@@ -40,9 +40,9 @@ type Manager interface {
 // Lease retains resources to prevent cleanup before
 // the resources can be fully referenced.
 type Lease struct {
-	ID        string
 	CreatedAt time.Time
 	Labels    map[string]string
+	ID        string
 }
 
 // Resource represents low level resource of image, like content, ingest and

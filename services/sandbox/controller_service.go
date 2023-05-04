@@ -50,8 +50,8 @@ func init() {
 }
 
 type controllerService struct {
-	local sandbox.Controller
 	api.UnimplementedControllerServer
+	local sandbox.Controller
 }
 
 var _ api.ControllerServer = (*controllerService)(nil)

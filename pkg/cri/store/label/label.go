@@ -24,10 +24,10 @@ import (
 
 // Store is used to store SELinux process labels
 type Store struct {
-	sync.Mutex
 	levels   map[string]int
 	Releaser func(string)
 	Reserver func(string)
+	sync.Mutex
 }
 
 // NewStore creates a new SELinux process label store

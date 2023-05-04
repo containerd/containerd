@@ -65,28 +65,30 @@ const statusVersion = "v1"
 
 // versionedStatus is the internal used versioned container status.
 type versionedStatus struct {
+	Status
 	// Version indicates the version of the versioned container status.
 	Version string
-	Status
 }
 
 // Status is the status of a container.
 type Status struct {
-	// Pid is the init process id of the container.
-	Pid uint32
+	// Resources has container runtime resource constraints
+	Resources *runtime.ContainerResources
+	// CamelCase string explaining why container is in its current state.
+	Reason string
+	// Human-readable message indicating details about why container is in its
+	// current state.
+	Message string
 	// CreatedAt is the created timestamp.
 	CreatedAt int64
 	// StartedAt is the started timestamp.
 	StartedAt int64
 	// FinishedAt is the finished timestamp.
 	FinishedAt int64
+	// Pid is the init process id of the container.
+	Pid uint32
 	// ExitCode is the container exit code.
 	ExitCode int32
-	// CamelCase string explaining why container is in its current state.
-	Reason string
-	// Human-readable message indicating details about why container is in its
-	// current state.
-	Message string
 	// Starting indicates that the container is in starting state.
 	// This field doesn't need to be checkpointed.
 	Starting bool `json:"-"`
@@ -96,8 +98,6 @@ type Status struct {
 	// Unknown indicates that the container status is not fully loaded.
 	// This field doesn't need to be checkpointed.
 	Unknown bool `json:"-"`
-	// Resources has container runtime resource constraints
-	Resources *runtime.ContainerResources
 }
 
 // State returns current state of the container based on the container status.
@@ -195,9 +195,9 @@ func LoadStatus(root, id string) (Status, error) {
 }
 
 type statusStorage struct {
-	sync.RWMutex
-	path   string
 	status Status
+	path   string
+	sync.RWMutex
 }
 
 // Get a copy of container status.

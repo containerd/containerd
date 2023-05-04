@@ -78,8 +78,8 @@ func (n *nopWriteCloser) Close() error {
 //  2. <3.14 Linux Kernel: write is not atomic
 //     See http://man7.org/linux/man-pages/man2/write.2.html
 type serialWriteCloser struct {
-	mu sync.Mutex
 	wc io.WriteCloser
+	mu sync.Mutex
 }
 
 // NewSerialWriteCloser creates a SerialWriteCloser from a write closer.

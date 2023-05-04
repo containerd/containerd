@@ -21,12 +21,12 @@ type InstallOpts func(*InstallConfig)
 
 // InstallConfig sets the binary install configuration
 type InstallConfig struct {
+	// Path to install libs and binaries to
+	Path string
 	// Libs installs libs from the image
 	Libs bool
 	// Replace will overwrite existing binaries or libs in the opt directory
 	Replace bool
-	// Path to install libs and binaries to
-	Path string
 }
 
 // WithInstallLibs installs libs from the image

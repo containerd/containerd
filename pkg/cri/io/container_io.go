@@ -36,8 +36,6 @@ func streamKey(id, name string, stream StreamType) string {
 
 // ContainerIO holds the container io.
 type ContainerIO struct {
-	id string
-
 	fifos *cio.FIFOSet
 	*stdioPipes
 
@@ -45,6 +43,7 @@ type ContainerIO struct {
 	stderrGroup *cioutil.WriterGroup
 
 	closer *wgCloser
+	id     string
 }
 
 var _ cio.IO = &ContainerIO{}

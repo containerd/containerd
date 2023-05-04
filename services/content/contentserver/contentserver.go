@@ -36,8 +36,8 @@ import (
 )
 
 type service struct {
-	store content.Store
 	api.UnimplementedContentServer
+	store content.Store
 }
 
 var bufPool = sync.Pool{
@@ -197,8 +197,8 @@ func (s *service) Read(req *api.ReadContentRequest, session api.Content_ReadServ
 // This allows io.CopyBuffer to do the heavy lifting of chunking the responses
 // into the buffer size.
 type readResponseWriter struct {
-	offset  int64
 	session api.Content_ReadServer
+	offset  int64
 }
 
 func (rw *readResponseWriter) Write(p []byte) (n int, err error) {

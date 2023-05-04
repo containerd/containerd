@@ -104,18 +104,19 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 }
 
 type binaryProcessor struct {
+	err error
+
 	cmd    *exec.Cmd
 	r      *os.File
-	mt     string
 	stderr *bytes.Buffer
-
-	mu  sync.Mutex
-	err error
 
 	// There is a race condition between waiting on c.cmd.Wait() and setting c.err within
 	// c.wait(), and reading that value from c.Err().
 	// Use done to wait for the returned error to be captured and set.
 	done chan struct{}
+	mt   string
+
+	mu sync.Mutex
 }
 
 func (c *binaryProcessor) Err() error {

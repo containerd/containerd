@@ -36,28 +36,28 @@ type IO struct {
 type CreateOpts struct {
 	// Spec is the OCI runtime spec
 	Spec typeurl.Any
-	// Rootfs mounts to perform to gain access to the container's filesystem
-	Rootfs []mount.Mount
-	// IO for the container's main process
-	IO IO
-	// Checkpoint digest to restore container state
-	Checkpoint string
 	// RuntimeOptions for the runtime
 	RuntimeOptions typeurl.Any
 	// TaskOptions received for the task
 	TaskOptions typeurl.Any
+	// Checkpoint digest to restore container state
+	Checkpoint string
 	// Runtime name to use (e.g. `io.containerd.NAME.VERSION`).
 	// As an alternative full abs path to binary may be specified instead.
 	Runtime string
 	// SandboxID is an optional ID of sandbox this container belongs to
 	SandboxID string
+	// IO for the container's main process
+	IO IO
+	// Rootfs mounts to perform to gain access to the container's filesystem
+	Rootfs []mount.Mount
 }
 
 // Exit information for a process
 type Exit struct {
+	Timestamp time.Time
 	Pid       uint32
 	Status    uint32
-	Timestamp time.Time
 }
 
 // PlatformRuntime is responsible for the creation and management of

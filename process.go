@@ -65,9 +65,9 @@ func NewExitStatus(code uint32, t time.Time, err error) *ExitStatus {
 // ExitStatus encapsulates a process's exit status.
 // It is used by `Wait()` to return either a process exit code or an error
 type ExitStatus struct {
-	code     uint32
 	exitedAt time.Time
 	err      error
+	code     uint32
 }
 
 // Result returns the exit code and time of the exit status.
@@ -100,10 +100,10 @@ func (s ExitStatus) Error() error {
 }
 
 type process struct {
-	id   string
-	task *task
-	pid  uint32
 	io   cio.IO
+	task *task
+	id   string
+	pid  uint32
 }
 
 func (p *process) ID() string {

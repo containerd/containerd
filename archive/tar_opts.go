@@ -27,10 +27,11 @@ import (
 type ApplyOptions struct {
 	Filter          Filter          // Filter tar headers
 	ConvertWhiteout ConvertWhiteout // Convert whiteout files
-	Parents         []string        // Parent directories to handle inherited attributes without CoW
-	NoSameOwner     bool            // NoSameOwner will not attempt to preserve the owner specified in the tar archive.
 
-	applyFunc func(context.Context, string, io.Reader, ApplyOptions) (int64, error)
+	applyFunc   func(context.Context, string, io.Reader, ApplyOptions) (int64, error)
+	Parents     []string // Parent directories to handle inherited attributes without CoW
+	NoSameOwner bool     // NoSameOwner will not attempt to preserve the owner specified in the tar archive.
+
 }
 
 // ApplyOpt allows setting mutable archive apply properties on creation
@@ -87,8 +88,6 @@ func WithParents(p []string) ApplyOpt {
 
 // WriteDiffOptions provides additional options for a WriteDiff operation
 type WriteDiffOptions struct {
-	ParentLayers []string // Windows needs the full list of parent layers
-
 	writeDiffFunc func(context.Context, io.Writer, string, string, WriteDiffOptions) error
 
 	// SourceDateEpoch specifies the following timestamps to provide control for reproducibility.
@@ -97,6 +96,8 @@ type WriteDiffOptions struct {
 	//
 	// See also https://reproducible-builds.org/docs/source-date-epoch/ .
 	SourceDateEpoch *time.Time
+	ParentLayers    []string // Windows needs the full list of parent layers
+
 }
 
 // WriteDiffOpt allows setting mutable archive write properties on creation

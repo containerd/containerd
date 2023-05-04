@@ -85,8 +85,8 @@ type Container struct {
 
 // RuntimeInfo holds runtime specific information
 type RuntimeInfo struct {
-	Name    string
 	Options typeurl.Any
+	Name    string
 }
 
 // Store interacts with the underlying container storage

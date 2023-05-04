@@ -303,8 +303,8 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 	}
 
 	for _, v := range []struct {
-		name string
 		d    *string
+		name string
 	}{
 		{
 			name: "root",

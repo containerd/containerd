@@ -33,8 +33,6 @@ import (
 // Container contains all resources associated with the container. All methods to
 // mutate the internal state are thread-safe.
 type Container struct {
-	// Metadata is the metadata of the container, it is **immutable** after created.
-	Metadata
 	// Status stores the status of the container.
 	Status StatusStorage
 	// Container is the containerd container client.
@@ -49,6 +47,8 @@ type Container struct {
 	IsStopSignaledWithTimeout *uint32
 	// Stats contains (mutable) stats for the container
 	Stats *stats.ContainerStats
+	// Metadata is the metadata of the container, it is **immutable** after created.
+	Metadata
 }
 
 // Opts sets specific information to newly created Container.
@@ -107,10 +107,10 @@ func (c *Container) Delete() error {
 
 // Store stores all Containers.
 type Store struct {
-	lock       sync.RWMutex
 	containers map[string]Container
 	idIndex    *truncindex.TruncIndex
 	labels     *label.Store
+	lock       sync.RWMutex
 }
 
 // NewStore creates a container store.

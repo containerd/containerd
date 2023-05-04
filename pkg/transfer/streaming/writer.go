@@ -76,8 +76,8 @@ func WriteByteStream(ctx context.Context, stream streaming.Stream) io.WriteClose
 type writeByteStream struct {
 	ctx       context.Context
 	stream    streaming.Stream
-	remaining int32
 	updated   chan struct{}
+	remaining int32
 }
 
 func (wbs *writeByteStream) Write(p []byte) (n int, err error) {

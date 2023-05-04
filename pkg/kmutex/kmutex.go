@@ -42,9 +42,8 @@ func newKeyMutex() *keyMutex {
 }
 
 type keyMutex struct {
-	mu sync.Mutex
-
 	locks map[string]*klock
+	mu    sync.Mutex
 }
 
 type klock struct {

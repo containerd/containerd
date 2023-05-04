@@ -34,9 +34,9 @@ type ttrpcConnector func() (*ttrpc.Client, error)
 
 // Client is the client to interact with TTRPC part of containerd server (plugins, events)
 type Client struct {
-	mu        sync.Mutex
 	connector ttrpcConnector
 	client    *ttrpc.Client
+	mu        sync.Mutex
 	closed    bool
 }
 

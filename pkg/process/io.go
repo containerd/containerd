@@ -54,8 +54,8 @@ type processIO struct {
 	io runc.IO
 
 	uri   *url.URL
-	copy  bool
 	stdio stdio.Stdio
+	copy  bool
 }
 
 func (p *processIO) Close() error {
@@ -134,8 +134,8 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 func copyPipes(ctx context.Context, rio runc.IO, stdin, stdout, stderr string, wg, cwg *sync.WaitGroup) error {
 	var sameFile *countingWriteCloser
 	for _, i := range []struct {
-		name string
 		dest func(wc io.WriteCloser, rc io.Closer)
+		name string
 	}{
 		{
 			name: stdout,

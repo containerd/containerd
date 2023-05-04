@@ -54,10 +54,10 @@ func init() {
 
 // Local is a local implementation of the introspection service
 type Local struct {
-	mu          sync.Mutex
-	root        string
 	plugins     *plugin.Set
+	root        string
 	pluginCache []*api.Plugin
+	mu          sync.Mutex
 }
 
 var _ = (api.IntrospectionClient)(&Local{})

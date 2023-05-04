@@ -172,10 +172,10 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 		}
 
 		manifest := struct {
-			SchemaVersion int                  `json:"schemaVersion"`
-			MediaType     string               `json:"mediaType"`
 			Config        ocispec.Descriptor   `json:"config"`
+			MediaType     string               `json:"mediaType"`
 			Layers        []ocispec.Descriptor `json:"layers"`
+			SchemaVersion int                  `json:"schemaVersion"`
 		}{
 			SchemaVersion: 2,
 			MediaType:     images.MediaTypeDockerSchema2Manifest,

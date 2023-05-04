@@ -613,8 +613,8 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 	t2 := time.Now().UTC()
 	testcases := []struct {
 		name   string
-		kind   snapshots.Kind
 		parent string
+		kind   snapshots.Kind
 	}{
 		{
 			name: "c1",

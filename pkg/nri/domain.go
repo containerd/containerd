@@ -64,8 +64,8 @@ func RegisterDomain(d Domain) {
 }
 
 type domainTable struct {
-	sync.Mutex
 	domains map[string]Domain
+	sync.Mutex
 }
 
 func (t *domainTable) add(d Domain) error {

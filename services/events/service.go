@@ -50,9 +50,9 @@ func init() {
 }
 
 type service struct {
+	api.UnimplementedEventsServer
 	ttService *ttrpcService
 	events    *exchange.Exchange
-	api.UnimplementedEventsServer
 }
 
 // NewService returns the GRPC events server

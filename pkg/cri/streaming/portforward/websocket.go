@@ -165,19 +165,19 @@ func handleWebSocketStreams(req *http.Request, w http.ResponseWriter, portForwar
 // websocketStreamPair represents the error and data streams for a port
 // forwarding request.
 type websocketStreamPair struct {
-	port        int32
 	dataStream  io.ReadWriteCloser
 	errorStream io.WriteCloser
+	port        int32
 }
 
 // websocketStreamHandler is capable of processing a single port forward
 // request over a websocket connection
 type websocketStreamHandler struct {
+	forwarder   PortForwarder
 	conn        *wsstream.Conn
-	streamPairs []*websocketStreamPair
 	pod         string
 	uid         types.UID
-	forwarder   PortForwarder
+	streamPairs []*websocketStreamPair
 }
 
 // run invokes the websocketStreamHandler's forwarder.PortForward

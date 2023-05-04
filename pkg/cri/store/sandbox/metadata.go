@@ -44,24 +44,24 @@ type metadataInternal Metadata
 
 // Metadata is the unversioned sandbox metadata.
 type Metadata struct {
+	// Config is the CRI sandbox config.
+	Config *runtime.PodSandboxConfig
+	// CNIresult resulting configuration for attached network namespace interfaces
+	CNIResult *cni.Result
 	// ID is the sandbox id.
 	ID string
 	// Name is the sandbox name.
 	Name string
-	// Config is the CRI sandbox config.
-	Config *runtime.PodSandboxConfig
 	// NetNSPath is the network namespace used by the sandbox.
 	NetNSPath string
 	// IP of Pod if it is attached to non host network
 	IP string
-	// AdditionalIPs of the Pod if it is attached to non host network
-	AdditionalIPs []string
 	// RuntimeHandler is the runtime handler name of the pod.
 	RuntimeHandler string
-	// CNIresult resulting configuration for attached network namespace interfaces
-	CNIResult *cni.Result
 	// ProcessLabel is the SELinux process label for the container
 	ProcessLabel string
+	// AdditionalIPs of the Pod if it is attached to non host network
+	AdditionalIPs []string
 }
 
 // MarshalJSON encodes Metadata into bytes in json format.

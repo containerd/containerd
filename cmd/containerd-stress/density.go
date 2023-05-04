@@ -190,11 +190,12 @@ func getppid(pid int) (int, error) {
 // described in proc(5) with names based on the /proc/[pid]/status
 // fields.
 type Stat struct {
-	// PID is the process ID.
-	PID uint
 
 	// Name is the command run by the process.
 	Name string
+
+	// PID is the process ID.
+	PID uint
 
 	// StartTime is the number of clock ticks after system boot (since
 	// Linux 2.6).

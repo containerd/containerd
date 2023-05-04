@@ -70,8 +70,8 @@ func WithEventsPublisher(p events.Publisher) DBOpt {
 
 // dbOptions configure db options.
 type dbOptions struct {
-	shared    bool
 	publisher events.Publisher
+	shared    bool
 }
 
 // DB represents a metadata database backed by a bolt
@@ -80,9 +80,23 @@ type dbOptions struct {
 // while proxying data shared across namespaces to backend
 // datastores for content and snapshots.
 type DB struct {
-	db *bolt.DB
-	ss map[string]*snapshotter
-	cs *contentStore
+	dbopts dbOptions
+	db     *bolt.DB
+	ss     map[string]*snapshotter
+	cs     *contentStore
+
+	// dirtySS and dirtyCS flags keeps track of datastores which have had
+	// deletions since the last garbage collection. These datastores will
+	// be garbage collected during the next garbage collection. These
+	// should only be updated inside of a write transaction or wlock.Lock.
+	dirtySS map[string]struct{}
+
+	// collectible resources
+	collectors map[gc.ResourceType]Collector
+
+	// mutationCallbacks are called after each mutation with the flag
+	// set indicating whether any dirty flags are set
+	mutationCallbacks []func(bool)
 
 	// wlock is used to protect access to the data structures during garbage
 	// collection. While the wlock is held no writable transactions can be
@@ -96,21 +110,7 @@ type DB struct {
 	// atomically if outside of wlock.Lock.
 	dirty uint32
 
-	// dirtySS and dirtyCS flags keeps track of datastores which have had
-	// deletions since the last garbage collection. These datastores will
-	// be garbage collected during the next garbage collection. These
-	// should only be updated inside of a write transaction or wlock.Lock.
-	dirtySS map[string]struct{}
 	dirtyCS bool
-
-	// mutationCallbacks are called after each mutation with the flag
-	// set indicating whether any dirty flags are set
-	mutationCallbacks []func(bool)
-
-	// collectible resources
-	collectors map[gc.ResourceType]Collector
-
-	dbopts dbOptions
 }
 
 // NewDB creates a new metadata database using the provided
@@ -314,8 +314,8 @@ func (m *DB) RegisterCollectibleResource(t gc.ResourceType, c Collector) {
 
 // namespacedEvent is used to handle any event for a namespace
 type namespacedEvent struct {
-	namespace string
 	event     interface{}
+	namespace string
 }
 
 func (m *DB) publishEvents(events []namespacedEvent) {
@@ -340,9 +340,9 @@ func (m *DB) publishEvents(events []namespacedEvent) {
 
 // GCStats holds the duration for the different phases of the garbage collector
 type GCStats struct {
+	SnapshotD map[string]time.Duration
 	MetaD     time.Duration
 	ContentD  time.Duration
-	SnapshotD map[string]time.Duration
 }
 
 // Elapsed returns the duration which elapsed during a collection

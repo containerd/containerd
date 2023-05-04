@@ -29,13 +29,13 @@ import (
 type Status struct {
 	content.Status
 
-	Committed bool
-
 	// ErrClosed contains error encountered on close.
 	ErrClosed error
 
 	// UploadUUID is used by the Docker registry to reference blob uploads
 	UploadUUID string
+
+	Committed bool
 }
 
 // StatusTracker to track status of operations
@@ -53,8 +53,8 @@ type StatusTrackLocker interface {
 
 type memoryStatusTracker struct {
 	statuses map[string]Status
-	m        sync.Mutex
 	locker   *locker.Locker
+	m        sync.Mutex
 }
 
 // NewInMemoryTracker returns a StatusTracker that tracks content status in-memory

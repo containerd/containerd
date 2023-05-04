@@ -502,13 +502,13 @@ func mkparent(ctx context.Context, path, root string, parents []string) error {
 // See also https://github.com/opencontainers/image-spec/blob/main/layer.md for details
 // about OCI layers
 type ChangeWriter struct {
-	tw                *tar.Writer
-	source            string
-	modTimeUpperBound *time.Time
 	whiteoutT         time.Time
+	tw                *tar.Writer
+	modTimeUpperBound *time.Time
 	inodeSrc          map[uint64]string
 	inodeRefs         map[uint64][]string
 	addedDirs         map[string]struct{}
+	source            string
 }
 
 // ChangeWriterOpt can be specified in NewChangeWriter.

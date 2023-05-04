@@ -43,8 +43,8 @@ const (
 
 type snapshotter struct {
 	snapshots.Snapshotter
-	name string
 	db   *DB
+	name string
 	l    sync.RWMutex
 }
 
@@ -714,8 +714,8 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 }
 
 type infoPair struct {
-	bkey string
 	info snapshots.Info
+	bkey string
 }
 
 func (s *snapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
@@ -910,8 +910,8 @@ func (s *snapshotter) garbageCollect(ctx context.Context) (d time.Duration, err 
 
 type treeNode struct {
 	info     snapshots.Info
-	remove   bool
 	children []*treeNode
+	remove   bool
 }
 
 func (s *snapshotter) walkTree(ctx context.Context, seen map[string]struct{}) ([]*treeNode, error) {

@@ -37,20 +37,20 @@ type CalledDetail struct {
 // If a member of the form `*Fn` is set, that function will be called in place
 // of the real call.
 type FakeOS struct {
-	sync.Mutex
-	MkdirAllFn             func(string, os.FileMode) error
+	CopyFileFn             func(string, string, os.FileMode) error
+	MountFn                func(source string, target string, fstype string, flags uintptr, data string) error
 	RemoveAllFn            func(string) error
 	StatFn                 func(string) (os.FileInfo, error)
 	ResolveSymbolicLinkFn  func(string) (string, error)
 	FollowSymlinkInScopeFn func(string, string) (string, error)
-	CopyFileFn             func(string, string, os.FileMode) error
-	WriteFileFn            func(string, []byte, os.FileMode) error
-	MountFn                func(source string, target string, fstype string, flags uintptr, data string) error
-	UnmountFn              func(target string) error
+	MkdirAllFn             func(string, os.FileMode) error
+	errors                 map[string]error
 	LookupMountFn          func(path string) (containerdmount.Info, error)
+	UnmountFn              func(target string) error
+	WriteFileFn            func(string, []byte, os.FileMode) error
 	HostnameFn             func() (string, error)
 	calls                  []CalledDetail
-	errors                 map[string]error
+	sync.Mutex
 }
 
 var _ osInterface.OS = &FakeOS{}

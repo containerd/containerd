@@ -53,8 +53,8 @@ func init() {
 }
 
 type service struct {
-	local imagesapi.ImagesClient
 	imagesapi.UnimplementedImagesServer
+	local imagesapi.ImagesClient
 }
 
 var _ imagesapi.ImagesServer = &service{}

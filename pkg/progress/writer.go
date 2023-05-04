@@ -36,8 +36,8 @@ var (
 // implementing progress displays, such as those implemented in docker and
 // git.
 type Writer struct {
-	buf   bytes.Buffer
 	w     io.Writer
+	buf   bytes.Buffer
 	lines int
 }
 

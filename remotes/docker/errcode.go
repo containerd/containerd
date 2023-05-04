@@ -113,12 +113,12 @@ func (ec ErrorCode) WithArgs(args ...interface{}) Error {
 
 // Error provides a wrapper around ErrorCode with extra Details provided.
 type Error struct {
-	Code    ErrorCode   `json:"code"`
-	Message string      `json:"message"`
-	Detail  interface{} `json:"detail,omitempty"`
+	Detail interface{} `json:"detail,omitempty"`
 
 	// TODO(duglin): See if we need an "args" property so we can do the
 	// variable substitution right before showing the message to the user
+	Message string    `json:"message"`
+	Code    ErrorCode `json:"code"`
 }
 
 var _ error = Error{}
@@ -155,8 +155,6 @@ func (e Error) WithArgs(args ...interface{}) Error {
 
 // ErrorDescriptor provides relevant information about a given error code.
 type ErrorDescriptor struct {
-	// Code is the error code that this descriptor describes.
-	Code ErrorCode
 
 	// Value provides a unique, string key, often captilized with
 	// underscores, to identify the error code. This value is used as the
@@ -170,6 +168,9 @@ type ErrorDescriptor struct {
 	// Description provides a complete account of the errors purpose, suitable
 	// for use in documentation.
 	Description string
+
+	// Code is the error code that this descriptor describes.
+	Code ErrorCode
 
 	// HTTPStatusCode provides the http status code that is associated with
 	// this error condition.

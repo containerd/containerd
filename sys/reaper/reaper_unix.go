@@ -36,8 +36,8 @@ var ErrNoSuchProcess = errors.New("no such process")
 const bufferSize = 32
 
 type subscriber struct {
+	c chan runc.Exit
 	sync.Mutex
-	c      chan runc.Exit
 	closed bool
 }
 
@@ -85,9 +85,8 @@ var Default = &Monitor{
 
 // Monitor monitors the underlying system for process status changes
 type Monitor struct {
-	sync.Mutex
-
 	subscribers map[chan runc.Exit]*subscriber
+	sync.Mutex
 }
 
 // Start starts the command and registers the process with the reaper
@@ -120,8 +119,8 @@ func (m *Monitor) Wait(c *exec.Cmd, ec chan runc.Exit) (int, error) {
 // WaitTimeout is used to skip the blocked command and kill the left process.
 func (m *Monitor) WaitTimeout(c *exec.Cmd, ec chan runc.Exit, timeout time.Duration) (int, error) {
 	type exitStatusWrapper struct {
-		status int
 		err    error
+		status int
 	}
 
 	// capacity can make sure that the following goroutine will not be

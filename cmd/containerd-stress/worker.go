@@ -30,15 +30,15 @@ import (
 )
 
 type ctrWorker struct {
-	id       int
-	wg       *sync.WaitGroup
-	count    int
-	failures int
+	image containerd.Image
+	wg    *sync.WaitGroup
 
 	client      *containerd.Client
-	image       containerd.Image
 	commit      string
 	snapshotter string
+	id          int
+	count       int
+	failures    int
 }
 
 func (w *ctrWorker) run(ctx, tctx context.Context) {

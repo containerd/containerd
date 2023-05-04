@@ -19,9 +19,9 @@ package metadata
 import bolt "go.etcd.io/bbolt"
 
 type migration struct {
+	migrate func(*bolt.Tx) error
 	schema  string
 	version int
-	migrate func(*bolt.Tx) error
 }
 
 // migrations stores the list of database migrations

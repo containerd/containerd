@@ -42,19 +42,19 @@ import (
 type UpdateClientFunc func(client *http.Client) error
 
 type hostConfig struct {
-	scheme string
-	host   string
-	path   string
-
-	capabilities docker.HostCapabilities
-
-	caCerts     []string
-	clientPairs [][2]string
-	skipVerify  *bool
+	skipVerify *bool
 
 	header http.Header
 
 	// TODO: Add credential configuration (domain alias, username)
+	scheme string
+	host   string
+	path   string
+
+	caCerts     []string
+	clientPairs [][2]string
+
+	capabilities docker.HostCapabilities
 }
 
 // HostOptions is used to configure registry hosts
@@ -287,12 +287,6 @@ func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 }
 
 type hostFileConfig struct {
-	// Capabilities determine what operations a host is
-	// capable of performing. Allowed values
-	//  - pull
-	//  - resolve
-	//  - push
-	Capabilities []string `toml:"capabilities"`
 
 	// CACert are the public key certificates for TLS
 	// Accepted types
@@ -315,6 +309,13 @@ type hostFileConfig struct {
 	// Header are additional header files to send to the server
 	Header map[string]interface{} `toml:"header"`
 
+	// Capabilities determine what operations a host is
+	// capable of performing. Allowed values
+	//  - pull
+	//  - resolve
+	//  - push
+	Capabilities []string `toml:"capabilities"`
+
 	// OverridePath indicates the API root endpoint is defined in the URL
 	// path rather than by the API specification.
 	// This may be used with non-compliant OCI registries to override the
@@ -336,12 +337,12 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	type HostFileConfig = hostFileConfig
 
 	c := struct {
+		// HostConfigs store the per-host configuration
+		HostConfigs map[string]hostFileConfig `toml:"host"`
 		HostFileConfig
 		// Server specifies the default server. When `host` is
 		// also specified, those hosts are tried first.
 		Server string `toml:"server"`
-		// HostConfigs store the per-host configuration
-		HostConfigs map[string]hostFileConfig `toml:"host"`
 	}{}
 
 	orderedHosts, err := getSortedHosts(tree)

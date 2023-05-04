@@ -40,20 +40,20 @@ const (
 )
 
 type CRIImageService struct {
-	// config contains all configurations.
-	config criconfig.Config
-	// client is an instance of the containerd client
-	client *containerd.Client
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
-	// imageStore stores all resources associated with images.
-	imageStore *imagestore.Store
-	// snapshotStore stores information of all snapshots.
-	snapshotStore *snapshotstore.Store
 	// unpackDuplicationSuppressor is used to make sure that there is only
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+	// client is an instance of the containerd client
+	client *containerd.Client
+	// imageStore stores all resources associated with images.
+	imageStore *imagestore.Store
+	// snapshotStore stores information of all snapshots.
+	snapshotStore *snapshotstore.Store
+	// config contains all configurations.
+	config criconfig.Config
+	// imageFSPath is the path to image filesystem.
+	imageFSPath string
 }
 
 func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client) (*CRIImageService, error) {

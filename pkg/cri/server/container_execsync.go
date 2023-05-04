@@ -101,13 +101,13 @@ func (c *criService) ExecSync(ctx context.Context, r *runtime.ExecSyncRequest) (
 
 // execOptions specifies how to execute command in container.
 type execOptions struct {
-	cmd     []string
 	stdin   io.Reader
 	stdout  io.WriteCloser
 	stderr  io.WriteCloser
-	tty     bool
 	resize  <-chan remotecommand.TerminalSize
+	cmd     []string
 	timeout time.Duration
+	tty     bool
 }
 
 func (c *criService) execInternal(ctx context.Context, container containerd.Container, id string, opts execOptions) (*uint32, error) {

@@ -31,12 +31,12 @@ import (
 )
 
 type importOpts struct {
-	indexName       string
+	platformMatcher platforms.MatchComparer
 	imageRefT       func(string) string
 	dgstRefT        func(digest.Digest) string
 	skipDgstRef     func(string) bool
+	indexName       string
 	allPlatforms    bool
-	platformMatcher platforms.MatchComparer
 	compress        bool
 	discardLayers   bool
 }

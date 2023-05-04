@@ -64,8 +64,8 @@ type LabelStore interface {
 // Store can generally support multi-reader, single-writer ingest of data,
 // including resumable ingest.
 type store struct {
-	root string
 	ls   LabelStore
+	root string
 }
 
 // NewStore returns a local content store

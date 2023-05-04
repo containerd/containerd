@@ -160,15 +160,14 @@ func (ts *localTransferService) withLease(ctx context.Context, opts ...leases.Op
 }
 
 type TransferConfig struct {
-	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
-	MaxConcurrentDownloads int
-	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
-	MaxConcurrentUploadedLayers int
 
 	// DuplicationSuppressor is used to make sure that there is only one
 	// in-flight fetch request or unpack handler for a given descriptor's
 	// digest or chain ID.
 	DuplicationSuppressor kmutex.KeyedLocker
+
+	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
+	RegistryConfigPath string
 
 	// BaseHandlers are a set of handlers which get are called on dispatch.
 	// These handlers always get called before any operation specific
@@ -178,6 +177,8 @@ type TransferConfig struct {
 	// UnpackPlatforms are used to specify supported combination of platforms and snapshotters
 	UnpackPlatforms []unpack.Platform
 
-	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
-	RegistryConfigPath string
+	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
+	MaxConcurrentDownloads int
+	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
+	MaxConcurrentUploadedLayers int
 }

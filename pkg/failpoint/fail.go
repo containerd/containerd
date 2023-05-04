@@ -86,10 +86,9 @@ func (t Type) String() string {
 //
 // Inspired by FreeBSD fail(9): https://freebsd.org/cgi/man.cgi?query=fail.
 type Failpoint struct {
-	sync.Mutex
-
 	fnName  string
 	entries []*failpointEntry
+	sync.Mutex
 }
 
 // NewFailpoint returns failpoint control.
@@ -149,8 +148,8 @@ func (fp *Failpoint) Marshal() string {
 }
 
 type failpointEntry struct {
-	typ   Type
 	arg   interface{}
+	typ   Type
 	count int64
 }
 

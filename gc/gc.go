@@ -38,9 +38,9 @@ const ResourceMax = ResourceType(0x1F)
 // Node presents a resource which has a type and key,
 // this node can be used to lookup other nodes.
 type Node struct {
-	Type      ResourceType
 	Namespace string
 	Key       string
+	Type      ResourceType
 }
 
 // Stats about a garbage collection run

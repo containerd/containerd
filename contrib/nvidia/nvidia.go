@@ -104,13 +104,13 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 }
 
 type config struct {
-	Devices      []string
-	Capabilities []Capability
-	LoadKmods    bool
 	LDCache      string
 	LDConfig     string
-	Requirements []string
 	OCIHookPath  string
+	Devices      []string
+	Capabilities []Capability
+	Requirements []string
+	LoadKmods    bool
 	NoCgroups    bool
 }
 

@@ -28,19 +28,19 @@ import (
 
 // InitContext is used for plugin initialization
 type InitContext struct {
-	Context      context.Context
-	Root         string
-	State        string
-	Config       interface{}
-	Address      string
-	TTRPCAddress string
+	Context context.Context
+	Config  interface{}
 
 	// deprecated: will be removed in 2.0, use plugin.EventType
 	Events *exchange.Exchange
 
 	Meta *Meta // plugins can fill in metadata at init.
 
-	plugins *Set
+	plugins      *Set
+	Root         string
+	State        string
+	Address      string
+	TTRPCAddress string
 }
 
 // NewContext returns a new plugin InitContext
@@ -97,8 +97,8 @@ func (p *Plugin) Instance() (interface{}, error) {
 // After iteratively instantiating plugins, this set should represent, the
 // ordered, initialization set of plugins for a containerd instance.
 type Set struct {
-	ordered     []*Plugin // order of initialization
 	byTypeAndID map[Type]map[string]*Plugin
+	ordered     []*Plugin // order of initialization
 }
 
 // NewPluginSet returns an initialized plugin set

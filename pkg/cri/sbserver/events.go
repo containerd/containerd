@@ -63,24 +63,25 @@ type eventMonitor struct {
 }
 
 type backOff struct {
-	// queuePoolMu is mutex used to protect the queuePool map
-	queuePoolMu sync.Mutex
+	clock clock.Clock
 
-	queuePool map[string]*backOffQueue
-	// tickerMu is mutex used to protect the ticker.
-	tickerMu      sync.Mutex
+	queuePool     map[string]*backOffQueue
 	ticker        *time.Ticker
 	minDuration   time.Duration
 	maxDuration   time.Duration
 	checkDuration time.Duration
-	clock         clock.Clock
+	// queuePoolMu is mutex used to protect the queuePool map
+	queuePoolMu sync.Mutex
+
+	// tickerMu is mutex used to protect the ticker.
+	tickerMu sync.Mutex
 }
 
 type backOffQueue struct {
-	events     []interface{}
 	expireTime time.Time
-	duration   time.Duration
 	clock      clock.Clock
+	events     []interface{}
+	duration   time.Duration
 }
 
 // Create new event monitor. New event monitor will start subscribing containerd event. All events

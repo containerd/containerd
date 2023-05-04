@@ -37,11 +37,11 @@ const (
 // Challenge carries information from a WWW-Authenticate response header.
 // See RFC 2617.
 type Challenge struct {
-	// scheme is the auth-scheme according to RFC 2617
-	Scheme AuthenticationScheme
 
 	// parameters are the auth-params according to RFC 2617
 	Parameters map[string]string
+	// scheme is the auth-scheme according to RFC 2617
+	Scheme AuthenticationScheme
 }
 
 type byScheme []Challenge

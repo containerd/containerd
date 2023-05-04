@@ -99,19 +99,20 @@ const (
 
 // Registration contains information for registering a plugin
 type Registration struct {
-	// Type of the plugin
-	Type Type
-	// ID of the plugin
-	ID string
 	// Config specific to the plugin
 	Config interface{}
-	// Requires is a list of plugins that the registered plugin requires to be available
-	Requires []Type
 
 	// InitFn is called when initializing a plugin. The registration and
 	// context are passed in. The init function may modify the registration to
 	// add exports, capabilities and platform support declarations.
 	InitFn func(*InitContext) (interface{}, error)
+	// Type of the plugin
+	Type Type
+	// ID of the plugin
+	ID string
+	// Requires is a list of plugins that the registered plugin requires to be available
+	Requires []Type
+
 	// Disable the plugin from loading
 	Disable bool
 }
@@ -134,8 +135,8 @@ func (r *Registration) URI() string {
 }
 
 var register = struct {
-	sync.RWMutex
 	r []*Registration
+	sync.RWMutex
 }{}
 
 // Load loads all plugins at the provided path into containerd

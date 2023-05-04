@@ -29,10 +29,10 @@ import (
 )
 
 type remoteWriter struct {
-	ref    string
 	client contentapi.Content_WriteClient
-	offset int64
+	ref    string
 	digest digest.Digest
+	offset int64
 }
 
 // send performs a synchronous req-resp cycle on the client.

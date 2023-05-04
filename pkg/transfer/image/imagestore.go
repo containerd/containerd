@@ -42,17 +42,18 @@ func init() {
 }
 
 type Store struct {
-	imageName     string
-	imageLabels   map[string]string
-	platforms     []ocispec.Platform
-	allMetadata   bool
-	labelMap      func(ocispec.Descriptor) []string
-	manifestLimit int
+	imageLabels map[string]string
+	labelMap    func(ocispec.Descriptor) []string
+	imageName   string
+	platforms   []ocispec.Platform
 
 	// extraReferences are used to store or lookup multiple references
 	extraReferences []Reference
 
-	unpacks []transfer.UnpackConfiguration
+	unpacks       []transfer.UnpackConfiguration
+	manifestLimit int
+
+	allMetadata bool
 }
 
 // Reference is used to create or find a reference for an image

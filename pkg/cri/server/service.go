@@ -68,17 +68,18 @@ type CRIService interface {
 
 // criService implements CRIService.
 type criService struct {
-	// config contains all configurations.
-	config criconfig.Config
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
+	// streamServer is the streaming server serves container streaming request.
+	streamServer streaming.Server
+	// unpackDuplicationSuppressor is used to make sure that there is only
+	// one in-flight fetch request or unpack handler for a given descriptor's
+	// or chain ID.
+	unpackDuplicationSuppressor kmutex.KeyedLocker
 	// os is an interface for all required os operations.
 	os osinterface.OS
-	// sandboxStore stores all resources associated with sandboxes.
-	sandboxStore *sandboxstore.Store
-	// sandboxNameIndex stores all sandbox names and make sure each name
-	// is unique.
-	sandboxNameIndex *registrar.Registrar
+	// client is an instance of the containerd client
+	client *containerd.Client
+	// eventMonitor is the monitor monitors containerd events.
+	eventMonitor *eventMonitor
 	// containerStore stores all resources associated with containers.
 	containerStore *containerstore.Store
 	// containerNameIndex stores all container names and make sure each
@@ -90,32 +91,31 @@ type criService struct {
 	snapshotStore *snapshotstore.Store
 	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
 	netPlugin map[string]cni.CNI
-	// client is an instance of the containerd client
-	client *containerd.Client
-	// streamServer is the streaming server serves container streaming request.
-	streamServer streaming.Server
-	// eventMonitor is the monitor monitors containerd events.
-	eventMonitor *eventMonitor
-	// initialized indicates whether the server is initialized. All GRPC services
-	// should return error before the server is initialized.
-	initialized atomic.Bool
+	// containerEventsChan is used to capture container events and send them
+	// to the caller of GetContainerEvents.
+	containerEventsChan chan runtime.ContainerEventResponse
+	// sandboxStore stores all resources associated with sandboxes.
+	sandboxStore *sandboxstore.Store
+	// sandboxNameIndex stores all sandbox names and make sure each name
+	// is unique.
+	sandboxNameIndex *registrar.Registrar
+	// nri is used to hook NRI into CRI request processing.
+	nri *nri.API
 	// cniNetConfMonitor is used to reload cni network conf if there is
 	// any valid fs change events from cni network conf dir.
 	cniNetConfMonitor map[string]*cniNetConfSyncer
 	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	baseOCISpecs map[string]*oci.Spec
+	// config contains all configurations.
+	config criconfig.Config
+	// imageFSPath is the path to image filesystem.
+	imageFSPath string
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
-	// unpackDuplicationSuppressor is used to make sure that there is only
-	// one in-flight fetch request or unpack handler for a given descriptor's
-	// or chain ID.
-	unpackDuplicationSuppressor kmutex.KeyedLocker
-	// nri is used to hook NRI into CRI request processing.
-	nri *nri.API
-	// containerEventsChan is used to capture container events and send them
-	// to the caller of GetContainerEvents.
-	containerEventsChan chan runtime.ContainerEventResponse
+	// initialized indicates whether the server is initialized. All GRPC services
+	// should return error before the server is initialized.
+	initialized atomic.Bool
 }
 
 // NewCRIService returns a new instance of CRIService

@@ -60,12 +60,13 @@ func WithShutdown(ctx context.Context) (context.Context, Service) {
 type shutdownService struct {
 	context.Context
 
+	err       error
+	doneC     chan struct{}
+	callbacks []func(context.Context) error
+	timeout   time.Duration
+
 	mu         sync.Mutex
 	isShutdown bool
-	callbacks  []func(context.Context) error
-	doneC      chan struct{}
-	err        error
-	timeout    time.Duration
 }
 
 func (s *shutdownService) Shutdown() {

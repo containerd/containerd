@@ -53,9 +53,9 @@ type Transactor interface {
 // the last index. The last index should always be considered the active
 // snapshots immediate parent.
 type Snapshot struct {
-	Kind      snapshots.Kind
 	ID        string
 	ParentIDs []string
+	Kind      snapshots.Kind
 }
 
 // MetaStore is used to store metadata related to a snapshot driver. The
@@ -64,10 +64,10 @@ type Snapshot struct {
 // driver but can be used to handle the persistence and transactional
 // complexities of a driver implementation.
 type MetaStore struct {
+	db     *bolt.DB
 	dbfile string
 
 	dbL sync.Mutex
-	db  *bolt.DB
 }
 
 // NewMetaStore returns a snapshot MetaStore for storage of metadata related to

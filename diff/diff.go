@@ -28,14 +28,6 @@ import (
 
 // Config is used to hold parameters needed for a diff operation
 type Config struct {
-	// MediaType is the type of diff to generate
-	// Default depends on the differ,
-	// i.e. application/vnd.oci.image.layer.v1.tar+gzip
-	MediaType string
-
-	// Reference is the content upload reference
-	// Default will use a random reference string
-	Reference string
 
 	// Labels are the labels to apply to the generated content
 	Labels map[string]string
@@ -48,6 +40,14 @@ type Config struct {
 
 	// SourceDateEpoch specifies the SOURCE_DATE_EPOCH without touching the env vars.
 	SourceDateEpoch *time.Time
+	// MediaType is the type of diff to generate
+	// Default depends on the differ,
+	// i.e. application/vnd.oci.image.layer.v1.tar+gzip
+	MediaType string
+
+	// Reference is the content upload reference
+	// Default will use a random reference string
+	Reference string
 }
 
 // Opt is used to configure a diff operation

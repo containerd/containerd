@@ -57,8 +57,8 @@ func init() {
 }
 
 type service struct {
-	local api.TasksClient
 	api.UnimplementedTasksServer
+	local api.TasksClient
 }
 
 func (s *service) Register(server *grpc.Server) error {

@@ -38,14 +38,14 @@ var bufPool = sync.Pool{
 
 // Config holds the IO configurations.
 type Config struct {
-	// Terminal is true if one has been allocated
-	Terminal bool
 	// Stdin path
 	Stdin string
 	// Stdout path
 	Stdout string
 	// Stderr path
 	Stderr string
+	// Terminal is true if one has been allocated
+	Terminal bool
 }
 
 // IO holds the io information for a task or process
@@ -73,8 +73,8 @@ type Attach func(*FIFOSet) (IO, error)
 
 // FIFOSet is a set of file paths to FIFOs for a task's standard IO streams
 type FIFOSet struct {
-	Config
 	close func() error
+	Config
 }
 
 // Close the FIFOSet
@@ -95,8 +95,8 @@ type Streams struct {
 	Stdin    io.Reader
 	Stdout   io.Writer
 	Stderr   io.Writer
-	Terminal bool
 	FIFODir  string
+	Terminal bool
 }
 
 // Opt customize options for creating a Creator or Attach
@@ -177,10 +177,10 @@ func NullIO(_ string) (IO, error) {
 
 // cio is a basic container IO implementation.
 type cio struct {
-	config  Config
 	wg      *sync.WaitGroup
-	closers []io.Closer
 	cancel  context.CancelFunc
+	config  Config
+	closers []io.Closer
 }
 
 func (c *cio) Config() Config {

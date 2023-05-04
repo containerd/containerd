@@ -130,9 +130,9 @@ type progressPusher struct {
 }
 
 type pushStatus struct {
-	l        sync.Mutex
 	statuses map[string]content.Status
 	complete map[digest.Digest]struct{}
+	l        sync.Mutex
 }
 
 func newProgressPusher(pusher remotes.Pusher, progress *ProgressTracker) *progressPusher {
@@ -241,10 +241,10 @@ func (p *progressPusher) Check(ctx context.Context, dgst digest.Digest) (bool, e
 
 type progressWriter struct {
 	content.Writer
-	ref      string
-	desc     ocispec.Descriptor
 	status   *pushStatus
 	progress *ProgressTracker
+	desc     ocispec.Descriptor
+	ref      string
 }
 
 func (pw *progressWriter) Write(p []byte) (n int, err error) {

@@ -120,8 +120,8 @@ func NewProcessorChain(mt string, r io.Reader) StreamProcessor {
 }
 
 type processorChain struct {
-	mt string
 	rc io.Reader
+	mt string
 }
 
 func (c *processorChain) MediaType() string {

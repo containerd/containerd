@@ -67,13 +67,13 @@ func (c HostCapabilities) Has(t HostCapabilities) bool {
 // host, representing the capabilities, authorizations, connection
 // configuration, and location.
 type RegistryHost struct {
-	Client       *http.Client
 	Authorizer   Authorizer
+	Client       *http.Client
+	Header       http.Header
 	Host         string
 	Scheme       string
 	Path         string
 	Capabilities HostCapabilities
-	Header       http.Header
 }
 
 func (h RegistryHost) isProxy(refhost string) bool {

@@ -101,16 +101,16 @@ type FetchConfig struct {
 	Resolver remotes.Resolver
 	// ProgressOutput to display progress
 	ProgressOutput io.Writer
-	// Labels to set on the content
-	Labels []string
 	// PlatformMatcher matches platforms, supersedes Platforms
 	PlatformMatcher platforms.MatchComparer
+	// Labels to set on the content
+	Labels []string
 	// Platforms to fetch
 	Platforms []string
-	// Whether or not download all metadata
-	AllMetadata bool
 	// RemoteOpts to configure object resolutions and transfers with remote content providers
 	RemoteOpts []containerd.RemoteOpt
+	// Whether or not download all metadata
+	AllMetadata bool
 	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
 	TraceHTTP bool
 }
@@ -401,12 +401,12 @@ const (
 
 // StatusInfo holds the status info for an upload or download
 type StatusInfo struct {
+	StartedAt time.Time
+	UpdatedAt time.Time
 	Ref       string
 	Status    StatusInfoStatus
 	Offset    int64
 	Total     int64
-	StartedAt time.Time
-	UpdatedAt time.Time
 }
 
 // Display pretty prints out the download or upload progress

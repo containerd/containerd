@@ -68,14 +68,14 @@ func TarFromWriterTo(wt WriterToTar) io.ReadCloser {
 
 // TarContext is used to create tar records
 type TarContext struct {
-	UID int
-	GID int
 
 	// ModTime sets the modtimes for all files, if nil the current time
 	// is used for each file when it was written
 	ModTime *time.Time
 
 	Xattrs map[string]string
+	UID    int
+	GID    int
 }
 
 func (tc TarContext) newHeader(mode os.FileMode, name, link string, size int64) *tar.Header {
@@ -106,11 +106,11 @@ func (tc TarContext) newHeader(mode os.FileMode, name, link string, size int64) 
 }
 
 type tarInfo struct {
-	name string
-	mode os.FileMode
-	size int64
 	modt *time.Time
 	hdr  *tar.Header
+	name string
+	size int64
+	mode os.FileMode
 }
 
 func (ti tarInfo) Name() string {

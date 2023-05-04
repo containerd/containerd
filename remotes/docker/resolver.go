@@ -86,11 +86,6 @@ type Authorizer interface {
 
 // ResolverOptions are used to configured a new Docker register resolver
 type ResolverOptions struct {
-	// Hosts returns registry host configurations for a namespace.
-	Hosts RegistryHosts
-
-	// Headers are the HTTP request header fields sent by the resolver
-	Headers http.Header
 
 	// Tracker is used to track uploads to the registry. This is used
 	// since the registry does not have upload tracking and the existing
@@ -100,6 +95,12 @@ type ResolverOptions struct {
 	// Authorizer is used to authorize registry requests
 	// Deprecated: use Hosts
 	Authorizer Authorizer
+
+	// Hosts returns registry host configurations for a namespace.
+	Hosts RegistryHosts
+
+	// Headers are the HTTP request header fields sent by the resolver
+	Headers http.Header
 
 	// Credentials provides username and secret given a host.
 	// If username is empty but a secret is given, that secret
@@ -111,13 +112,13 @@ type ResolverOptions struct {
 	// Deprecated: use Hosts
 	Host func(string) (string, error)
 
-	// PlainHTTP specifies to use plain http and not https
-	// Deprecated: use Hosts
-	PlainHTTP bool
-
 	// Client is the http client to used when making registry requests
 	// Deprecated: use Hosts
 	Client *http.Client
+
+	// PlainHTTP specifies to use plain http and not https
+	// Deprecated: use Hosts
+	PlainHTTP bool
 }
 
 // DefaultHost is the default host function.
@@ -437,10 +438,10 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
+	header     http.Header
 	refspec    reference.Spec
 	repository string
 	hosts      []RegistryHost
-	header     http.Header
 }
 
 func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
@@ -524,11 +525,11 @@ func (r *request) addNamespace(ns string) (err error) {
 }
 
 type request struct {
+	host   RegistryHost
+	header http.Header
+	body   func() (io.ReadCloser, error)
 	method string
 	path   string
-	header http.Header
-	host   RegistryHost
-	body   func() (io.ReadCloser, error)
 	size   int64
 }
 

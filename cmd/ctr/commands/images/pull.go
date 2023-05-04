@@ -203,9 +203,9 @@ command. As part of this process, we do the following:
 }
 
 type progressNode struct {
-	transfer.Progress
 	children []*progressNode
-	root     bool
+	transfer.Progress
+	root bool
 }
 
 // ProgressHandler continuously updates the output with job progress

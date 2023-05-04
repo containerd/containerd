@@ -454,8 +454,8 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 }
 
 type proxyClients struct {
-	m       sync.Mutex
 	clients map[string]*grpc.ClientConn
+	m       sync.Mutex
 }
 
 func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {

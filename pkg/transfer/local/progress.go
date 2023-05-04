@@ -31,13 +31,13 @@ import (
 )
 
 type ProgressTracker struct {
+	added chan jobUpdate
+	waitC chan struct{}
+
+	parents       map[digest.Digest][]ocispec.Descriptor
 	root          string
 	transferState string
-	added         chan jobUpdate
-	waitC         chan struct{}
-
-	parents map[digest.Digest][]ocispec.Descriptor
-	parentL sync.Mutex
+	parentL       sync.Mutex
 }
 
 type jobState uint8
@@ -49,11 +49,11 @@ const (
 )
 
 type jobStatus struct {
-	state    jobState
+	desc     ocispec.Descriptor
 	name     string
 	parents  []string
 	progress int64
-	desc     ocispec.Descriptor
+	state    jobState
 }
 
 type jobUpdate struct {

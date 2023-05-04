@@ -166,11 +166,11 @@ func WithProcessKill(ctx context.Context, p Process) error {
 
 // KillInfo contains information on how to process a Kill action
 type KillInfo struct {
+	// ExecID is the ID of a process to kill
+	ExecID string
 	// All kills all processes inside the task
 	// only valid on tasks, ignored on processes
 	All bool
-	// ExecID is the ID of a process to kill
-	ExecID string
 }
 
 // KillOpts allows options to be set for the killing of a process

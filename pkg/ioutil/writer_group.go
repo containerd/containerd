@@ -25,8 +25,8 @@ import (
 // WriterGroup is a group of writers. Writer could be dynamically
 // added and removed.
 type WriterGroup struct {
-	mu      sync.Mutex
 	writers map[string]io.WriteCloser
+	mu      sync.Mutex
 	closed  bool
 }
 

@@ -62,8 +62,8 @@ func NewPublisher(address string) (*RemoteEventsPublisher, error) {
 type RemoteEventsPublisher struct {
 	client  *ttrpcutil.Client
 	closed  chan struct{}
-	closer  sync.Once
 	requeue chan *item
+	closer  sync.Once
 }
 
 // Done returns a channel which closes when done

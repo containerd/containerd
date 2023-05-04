@@ -36,12 +36,12 @@ type dockerAuthorizer struct {
 
 	client *http.Client
 	header http.Header
-	mu     sync.RWMutex
 
 	// indexed by host name
 	handlers map[string]*authHandler
 
 	onFetchRefreshToken OnFetchRefreshToken
+	mu                  sync.RWMutex
 }
 
 type authorizerConfig struct {
@@ -202,29 +202,29 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 
 // authResult is used to control limit rate.
 type authResult struct {
-	sync.WaitGroup
+	err          error
 	token        string
 	refreshToken string
-	err          error
+	sync.WaitGroup
 }
 
 // authHandler is used to handle auth request per registry server.
 type authHandler struct {
-	sync.Mutex
-
 	header http.Header
 
 	client *http.Client
 
-	// only support basic and bearer schemes
-	scheme auth.AuthenticationScheme
+	// scopedTokens caches token indexed by scopes, which used in
+	// bearer auth case
+	scopedTokens map[string]*authResult
 
 	// common contains common challenge answer
 	common auth.TokenOptions
 
-	// scopedTokens caches token indexed by scopes, which used in
-	// bearer auth case
-	scopedTokens map[string]*authResult
+	sync.Mutex
+
+	// only support basic and bearer schemes
+	scheme auth.AuthenticationScheme
 }
 
 func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.AuthenticationScheme, opts auth.TokenOptions) *authHandler {

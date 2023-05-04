@@ -27,8 +27,8 @@ import (
 type TaskInfo struct {
 	ID        string
 	Runtime   string
-	Spec      []byte
 	Namespace string
+	Spec      []byte
 }
 
 // Process is a runtime object for an executing process inside a container
@@ -117,6 +117,12 @@ const (
 
 // State information for a process
 type State struct {
+	// ExitedAt is the time at which the process exited
+	// Only valid if the Status is Stopped
+	ExitedAt time.Time
+	Stdin    string
+	Stdout   string
+	Stderr   string
 	// Status is the current status of the container
 	Status Status
 	// Pid is the main process id for the container
@@ -124,20 +130,14 @@ type State struct {
 	// ExitStatus of the process
 	// Only valid if the Status is Stopped
 	ExitStatus uint32
-	// ExitedAt is the time at which the process exited
-	// Only valid if the Status is Stopped
-	ExitedAt time.Time
-	Stdin    string
-	Stdout   string
-	Stderr   string
-	Terminal bool
+	Terminal   bool
 }
 
 // ProcessInfo holds platform specific process information
 type ProcessInfo struct {
-	// Pid is the process ID
-	Pid uint32
 	// Info includes additional process information
 	// Info varies by platform
 	Info interface{}
+	// Pid is the process ID
+	Pid uint32
 }

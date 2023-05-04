@@ -31,8 +31,8 @@ type object interface {
 
 // NSMap extends Map type with a notion of namespaces passed via Context.
 type NSMap[T object] struct {
-	mu      sync.Mutex
 	objects map[string]map[string]T
+	mu      sync.Mutex
 }
 
 // NewNSMap returns a new NSMap

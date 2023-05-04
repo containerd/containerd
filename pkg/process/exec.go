@@ -39,25 +39,28 @@ import (
 )
 
 type execProcess struct {
-	wg sync.WaitGroup
+	exited time.Time
+	stdin  io.Closer
 
 	execState execState
 
-	mu      sync.Mutex
-	id      string
-	console console.Console
-	io      *processIO
-	status  int
-	exited  time.Time
-	pid     safePid
-	closers []io.Closer
-	stdin   io.Closer
-	stdio   stdio.Stdio
-	path    string
-	spec    specs.Process
-
-	parent    *Init
+	console   console.Console
 	waitBlock chan struct{}
+
+	parent *Init
+	io     *processIO
+	spec   specs.Process
+
+	path    string
+	id      string
+	stdio   stdio.Stdio
+	closers []io.Closer
+	pid     safePid
+	wg      sync.WaitGroup
+
+	status int
+
+	mu sync.Mutex
 }
 
 func (e *execProcess) Wait() {

@@ -136,10 +136,11 @@ func (sm *streamManager) ReferenceLabel() string {
 type managedStream struct {
 	streaming.Stream
 
-	ns      string
-	name    string
-	lease   string
 	manager *streamManager
+
+	ns    string
+	name  string
+	lease string
 }
 
 func (m *managedStream) Close() error {

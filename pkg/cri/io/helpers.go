@@ -30,13 +30,13 @@ import (
 
 // AttachOptions specifies how to attach to a container.
 type AttachOptions struct {
-	Stdin     io.Reader
-	Stdout    io.WriteCloser
-	Stderr    io.WriteCloser
-	Tty       bool
-	StdinOnce bool
+	Stdin  io.Reader
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
 	// CloseStdin is the function to close container stdin.
 	CloseStdin func() error
+	Tty        bool
+	StdinOnce  bool
 }
 
 // StreamType is the type of the stream, stdout/stderr.
@@ -54,8 +54,8 @@ const (
 type wgCloser struct {
 	ctx    context.Context
 	wg     *sync.WaitGroup
-	set    []io.Closer
 	cancel context.CancelFunc
+	set    []io.Closer
 }
 
 func (g *wgCloser) Wait() {

@@ -152,7 +152,6 @@ type gcScheduler struct {
 
 	eventC chan mutationEvent
 
-	waiterL sync.Mutex
 	waiters []chan gc.Stats
 
 	pauseThreshold    float64
@@ -160,6 +159,8 @@ type gcScheduler struct {
 	mutationThreshold int
 	scheduleDelay     time.Duration
 	startupDelay      time.Duration
+
+	waiterL sync.Mutex
 }
 
 func newScheduler(c collector, cfg *config) *gcScheduler {

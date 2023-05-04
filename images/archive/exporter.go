@@ -35,11 +35,11 @@ import (
 )
 
 type exportOptions struct {
-	manifests          []ocispec.Descriptor
 	platform           platforms.MatchComparer
+	blobRecordOptions  blobRecordOptions
+	manifests          []ocispec.Descriptor
 	allPlatforms       bool
 	skipDockerManifest bool
-	blobRecordOptions  blobRecordOptions
 }
 
 // ExportOpt defines options for configuring exported descriptors

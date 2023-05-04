@@ -94,11 +94,11 @@ const (
 )
 
 type local struct {
-	sync.Mutex
 	cfg *Config
 	nri *nri.Adaptation
 
 	state map[string]State
+	sync.Mutex
 }
 
 var _ API = &local{}

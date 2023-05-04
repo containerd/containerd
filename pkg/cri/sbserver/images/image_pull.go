@@ -592,8 +592,8 @@ const (
 
 // pullProgressReporter is used to check single PullImage progress.
 type pullProgressReporter struct {
-	ref         string
 	cancel      context.CancelFunc
+	ref         string
 	reqReporter pullRequestReporter
 	timeout     time.Duration
 }
@@ -677,10 +677,9 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 // countingReadCloser wraps http.Response.Body with pull request reporter,
 // which is used by pullRequestReporterRoundTripper.
 type countingReadCloser struct {
-	once sync.Once
-
 	rc          io.ReadCloser
 	reqReporter *pullRequestReporter
+	once        sync.Once
 }
 
 // Read reads bytes from original io.ReadCloser and increases bytes in

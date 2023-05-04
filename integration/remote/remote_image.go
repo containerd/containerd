@@ -50,8 +50,8 @@ import (
 
 // ImageService is a gRPC implementation of internalapi.ImageManagerService.
 type ImageService struct {
-	timeout     time.Duration
 	imageClient runtimeapi.ImageServiceClient
+	timeout     time.Duration
 }
 
 // NewImageService creates a new internalapi.ImageManagerService.

@@ -102,13 +102,13 @@ type Collector interface {
 }
 
 type gcContext struct {
-	labelHandlers []referenceLabelHandler
 	contexts      map[gc.ResourceType]CollectionContext
+	labelHandlers []referenceLabelHandler
 }
 
 type referenceLabelHandler struct {
-	key []byte
 	fn  func(string, []byte, []byte, func(gc.Node))
+	key []byte
 }
 
 func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collector) *gcContext {
