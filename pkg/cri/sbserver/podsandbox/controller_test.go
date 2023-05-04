@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/store/label"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/store/label"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 	"github.com/stretchr/testify/assert"
 )
 

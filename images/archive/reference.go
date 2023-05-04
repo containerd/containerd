@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containerd/containerd/reference"
-	distref "github.com/containerd/containerd/reference/docker"
+	"github.com/containerd/containerd/v2/reference"
+	distref "github.com/containerd/containerd/v2/reference/docker"
 	"github.com/opencontainers/go-digest"
 )
 

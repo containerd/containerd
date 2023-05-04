@@ -23,8 +23,8 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/content/local"
+	"github.com/containerd/containerd/v2/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 )

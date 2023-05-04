@@ -31,9 +31,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/oci"
 )
 
 // Linux dependent OCI spec opts.

@@ -5,8 +5,8 @@
 		"context": "..",
 		"dockerfile": "Dockerfile"
 	},
-	"workspaceFolder": "/go/src/github.com/containerd/containerd",
-	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/containerd/containerd,type=bind,consistency=cached",
+	"workspaceFolder": "/go/src/github.com/containerd/containerd/v2",
+	"workspaceMount": "source=${localWorkspaceFolder},target=/go/src/github.com/containerd/containerd/v2,type=bind,consistency=cached",
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {

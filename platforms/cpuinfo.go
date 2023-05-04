@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 )
 
 // Present the ARM instruction set architecture, eg: v7, v8

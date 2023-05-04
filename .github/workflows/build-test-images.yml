@@ -38,7 +38,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/containerd/containerd/v2
 
     steps:
       - uses: actions/setup-go@v3
@@ -47,7 +47,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          path: src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd/v2
 
       - name: Set env
         shell: bash
@@ -108,7 +108,7 @@ jobs:
               --command-id RunPowerShellScript \
               -n WinDockerHelper \
               -g ${{ env.AZURE_RESOURCE_GROUP }} \
-              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/prepare_windows_docker_helper.ps1
+              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/script/setup/prepare_windows_docker_helper.ps1
             # The prepare_windows_docker_helper.ps1 script reboots the server after enabling the Windows features
             # Give it a chance to reboot. Running another run-command via azure CLI should work even without this
             # sleep, but we want to avoid the possibility that it may run before the server reboots.
@@ -118,7 +118,7 @@ jobs:
               --command-id RunPowerShellScript \
               -n WinDockerHelper \
               -g ${{ env.AZURE_RESOURCE_GROUP }} \
-              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/enable_ssh_windows.ps1 \
+              --scripts @$GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/script/setup/enable_ssh_windows.ps1 \
               --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
 
       - name: Get Windows Helper IPs
@@ -132,7 +132,7 @@ jobs:
       - name: Enable Docker TLS
         shell: bash
         run: |
-          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} $GITHUB_WORKSPACE/src/github.com/containerd/containerd/script/setup/enable_docker_tls_on_windows.ps1  azureuser@${{ env.PUBLIC_IP }}:/enable_docker_tls_on_windows.ps1
+          scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/script/setup/enable_docker_tls_on_windows.ps1  azureuser@${{ env.PUBLIC_IP }}:/enable_docker_tls_on_windows.ps1
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }} "powershell.exe -command { C:/enable_docker_tls_on_windows.ps1 -IPAddresses ${{ env.PUBLIC_IP }},${{ env.PRIVATE_IP }} }"
 
       - name: Fetch client certificate and key
@@ -153,13 +153,13 @@ jobs:
       - name: Build and push images
         shell: bash
         run: |
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up setup-buildx
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/integration/images/volume-copy-up setup-buildx
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-copy-up push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/integration/images/volume-copy-up build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/integration/images/volume-copy-up push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
 
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
-          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/integration/images/volume-ownership push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/integration/images/volume-ownership build-registry PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
+          make -C $GITHUB_WORKSPACE/src/github.com/containerd/containerd/v2/integration/images/volume-ownership push-manifest PROJ=${{ github.event.inputs.push_to_project }} REMOTE_DOCKER_URL=${{ env.PUBLIC_IP }}:2376
 
       - name: Cleanup resources
         if: always()

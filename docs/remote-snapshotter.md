@@ -39,7 +39,7 @@ This is useful if the values of these labels are determined statically regardles
 These user-defined labels must be prefixed by `containerd.io/snapshot/`.
 
 ```go
-import "github.com/containerd/containerd/snapshots"
+import "github.com/containerd/containerd/v2/snapshots"
 
 image, err := client.Pull(ctx, ref,
 	containerd.WithPullUnpack,

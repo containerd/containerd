@@ -1,4 +1,4 @@
-module github.com/containerd/containerd/integration/client
+module github.com/containerd/containerd/v2/integration/client
 
 go 1.19
 
@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/hcsshim v0.10.0-rc.7
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.1
-	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
+	github.com/containerd/containerd/v2 v2.0.0-00010101000000-000000000000
 	github.com/containerd/continuity v0.3.1-0.20230307035957-72c70feb3081
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.2.1
@@ -71,7 +71,7 @@ require (
 // IMPORTANT: this replace rule ONLY replaces containerd itself; dependencies
 // in the "require" section above are still taken into account for version
 // resolution if newer.
-replace github.com/containerd/containerd => ../../
+replace github.com/containerd/containerd/v2 => ../../
 
 // Fork will be merged later but may impact other go-fuzz-headers consumers:
 // https://github.com/containerd/containerd/pull/7957#pullrequestreview-1244814968

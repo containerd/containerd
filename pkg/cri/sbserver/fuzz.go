@@ -21,8 +21,8 @@ package sbserver
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/pkg/cri/server"
-	"github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/cri/server"
+	"github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
 func SandboxStore(cs server.CRIService) (*sandbox.Store, error) {

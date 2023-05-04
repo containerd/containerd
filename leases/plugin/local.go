@@ -19,10 +19,10 @@ package plugin
 import (
 	"context"
 
-	"github.com/containerd/containerd/gc"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/gc"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 func init() {

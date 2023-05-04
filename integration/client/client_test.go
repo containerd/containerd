@@ -32,16 +32,16 @@ import (
 	"go.opentelemetry.io/otel"
 	exec "golang.org/x/sys/execabs"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	imagelist "github.com/containerd/containerd/integration/images"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/platforms"
+	. "github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	imagelist "github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 var (
@@ -466,21 +466,21 @@ func TestImagePullWithTracing(t *testing.T) {
 
 	ctx := namespaces.WithNamespace(context.Background(), "tracing")
 
-	//create in memory exporter and global tracer provider for test
+	// create in memory exporter and global tracer provider for test
 	exp, tp := newInMemoryExporterTracer()
-	//set the tracer provider global available
+	// set the tracer provider global available
 	otel.SetTracerProvider(tp)
 	// Shutdown properly so nothing leaks.
 	defer func() { _ = tp.Shutdown(ctx) }()
 
-	//do an image pull which is instrumented, we should expect spans in the exporter
+	// do an image pull which is instrumented, we should expect spans in the exporter
 	_, err = client.Pull(ctx, testImage, WithPlatformMatcher(platforms.Default()))
 	require.NoError(t, err)
 
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
 
-	//The span name was defined in client.pull when instrumented it
+	// The span name was defined in client.pull when instrumented it
 	spanNameExpected := "pull.Pull"
 	spans := exp.GetSpans()
 	validateRootSpan(t, spanNameExpected, spans)

@@ -24,8 +24,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/leases"
 	"github.com/urfave/cli"
 )
 

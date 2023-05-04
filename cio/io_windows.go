@@ -22,7 +22,7 @@ import (
 	"io"
 
 	winio "github.com/Microsoft/go-winio"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 )
 
 const pipeRoot = `\\.\pipe`

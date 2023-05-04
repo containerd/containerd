@@ -22,10 +22,10 @@ import (
 	"path"
 	"sync"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 	"github.com/sirupsen/logrus"
 
-	"github.com/containerd/containerd/version"
+	"github.com/containerd/containerd/v2/version"
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 

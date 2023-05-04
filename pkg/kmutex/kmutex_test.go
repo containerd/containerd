@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/pkg/randutil"
+	"github.com/containerd/containerd/v2/pkg/randutil"
 	"github.com/stretchr/testify/assert"
 )
 

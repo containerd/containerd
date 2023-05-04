@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/services/server"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/services/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	exec "golang.org/x/sys/execabs"

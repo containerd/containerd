@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
 func TestWaitSandboxStop(t *testing.T) {

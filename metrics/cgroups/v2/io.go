@@ -21,7 +21,7 @@ package v2
 import (
 	"strconv"
 
-	v2 "github.com/containerd/containerd/metrics/types/v2"
+	v2 "github.com/containerd/containerd/v2/metrics/types/v2"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )

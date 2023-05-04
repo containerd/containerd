@@ -22,7 +22,7 @@ import (
 	"fmt"
 	goruntime "runtime"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

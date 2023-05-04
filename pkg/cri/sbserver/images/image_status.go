@@ -23,11 +23,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	"github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/log"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/containerd/v2/reference/docker"
+	"github.com/containerd/containerd/v2/tracing"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

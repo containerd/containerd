@@ -26,7 +26,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/v2/defaults"
 )
 
 var bufPool = sync.Pool{

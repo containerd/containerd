@@ -18,7 +18,7 @@ syntax = "proto3";
 
 package containerd.types;
 
-option go_package = "github.com/containerd/containerd/api/types;types";
+option go_package = "github.com/containerd/containerd/v2/api/types;types";
 
 // Descriptor describes a blob in a content store.
 //

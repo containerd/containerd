@@ -17,10 +17,10 @@
 package images
 
 import (
-	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/protobuf"
+	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

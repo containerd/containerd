@@ -23,7 +23,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/containerd/containerd/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/blockio"
 )
 
 // blockIOClassFromAnnotations examines container and pod annotations of a

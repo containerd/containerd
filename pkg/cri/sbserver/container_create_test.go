@@ -24,8 +24,8 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	ostesting "github.com/containerd/containerd/pkg/os/testing"
-	"github.com/containerd/containerd/platforms"
+	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
+	"github.com/containerd/containerd/v2/platforms"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -33,10 +33,10 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/opts"
 )
 
 var currentPlatform = platforms.DefaultSpec()

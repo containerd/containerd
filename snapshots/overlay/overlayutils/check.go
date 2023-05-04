@@ -24,10 +24,10 @@ import (
 	"path/filepath"
 	"syscall"
 
-	kernel "github.com/containerd/containerd/contrib/seccomp/kernelversion"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/userns"
+	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/continuity/fs"
 )
 

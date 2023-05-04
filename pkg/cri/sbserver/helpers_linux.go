@@ -31,11 +31,11 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/apparmor"
-	"github.com/containerd/containerd/pkg/seccomp"
-	"github.com/containerd/containerd/pkg/seutil"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/apparmor"
+	"github.com/containerd/containerd/v2/pkg/seccomp"
+	"github.com/containerd/containerd/v2/pkg/seutil"
 )
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,

@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 )
 
 func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,

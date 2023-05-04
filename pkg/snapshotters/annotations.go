@@ -19,9 +19,9 @@ package snapshotters
 import (
 	"context"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

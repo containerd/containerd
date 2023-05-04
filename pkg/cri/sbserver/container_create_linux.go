@@ -28,12 +28,12 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/contrib/apparmor"
-	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/contrib/apparmor"
+	"github.com/containerd/containerd/v2/contrib/seccomp"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/snapshots"
 
-	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 )
 
 const (

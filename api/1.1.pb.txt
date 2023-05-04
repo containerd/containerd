@@ -29,7 +29,7 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  name: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   package: "containerd.plugin"
   dependency: "google/protobuf/descriptor.proto"
   extension {
@@ -50,11 +50,11 @@ file {
   }
 }
 file {
-  name: "github.com/containerd/containerd/api/events/container.proto"
+  name: "github.com/containerd/containerd/v2/api/events/container.proto"
   package: "containerd.events"
   dependency: "google/protobuf/any.proto"
   dependency: "gogoproto/gogo.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "ContainerCreate"
     field {
@@ -161,7 +161,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 1
@@ -169,10 +169,10 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/events/content.proto"
+  name: "github.com/containerd/containerd/v2/api/events/content.proto"
   package: "containerd.events"
   dependency: "gogoproto/gogo.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "ContentDelete"
     field {
@@ -188,7 +188,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 0
@@ -196,9 +196,9 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/events/image.proto"
+  name: "github.com/containerd/containerd/v2/api/events/image.proto"
   package: "containerd.services.images.v1"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "ImageCreate"
     field {
@@ -286,17 +286,17 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/events/namespace.proto"
+  name: "github.com/containerd/containerd/v2/api/events/namespace.proto"
   package: "containerd.events"
   dependency: "gogoproto/gogo.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "NamespaceCreate"
     field {
@@ -384,7 +384,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 0
@@ -392,9 +392,9 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/events/snapshot.proto"
+  name: "github.com/containerd/containerd/v2/api/events/snapshot.proto"
   package: "containerd.events"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "SnapshotPrepare"
     field {
@@ -440,7 +440,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 0
@@ -478,7 +478,7 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/mount.proto"
+  name: "github.com/containerd/containerd/v2/api/types/mount.proto"
   package: "containerd.types"
   dependency: "gogoproto/gogo.proto"
   message_type {
@@ -513,18 +513,18 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/events/task.proto"
+  name: "github.com/containerd/containerd/v2/api/events/task.proto"
   package: "containerd.events"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
-  dependency: "github.com/containerd/containerd/api/types/mount.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   message_type {
     name: "TaskCreate"
     field {
@@ -791,7 +791,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   weak_dependency: 0
@@ -839,7 +839,7 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/containers/v1/containers.proto"
+  name: "github.com/containerd/containerd/v2/api/services/containers/v1/containers.proto"
   package: "containerd.services.containers.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
@@ -1146,13 +1146,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/containers/v1;containers"
+    go_package: "github.com/containerd/containerd/v2/api/services/containers/v1;containers"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/content/v1/content.proto"
+  name: "github.com/containerd/containerd/v2/api/services/content/v1/content.proto"
   package: "containerd.services.content.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/field_mask.proto"
@@ -1711,13 +1711,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/content/v1;content"
+    go_package: "github.com/containerd/containerd/v2/api/services/content/v1;content"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/descriptor.proto"
+  name: "github.com/containerd/containerd/v2/api/types/descriptor.proto"
   package: "containerd.types"
   dependency: "gogoproto/gogo.proto"
   message_type {
@@ -1749,17 +1749,17 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/diff/v1/diff.proto"
+  name: "github.com/containerd/containerd/v2/api/services/diff/v1/diff.proto"
   package: "containerd.services.diff.v1"
   dependency: "gogoproto/gogo.proto"
-  dependency: "github.com/containerd/containerd/api/types/mount.proto"
-  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/descriptor.proto"
   message_type {
     name: "ApplyRequest"
     field {
@@ -1876,15 +1876,15 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
+    go_package: "github.com/containerd/containerd/v2/api/services/diff/v1;diff"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/events/v1/events.proto"
+  name: "github.com/containerd/containerd/v2/api/services/events/v1/events.proto"
   package: "containerd.services.events.v1"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/v2/protobuf/plugin/fieldpath.proto"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
@@ -1988,20 +1988,20 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/events/v1;events"
+    go_package: "github.com/containerd/containerd/v2/api/services/events/v1;events"
   }
   weak_dependency: 0
   weak_dependency: 1
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/images/v1/images.proto"
+  name: "github.com/containerd/containerd/v2/api/services/images/v1/images.proto"
   package: "containerd.services.images.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
-  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/descriptor.proto"
   message_type {
     name: "Image"
     field {
@@ -2230,13 +2230,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/images/v1;images"
+    go_package: "github.com/containerd/containerd/v2/api/services/images/v1;images"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/platform.proto"
+  name: "github.com/containerd/containerd/v2/api/types/platform.proto"
   package: "containerd.types"
   dependency: "gogoproto/gogo.proto"
   message_type {
@@ -2267,7 +2267,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   weak_dependency: 0
   syntax: "proto3"
@@ -2311,9 +2311,9 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/introspection/v1/introspection.proto"
+  name: "github.com/containerd/containerd/v2/api/services/introspection/v1/introspection.proto"
   package: "containerd.services.introspection.v1"
-  dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/platform.proto"
   dependency: "google/rpc/status.proto"
   dependency: "gogoproto/gogo.proto"
   message_type {
@@ -2427,13 +2427,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
+    go_package: "github.com/containerd/containerd/v2/api/services/introspection/v1;introspection"
   }
   weak_dependency: 2
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/leases/v1/leases.proto"
+  name: "github.com/containerd/containerd/v2/api/services/leases/v1/leases.proto"
   package: "containerd.services.leases.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
@@ -2587,13 +2587,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
+    go_package: "github.com/containerd/containerd/v2/api/services/leases/v1;leases"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/namespaces/v1/namespace.proto"
+  name: "github.com/containerd/containerd/v2/api/services/namespaces/v1/namespace.proto"
   package: "containerd.services.namespaces.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
@@ -2787,19 +2787,19 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
+    go_package: "github.com/containerd/containerd/v2/api/services/namespaces/v1;namespaces"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/snapshots/v1/snapshots.proto"
+  name: "github.com/containerd/containerd/v2/api/services/snapshots/v1/snapshots.proto"
   package: "containerd.services.snapshots.v1"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/field_mask.proto"
   dependency: "google/protobuf/timestamp.proto"
-  dependency: "github.com/containerd/containerd/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/mount.proto"
   message_type {
     name: "PrepareSnapshotRequest"
     field {
@@ -3317,13 +3317,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
+    go_package: "github.com/containerd/containerd/v2/api/services/snapshots/v1;snapshots"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/metrics.proto"
+  name: "github.com/containerd/containerd/v2/api/types/metrics.proto"
   package: "containerd.types"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/any.proto"
@@ -3359,13 +3359,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   weak_dependency: 0
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/types/task/task.proto"
+  name: "github.com/containerd/containerd/v2/api/types/task/task.proto"
   package: "containerd.v1.types"
   dependency: "gogoproto/gogo.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -3520,15 +3520,15 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/tasks/v1/tasks.proto"
+  name: "github.com/containerd/containerd/v2/api/services/tasks/v1/tasks.proto"
   package: "containerd.services.tasks.v1"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "gogoproto/gogo.proto"
-  dependency: "github.com/containerd/containerd/api/types/mount.proto"
-  dependency: "github.com/containerd/containerd/api/types/metrics.proto"
-  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
-  dependency: "github.com/containerd/containerd/api/types/task/task.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/mount.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/metrics.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/descriptor.proto"
+  dependency: "github.com/containerd/containerd/v2/api/types/task/task.proto"
   dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "CreateTaskRequest"
@@ -4138,13 +4138,13 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
+    go_package: "github.com/containerd/containerd/v2/api/services/tasks/v1;tasks"
   }
   weak_dependency: 2
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/version/v1/version.proto"
+  name: "github.com/containerd/containerd/v2/api/services/version/v1/version.proto"
   package: "containerd.services.version.v1"
   dependency: "google/protobuf/empty.proto"
   dependency: "gogoproto/gogo.proto"
@@ -4174,7 +4174,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/version/v1;version"
+    go_package: "github.com/containerd/containerd/v2/api/services/version/v1;version"
   }
   weak_dependency: 1
   syntax: "proto3"

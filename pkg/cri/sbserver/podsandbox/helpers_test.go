@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/reference/docker"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"

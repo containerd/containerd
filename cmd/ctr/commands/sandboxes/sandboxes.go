@@ -22,11 +22,11 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/urfave/cli"
 )
 

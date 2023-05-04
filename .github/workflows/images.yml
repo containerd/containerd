@@ -23,7 +23,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: src/github.com/containerd/containerd
+        working-directory: src/github.com/containerd/containerd/v2
 
     steps:
       - uses: actions/setup-go@v3
@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          path: src/github.com/containerd/containerd
+          path: src/github.com/containerd/containerd/v2
 
       - name: Set env
         shell: bash

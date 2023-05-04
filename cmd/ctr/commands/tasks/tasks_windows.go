@@ -23,9 +23,9 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/log"
 	"github.com/urfave/cli"
 )
 

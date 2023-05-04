@@ -32,11 +32,11 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/oci"
-	osinterface "github.com/containerd/containerd/pkg/os"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/oci"
+	osinterface "github.com/containerd/containerd/v2/pkg/os"
 )
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec

@@ -21,7 +21,7 @@ package containerd.services.namespaces.v1;
 import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/namespaces/v1;namespaces";
+option go_package = "github.com/containerd/containerd/v2/api/services/namespaces/v1;namespaces";
 
 // Namespaces provides the ability to manipulate containerd namespaces.
 //

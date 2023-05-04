@@ -29,9 +29,9 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/log"
-	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
-	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
+	"github.com/containerd/containerd/v2/log"
+	blkdiscard "github.com/containerd/containerd/v2/snapshots/devmapper/blkdiscard"
+	"github.com/containerd/containerd/v2/snapshots/devmapper/dmsetup"
 )
 
 // PoolDevice ties together data and metadata volumes, represents thin-pool and manages volumes, snapshots and device ids.

@@ -305,7 +305,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/containerd/runtime/v2/logging"
+	"github.com/containerd/containerd/v2/runtime/v2/logging"
 	"github.com/coreos/go-systemd/journal"
 )
 

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/mount"
 )
 
 const (

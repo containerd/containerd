@@ -24,12 +24,12 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/progress"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/pkg/progress"
+	"github.com/containerd/containerd/v2/platforms"
 	"github.com/urfave/cli"
 )
 

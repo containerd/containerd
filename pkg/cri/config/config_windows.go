@@ -21,8 +21,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/streaming"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/pkg/cri/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.

@@ -31,11 +31,11 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/transfer/registry"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/remotes/docker/config"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/pkg/transfer/registry"
+	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/containerd/v2/remotes/docker"
+	"github.com/containerd/containerd/v2/remotes/docker/config"
 	"github.com/urfave/cli"
 )
 

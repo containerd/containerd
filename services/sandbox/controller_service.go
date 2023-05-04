@@ -19,12 +19,12 @@ package sandbox
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/sandbox"
+	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/sandbox"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 )

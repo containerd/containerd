@@ -20,10 +20,10 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/v2/cio"
 	"github.com/sirupsen/logrus"
 
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
 
 // ExecIO holds the exec io.

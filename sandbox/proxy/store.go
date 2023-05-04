@@ -19,9 +19,9 @@ package proxy
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/errdefs"
-	sb "github.com/containerd/containerd/sandbox"
+	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	"github.com/containerd/containerd/v2/errdefs"
+	sb "github.com/containerd/containerd/v2/sandbox"
 )
 
 // remoteSandboxStore is a low-level containerd client to manage sandbox environments metadata

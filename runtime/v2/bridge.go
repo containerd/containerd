@@ -23,8 +23,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	v2 "github.com/containerd/containerd/api/runtime/task/v2"
-	v3 "github.com/containerd/containerd/api/runtime/task/v3"
+	v2 "github.com/containerd/containerd/v2/api/runtime/task/v2"
+	v3 "github.com/containerd/containerd/v2/api/runtime/task/v3"
 	"github.com/containerd/ttrpc"
 )
 

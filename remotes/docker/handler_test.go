@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/reference"
+	"github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/reference"
 )
 
 func TestAppendDistributionLabel(t *testing.T) {

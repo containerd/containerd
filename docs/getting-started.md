@@ -198,7 +198,7 @@ package main
 import (
 	"log"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/v2"
 )
 
 func main() {
@@ -252,8 +252,8 @@ import (
         "context"
         "log"
 
-        "github.com/containerd/containerd"
-        "github.com/containerd/containerd/namespaces"
+        "github.com/containerd/containerd/v2"
+        "github.com/containerd/containerd/v2/namespaces"
 )
 
 func main() {
@@ -327,9 +327,9 @@ import (
         "context"
         "log"
 
-        "github.com/containerd/containerd"
-        "github.com/containerd/containerd/oci"
-        "github.com/containerd/containerd/namespaces"
+        "github.com/containerd/containerd/v2"
+        "github.com/containerd/containerd/v2/oci"
+        "github.com/containerd/containerd/v2/namespaces"
 )
 
 func main() {
@@ -474,10 +474,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 func main() {

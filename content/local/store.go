@@ -27,11 +27,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/randutil"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/filters"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/pkg/randutil"
 	"github.com/sirupsen/logrus"
 
 	"github.com/opencontainers/go-digest"

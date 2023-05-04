@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// FromAny converts typeurl.Any to github.com/containerd/containerd/protobuf/types.Any.
+// FromAny converts typeurl.Any to github.com/containerd/containerd/v2/protobuf/types.Any.
 func FromAny(from typeurl.Any) *anypb.Any {
 	if from == nil {
 		return nil
@@ -37,7 +37,7 @@ func FromAny(from typeurl.Any) *anypb.Any {
 	}
 }
 
-// FromAny converts an arbitrary interface to github.com/containerd/containerd/protobuf/types.Any.
+// FromAny converts an arbitrary interface to github.com/containerd/containerd/v2/protobuf/types.Any.
 func MarshalAnyToProto(from interface{}) (*anypb.Any, error) {
 	any, err := typeurl.MarshalAny(from)
 	if err != nil {

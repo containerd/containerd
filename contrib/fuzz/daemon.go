@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/cmd/containerd/command"
+	"github.com/containerd/containerd/v2/cmd/containerd/command"
 )
 
 var (

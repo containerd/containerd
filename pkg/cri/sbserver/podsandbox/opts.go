@@ -19,8 +19,8 @@ package podsandbox
 import (
 	"context"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 )

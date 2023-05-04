@@ -22,13 +22,13 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/pkg/shutdown"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/ttrpc"
 	log "github.com/sirupsen/logrus"
 
-	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
-	"github.com/containerd/containerd/plugin"
+	api "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 func init() {

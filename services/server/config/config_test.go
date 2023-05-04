@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 func TestMergeConfigs(t *testing.T) {

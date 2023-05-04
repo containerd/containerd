@@ -21,7 +21,7 @@ import (
 
 	sd "github.com/coreos/go-systemd/v22/daemon"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 )
 
 // notifyReady notifies systemd that the daemon is ready to serve requests

@@ -107,9 +107,9 @@ containerd offers a full client package to help you integrate containerd into yo
 import (
   "context"
 
-  "github.com/containerd/containerd"
-  "github.com/containerd/containerd/cio"
-  "github.com/containerd/containerd/namespaces"
+  "github.com/containerd/containerd/v2"
+  "github.com/containerd/containerd/v2/cio"
+  "github.com/containerd/containerd/v2/namespaces"
 )
 
 

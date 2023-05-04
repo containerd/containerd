@@ -21,10 +21,10 @@ import (
 	"errors"
 	"io"
 
-	api "github.com/containerd/containerd/api/services/containers/v1"
-	"github.com/containerd/containerd/plugin"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/services"
+	api "github.com/containerd/containerd/v2/api/services/containers/v1"
+	"github.com/containerd/containerd/v2/plugin"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/services"
 	"google.golang.org/grpc"
 )
 

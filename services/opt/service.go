@@ -21,7 +21,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 // Config for the opt manager

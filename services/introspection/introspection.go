@@ -19,10 +19,10 @@ package introspection
 import (
 	context "context"
 
-	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/log"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 )
 
 // Service defines the introspection service interface

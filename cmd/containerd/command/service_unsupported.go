@@ -19,7 +19,7 @@
 package command
 
 import (
-	"github.com/containerd/containerd/services/server"
+	"github.com/containerd/containerd/v2/services/server"
 	"github.com/urfave/cli"
 )
 

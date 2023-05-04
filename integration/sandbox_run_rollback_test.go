@@ -36,9 +36,9 @@ import (
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
-	"github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/containerd/containerd/pkg/failpoint"
+	"github.com/containerd/containerd/v2/pkg/cri/sbserver/podsandbox"
+	"github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/failpoint"
 	"github.com/containerd/typeurl/v2"
 )
 

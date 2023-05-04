@@ -21,9 +21,9 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
-	"github.com/containerd/containerd"
-	_ "github.com/containerd/containerd/cmd/containerd/builtins"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2"
+	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 const (

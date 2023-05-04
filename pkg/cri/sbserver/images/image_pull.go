@@ -41,17 +41,17 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	snpkg "github.com/containerd/containerd/pkg/snapshotters"
-	distribution "github.com/containerd/containerd/reference/docker"
-	"github.com/containerd/containerd/remotes/docker"
-	"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/errdefs"
+	containerdimages "github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/pkg/cri/annotations"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
+	distribution "github.com/containerd/containerd/v2/reference/docker"
+	"github.com/containerd/containerd/v2/remotes/docker"
+	"github.com/containerd/containerd/v2/remotes/docker/config"
+	"github.com/containerd/containerd/v2/tracing"
 )
 
 // For image management:

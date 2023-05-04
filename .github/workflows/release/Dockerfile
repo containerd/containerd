@@ -39,7 +39,7 @@ ARG GATEWAY
 ARG PREFIX_LEN
 
 FROM ${TARGETOS} AS target
-WORKDIR /go/src/github.com/containerd/containerd
+WORKDIR /go/src/github.com/containerd/containerd/v2
 COPY . .
 ARG TARGETPLATFORM
 ARG RELEASE_VER
@@ -58,4 +58,4 @@ RUN \
 	test -z $GIT_STATUS_OUTPUT || (echo $GIT_STATUS_OUTPUT && exit 1)
 
 FROM scratch AS release
-COPY --from=target /go/src/github.com/containerd/containerd/releases/ /
+COPY --from=target /go/src/github.com/containerd/containerd/v2/releases/ /

@@ -25,8 +25,8 @@ import (
 	"github.com/imdario/mergo"
 	"github.com/pelletier/go-toml"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.

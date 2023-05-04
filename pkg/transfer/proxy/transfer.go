@@ -23,12 +23,12 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
-	transfertypes "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/streaming"
-	"github.com/containerd/containerd/pkg/transfer"
-	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
+	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
+	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/pkg/streaming"
+	"github.com/containerd/containerd/v2/pkg/transfer"
+	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
 	"github.com/containerd/typeurl/v2"
 )
 

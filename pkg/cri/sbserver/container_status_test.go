@@ -22,13 +22,13 @@ import (
 	"testing"
 	"time"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 )
 
 func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,

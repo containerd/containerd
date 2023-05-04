@@ -17,9 +17,9 @@
 package snapshots
 
 import (
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/services"
 )
 
 func init() {

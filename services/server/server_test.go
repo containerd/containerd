@@ -19,7 +19,7 @@ package server
 import (
 	"testing"
 
-	srvconfig "github.com/containerd/containerd/services/server/config"
+	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -23,10 +23,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/log/logtest"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/log/logtest"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 const (

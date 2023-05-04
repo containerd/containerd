@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2/errdefs"
 )
 
 func getCPUVariant() (string, error) {

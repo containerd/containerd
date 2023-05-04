@@ -22,11 +22,11 @@ import (
 	"testing"
 	"time"
 
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 )

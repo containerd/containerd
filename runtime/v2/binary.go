@@ -25,14 +25,14 @@ import (
 	"path/filepath"
 	gruntime "runtime"
 
-	"github.com/containerd/containerd/api/runtime/task/v2"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/runtime"
-	client "github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/api/runtime/task/v2"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/protobuf/proto"
+	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/runtime"
+	client "github.com/containerd/containerd/v2/runtime/v2/shim"
 )
 
 type shimBinaryConfig struct {

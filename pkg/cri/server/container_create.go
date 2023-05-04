@@ -30,15 +30,15 @@ import (
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/oci"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	cio "github.com/containerd/containerd/pkg/cri/io"
-	customopts "github.com/containerd/containerd/pkg/cri/opts"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/oci"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	cio "github.com/containerd/containerd/v2/pkg/cri/io"
+	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
 func init() {

@@ -26,7 +26,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 
-	refDocker "github.com/containerd/containerd/reference/docker"
+	refDocker "github.com/containerd/containerd/v2/reference/docker"
 )
 
 func FuzzFetcher(data []byte) int {

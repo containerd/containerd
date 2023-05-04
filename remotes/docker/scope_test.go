@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/reference"
+	"github.com/containerd/containerd/v2/reference"
 	"github.com/stretchr/testify/assert"
 )
 

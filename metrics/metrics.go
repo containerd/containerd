@@ -19,8 +19,8 @@ package metrics
 import (
 	"time"
 
-	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/version"
+	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/containerd/v2/version"
 	goMetrics "github.com/docker/go-metrics"
 )
 

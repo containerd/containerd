@@ -23,12 +23,12 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )

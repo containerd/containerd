@@ -24,7 +24,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 	"github.com/sirupsen/logrus"
 )
 

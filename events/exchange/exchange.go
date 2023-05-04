@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/identifiers"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/filters"
+	"github.com/containerd/containerd/v2/identifiers"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/typeurl/v2"
 	goevents "github.com/docker/go-events"
 )

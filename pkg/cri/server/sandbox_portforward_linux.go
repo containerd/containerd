@@ -23,7 +23,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/log"
 	"github.com/containernetworking/plugins/pkg/ns"
 )
 

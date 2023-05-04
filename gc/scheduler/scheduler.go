@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/gc"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/gc"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 // config configures the garbage collection policies.

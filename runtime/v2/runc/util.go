@@ -24,9 +24,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/log"
+	"github.com/containerd/containerd/v2/runtime"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
