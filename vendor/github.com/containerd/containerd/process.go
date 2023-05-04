@@ -23,9 +23,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/protobuf"
 )
 
 // Process represents a system process
@@ -81,13 +82,13 @@ func (s ExitStatus) Result() (uint32, time.Time, error) {
 }
 
 // ExitCode returns the exit code of the process.
-// This is only valid is Error() returns nil
+// This is only valid if Error() returns nil.
 func (s ExitStatus) ExitCode() uint32 {
 	return s.code
 }
 
 // ExitTime returns the exit time of the process
-// This is only valid is Error() returns nil
+// This is only valid if Error() returns nil.
 func (s ExitStatus) ExitTime() time.Time {
 	return s.exitedAt
 }
@@ -166,7 +167,7 @@ func (p *process) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 		}
 		c <- ExitStatus{
 			code:     r.ExitStatus,
-			exitedAt: r.ExitedAt,
+			exitedAt: protobuf.FromTimestamp(r.ExitedAt),
 		}
 	}()
 	return c, nil
@@ -226,7 +227,7 @@ func (p *process) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitS
 		p.io.Wait()
 		p.io.Close()
 	}
-	return &ExitStatus{code: r.ExitStatus, exitedAt: r.ExitedAt}, nil
+	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
 }
 
 func (p *process) Status(ctx context.Context) (Status, error) {

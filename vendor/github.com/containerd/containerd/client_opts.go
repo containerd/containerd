@@ -19,10 +19,10 @@ package containerd
 import (
 	"time"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/containerd/v2/snapshots"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/grpc"
@@ -200,6 +200,8 @@ func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
 // WithSchema1Conversion is used to convert Docker registry schema 1
 // manifests to oci manifests on pull. Without this option schema 1
 // manifests will return a not supported error.
+//
+// Deprecated: use Schema 2 or OCI images.
 func WithSchema1Conversion(client *Client, c *RemoteContext) error {
 	c.ConvertSchema1 = true
 	return nil

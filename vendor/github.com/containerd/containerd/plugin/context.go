@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/events/exchange"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -80,7 +80,7 @@ type Plugin struct {
 }
 
 // Err returns the errors during initialization.
-// returns nil if not error was encountered
+// returns nil if no error was encountered
 func (p *Plugin) Err() error {
 	return p.err
 }

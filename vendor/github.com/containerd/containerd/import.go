@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -38,6 +38,7 @@ type importOpts struct {
 	allPlatforms    bool
 	platformMatcher platforms.MatchComparer
 	compress        bool
+	discardLayers   bool
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -101,6 +102,15 @@ func WithImportPlatform(platformMacher platforms.MatchComparer) ImportOpt {
 func WithImportCompression() ImportOpt {
 	return func(c *importOpts) error {
 		c.compress = true
+		return nil
+	}
+}
+
+// WithDiscardUnpackedLayers allows the garbage collector to clean up
+// layers from content store after unpacking.
+func WithDiscardUnpackedLayers() ImportOpt {
+	return func(c *importOpts) error {
+		c.discardLayers = true
 		return nil
 	}
 }
@@ -195,7 +205,11 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 
 	handler = images.FilterPlatforms(handler, platformMatcher)
-	handler = images.SetChildrenLabels(cs, handler)
+	if iopts.discardLayers {
+		handler = images.SetChildrenMappedLabels(cs, handler, images.ChildGCLabelsFilterLayers)
+	} else {
+		handler = images.SetChildrenLabels(cs, handler)
+	}
 	if err := images.WalkNotEmpty(ctx, handler, index); err != nil {
 		return nil, err
 	}
