@@ -1,0 +1,78 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.0"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+This first patch release for containerd 1.7 contains various fixes and updates.
+
+### Notable Updates
+
+* **Update hcsshim tag to v0.10.0-rc.8 ([#8480](https://github.com/containerd/containerd/pull/8480))
+  * [`aaa65e8`](https://github.com/containerd/containerd/commit/aaa65e8c1461ae7187357ea6b7f2807667eada6e) Update hcsshim tag to v0.10.0-rc.8
+* **cri: Fix umarshal metrics ([#8472](https://github.com/containerd/containerd/pull/8472))
+  * [`95ef67e19`](https://github.com/containerd/containerd/commit/95ef67e19552aaec3618cdfa06d6d3ffb57d085b) Fix umarshal metrics for CRI server
+* **fix the task setting the runtime path ([#8453](https://github.com/containerd/containerd/pull/8453))
+  * [`c0e128624`](https://github.com/containerd/containerd/commit/c0e128624a8d6a02bb7d2ab3d29369f54791b68e) skip TestContainerStartWithAbsRuntimePath if the runtime is v1
+  * [`aa3c63c15`](https://github.com/containerd/containerd/commit/aa3c63c15f379eec906cb89f7e1204a42a5d1317) integration: add container start test using abs runtime path
+  * [`d2d9eedb1`](https://github.com/containerd/containerd/commit/d2d9eedb1d1b2d047fbdd847ce7c67724f27bde4) WithRuntimePath uses the TaskInfo.RuntimePath field
+* **Remove entry for container from container store on error  ([#8457](https://github.com/containerd/containerd/pull/8457))
+  * [`6b3ae0129`](https://github.com/containerd/containerd/commit/6b3ae01297d2cb39c8018fc783751baba513b390) Remove entry for container from container store on error
+* **oci: partially restore comment on read-only mounts for uid/gid uses ([#8404](https://github.com/containerd/containerd/pull/8404))
+  * [`1bbf98e53`](https://github.com/containerd/containerd/commit/1bbf98e53ec77bad5dabc2a762f4407e99f527c9) oci: partially restore comment on read-only mounts for uid/gid uses
+* **Fix argsEscaped tests ([#8405](https://github.com/containerd/containerd/pull/8405))
+  * [`a6d336c1f`](https://github.com/containerd/containerd/commit/a6d336c1f6674c2b342d65ca78fba7fac955eaf1) Fix argsEscaped tests
+* **Throw an error if the kubelet requests mounts with uid/gid mappings ([#8211](https://github.com/containerd/containerd/pull/8211))
+  * [`7de8629be`](https://github.com/containerd/containerd/commit/7de8629be0e62c4d8164cd873baf14b64bcbb90b) cri: Throw an error if idmap mounts is requested
+  * [`75ac7e0d8`](https://github.com/containerd/containerd/commit/75ac7e0d8200539ff444b952bc060ffa23582a87) cri: Vendor v0.27.0-beta.0 for mounts uid/gid mappings
+* **go.mod: remove redundant replace, and some cleaning-up ([#8396](https://github.com/containerd/containerd/pull/8396))
+  * [`8f6e86fec`](https://github.com/containerd/containerd/commit/8f6e86fecad5c11871df20e516ae181d7abf4a7c) go.mod: add comment explaining go-fuzz-headers replace rule
+  * [`1ece0cb50`](https://github.com/containerd/containerd/commit/1ece0cb50f7f2f6fc9c59a76ae49227a84a92f1e) go.mod: remove replace for github.com/opencontainers/runtime-tools
+  * [`e9f962187`](https://github.com/containerd/containerd/commit/e9f96218795ef6a527fc8cac550ae90b9b09fe5c) go.mod: integration: use non-pre-release of containerd
+  * [`84393b005`](https://github.com/containerd/containerd/commit/84393b005f76c085ad62c62dff980dc13d13b131) go.mod: integration: move indirect dependencies to the right group
+* **update runc binary to v1.1.6 ([#8386](https://github.com/containerd/containerd/pull/8386))
+  * [`dec2595af`](https://github.com/containerd/containerd/commit/dec2595afe92800fbf8e4e506398b00ff532332f) update runc binary to v1.1.6
+* **oci: Use WithReadonlyTempMount when adding users/groups ([#8358](https://github.com/containerd/containerd/pull/8358))
+  * [`54d12b872`](https://github.com/containerd/containerd/commit/54d12b872132d56feca792051abdce87a2077988) oci: Use WithReadonlyTempMount when adding users/groups
+* **consistently respect value of WithSkipDockerManifest ([#8344](https://github.com/containerd/containerd/pull/8344))
+  * [`1d6641b7c`](https://github.com/containerd/containerd/commit/1d6641b7c92d8854548c7a07bdaa07979ad0eb68) export: add test for WithSkipDockerManifest
+  * [`0e0d84f6b`](https://github.com/containerd/containerd/commit/0e0d84f6bb7a0226480dd5ead7c894175d2edcc8) archive: consistently respect value of WithSkipDockerManifest
+* **Add noexec nodev and nosuid to sandbox /etc/resolv.conf mount bind. ([#8336](https://github.com/containerd/containerd/pull/8336))
+  * [`9b4935d86`](https://github.com/containerd/containerd/commit/9b4935d86436419670febe9695787a3aaf5ceeb7) Update sbserver to add noexec nodev and nosuid to /etc/resolv.conf mount bind.
+  * [`5e953cfa6`](https://github.com/containerd/containerd/commit/5e953cfa62abb90b2c4dc775907cbb276637bfe8) Test to ensure nosuid,nodev,noexec are set on /etc/reolv.conf mount.
+  * [`0aad93f08`](https://github.com/containerd/containerd/commit/0aad93f08ca4da8f33ad709dbe49593f6ff5c59c) Add noexec nodev and nosuid to sandbox /etc/resolv.conf mount bind.
+* **ctr/tasks: fix unmarshal the task metrics for cgroups v1 ([#8335](https://github.com/containerd/containerd/pull/8335))
+  * [`1a64f1b43`](https://github.com/containerd/containerd/commit/1a64f1b4341ebda4b8f8cf67cac543394a10a4c3) ctr/tasks: fix unmarshal the task metrics for cgroups v1
+* **Keep linux mounts for linux sandboxes on Windows/Darwin ([#8331](https://github.com/containerd/containerd/pull/8331))
+  * [`17c52a26d`](https://github.com/containerd/containerd/commit/17c52a26d63d6105e9918fb2d90ff346e4e4c463) Keep linux mounts for linux sandboxes on Windows/Darwin
+* **update runc binary to v1.1.5 ([#8325](https://github.com/containerd/containerd/pull/8325))
+  * [`d81fc15af`](https://github.com/containerd/containerd/commit/d81fc15affe09dbb621be16bda805801a98cab4b) update runc binary to v1.1.5
+  * [`755efbe64`](https://github.com/containerd/containerd/commit/755efbe6402acdaf5832e36b7c6f4e15cc2a406d) go.mod: github.com/opencontainers/runc v1.1.5
+* **Defer uid lookups on Darwin ([#8314](https://github.com/containerd/containerd/pull/8314))
+  * [`90591db47`](https://github.com/containerd/containerd/commit/90591db47c70db29386b8d9e58ffa1005b560dc0) Defer uid lookups on Darwin
+* **Add `WithReadonlyTempMount` to create readonly temporary mounts ([#8300](https://github.com/containerd/containerd/pull/8300))
+  * [`b7d87b190`](https://github.com/containerd/containerd/commit/b7d87b190d013929377bb85df8301fade73b0298) Add `WithReadonlyTempMount` to create readonly temporary mounts
+* **Backport Sandbox/CRI fixes ([#8282](https://github.com/containerd/containerd/pull/8282))
+  * [`1c1b6bcb2`](https://github.com/containerd/containerd/commit/1c1b6bcb2b4a47053855bd7adaed5d9bfdf2a5f5) CRI: Don't always close netConfMonitor channel
+  * [`cf2e454bf`](https://github.com/containerd/containerd/commit/cf2e454bf052bee63c0582552566c96357bd2250) Sandbox: Correct/add some fields to Status()
+  * [`ce68e8e0d`](https://github.com/containerd/containerd/commit/ce68e8e0db47174580fc74ecdeb66c26695ecd0b) Sandbox: Cleanup shim on Start failure
+
+See the changelog for complete list of changes"""
