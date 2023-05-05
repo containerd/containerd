@@ -33,8 +33,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
-
-	"github.com/sirupsen/logrus"
 )
 
 type snapshotter struct {
@@ -364,9 +362,9 @@ func (b *snapshotter) Remove(ctx context.Context, key string) (err error) {
 			// Attempt to restore source
 			if err1 := btrfs.SubvolSnapshot(source, removed, readonly); err1 != nil {
 				log.G(ctx).WithFields(log.Fields{
-					logrus.ErrorKey: err1,
-					"subvolume":     source,
-					"renamed":       removed,
+					"error":     err1,
+					"subvolume": source,
+					"renamed":   removed,
 				}).Error("failed to restore subvolume from renamed")
 				// Keep removed to allow for manual restore
 				removed = ""

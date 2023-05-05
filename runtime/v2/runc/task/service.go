@@ -31,6 +31,7 @@ import (
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/oom"
 	oomv1 "github.com/containerd/containerd/pkg/oom/v1"
@@ -48,7 +49,6 @@ import (
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -170,23 +170,23 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		switch cg := container.Cgroup().(type) {
 		case cgroup1.Cgroup:
 			if err := s.ep.Add(container.ID, cg); err != nil {
-				logrus.WithError(err).Error("add cg to OOM monitor")
+				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
 			}
 		case *cgroupsv2.Manager:
 			allControllers, err := cg.RootControllers()
 			if err != nil {
-				logrus.WithError(err).Error("failed to get root controllers")
+				log.G(ctx).WithError(err).Error("failed to get root controllers")
 			} else {
 				if err := cg.ToggleControllers(allControllers, cgroupsv2.Enable); err != nil {
 					if userns.RunningInUserNS() {
-						logrus.WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
+						log.G(ctx).WithError(err).Debugf("failed to enable controllers (%v)", allControllers)
 					} else {
-						logrus.WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
+						log.G(ctx).WithError(err).Errorf("failed to enable controllers (%v)", allControllers)
 					}
 				}
 			}
 			if err := s.ep.Add(container.ID, cg); err != nil {
-				logrus.WithError(err).Error("add cg to OOM monitor")
+				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
 			}
 		}
 
@@ -541,7 +541,7 @@ func (s *service) checkProcesses(e runcC.Exit) {
 				// Ensure all children are killed
 				if runc.ShouldKillAllOnExit(s.context, container.Bundle) {
 					if err := ip.KillAll(s.context); err != nil {
-						logrus.WithError(err).WithField("id", ip.ID()).
+						log.L.WithError(err).WithField("id", ip.ID()).
 							Error("failed to kill init's children")
 					}
 				}
@@ -587,7 +587,7 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	for e := range s.events {
 		err := publisher.Publish(ctx, runc.GetTopic(e), e)
 		if err != nil {
-			logrus.WithError(err).Error("post event")
+			log.G(ctx).WithError(err).Error("post event")
 		}
 	}
 	publisher.Close()

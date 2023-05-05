@@ -27,7 +27,6 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
@@ -242,7 +241,7 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 			if stderrCh != nil {
 				<-stderrCh
 			}
-			logrus.Debugf("Finish redirecting log file %q, closing it", logPath)
+			log.L.Debugf("Finish redirecting log file %q, closing it", logPath)
 			f.Close()
 		}()
 	} else {

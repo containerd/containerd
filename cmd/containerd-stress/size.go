@@ -19,7 +19,7 @@ package main
 import (
 	"os"
 
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 )
 
 const defaultPath = "/usr/local/bin/"
@@ -37,12 +37,12 @@ func checkBinarySizes() {
 	for _, name := range binaries {
 		fi, err := os.Stat(name)
 		if err != nil {
-			logrus.WithError(err).Error("stat binary")
+			log.L.WithError(err).Error("stat binary")
 			continue
 		}
 
 		if fi.IsDir() {
-			logrus.Error(name, "is not a file")
+			log.L.Error(name, "is not a file")
 			continue
 		}
 

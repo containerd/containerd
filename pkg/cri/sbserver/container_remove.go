@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -62,7 +61,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 	state := container.Status.Get().State()
 	if state == runtime.ContainerState_CONTAINER_RUNNING ||
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
-		logrus.Infof("Forcibly stopping container %q", id)
+		log.L.Infof("Forcibly stopping container %q", id)
 		if err := c.stopContainer(ctx, container, 0); err != nil {
 			return nil, fmt.Errorf("failed to forcibly stop container %q: %w", id, err)
 		}

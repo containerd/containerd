@@ -32,13 +32,13 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
-	"github.com/sirupsen/logrus"
 )
 
 // NewContainer returns a new runc container
@@ -111,7 +111,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	defer func() {
 		if retErr != nil {
 			if err := mount.UnmountMounts(mounts, rootfs, 0); err != nil {
-				logrus.WithError(err).Warn("failed to cleanup rootfs mount")
+				log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
 			}
 		}
 	}()
@@ -148,17 +148,17 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		if cgroups.Mode() == cgroups.Unified {
 			g, err := cgroupsv2.PidGroupPath(pid)
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
 				return container, nil
 			}
 			cg, err = cgroupsv2.Load(g)
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", pid)
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
 			}
 		} else {
 			cg, err = cgroup1.Load(cgroup1.PidPath(pid))
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup for %d", pid)
+				log.G(ctx).WithError(err).Errorf("loading cgroup for %d", pid)
 			}
 		}
 		container.cgroup = cg
@@ -369,16 +369,16 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 		if cgroups.Mode() == cgroups.Unified {
 			g, err := cgroupsv2.PidGroupPath(p.Pid())
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
 			}
 			cg, err = cgroupsv2.Load(g)
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
 			}
 		} else {
 			cg, err = cgroup1.Load(cgroup1.PidPath(p.Pid()))
 			if err != nil {
-				logrus.WithError(err).Errorf("loading cgroup for %d", p.Pid())
+				log.G(ctx).WithError(err).Errorf("loading cgroup for %d", p.Pid())
 			}
 		}
 		c.cgroup = cg

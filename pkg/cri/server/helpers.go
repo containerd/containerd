@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	clabels "github.com/containerd/containerd/labels"
+	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -295,7 +296,7 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 		} else {
 			// In case the image label is invalid, we output a warning and skip adding it to the
 			// container.
-			logrus.WithError(err).Warnf("unable to add image label with key %s to the container", k)
+			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
 		}
 	}
 	// labels from the CRI request (config) will override labels in the image config
@@ -517,7 +518,7 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 func (c *criService) generateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
 	podSandboxStatus, err := c.getPodSandboxStatus(ctx, sandboxID)
 	if err != nil {
-		logrus.Warnf("Failed to get podSandbox status for container event for sandboxID %q: %v. Sending the event with nil podSandboxStatus.", sandboxID, err)
+		log.L.Warnf("Failed to get podSandbox status for container event for sandboxID %q: %v. Sending the event with nil podSandboxStatus.", sandboxID, err)
 		podSandboxStatus = nil
 	}
 	containerStatuses, err := c.getContainerStatuses(ctx, sandboxID)

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -122,11 +122,11 @@ func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-ch
 	exitedAt = time.Now()
 	select {
 	case exitRes := <-exitCh:
-		logrus.Debugf("received sandbox exit %+v", exitRes)
+		log.G(ctx).Debugf("received sandbox exit %+v", exitRes)
 
 		exitStatus, exitedAt, err = exitRes.Result()
 		if err != nil {
-			logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
+			log.G(ctx).WithError(err).Errorf("failed to get task exit status for %q", id)
 			exitStatus = unknownExitCode
 			exitedAt = time.Now()
 		}
@@ -148,7 +148,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-ch
 			return nil
 		}()
 		if err != nil {
-			logrus.WithError(err).Errorf("failed to handle sandbox TaskExit %s", id)
+			log.G(ctx).WithError(err).Errorf("failed to handle sandbox TaskExit %s", id)
 			// Don't backoff, the caller is responsible for.
 			return
 		}
