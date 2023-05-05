@@ -17,12 +17,15 @@
 package sbserver
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
+	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
+	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
+	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/types"
-	v1 "github.com/containerd/containerd/metrics/types/v1"
-	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -60,18 +63,29 @@ func (c *criService) containerMetrics(
 	}
 
 	if stats != nil {
-		s, err := typeurl.UnmarshalAny(stats.Data)
-		if err != nil {
+		var data interface{}
+		switch {
+		case typeurl.Is(stats.Data, (*v1.Metrics)(nil)):
+			data = &v1.Metrics{}
+		case typeurl.Is(stats.Data, (*v2.Metrics)(nil)):
+			data = &v2.Metrics{}
+		case typeurl.Is(stats.Data, (*wstats.Statistics)(nil)):
+			data = &wstats.Statistics{}
+		default:
+			return nil, errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+		}
+
+		if err := typeurl.UnmarshalTo(stats.Data, data); err != nil {
 			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, s, protobuf.FromTimestamp(stats.Timestamp))
+		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
 		cs.Cpu = cpuStats
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, s, protobuf.FromTimestamp(stats.Timestamp))
+		memoryStats, err := c.memoryContainerStats(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
@@ -231,7 +245,7 @@ func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interfac
 			}, nil
 		}
 	default:
-		return nil, fmt.Errorf("unexpected metrics type: %v", metrics)
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
 	return nil, nil
 }
@@ -273,7 +287,7 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 			}, nil
 		}
 	default:
-		return nil, fmt.Errorf("unexpected metrics type: %v", metrics)
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
 	return nil, nil
 }
