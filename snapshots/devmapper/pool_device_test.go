@@ -26,11 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/docker/go-units"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	exec "golang.org/x/sys/execabs"
 )
@@ -57,7 +57,7 @@ const (
 func TestPoolDevice(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	logrus.SetLevel(logrus.DebugLevel)
+	assert.NoError(t, log.SetLevel("debug"))
 	ctx := context.Background()
 
 	tempDir := t.TempDir()

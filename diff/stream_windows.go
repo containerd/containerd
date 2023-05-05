@@ -26,12 +26,13 @@ import (
 	"path/filepath"
 	"sync"
 
-	winio "github.com/Microsoft/go-winio"
+	"github.com/Microsoft/go-winio"
+	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/typeurl/v2"
-	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
 )
 
 const processorPipe = "STREAM_PROCESSOR_PIPE"
@@ -61,7 +62,7 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 			defer l.Close()
 			conn, err := l.Accept()
 			if err != nil {
-				logrus.WithError(err).Error("accept npipe connection")
+				log.G(ctx).WithError(err).Error("accept npipe connection")
 				return
 			}
 			io.Copy(conn, bytes.NewReader(data))

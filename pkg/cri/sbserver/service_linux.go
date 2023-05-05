@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	"github.com/opencontainers/selinux/go-selinux"
+
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/go-cni"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/sirupsen/logrus"
 )
 
 // networkAttachCount is the minimum number of networks the PodSandbox
@@ -35,13 +36,13 @@ const networkAttachCount = 2
 func (c *criService) initPlatform() (err error) {
 	if userns.RunningInUserNS() {
 		if !(c.config.DisableCgroup && !c.apparmorEnabled() && c.config.RestrictOOMScoreAdj) {
-			logrus.Warn("Running containerd in a user namespace typically requires disable_cgroup, disable_apparmor, restrict_oom_score_adj set to be true")
+			log.L.Warn("Running containerd in a user namespace typically requires disable_cgroup, disable_apparmor, restrict_oom_score_adj set to be true")
 		}
 	}
 
 	if c.config.EnableSelinux {
 		if !selinux.GetEnabled() {
-			logrus.Warn("Selinux is not supported")
+			log.L.Warn("Selinux is not supported")
 		}
 		if r := c.config.SelinuxCategoryRange; r > 0 {
 			selinux.CategoryRange = uint32(r)

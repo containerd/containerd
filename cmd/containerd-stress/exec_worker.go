@@ -25,9 +25,9 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 )
 
 type execWorker struct {
@@ -37,7 +37,7 @@ type execWorker struct {
 func (w *execWorker) exec(ctx, tctx context.Context) {
 	defer func() {
 		w.wg.Done()
-		logrus.Infof("worker %d finished", w.id)
+		log.L.Infof("worker %d finished", w.id)
 	}()
 	id := fmt.Sprintf("exec-container-%d", w.id)
 	c, err := w.client.NewContainer(ctx, id,
@@ -46,32 +46,32 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		containerd.WithNewSpec(oci.WithImageConfig(w.image), oci.WithUsername("games"), oci.WithProcessArgs("sleep", "30d")),
 	)
 	if err != nil {
-		logrus.WithError(err).Error("create exec container")
+		log.L.WithError(err).Error("create exec container")
 		return
 	}
 	defer c.Delete(ctx, containerd.WithSnapshotCleanup)
 
 	task, err := c.NewTask(ctx, cio.NullIO)
 	if err != nil {
-		logrus.WithError(err).Error("create exec container's task")
+		log.L.WithError(err).Error("create exec container's task")
 		return
 	}
 	defer task.Delete(ctx, containerd.WithProcessKill)
 
 	statusC, err := task.Wait(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("wait exec container's task")
+		log.L.WithError(err).Error("wait exec container's task")
 		return
 	}
 
 	if err := task.Start(ctx); err != nil {
-		logrus.WithError(err).Error("exec container start failure")
+		log.L.WithError(err).Error("exec container start failure")
 		return
 	}
 
 	spec, err := c.Spec(ctx)
 	if err != nil {
-		logrus.WithError(err).Error("failed to get spec")
+		log.L.WithError(err).Error("failed to get spec")
 		return
 	}
 
@@ -82,7 +82,7 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 		select {
 		case <-tctx.Done():
 			if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
-				logrus.WithError(err).Error("kill exec container's task")
+				log.L.WithError(err).Error("kill exec container's task")
 			}
 			<-statusC
 			return
@@ -91,14 +91,14 @@ func (w *execWorker) exec(ctx, tctx context.Context) {
 
 		w.count++
 		id := w.getID()
-		logrus.Debugf("starting exec %s", id)
+		log.L.Debugf("starting exec %s", id)
 		start := time.Now()
 
 		if err := w.runExec(ctx, task, id, pspec); err != nil {
 			if err != context.DeadlineExceeded ||
 				!strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
 				w.failures++
-				logrus.WithError(err).Errorf("running exec %s", id)
+				log.L.WithError(err).Errorf("running exec %s", id)
 				errCounter.WithValues(err.Error()).Inc()
 			}
 			continue

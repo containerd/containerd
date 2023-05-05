@@ -23,9 +23,9 @@ import (
 	"runtime"
 
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/ttrpc"
-	log "github.com/sirupsen/logrus"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/plugin"
@@ -64,17 +64,17 @@ func (p *pauseService) RegisterTTRPC(server *ttrpc.Server) error {
 }
 
 func (p *pauseService) CreateSandbox(ctx context.Context, req *api.CreateSandboxRequest) (*api.CreateSandboxResponse, error) {
-	log.Debugf("create sandbox request: %+v", req)
+	log.G(ctx).Debugf("create sandbox request: %+v", req)
 	return &api.CreateSandboxResponse{}, nil
 }
 
 func (p *pauseService) StartSandbox(ctx context.Context, req *api.StartSandboxRequest) (*api.StartSandboxResponse, error) {
-	log.Debugf("start sandbox request: %+v", req)
+	log.G(ctx).Debugf("start sandbox request: %+v", req)
 	return &api.StartSandboxResponse{}, nil
 }
 
 func (p *pauseService) Platform(ctx context.Context, req *api.PlatformRequest) (*api.PlatformResponse, error) {
-	log.Debugf("platform request: %+v", req)
+	log.G(ctx).Debugf("platform request: %+v", req)
 
 	platform := types.Platform{
 		OS:           runtime.GOOS,
@@ -85,7 +85,7 @@ func (p *pauseService) Platform(ctx context.Context, req *api.PlatformRequest) (
 }
 
 func (p *pauseService) StopSandbox(ctx context.Context, req *api.StopSandboxRequest) (*api.StopSandboxResponse, error) {
-	log.Debugf("stop sandbox request: %+v", req)
+	log.G(ctx).Debugf("stop sandbox request: %+v", req)
 	p.shutdown.Shutdown()
 	return &api.StopSandboxResponse{}, nil
 }
@@ -97,7 +97,7 @@ func (p *pauseService) WaitSandbox(ctx context.Context, req *api.WaitSandboxRequ
 }
 
 func (p *pauseService) SandboxStatus(ctx context.Context, req *api.SandboxStatusRequest) (*api.SandboxStatusResponse, error) {
-	log.Debugf("sandbox status request: %+v", req)
+	log.G(ctx).Debugf("sandbox status request: %+v", req)
 	return &api.SandboxStatusResponse{}, nil
 }
 

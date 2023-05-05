@@ -30,10 +30,10 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/remote"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	metrics "github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -177,10 +177,14 @@ func main() {
 	}
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("json") {
-			logrus.SetLevel(logrus.WarnLevel)
+			if err := log.SetLevel("warn"); err != nil {
+				return err
+			}
 		}
 		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
+			if err := log.SetLevel("debug"); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -241,7 +245,7 @@ func serve(c config) error {
 			ReadHeaderTimeout: 5 * time.Minute, // "G112: Potential Slowloris Attack (gosec)"; not a real concern for our use, so setting a long timeout.
 		}
 		if err := srv.ListenAndServe(); err != nil {
-			logrus.WithError(err).Error("listen and serve")
+			log.L.WithError(err).Error("listen and serve")
 		}
 	}()
 	checkBinarySizes()
@@ -287,7 +291,7 @@ func criTest(c config) error {
 		workers []worker
 		r       = &run{}
 	)
-	logrus.Info("starting stress test run...")
+	log.L.Info("starting stress test run...")
 	// create the workers along with their spec
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
@@ -312,9 +316,9 @@ func criTest(c config) error {
 	r.end()
 
 	results := r.gather(workers)
-	logrus.Infof("ending test run in %0.3f seconds", results.Seconds)
+	log.L.Infof("ending test run in %0.3f seconds", results.Seconds)
 
-	logrus.WithField("failures", r.failures).Infof(
+	log.L.WithField("failures", r.failures).Infof(
 		"create/start/delete %d containers in %0.3f seconds (%0.3f c/sec) or (%0.3f sec/c)",
 		results.Total,
 		results.Seconds,
@@ -345,7 +349,7 @@ func test(c config) error {
 		return err
 	}
 
-	logrus.Infof("pulling %s", c.Image)
+	log.L.Infof("pulling %s", c.Image)
 	image, err := client.Pull(ctx, c.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(c.Snapshotter))
 	if err != nil {
 		return err
@@ -367,7 +371,7 @@ func test(c config) error {
 		workers []worker
 		r       = &run{}
 	)
-	logrus.Info("starting stress test run...")
+	log.L.Info("starting stress test run...")
 	// create the workers along with their spec
 	for i := 0; i < c.Concurrency; i++ {
 		wg.Add(1)
@@ -414,9 +418,9 @@ func test(c config) error {
 		results.ExecTotal = exec.count
 		results.ExecFailures = exec.failures
 	}
-	logrus.Infof("ending test run in %0.3f seconds", results.Seconds)
+	log.L.Infof("ending test run in %0.3f seconds", results.Seconds)
 
-	logrus.WithField("failures", r.failures).Infof(
+	log.L.WithField("failures", r.failures).Infof(
 		"create/start/delete %d containers in %0.3f seconds (%0.3f c/sec) or (%0.3f sec/c)",
 		results.Total,
 		results.Seconds,

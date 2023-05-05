@@ -30,13 +30,13 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -204,7 +204,7 @@ var execCommand = cli.Command{
 		}
 		fmt.Printf("exec running with pid %d\n", r.Pid)
 		if context.Bool("attach") {
-			logrus.Info("attaching")
+			log.L.Info("attaching")
 			if tty {
 				current := console.Current()
 				defer current.Reset()

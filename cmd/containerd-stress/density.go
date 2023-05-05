@@ -31,9 +31,9 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -76,12 +76,12 @@ var densityCommand = cli.Command{
 		if err := cleanup(ctx, client); err != nil {
 			return err
 		}
-		logrus.Infof("pulling %s", config.Image)
+		log.L.Infof("pulling %s", config.Image)
 		image, err := client.Pull(ctx, config.Image, containerd.WithPullUnpack, containerd.WithPullSnapshotter(config.Snapshotter))
 		if err != nil {
 			return err
 		}
-		logrus.Info("generating spec from image")
+		log.L.Info("generating spec from image")
 
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGTERM, syscall.SIGINT)

@@ -21,8 +21,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/blockio"
 )
 
@@ -37,7 +36,7 @@ func (c *criService) blockIOClassFromAnnotations(containerName string, container
 	if cls != "" && !blockio.IsEnabled() {
 		if c.config.ContainerdConfig.IgnoreBlockIONotEnabledErrors {
 			cls = ""
-			logrus.Debugf("continuing create container %s, ignoring blockio not enabled (%v)", containerName, err)
+			log.L.Debugf("continuing create container %s, ignoring blockio not enabled (%v)", containerName, err)
 		} else {
 			return "", fmt.Errorf("blockio disabled, refusing to set blockio class of container %q to %q", containerName, cls)
 		}

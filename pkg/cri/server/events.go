@@ -28,6 +28,7 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
@@ -115,7 +116,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 		case exitRes := <-exitCh:
 			exitStatus, exitedAt, err := exitRes.Result()
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
+				log.L.WithError(err).Errorf("failed to get task exit status for %q", id)
 				exitStatus = unknownExitCode
 				exitedAt = time.Now()
 			}
@@ -128,7 +129,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
-			logrus.Debugf("received exit event %+v", e)
+			log.L.Debugf("received exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
@@ -147,7 +148,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				return nil
 			}()
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to handle sandbox TaskExit event %+v", e)
+				log.L.WithError(err).Errorf("failed to handle sandbox TaskExit event %+v", e)
 				em.backOff.enBackOff(id, e)
 			}
 			return
@@ -166,7 +167,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 		case exitRes := <-exitCh:
 			exitStatus, exitedAt, err := exitRes.Result()
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to get task exit status for %q", id)
+				log.L.WithError(err).Errorf("failed to get task exit status for %q", id)
 				exitStatus = unknownExitCode
 				exitedAt = time.Now()
 			}
@@ -179,7 +180,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
-			logrus.Debugf("received exit event %+v", e)
+			log.L.Debugf("received exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
@@ -198,7 +199,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				return nil
 			}()
 			if err != nil {
-				logrus.WithError(err).Errorf("failed to handle container TaskExit event %+v", e)
+				log.L.WithError(err).Errorf("failed to handle container TaskExit event %+v", e)
 				em.backOff.enBackOff(id, e)
 			}
 			return
@@ -251,14 +252,14 @@ func (em *eventMonitor) start() <-chan error {
 		for {
 			select {
 			case e := <-em.ch:
-				logrus.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
+				log.L.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
 				if e.Namespace != constants.K8sContainerdNamespace {
-					logrus.Debugf("Ignoring events in namespace - %q", e.Namespace)
+					log.L.Debugf("Ignoring events in namespace - %q", e.Namespace)
 					break
 				}
 				id, evt, err := convertEvent(e.Event)
 				if err != nil {
-					logrus.WithError(err).Errorf("Failed to convert event %+v", e)
+					log.L.WithError(err).Errorf("Failed to convert event %+v", e)
 					break
 				}
 				if em.backOff.isInBackOff(id) {

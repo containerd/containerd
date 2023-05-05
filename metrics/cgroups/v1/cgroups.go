@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
 )
 
 // NewTaskMonitor returns a new cgroups monitor
@@ -75,7 +74,7 @@ func (m *cgroupsMonitor) Monitor(c runtime.Task, labels map[string]string) error
 	}
 	err = m.oom.Add(c.ID(), c.Namespace(), cg, m.trigger)
 	if err == cgroups.ErrMemoryNotSupported {
-		logrus.WithError(err).Warn("OOM monitoring failed")
+		log.L.WithError(err).Warn("OOM monitoring failed")
 		return nil
 	}
 	return err

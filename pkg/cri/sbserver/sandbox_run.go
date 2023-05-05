@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
 	"github.com/hashicorp/go-multierror"
-	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -598,7 +597,7 @@ func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runt
 }
 
 func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.Result) {
-	if logrus.GetLevel() < logrus.DebugLevel {
+	if log.GetLevel() < log.DebugLevel {
 		return
 	}
 	cniResult, err := json.Marshal(result)
