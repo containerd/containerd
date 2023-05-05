@@ -4,11 +4,13 @@ github.com/AdaLogics/go-fuzz-headers
 # github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
 ## explicit; go 1.18
 github.com/AdamKorcz/go-118-fuzz-build/testing
-# github.com/Microsoft/go-winio v0.6.0
+# github.com/Microsoft/go-winio v0.6.1
 ## explicit; go 1.17
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
+github.com/Microsoft/go-winio/internal/fs
 github.com/Microsoft/go-winio/internal/socket
+github.com/Microsoft/go-winio/internal/stringbuffer
 github.com/Microsoft/go-winio/pkg/etw
 github.com/Microsoft/go-winio/pkg/etwlogrus
 github.com/Microsoft/go-winio/pkg/fs
@@ -16,7 +18,7 @@ github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/tools/mkwinsyscall
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.10.0-rc.7
+# github.com/Microsoft/hcsshim v0.10.0-rc.8
 ## explicit; go 1.18
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
@@ -500,7 +502,7 @@ golang.org/x/crypto/openpgp/errors
 golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
-# golang.org/x/mod v0.8.0
+# golang.org/x/mod v0.9.0
 ## explicit; go 1.17
 golang.org/x/mod/semver
 # golang.org/x/net v0.8.0
@@ -524,7 +526,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.6.0
+# golang.org/x/sys v0.7.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -548,12 +550,13 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.6.0
+# golang.org/x/tools v0.7.0
 ## explicit; go 1.18
 golang.org/x/tools/cmd/stringer
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
+golang.org/x/tools/go/types/objectpath
 golang.org/x/tools/internal/event
 golang.org/x/tools/internal/event/core
 golang.org/x/tools/internal/event/keys
@@ -634,7 +637,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.28.1
+# google.golang.org/protobuf v1.29.1
 ## explicit; go 1.11
 google.golang.org/protobuf/compiler/protogen
 google.golang.org/protobuf/encoding/protojson
@@ -666,6 +669,7 @@ google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface
 google.golang.org/protobuf/runtime/protoimpl
 google.golang.org/protobuf/types/descriptorpb
+google.golang.org/protobuf/types/dynamicpb
 google.golang.org/protobuf/types/known/anypb
 google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/emptypb
