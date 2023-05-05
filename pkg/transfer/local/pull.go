@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -52,6 +53,32 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 		// Explicitly call out schema 1 as deprecated and not supported
 		return fmt.Errorf("schema 1 image manifests are no longer supported: %w", errdefs.ErrInvalidArgument)
+	}
+
+	// Verify image before pulling.
+	for vfName, vf := range ts.verifiers {
+		log := log.G(ctx).WithFields(logrus.Fields{
+			"name":     name,
+			"digest":   desc.Digest.String(),
+			"verifier": vfName,
+		})
+		log.Debug("Verifying image pull")
+
+		jdg, err := vf.VerifyImage(ctx, name, desc)
+		if err != nil {
+			log.WithError(err).Error("No judgement received from verifier")
+			return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
+		}
+		log = log.WithFields(logrus.Fields{
+			"ok":     jdg.OK,
+			"reason": jdg.Reason,
+		})
+
+		if !jdg.OK {
+			log.Warn("Image verifier blocked pull")
+			return fmt.Errorf("image verifier %s blocked pull of %v with digest %v for reason: %v", vfName, name, desc.Digest.String(), jdg.Reason)
+		}
+		log.Debug("Image verifier allowed pull")
 	}
 
 	// TODO: Handle already exists
