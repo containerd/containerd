@@ -90,6 +90,8 @@ const (
 	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
 	// SandboxControllerPlugin implements a sandbox controller
 	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
+	// ImageVerifierPlugin implements an image verifier service
+	ImageVerifierPlugin Type = "io.containerd.image-verifier.v1"
 )
 
 const (

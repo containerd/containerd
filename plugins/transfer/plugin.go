@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/pkg/imageverifier"
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
@@ -45,6 +46,7 @@ func init() {
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
 			plugin.DiffPlugin,
+			plugin.ImageVerifierPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -57,6 +59,20 @@ func init() {
 			l, err := ic.Get(plugin.LeasePlugin)
 			if err != nil {
 				return nil, err
+			}
+
+			vfs := make(map[string]imageverifier.ImageVerifier)
+			vps, err := ic.GetByType(plugin.ImageVerifierPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			for name, vp := range vps {
+				inst, err := vp.Instance()
+				if err != nil {
+					return nil, err
+				}
+				vfs[name] = inst.(imageverifier.ImageVerifier)
 			}
 
 			// Set configuration based on default or user input
@@ -126,7 +142,7 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), &lc), nil
+			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc), nil
 		},
 	})
 }
