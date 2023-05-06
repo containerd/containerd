@@ -87,21 +87,19 @@ func Handlers(handlers ...Handler) HandlerFunc {
 // This differs from dispatch in that each sibling resource is considered
 // synchronously.
 func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) error {
-	for _, desc := range descs {
-
+	queue := descs
+	for len(queue) > 0 {
+		desc := queue[0]
+		queue = queue[1:]
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
 			if errors.Is(err, ErrSkipDesc) {
-				continue // don't traverse the children.
+				// don't traverse children.
+				continue
 			}
 			return err
 		}
-
-		if len(children) > 0 {
-			if err := Walk(ctx, handler, children...); err != nil {
-				return err
-			}
-		}
+		queue = append(queue, children...)
 	}
 	return nil
 }
