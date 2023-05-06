@@ -72,14 +72,13 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 	go ep.Run(ctx)
 	s := &service{
-		context:    ctx,
 		events:     make(chan interface{}, 128),
 		ec:         reaper.Default.Subscribe(),
 		ep:         ep,
 		shutdown:   sd,
 		containers: make(map[string]*runc.Container),
 	}
-	go s.processExits()
+	go s.processExits(ctx)
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
@@ -103,7 +102,6 @@ type service struct {
 	mu          sync.Mutex
 	eventSendMu sync.Mutex
 
-	context  context.Context
 	events   chan interface{}
 	platform stdio.Platform
 	ec       chan runcC.Exit
@@ -507,9 +505,9 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	}, nil
 }
 
-func (s *service) processExits() {
+func (s *service) processExits(ctx context.Context) {
 	for e := range s.ec {
-		s.checkProcesses(e)
+		s.checkProcesses(ctx, e)
 	}
 }
 
@@ -523,7 +521,7 @@ func (s *service) sendL(evt interface{}) {
 	s.eventSendMu.Unlock()
 }
 
-func (s *service) checkProcesses(e runcC.Exit) {
+func (s *service) checkProcesses(ctx context.Context, e runcC.Exit) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -539,9 +537,9 @@ func (s *service) checkProcesses(e runcC.Exit) {
 
 			if ip, ok := p.(*process.Init); ok {
 				// Ensure all children are killed
-				if runc.ShouldKillAllOnExit(s.context, container.Bundle) {
-					if err := ip.KillAll(s.context); err != nil {
-						log.L.WithError(err).WithField("id", ip.ID()).
+				if runc.ShouldKillAllOnExit(ctx, container.Bundle) {
+					if err := ip.KillAll(ctx); err != nil {
+						log.G(ctx).WithError(err).WithField("id", ip.ID()).
 							Error("failed to kill init's children")
 					}
 				}

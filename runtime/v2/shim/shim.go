@@ -290,7 +290,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-	publisher, err := NewPublisher(ttrpcAddress)
+	publisher, err := NewPublisherWithContext(ctx, ttrpcAddress)
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
-		go reap(ctx, logger, signals)
+		go reap(log.WithLogger(ctx, logger), signals)
 		ss, err := manager.Stop(ctx, id)
 		if err != nil {
 			return err
@@ -440,7 +440,7 @@ func run(ctx context.Context, manager Manager, initFunc Init, name string, confi
 		}
 
 		if src, ok := instance.(ttrpcService); ok {
-			logrus.WithField("id", id).Debug("registering ttrpc service")
+			log.G(ctx).WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}
@@ -497,7 +497,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 		return err
 	}
 
-	l, err := serveListener(socketFlag)
+	l, err := serveListener(ctx, socketFlag)
 	if err != nil {
 		return err
 	}
@@ -507,22 +507,23 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 			log.G(ctx).WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()
-	logger := log.G(ctx).WithFields(log.Fields{
+
+	ctx1 := log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 		"pid":       os.Getpid(),
 		"path":      path,
 		"namespace": namespaceFlag,
-	})
+	}))
 	go func() {
 		for range dump {
-			dumpStacks(logger)
+			dumpStacks(ctx1)
 		}
 	}()
 
-	go handleExitSignals(ctx, logger, shutdown)
-	return reap(ctx, logger, signals)
+	go handleExitSignals(ctx1, shutdown)
+	return reap(ctx1, signals)
 }
 
-func dumpStacks(logger *logrus.Entry) {
+func dumpStacks(ctx context.Context) {
 	var (
 		buf       []byte
 		stackSize int
@@ -534,5 +535,5 @@ func dumpStacks(logger *logrus.Entry) {
 		bufferLen *= 2
 	}
 	buf = buf[:stackSize]
-	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+	log.G(ctx).Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }

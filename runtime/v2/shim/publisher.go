@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/ttrpc"
 )
 
@@ -43,6 +44,11 @@ type item struct {
 
 // NewPublisher creates a new remote events publisher
 func NewPublisher(address string) (*RemoteEventsPublisher, error) {
+	return NewPublisherWithContext(context.Background(), address)
+}
+
+// NewPublisherWithContext creates a new remote events publisher with context
+func NewPublisherWithContext(ctx context.Context, address string) (*RemoteEventsPublisher, error) {
 	client, err := ttrpcutil.NewClient(address)
 	if err != nil {
 		return nil, err
@@ -54,7 +60,7 @@ func NewPublisher(address string) (*RemoteEventsPublisher, error) {
 		requeue: make(chan *item, queueSize),
 	}
 
-	go l.processQueue()
+	go l.processQueue(ctx)
 	return l, nil
 }
 
@@ -80,16 +86,16 @@ func (l *RemoteEventsPublisher) Close() (err error) {
 	return err
 }
 
-func (l *RemoteEventsPublisher) processQueue() {
+func (l *RemoteEventsPublisher) processQueue(ctx context.Context) {
 	for i := range l.requeue {
 		if i.count > maxRequeue {
-			log.L.Errorf("evicting %s from queue because of retry count", i.ev.Topic)
+			log.G(ctx).Errorf("evicting %s from queue because of retry count", i.ev.Topic)
 			// drop the event
 			continue
 		}
 
 		if err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev}); err != nil {
-			log.L.WithError(err).Error("forward event")
+			log.G(ctx).WithError(err).Error("forward event")
 			l.queue(i)
 		}
 	}
@@ -106,6 +112,10 @@ func (l *RemoteEventsPublisher) queue(i *item) {
 
 // Publish publishes the event by forwarding it to the configured ttrpc server
 func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event events.Event) error {
+	if topic == runtime.TaskUnknownTopic {
+		log.G(ctx).Warnf("publish a unknown topic event: %#v", event)
+	}
+
 	ns, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err

@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/runtime"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 )
 
 // GetTopic converts an event from an interface type to the specific
@@ -56,9 +55,8 @@ func GetTopic(e interface{}) string {
 	case *events.TaskCheckpointed:
 		return runtime.TaskCheckpointedEventTopic
 	default:
-		logrus.Warnf("no topic for type %#v", e)
+		return runtime.TaskUnknownTopic
 	}
-	return runtime.TaskUnknownTopic
 }
 
 // ShouldKillAllOnExit reads the bundle's OCI spec and returns true if

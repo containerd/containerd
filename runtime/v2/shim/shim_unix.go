@@ -27,9 +27,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/fifo"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -49,7 +49,7 @@ func setupDumpStacks(dump chan<- os.Signal) {
 	signal.Notify(dump, syscall.SIGUSR1)
 }
 
-func serveListener(path string) (net.Listener, error) {
+func serveListener(ctx context.Context, path string) (net.Listener, error) {
 	var (
 		l   net.Listener
 		err error
@@ -66,12 +66,12 @@ func serveListener(path string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithField("socket", path).Debug("serving api on socket")
+	log.G(ctx).WithField("socket", path).Debug("serving api on socket")
 	return l, nil
 }
 
-func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
-	logger.Debug("starting signal loop")
+func reap(ctx context.Context, signals chan os.Signal) error {
+	log.G(ctx).Debug("starting signal loop")
 
 	for {
 		select {
@@ -83,7 +83,7 @@ func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) err
 			switch s {
 			case unix.SIGCHLD:
 				if err := reaper.Reap(); err != nil {
-					logger.WithError(err).Error("reap exit status")
+					log.G(ctx).WithError(err).Error("reap exit status")
 				}
 			case unix.SIGPIPE:
 			}
@@ -91,14 +91,14 @@ func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) err
 	}
 }
 
-func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
+func handleExitSignals(ctx context.Context, cancel context.CancelFunc) {
 	ch := make(chan os.Signal, 32)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
 	for {
 		select {
 		case s := <-ch:
-			logger.WithField("signal", s).Debugf("Caught exit signal")
+			log.G(ctx).WithField("signal", s).Debugf("Caught exit signal")
 			cancel()
 			return
 		case <-ctx.Done():

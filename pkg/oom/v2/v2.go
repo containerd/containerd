@@ -24,6 +24,7 @@ import (
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -74,7 +75,7 @@ func (w *watcher) Run(ctx context.Context) {
 				if err := w.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 					ContainerID: i.id,
 				}); err != nil {
-					logrus.WithError(err).Error("publish OOM event")
+					log.G(ctx).WithError(err).Error("publish OOM event")
 				}
 			}
 			if i.ev.OOMKill > 0 {
