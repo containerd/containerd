@@ -23,11 +23,11 @@ import (
 
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -83,13 +83,13 @@ func (l *RemoteEventsPublisher) Close() (err error) {
 func (l *RemoteEventsPublisher) processQueue() {
 	for i := range l.requeue {
 		if i.count > maxRequeue {
-			logrus.Errorf("evicting %s from queue because of retry count", i.ev.Topic)
+			log.L.Errorf("evicting %s from queue because of retry count", i.ev.Topic)
 			// drop the event
 			continue
 		}
 
 		if err := l.forwardRequest(i.ctx, &v1.ForwardRequest{Envelope: i.ev}); err != nil {
-			logrus.WithError(err).Error("forward event")
+			log.L.WithError(err).Error("forward event")
 			l.queue(i)
 		}
 	}

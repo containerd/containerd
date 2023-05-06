@@ -75,7 +75,7 @@ func setupDumpStacks() {
 	ev, _ := windows.UTF16PtrFromString(event)
 	sd, err := windows.SecurityDescriptorFromString("D:P(A;;GA;;;BA)(A;;GA;;;SY)")
 	if err != nil {
-		logrus.Errorf("failed to get security descriptor for debug stackdump event %s: %s", event, err.Error())
+		log.L.Errorf("failed to get security descriptor for debug stackdump event %s: %s", event, err.Error())
 		return
 	}
 	var sa windows.SecurityAttributes
@@ -84,11 +84,11 @@ func setupDumpStacks() {
 	sa.SecurityDescriptor = sd
 	h, err := windows.CreateEvent(&sa, 0, 0, ev)
 	if h == 0 || err != nil {
-		logrus.Errorf("failed to create debug stackdump event %s: %s", event, err.Error())
+		log.L.Errorf("failed to create debug stackdump event %s: %s", event, err.Error())
 		return
 	}
 	go func() {
-		logrus.Debugf("Stackdump - waiting signal at %s", event)
+		log.L.Debugf("Stackdump - waiting signal at %s", event)
 		for {
 			windows.WaitForSingleObject(h, windows.INFINITE)
 			dumpStacks(true)
@@ -109,7 +109,7 @@ func init() {
 	// Microsoft/go-winio/tools/etw-provider-gen.
 	provider, err := etw.NewProvider("ContainerD", etwCallback)
 	if err != nil {
-		logrus.Error(err)
+		log.L.Error(err)
 	} else {
 		if hook, err := etwlogrus.NewHookFromProvider(provider); err == nil {
 			logrus.AddHook(hook)

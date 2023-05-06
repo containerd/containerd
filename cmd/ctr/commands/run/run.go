@@ -30,10 +30,10 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
 	clabels "github.com/containerd/containerd/labels"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -199,7 +199,7 @@ var Command = cli.Command{
 			defer func() {
 				if enableCNI {
 					if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
-						logrus.WithError(err).Error("network review")
+						log.L.WithError(err).Error("network review")
 					}
 				}
 				task.Delete(ctx)
@@ -232,7 +232,7 @@ var Command = cli.Command{
 		}
 		if tty {
 			if err := tasks.HandleConsoleResize(ctx, task, con); err != nil {
-				logrus.WithError(err).Error("console resize")
+				log.L.WithError(err).Error("console resize")
 			}
 		} else {
 			sigc := commands.ForwardAllSignals(ctx, task)
@@ -262,7 +262,7 @@ func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 		} else {
 			// In case the image label is invalid, we output a warning and skip adding it to the
 			// container.
-			logrus.WithError(err).Warnf("unable to add image label with key %s to the container", k)
+			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
 		}
 	}
 	// labels from the command line will override image and the initial image config labels

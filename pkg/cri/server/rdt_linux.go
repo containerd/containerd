@@ -21,8 +21,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/rdt"
 )
 
@@ -40,7 +39,7 @@ func (c *criService) rdtClassFromAnnotations(containerName string, containerAnno
 
 	if err != nil {
 		if !rdt.IsEnabled() && c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
-			logrus.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
+			log.L.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
 			return "", nil
 		}
 		return "", err

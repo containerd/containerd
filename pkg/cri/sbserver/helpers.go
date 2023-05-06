@@ -27,14 +27,17 @@ import (
 	"strings"
 	"time"
 
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
+	"github.com/pelletier/go-toml"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	clabels "github.com/containerd/containerd/labels"
+	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -42,10 +45,6 @@ import (
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
-	"github.com/pelletier/go-toml"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // TODO: Move common helpers for sbserver and podsandbox to a dedicated package once basic services are functinal.
@@ -254,7 +253,7 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 		} else {
 			// In case the image label is invalid, we output a warning and skip adding it to the
 			// container.
-			logrus.WithError(err).Warnf("unable to add image label with key %s to the container", k)
+			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
 		}
 	}
 	// labels from the CRI request (config) will override labels in the image config
@@ -448,12 +447,12 @@ func copyResourcesToStatus(spec *runtimespec.Spec, status containerstore.Status)
 func (c *criService) generateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
 	podSandboxStatus, err := c.getPodSandboxStatus(ctx, sandboxID)
 	if err != nil {
-		logrus.Warnf("Failed to get podSandbox status for container event for sandboxID %q: %v. Sending the event with nil podSandboxStatus.", sandboxID, err)
+		log.G(ctx).Warnf("Failed to get podSandbox status for container event for sandboxID %q: %v. Sending the event with nil podSandboxStatus.", sandboxID, err)
 		podSandboxStatus = nil
 	}
 	containerStatuses, err := c.getContainerStatuses(ctx, sandboxID)
 	if err != nil {
-		logrus.Errorf("Failed to get container statuses for container event for sandboxID %q: %v", sandboxID, err)
+		log.G(ctx).Errorf("Failed to get container statuses for container event for sandboxID %q: %v", sandboxID, err)
 	}
 
 	event := runtime.ContainerEventResponse{
@@ -468,7 +467,7 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 	select {
 	case c.containerEventsChan <- event:
 	default:
-		logrus.Debugf("containerEventsChan is full, discarding event %+v", event)
+		log.G(ctx).Debugf("containerEventsChan is full, discarding event %+v", event)
 	}
 }
 

@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/log"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/pkg/cri/util"
@@ -109,12 +110,12 @@ func (c *ContainerIO) Pipe() {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(c.stdoutGroup, c.stdout); err != nil {
-				logrus.WithError(err).Errorf("Failed to pipe stdout of container %q", c.id)
+				log.L.WithError(err).Errorf("Failed to pipe stdout of container %q", c.id)
 			}
 			c.stdout.Close()
 			c.stdoutGroup.Close()
 			wg.Done()
-			logrus.Debugf("Finish piping stdout of container %q", c.id)
+			log.L.Debugf("Finish piping stdout of container %q", c.id)
 		}()
 	}
 
@@ -122,12 +123,12 @@ func (c *ContainerIO) Pipe() {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(c.stderrGroup, c.stderr); err != nil {
-				logrus.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
+				log.L.WithError(err).Errorf("Failed to pipe stderr of container %q", c.id)
 			}
 			c.stderr.Close()
 			c.stderrGroup.Close()
 			wg.Done()
-			logrus.Debugf("Finish piping stderr of container %q", c.id)
+			log.L.Debugf("Finish piping stderr of container %q", c.id)
 		}()
 	}
 }
@@ -150,9 +151,9 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 		wg.Add(1)
 		go func() {
 			if _, err := io.Copy(c.stdin, stdinStreamRC); err != nil {
-				logrus.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
+				log.L.WithError(err).Errorf("Failed to pipe stdin for container attach %q", c.id)
 			}
-			logrus.Infof("Attach stream %q closed", stdinKey)
+			log.L.Infof("Attach stream %q closed", stdinKey)
 			if opts.StdinOnce && !opts.Tty {
 				// Due to kubectl requirements and current docker behavior, when (opts.StdinOnce &&
 				// opts.Tty) we have to close container stdin and keep stdout and stderr open until

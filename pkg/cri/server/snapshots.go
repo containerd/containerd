@@ -22,11 +22,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	snapshot "github.com/containerd/containerd/snapshots"
-	"github.com/sirupsen/logrus"
-
+	"github.com/containerd/containerd/log"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	snapshot "github.com/containerd/containerd/snapshots"
 )
 
 // snapshotsSyncer syncs snapshot stats periodically. imagefs info and container stats
@@ -60,7 +59,7 @@ func (s *snapshotsSyncer) start() {
 		// check the resource usage and optimize this.
 		for {
 			if err := s.sync(); err != nil {
-				logrus.WithError(err).Error("Failed to sync snapshot stats")
+				log.L.WithError(err).Error("Failed to sync snapshot stats")
 			}
 			<-tick.C
 		}
@@ -101,7 +100,7 @@ func (s *snapshotsSyncer) sync() error {
 		usage, err := s.snapshotter.Usage(ctx, info.Name)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
-				logrus.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
+				log.L.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
 			}
 			continue
 		}

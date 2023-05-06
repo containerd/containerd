@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/instrument"
 	"github.com/containerd/containerd/pkg/cri/nri"
@@ -144,7 +145,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	}
 
 	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
-	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
+	log.L.Infof("Get image filesystem path %q", c.imageFSPath)
 
 	if err := c.initPlatform(); err != nil {
 		return nil, fmt.Errorf("initialize platform: %w", err)
@@ -203,20 +204,20 @@ func (c *criService) RegisterTCP(s *grpc.Server) error {
 
 // Run starts the CRI service.
 func (c *criService) Run() error {
-	logrus.Info("Start subscribing containerd event")
+	log.L.Info("Start subscribing containerd event")
 	c.eventMonitor.subscribe(c.client)
 
-	logrus.Infof("Start recovering state")
+	log.L.Infof("Start recovering state")
 	if err := c.recover(ctrdutil.NamespacedContext()); err != nil {
 		return fmt.Errorf("failed to recover state: %w", err)
 	}
 
 	// Start event handler.
-	logrus.Info("Start event monitor")
+	log.L.Info("Start event monitor")
 	eventMonitorErrCh := c.eventMonitor.start()
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
-	logrus.Info("Start snapshots syncer")
+	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		c.snapshotStore,
 		c.client.SnapshotService(c.config.ContainerdConfig.Snapshotter),
@@ -229,7 +230,7 @@ func (c *criService) Run() error {
 	var netSyncGroup sync.WaitGroup
 	for name, h := range c.cniNetConfMonitor {
 		netSyncGroup.Add(1)
-		logrus.Infof("Start cni network conf syncer for %s", name)
+		log.L.Infof("Start cni network conf syncer for %s", name)
 		go func(h *cniNetConfSyncer) {
 			cniNetConfMonitorErrCh <- h.syncLoop()
 			netSyncGroup.Done()
@@ -248,12 +249,12 @@ func (c *criService) Run() error {
 	}
 
 	// Start streaming server.
-	logrus.Info("Start streaming server")
+	log.L.Info("Start streaming server")
 	streamServerErrCh := make(chan error)
 	go func() {
 		defer close(streamServerErrCh)
 		if err := c.streamServer.Start(true); err != nil && err != http.ErrServerClosed {
-			logrus.WithError(err).Error("Failed to start streaming server")
+			log.L.WithError(err).Error("Failed to start streaming server")
 			streamServerErrCh <- err
 		}
 	}()
@@ -281,11 +282,11 @@ func (c *criService) Run() error {
 	if err := <-eventMonitorErrCh; err != nil {
 		eventMonitorErr = err
 	}
-	logrus.Info("Event monitor stopped")
+	log.L.Info("Event monitor stopped")
 	if err := <-streamServerErrCh; err != nil {
 		streamServerErr = err
 	}
-	logrus.Info("Stream server stopped")
+	log.L.Info("Stream server stopped")
 	if eventMonitorErr != nil {
 		return fmt.Errorf("event monitor error: %w", eventMonitorErr)
 	}

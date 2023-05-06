@@ -23,10 +23,10 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/log"
 	gocni "github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -54,7 +54,7 @@ func RemoveCniNetworkIfExist(ctx context.Context, container containerd.Container
 			return err
 		}
 		if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
-			logrus.WithError(err).Error("network remove error")
+			log.L.WithError(err).Error("network remove error")
 			return err
 		}
 	}

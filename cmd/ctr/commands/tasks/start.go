@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 	"github.com/urfave/cli"
 )
 
@@ -115,7 +115,7 @@ var startCommand = cli.Command{
 		}
 		if tty {
 			if err := HandleConsoleResize(ctx, task, con); err != nil {
-				logrus.WithError(err).Error("console resize")
+				log.L.WithError(err).Error("console resize")
 			}
 		} else {
 			sigc := commands.ForwardAllSignals(ctx, task)
