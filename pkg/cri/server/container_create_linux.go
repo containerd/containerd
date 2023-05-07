@@ -362,11 +362,11 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		// Image
 		userstr = imageConfig.User
 	}
-	if userstr != "" {
-		specOpts = append(specOpts, oci.WithUser(userstr))
+	if userstr == "" {
+		userstr = "0" // runtime default
 	}
+	specOpts = append(specOpts, oci.WithUser(userstr))
 
-	userstr = "0" // runtime default
 	if securityContext.GetRunAsUsername() != "" {
 		userstr = securityContext.GetRunAsUsername()
 	} else if securityContext.GetRunAsUser() != nil {
@@ -374,8 +374,19 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	} else if imageConfig.User != "" {
 		userstr, _, _ = strings.Cut(imageConfig.User, ":")
 	}
-	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr),
-		customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
+
+	policy := runtime.SupplementalGroupsPolicy_Merge
+	if securityContext != nil {
+		policy = securityContext.SupplementalGroupsPolicy
+	}
+	switch policy {
+	case runtime.SupplementalGroupsPolicy_Merge:
+		specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr), customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
+	case runtime.SupplementalGroupsPolicy_Strict:
+		specOpts = append(specOpts, customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
+	default:
+		return nil, fmt.Errorf("Unsupported SupplementalGroupsPolicy: %s", securityContext.SupplementalGroupsPolicy.String())
+	}
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {
