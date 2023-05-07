@@ -59,7 +59,10 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 			imageRef = repoDigests[0]
 		}
 	}
-	status := toCRIContainerStatus(container, spec, imageRef)
+	status, err := toCRIContainerStatus(ctx, container, spec, imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ContainerStatus: %w", err)
+	}
 
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
@@ -82,7 +85,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 }
 
 // toCRIContainerStatus converts internal container object to CRI container status.
-func toCRIContainerStatus(container containerstore.Container, spec *runtime.ImageSpec, imageRef string) *runtime.ContainerStatus {
+func toCRIContainerStatus(ctx context.Context, container containerstore.Container, spec *runtime.ImageSpec, imageRef string) (*runtime.ContainerStatus, error) {
 	meta := container.Metadata
 	status := container.Status.Get()
 	reason := status.Reason
@@ -104,6 +107,11 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		st, ft = status.StartedAt, status.FinishedAt
 	}
 
+	runtimeUser, err := toCRIContainerUser(ctx, container)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ConteianerUser: %w", err)
+	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -121,7 +129,8 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		Mounts:      meta.Config.GetMounts(),
 		LogPath:     meta.LogPath,
 		Resources:   status.Resources,
-	}
+		User:        runtimeUser,
+	}, nil
 }
 
 // ContainerInfo is extra information for a container.
