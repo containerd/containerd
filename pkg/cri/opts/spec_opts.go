@@ -161,7 +161,7 @@ func WithoutDefaultSecuritySettings(_ context.Context, _ oci.Client, c *containe
 	if s.Linux != nil {
 		s.Linux.Seccomp = nil
 	}
-	// Remove default rlimits (See issue #515)
+	// Remove default rlimits (See https://github.com/containerd/cri/issues/515)
 	s.Process.Rlimits = nil
 	return nil
 }
