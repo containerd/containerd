@@ -83,12 +83,21 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			return err
 		}
 		// fast path
-		bf, err := os.ReadDir(bundle.Path)
+		f, err := os.Open(bundle.Path)
 		if err != nil {
 			bundle.Delete()
 			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
 			continue
 		}
+
+		bf, err := f.Readdirnames(-1)
+		if err != nil {
+			f.Close()
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+		f.Close()
 		if len(bf) == 0 {
 			bundle.Delete()
 			continue
@@ -177,16 +186,24 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	dirs, err := os.ReadDir(filepath.Join(m.root, ns))
+
+	f, err := os.Open(filepath.Join(m.root, ns))
 	if err != nil {
 		return err
 	}
-	for _, d := range dirs {
+	defer f.Close()
+
+	dirs, err := f.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, dir := range dirs {
 		// if the task was not loaded, cleanup and empty working directory
 		// this can happen on a reboot where /run for the bundle state is cleaned up
 		// but that persistent working dir is left
-		if _, err := m.shims.Get(ctx, d.Name()); err != nil {
-			path := filepath.Join(m.root, ns, d.Name())
+		if _, err := m.shims.Get(ctx, dir); err != nil {
+			path := filepath.Join(m.root, ns, dir)
 			if err := os.RemoveAll(path); err != nil {
 				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
 			}

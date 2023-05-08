@@ -295,10 +295,9 @@ func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Statu
 	if err != nil {
 		return nil, err
 	}
-
 	defer fp.Close()
 
-	fis, err := fp.Readdir(-1)
+	fis, err := fp.Readdirnames(-1)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +309,7 @@ func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Statu
 
 	var active []content.Status
 	for _, fi := range fis {
-		p := filepath.Join(s.root, "ingest", fi.Name())
+		p := filepath.Join(s.root, "ingest", fi)
 		stat, err := s.status(p)
 		if err != nil {
 			if !os.IsNotExist(err) {
@@ -345,16 +344,15 @@ func (s *store) WalkStatusRefs(ctx context.Context, fn func(string) error) error
 	if err != nil {
 		return err
 	}
-
 	defer fp.Close()
 
-	fis, err := fp.Readdir(-1)
+	fis, err := fp.Readdirnames(-1)
 	if err != nil {
 		return err
 	}
 
 	for _, fi := range fis {
-		rf := filepath.Join(s.root, "ingest", fi.Name(), "ref")
+		rf := filepath.Join(s.root, "ingest", fi, "ref")
 
 		ref, err := readFileString(rf)
 		if err != nil {

@@ -121,7 +121,13 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 // copyExistingContents copies from the source to the destination and
 // ensures the ownership is appropriately set.
 func copyExistingContents(source, destination string) error {
-	dstList, err := os.ReadDir(destination)
+	f, err := os.Open(destination)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dstList, err := f.Readdirnames(-1)
 	if err != nil {
 		return err
 	}
