@@ -61,8 +61,13 @@ type Container interface {
 	Spec(context.Context) (*oci.Spec, error)
 	// Task returns the current task for the container
 	//
+	// If cio.Load options are passed the client will Load the IO for the running
+	// task.
+	//
 	// If cio.Attach options are passed the client will reattach to the IO for the running
-	// task. If no task exists for the container a NotFound error is returned
+	// task.
+	//
+	// If no task exists for the container a NotFound error is returned
 	//
 	// Clients must make sure that only one reader is attached to the task and consuming
 	// the output from the task's fifos
