@@ -46,14 +46,19 @@ type localTransferService struct {
 }
 
 func NewTransferService(lm leases.Manager, cs content.Store, is images.Store, tc *TransferConfig) transfer.Transferrer {
-	return &localTransferService{
-		leases:   lm,
-		content:  cs,
-		images:   is,
-		limiterU: semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers)),
-		limiterD: semaphore.NewWeighted(int64(tc.MaxConcurrentDownloads)),
-		config:   *tc,
+	ts := &localTransferService{
+		leases:  lm,
+		content: cs,
+		images:  is,
+		config:  *tc,
 	}
+	if tc.MaxConcurrentUploadedLayers > 0 {
+		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
+	}
+	if tc.MaxConcurrentDownloads > 0 {
+		ts.limiterD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloads))
+	}
+	return ts
 }
 
 func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
