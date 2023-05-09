@@ -99,7 +99,7 @@ func IsUncompressedType(mt string) bool {
 		images.MediaTypeDockerSchema2Layer,
 		images.MediaTypeDockerSchema2LayerForeign,
 		ocispec.MediaTypeImageLayer,
-		ocispec.MediaTypeImageLayerNonDistributable:
+		ocispec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // deprecated
 		return true
 	default:
 		return false
@@ -114,8 +114,8 @@ func convertMediaType(mt string) string {
 		return images.MediaTypeDockerSchema2LayerForeign
 	case ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayerZstd:
 		return ocispec.MediaTypeImageLayer
-	case ocispec.MediaTypeImageLayerNonDistributableGzip, ocispec.MediaTypeImageLayerNonDistributableZstd:
-		return ocispec.MediaTypeImageLayerNonDistributable
+	case ocispec.MediaTypeImageLayerNonDistributableGzip, ocispec.MediaTypeImageLayerNonDistributableZstd: //nolint:staticcheck // deprecated
+		return ocispec.MediaTypeImageLayerNonDistributable //nolint:staticcheck // deprecated
 	default:
 		return mt
 	}
