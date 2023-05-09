@@ -36,7 +36,7 @@ const (
 	CtrCniMetadataExtension = "ctr.cni-containerd.metadata"
 )
 
-// ctr pass cni network metadata to containerd if ctr run use option of --cni
+// NetworkMetaData ctr pass cni network metadata to containerd if ctr run use option of --cni
 type NetworkMetaData struct {
 	EnableCni bool
 }

@@ -72,7 +72,7 @@ var (
 // function and optimize other functions for running fast during garbage
 // collection write locks.
 type CollectionContext interface {
-	// Sends all known resources
+	// All sends all known resources
 	All(func(gc.Node))
 
 	// Active sends all active resources

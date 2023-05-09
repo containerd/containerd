@@ -42,7 +42,7 @@ func init() {
 	plugins.Register(&transfertypes.OCIRegistry{}, &OCIRegistry{})
 }
 
-// Initialize with hosts, authorizer callback, and headers
+// NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OCIRegistry {
 	// Create an authorizer
 	var aopts []docker.AuthorizerOpt

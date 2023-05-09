@@ -45,11 +45,11 @@ type Shaper interface {
 	// Limits are aggregate limits for the CIDR, not per IP address.  CIDRs must be unique, but can be overlapping, traffic
 	// that matches multiple CIDRs counts against all limits.
 	Limit(cidr string, egress, ingress *resource.Quantity) error
-	// Remove a bandwidth limit for a particular CIDR on a particular network interface
+	// Reset removes a bandwidth limit for a particular CIDR on a particular network interface
 	Reset(cidr string) error
-	// Reconcile the interface managed by this shaper with the state on the ground.
+	// ReconcileInterface reconciles the interface managed by this shaper with the state on the ground.
 	ReconcileInterface() error
-	// Reconcile a CIDR managed by this shaper with the state on the ground
+	// ReconcileCIDR reconciles a CIDR managed by this shaper with the state on the ground
 	ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error
 	// GetCIDRs returns the set of CIDRs that are being managed by this shaper
 	GetCIDRs() ([]string, error)

@@ -136,7 +136,7 @@ func (fp *Failpoint) DelegatedEval() EvalFn {
 	return target.evaluate
 }
 
-// Failpoint returns the current state of control in string format.
+// Marshal returns the current state of control in string format.
 func (fp *Failpoint) Marshal() string {
 	fp.Lock()
 	defer fp.Unlock()
