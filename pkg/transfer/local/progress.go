@@ -208,7 +208,7 @@ func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
 
 }
 
-// Adds hierarchy information
+// AddChildren adds hierarchy information
 func (j *ProgressTracker) AddChildren(desc ocispec.Descriptor, children []ocispec.Descriptor) {
 	if j == nil || len(children) == 0 {
 		return

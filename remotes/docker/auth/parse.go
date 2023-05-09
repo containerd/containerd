@@ -49,7 +49,7 @@ type byScheme []Challenge
 func (bs byScheme) Len() int      { return len(bs) }
 func (bs byScheme) Swap(i, j int) { bs[i], bs[j] = bs[j], bs[i] }
 
-// Sort in priority order: token > digest > basic
+// Less sorts in priority order: token > digest > basic
 func (bs byScheme) Less(i, j int) bool { return bs[i].Scheme > bs[j].Scheme }
 
 // Octet types from RFC 2616.
