@@ -28,6 +28,24 @@ issues:
     - path: 'archive[\\/]tarheader[\\/]'
       # conversion is necessary on Linux, unnecessary on macOS
       text: "unnecessary conversion"
+    - linters:
+        - revive
+      text: "if-return"
+    - linters:
+        - revive
+      text: "empty-block"
+    - linters:
+        - revive
+      text: "superfluous-else"
+    - linters:
+        - revive
+      text: "unused-parameter"
+    - linters:
+        - revive
+      text: "unreachable-code"
+    - linters:
+        - revive
+      text: "redefines-builtin-id"
 
 linters-settings:
   gosec:
