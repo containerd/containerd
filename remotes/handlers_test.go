@@ -78,6 +78,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 	})
 }
 
+//nolint:staticcheck // Non-distributable layers are deprecated
 func TestSkipNonDistributableBlobs(t *testing.T) {
 	ctx := context.Background()
 
