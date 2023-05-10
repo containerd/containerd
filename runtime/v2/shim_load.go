@@ -91,13 +91,12 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		}
 
 		bf, err := f.Readdirnames(-1)
+		f.Close()
 		if err != nil {
-			f.Close()
 			bundle.Delete()
 			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
 			continue
 		}
-		f.Close()
 		if len(bf) == 0 {
 			bundle.Delete()
 			continue
