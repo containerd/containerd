@@ -20,13 +20,22 @@ import (
 	"context"
 	"io"
 
+	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
 )
 
 // applyWindowsLayer applies a tar stream of an OCI style diff tar of a Windows layer
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md#applying-changesets
 func applyWindowsLayer(ctx context.Context, root string, r io.Reader, options ApplyOptions) (size int64, err error) {
-	return ociwclayer.ImportLayerFromTar(ctx, r, root, options.Parents)
+	// It seems that in certain situations, like having the containerd root and state on a file system hosted on a
+	// mounted VHDX, we need SeSecurityPrivilege when opening a file with winio.ACCESS_SYSTEM_SECURITY. This happens
+	// in the base layer writer in hcsshim when adding a new file.
+	err = winio.RunWithPrivileges([]string{winio.SeSecurityPrivilege}, func() error {
+		var innerErr error
+		size, innerErr = ociwclayer.ImportLayerFromTar(ctx, r, root, options.Parents)
+		return innerErr
+	})
+	return
 }
 
 // AsWindowsContainerLayer indicates that the tar stream to apply is that of
