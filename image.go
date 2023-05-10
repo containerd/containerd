@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/containerd/containerd/content"
@@ -137,6 +138,9 @@ type image struct {
 
 	i        images.Image
 	platform platforms.MatchComparer
+	diffIDs  []digest.Digest
+
+	mu sync.Mutex
 }
 
 func (i *image) Metadata() images.Image {
@@ -156,8 +160,19 @@ func (i *image) Labels() map[string]string {
 }
 
 func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.diffIDs != nil {
+		return i.diffIDs, nil
+	}
+
 	provider := i.client.ContentStore()
-	return i.i.RootFS(ctx, provider, i.platform)
+	diffIDs, err := i.i.RootFS(ctx, provider, i.platform)
+	if err != nil {
+		return nil, err
+	}
+	i.diffIDs = diffIDs
+	return diffIDs, nil
 }
 
 func (i *image) Size(ctx context.Context) (int64, error) {
@@ -264,9 +279,8 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	if err != nil {
 		return false, err
 	}
-	cs := i.client.ContentStore()
 
-	diffs, err := i.i.RootFS(ctx, cs, i.platform)
+	diffs, err := i.RootFS(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -355,7 +369,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		return err
 	}
 
-	layers, err := i.getLayers(ctx, i.platform, manifest)
+	layers, err := i.getLayers(ctx, manifest)
 	if err != nil {
 		return err
 	}
@@ -431,9 +445,8 @@ func (i *image) getManifest(ctx context.Context, platform platforms.MatchCompare
 	return manifest, nil
 }
 
-func (i *image) getLayers(ctx context.Context, platform platforms.MatchComparer, manifest ocispec.Manifest) ([]rootfs.Layer, error) {
-	cs := i.ContentStore()
-	diffIDs, err := i.i.RootFS(ctx, cs, platform)
+func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]rootfs.Layer, error) {
+	diffIDs, err := i.RootFS(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
