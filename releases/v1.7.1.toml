@@ -1,0 +1,39 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.7.0"
+
+pre_release = false
+
+preface = """\
+The first patch release for containerd 1.7 includes many fixes to CRI
+sandbox mode, various other fixes, runc update, and important fixes in
+core dependencies such as ttrpc and typeurl.
+
+### CRI/Sandbox Updates
+* **Throw not supported error when UID or GID mappings provided** ([#8211](https://github.com/containerd/containerd/pull/8211))
+* **Cleanup shim on start failure** ([#8282](https://github.com/containerd/containerd/pull/8282))
+* **Fix premature close of CRI service when there are no CNI configuration monitors** ([#8282](https://github.com/containerd/containerd/pull/8282))
+* **Avoid UID lookup from mount on Darwin** ([#8314](https://github.com/containerd/containerd/pull/8314))
+* **Keep Linux mounts for Linux sandboxes on non-Linux hosts** ([#8331](https://github.com/containerd/containerd/pull/8331))
+* **Add `noexec`,`nodev`,`nosuid` to `/etc/resolv.conf` bind mount** ([#8336](https://github.com/containerd/containerd/pull/8336))
+* **Remove entry for container from container store on error** ([#8457](https://github.com/containerd/containerd/pull/8457))
+* **Fix unmarshal in container metrics** ([#8472](https://github.com/containerd/containerd/pull/8472))
+
+### Other Notable Updates
+* **Use readonly for temporary mounts** ([#8300](https://github.com/containerd/containerd/pull/8300) [#8358](https://github.com/containerd/containerd/pull/8358))
+* **Fix skip docker manifest option on image exporter** ([#8344](https://github.com/containerd/containerd/pull/8344))
+* **Update runc binary to v1.1.7** ([#8451](https://github.com/containerd/containerd/pull/8451))
+* **Fix runtime path task option** ([#8453](https://github.com/containerd/containerd/pull/8453))
+* **Fix panic from nil checkpoint options** ([#8475](https://github.com/containerd/containerd/pull/8475))
+* **Fix transfer service configuration options** ([#8491](https://github.com/containerd/containerd/pull/8491))
+* **Fix server-side goroutine leak on receive message error** ([ttrpc#141](https://github.com/containerd/ttrpc/pull/141))
+* **Fix panic caused by race to close send channel** ([ttrpc#140](https://github.com/containerd/ttrpc/pull/140))
+* **Fix unmarshal to return non-nil object when nil value** ([ttrpc#140](https://github.com/containerd/typeurl/pull/41))
+
+See the changelog for complete list of changes"""
