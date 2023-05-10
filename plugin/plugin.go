@@ -138,7 +138,11 @@ var register = struct {
 	r []*Registration
 }{}
 
-// Load loads all plugins at the provided path into containerd
+// Load loads all plugins at the provided path into containerd.
+//
+// Load is currently only implemented on non-static, non-gccgo builds for amd64
+// and arm64, and plugins must be built with the exact same version of Go as
+// containerd itself.
 func Load(path string) (err error) {
 	defer func() {
 		if v := recover(); v != nil {
