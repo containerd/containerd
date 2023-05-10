@@ -44,7 +44,7 @@ func escapeAndCombineArgsWindows(args []string) string {
 // If image.ArgsEscaped field is set, this function sets the process command line and if not, it sets the
 // process args field
 func WithProcessCommandLineOrArgsForWindows(config *runtime.ContainerConfig, image *imagespec.ImageConfig) oci.SpecOpts {
-	if image.ArgsEscaped {
+	if image.ArgsEscaped { //nolint:staticcheck // ArgsEscaped is deprecated
 		return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 			// firstArgFromImg is a flag that is returned to indicate that the first arg in the slice comes from either the
 			// image Entrypoint or Cmd. If the first arg instead comes from the container config (e.g. overriding the image values),
@@ -57,7 +57,7 @@ func WithProcessCommandLineOrArgsForWindows(config *runtime.ContainerConfig, ima
 			}
 
 			var cmdLine string
-			if image.ArgsEscaped && firstArgFromImg {
+			if image.ArgsEscaped && firstArgFromImg { //nolint:staticcheck // ArgsEscaped is deprecated
 				cmdLine = args[0]
 				if len(args) > 1 {
 					cmdLine += " " + escapeAndCombineArgsWindows(args[1:])
