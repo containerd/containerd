@@ -1453,6 +1453,85 @@ file {
       json_name: "info"
     }
   }
+  message_type {
+    name: "RuntimeVersion"
+    field {
+      name: "version"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "version"
+    }
+    field {
+      name: "revision"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "revision"
+    }
+  }
+  message_type {
+    name: "RuntimeInfo"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "version"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.RuntimeVersion"
+      json_name: "version"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+    field {
+      name: "features"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "features"
+    }
+    field {
+      name: "annotations"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.v1.types.RuntimeInfo.AnnotationsEntry"
+      json_name: "annotations"
+    }
+    nested_type {
+      name: "AnnotationsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
   enum_type {
     name: "Status"
     value {
@@ -6642,6 +6721,24 @@ file {
       json_name: "exitedAt"
     }
   }
+  message_type {
+    name: "RuntimeInfoRequest"
+    field {
+      name: "runtime_path"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "runtimePath"
+    }
+    field {
+      name: "options"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
   service {
     name: "Tasks"
     method {
@@ -6728,6 +6825,11 @@ file {
       name: "Wait"
       input_type: ".containerd.services.tasks.v1.WaitRequest"
       output_type: ".containerd.services.tasks.v1.WaitResponse"
+    }
+    method {
+      name: "RuntimeInfo"
+      input_type: ".containerd.services.tasks.v1.RuntimeInfoRequest"
+      output_type: ".containerd.v1.types.RuntimeInfo"
     }
   }
   options {

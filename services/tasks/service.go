@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
@@ -132,4 +133,8 @@ func (s *service) Metrics(ctx context.Context, r *api.MetricsRequest) (*api.Metr
 
 func (s *service) Wait(ctx context.Context, r *api.WaitRequest) (*api.WaitResponse, error) {
 	return s.local.Wait(ctx, r)
+}
+
+func (s *service) RuntimeInfo(ctx context.Context, r *api.RuntimeInfoRequest) (*task.RuntimeInfo, error) {
+	return s.local.RuntimeInfo(ctx, r)
 }

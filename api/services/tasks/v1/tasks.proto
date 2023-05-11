@@ -66,6 +66,8 @@ service Tasks {
 	rpc Metrics(MetricsRequest) returns (MetricsResponse);
 
 	rpc Wait(WaitRequest) returns (WaitResponse);
+
+	rpc RuntimeInfo(RuntimeInfoRequest) returns (containerd.v1.types.RuntimeInfo);
 }
 
 message CreateTaskRequest {
@@ -224,4 +226,10 @@ message WaitRequest {
 message WaitResponse {
 	uint32 exit_status = 1;
 	google.protobuf.Timestamp exited_at = 2;
+}
+
+message RuntimeInfoRequest {
+	string runtime_path = 1;
+	// Options correspond to CreateTaskRequest.options
+	google.protobuf.Any options = 2;
 }

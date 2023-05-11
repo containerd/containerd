@@ -739,3 +739,23 @@ func getRestorePath(runtime string, option *ptypes.Any) (string, error) {
 
 	return restorePath, nil
 }
+
+func (l *local) RuntimeInfo(ctx context.Context, in *api.RuntimeInfoRequest, opts ...grpc.CallOption) (*task.RuntimeInfo, error) {
+	var (
+		rtOptions interface{}
+		err       error
+	)
+	if in.Options != nil {
+		rtOptions, err = typeurl.UnmarshalAny(in.Options)
+		if err != nil {
+			err = fmt.Errorf("failed to unmarshal RuntimeInfoRequest.Options: %w", err)
+			return nil, errdefs.ToGRPC(err)
+		}
+	}
+	info, err := l.v2Runtime.RuntimeInfo(ctx, in.RuntimePath, rtOptions)
+	if err != nil {
+		err = fmt.Errorf("failed to get runtime info for %q: %w", in.RuntimePath, err)
+		return nil, errdefs.ToGRPC(err)
+	}
+	return info, nil
+}

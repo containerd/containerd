@@ -18,9 +18,11 @@ package example
 
 import (
 	"context"
+	"io"
 	"os"
 
 	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
+	containerdTaskAPI "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
@@ -69,6 +71,16 @@ func (m manager) Start(ctx context.Context, id string, opts shim.StartOpts) (str
 
 func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 	return shim.StopStatus{}, errdefs.ErrNotImplemented
+}
+
+func (m manager) Info(ctx context.Context, optionsR io.Reader) (*containerdTaskAPI.RuntimeInfo, error) {
+	info := &containerdTaskAPI.RuntimeInfo{
+		Name: "io.containerd.example.v1",
+		Version: &containerdTaskAPI.RuntimeVersion{
+			Version: "v1.0.0",
+		},
+	}
+	return info, nil
 }
 
 func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {

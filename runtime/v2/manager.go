@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -35,6 +37,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sandbox"
@@ -497,4 +500,35 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	}
 
 	return exit, nil
+}
+
+func (m *TaskManager) RuntimeInfo(ctx context.Context, runtimeName string, runtimeOptions interface{}) (*task.RuntimeInfo, error) {
+	runtimePath, err := m.manager.resolveRuntimePath(runtimeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
+	}
+	var optsB []byte
+	if runtimeOptions != nil {
+		optsPBAny, err := protobuf.MarshalAnyToProto(runtimeOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
+		}
+		optsB, err = proto.Marshal(optsPBAny)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", optsPBAny, err)
+		}
+	}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, runtimePath, "-info")
+	cmd.Stdin = bytes.NewReader(optsB)
+	cmd.Stderr = &stderr
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run %v: %w (stderr: %q)", cmd.Args, err, stderr.String())
+	}
+	var info task.RuntimeInfo
+	if err = proto.Unmarshal(stdout, &info); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
+	}
+	return &info, nil
 }

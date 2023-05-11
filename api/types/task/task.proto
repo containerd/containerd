@@ -53,3 +53,19 @@ message ProcessInfo {
 	// Info varies by platform.
 	google.protobuf.Any info = 2;
 }
+
+message RuntimeVersion {
+	string version = 1;
+	string revision = 2;
+}
+
+message RuntimeInfo {
+	string name = 1;
+	RuntimeVersion version = 2;
+	// Options correspond to RuntimeInfoRequest.Options
+	google.protobuf.Any options = 3;
+	// OCI-compatible runtimes should use https://github.com/opencontainers/runtime-spec/blob/main/features.md
+	google.protobuf.Any features = 4;
+	// Annotations of the shim. Irrelevant to features.Annotations.
+	map<string, string> annotations = 5;
+}

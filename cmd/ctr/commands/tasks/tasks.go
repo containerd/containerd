@@ -43,5 +43,6 @@ var Command = cli.Command{
 		psCommand,
 		resumeCommand,
 		startCommand,
+		runtimeInfoCommand,
 	},
 }

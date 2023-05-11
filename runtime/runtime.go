@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/typeurl/v2"
 )
@@ -74,4 +75,6 @@ type PlatformRuntime interface {
 	Tasks(ctx context.Context, all bool) ([]Task, error)
 	// Delete remove a task.
 	Delete(ctx context.Context, taskID string) (*Exit, error)
+	// RuntimeInfo returns the runtime info.
+	RuntimeInfo(ctx context.Context, runtimeName string, runtimeOptions interface{}) (*task.RuntimeInfo, error)
 }

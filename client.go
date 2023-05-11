@@ -53,6 +53,7 @@ import (
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -64,6 +65,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -79,6 +81,7 @@ func init() {
 	typeurl.Register(&specs.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
 	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
+	typeurl.Register(&features.Features{}, prefix, "opencontainers/runtime-spec", major, "features", "Features")
 }
 
 // New returns a new containerd client that is connected to the containerd
@@ -871,4 +874,59 @@ func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName
 
 	sn := resp.Plugins[0]
 	return sn.Capabilities, nil
+}
+
+type RuntimeVersion struct {
+	Version  string
+	Revision string
+}
+
+type RuntimeInfo struct {
+	Name        string
+	Version     RuntimeVersion
+	Options     interface{}
+	Features    interface{}
+	Annotations map[string]string
+}
+
+func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOptions interface{}) (*RuntimeInfo, error) {
+	rt := c.runtime
+	if runtimePath != "" {
+		rt = runtimePath
+	}
+	req := &tasks.RuntimeInfoRequest{
+		RuntimePath: rt,
+	}
+	var err error
+	if runtimeOptions != nil {
+		req.Options, err = protobuf.MarshalAnyToProto(runtimeOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
+		}
+	}
+	s := c.TaskService()
+	resp, err := s.RuntimeInfo(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	var result RuntimeInfo
+	result.Name = resp.Name
+	if resp.Version != nil {
+		result.Version.Version = resp.Version.Version
+		result.Version.Revision = resp.Version.Revision
+	}
+	if resp.Options != nil {
+		result.Options, err = typeurl.UnmarshalAny(resp.Options)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal RuntimeInfo.Options (%T): %w", resp.Options, err)
+		}
+	}
+	if resp.Features != nil {
+		result.Features, err = typeurl.UnmarshalAny(resp.Features)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal RuntimeInfo.Features (%T): %w", resp.Features, err)
+		}
+	}
+	result.Annotations = resp.Annotations
+	return &result, nil
 }

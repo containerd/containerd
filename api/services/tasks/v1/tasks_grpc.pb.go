@@ -8,6 +8,7 @@ package tasks
 
 import (
 	context "context"
+	task "github.com/containerd/containerd/api/types/task"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -44,6 +45,7 @@ type TasksClient interface {
 	Update(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Metrics(ctx context.Context, in *MetricsRequest, opts ...grpc.CallOption) (*MetricsResponse, error)
 	Wait(ctx context.Context, in *WaitRequest, opts ...grpc.CallOption) (*WaitResponse, error)
+	RuntimeInfo(ctx context.Context, in *RuntimeInfoRequest, opts ...grpc.CallOption) (*task.RuntimeInfo, error)
 }
 
 type tasksClient struct {
@@ -207,6 +209,15 @@ func (c *tasksClient) Wait(ctx context.Context, in *WaitRequest, opts ...grpc.Ca
 	return out, nil
 }
 
+func (c *tasksClient) RuntimeInfo(ctx context.Context, in *RuntimeInfoRequest, opts ...grpc.CallOption) (*task.RuntimeInfo, error) {
+	out := new(task.RuntimeInfo)
+	err := c.cc.Invoke(ctx, "/containerd.services.tasks.v1.Tasks/RuntimeInfo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TasksServer is the server API for Tasks service.
 // All implementations must embed UnimplementedTasksServer
 // for forward compatibility
@@ -232,6 +243,7 @@ type TasksServer interface {
 	Update(context.Context, *UpdateTaskRequest) (*emptypb.Empty, error)
 	Metrics(context.Context, *MetricsRequest) (*MetricsResponse, error)
 	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
+	RuntimeInfo(context.Context, *RuntimeInfoRequest) (*task.RuntimeInfo, error)
 	mustEmbedUnimplementedTasksServer()
 }
 
@@ -289,6 +301,9 @@ func (UnimplementedTasksServer) Metrics(context.Context, *MetricsRequest) (*Metr
 }
 func (UnimplementedTasksServer) Wait(context.Context, *WaitRequest) (*WaitResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Wait not implemented")
+}
+func (UnimplementedTasksServer) RuntimeInfo(context.Context, *RuntimeInfoRequest) (*task.RuntimeInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RuntimeInfo not implemented")
 }
 func (UnimplementedTasksServer) mustEmbedUnimplementedTasksServer() {}
 
@@ -609,6 +624,24 @@ func _Tasks_Wait_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Tasks_RuntimeInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeInfoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TasksServer).RuntimeInfo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.tasks.v1.Tasks/RuntimeInfo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TasksServer).RuntimeInfo(ctx, req.(*RuntimeInfoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Tasks_ServiceDesc is the grpc.ServiceDesc for Tasks service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -683,6 +716,10 @@ var Tasks_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Wait",
 			Handler:    _Tasks_Wait_Handler,
+		},
+		{
+			MethodName: "RuntimeInfo",
+			Handler:    _Tasks_RuntimeInfo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

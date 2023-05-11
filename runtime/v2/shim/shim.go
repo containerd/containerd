@@ -30,6 +30,7 @@ import (
 	"time"
 
 	shimapi "github.com/containerd/containerd/api/runtime/task/v2"
+	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
@@ -76,6 +77,7 @@ type Manager interface {
 	Name() string
 	Start(ctx context.Context, id string, opts StartOpts) (string, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
+	Info(ctx context.Context, optionsR io.Reader) (*task.RuntimeInfo, error)
 }
 
 // OptsKey is the context key for the Opts value.
@@ -113,6 +115,7 @@ type TTRPCServerOptioner interface {
 var (
 	debugFlag            bool
 	versionFlag          bool
+	infoFlag             bool
 	id                   string
 	namespaceFlag        string
 	socketFlag           string
@@ -132,6 +135,9 @@ const (
 func parseFlags() {
 	flag.BoolVar(&debugFlag, "debug", false, "enable debug output in logs")
 	flag.BoolVar(&versionFlag, "v", false, "show the shim version and exit")
+	// "info" is not a subcommand, because old shims produce very confusing errors for unknown subcommands
+	// https://github.com/containerd/containerd/pull/8509#discussion_r1210021403
+	flag.BoolVar(&infoFlag, "info", false, "get the option protobuf from stdin, print the shim info protobuf to stdout, and exit")
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
@@ -192,6 +198,19 @@ func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 	}
 }
 
+func runInfo(ctx context.Context, manager Manager) error {
+	info, err := manager.Info(ctx, os.Stdin)
+	if err != nil {
+		return err
+	}
+	infoB, err := proto.Marshal(info)
+	if err != nil {
+		return err
+	}
+	_, err = os.Stdout.Write(infoB)
+	return err
+}
+
 func run(ctx context.Context, manager Manager, name string, config Config) error {
 	parseFlags()
 	if versionFlag {
@@ -201,6 +220,10 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		fmt.Println("  Go version:", version.GoVersion)
 		fmt.Println("")
 		return nil
+	}
+
+	if infoFlag {
+		return runInfo(ctx, manager)
 	}
 
 	if namespaceFlag == "" {
