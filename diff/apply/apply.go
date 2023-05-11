@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/ioutil"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -88,8 +89,12 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	defer processor.Close()
 
 	digester := digest.Canonical.Digester()
+	reader := ioutil.NewConReader(processor)
+	defer func() {
+		reader.Close()
+	}()
 	rc := &readCounter{
-		r: io.TeeReader(processor, digester.Hash()),
+		r: io.TeeReader(reader, digester.Hash()),
 	}
 
 	if err := apply(ctx, mounts, rc); err != nil {
