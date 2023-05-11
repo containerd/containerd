@@ -52,28 +52,12 @@ const (
 )
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
-	var specOpts []oci.SpecOpts
+	var (
+		specOpts []oci.SpecOpts
+		err      error
+	)
 	securityContext := config.GetLinux().GetSecurityContext()
-	// Set container username. This could only be done by containerd, because it needs
-	// access to the container rootfs. Pass user name to containerd, and let it overwrite
-	// the spec for us.
-	userstr, err := generateUserString(
-		securityContext.GetRunAsUsername(),
-		securityContext.GetRunAsUser(),
-		securityContext.GetRunAsGroup())
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate user string: %w", err)
-	}
-	if userstr == "" {
-		// Lastly, since no user override was passed via CRI try to set via OCI
-		// Image
-		userstr = imageConfig.User
-	}
-	if userstr != "" {
-		specOpts = append(specOpts, oci.WithUser(userstr))
-	}
-
-	userstr = "0" // runtime default
+	userstr := "0" // runtime default
 	if securityContext.GetRunAsUsername() != "" {
 		userstr = securityContext.GetRunAsUsername()
 	} else if securityContext.GetRunAsUser() != nil {
@@ -277,44 +261,6 @@ func appArmorProfileExists(profile string) (bool, error) {
 			return false, err
 		}
 	}
-}
-
-// generateUserString generates valid user string based on OCI Image Spec
-// v1.0.0.
-//
-// CRI defines that the following combinations are valid:
-//
-// (none) -> ""
-// username -> username
-// username, uid -> username
-// username, uid, gid -> username:gid
-// username, gid -> username:gid
-// uid -> uid
-// uid, gid -> uid:gid
-// gid -> error
-//
-// TODO(random-liu): Add group name support in CRI.
-func generateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
-	var userstr, groupstr string
-	if uid != nil {
-		userstr = strconv.FormatInt(uid.GetValue(), 10)
-	}
-	if username != "" {
-		userstr = username
-	}
-	if gid != nil {
-		groupstr = strconv.FormatInt(gid.GetValue(), 10)
-	}
-	if userstr == "" {
-		if groupstr != "" {
-			return "", fmt.Errorf("user group %q is specified without user", groupstr)
-		}
-		return "", nil
-	}
-	if groupstr != "" {
-		userstr = userstr + ":" + groupstr
-	}
-	return userstr, nil
 }
 
 // snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
