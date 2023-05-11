@@ -97,14 +97,22 @@ func WithVolumes(volumeMounts map[string]string) containerd.NewContainerOpts {
 		}()
 
 		for host, volume := range volumeMounts {
-			// On Windows, volumes may be defined as different drive letters than C:. For non-C: volumes
-			// we need to skip trying to copy existing contents, as an image can only hold files
-			// destined for volumes hosted on drive C:.
-			if len(volume) >= 2 && string(volume[1]) == ":" && !strings.EqualFold(string(volume[0]), "c") {
-				continue
+			// Windows allows volume mounts in subfolders under C: and as any other drive letter like D:, E:, etc.
+			// An image may contain files inside a folder defined as a VOLUME in a Dockerfile. On Windows, images
+			// can only contain pre-existing files for volumes situated on the root filesystem, which is C:.
+			// For any other volumes, we need to skip attempting to copy existing contents.
+			//
+			// C:\some\volume --> \some\volume
+			// D:\some\volume --> skip
+			if len(volume) >= 2 && string(volume[1]) == ":" {
+				// Perform a case insensitive comparison to "C", and skip non-C mounted volumes.
+				if !strings.EqualFold(string(volume[0]), "c") {
+					continue
+				}
+				// This is a volume mounted somewhere under C:\. We strip the drive letter and allow fs.RootPath()
+				// to append the remaining path to the rootfs path as seen by the host OS.
+				volume = volume[2:]
 			}
-			// The volume may have been defined with a C: prefix, which we can't use here.
-			volume = strings.TrimPrefix(volume, "C:")
 			src, err := fs.RootPath(root, volume)
 			if err != nil {
 				return fmt.Errorf("rootpath on mountPath %s, volume %s: %w", root, volume, err)
