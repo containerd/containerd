@@ -301,6 +301,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
 			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
 			pushw.setError(err)
+			return
 		}
 		pushw.setResponse(resp)
 	}()
@@ -436,6 +437,8 @@ func (pw *pushWriter) Write(p []byte) (n int, err error) {
 			pw.Close()
 		case p := <-pw.pipeC:
 			return 0, pw.replacePipe(p)
+		case resp := <-pw.respC:
+			pw.setResponse(resp)
 		}
 	}
 	status.Offset += int64(n)
