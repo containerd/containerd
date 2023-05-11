@@ -28,5 +28,5 @@ import (
 )
 
 func main() {
-	shim.RunManager(context.Background(), manager.NewShimManager("io.containerd.runc.v2"))
+	shim.Run(context.Background(), manager.NewShimManager("io.containerd.runc.v2"))
 }
