@@ -72,3 +72,7 @@ func (s *server) Plugins(ctx context.Context, req *api.PluginsRequest) (*api.Plu
 func (s *server) Server(ctx context.Context, empty *ptypes.Empty) (*api.ServerResponse, error) {
 	return s.local.Server(ctx, empty)
 }
+
+func (s *server) PluginInfo(ctx context.Context, req *api.PluginInfoRequest) (*api.PluginInfoResponse, error) {
+	return s.local.PluginInfo(ctx, req)
+}

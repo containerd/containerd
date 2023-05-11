@@ -128,8 +128,9 @@ var Command = cli.Command{
 			Usage: "Enable cni networking for the container",
 		},
 	}, append(platformRunFlags,
-		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
-			commands.ContainerFlags...)...)...),
+		append(commands.RuntimeFlags,
+			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+				commands.ContainerFlags...)...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error

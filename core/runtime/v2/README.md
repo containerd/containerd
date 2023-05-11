@@ -243,6 +243,29 @@ The delete command MUST accept the following flags:
 
 The delete command will be executed in the container's bundle as its `cwd` except for on Windows and FreeBSD platforms.
 
+### Command-like flags
+#### `-v`
+Each shim SHOULD implement a `-v` flag.
+This command-like flag prints the shim implementation version and exits.
+The output is not machine-parsable.
+
+#### `-info`
+Each shim SHOULD implement a `-info` flag.
+This command-like flag gets the option protobuf from stdin, prints the shim info protobuf (see below) to stdout, and exits.
+
+```proto
+message RuntimeInfo {
+       string name = 1;
+       RuntimeVersion version = 2;
+       // Options from stdin
+       google.protobuf.Any options = 3;
+       // OCI-compatible runtimes should use https://github.com/opencontainers/runtime-spec/blob/main/features.md
+       google.protobuf.Any features = 4;
+       // Annotations of the shim. Irrelevant to features.Annotations.
+       map<string, string> annotations = 5;
+}
+```
+
 ### Host Level Shim Configuration
 
 containerd does not provide any host level configuration for shims via the API.

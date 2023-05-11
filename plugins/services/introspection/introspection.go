@@ -29,6 +29,7 @@ import (
 type Service interface {
 	Plugins(context.Context, []string) (*api.PluginsResponse, error)
 	Server(context.Context, *ptypes.Empty) (*api.ServerResponse, error)
+	PluginInfo(ctx context.Context, in *api.PluginInfoRequest) (*api.PluginInfoResponse, error)
 }
 
 type introspectionRemote struct {
@@ -57,6 +58,16 @@ func (i *introspectionRemote) Plugins(ctx context.Context, filters []string) (*a
 
 func (i *introspectionRemote) Server(ctx context.Context, in *ptypes.Empty) (*api.ServerResponse, error) {
 	resp, err := i.client.Server(ctx, in)
+
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+
+	return resp, nil
+}
+
+func (i *introspectionRemote) PluginInfo(ctx context.Context, in *api.PluginInfoRequest) (*api.PluginInfoResponse, error) {
+	resp, err := i.client.PluginInfo(ctx, in)
 
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)

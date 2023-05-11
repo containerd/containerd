@@ -19,6 +19,7 @@ package introspection
 import (
 	context "context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -41,6 +42,7 @@ import (
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 )
 
 func init() {
@@ -209,47 +211,51 @@ func adaptPlugin(o interface{}) filters.Adaptor {
 	})
 }
 
-func pluginsToPB(plugins []*plugin.Plugin) []*api.Plugin {
-	var pluginsPB []*api.Plugin
-	for _, p := range plugins {
-		var requires []string
-		for _, r := range p.Registration.Requires {
-			requires = append(requires, r.String())
-		}
+func pluginToPB(p *plugin.Plugin) *api.Plugin {
+	var requires []string
+	for _, r := range p.Registration.Requires {
+		requires = append(requires, r.String())
+	}
 
-		var initErr *rpc.Status
-		if err := p.Err(); err != nil {
-			st, ok := status.FromError(errdefs.ToGRPC(err))
-			if ok {
-				var details []*ptypes.Any
-				for _, d := range st.Proto().Details {
-					details = append(details, &ptypes.Any{
-						TypeUrl: d.TypeUrl,
-						Value:   d.Value,
-					})
-				}
-				initErr = &rpc.Status{
-					Code:    int32(st.Code()),
-					Message: st.Message(),
-					Details: details,
-				}
-			} else {
-				initErr = &rpc.Status{
-					Code:    int32(code.Code_UNKNOWN),
-					Message: err.Error(),
-				}
+	var initErr *rpc.Status
+	if err := p.Err(); err != nil {
+		st, ok := status.FromError(errdefs.ToGRPC(err))
+		if ok {
+			var details []*ptypes.Any
+			for _, d := range st.Proto().Details {
+				details = append(details, &ptypes.Any{
+					TypeUrl: d.TypeUrl,
+					Value:   d.Value,
+				})
+			}
+			initErr = &rpc.Status{
+				Code:    int32(st.Code()),
+				Message: st.Message(),
+				Details: details,
+			}
+		} else {
+			initErr = &rpc.Status{
+				Code:    int32(code.Code_UNKNOWN),
+				Message: err.Error(),
 			}
 		}
+	}
 
-		pluginsPB = append(pluginsPB, &api.Plugin{
-			Type:         p.Registration.Type.String(),
-			ID:           p.Registration.ID,
-			Requires:     requires,
-			Platforms:    types.OCIPlatformToProto(p.Meta.Platforms),
-			Capabilities: p.Meta.Capabilities,
-			Exports:      p.Meta.Exports,
-			InitErr:      initErr,
-		})
+	return &api.Plugin{
+		Type:         p.Registration.Type.String(),
+		ID:           p.Registration.ID,
+		Requires:     requires,
+		Platforms:    types.OCIPlatformToProto(p.Meta.Platforms),
+		Capabilities: p.Meta.Capabilities,
+		Exports:      p.Meta.Exports,
+		InitErr:      initErr,
+	}
+}
+
+func pluginsToPB(plugins []*plugin.Plugin) []*api.Plugin {
+	pluginsPB := make([]*api.Plugin, 0, len(plugins))
+	for _, p := range plugins {
+		pluginsPB = append(pluginsPB, pluginToPB(p))
 	}
 
 	return pluginsPB
@@ -266,4 +272,58 @@ func warningsPB(ctx context.Context, warnings []warning.Warning) []*api.Deprecat
 		})
 	}
 	return pb
+}
+
+type pluginInfoProvider interface {
+	PluginInfo(context.Context, interface{}) (interface{}, error)
+}
+
+func (l *Local) PluginInfo(ctx context.Context, req *api.PluginInfoRequest, _ ...grpc.CallOption) (*api.PluginInfoResponse, error) {
+	p := l.plugins.Get(plugin.Type(req.Type), req.ID)
+	if p == nil {
+		err := fmt.Errorf("plugin %s.%s not found: %w", req.Type, req.ID, errdefs.ErrNotFound)
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	resp := &api.PluginInfoResponse{
+		Plugin: pluginToPB(p),
+	}
+
+	// Request additional info from plugin instance
+	if req.Options != nil {
+		if p.Err() != nil {
+			err := fmt.Errorf("cannot get extra info, plugin not successfully loaded: %w", errdefs.ErrFailedPrecondition)
+			return resp, errdefs.ToGRPC(err)
+		}
+		inst, err := p.Instance()
+		if err != nil {
+			err := fmt.Errorf("failed to get plugin instance: %w", errdefs.ErrFailedPrecondition)
+			return resp, errdefs.ToGRPC(err)
+		}
+		pi, ok := inst.(pluginInfoProvider)
+		if !ok {
+			err := fmt.Errorf("plugin does not provided extra information: %w", errdefs.ErrNotImplemented)
+			return resp, errdefs.ToGRPC(err)
+		}
+
+		options, err := typeurl.UnmarshalAny(req.Options)
+		if err != nil {
+			err = fmt.Errorf("failed to unmarshal plugin info Options: %w", err)
+			return resp, errdefs.ToGRPC(err)
+		}
+		info, err := pi.PluginInfo(ctx, options)
+		if err != nil {
+			return resp, errdefs.ToGRPC(err)
+		}
+		ai, err := typeurl.MarshalAny(info)
+		if err != nil {
+			err = fmt.Errorf("failed to marshal plugin info: %w", err)
+			return resp, errdefs.ToGRPC(err)
+		}
+		resp.Extra = &ptypes.Any{
+			TypeUrl: ai.GetTypeUrl(),
+			Value:   ai.GetValue(),
+		}
+	}
+	return resp, nil
 }

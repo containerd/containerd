@@ -17,9 +17,12 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -30,16 +33,21 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/version"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/log"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"golang.org/x/sys/unix"
 )
 
@@ -271,4 +279,64 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		ExitStatus: 128 + int(unix.SIGKILL),
 		Pid:        pid,
 	}, nil
+}
+
+func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeInfo, error) {
+	info := &types.RuntimeInfo{
+		Name: m.name,
+		Version: &types.RuntimeVersion{
+			Version:  version.Version,
+			Revision: version.Version,
+		},
+		Annotations: nil,
+	}
+	binaryName := runcC.DefaultCommand
+	opts, err := shim.ReadRuntimeOptions[*options.Options](optionsR)
+	if err != nil {
+		if !errors.Is(err, errdefs.ErrNotFound) {
+			return nil, fmt.Errorf("failed to read runtime options (*options.Options): %w", err)
+		}
+	}
+	if opts != nil {
+		info.Options, err = protobuf.MarshalAnyToProto(opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", opts, err)
+		}
+		if opts.BinaryName != "" {
+			binaryName = opts.BinaryName
+		}
+
+	}
+	absBinary, err := exec.LookPath(binaryName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up the path of %q: %w", binaryName, err)
+	}
+	features, err := m.features(ctx, absBinary, opts)
+	if err != nil {
+		// youki does not implement `runc features` yet, at the time of writing this (Sep 2023)
+		// https://github.com/containers/youki/issues/815
+		log.G(ctx).WithError(err).Debug("Failed to get the runtime features. The runc binary does not implement `runc features` command?")
+	}
+	if features != nil {
+		info.Features, err = protobuf.MarshalAnyToProto(features)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", features, err)
+		}
+	}
+	return info, nil
+}
+
+func (m manager) features(ctx context.Context, absBinary string, opts *options.Options) (*features.Features, error) {
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, absBinary, "features")
+	cmd.Stderr = &stderr
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute %v: %w (stderr: %q)", cmd.Args, err, stderr.String())
+	}
+	var feat features.Features
+	if err := json.Unmarshal(stdout, &feat); err != nil {
+		return nil, err
+	}
+	return &feat, nil
 }

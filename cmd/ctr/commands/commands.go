@@ -96,6 +96,19 @@ var (
 		},
 	}
 
+	// RuntimeFlags are cli flags specifying runtime
+	RuntimeFlags = []cli.Flag{
+		cli.StringFlag{
+			Name:  "runtime",
+			Usage: "Runtime name or absolute path to runtime binary",
+			Value: defaults.DefaultRuntime,
+		},
+		cli.StringFlag{
+			Name:  "runtime-config-path",
+			Usage: "Optional runtime config path",
+		},
+	}
+
 	// ContainerFlags are cli flags specifying container options
 	ContainerFlags = []cli.Flag{
 		cli.StringFlag{
@@ -139,17 +152,8 @@ var (
 			Usage: "Set the containers filesystem as readonly",
 		},
 		cli.StringFlag{
-			Name:  "runtime",
-			Usage: "Runtime name or absolute path to runtime binary",
-			Value: defaults.DefaultRuntime,
-		},
-		cli.StringFlag{
 			Name:  "sandbox",
 			Usage: "Create the container in the given sandbox",
-		},
-		cli.StringFlag{
-			Name:  "runtime-config-path",
-			Usage: "Optional runtime config path",
 		},
 		cli.BoolFlag{
 			Name:  "tty,t",
