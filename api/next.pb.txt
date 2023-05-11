@@ -4308,6 +4308,112 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/introspection.proto"
+  package: "containerd.types"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "RuntimeRequest"
+    field {
+      name: "runtime_path"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "runtimePath"
+    }
+    field {
+      name: "options"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
+  message_type {
+    name: "RuntimeVersion"
+    field {
+      name: "version"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "version"
+    }
+    field {
+      name: "revision"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "revision"
+    }
+  }
+  message_type {
+    name: "RuntimeInfo"
+    field {
+      name: "name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "name"
+    }
+    field {
+      name: "version"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.RuntimeVersion"
+      json_name: "version"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+    field {
+      name: "features"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "features"
+    }
+    field {
+      name: "annotations"
+      number: 5
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.RuntimeInfo.AnnotationsEntry"
+      json_name: "annotations"
+    }
+    nested_type {
+      name: "AnnotationsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
   name: "google/rpc/status.proto"
   package: "google.rpc"
   dependency: "google/protobuf/any.proto"
@@ -4348,6 +4454,8 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/introspection/v1/introspection.proto"
   package: "containerd.services.introspection.v1"
+  dependency: "google/protobuf/any.proto"
+  dependency: "github.com/containerd/containerd/api/types/introspection.proto"
   dependency: "github.com/containerd/containerd/api/types/platform.proto"
   dependency: "google/rpc/status.proto"
   dependency: "google/protobuf/empty.proto"
@@ -4505,6 +4613,50 @@ file {
       json_name: "lastOccurrence"
     }
   }
+  message_type {
+    name: "PluginInfoRequest"
+    field {
+      name: "type"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "type"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "options"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
+  message_type {
+    name: "PluginInfoResponse"
+    field {
+      name: "plugin"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.introspection.v1.Plugin"
+      json_name: "plugin"
+    }
+    field {
+      name: "extra"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "extra"
+    }
+  }
   service {
     name: "Introspection"
     method {
@@ -4516,6 +4668,11 @@ file {
       name: "Server"
       input_type: ".google.protobuf.Empty"
       output_type: ".containerd.services.introspection.v1.ServerResponse"
+    }
+    method {
+      name: "PluginInfo"
+      input_type: ".containerd.services.introspection.v1.PluginInfoRequest"
+      output_type: ".containerd.services.introspection.v1.PluginInfoResponse"
     }
   }
   options {
