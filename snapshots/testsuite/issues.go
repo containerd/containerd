@@ -124,10 +124,16 @@ func checkRename(ss string) func(ctx context.Context, t *testing.T, sn snapshots
 		)
 
 		var applier []fstest.Applier
-		if ss != "overlayfs" {
-			// With neither OVERLAY_FS_REDIRECT_DIR nor redirect_dir,
-			// renaming the directory on the lower directory doesn't work on overlayfs.
-			// https://github.com/torvalds/linux/blob/v5.18/Documentation/filesystems/overlayfs.rst#renaming-directories
+		switch ss {
+		// With neither OVERLAY_FS_REDIRECT_DIR nor redirect_dir,
+		// renaming the directory on the lower directory doesn't work on overlayfs.
+		// https://github.com/torvalds/linux/blob/v5.18/Documentation/filesystems/overlayfs.rst#renaming-directories
+		//
+		// It doesn't work on fuse-overlayfs either.
+		// https://github.com/containerd/fuse-overlayfs-snapshotter/pull/53#issuecomment-1543442048
+		case "overlayfs", "fuse-overlayfs":
+			// NOP
+		default:
 			applier = append(applier, fstest.Rename("/dir1", "/dir2"))
 		}
 		applier = append(
