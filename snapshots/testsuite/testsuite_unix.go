@@ -18,11 +18,19 @@
 
 package testsuite
 
-import "syscall"
+import (
+	"syscall"
+
+	"golang.org/x/sys/unix"
+)
 
 func clearMask() func() {
 	oldumask := syscall.Umask(0)
 	return func() {
 		syscall.Umask(oldumask)
 	}
+}
+
+func sync() {
+	unix.Sync()
 }
