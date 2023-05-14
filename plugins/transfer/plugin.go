@@ -45,6 +45,7 @@ func init() {
 			plugin.LeasePlugin,
 			plugin.MetadataPlugin,
 			plugin.DiffPlugin,
+			plugin.RegistryPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

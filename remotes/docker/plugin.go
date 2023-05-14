@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package config
+package docker
 
 import (
 	"context"
@@ -26,9 +26,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/plugins/credential"
 	"github.com/containerd/containerd/remotes/docker"
-
-	//"github.com/containerd/containerd/remotes/docker/config"
-	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/remotes/docker/config"
 )
 
 type Config struct {
@@ -37,8 +35,8 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.ServicePlugin,
-		ID:     services.RegistryService,
+		Type:   plugin.RegistryPlugin,
+		ID:     "registry",
 		Config: &Config{},
 		Requires: []plugin.Type{
 			plugin.CredentialPlugin,
@@ -76,7 +74,7 @@ type Manager struct {
 	configPath string
 }
 
-func (m *Manager) RegistryHosts(ctx context.Context, opt HostOptions) docker.RegistryHosts {
+func (m *Manager) RegistryHosts(ctx context.Context, opt config.HostOptions) docker.RegistryHosts {
 	paths := filepath.SplitList(m.configPath)
 	hostDirFn := hostDirFromRoots(paths)
 	opt.HostDir = hostDirFn
@@ -86,7 +84,7 @@ func (m *Manager) RegistryHosts(ctx context.Context, opt HostOptions) docker.Reg
 			if err != nil && !errdefs.IsNotFound(err) {
 				return "", "", err
 			}
-			hosts, err := LoadHostDir(ctx, dir)
+			hosts, err := config.LoadHostDir(ctx, dir)
 			if err != nil {
 				return "", "", err
 			}
@@ -108,13 +106,13 @@ func (m *Manager) RegistryHosts(ctx context.Context, opt HostOptions) docker.Reg
 			return "", "", nil
 		}
 	}
-	return ConfigureHosts(ctx, opt)
+	return config.ConfigureHosts(ctx, opt)
 }
 
 func hostDirFromRoots(roots []string) func(string) (string, error) {
 	rootfn := make([]func(string) (string, error), len(roots))
 	for i := range roots {
-		rootfn[i] = HostDirFromRoot(roots[i])
+		rootfn[i] = config.HostDirFromRoot(roots[i])
 	}
 	return func(host string) (dir string, err error) {
 		for _, fn := range rootfn {

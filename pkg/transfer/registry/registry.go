@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
-	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -58,20 +57,11 @@ func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OC
 		}))
 	}
 
-	ropts := []docker.RegistryOpt{
-		docker.WithAuthorizer(docker.NewDockerAuthorizer(aopts...)),
-	}
-
-	// TODO: Apply local configuration, maybe dynamically create resolver when requested
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
-		Headers: headers,
-	})
 	return &OCIRegistry{
 		reference: ref,
 		headers:   headers,
 		creds:     creds,
-		resolver:  resolver,
+		authOpts:  aopts,
 	}
 }
 
@@ -94,10 +84,9 @@ type OCIRegistry struct {
 	headers http.Header
 	creds   CredentialHelper
 
-	resolver remotes.Resolver
-
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
+	authOpts []docker.AuthorizerOpt
 }
 
 func (r *OCIRegistry) String() string {
@@ -109,6 +98,19 @@ func (r *OCIRegistry) Image() string {
 }
 
 func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error) {
+	return r.resolver.Resolve(ctx, r.reference)
+}
+
+func (r *OCIRegistry) Resolver(ctx context.Context, ropts docker.ResolverOptions) (transfer.Resolver, error) {
+	var ropts []docker.RegistryOpt
+	authorizer := docker.NewDockerAuthorizer(r.authOpts...)
+	ropts = append(ropts, docker.WithAuthorizer(authorizer))
+
+	resolver := docker.NewResolver(docker.ResolverOptions{
+		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
+		Headers: r.headers,
+	})
+
 	return r.resolver.Resolve(ctx, r.reference)
 }
 
@@ -204,8 +206,8 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 
 func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a typeurl.Any) error {
 	var (
-		s     transfertypes.OCIRegistry
-		ropts []docker.RegistryOpt
+		s transfertypes.OCIRegistry
+		//ropts []docker.RegistryOpt
 		aopts []docker.AuthorizerOpt
 	)
 	if err := typeurl.UnmarshalTo(a, &s); err != nil {
@@ -236,14 +238,15 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 			r.headers.Add(k, v)
 		}
 	}
-	authorizer := docker.NewDockerAuthorizer(aopts...)
-	ropts = append(ropts, docker.WithAuthorizer(authorizer))
+	//authorizer := docker.NewDockerAuthorizer(aopts...)
+	//ropts = append(ropts, docker.WithAuthorizer(authorizer))
 
 	r.reference = s.Reference
-	r.resolver = docker.NewResolver(docker.ResolverOptions{
-		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
-		Headers: r.headers,
-	})
+	//r.resolver = docker.NewResolver(docker.ResolverOptions{
+	//	Hosts:   docker.ConfigureDefaultRegistries(ropts...),
+	//	Headers: r.headers,
+	//})
+	r.authOpts = aopts
 
 	return nil
 }

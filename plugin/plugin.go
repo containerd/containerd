@@ -92,6 +92,8 @@ const (
 	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
 	// CredentialPlugin implements a credential manager
 	CredentialPlugin Type = "io.containerd.credential.v1" // #nosec G101
+	// RegistryPlugin implements a registry service
+	RegistryPlugin Type = "io.containerd.registry.v1"
 )
 
 const (

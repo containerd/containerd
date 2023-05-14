@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/remotes/docker"
 )
 
 type Transferrer interface {
@@ -31,7 +32,7 @@ type Transferrer interface {
 }
 
 type ImageResolver interface {
-	Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error)
+	Resolver(ctx context.Context, ropts docker.ResolverOptions) (Resolver, error)
 }
 
 type ImageFetcher interface {
@@ -42,6 +43,10 @@ type ImageFetcher interface {
 
 type ImagePusher interface {
 	Pusher(context.Context, ocispec.Descriptor) (Pusher, error)
+}
+
+type Resolver interface {
+	Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error)
 }
 
 type Fetcher interface {
