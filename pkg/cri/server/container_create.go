@@ -60,6 +60,16 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
 	}
+
+	// Validate if the sandbox task is in correct state in case that its pid is ZERO.
+	ss, err := s.Status(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get status of sandbox container task: %w", err)
+	}
+	if ss.Status == containerd.Unknown {
+		return nil, fmt.Errorf("sandbox container task is in wrong state 'unknown'")
+	}
+
 	sandboxPid := s.Pid()
 
 	// Generate unique id and name for the container and reserve the name.
