@@ -125,7 +125,7 @@ func TestRestartMonitor(t *testing.T) {
 	)
 
 	configTOML := fmt.Sprintf(`
-version = 2
+version = 3
 [plugins]
   [plugins."io.containerd.internal.v1.restart"]
 	  interval = "%s"
