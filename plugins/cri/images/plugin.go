@@ -24,6 +24,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/transfer"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
@@ -49,6 +50,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
+			plugins.TransferPlugin, // For pulling image using transfer service
 			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -71,11 +73,21 @@ func init() {
 				}
 			}
 
+			if !config.UseLocalImagePull {
+				criconfig.CheckLocalImagePullConfigs(ic.Context, &config)
+			}
+
+			ts, err := ic.GetSingle(plugins.TransferPlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			options := &images.CRIImageServiceOptions{
 				Content:          mdb.ContentStore(),
 				RuntimePlatforms: map[string]images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
+				Transferrer:      ts.(transfer.Transferrer),
 			}
 
 			ctrdCli, err := containerd.New(

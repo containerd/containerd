@@ -61,9 +61,12 @@ func TestCRIImagePullTimeout(t *testing.T) {
 		t.Skip()
 	}
 
-	t.Run("HoldingContentOpenWriter", testCRIImagePullTimeoutByHoldingContentOpenWriter)
-	t.Run("NoDataTransferred", testCRIImagePullTimeoutByNoDataTransferred)
-	t.Run("SlowCommitWriter", testCRIImagePullTimeoutBySlowCommitWriter)
+	t.Run("HoldingContentOpenWriterWithLocalPull", testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal)
+	t.Run("HoldingContentOpenWriterWithTransferService", testCRIImagePullTimeoutByHoldingContentOpenWriterWithTransfer)
+	t.Run("NoDataTransferredWithLocalPull", testCRIImagePullTimeoutByNoDataTransferredWithLocal)
+	t.Run("NoDataTransferredWithTransferService", testCRIImagePullTimeoutByNoDataTransferredWithTransfer)
+	t.Run("SlowCommitWriterWithLocalPull", testCRIImagePullTimeoutBySlowCommitWriterWithLocal)
+	t.Run("SlowCommitWriterWithTransferService", testCRIImagePullTimeoutBySlowCommitWriterWithTransfer)
 }
 
 // testCRIImagePullTimeoutBySlowCommitWriter tests that
@@ -79,21 +82,29 @@ func TestCRIImagePullTimeout(t *testing.T) {
 // ImagePull.
 //
 // It's reproducer for #9347.
-func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	delayDuration := 2 * defaultImagePullProgressTimeout
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
-	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 
 	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
 	assert.NoError(t, err)
+}
+
+func testCRIImagePullTimeoutBySlowCommitWriterWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutBySlowCommitWriter(t, true)
+}
+
+func testCRIImagePullTimeoutBySlowCommitWriterWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutBySlowCommitWriter(t, false)
 }
 
 // testCRIImagePullTimeoutByHoldingContentOpenWriter tests that
@@ -103,14 +114,12 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
 // When there are several pulling requests for the same blob content, there
 // will only one active http request. It is singleflight. For the waiting pulling
 // request, we should not cancel.
-func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
-	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{}, useLocal)
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -225,6 +234,16 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 	assert.NoError(t, <-errCh)
 }
 
+func testCRIImagePullTimeoutByHoldingContentOpenWriterWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByHoldingContentOpenWriter(t, true)
+}
+
+func testCRIImagePullTimeoutByHoldingContentOpenWriterWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByHoldingContentOpenWriter(t, false)
+}
+
 // testCRIImagePullTimeoutByNoDataTransferred tests that
 //
 //	It should fail because there is no data transferred in open http request.
@@ -237,9 +256,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 //
 // This case uses ghcr.io/containerd/volume-ownership:2.1 which has one layer > 3MB.
 // The circuit breaker will enable after transferred 3MB in one connection.
-func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
-	t.Parallel()
-
+func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T, useLocal bool) {
 	tmpDir := t.TempDir()
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
@@ -288,7 +305,12 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 			},
 		},
 	} {
-		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg)
+		// Skip Mirrors configuration (idx=1) when using transfer service
+		if idx == 1 && !useLocal {
+			t.Log("Skipping Mirrors configuration with Transfer service as it's not supported")
+			continue
+		}
+		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg, useLocal)
 		assert.NoError(t, err)
 
 		dctx, _, err := cli.WithLease(ctx)
@@ -305,6 +327,16 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 		err = cli.LeasesService().Delete(ctx, leases.Lease{ID: lid}, leases.SynchronousDelete)
 		assert.NoError(t, err)
 	}
+}
+
+func testCRIImagePullTimeoutByNoDataTransferredWithLocal(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByNoDataTransferred(t, true)
+}
+
+func testCRIImagePullTimeoutByNoDataTransferredWithTransfer(t *testing.T) {
+	t.Parallel()
+	testCRIImagePullTimeoutByNoDataTransferred(t, false)
 }
 
 func setupLocalMirrorRegistry(srv *mirrorRegistryServer) *httptest.Server {
@@ -473,7 +505,7 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 //
 // NOTE: We don't need to start the CRI plugin here because we just need the
 // ImageService API.
-func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.ImageService, error) {
+func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry, useLocalPull bool) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
 
 	cfg := criconfig.ImageConfig{
@@ -481,6 +513,7 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Registry:                 registryCfg,
 		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
 		StatsCollectPeriod:       10,
+		UseLocalImagePull:        useLocalPull,
 	}
 
 	return images.NewService(cfg, &images.CRIImageServiceOptions{
@@ -491,5 +524,6 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Content:          client.ContentStore(),
 		Images:           client.ImageService(),
 		Client:           client,
+		Transferrer:      client.TransferService(),
 	})
 }

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	gruntime "runtime"
 	"slices"
 	"time"
 
@@ -335,6 +336,12 @@ type ImageConfig struct {
 
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// Uses client.Pull to pull images locally, instead of containerd's Transfer Service.
+	// By default it is set to false, i.e. use transfer service to pull images.
+	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
+	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
@@ -402,7 +409,6 @@ type RuntimeConfig struct {
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
@@ -518,6 +524,79 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	}
 
 	return warnings, nil
+}
+
+// CheckLocalImagePullConfigs checks if there are CRI Image Config options configured that are not supported
+// with transfer service and sets UseLocalImagePull to true. This ensures compatibility with configurations
+// that aren't supported or need to be configured differently when using transfer service.
+func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
+	// If already using local image pull, no need to check for conflicts
+	if c.UseLocalImagePull {
+		return
+	}
+
+	// List of Config options that automatically trigger fallback to local image pull
+	localPullOnlyConfigs := []struct {
+		Name      string
+		IsPresent func() bool
+		Reason    string
+	}{
+		{
+			Name: "DisableSnapshotAnnotations",
+			IsPresent: func() bool {
+				if gruntime.GOOS == "windows" {
+					return c.DisableSnapshotAnnotations
+				}
+				return !c.DisableSnapshotAnnotations
+			},
+			Reason: "moved to snapshotter plugin when using transfer service",
+		},
+		{
+			Name:      "DiscardUnpackedLayers",
+			IsPresent: func() bool { return c.DiscardUnpackedLayers },
+			Reason:    "not supported with transfer service",
+		},
+		{
+			Name:      "Registry.Mirrors",
+			IsPresent: func() bool { return len(c.Registry.Mirrors) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "Registry.Configs",
+			IsPresent: func() bool { return len(c.Registry.Configs) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "Registry.Auths",
+			IsPresent: func() bool { return len(c.Registry.Auths) > 0 },
+			Reason:    "not supported with transfer service (also deprecated)",
+		},
+		{
+			Name:      "MaxConcurrentDownloads",
+			IsPresent: func() bool { return c.MaxConcurrentDownloads != 3 },
+			Reason:    "must be configured in transfer service plugin: plugins.\"io.containerd.transfer.v1.local\"",
+		},
+		{
+			Name:      "ImagePullWithSyncFs",
+			IsPresent: func() bool { return c.ImagePullWithSyncFs },
+			Reason:    "not supported with transfer service",
+		},
+	}
+
+	for _, config := range localPullOnlyConfigs {
+		if config.IsPresent() {
+			// Fall back to local image pull
+			c.UseLocalImagePull = true
+			log.G(ctx).Warnf(
+				"Found '%s' in CRI config which is incompatible with transfer service (%s). "+
+					"Falling back to local image pull mode.",
+				config.Name,
+				config.Reason,
+			)
+			// Break after first conflict is found
+			break
+		}
+	}
 }
 
 // ValidateRuntimeConfig validates the given runtime configuration.
