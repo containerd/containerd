@@ -321,21 +321,6 @@ version = 2
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
-  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
-  # container requests with huge page limits if the cgroup controller for hugepages is not present.
-  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
-  tolerate_missing_hugetlb_controller = true
-
-  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
-	# isolation, security and early detection of issues in the mount configuration when using
-	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
-  ignore_image_defined_volumes = false
-
-  # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
-  # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
-  # requires that all containers are deleted.
-  netns_mounts_under_state_dir = false
-
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
@@ -379,6 +364,30 @@ version = 2
     # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
   unset_seccomp_profile = ""
 
+  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
+  # container requests with huge page limits if the cgroup controller for hugepages is not present.
+  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+  tolerate_missing_hugetlb_controller = true
+
+	# disable_hugetlb_controller indicates to silently disable the hugetlb controller, even when it is
+	# present in /sys/fs/cgroup/cgroup.controllers.
+	# This helps with running rootless mode + cgroup v2 + systemd but without hugetlb delegation.
+  disable_hugetlb_controller = true
+
+  # device_ownership_from_security_context changes the default behavior of setting container devices uid/gid
+	# from CRI's SecurityContext (RunAsUser/RunAsGroup) instead of taking host's uid/gid. Defaults to false.
+  device_ownership_from_security_context = false
+
+  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
+	# isolation, security and early detection of issues in the mount configuration when using
+	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  ignore_image_defined_volumes = false
+
+  # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
+  # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
+  # requires that all containers are deleted.
+  netns_mounts_under_state_dir = false
+
   # enable_unprivileged_ports configures net.ipv4.ip_unprivileged_port_start=0
   # for all containers which are not using host network
   # and if it is not overwritten by PodSandboxConfig
@@ -407,6 +416,20 @@ version = 2
   # For more details about CDI configuration please refer to
   # https://tags.cncf.io/container-device-interface#containerd-configuration
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
+
+	# image_pull_progress_timeout is the maximum duration that there is no
+	# image data read from image registry in the open connection. It will
+	# be reset whatever a new byte has been read. If timeout, the image
+	# pulling will be cancelled. A zero value means there is no timeout.
+	#
+	# The string is in the golang duration format, see:
+	#   https://golang.org/pkg/time/#ParseDuration
+  image_pull_progress_timeout = "1m0s"
+
+  # disable_image_pull_with_transfer_service disables image pull using transfer service, i.e. use client.Pull to pull images
+	# By default it is set to false, i.e. use transfer service to pull images
+  # When transfer service is used to pull images, pull releted configs, like max_concurrent_downloads and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+  disable_image_pull_with_transfer_service = false
 
   # drain_exec_sync_io_timeout is the maximum duration to wait for ExecSync API'
   # IO EOF event after exec init process exits. A zero value means there is no

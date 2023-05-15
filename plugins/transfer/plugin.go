@@ -134,6 +134,11 @@ func init() {
 					return nil, fmt.Errorf("no matching diff plugins: %w", errdefs.ErrNotFound)
 				}
 
+				// If CheckPlatformSupported is false, we will match all platforms
+				if !config.CheckPlatformSupported {
+					target = platforms.All
+				}
+
 				up := unpack.Platform{
 					Platform:       target,
 					SnapshotterKey: uc.Snapshotter,
@@ -155,6 +160,9 @@ type transferConfig struct {
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
+
+	// UnpackConfiguration is used only when CheckPlatformSupported is true
+	CheckPlatformSupported bool `toml:"check_platform_supported"`
 
 	// UnpackConfiguration is used to read config from toml
 	UnpackConfiguration []unpackConfiguration `toml:"unpack_config,omitempty"`
@@ -178,5 +186,6 @@ func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
+		CheckPlatformSupported:      false,
 	}
 }
