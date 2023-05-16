@@ -203,7 +203,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		for _, v := range volumeMounts {
 			mountMap[filepath.Clean(v.HostPath)] = v.ContainerPath
 		}
-		opts = append(opts, customopts.WithVolumes(mountMap))
+		opts = append(opts, customopts.WithVolumes(mountMap, image.ImageSpec.OS))
 	}
 	meta.ImageRef = image.ID
 	meta.StopSignal = image.ImageSpec.Config.StopSignal
