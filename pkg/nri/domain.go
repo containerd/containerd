@@ -31,13 +31,13 @@ import (
 // Domain implements the functions the generic NRI interface needs to
 // deal with pods and containers from a particular containerd namespace.
 type Domain interface {
-	// GetName() returns the containerd namespace for this domain.
+	// GetName returns the containerd namespace for this domain.
 	GetName() string
 
-	// ListPodSandboxes list all pods in this namespace.
+	// ListPodSandboxes lists all pods in this namespace.
 	ListPodSandboxes() []PodSandbox
 
-	// ListContainer list all containers in this namespace.
+	// ListContainers lists all containers in this namespace.
 	ListContainers() []Container
 
 	// GetPodSandbox returns the pod for the given ID.

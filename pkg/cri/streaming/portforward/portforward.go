@@ -45,7 +45,7 @@ import (
 // PortForwarder knows how to forward content from a data stream to/from a port
 // in a pod.
 type PortForwarder interface {
-	// PortForwarder copies data between a data stream and a port in a pod.
+	// PortForward copies data between a data stream and a port in a pod.
 	PortForward(name string, uid types.UID, port int32, stream io.ReadWriteCloser) error
 }
 

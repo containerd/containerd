@@ -37,7 +37,7 @@ func FromAny(from typeurl.Any) *anypb.Any {
 	}
 }
 
-// FromAny converts an arbitrary interface to github.com/containerd/containerd/protobuf/types.Any.
+// MarshalAnyToProto converts an arbitrary interface to github.com/containerd/containerd/protobuf/types.Any.
 func MarshalAnyToProto(from interface{}) (*anypb.Any, error) {
 	any, err := typeurl.MarshalAny(from)
 	if err != nil {

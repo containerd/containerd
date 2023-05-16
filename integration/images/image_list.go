@@ -90,7 +90,7 @@ const (
 	VolumeCopyUp
 	// VolumeOwnership image
 	VolumeOwnership
-	// Test image for ArgsEscaped windows bug
+	// ArgsEscaped tests image for ArgsEscaped windows bug
 	ArgsEscaped
 )
 

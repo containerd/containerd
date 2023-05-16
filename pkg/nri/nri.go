@@ -80,7 +80,7 @@ type API interface {
 	// NotifyContainerExit handles the exit event of a container.
 	NotifyContainerExit(context.Context, PodSandbox, Container)
 
-	// StopContainer relays container removal events to NRI.
+	// RemoveContainer relays container removal events to NRI.
 	RemoveContainer(context.Context, PodSandbox, Container) error
 }
 

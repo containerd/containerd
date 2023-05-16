@@ -130,7 +130,7 @@ func WithNamedPrefix(name string, allowOverwrite bool) StoreOpt {
 	}
 }
 
-// WithNamedPrefix uses a named prefix to references images which only have a tag name
+// WithDigestRef uses a named prefix to references images which only have a tag name
 // reference in the annotation or check full references annotations against and
 // additionally may add a digest reference. Images with no references resolved
 // from matching annotations may be stored by digest.

@@ -33,6 +33,6 @@ const (
 	DiffService = "diff-service"
 	// IntrospectionService is the id of introspection service
 	IntrospectionService = "introspection-service"
-	// Streaming service is the id of the streaming service
+	// StreamingService is the id of the streaming service
 	StreamingService = "streaming-service"
 )
