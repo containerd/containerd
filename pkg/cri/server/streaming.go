@@ -148,9 +148,9 @@ func (s *streamRuntime) Exec(containerID string, cmd []string, stdin io.Reader, 
 	}
 }
 
-func (s *streamRuntime) Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
+func (s *streamRuntime) Attach(ctx context.Context, containerID string, in io.Reader, out, err io.WriteCloser, tty bool,
 	resize <-chan remotecommand.TerminalSize) error {
-	return s.c.attachContainer(ctrdutil.NamespacedContext(), containerID, in, out, err, tty, resize)
+	return s.c.attachContainer(ctrdutil.WithNamespace(ctx), containerID, in, out, err, tty, resize)
 }
 
 func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error {

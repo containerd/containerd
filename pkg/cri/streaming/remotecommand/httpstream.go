@@ -90,6 +90,7 @@ func NewOptions(req *http.Request) (*Options, error) {
 // context contains the connection and streams used when
 // forwarding an attach or execute session into a container.
 type context struct {
+	closeChan    <-chan bool
 	conn         io.Closer
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
@@ -203,6 +204,7 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 	}
 
 	ctx.conn = conn
+	ctx.closeChan = conn.CloseChan()
 	ctx.tty = opts.TTY
 
 	return ctx, true

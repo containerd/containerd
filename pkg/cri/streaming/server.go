@@ -33,6 +33,7 @@ limitations under the License.
 package streaming
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"io"
@@ -79,7 +80,7 @@ type Server interface {
 // Runtime is the interface to execute the commands and provide the streams.
 type Runtime interface {
 	Exec(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
-	Attach(containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	Attach(ctx context.Context, containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error
 }
 
@@ -392,8 +393,8 @@ func (a *criAdapter) ExecInContainer(podName string, podUID types.UID, container
 	return a.Runtime.Exec(container, cmd, in, out, err, tty, resize)
 }
 
-func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return a.Runtime.Attach(container, in, out, err, tty, resize)
+func (a *criAdapter) AttachContainer(ctx context.Context, podName string, podUID types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
+	return a.Runtime.Attach(ctx, container, in, out, err, tty, resize)
 }
 
 func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {

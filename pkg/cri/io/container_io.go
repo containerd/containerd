@@ -17,6 +17,7 @@
 package io
 
 import (
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -135,7 +136,12 @@ func (c *ContainerIO) Pipe() {
 
 // Attach attaches container stdio.
 // TODO(random-liu): Use pools.Copy in docker to reduce memory usage?
-func (c *ContainerIO) Attach(opts AttachOptions) {
+
+func (c *ContainerIO) Attach(ctx context.Context, opts AttachOptions) {
+	logrus.Infof("Attach container %s started", c.id)
+	defer func() {
+		logrus.Infof("Attach container %s exited", c.id)
+	}()
 	var wg sync.WaitGroup
 	key := util.GenerateID()
 	stdinKey := streamKey(c.id, "attach-"+key, Stdin)
@@ -143,6 +149,9 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 	stderrKey := streamKey(c.id, "attach-"+key, Stderr)
 
 	var stdinStreamRC io.ReadCloser
+
+	cancelStdout := make(chan struct{})
+	cancelStderr := make(chan struct{})
 	if c.stdin != nil && opts.Stdin != nil {
 		// Create a wrapper of stdin which could be closed. Note that the
 		// wrapper doesn't close the actual stdin, it only stops io.Copy.
@@ -174,28 +183,44 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 			wg.Done()
 		}()
 	}
-
-	attachStream := func(key string, close <-chan struct{}) {
-		<-close
-		logrus.Infof("Attach stream %q closed", key)
-		// Make sure stdin gets closed.
-		if stdinStreamRC != nil {
-			stdinStreamRC.Close()
-		}
+	wg.Add(1)
+	go func() {
+		<-ctx.Done()
+		close(cancelStdout)
+		close(cancelStderr)
 		wg.Done()
-	}
-
+	}()
 	if opts.Stdout != nil {
 		wg.Add(1)
-		wc, close := cioutil.NewWriteCloseInformer(opts.Stdout)
+		wc, stdoutClose := cioutil.NewWriteCloseInformer(opts.Stdout)
 		c.stdoutGroup.Add(stdoutKey, wc)
-		go attachStream(stdoutKey, close)
+		go func() {
+			select {
+			case <-stdoutClose:
+			case <-cancelStdout:
+			}
+			logrus.Infof("Attach stream %q closed", stdoutKey)
+			if stdinStreamRC != nil {
+				stdinStreamRC.Close()
+			}
+			wg.Done()
+		}()
 	}
 	if !opts.Tty && opts.Stderr != nil {
 		wg.Add(1)
-		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
+		wc, stderrClose := cioutil.NewWriteCloseInformer(opts.Stderr)
 		c.stderrGroup.Add(stderrKey, wc)
-		go attachStream(stderrKey, close)
+		go func() {
+			select {
+			case <-stderrClose:
+			case <-cancelStderr:
+			}
+			logrus.Infof("Attach stream %q closed", stderrKey)
+			if stdinStreamRC != nil {
+				stdinStreamRC.Close()
+			}
+			wg.Done()
+		}()
 	}
 	wg.Wait()
 }

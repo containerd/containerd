@@ -33,6 +33,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	gocontext "context"
 	"fmt"
 	"io"
 	"net/http"
@@ -49,7 +50,7 @@ import (
 type Attacher interface {
 	// AttachContainer attaches to the running container in the pod, copying data between in/out/err
 	// and the container's stdin/stdout/stderr.
-	AttachContainer(name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
+	AttachContainer(ctx gocontext.Context, name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 }
 
 // ServeAttach handles requests to attach to a container. After creating/receiving the required
@@ -61,8 +62,12 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 		return
 	}
 	defer ctx.conn.Close()
-
-	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
+	context, cancel := gocontext.WithCancel(gocontext.Background())
+	go func() {
+		<-ctx.closeChan
+		cancel()
+	}()
+	err := attacher.AttachContainer(context, podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
 		err = fmt.Errorf("error attaching to container: %v", err)
 		runtime.HandleError(err)
