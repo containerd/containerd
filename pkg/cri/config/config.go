@@ -127,6 +127,13 @@ type CniConfig struct {
 	NetworkPluginMaxConfNum int `toml:"max_conf_num" json:"maxConfNum"`
 	// NetworkPluginSetupSerially is a boolean flag to specify whether containerd sets up networks serially
 	// if there are multiple CNI plugin config files existing and NetworkPluginMaxConfNum is larger than 1.
+	//
+	// NOTE: On the Linux platform, containerd provides loopback network
+	// configuration by default. There are at least two network plugins.
+	// The default value of NetworkPluginSetupSerially is false which means
+	// the loopback and eth0 are handled in parallel mode. Since the loopback
+	// device is created as the net namespace is created, it's safe to run
+	// in parallel mode as the default setting.
 	NetworkPluginSetupSerially bool `toml:"setup_serially" json:"setupSerially"`
 	// NetworkPluginConfTemplate is the file path of golang template used to generate
 	// cni config.
