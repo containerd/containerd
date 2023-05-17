@@ -28,9 +28,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
@@ -1619,6 +1621,35 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 			s.Windows.Network = &specs.WindowsNetwork{}
 		}
 		s.Windows.Network.NetworkNamespace = ns
+		return nil
+	}
+}
+
+// WithCDIDevices injects the requested CDI devices into the OCI specification.
+func WithCDIDevices(devices ...string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if len(devices) == 0 {
+			return nil
+		}
+
+		registry := cdi.GetRegistry()
+		if err := registry.Refresh(); err != nil {
+			// We don't consider registry refresh failure a fatal error.
+			// For instance, a dynamically generated invalid CDI Spec file for
+			// any particular vendor shouldn't prevent injection of devices of
+			// different vendors. CDI itself knows better and it will fail the
+			// injection if necessary.
+			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
+		}
+
+		if _, err := registry.InjectDevices(s, devices...); err != nil {
+			return fmt.Errorf("CDI device injection failed: %w", err)
+		}
+
+		// One crucial thing to keep in mind is that CDI device injection
+		// might add OCI Spec environment variables, hooks, and mounts as
+		// well. Therefore it is important that none of the corresponding
+		// OCI Spec fields are reset up in the call stack once we return.
 		return nil
 	}
 }
