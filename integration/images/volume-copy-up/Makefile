@@ -15,7 +15,7 @@
 all: build
 
 PROJ=ghcr.io/containerd
-VERSION=2.1
+VERSION=2.2
 IMAGE=$(PROJ)/volume-copy-up:$(VERSION)
 DOCKER_CERT_PATH ?= "$(HOME)/.docker"
 REMOTE_DOCKER_URL ?=
