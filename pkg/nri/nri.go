@@ -146,12 +146,35 @@ func (l *local) Start() error {
 		return nil
 	}
 
+	l.setContainers()
+
 	err := l.nri.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start NRI interface: %w", err)
 	}
 
+	logrus.Infof("success to start NRI interface and state list size %d", len(l.state))
+
 	return nil
+}
+
+func (l *local) setContainers() []*nri.Container {
+	containers := containersToNRI(domains.listContainers())
+
+	for _, ctr := range containers {
+		switch ctr.GetState() {
+		case nri.ContainerState_CONTAINER_CREATED:
+			l.setState(ctr.GetId(), Created)
+		case nri.ContainerState_CONTAINER_RUNNING, nri.ContainerState_CONTAINER_PAUSED:
+			l.setState(ctr.GetId(), Running)
+		case nri.ContainerState_CONTAINER_STOPPED:
+			l.setState(ctr.GetId(), Stopped)
+		default:
+			l.setState(ctr.GetId(), Removed)
+		}
+	}
+
+	return containers
 }
 
 func (l *local) Stop() {
@@ -443,20 +466,7 @@ func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
 	log.G(ctx).Info("Synchronizing NRI (plugin) with current runtime state")
 
 	pods := podSandboxesToNRI(domains.listPodSandboxes())
-	containers := containersToNRI(domains.listContainers())
-
-	for _, ctr := range containers {
-		switch ctr.GetState() {
-		case nri.ContainerState_CONTAINER_CREATED:
-			l.setState(ctr.GetId(), Created)
-		case nri.ContainerState_CONTAINER_RUNNING, nri.ContainerState_CONTAINER_PAUSED:
-			l.setState(ctr.GetId(), Running)
-		case nri.ContainerState_CONTAINER_STOPPED:
-			l.setState(ctr.GetId(), Stopped)
-		default:
-			l.setState(ctr.GetId(), Removed)
-		}
-	}
+	containers := l.setContainers()
 
 	updates, err := syncFn(ctx, pods, containers)
 	if err != nil {
