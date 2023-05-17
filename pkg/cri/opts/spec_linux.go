@@ -30,10 +30,12 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 // Linux dependent OCI spec opts.
@@ -139,18 +141,40 @@ func IsCgroup2UnifiedMode() bool {
 }
 
 // WithCDI updates OCI spec with CDI content
-func WithCDI(annotations map[string]string) oci.SpecOpts {
+func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci.SpecOpts {
 	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
-		// TODO: Once CRI is extended with native CDI support this will need to be updated...
-		_, cdiDevices, err := cdi.ParseAnnotations(annotations)
+		// Add devices from CDIDevices CRI field
+		var devices []string
+		var err error
+		for _, device := range CDIDevices {
+			devices = append(devices, device.Name)
+		}
+		log.G(ctx).Infof("Container %v: CDI devices from CRI Config.CDIDevices: %v", c.ID, devices)
+
+		// Add devices from CDI annotations
+		_, devsFromAnnotations, err := cdi.ParseAnnotations(annotations)
 		if err != nil {
 			return fmt.Errorf("failed to parse CDI device annotations: %w", err)
 		}
-		if cdiDevices == nil {
-			return nil
+
+		if devsFromAnnotations != nil {
+			log.G(ctx).Infof("Container %v: CDI devices from annotations: %v", c.ID, devsFromAnnotations)
+			for _, deviceName := range devsFromAnnotations {
+				if ctrdutil.InStringSlice(devices, deviceName) {
+					// TODO: change to Warning when passing CDI devices as annotations is deprecated
+					log.G(ctx).Debugf("Skipping duplicated CDI device %s", deviceName)
+					continue
+				}
+				devices = append(devices, deviceName)
+			}
+			// TODO: change to Warning when passing CDI devices as annotations is deprecated
+			log.G(ctx).Debug("Passing CDI devices as annotations will be deprecated soon, please use CRI CDIDevices instead")
 		}
 
-		log.G(ctx).Infof("container %v: CDI devices: %v", c.ID, cdiDevices)
+		if len(devices) == 0 {
+			// No devices found, skip device injection
+			return nil
+		}
 
 		registry := cdi.GetRegistry()
 		if err = registry.Refresh(); err != nil {
@@ -162,7 +186,7 @@ func WithCDI(annotations map[string]string) oci.SpecOpts {
 			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
 		}
 
-		if _, err := registry.InjectDevices(s, cdiDevices...); err != nil {
+		if _, err := registry.InjectDevices(s, devices...); err != nil {
 			return fmt.Errorf("CDI device injection failed: %w", err)
 		}
 

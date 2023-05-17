@@ -1553,13 +1553,20 @@ func TestCDIInjections(t *testing.T) {
 	for _, test := range []struct {
 		description   string
 		cdiSpecFiles  []string
+		cdiDevices    []*runtime.CDIDevice
 		annotations   map[string]string
 		expectError   bool
 		expectDevices []runtimespec.LinuxDevice
 		expectEnv     []string
 	}{
-		{description: "expect no CDI error for nil annotations"},
-		{description: "expect no CDI error for empty annotations",
+		{description: "expect no CDI error for nil annotations",
+			cdiDevices: []*runtime.CDIDevice{},
+		},
+		{description: "expect no CDI error for nil CDIDevices",
+			annotations: map[string]string{},
+		},
+		{description: "expect no CDI error for empty CDI devices and annotations",
+			cdiDevices:  []*runtime.CDIDevice{},
 			annotations: map[string]string{},
 		},
 		{description: "expect CDI error for invalid CDI device reference in annotations",
@@ -1568,13 +1575,25 @@ func TestCDIInjections(t *testing.T) {
 			},
 			expectError: true,
 		},
-		{description: "expect CDI error for unresolvable devices",
+		{description: "expect CDI error for invalid CDI device reference in CDIDevices",
+			cdiDevices: []*runtime.CDIDevice{
+				{Name: "foobar"},
+			},
+			expectError: true,
+		},
+		{description: "expect CDI error for unresolvable devices in annotations",
 			annotations: map[string]string{
 				cdi.AnnotationPrefix + "vendor1_devices": "vendor1.com/device=no-such-dev",
 			},
 			expectError: true,
 		},
-		{description: "expect properly injected resolvable CDI devices",
+		{description: "expect CDI error for unresolvable devices in CDIDevices",
+			cdiDevices: []*runtime.CDIDevice{
+				{Name: "vendor1.com/device=no-such-dev"},
+			},
+			expectError: true,
+		},
+		{description: "expect properly injected resolvable CDI devices from annotations",
 			cdiSpecFiles: []string{
 				`
 cdiVersion: "0.3.0"
@@ -1636,6 +1655,185 @@ containerEdits:
 				"VENDOR2=present",
 			},
 		},
+		{description: "expect properly injected resolvable CDI devices from CDIDevices",
+			cdiSpecFiles: []string{
+				`
+cdiVersion: "0.3.0"
+kind: "vendor1.com/device"
+devices:
+  - name: foo
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop8
+          type: b
+          major: 7
+          minor: 8
+      env:
+        - FOO=injected
+containerEdits:
+  env:
+    - "VENDOR1=present"
+`,
+				`
+cdiVersion: "0.3.0"
+kind: "vendor2.com/device"
+devices:
+  - name: bar
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop9
+          type: b
+          major: 7
+          minor: 9
+      env:
+        - BAR=injected
+containerEdits:
+  env:
+    - "VENDOR2=present"
+`,
+			},
+			cdiDevices: []*runtime.CDIDevice{
+				{Name: "vendor1.com/device=foo"},
+				{Name: "vendor2.com/device=bar"},
+			},
+			expectDevices: []runtimespec.LinuxDevice{
+				{
+					Path:  "/dev/loop8",
+					Type:  "b",
+					Major: 7,
+					Minor: 8,
+				},
+				{
+					Path:  "/dev/loop9",
+					Type:  "b",
+					Major: 7,
+					Minor: 9,
+				},
+			},
+			expectEnv: []string{
+				"FOO=injected",
+				"VENDOR1=present",
+				"BAR=injected",
+				"VENDOR2=present",
+			},
+		},
+		{description: "expect CDI devices from CDIDevices and annotations",
+			cdiSpecFiles: []string{
+				`
+cdiVersion: "0.3.0"
+kind: "vendor1.com/device"
+devices:
+  - name: foo
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop8
+          type: b
+          major: 7
+          minor: 8
+      env:
+        - FOO=injected
+containerEdits:
+  env:
+    - "VENDOR1=present"
+`,
+				`
+cdiVersion: "0.3.0"
+kind: "vendor2.com/device"
+devices:
+  - name: bar
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop9
+          type: b
+          major: 7
+          minor: 9
+      env:
+        - BAR=injected
+containerEdits:
+  env:
+    - "VENDOR2=present"
+`,
+				`
+cdiVersion: "0.3.0"
+kind: "vendor3.com/device"
+devices:
+  - name: foo3
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop10
+          type: b
+          major: 7
+          minor: 10
+      env:
+        - FOO3=injected
+containerEdits:
+  env:
+    - "VENDOR3=present"
+`,
+				`
+cdiVersion: "0.3.0"
+kind: "vendor4.com/device"
+devices:
+  - name: bar4
+    containerEdits:
+      deviceNodes:
+        - path: /dev/loop11
+          type: b
+          major: 7
+          minor: 11
+      env:
+        - BAR4=injected
+containerEdits:
+  env:
+    - "VENDOR4=present"
+`,
+			},
+			cdiDevices: []*runtime.CDIDevice{
+				{Name: "vendor1.com/device=foo"},
+				{Name: "vendor2.com/device=bar"},
+				{Name: "vendor3.com/device=foo3"},
+			},
+			annotations: map[string]string{
+				cdi.AnnotationPrefix + "vendor3_devices": "vendor3.com/device=foo3", // Duplicated device, should be ignored
+				cdi.AnnotationPrefix + "vendor4_devices": "vendor4.com/device=bar4",
+			},
+			expectDevices: []runtimespec.LinuxDevice{
+				{
+					Path:  "/dev/loop8",
+					Type:  "b",
+					Major: 7,
+					Minor: 8,
+				},
+				{
+					Path:  "/dev/loop9",
+					Type:  "b",
+					Major: 7,
+					Minor: 9,
+				},
+				{
+					Path:  "/dev/loop10",
+					Type:  "b",
+					Major: 7,
+					Minor: 10,
+				},
+				{
+					Path:  "/dev/loop11",
+					Type:  "b",
+					Major: 7,
+					Minor: 11,
+				},
+			},
+			expectEnv: []string{
+				"FOO=injected",
+				"VENDOR1=present",
+				"BAR=injected",
+				"VENDOR2=present",
+				"FOO3=injected",
+				"VENDOR3=present",
+				"BAR4=injected",
+				"VENDOR4=present",
+			},
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
@@ -1653,7 +1851,7 @@ containerEdits:
 			err = reg.Configure(cdi.WithSpecDirs(cdiDir))
 			require.NoError(t, err)
 
-			injectFun := customopts.WithCDI(test.annotations)
+			injectFun := customopts.WithCDI(test.annotations, test.cdiDevices)
 			err = injectFun(ctx, nil, testContainer, spec)
 			assert.Equal(t, test.expectError, err != nil)
 
