@@ -34,7 +34,6 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 )
 
 // Linux dependent OCI spec opts.
@@ -141,12 +140,19 @@ func IsCgroup2UnifiedMode() bool {
 
 // WithCDI updates OCI spec with CDI content
 func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci.SpecOpts {
-	return func(ctx context.Context, _ oci.Client, c *containers.Container, s *oci.Spec) error {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *oci.Spec) error {
+		seen := make(map[string]bool)
 		// Add devices from CDIDevices CRI field
 		var devices []string
 		var err error
 		for _, device := range CDIDevices {
-			devices = append(devices, device.Name)
+			deviceName := device.Name
+			if seen[deviceName] {
+				log.G(ctx).Debugf("Skipping duplicated CDI device %s", deviceName)
+				continue
+			}
+			devices = append(devices, deviceName)
+			seen[deviceName] = true
 		}
 		log.G(ctx).Infof("Container %v: CDI devices from CRI Config.CDIDevices: %v", c.ID, devices)
 
@@ -159,40 +165,18 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 		if devsFromAnnotations != nil {
 			log.G(ctx).Infof("Container %v: CDI devices from annotations: %v", c.ID, devsFromAnnotations)
 			for _, deviceName := range devsFromAnnotations {
-				if ctrdutil.InStringSlice(devices, deviceName) {
+				if seen[deviceName] {
 					// TODO: change to Warning when passing CDI devices as annotations is deprecated
 					log.G(ctx).Debugf("Skipping duplicated CDI device %s", deviceName)
 					continue
 				}
 				devices = append(devices, deviceName)
+				seen[deviceName] = true
 			}
 			// TODO: change to Warning when passing CDI devices as annotations is deprecated
 			log.G(ctx).Debug("Passing CDI devices as annotations will be deprecated soon, please use CRI CDIDevices instead")
 		}
 
-		if len(devices) == 0 {
-			// No devices found, skip device injection
-			return nil
-		}
-
-		registry := cdi.GetRegistry()
-		if err = registry.Refresh(); err != nil {
-			// We don't consider registry refresh failure a fatal error.
-			// For instance, a dynamically generated invalid CDI Spec file for
-			// any particular vendor shouldn't prevent injection of devices of
-			// different vendors. CDI itself knows better and it will fail the
-			// injection if necessary.
-			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
-		}
-
-		if _, err := registry.InjectDevices(s, devices...); err != nil {
-			return fmt.Errorf("CDI device injection failed: %w", err)
-		}
-
-		// One crucial thing to keep in mind is that CDI device injection
-		// might add OCI Spec environment variables, hooks, and mounts as
-		// well. Therefore it is important that none of the corresponding
-		// OCI Spec fields are reset up in the call stack once we return.
-		return nil
+		return oci.WithCDIDevices(devices...)(ctx, client, c, s)
 	}
 }
