@@ -21,6 +21,7 @@ package reaper
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -98,6 +99,13 @@ func (m *Monitor) Start(c *exec.Cmd) (chan runc.Exit, error) {
 		return nil, err
 	}
 	return ec, nil
+}
+
+// StartLocked starts the command and registers the process with the reaper
+func (m *Monitor) StartLocked(c *exec.Cmd) (chan runc.Exit, error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	return m.Start(c)
 }
 
 // Wait blocks until a process is signal as dead.
