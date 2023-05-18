@@ -87,7 +87,7 @@ sub-container-%:
 container: .container-${OS}-$(ARCH)
 
 .container-linux-$(ARCH):
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/${ARCH} \
+	docker buildx build --provenance=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/${ARCH} \
 		-t $(IMAGE)-${OS}-${ARCH} --build-arg BASE=${BASE} .
 
 .container-windows-$(ARCH):
