@@ -1,4 +1,4 @@
-//go:build darwin || freebsd || solaris
+//go:build windows || darwin
 
 /*
    Copyright The containerd Authors.
@@ -16,9 +16,11 @@
    limitations under the License.
 */
 
-package builtins
+package blockfile
 
-import (
-	_ "github.com/containerd/containerd/snapshots/blockfile/plugin"
-	_ "github.com/containerd/containerd/snapshots/native/plugin"
-)
+import "testing"
+
+func setupSnapshotter(t *testing.T) ([]Opt, error) {
+	t.Skip("No support for loopback mounts")
+	return nil, nil
+}
