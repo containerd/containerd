@@ -224,3 +224,7 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 func isUnifiedCgroupsMode() bool {
 	return cgroups.Mode() == cgroups.Unified
 }
+
+func isCgroupsAvailable() bool {
+	return cgroups.Mode() != cgroups.Unavailable
+}

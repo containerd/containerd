@@ -45,3 +45,7 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 func isUnifiedCgroupsMode() bool {
 	return false
 }
+
+func isCgroupsAvailable() bool {
+	return false
+}

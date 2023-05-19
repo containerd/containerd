@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -720,11 +721,38 @@ func (c *criService) buildLinuxSpec(
 	// For compatibility, cgroupns is not used when running in cgroup v1 mode or in privileged.
 	// https://github.com/containers/libpod/issues/4363
 	// https://github.com/kubernetes/enhancements/blob/0e409b47497e398b369c281074485c8de129694f/keps/sig-node/20191118-cgroups-v2.md#cgroup-namespace
-	if isUnifiedCgroupsMode() && !securityContext.GetPrivileged() {
+	if c.enableCgroupNamespace(securityContext) {
 		specOpts = append(specOpts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{Type: runtimespec.CgroupNamespace}))
 	}
 
 	return specOpts, nil
+}
+
+func (c *criService) enableCgroupNamespace(securityContext *runtime.LinuxContainerSecurityContext) bool {
+	// No need to enable cgroup namespace for privileged container.
+	if securityContext.GetPrivileged() || !isCgroupsAvailable() {
+		return false
+	}
+	// Enable cgroup namespace for Unified mode by default.
+	if isUnifiedCgroupsMode() {
+		return true
+	}
+
+	// Enable the cgroup namespace if it is supported.
+	if cgroupNamespacesSupported() {
+		if c.config.EnableCgroupNamespace {
+			return true
+		}
+	}
+
+	return false
+}
+
+func cgroupNamespacesSupported() bool {
+	if _, err := os.Stat("/proc/self/ns/cgroup"); err != nil {
+		return !errors.Is(err, os.ErrNotExist)
+	}
+	return true
 }
 
 func (c *criService) buildWindowsSpec(

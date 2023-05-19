@@ -289,6 +289,11 @@ type PluginConfig struct {
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
+	// EnableCgroupNamespace indicates to enable the cgroup namespace in non-unified cgroup mode.
+	// This is useful when containerd is running on a machine with non-unified cgroup.
+	// Note: The cgroup namespace is enabled by default in unified cgroup mode and
+	// was not be affected by this entry. https://github.com/containerd/cri/pull/1371
+	EnableCgroupNamespace bool `toml:"enable_cgroup_namespace" json:"enableCgroupNamespace"`
 	// DisableApparmor indicates to disable the apparmor support.
 	// This is useful when the containerd does not have permission to access Apparmor.
 	DisableApparmor bool `toml:"disable_apparmor" json:"disableApparmor"`
