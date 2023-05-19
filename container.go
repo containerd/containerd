@@ -235,7 +235,17 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	if err != nil {
 		return nil, err
 	}
-	if r.SnapshotKey != "" {
+
+	info := TaskInfo{
+		runtime: r.Runtime.Name,
+	}
+	for _, o := range opts {
+		if err := o(ctx, c.client, &info); err != nil {
+			return nil, err
+		}
+	}
+
+	if r.SnapshotKey != "" && info.RootFS == nil {
 		if r.Snapshotter == "" {
 			return nil, fmt.Errorf("unable to resolve rootfs mounts without snapshotter on container: %w", errdefs.ErrInvalidArgument)
 		}
@@ -268,14 +278,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			})
 		}
 	}
-	info := TaskInfo{
-		runtime: r.Runtime.Name,
-	}
-	for _, o := range opts {
-		if err := o(ctx, c.client, &info); err != nil {
-			return nil, err
-		}
-	}
+
 	if info.RootFS != nil {
 		for _, m := range info.RootFS {
 			request.Rootfs = append(request.Rootfs, &types.Mount{
