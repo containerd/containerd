@@ -271,6 +271,13 @@ type PluginConfig struct {
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	// MaxContainerLogIOSize is the maximum log size in bytes for a container io(stdout or stderr) in a single log file.
+	// Log content after the log io size will be dropped until ReopenContainerLog is called which mean
+	// a new log io is created.
+	// Notice this value should be larger than kubelet --container-log-max-size option(default 10Mi=10*1024*1024),
+	// otherwise kubelet can never rotate log file and all container later output would be dropped.
+	// Non-positive(default) value means no limit.
+	MaxContainerLogIOSize int64 `toml:"max_container_log_io_size" json:"maxContainerLogIOSize"`
 	// DisableCgroup indicates to disable the cgroup support.
 	// This is useful when the containerd does not have permission to access cgroup.
 	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`

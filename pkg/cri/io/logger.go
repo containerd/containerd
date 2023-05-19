@@ -50,12 +50,12 @@ func NewDiscardLogger() io.WriteCloser {
 // returns a channel which indicates whether the logger is stopped.
 // maxLen is the max length limit of a line. A line longer than the
 // limit will be cut into multiple lines.
-func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.WriteCloser, <-chan struct{}) {
+func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int, maxIOLen int64) (io.WriteCloser, <-chan struct{}) {
 	logrus.Debugf("Start writing stream %q to log file %q", stream, path)
 	prc, pwc := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
-		redirectLogs(path, prc, w, stream, maxLen)
+		redirectLogs(path, prc, w, stream, maxLen, maxIOLen)
 		close(stop)
 	}()
 	return pwc, stop
@@ -111,16 +111,18 @@ func readLine(b *bufio.Reader) (line []byte, isPrefix bool, err error) {
 	return
 }
 
-func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int) {
+func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxLen int, maxIOLen int64) {
 	defer rc.Close()
 	var (
-		stream    = []byte(s)
-		delimiter = []byte{delimiter}
-		partial   = []byte(runtime.LogTagPartial)
-		full      = []byte(runtime.LogTagFull)
-		buf       [][]byte
-		length    int
-		bufSize   = defaultBufSize
+		stream                 = []byte(s)
+		delimiter              = []byte{delimiter}
+		partial                = []byte(runtime.LogTagPartial)
+		full                   = []byte(runtime.LogTagFull)
+		buf                    [][]byte
+		length                 int
+		ioLength               int64
+		ioLengthLimitedNoticed bool
+		bufSize                = defaultBufSize
 
 		timeBuffer = make([]byte, len(timestampFormat))
 		lineBuffer = bytes.Buffer{}
@@ -143,9 +145,18 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			lineBuffer.Write(l)
 		}
 		lineBuffer.WriteByte(eol)
+		bufSize := lineBuffer.Len()
+		if maxIOLen > 0 && ioLength+int64(bufSize) > maxIOLen {
+			if !ioLengthLimitedNoticed {
+				logrus.Errorf("Fail to write %q log to log file %q, io max length reached. current %d, max: %d", s, path, ioLength, maxIOLen)
+				ioLengthLimitedNoticed = true
+			}
+			return
+		}
 		if n, err := lineBuffer.WriteTo(w); err == nil {
 			outputEntries.Inc()
 			outputBytes.Inc(float64(n))
+			ioLength += n
 		} else {
 			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
 			// Continue on write error to drain the container output.

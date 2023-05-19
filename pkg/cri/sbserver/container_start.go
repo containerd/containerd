@@ -23,11 +23,12 @@ import (
 	"io"
 	"time"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -227,12 +228,27 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 				f.Close()
 			}
 		}()
+
+		maxLogIOSize := c.config.MaxContainerLogIOSize
+		if maxLogIOSize > 0 {
+			fi, err := f.Stat()
+			if err != nil {
+				log.L.Errorf("stat log file failed. file: %s, err: %v", logPath, err)
+			} else {
+				maxLogIOSize -= fi.Size()
+				if maxLogIOSize <= 0 {
+					// need to keep processing container stdio, but nothing can output to log file
+					maxLogIOSize = 1
+				}
+			}
+		}
+
 		var stdoutCh, stderrCh <-chan struct{}
 		wc := cioutil.NewSerialWriteCloser(f)
-		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize)
+		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize, maxLogIOSize)
 		// Only redirect stderr when there is no tty.
 		if !tty {
-			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize)
+			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize, maxLogIOSize)
 		}
 		go func() {
 			if stdoutCh != nil {

@@ -37,6 +37,7 @@ func TestRedirectLogs(t *testing.T) {
 		input   string
 		stream  StreamType
 		maxLen  int
+		ioLen   int64
 		tag     []runtime.LogTag
 		content []string
 	}{
@@ -235,12 +236,24 @@ func TestRedirectLogs(t *testing.T) {
 				strings.Repeat("a", defaultBufSize-1),
 			},
 		},
+		"log total length longer than max io length": {
+			input:  strings.Repeat("a", 10) + "\n" + strings.Repeat("a", 10) + "\n",
+			stream: Stdout,
+			maxLen: 9,
+			ioLen:  60, // line overhead is 42
+			tag: []runtime.LogTag{
+				runtime.LogTagPartial,
+			},
+			content: []string{
+				strings.Repeat("a", 9),
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			rc := io.NopCloser(strings.NewReader(test.input))
 			buf := bytes.NewBuffer(nil)
 			wc := cioutil.NewNopWriteCloser(buf)
-			redirectLogs("test-path", rc, wc, test.stream, test.maxLen)
+			redirectLogs("test-path", rc, wc, test.stream, test.maxLen, test.ioLen)
 			output := buf.String()
 			lines := strings.Split(output, "\n")
 			lines = lines[:len(lines)-1] // Discard empty string after last \n

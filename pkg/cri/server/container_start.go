@@ -226,12 +226,27 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 				f.Close()
 			}
 		}()
+
+		maxLogIOSize := c.config.MaxContainerLogIOSize
+		if maxLogIOSize > 0 {
+			fi, err := f.Stat()
+			if err != nil {
+				log.L.Errorf("stat log file failed. file: %s, err: %v", logPath, err)
+			} else {
+				maxLogIOSize -= fi.Size()
+				if maxLogIOSize <= 0 {
+					// need to keep processing container stdio, but nothing can output to log file
+					maxLogIOSize = 1
+				}
+			}
+		}
+
 		var stdoutCh, stderrCh <-chan struct{}
 		wc := cioutil.NewSerialWriteCloser(f)
-		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize)
+		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize, maxLogIOSize)
 		// Only redirect stderr when there is no tty.
 		if !tty {
-			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize)
+			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize, maxLogIOSize)
 		}
 		go func() {
 			if stdoutCh != nil {
