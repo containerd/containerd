@@ -20,8 +20,14 @@ package local
 
 import (
 	"os"
+	"sync"
 	"syscall"
 	"time"
+)
+
+var (
+	// FlyingReqWg for grace-termination
+	FlyingReqWg sync.WaitGroup
 )
 
 func getATime(fi os.FileInfo) time.Time {

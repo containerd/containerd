@@ -44,6 +44,7 @@ import (
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/pkg/grpc/interceptor"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -131,6 +132,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			otelgrpc.UnaryServerInterceptor(),
 			grpc_prometheus.UnaryServerInterceptor,
 			unaryNamespaceInterceptor,
+			interceptor.FlyingRequestCountInterceptor(interceptor.FlyingReqCountDecider, &local.FlyingReqWg),
 		)),
 	}
 	if config.GRPC.MaxRecvMsgSize > 0 {

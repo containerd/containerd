@@ -28,12 +28,14 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/instrument"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
+	timeout2 "github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
@@ -54,6 +56,10 @@ import (
 
 // defaultNetworkPlugin is used for the default CNI configuration
 const defaultNetworkPlugin = "default"
+
+const (
+	graceTerminating = "io.containerd.cri.grace.close"
+)
 
 // CRIService is the interface implement CRI remote service server.
 type CRIService interface {
@@ -313,6 +319,24 @@ func (c *criService) Close() error {
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
 	}
+
+	// wait flying req to zero
+	// drain all requests on going which we care, exclude requests like exec
+	logrus.Info("Start waiting for flying request")
+	drain := make(chan struct{})
+	go func() {
+		defer close(drain)
+		local.FlyingReqWg.Wait()
+	}()
+
+	timeout := timeout2.Get(graceTerminating)
+	select {
+	case <-drain:
+		logrus.Info("CRI server has shutdown")
+	case <-time.After(timeout):
+		logrus.Infof("stopping CRI server after waited %v, on going request %v", timeout, &local.FlyingReqWg)
+	}
+
 	return nil
 }
 
