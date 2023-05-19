@@ -249,7 +249,7 @@ func digitVal(ch rune) int {
 }
 
 func isFieldRune(r rune) bool {
-	return (r == '_' || isAlphaRune(r) || isDigitRune(r))
+	return (r == '_' || r == '-' || isAlphaRune(r) || isDigitRune(r))
 }
 
 func isAlphaRune(r rune) bool {
