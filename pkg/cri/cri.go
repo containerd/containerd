@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/netns"
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -84,6 +85,15 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
+	}
+
+	// creating a guard netns before cri service starting to avoid a kernel bug:
+	// concurrently creating the first netns after rebooting would lead to creation failure later.
+	// Debian Bug report logs - #949235 ip netns add race condition can wreak havoc in mount points
+	// link: https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949235
+	log.G(ctx).Info("Create place holder netns to avoid kernel bug")
+	if err := netns.RecoverNetNS("/var/run/netns/CONTAINERD_PLACE_HOLDER"); err != nil {
+		return nil, fmt.Errorf("failed to create place holder netns: %w", err)
 	}
 
 	var s server.CRIService
