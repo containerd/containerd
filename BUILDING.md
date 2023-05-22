@@ -43,12 +43,7 @@ You need `git` to checkout the source code:
 git clone https://github.com/containerd/containerd
 ```
 
-For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
-
-```sh
-wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
-sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
-```
+For proper results, install the `protoc` release into `/usr/local` on your build system. When generating source code from `.proto` files, containerd may rely on some external protocol buffer files. These external dependencies should be added to the `/usr/local/include` directory. To install the appropriate version of `protoc` and download any necessary external protocol buffer files on a Linux host, run the install script located at `script/setup/install-protobuf`.
 
 To enable optional [Btrfs](https://en.wikipedia.org/wiki/Btrfs) snapshotter, you should have the headers from the Linux kernel 4.12 or later.
 The dependency on the kernel headers only affects users building containerd from source.
