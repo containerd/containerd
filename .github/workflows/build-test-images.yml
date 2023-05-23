@@ -9,7 +9,7 @@ on:
       azure_windows_image_id:
         description: Windows image URN to deploy
         required: true
-        default: MicrosoftWindowsServer:WindowsServer:2022-datacenter:20348.350.2111030009
+        default: MicrosoftWindowsServer:WindowsServer:2022-datacenter:latest
       azure_vm_size:
         description: Windows image builder VM size
         required: true
@@ -144,7 +144,7 @@ jobs:
           scp -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.PUBLIC_IP }}:/Users/azureuser/.docker/key.pem $HOME/.docker/key.pem
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
