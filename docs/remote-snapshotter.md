@@ -61,15 +61,15 @@ Every time the containerd client queries remote snapshot, it passes `Annotations
 These annotations are passed to the snapshotter as user-defined labels.
 The values of annotations can be dynamically added and modified in the handler wrapper.
 Note that annotations must be prefixed by `containerd.io/snapshot/`.
-[CRI plugin](https://github.com/containerd/cri/blob/09d6426f33cac217528158ddc6d254ca7d597a7b/pkg/server/image_pull.go#L127) and [stargz snapshotter](https://github.com/containerd/stargz-snapshotter/blob/875ec333403a885f5b6e5b64c94ec4dc713e0596/cmd/ctr-remote/commands/rpull.go#L97) leverage this method.
+`github.com/containerd/containerd/pkg/snapshotters` is a handler implementation used by the CRI package, nerdctl and moby.
 
 ```go
-import "github.com/ktock/snapshotter/handler"
+import "github.com/containerd/containerd/pkg/snapshotters"
 
 if _, err := client.Pull(ctx, ref,
 	containerd.WithPullUnpack,
 	containerd.WithPullSnapshotter("my-remote-snapshotter"),
-	containerd.WithImageHandlerWrapper(handler.Wrapper(ref)),
+	containerd.WithImageHandlerWrapper(snapshotters.AppendInfoHandlerWrapper(ref)),
 )
 ```
 
@@ -77,7 +77,7 @@ if _, err := client.Pull(ctx, ref,
 
 The containerd client queries remote snapshots to the underlying remote snapshotter using snapshotter APIs.
 This section describes the high-level overview of how snapshotter APIs are used for remote snapshots functionality, with some piece of pseudo-codes that describe the simplified logic implemented in the containerd client.
-For more details, see [`unpacker.go`](/unpacker.go) that implements this logic.
+For more details, see [`unpacker.go`](../pkg/unpack/unpacker.go) that implements this logic.
 
 During image pull, the containerd client calls `Prepare` API with the label `containerd.io/snapshot.ref`.
 This is a containerd-defined label which contains ChainID that targets a committed snapshot that the client is trying to prepare.
