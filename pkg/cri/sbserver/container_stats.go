@@ -40,7 +40,12 @@ func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerSt
 		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
 	}
 
-	cs, err := c.containerMetrics(cntr.Metadata, resp.Metrics[0])
+	handler, err := c.getMetricsHandler(ctx, cntr.SandboxID)
+	if err != nil {
+		return nil, err
+	}
+
+	cs, err := handler(cntr.Metadata, resp.Metrics[0])
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode container metrics: %w", err)
 	}
