@@ -34,6 +34,9 @@ type Config struct {
 
 	// FSType is the filesystem type for the mount
 	FSType string `toml:"fs_type"`
+
+	// MountOptions are options used for the mount
+	MountOptions []string `toml:"mount_options"`
 }
 
 func init() {
@@ -59,6 +62,9 @@ func init() {
 			}
 			if config.FSType != "" {
 				opts = append(opts, blockfile.WithFSType(config.FSType))
+			}
+			if len(config.MountOptions) > 0 {
+				opts = append(opts, blockfile.WithMountOptions(config.MountOptions))
 			}
 
 			return blockfile.NewSnapshotter(root, opts...)
