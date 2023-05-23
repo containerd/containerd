@@ -29,12 +29,17 @@ import (
 func Lookup(dir string) (Info, error) {
 	dir = filepath.Clean(dir)
 
-	m, err := mountinfo.GetMounts(mountinfo.ParentsFilter(dir))
+	resolvedDir, err := filepath.EvalSymlinks(dir)
 	if err != nil {
-		return Info{}, fmt.Errorf("failed to find the mount info for %q: %w", dir, err)
+		return Info{}, fmt.Errorf("failed to resolve symlink for %q: %w", dir, err)
+	}
+
+	m, err := mountinfo.GetMounts(mountinfo.ParentsFilter(resolvedDir))
+	if err != nil {
+		return Info{}, fmt.Errorf("failed to find the mount info for %q: %w", resolvedDir, err)
 	}
 	if len(m) == 0 {
-		return Info{}, fmt.Errorf("failed to find the mount info for %q", dir)
+		return Info{}, fmt.Errorf("failed to find the mount info for %q", resolvedDir)
 	}
 
 	// find the longest matching mount point
