@@ -41,6 +41,9 @@ type SnapshotterConfig struct {
 
 	// fsType is the filesystem type for the mount (defaults to ext4)
 	fsType string
+
+	// mountOptions are the base options added to the mount (defaults to ["loop"])
+	mountOptions []string
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -68,10 +71,19 @@ func WithFSType(fsType string) Opt {
 	}
 }
 
+// WithMountOptions defines the mount options used for the mount
+func WithMountOptions(options []string) Opt {
+	return func(root string, config *SnapshotterConfig) {
+		config.mountOptions = options
+	}
+
+}
+
 type snapshotter struct {
 	root    string
 	scratch string
 	fsType  string
+	options []string
 	ms      *storage.MetaStore
 }
 
@@ -110,6 +122,10 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		config.fsType = "ext4"
 	}
 
+	if config.mountOptions != nil {
+		config.mountOptions = []string{"loop"}
+	}
+
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
 	if err != nil {
 		return nil, err
@@ -123,6 +139,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		root:    root,
 		scratch: scratch,
 		fsType:  config.fsType,
+		options: config.mountOptions,
 		ms:      ms,
 	}, nil
 }
@@ -356,10 +373,8 @@ func (o *snapshotter) getBlockFile(id string) string {
 
 func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 	var (
-		mountOptions = []string{
-			"loop",
-		}
-		source string
+		mountOptions = o.options
+		source       string
 	)
 
 	if s.Kind == snapshots.KindView {

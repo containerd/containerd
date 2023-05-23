@@ -66,6 +66,8 @@ func setupSnapshotter(t *testing.T) ([]Opt, error) {
 
 	return []Opt{
 		WithScratchFile(scratch),
+		WithFSType("ext4"),
+		WithMountOptions([]string{"loop", "sync"}),
 	}, nil
 }
 
