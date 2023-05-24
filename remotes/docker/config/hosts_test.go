@@ -23,10 +23,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/credentials"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
@@ -205,6 +209,114 @@ ca = "/etc/path/default"
 			t.Fatalf("Mismatch at host %d", i)
 		}
 	}
+}
+
+func TestParseHostFileWithCredentialHelper(t *testing.T) {
+	var (
+		rootCredentialHelper  = credentials.NewMemoryStore()
+		childCredentialHelper = credentials.NewMemoryStore()
+	)
+
+	var testGetCredentialsHelper = func(path, helperType string) (credentials.CredentialHelper, error) {
+		switch strings.ToLower(helperType) {
+		case "root-memory-store":
+			return rootCredentialHelper, nil
+		case "child-memory-store":
+			return childCredentialHelper, nil
+		default:
+			return nil, fmt.Errorf("supported credential helper type: %s", helperType)
+		}
+	}
+
+	require.NoError(t, rootCredentialHelper.Set(&credentials.Credentials{
+		ServerURL: "https://test-default.registry",
+		Header:    "Bearer foo",
+	}))
+	require.NoError(t, rootCredentialHelper.Set(&credentials.Credentials{
+		ServerURL: "https://mirror-bak.registry/us",
+		Username:  "username",
+		Secret:    "secret",
+	}))
+
+	tmp := credentials.GetCredentialHelper
+	defer func() {
+		credentials.GetCredentialHelper = tmp
+	}()
+
+	credentials.GetCredentialHelper = testGetCredentialsHelper
+
+	const testtoml = `
+server = "https://test-default.registry"
+capabilities = ["pull", "push", "resolve"]
+[header]
+  x-custom-1 = "custom header"
+[credential_helper]
+  path = "some-path"
+  type = "root-memory-store"
+
+[host."https://test-1.registry"]
+  capabilities = ["pull", "push", "resolve"]
+  ca = "/etc/certs/mirror.pem"
+  skip_verify = false
+  [host."https://test-1.registry".header]
+    x-custom-2 = ["value1", "value2"]
+  [host."https://test-1.registry".credential_helper]
+    path = "some-path"
+    type = "child-memory-store"
+
+[host."http://mirror.registry:5000"]
+  capabilities = ["pull"]
+  skip_verify = true
+
+[host."https://test-2.registry"]
+  capabilities = ["pull"]
+  ca = "/etc/certs/test-2.pem"
+  client = [["/etc/certs/client.cert", "/etc/certs/client.key"], ["/etc/certs/client.pem", ""]]
+`
+	var tb, fb = true, false
+	expected := []hostConfig{
+		{
+			scheme:           "https",
+			host:             "test-1.registry",
+			path:             "/v2",
+			capabilities:     allCaps,
+			caCerts:          []string{filepath.FromSlash("/etc/certs/mirror.pem")},
+			skipVerify:       &fb,
+			header:           http.Header{"x-custom-2": {"value1", "value2"}},
+			credentialHelper: childCredentialHelper,
+		},
+		{
+			scheme:       "http",
+			host:         "mirror.registry:5000",
+			path:         "/v2",
+			capabilities: docker.HostCapabilityPull,
+			skipVerify:   &tb,
+		},
+		{
+			scheme:       "https",
+			host:         "test-2.registry",
+			path:         "/v2",
+			capabilities: docker.HostCapabilityPull,
+			caCerts:      []string{filepath.FromSlash("/etc/certs/test-2.pem")},
+			clientPairs: [][2]string{
+				{filepath.FromSlash("/etc/certs/client.cert"), filepath.FromSlash("/etc/certs/client.key")},
+				{filepath.FromSlash("/etc/certs/client.pem"), ""},
+			},
+		},
+		{
+			scheme:           "https",
+			host:             "test-default.registry",
+			path:             "/v2",
+			capabilities:     allCaps,
+			header:           http.Header{"x-custom-1": {"custom header"}},
+			credentialHelper: rootCredentialHelper,
+		},
+	}
+
+	hosts, err := parseHostsFile("", []byte(testtoml))
+
+	assert.NoError(t, err)
+	assert.Equal(t, expected, hosts)
 }
 
 func TestLoadCertFiles(t *testing.T) {

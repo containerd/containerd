@@ -28,11 +28,12 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker/auth"
+	"github.com/containerd/containerd/remotes/docker/credentials"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
 )
 
 type dockerAuthorizer struct {
-	credentials func(string) (string, string, error)
+	credentials func(string) (*credentials.Credentials, error)
 
 	client *http.Client
 	header http.Header
@@ -45,7 +46,7 @@ type dockerAuthorizer struct {
 }
 
 type authorizerConfig struct {
-	credentials         func(string) (string, string, error)
+	credentials         func(string) (*credentials.Credentials, error)
 	client              *http.Client
 	header              http.Header
 	onFetchRefreshToken OnFetchRefreshToken
@@ -61,10 +62,36 @@ func WithAuthClient(client *http.Client) AuthorizerOpt {
 	}
 }
 
-// WithAuthCreds provides a credential function to the authorizer
+// WithAuthCreds provides a credential function to the authorizer that
+// returns a username and secret for a given host.
 func WithAuthCreds(creds func(string) (string, string, error)) AuthorizerOpt {
 	return func(opt *authorizerConfig) {
-		opt.credentials = creds
+		if creds == nil {
+			return
+		}
+		opt.credentials = func(host string) (*credentials.Credentials, error) {
+			username, secret, err := creds(host)
+			if err != nil {
+				return nil, err
+			}
+			return &credentials.Credentials{
+				Username: username,
+				Secret:   secret,
+			}, nil
+		}
+	}
+}
+
+// WithAuthCredentials provides a credential function to the authorizer that
+// returns a Credentials type for a given host.
+//
+// The Credentials type supports username, secret, and a static authorization header value.
+// Setting this authorization header will skip the request to the oauth/token server and
+// the http client will directly set the "Authorization" header with this value when making
+// the http request to the registry.
+func WithAuthCredentials(credentials func(string) (*credentials.Credentials, error)) AuthorizerOpt {
+	return func(opt *authorizerConfig) {
+		opt.credentials = credentials
 	}
 }
 
@@ -163,12 +190,16 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 				return nil
 			}
 
-			var username, secret string
+			var username, secret, authorization string
 			if a.credentials != nil {
-				var err error
-				username, secret, err = a.credentials(host)
+				creds, err := a.credentials(host)
 				if err != nil {
 					return err
+				}
+				if creds != nil {
+					username = creds.Username
+					secret = creds.Secret
+					authorization = creds.Header
 				}
 			}
 
@@ -178,21 +209,21 @@ func (a *dockerAuthorizer) AddResponses(ctx context.Context, responses []*http.R
 			}
 			common.FetchRefreshToken = a.onFetchRefreshToken != nil
 
-			a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
+			a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common, authorization)
 			return nil
 		} else if c.Scheme == auth.BasicAuth && a.credentials != nil {
-			username, secret, err := a.credentials(host)
+			creds, err := a.credentials(host)
 			if err != nil {
 				return err
 			}
 
-			if username != "" && secret != "" {
+			if creds != nil && creds.Username != "" && creds.Secret != "" {
 				common := auth.TokenOptions{
-					Username: username,
-					Secret:   secret,
+					Username: creds.Username,
+					Secret:   creds.Secret,
 				}
 
-				a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common)
+				a.handlers[host] = newAuthHandler(a.client, a.header, c.Scheme, common, "")
 				return nil
 			}
 		}
@@ -225,19 +256,31 @@ type authHandler struct {
 	// scopedTokens caches token indexed by scopes, which used in
 	// bearer auth case
 	scopedTokens map[string]*authResult
+
+	// authorization is the static authorization value.
+	// Setting this will skip the authentication requests and directly
+	// use the value in the Authorization header
+	authorization string
 }
 
-func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.AuthenticationScheme, opts auth.TokenOptions) *authHandler {
+func newAuthHandler(client *http.Client, hdr http.Header, scheme auth.AuthenticationScheme, opts auth.TokenOptions, authorization string) *authHandler {
 	return &authHandler{
-		header:       hdr,
-		client:       client,
-		scheme:       scheme,
-		common:       opts,
-		scopedTokens: map[string]*authResult{},
+		header:        hdr,
+		client:        client,
+		scheme:        scheme,
+		common:        opts,
+		scopedTokens:  map[string]*authResult{},
+		authorization: authorization,
 	}
 }
 
 func (ah *authHandler) authorize(ctx context.Context) (string, string, error) {
+	// if authorization value is set, skip the authentication request and just
+	// return the value with empty refresh token
+	if ah.authorization != "" {
+		return ah.authorization, "", nil
+	}
+
 	switch ah.scheme {
 	case auth.BasicAuth:
 		return ah.doBasicAuth(ctx)

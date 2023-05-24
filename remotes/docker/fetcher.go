@@ -73,6 +73,17 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				Path:         u.Path,
 				Capabilities: HostCapabilityPull,
 			}
+			// Filter through the list of RegistryHost matching on name and scheme.
+			// If there is a match, then update the Authorizer, Header, and Client to the
+			// configured host's Authorizer, Header, and Client.
+			for _, h := range r.hosts {
+				if h.Authorizer != nil && h.Host == host.Host && h.Scheme == host.Scheme {
+					host.Authorizer = h.Authorizer
+					host.Header = h.Header
+					host.Client = h.Client
+				}
+			}
+
 			req := r.request(host, http.MethodGet)
 			// Strip namespace from base
 			req.path = u.Path

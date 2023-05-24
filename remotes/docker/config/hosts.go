@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/credentials"
 	"github.com/pelletier/go-toml"
 )
 
@@ -54,6 +55,7 @@ type hostConfig struct {
 
 	header http.Header
 
+	credentialHelper credentials.CredentialHelper
 	// TODO: Add credential configuration (domain alias, username)
 }
 
@@ -167,6 +169,20 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
 			rhosts[i].Header = host.header
+
+			if host.credentialHelper != nil {
+				helper := host.credentialHelper
+				authOpts = append(authOpts,
+					docker.WithAuthCredentials(func(server string) (*credentials.Credentials, error) {
+						creds, err := helper.Get(server)
+						if err != nil {
+							return nil, err
+						}
+						return creds, nil
+					}),
+				)
+				authorizer = docker.NewDockerAuthorizer(authOpts...)
+			}
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
 				tr := defaultTransport.Clone()
@@ -286,6 +302,17 @@ func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 	return hosts, nil
 }
 
+type credentialHelper struct {
+	// Path is the absolute path to the plugin which containerd will invoke to manage credentials.
+	Path string `toml:"path"`
+
+	// Type defines the type of credential helper, different credential helper type may require
+	// different set of APIs for containerd to invoke with.
+	// Allowed values:
+	//  - docker-credential-helper
+	Type string `toml:"type"`
+}
+
 type hostFileConfig struct {
 	// Capabilities determine what operations a host is
 	// capable of performing. Allowed values
@@ -321,7 +348,11 @@ type hostFileConfig struct {
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
 
-	// TODO: Credentials: helper? name? username? alternate domain? token?
+	// CredentialHelper defines a plugin that can be invoked to provide
+	// the credentials to use for the server.
+	CredentialHelper credentialHelper `toml:"credential_helper"`
+
+	// TODO: Credentials: name? username? alternate domain? token?
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
@@ -488,6 +519,14 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		}
 		result.header = header
+	}
+
+	if config.CredentialHelper.Type != "" && config.CredentialHelper.Path != "" {
+		plugin, err := credentials.GetCredentialHelper(config.CredentialHelper.Path, config.CredentialHelper.Type)
+		if err != nil {
+			return hostConfig{}, err
+		}
+		result.credentialHelper = plugin
 	}
 
 	return result, nil
