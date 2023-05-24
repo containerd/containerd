@@ -42,7 +42,6 @@ import (
 )
 
 const (
-	checkpointImageNameLabel       = "org.opencontainers.image.ref.name"
 	checkpointRuntimeNameLabel     = "io.containerd.checkpoint.runtime"
 	checkpointSnapshotterNameLabel = "io.containerd.checkpoint.snapshotter"
 )
@@ -357,7 +356,7 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	defer done(ctx)
 
 	// add image name to manifest
-	index.Annotations[checkpointImageNameLabel] = img.Name()
+	index.Annotations[ocispec.AnnotationRefName] = img.Name()
 	// add runtime info to index
 	index.Annotations[checkpointRuntimeNameLabel] = info.Runtime.Name
 	// add snapshotter info to index
