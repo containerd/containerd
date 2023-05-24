@@ -19,7 +19,7 @@ package sbserver
 import (
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -29,7 +29,7 @@ import (
 )
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
+	*ocispec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
 			Name:    "test-name",
@@ -87,7 +87,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		Hostname:    "test-hostname",
 		Annotations: map[string]string{"c": "d"},
 	}
-	imageConfig := &imagespec.ImageConfig{
+	imageConfig := &ocispec.ImageConfig{
 		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},

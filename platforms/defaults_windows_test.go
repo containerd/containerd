@@ -23,14 +23,14 @@ import (
 	"sort"
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/windows"
 )
 
 func TestDefault(t *testing.T) {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
-	expected := imagespec.Platform{
+	expected := ocispec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
@@ -51,7 +51,7 @@ func TestDefaultMatchComparer(t *testing.T) {
 	defaultMatcher := Default()
 
 	for _, test := range []struct {
-		platform imagespec.Platform
+		platform ocispec.Platform
 		match    bool
 	}{
 		{
@@ -59,7 +59,7 @@ func TestDefaultMatchComparer(t *testing.T) {
 			match:    true,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				OS:           "linux",
 				Architecture: runtime.GOARCH,
 			},
@@ -82,7 +82,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 		},
 	}
 	for _, test := range []struct {
-		platform imagespec.Platform
+		platform ocispec.Platform
 		match    bool
 	}{
 		{
@@ -90,7 +90,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 			match:    true,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				OSVersion:    buildStr + ".1",
@@ -98,7 +98,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 			match: true,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				OSVersion:    buildStr + ".2",
@@ -106,7 +106,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 			match: true,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				// Use an nonexistent Windows build so we don't get a match. Ws2019's build is 17763/
@@ -115,7 +115,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 			match: false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				// Use an nonexistent Windows build so we don't get a match. Ws2019's build is 17763/
@@ -124,14 +124,14 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 			match: false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 			},
 			match: true,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "linux",
 			},
@@ -146,13 +146,13 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
 	buildStr := fmt.Sprintf("%d.%d.%d", major, minor, build)
 	m := windowsmatcher{
-		Platform: imagespec.Platform{
+		Platform: ocispec.Platform{
 			OS:           "linux",
 			Architecture: "amd64",
 		},
 		osVersionPrefix: "",
 		defaultMatcher: &matcher{
-			Platform: Normalize(imagespec.Platform{
+			Platform: Normalize(ocispec.Platform{
 				OS:           "linux",
 				Architecture: "amd64",
 			},
@@ -160,7 +160,7 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 		},
 	}
 	for _, test := range []struct {
-		platform imagespec.Platform
+		platform ocispec.Platform
 		match    bool
 	}{
 		{
@@ -168,14 +168,14 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 			match:    false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 			},
 			match: false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				OSVersion:    buildStr + ".2",
@@ -183,7 +183,7 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 			match: false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "windows",
 				// Use an nonexistent Windows build so we don't get a match. Ws2019's build is 17763/
@@ -192,7 +192,7 @@ func TestMatchComparerMatch_LCOW(t *testing.T) {
 			match: false,
 		},
 		{
-			platform: imagespec.Platform{
+			platform: ocispec.Platform{
 				Architecture: "amd64",
 				OS:           "linux",
 			},
@@ -211,7 +211,7 @@ func TestMatchComparerLess(t *testing.T) {
 			Platform: Normalize(DefaultSpec()),
 		},
 	}
-	platforms := []imagespec.Platform{
+	platforms := []ocispec.Platform{
 		{
 			Architecture: "amd64",
 			OS:           "windows",
@@ -237,7 +237,7 @@ func TestMatchComparerLess(t *testing.T) {
 			OSVersion:    "10.0.17762.1",
 		},
 	}
-	expected := []imagespec.Platform{
+	expected := []ocispec.Platform{
 		{
 			Architecture: "amd64",
 			OS:           "windows",

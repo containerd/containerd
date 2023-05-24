@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -44,10 +44,10 @@ var (
 )
 
 // CheckpointOpts are options to manage the checkpoint operation
-type CheckpointOpts func(context.Context, *Client, *containers.Container, *imagespec.Index, *options.CheckpointOptions) error
+type CheckpointOpts func(context.Context, *Client, *containers.Container, *ocispec.Index, *options.CheckpointOptions) error
 
 // WithCheckpointImage includes the container image in the checkpoint
-func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Container, index *ocispec.Index, copts *options.CheckpointOptions) error {
 	ir, err := client.ImageService().Get(ctx, c.Image)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 }
 
 // WithCheckpointTask includes the running task
-func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *ocispec.Index, copts *options.CheckpointOptions) error {
 	any, err := protobuf.MarshalAnyToProto(copts)
 	if err != nil {
 		return nil
@@ -71,7 +71,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 	}
 	for _, d := range task.Descriptors {
 		platformSpec := platforms.DefaultSpec()
-		index.Manifests = append(index.Manifests, imagespec.Descriptor{
+		index.Manifests = append(index.Manifests, ocispec.Descriptor{
 			MediaType:   d.MediaType,
 			Size:        d.Size,
 			Digest:      digest.Digest(d.Digest),
@@ -89,7 +89,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 	if err != nil {
 		return err
 	}
-	desc.Platform = &imagespec.Platform{
+	desc.Platform = &ocispec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 	}
@@ -98,7 +98,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 }
 
 // WithCheckpointRuntime includes the container runtime info
-func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *ocispec.Index, copts *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
 		any := protobuf.FromAny(c.Runtime.Options)
 		data, err := proto.Marshal(any)
@@ -110,7 +110,7 @@ func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Co
 		if err != nil {
 			return err
 		}
-		desc.Platform = &imagespec.Platform{
+		desc.Platform = &ocispec.Platform{
 			OS:           runtime.GOOS,
 			Architecture: runtime.GOARCH,
 		}
@@ -120,7 +120,7 @@ func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Co
 }
 
 // WithCheckpointRW includes the rw in the checkpoint
-func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Container, index *ocispec.Index, copts *options.CheckpointOptions) error {
 	diffOpts := []diff.Opt{
 		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", c.SnapshotKey)),
 	}
@@ -134,7 +134,7 @@ func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Contain
 		return err
 
 	}
-	rw.Platform = &imagespec.Platform{
+	rw.Platform = &ocispec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 	}
@@ -143,13 +143,13 @@ func WithCheckpointRW(ctx context.Context, client *Client, c *containers.Contain
 }
 
 // WithCheckpointTaskExit causes the task to exit after checkpoint
-func WithCheckpointTaskExit(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
+func WithCheckpointTaskExit(ctx context.Context, client *Client, c *containers.Container, index *ocispec.Index, copts *options.CheckpointOptions) error {
 	copts.Exit = true
 	return nil
 }
 
 // GetIndexByMediaType returns the index in a manifest for the specified media type
-func GetIndexByMediaType(index *imagespec.Index, mt string) (*imagespec.Descriptor, error) {
+func GetIndexByMediaType(index *ocispec.Index, mt string) (*ocispec.Descriptor, error) {
 	for _, d := range index.Manifests {
 		if d.MediaType == mt {
 			return &d, nil

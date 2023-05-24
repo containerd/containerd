@@ -19,14 +19,14 @@
 package sbserver
 
 import (
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
 )
 
-func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *ocispec.ImageConfig) ([]oci.SpecOpts, error) {
 	return []oci.SpecOpts{}, nil
 }
 

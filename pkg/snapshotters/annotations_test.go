@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	digest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -59,10 +59,10 @@ func TestImageLayersLabel(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			sampleLayers := make([]imagespec.Descriptor, 0, tt.layersNum)
+			sampleLayers := make([]ocispec.Descriptor, 0, tt.layersNum)
 			for i := 0; i < tt.layersNum; i++ {
-				sampleLayers = append(sampleLayers, imagespec.Descriptor{
-					MediaType: imagespec.MediaTypeImageLayerGzip,
+				sampleLayers = append(sampleLayers, ocispec.Descriptor{
+					MediaType: ocispec.MediaTypeImageLayerGzip,
 					Digest:    sampleDigest,
 				})
 			}

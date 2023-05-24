@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/continuity/fs"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -376,11 +376,11 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 		}
 		var (
 			imageConfigBytes []byte
-			ociimage         v1.Image
-			config           v1.ImageConfig
+			ociimage         ocispec.Image
+			config           ocispec.ImageConfig
 		)
 		switch ic.MediaType {
-		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+		case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
 			var err error
 			imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
 			if err != nil {

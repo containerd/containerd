@@ -29,7 +29,7 @@ import (
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Image contains all resources associated with the image. All fields
@@ -44,7 +44,7 @@ type Image struct {
 	// Size is the compressed size of the image.
 	Size int64
 	// ImageSpec is the oci image structure which describes basic information about the image.
-	ImageSpec imagespec.Image
+	ImageSpec ocispec.Image
 }
 
 // Store stores all images.

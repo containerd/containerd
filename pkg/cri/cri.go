@@ -29,7 +29,7 @@ import (
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
@@ -54,7 +54,7 @@ func init() {
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
-	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
+	ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)

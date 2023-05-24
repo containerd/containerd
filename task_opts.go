@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -79,8 +79,8 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 	}
 }
 
-func decodeIndex(ctx context.Context, store content.Provider, desc imagespec.Descriptor) (*imagespec.Index, error) {
-	var index imagespec.Index
+func decodeIndex(ctx context.Context, store content.Provider, desc ocispec.Descriptor) (*ocispec.Index, error) {
+	var index ocispec.Index
 	p, err := content.ReadBlob(ctx, store, desc)
 	if err != nil {
 		return nil, err

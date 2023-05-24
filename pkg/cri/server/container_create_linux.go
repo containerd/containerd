@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -123,7 +123,7 @@ func (c *criService) containerSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
@@ -344,7 +344,7 @@ func (c *criService) containerSpec(
 	return c.runtimeSpec(id, ociRuntime.BaseRuntimeSpec, specOpts...)
 }
 
-func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *ocispec.ImageConfig) ([]oci.SpecOpts, error) {
 	var specOpts []oci.SpecOpts
 	securityContext := config.GetLinux().GetSecurityContext()
 	// Set container username. This could only be done by containerd, because it needs

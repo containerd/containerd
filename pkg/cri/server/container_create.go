@@ -25,7 +25,7 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -310,7 +310,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *ocispec.ImageConfig) []*runtime.Mount {
 	if len(config.Volumes) == 0 {
 		return nil
 	}

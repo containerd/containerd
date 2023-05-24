@@ -19,7 +19,7 @@ package server
 import (
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -44,7 +44,7 @@ func getSandboxConfig() *runtime.PodSandboxConfig {
 }
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
+	*ocispec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
 			Name:    "test-name",
@@ -92,7 +92,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		},
 	}
 	sandboxConfig := getSandboxConfig()
-	imageConfig := &imagespec.ImageConfig{
+	imageConfig := &ocispec.ImageConfig{
 		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},
@@ -336,7 +336,7 @@ func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			imageConfig := &imagespec.ImageConfig{
+			imageConfig := &ocispec.ImageConfig{
 				Entrypoint:  test.imgEntrypoint,
 				Cmd:         test.imgCmd,
 				ArgsEscaped: test.ArgsEscaped,

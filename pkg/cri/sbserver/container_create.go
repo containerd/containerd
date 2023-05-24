@@ -26,7 +26,7 @@ import (
 
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -337,7 +337,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *ocispec.ImageConfig) []*runtime.Mount {
 	if len(config.Volumes) == 0 {
 		return nil
 	}
@@ -448,7 +448,7 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 func (c *criService) platformSpecOpts(
 	platform platforms.Platform,
 	config *runtime.ContainerConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 ) ([]oci.SpecOpts, error) {
 	var specOpts []oci.SpecOpts
 
@@ -502,7 +502,7 @@ func (c *criService) buildContainerSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ *runtimespec.Spec, retErr error) {
@@ -581,7 +581,7 @@ func (c *criService) buildLinuxSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
@@ -813,7 +813,7 @@ func (c *criService) buildWindowsSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
@@ -907,7 +907,7 @@ func (c *criService) buildDarwinSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {

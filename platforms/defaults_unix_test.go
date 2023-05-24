@@ -23,11 +23,11 @@ import (
 	"runtime"
 	"testing"
 
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestDefault(t *testing.T) {
-	expected := specs.Platform{
+	expected := ocispec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		Variant:      cpuVariant(),

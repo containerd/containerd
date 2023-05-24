@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +35,7 @@ import (
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *ocispec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
@@ -51,7 +51,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 			CgroupParent: "/test/cgroup/parent",
 		},
 	}
-	imageConfig := &imagespec.ImageConfig{
+	imageConfig := &ocispec.ImageConfig{
 		Env:        []string{"a=b", "c=d"},
 		Entrypoint: []string{"/pause"},
 		Cmd:        []string{"forever"},

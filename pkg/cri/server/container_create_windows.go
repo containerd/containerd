@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strconv"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -47,7 +47,7 @@ func (c *criService) containerSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *ocispec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime config.Runtime,
 ) (*runtimespec.Spec, error) {
@@ -135,7 +135,7 @@ func (c *criService) containerSpec(
 }
 
 // No extra spec options needed for windows.
-func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *ocispec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil
 }
 

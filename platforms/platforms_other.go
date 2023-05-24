@@ -19,11 +19,11 @@
 package platforms
 
 import (
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // NewMatcher returns the default Matcher for containerd
-func newDefaultMatcher(platform specs.Platform) Matcher {
+func newDefaultMatcher(platform ocispec.Platform) Matcher {
 	return &matcher{
 		Platform: Normalize(platform),
 	}

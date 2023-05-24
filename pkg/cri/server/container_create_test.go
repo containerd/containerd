@@ -22,7 +22,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -276,7 +276,7 @@ func TestVolumeMounts(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			config := &imagespec.ImageConfig{
+			config := &ocispec.ImageConfig{
 				Volumes: test.imageVolumes,
 			}
 			c := newTestCRIService()

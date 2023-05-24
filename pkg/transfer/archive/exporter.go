@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/typeurl/v2"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
@@ -43,7 +43,7 @@ func init() {
 
 type ExportOpt func(*ImageExportStream)
 
-func WithPlatform(p v1.Platform) ExportOpt {
+func WithPlatform(p ocispec.Platform) ExportOpt {
 	return func(s *ImageExportStream) {
 		s.platforms = append(s.platforms, p)
 	}
@@ -77,7 +77,7 @@ type ImageExportStream struct {
 	stream    io.WriteCloser
 	mediaType string
 
-	platforms                 []v1.Platform
+	platforms                 []ocispec.Platform
 	allPlatforms              bool
 	skipCompatibilityManifest bool
 	skipNonDistributable      bool
@@ -156,9 +156,9 @@ func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 		return err
 	}
 
-	var specified []v1.Platform
+	var specified []ocispec.Platform
 	for _, p := range s.Platforms {
-		specified = append(specified, v1.Platform{
+		specified = append(specified, ocispec.Platform{
 			OS:           p.OS,
 			Architecture: p.Architecture,
 			Variant:      p.Variant,

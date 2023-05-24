@@ -54,7 +54,7 @@ import (
 	"github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -398,7 +398,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			f func(*grpc.ClientConn) interface{}
 
 			address = pp.Address
-			p       v1.Platform
+			p       ocispec.Platform
 			err     error
 		)
 

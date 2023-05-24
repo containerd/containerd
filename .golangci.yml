@@ -4,6 +4,7 @@ linters:
     - gofmt
     - goimports
     - gosec
+    - importas
     - ineffassign
     - misspell
     - nolintlint
@@ -52,6 +53,14 @@ issues:
       text: "redefines-builtin-id"
 
 linters-settings:
+  importas:
+    # Do not allow unaliased imports of aliased packages.
+    no-unaliased: true
+
+    alias:
+      - pkg: github.com/opencontainers/image-spec/specs-go/v1
+        alias: ocispec
+
   gosec:
     # The following issues surfaced when `gosec` linter
     # was enabled. They are temporarily excluded to unblock

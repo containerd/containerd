@@ -26,7 +26,7 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/tracing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -80,8 +80,8 @@ func toCRIImage(image imagestore.Image) *runtime.Image {
 
 // TODO (mikebrow): discuss moving this struct and / or constants for info map for some or all of these fields to CRI
 type verboseImageInfo struct {
-	ChainID   string          `json:"chainID"`
-	ImageSpec imagespec.Image `json:"imageSpec"`
+	ChainID   string        `json:"chainID"`
+	ImageSpec ocispec.Image `json:"imageSpec"`
 }
 
 // toCRIImageInfo converts internal image object information to CRI image status response info map.

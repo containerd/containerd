@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/platforms"
 	pluginutils "github.com/containerd/containerd/plugin"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"
 )
@@ -149,7 +149,7 @@ var listCommand = cli.Command{
 func prettyPlatforms(pspb []*types.Platform) string {
 	psm := map[string]struct{}{}
 	for _, p := range pspb {
-		psm[platforms.Format(v1.Platform{
+		psm[platforms.Format(ocispec.Platform{
 			OS:           p.OS,
 			Architecture: p.Architecture,
 			Variant:      p.Variant,

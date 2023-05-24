@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
@@ -50,7 +50,7 @@ import (
 )
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
-	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
+	*ocispec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
 	config := &runtime.ContainerConfig{
 		Metadata: &runtime.ContainerMetadata{
 			Name:    "test-name",
@@ -113,7 +113,7 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			SecurityContext: &runtime.LinuxSandboxSecurityContext{},
 		},
 	}
-	imageConfig := &imagespec.ImageConfig{
+	imageConfig := &ocispec.ImageConfig{
 		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
 		Entrypoint: []string{"/entrypoint"},
 		Cmd:        []string{"cmd"},
@@ -1110,9 +1110,9 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 			defaultProfile: runtimeDefault,
 			specOpts:       seccomp.WithDefaultProfile(),
 		},
-		//-----------------------------------------------
+		// -----------------------------------------------
 		// now buckets for the SecurityProfile variants
-		//-----------------------------------------------
+		// -----------------------------------------------
 		{
 			desc:      "sp should return error if seccomp is specified when seccomp is not supported",
 			disable:   true,
@@ -1279,9 +1279,9 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			profile:   "test-profile",
 			expectErr: true,
 		},
-		//--------------------------------------
+		// --------------------------------------
 		// buckets for SecurityProfile struct
-		//--------------------------------------
+		// --------------------------------------
 		{
 			desc:      "sp should return error if apparmor is specified when apparmor is not supported",
 			disable:   true,

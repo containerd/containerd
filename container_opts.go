@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/image-spec/identity"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // DeleteOpts allows the caller to set options for the deletion of a container
@@ -121,11 +121,11 @@ func WithImageConfigLabels(image Image) NewContainerOpts {
 			return err
 		}
 		var (
-			ociimage v1.Image
-			config   v1.ImageConfig
+			ociimage ocispec.Image
+			config   ocispec.ImageConfig
 		)
 		switch ic.MediaType {
-		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
+		case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
 			p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
 			if err != nil {
 				return err

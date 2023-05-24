@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -38,8 +38,8 @@ func TestImageStatus(t *testing.T) {
 			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		},
 		Size: 1234,
-		ImageSpec: imagespec.Image{
-			Config: imagespec.ImageConfig{
+		ImageSpec: ocispec.Image{
+			Config: ocispec.ImageConfig{
 				User: "user:group",
 			},
 		},

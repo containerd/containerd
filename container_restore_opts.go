@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/protobuf/proto"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -40,10 +40,10 @@ var (
 )
 
 // RestoreOpts are options to manage the restore operation
-type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index) NewContainerOpts
+type RestoreOpts func(context.Context, string, *Client, Image, *ocispec.Index) NewContainerOpts
 
 // WithRestoreImage restores the image for the container
-func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
+func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint Image, index *ocispec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		name, ok := index.Annotations[checkpointImageNameLabel]
 		if !ok || name == "" {
@@ -74,7 +74,7 @@ func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint
 }
 
 // WithRestoreRuntime restores the runtime for the container
-func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
+func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoint Image, index *ocispec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		name, ok := index.Annotations[checkpointRuntimeNameLabel]
 		if !ok {
@@ -109,7 +109,7 @@ func WithRestoreRuntime(ctx context.Context, id string, client *Client, checkpoi
 }
 
 // WithRestoreSpec restores the spec from the checkpoint for the container
-func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
+func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint Image, index *ocispec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		m, err := GetIndexByMediaType(index, images.MediaTypeContainerd1CheckpointConfig)
 		if err != nil {
@@ -130,10 +130,10 @@ func WithRestoreSpec(ctx context.Context, id string, client *Client, checkpoint 
 }
 
 // WithRestoreRW restores the rw layer from the checkpoint for the container
-func WithRestoreRW(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
+func WithRestoreRW(ctx context.Context, id string, client *Client, checkpoint Image, index *ocispec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		// apply rw layer
-		rw, err := GetIndexByMediaType(index, imagespec.MediaTypeImageLayerGzip)
+		rw, err := GetIndexByMediaType(index, ocispec.MediaTypeImageLayerGzip)
 		if err != nil {
 			return err
 		}

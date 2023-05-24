@@ -19,7 +19,7 @@ package podsandbox
 import (
 	"testing"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/opts"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *ocispec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
@@ -48,7 +48,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 			},
 		},
 	}
-	imageConfig := &imagespec.ImageConfig{
+	imageConfig := &ocispec.ImageConfig{
 		Env:        []string{"a=b", "c=d"},
 		Entrypoint: []string{"/pause"},
 		Cmd:        []string{"forever"},

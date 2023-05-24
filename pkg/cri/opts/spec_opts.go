@@ -25,7 +25,7 @@ import (
 	"sort"
 	"strings"
 
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -56,7 +56,7 @@ func WithoutRoot(ctx context.Context, client oci.Client, c *containers.Container
 }
 
 // WithProcessArgs sets the process args on the spec based on the image and runtime config
-func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConfig) oci.SpecOpts {
+func WithProcessArgs(config *runtime.ContainerConfig, image *ocispec.ImageConfig) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
 		command, args := config.GetCommand(), config.GetArgs()
 		// The following logic is migrated from https://github.com/moby/moby/blob/master/daemon/commit.go

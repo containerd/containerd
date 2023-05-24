@@ -22,7 +22,7 @@ import (
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -31,7 +31,7 @@ import (
 )
 
 func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
+	imageConfig *ocispec.ImageConfig, nsPath string, runtimePodAnnotations []string) (*runtimespec.Spec, error) {
 	// Creates a spec Generator with the default spec.
 	specOpts := []oci.SpecOpts{
 		oci.WithEnv(imageConfig.Env),
@@ -89,7 +89,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 }
 
 // No sandbox container spec options for windows yet.
-func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+func (c *criService) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, imageConfig *ocispec.ImageConfig) ([]oci.SpecOpts, error) {
 	return nil, nil
 }
 

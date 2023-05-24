@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/typeurl/v2"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -42,13 +42,13 @@ func TestSandboxContainerSpec(t *testing.T) {
 		desc              string
 		configChange      func(*runtime.PodSandboxConfig)
 		podAnnotations    []string
-		imageConfigChange func(*imagespec.ImageConfig)
+		imageConfigChange func(*ocispec.ImageConfig)
 		specCheck         func(*testing.T, *runtimespec.Spec)
 		expectErr         bool
 	}{
 		{
 			desc: "should return error when entrypoint and cmd are empty",
-			imageConfigChange: func(c *imagespec.ImageConfig) {
+			imageConfigChange: func(c *ocispec.ImageConfig) {
 				c.Entrypoint = nil
 				c.Cmd = nil
 			},
