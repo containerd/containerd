@@ -63,7 +63,7 @@ type CRIService interface {
 	// Closer is used by containerd to gracefully stop cri service.
 	io.Closer
 
-	Run() error
+	Run(ready func()) error
 
 	Register(*grpc.Server) error
 }
@@ -237,7 +237,7 @@ func (c *criService) RegisterTCP(s *grpc.Server) error {
 }
 
 // Run starts the CRI service.
-func (c *criService) Run() error {
+func (c *criService) Run(ready func()) error {
 	log.L.Info("Start subscribing containerd event")
 	c.eventMonitor.subscribe(c.client)
 
@@ -291,6 +291,7 @@ func (c *criService) Run() error {
 
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Store(true)
+	ready()
 
 	var eventMonitorErr, streamServerErr, cniNetConfMonitorErr error
 	// Stop the whole CRI service if any of the critical service exits.
