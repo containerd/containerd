@@ -270,12 +270,21 @@ can be used and modified as necessary as a custom configuration.`
 		}
 		serve(ctx, l, server.ServeGRPC)
 
-		if err := notifyReady(ctx); err != nil {
-			log.G(ctx).WithError(err).Warn("notify ready failed")
-		}
+		readyC := make(chan struct{})
+		go func() {
+			server.Wait()
+			close(readyC)
+		}()
 
-		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
-		<-done
+		select {
+		case <-readyC:
+			if err := notifyReady(ctx); err != nil {
+				log.G(ctx).WithError(err).Warn("notify ready failed")
+			}
+			log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
+			<-done
+		case <-done:
+		}
 		return nil
 	}
 	return app
