@@ -218,6 +218,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		initContext.Events = events
 		initContext.Address = config.GRPC.Address
 		initContext.TTRPCAddress = config.TTRPC.Address
+		initContext.RegisterReadiness = s.RegisterReadiness
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
@@ -293,6 +294,7 @@ type Server struct {
 	tcpServer   *grpc.Server
 	config      *srvconfig.Config
 	plugins     []*plugin.Plugin
+	ready       sync.WaitGroup
 }
 
 // ServeGRPC provides the containerd grpc APIs on the provided listener
@@ -368,6 +370,17 @@ func (s *Server) Stop() {
 				Error("failed to close plugin")
 		}
 	}
+}
+
+func (s *Server) RegisterReadiness() func() {
+	s.ready.Add(1)
+	return func() {
+		s.ready.Done()
+	}
+}
+
+func (s *Server) Wait() {
+	s.ready.Wait()
 }
 
 // LoadPlugins loads all plugins into containerd and generates an ordered graph
