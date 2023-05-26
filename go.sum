@@ -266,8 +266,9 @@ github.com/containerd/zfs v0.0.0-20200918131355-0a33824f23a2/go.mod h1:8IgZOBdv8
 github.com/containerd/zfs v0.0.0-20210301145711-11e8f1707f62/go.mod h1:A9zfAbMlQwE+/is6hi0Xw8ktpL+6glmqZYtevJgaB8Y=
 github.com/containerd/zfs v0.0.0-20210315114300-dde8f0fda960/go.mod h1:m+m51S1DvAP6r3FcmYCp54bQ34pyOwTieQDNRIRHsFY=
 github.com/containerd/zfs v0.0.0-20210324211415-d5c4544f0433/go.mod h1:m+m51S1DvAP6r3FcmYCp54bQ34pyOwTieQDNRIRHsFY=
-github.com/containerd/zfs v1.0.0 h1:cXLJbx+4Jj7rNsTiqVfm6i+RNLx6FFA2fMmDlEf+Wm8=
 github.com/containerd/zfs v1.0.0/go.mod h1:m+m51S1DvAP6r3FcmYCp54bQ34pyOwTieQDNRIRHsFY=
+github.com/containerd/zfs v1.1.0 h1:n7OZ7jZumLIqNJqXrEc/paBM840mORnmGdJDmAmJZHM=
+github.com/containerd/zfs v1.1.0/go.mod h1:oZF9wBnrnQjpWLaPKEinrx3TQ9a+W/RJO7Zb41d8YLE=
 github.com/containernetworking/cni v0.7.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/containernetworking/cni v0.8.0/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
 github.com/containernetworking/cni v0.8.1/go.mod h1:LGwApLUm2FpoOfxTDEeq8T9ipbpZ61X79hmU3w8FmsY=
@@ -503,8 +504,9 @@ github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm4
 github.com/google/uuid v1.0.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/google/uuid v1.2.0 h1:qJYtXnJRWmpe7m/3XlyhrsLrEURqHRM2kxzoxXqyUDs=
 github.com/google/uuid v1.2.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/googleapis/gnostic v0.4.1/go.mod h1:LRhVm6pbyptWbWbuZ38d1eyptfvIytN3ir6b65WBswg=
@@ -631,8 +633,9 @@ github.com/miekg/dns v1.0.14/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3N
 github.com/miekg/pkcs11 v1.0.3/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WTFxgs=
 github.com/miekg/pkcs11 v1.1.1 h1:Ugu9pdy6vAYku5DEpVWVFPYnzV+bxB+iRdbuFSu7TvU=
 github.com/miekg/pkcs11 v1.1.1/go.mod h1:XsNlhZGX73bx86s2hdc/FuaLm2CPZJemRLMA+WTFxgs=
-github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible h1:aKW/4cBs+yK6gpqU3K/oIwk9Q/XICqd3zOX/UFuvqmk=
 github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible/go.mod h1:8AuVvqP/mXw1px98n46wfvcGfQ4ci2FwoAjKYxuo3Z4=
+github.com/mistifyio/go-zfs/v3 v3.0.1 h1:YaoXgBePoMA12+S1u/ddkv+QqxcfiZK4prI6HPnkFiU=
+github.com/mistifyio/go-zfs/v3 v3.0.1/go.mod h1:CzVgeB0RvF2EGzQnytKVvVSDwmKJXxkOTUGbNrTja/k=
 github.com/mitchellh/cli v1.0.0/go.mod h1:hNIlj7HEI86fIcpObd7a0FcrxTWetlwJDGcceTlRvqc=
 github.com/mitchellh/go-homedir v1.0.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
 github.com/mitchellh/go-homedir v1.1.0/go.mod h1:SfyaCUpYCn1Vlf4IUYiD9fPX4A5wJrkLzIz1N1q0pr0=
