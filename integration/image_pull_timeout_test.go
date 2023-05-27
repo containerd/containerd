@@ -257,13 +257,6 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 					Endpoints: []string{mirrorURL.String()},
 				},
 			},
-			Configs: map[string]criconfig.RegistryConfig{
-				mirrorURL.Host: {
-					TLS: &criconfig.TLSConfig{
-						InsecureSkipVerify: true,
-					},
-				},
-			},
 		},
 	} {
 		criService, err := initLocalCRIPlugin(cli, tmpDir, registryCfg)

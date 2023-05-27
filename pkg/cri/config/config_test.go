@@ -112,27 +112,6 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`mirrors` cannot be set when `config_path` is provided",
 		},
-		"conflicting tls registry config": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
-				Registry: Registry{
-					ConfigPath: "/etc/containerd/conf.d",
-					Configs: map[string]RegistryConfig{
-						"something.io": {
-							TLS: &TLSConfig{},
-						},
-					},
-				},
-			},
-			expectedErr: "`configs.tls` cannot be set when `config_path` is provided",
-		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			config: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
