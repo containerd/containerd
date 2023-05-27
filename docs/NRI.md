@@ -13,7 +13,7 @@ use to integrate to and interact with NRI and plugins. In principle
 any NRI plugin should be able to work with NRI-enabled runtimes.
 
 For a detailed description of NRI and its capabilities please take a
-look at the [NRI respository](https://github.com/containerd/nri).
+look at the [NRI repository](https://github.com/containerd/nri).
 
 ## Containerd NRI Integration
 
