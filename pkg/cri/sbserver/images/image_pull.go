@@ -19,7 +19,6 @@ package images
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -27,7 +26,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -340,48 +338,6 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	return nil
 }
 
-// getTLSConfig returns a TLSConfig configured with a CA/Cert/Key specified by registryTLSConfig
-func (c *CRIImageService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.Config, error) {
-	var (
-		tlsConfig = &tls.Config{}
-		cert      tls.Certificate
-		err       error
-	)
-	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile == "" {
-		return nil, fmt.Errorf("cert file %q was specified, but no corresponding key file was specified", registryTLSConfig.CertFile)
-	}
-	if registryTLSConfig.CertFile == "" && registryTLSConfig.KeyFile != "" {
-		return nil, fmt.Errorf("key file %q was specified, but no corresponding cert file was specified", registryTLSConfig.KeyFile)
-	}
-	if registryTLSConfig.CertFile != "" && registryTLSConfig.KeyFile != "" {
-		cert, err = tls.LoadX509KeyPair(registryTLSConfig.CertFile, registryTLSConfig.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load cert file: %w", err)
-		}
-		if len(cert.Certificate) != 0 {
-			tlsConfig.Certificates = []tls.Certificate{cert}
-		}
-		// TODO(thaJeztah): verify if we should ignore the deprecation; see https://github.com/containerd/containerd/pull/7349/files#r990644833
-		tlsConfig.BuildNameToCertificate() //nolint:staticcheck
-	}
-
-	if registryTLSConfig.CAFile != "" {
-		caCertPool, err := x509.SystemCertPool()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get system cert pool: %w", err)
-		}
-		caCert, err := os.ReadFile(registryTLSConfig.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load CA file: %w", err)
-		}
-		caCertPool.AppendCertsFromPEM(caCert)
-		tlsConfig.RootCAs = caCertPool
-	}
-
-	tlsConfig.InsecureSkipVerify = registryTLSConfig.InsecureSkipVerify
-	return tlsConfig, nil
-}
-
 func hostDirFromRoots(roots []string) func(string) (string, error) {
 	rootfn := make([]func(string) (string, error), len(roots))
 	for i := range roots {
@@ -439,12 +395,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, auth *runtime.AuthC
 				config    = c.config.Registry.Configs[u.Host]
 			)
 
-			if config.TLS != nil {
-				transport.TLSClientConfig, err = c.getTLSConfig(*config.TLS)
-				if err != nil {
-					return nil, fmt.Errorf("get TLSConfig for registry %q: %w", e, err)
-				}
-			} else if docker.IsLocalhost(host) && u.Scheme == "http" {
+			if docker.IsLocalhost(host) && u.Scheme == "http" {
 				// Skipping TLS verification for localhost
 				transport.TLSClientConfig = &tls.Config{
 					InsecureSkipVerify: true,

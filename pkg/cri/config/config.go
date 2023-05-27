@@ -179,14 +179,6 @@ type AuthConfig struct {
 	IdentityToken string `toml:"identitytoken" json:"identitytoken"`
 }
 
-// TLSConfig contains the CA/Cert/Key used for a registry
-type TLSConfig struct {
-	InsecureSkipVerify bool   `toml:"insecure_skip_verify" json:"insecure_skip_verify"`
-	CAFile             string `toml:"ca_file" json:"caFile"`
-	CertFile           string `toml:"cert_file" json:"certFile"`
-	KeyFile            string `toml:"key_file" json:"keyFile"`
-}
-
 // Registry is registry settings configured
 type Registry struct {
 	// ConfigPath is a path to the root directory containing registry-specific
@@ -213,11 +205,6 @@ type Registry struct {
 type RegistryConfig struct {
 	// Auth contains information to authenticate to the registry.
 	Auth *AuthConfig `toml:"auth" json:"auth"`
-	// TLS is a pair of CA/Cert/Key which then are used when creating the transport
-	// that communicates with the registry.
-	// This field will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 1.7.
-	TLS *TLSConfig `toml:"tls" json:"tls"`
 }
 
 // ImageDecryption contains configuration to handling decryption of encrypted container images.
@@ -411,19 +398,6 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			return errors.New("`mirrors` cannot be set when `config_path` is provided")
 		}
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
-	}
-	var hasDeprecatedTLS bool
-	for _, r := range c.Registry.Configs {
-		if r.TLS != nil {
-			hasDeprecatedTLS = true
-			break
-		}
-	}
-	if hasDeprecatedTLS {
-		if useConfigPath {
-			return errors.New("`configs.tls` cannot be set when `config_path` is provided")
-		}
-		log.G(ctx).Warning("`configs.tls` is deprecated, please use `config_path` instead")
 	}
 
 	// Validation for deprecated auths options and mapping it to configs.
