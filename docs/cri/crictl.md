@@ -59,29 +59,29 @@ command. With the load command you inject a container image into the container
 runtime from a file. First you need to create a container image tarball. For
 example to create an image tarball for a pause container using Docker:
 ```console
-$ docker pull registry.k8s.io/pause:3.7
-  3.7: Pulling from pause
+$ docker pull registry.k8s.io/pause:3.9
+  3.9: Pulling from pause
   7582c2cc65ef: Pull complete
-  Digest: sha256:bb6ed397957e9ca7c65ada0db5c5d1c707c9c8afc80a94acbe69f3ae76988f0c
-  Status: Downloaded newer image for registry.k8s.io/pause:3.7
-  registry.k8s.io/pause:3.7
-$ docker save registry.k8s.io/pause:3.7 -o pause.tar
+  Digest: sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097
+  Status: Downloaded newer image for registry.k8s.io/pause:3.9
+  registry.k8s.io/pause:3.9
+$ docker save registry.k8s.io/pause:3.9 -o pause.tar
 ```
 Then use `ctr` to load the container image into the container runtime:
 ```console
 # The cri plugin uses the "k8s.io" containerd namespace.
 $ sudo ctr -n=k8s.io images import pause.tar
-  Loaded image: registry.k8s.io/pause:3.7
+  Loaded image: registry.k8s.io/pause:3.9
 ```
 List images and inspect the pause image:
 ```console
 $ sudo crictl images
 IMAGE                       TAG                 IMAGE ID            SIZE
 docker.io/library/busybox   latest              f6e427c148a76       728kB
-registry.k8s.io/pause            3.7                 221177c6082a8       311kB
-$ sudo crictl inspecti 221177c6082a8
+registry.k8s.io/pause            3.9                 e6f181688397       311kB
+$ sudo crictl inspecti e6f181688397
   ... displays information about the pause image.
-$ sudo crictl inspecti registry.k8s.io/pause:3.7
+$ sudo crictl inspecti registry.k8s.io/pause:3.9
   ... displays information about the pause image.
 ```
 
@@ -290,7 +290,7 @@ $ crictl info
     "streamIdleTimeout": "4h0m0s",
     "enableSelinux": false,
     "selinuxCategoryRange": 1024,
-    "sandboxImage": "registry.k8s.io/pause:3.8",
+    "sandboxImage": "registry.k8s.io/pause:3.9",
     "statsCollectPeriod": 10,
     "systemdCgroup": false,
     "enableTLSStreaming": false,
