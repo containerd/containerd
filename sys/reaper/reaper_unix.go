@@ -34,7 +34,7 @@ import (
 // ErrNoSuchProcess is returned when the process no longer exists
 var ErrNoSuchProcess = errors.New("no such process")
 
-const bufferSize = 32
+const bufferSize = 1024
 
 type subscriber struct {
 	sync.Mutex
