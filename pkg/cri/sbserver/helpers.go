@@ -136,6 +136,7 @@ func (c *criService) getSandboxDevShm(id string) string {
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
 // generated is unique as long as sandbox metadata is unique.
+// If you modify the way the name is generated, you need to modify this method at the same time, streaming.SplitSandboxName
 func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
 		s.Name,                       // 0

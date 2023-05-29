@@ -40,6 +40,8 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"google.golang.org/grpc/codes"
@@ -83,6 +85,10 @@ type Runtime interface {
 	PortForward(podSandboxID string, port int32, stream io.ReadWriteCloser) error
 }
 
+type CRIStatusServer interface {
+	GetStatus(podSandboxID string) (*runtimeapi.PodSandboxStatusResponse, error)
+}
+
 // Config defines the options used for running the stream server.
 type Config struct {
 	// The host:port address the server will listen on.
@@ -122,10 +128,10 @@ var DefaultConfig = Config{
 
 // NewServer creates a new Server for stream requests.
 // TODO(tallclair): Add auth(n/z) interface & handling.
-func NewServer(config Config, runtime Runtime) (Server, error) {
+func NewServer(config Config, runtime Runtime, statusServer CRIStatusServer) (Server, error) {
 	s := &server{
 		config:  config,
-		runtime: &criAdapter{runtime},
+		runtime: &criAdapter{runtime, statusServer},
 		cache:   newRequestCache(),
 	}
 
@@ -366,6 +372,25 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		return
 	}
 
+	sandboxStatusResp, err := s.runtime.GetStatus(pf.PodSandboxId)
+	if err != nil && sandboxStatusResp != nil && sandboxStatusResp.Status != nil && sandboxStatusResp.Status.Metadata != nil {
+		sandboxName := sandboxStatusResp.Status.Metadata.Name
+		metadata := SplitSandboxName(sandboxName)
+		if metadata != nil {
+			portforward.ServePortForward(
+				resp.ResponseWriter,
+				req.Request,
+				s.runtime,
+				metadata.Name,
+				types.UID(pf.PodSandboxId),
+				portForwardOptions,
+				s.config.StreamIdleTimeout,
+				s.config.StreamCreationTimeout,
+				s.config.SupportedPortForwardProtocols)
+			return
+		}
+	}
+
 	portforward.ServePortForward(
 		resp.ResponseWriter,
 		req.Request,
@@ -382,6 +407,7 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 // The adapter binds the container ID to the container name argument, and the pod sandbox ID to the pod name.
 type criAdapter struct {
 	Runtime
+	CRIStatusServer
 }
 
 var _ remotecommandserver.Executor = &criAdapter{}
@@ -397,5 +423,29 @@ func (a *criAdapter) AttachContainer(podName string, podUID types.UID, container
 }
 
 func (a *criAdapter) PortForward(podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
+	if podUID != "" {
+		return a.Runtime.PortForward(string(podUID), port, stream)
+	}
 	return a.Runtime.PortForward(podName, port, stream)
+}
+
+func (a *criAdapter) GetStatus(podSandboxID string) (*runtimeapi.PodSandboxStatusResponse, error) {
+	if podSandboxID == "" {
+		return nil, errors.New("podSandboxID is empty")
+	}
+	return a.CRIStatusServer.GetStatus(podSandboxID)
+}
+
+func SplitSandboxName(name string) *runtimeapi.PodSandboxMetadata {
+	split := strings.Split(name, "_")
+	if len(split) != 4 {
+		return nil
+	}
+	attempt, _ := strconv.ParseUint(split[3], 10, 32)
+	return &runtimeapi.PodSandboxMetadata{
+		Name:      split[0],
+		Namespace: split[1],
+		Uid:       split[2],
+		Attempt:   uint32(attempt),
+	}
 }

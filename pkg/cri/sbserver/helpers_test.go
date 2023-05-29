@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
@@ -558,4 +559,19 @@ func TestHostNetwork(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_makeSandboxName(t *testing.T) {
+	sandboxName := makeSandboxName(&runtime.PodSandboxMetadata{
+		Name:      "nginx",
+		Uid:       "1234567890",
+		Namespace: "default",
+		Attempt:   0,
+	})
+	assert.Equal(t, "nginx_default_1234567890_0", sandboxName)
+	metadata := streaming.SplitSandboxName(sandboxName)
+	assert.Equal(t, "nginx", metadata.Name)
+	assert.Equal(t, "1234567890", metadata.Uid)
+	assert.Equal(t, "default", metadata.Namespace)
+	assert.Equal(t, uint32(0), metadata.Attempt)
 }

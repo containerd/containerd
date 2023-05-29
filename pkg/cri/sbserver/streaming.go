@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
 	k8scert "k8s.io/client-go/util/cert"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/utils/exec"
 
 	"github.com/containerd/containerd/pkg/cri/streaming"
@@ -85,6 +86,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 	}
 	config.Addr = net.JoinHostPort(addr, port)
 	run := newStreamRuntime(c)
+	statusServer := newStreamStatusServer(c)
 	tlsMode, err := getStreamListenerMode(c)
 	if err != nil {
 		return nil, fmt.Errorf("invalid stream server configuration: %w", err)
@@ -98,7 +100,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 		config.TLSConfig = &tls.Config{
 			Certificates: []tls.Certificate{tlsCert},
 		}
-		return streaming.NewServer(config, run)
+		return streaming.NewServer(config, run, statusServer)
 	case selfSignTLS:
 		tlsCert, err := newTLSCert()
 		if err != nil {
@@ -108,9 +110,9 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 			Certificates:       []tls.Certificate{tlsCert},
 			InsecureSkipVerify: true,
 		}
-		return streaming.NewServer(config, run)
+		return streaming.NewServer(config, run, statusServer)
 	case withoutTLS:
-		return streaming.NewServer(config, run)
+		return streaming.NewServer(config, run, statusServer)
 	default:
 		return nil, errors.New("invalid configuration for the stream listener")
 	}
@@ -121,6 +123,10 @@ type streamRuntime struct {
 }
 
 func newStreamRuntime(c *criService) streaming.Runtime {
+	return &streamRuntime{c: c}
+}
+
+func newStreamStatusServer(c *criService) streaming.CRIStatusServer {
 	return &streamRuntime{c: c}
 }
 
@@ -159,6 +165,12 @@ func (s *streamRuntime) PortForward(podSandboxID string, port int32, stream io.R
 	}
 	ctx := ctrdutil.NamespacedContext()
 	return s.c.portForward(ctx, podSandboxID, port, stream)
+}
+
+func (s *streamRuntime) GetStatus(podSandboxID string) (*runtimeapi.PodSandboxStatusResponse, error) {
+	ctx := ctrdutil.NamespacedContext()
+	request := &runtimeapi.PodSandboxStatusRequest{PodSandboxId: podSandboxID}
+	return s.c.PodSandboxStatus(ctx, request)
 }
 
 // handleResizing spawns a goroutine that processes the resize channel, calling resizeFunc for each
