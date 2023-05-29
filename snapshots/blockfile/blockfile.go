@@ -122,7 +122,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		config.fsType = "ext4"
 	}
 
-	if config.mountOptions != nil {
+	if config.mountOptions == nil {
 		config.mountOptions = []string{"loop"}
 	}
 
