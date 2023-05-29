@@ -17,13 +17,16 @@
 package config
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"sort"
 	"testing"
 
+	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/plugin"
 )
 
@@ -227,4 +230,57 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	var out Config
 	err = LoadConfig(path, &out)
 	assert.ErrorContains(t, err, "config version `1` is no longer supported")
+}
+
+func TestWarnUnsupportedPropertiesLoadConfig(t *testing.T) {
+	data := `
+root = "/var/lib/containerd"
+state = "/run/containerd"
+version = 2
+test = "test"
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      [plugins."io.containerd.grpc.v1.cri".registry.mirrors]
+        [plugins."io.containerd.grpc.v1.cri".registry.mirrors."gcr.io"]
+          endpoint = ["https://test.gcr.io"]
+          not_exist = "test"
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	err := os.WriteFile(path, []byte(data), 0600)
+	assert.NoError(t, err)
+
+	_, warnErr, err := loadConfigFile(path)
+	assert.NoError(t, err)
+	assert.ErrorContains(t, warnErr, "undecoded keys: [\"test\"]")
+}
+
+func Test_validateUnsupportedNonPluginProperties(t *testing.T) {
+	data := `
+root = "/var/lib/containerd"
+state = "/run/containerd"
+version = 2
+test = "test"
+`
+	r := bytes.NewReader([]byte(data))
+	err := validateUnsupportedNonPluginProperties(r)
+	assert.ErrorContains(t, err, "undecoded keys: [\"test\"]")
+}
+
+func Test_validateUnsupportedPluginProperties(t *testing.T) {
+	c := Config{}
+	tree := map[string]interface{}{
+		"registry": map[string]interface{}{
+			"mirrors": map[string]interface{}{
+				"gcr.io": map[string]interface{}{
+					"endpoint":  []string{"https://test.gcr.io"},
+					"not_exist": "test",
+				},
+			},
+		},
+	}
+	data, _ := toml.TreeFromMap(tree)
+	pluginConfig := criconfig.DefaultConfig()
+	err := c.validateUnsupportedPluginProperties(*data, &pluginConfig)
+	assert.ErrorContains(t, err, "undecoded keys: [\"registry.mirrors.gcr.io.not_exist\"]")
 }

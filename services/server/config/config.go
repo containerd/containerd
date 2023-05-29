@@ -17,16 +17,20 @@
 package config
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/plugin"
 	"github.com/imdario/mergo"
 	"github.com/pelletier/go-toml"
-
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/plugin"
 )
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
@@ -179,10 +183,27 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 	if !ok {
 		return p.Config, nil
 	}
+	// print warn when unsupported properties in plugin config file
+	if err := c.validateUnsupportedPluginProperties(data, p.Config); err != nil {
+		log.L.Warnf("unsupported properties in config file,err: %v", err)
+	}
+
 	if err := data.Unmarshal(p.Config); err != nil {
 		return nil, err
 	}
 	return p.Config, nil
+}
+
+// validaPluginConfigUnsupported validates if the config file contains unsupported properties
+func (c *Config) validateUnsupportedPluginProperties(data toml.Tree, cfg interface{}) error {
+	tmpCfg := cfg
+	tomlStr, err := data.ToTomlString()
+	if err != nil {
+		log.L.Errorf("failed to convert toml tree to string,err: %v", err)
+		return err
+	}
+	r := bytes.NewReader([]byte(tomlStr))
+	return toml.NewDecoder(r).Strict(true).Decode(tmpCfg)
 }
 
 // LoadConfig loads the containerd server config from the provided path
@@ -204,7 +225,7 @@ func LoadConfig(path string, out *Config) error {
 			continue
 		}
 
-		config, err := loadConfigFile(path)
+		config, _, err := loadConfigFile(path)
 		if err != nil {
 			return err
 		}
@@ -236,19 +257,55 @@ func LoadConfig(path string, out *Config) error {
 }
 
 // loadConfigFile decodes a TOML file at the given path
-func loadConfigFile(path string) (*Config, error) {
+func loadConfigFile(path string) (*Config, error, error) {
 	config := &Config{}
+	var warnErr error
+
+	// print warn when unsupported properties in config file
+	cfgFile, err := os.Open(path)
+	if err != nil {
+		return nil, warnErr, fmt.Errorf("failed to open config file: %s, err: %w", path, err)
+	}
+	defer cfgFile.Close()
+
+	if err = validateUnsupportedNonPluginProperties(cfgFile); err != nil {
+		log.L.Warnf("unsupported properties in config file: %s, err: %v", path, err)
+		warnErr = err
+	}
 
 	file, err := toml.LoadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load TOML: %s: %w", path, err)
+		return nil, warnErr, fmt.Errorf("failed to load TOML: %s: %w", path, err)
 	}
 
 	if err := file.Unmarshal(config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
+		return nil, warnErr, fmt.Errorf("failed to unmarshal TOML: %w", err)
 	}
 
-	return config, nil
+	return config, warnErr, nil
+}
+
+func validateUnsupportedNonPluginProperties(r io.Reader) error {
+	var tmpCfg Config
+	decoder := toml.NewDecoder(r).Strict(true)
+	if err := decoder.Decode(&tmpCfg); err != nil {
+		// when use go-toml v2 version, when can use StrictMissingError read DecodeError key, https://github.com/pelletier/go-toml/blob/8bb1e08dc7efa7d1b282953da2440f7edfb766d3/errors.go#L32
+		v := reflect.ValueOf(*decoder)
+		field := v.FieldByName("visitor").FieldByName("keys")
+		keys := field.MapKeys()
+		undecoded := make([]string, 0)
+		for _, key := range keys {
+			if strings.HasPrefix(key.String(), "plugins") {
+				continue
+			}
+			undecoded = append(undecoded, key.String())
+		}
+		if len(undecoded) == 0 {
+			return nil
+		}
+		return fmt.Errorf("undecoded keys: %q", undecoded)
+	}
+	return nil
 }
 
 // resolveImports resolves import strings list to absolute paths list:
