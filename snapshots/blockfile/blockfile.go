@@ -55,8 +55,7 @@ func WithScratchFile(src string) Opt {
 	return func(root string, config *SnapshotterConfig) {
 		config.scratchGenerator = func(dst string) error {
 			// Copy src to dst
-			scratch := filepath.Join(root, "scratch")
-			if err := fs.CopyFile(scratch, src); err != nil {
+			if err := fs.CopyFile(dst, src); err != nil {
 				return fmt.Errorf("failed to copy scratch: %w", err)
 			}
 			return nil
