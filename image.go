@@ -423,12 +423,12 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 		return err
 	}
 
-	rootfs := identity.ChainID(chain).String()
+	rootFS := identity.ChainID(chain).String()
 
 	cinfo := content.Info{
 		Digest: desc.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootfs,
+			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootFS,
 		},
 	}
 
