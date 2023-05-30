@@ -91,8 +91,8 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 		"manifests": [
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-				"size": 736,
-				"digest": "sha256:0d92c9993db0a3a2c38e5ffe31b150ea114922fca5dacbbe5ffbe75f64d6d674",
+				"size": 698,
+				"digest": "sha256:a73de573ba1830a0eb28a2b3976eb9ef270a8647d360fa70f15adc2c85f22ed3",
 				"platform": {
 					"architecture": "amd64",
 					"os": "linux"
@@ -100,8 +100,8 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 			},
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-				"size": 736,
-				"digest": "sha256:b9abb629fc01b6ce674b7bc4898dbb4d4a3f0766f4ccb13101e95fa44f9d9fad",
+				"size": 698,
+				"digest": "sha256:eb1fee73c590298329d379eb676565c443c34bc460a596c575aaaffed821690f",
 				"platform": {
 					"architecture": "arm64",
 					"os": "linux"
@@ -109,8 +109,8 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 			},
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-				"size": 736,
-				"digest": "sha256:ad3b2f13d23c6eb36310a2e5e9efede9fe815b3f13216049a41772168b6c6c31",
+				"size": 698,
+				"digest": "sha256:4ebd079e21fae2c2dfae912c69b60d609d81fceb727168a3e8b441879aa65307",
 				"platform": {
 					"architecture": "ppc64le",
 					"os": "linux"
@@ -119,31 +119,31 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
 				"size": 2796,
-				"digest": "sha256:0b329ba6f677012bbb17d381159661fb25accae42baf870c1e0dae9c40591c6c",
+				"digest": "sha256:1a9be70b621230dbc2731ff205ca378cfce011dd96bccb79b721c88e78c0d8de",
 				"platform": {
 					"architecture": "amd64",
 					"os": "windows",
-					"os.version": "10.0.17763.2452"
+					"os.version": "10.0.17763.4377"
 				}
 			},
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
 				"size": 2796,
-				"digest": "sha256:a246e419ad39e242deef88ceed67c400b2a3a217c5148a4a7054c5e5ac13d2af",
+				"digest": "sha256:34b5e440fe34fcb463f339db595937737363a694d470c220c407015b610c165a",
 				"platform": {
 					"architecture": "amd64",
 					"os": "windows",
-					"os.version": "10.0.19042.1466"
+					"os.version": "10.0.19042.1889"
 				}
 			},
 			{
 				"mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-				"size": 2797,
-				"digest": "sha256:7030c34dabb80a73f86a0fcccfa6c0b423bfea77f60f813749497df2d46b5eff",
+				"size": 2796,
+				"digest": "sha256:226db2ad1c68b6082a2cfd97fd6c0b87c7f0e3171b4fe2c22537f679285e6a20",
 				"platform": {
 					"architecture": "amd64",
 					"os": "windows",
-					"os.version": "10.0.20348.469"
+					"os.version": "10.0.20348.1726"
 				}
 			}
 		]
