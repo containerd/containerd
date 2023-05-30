@@ -93,12 +93,10 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 			defer close(stopCh)
 			exitStatus, exitedAt, err := c.waitSandboxExit(exitCtx, id, exitCh)
 			if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-				e := &eventtypes.TaskExit{
-					ContainerID: id,
-					ID:          id,
-					Pid:         task.Pid(),
-					ExitStatus:  exitStatus,
-					ExitedAt:    protobuf.ToTimestamp(exitedAt),
+				e := &eventtypes.SandboxExit{
+					SandboxID:  id,
+					ExitStatus: exitStatus,
+					ExitedAt:   protobuf.ToTimestamp(exitedAt),
 				}
 				logrus.WithError(err).Errorf("Failed to wait sandbox exit %+v", e)
 				// TODO: how to backoff
