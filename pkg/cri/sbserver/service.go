@@ -215,12 +215,6 @@ func (c *criService) BackOffEvent(id string, event interface{}) {
 	c.eventMonitor.backOff.enBackOff(id, event)
 }
 
-// GenerateAndSendContainerEvent is a temporary workaround to send PLEG events from podsandbopx/ controller
-// TODO: refactor PLEG event generator so both podsandbox/ controller and CRI service can access it.
-func (c *criService) GenerateAndSendContainerEvent(ctx context.Context, containerID string, sandboxID string, eventType runtime.ContainerEventType) {
-	c.generateAndSendContainerEvent(ctx, containerID, sandboxID, eventType)
-}
-
 // Register registers all required services onto a specific grpc server.
 // This is used by containerd cri plugin.
 func (c *criService) Register(s *grpc.Server) error {
