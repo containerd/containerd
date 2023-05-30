@@ -86,6 +86,10 @@ var platformRunFlags = []cli.Flag{
 		Name:  "cpuset-cpus",
 		Usage: "Set the CPUs the container will run in (e.g., 1-2,4)",
 	},
+	cli.StringFlag{
+		Name:  "cpuset-mems",
+		Usage: "Set the memory nodes the container will run in (e.g., 1-2,4)",
+	},
 }
 
 // NewContainer creates a new container
@@ -299,6 +303,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 		if cpusetCpus := context.String("cpuset-cpus"); len(cpusetCpus) > 0 {
 			opts = append(opts, oci.WithCPUs(cpusetCpus))
+		}
+
+		if cpusetMems := context.String("cpuset-mems"); len(cpusetMems) > 0 {
+			opts = append(opts, oci.WithCPUsMems(cpusetMems))
 		}
 
 		if shares := context.Int("cpu-shares"); shares > 0 {
