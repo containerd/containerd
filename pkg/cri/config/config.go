@@ -239,7 +239,7 @@ type Registry struct {
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 1.6.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0, supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
