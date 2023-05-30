@@ -41,7 +41,6 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/plugin"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
@@ -81,8 +80,6 @@ const (
 	// containerKindContainer is a label value indicating container is application container
 	containerKindContainer = "container"
 
-	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
-	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
 	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
 
@@ -331,13 +328,6 @@ func unknownContainerStatus() containerstore.Status {
 		ExitCode:   unknownExitCode,
 		Reason:     unknownExitReason,
 		Unknown:    true,
-	}
-}
-
-// unknownSandboxStatus returns the default sandbox status when its status is unknown.
-func unknownSandboxStatus() sandboxstore.Status {
-	return sandboxstore.Status{
-		State: sandboxstore.StateUnknown,
 	}
 }
 
