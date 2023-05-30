@@ -274,13 +274,16 @@ func compactLowerdirOption(opts []string) (string, []string) {
 	// in order to avoid to get snapshots/x, should be back to parent dir.
 	// however, there is assumption that the common dir is ${root}/io.containerd.v1.overlayfs/snapshots.
 	commondir = path.Dir(commondir)
-	if commondir == "/" {
+	if commondir == "/" || commondir == "." {
 		return "", opts
 	}
 	commondir = commondir + "/"
 
 	newdirs := make([]string, 0, len(dirs))
 	for _, dir := range dirs {
+		if len(dir) <= len(commondir) {
+			return "", opts
+		}
 		newdirs = append(newdirs, dir[len(commondir):])
 	}
 
