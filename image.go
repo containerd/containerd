@@ -58,7 +58,7 @@ type Image interface {
 	Usage(context.Context, ...UsageOpt) (int64, error)
 	// Config descriptor for the image.
 	Config(ctx context.Context) (ocispec.Descriptor, error)
-	// IsUnpacked returns whether or not an image is unpacked.
+	// IsUnpacked returns whether an image is unpacked.
 	IsUnpacked(context.Context, string) (bool, error)
 	// ContentStore provides a content store which contains image blob data
 	ContentStore() content.Store
@@ -285,15 +285,14 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 		return false, err
 	}
 
-	chainID := identity.ChainID(diffs)
-	_, err = sn.Stat(ctx, chainID.String())
-	if err == nil {
-		return true, nil
-	} else if !errdefs.IsNotFound(err) {
+	if _, err := sn.Stat(ctx, identity.ChainID(diffs).String()); err != nil {
+		if errdefs.IsNotFound(err) {
+			return false, nil
+		}
 		return false, err
 	}
 
-	return false, nil
+	return true, nil
 }
 
 func (i *image) Spec(ctx context.Context) (ocispec.Image, error) {
