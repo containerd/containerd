@@ -84,6 +84,13 @@ func TestCompactLowerdirOption(t *testing.T) {
 			"",
 			[]string{"lowerdir=/snapshots/1/fs:/other_snapshots/1/fs"},
 		},
+
+		// if common dir is .
+		{
+			[]string{"lowerdir=a:aaa"},
+			"",
+			[]string{"lowerdir=a:aaa"},
+		},
 	}
 
 	for i, tc := range tcases {
