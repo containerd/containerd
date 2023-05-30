@@ -19,14 +19,17 @@ package sandbox
 import (
 	"context"
 
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+
+	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func init() {
@@ -35,6 +38,7 @@ func init() {
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
 			plugin.SandboxControllerPlugin,
+			plugin.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			sc, err := ic.GetByID(plugin.SandboxControllerPlugin, "local")
@@ -42,15 +46,22 @@ func init() {
 				return nil, err
 			}
 
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			return &controllerService{
-				local: sc.(sandbox.Controller),
+				local:     sc.(sandbox.Controller),
+				publisher: ep.(events.Publisher),
 			}, nil
 		},
 	})
 }
 
 type controllerService struct {
-	local sandbox.Controller
+	local     sandbox.Controller
+	publisher events.Publisher
 	api.UnimplementedControllerServer
 }
 
@@ -68,6 +79,13 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 	if err != nil {
 		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
 	}
+
+	if err := s.publisher.Publish(ctx, "sandboxes/create", &eventtypes.SandboxCreate{
+		SandboxID: req.GetSandboxID(),
+	}); err != nil {
+		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
+	}
+
 	return &api.ControllerCreateResponse{
 		SandboxID: req.GetSandboxID(),
 	}, nil
@@ -79,6 +97,13 @@ func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartR
 	if err != nil {
 		return &api.ControllerStartResponse{}, errdefs.ToGRPC(err)
 	}
+
+	if err := s.publisher.Publish(ctx, "sandboxes/start", &eventtypes.SandboxStart{
+		SandboxID: req.GetSandboxID(),
+	}); err != nil {
+		return &api.ControllerStartResponse{}, errdefs.ToGRPC(err)
+	}
+
 	return &api.ControllerStartResponse{
 		SandboxID: inst.SandboxID,
 		Pid:       inst.Pid,
@@ -98,6 +123,15 @@ func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitReq
 	if err != nil {
 		return &api.ControllerWaitResponse{}, errdefs.ToGRPC(err)
 	}
+
+	if err := s.publisher.Publish(ctx, "sandboxes/exit", &eventtypes.SandboxExit{
+		SandboxID:  req.GetSandboxID(),
+		ExitStatus: exitStatus.ExitStatus,
+		ExitedAt:   protobuf.ToTimestamp(exitStatus.ExitedAt),
+	}); err != nil {
+		return &api.ControllerWaitResponse{}, errdefs.ToGRPC(err)
+	}
+
 	return &api.ControllerWaitResponse{
 		ExitStatus: exitStatus.ExitStatus,
 		ExitedAt:   protobuf.ToTimestamp(exitStatus.ExitedAt),
