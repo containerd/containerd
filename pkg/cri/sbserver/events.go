@@ -418,28 +418,11 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 
 // handleSandboxExit handles TaskExit event for sandbox.
 func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService) error {
-	// TODO: Move pause container cleanup to podsandbox/ package.
-	if sb.Container != nil {
-		// No stream attached to sandbox container.
-		task, err := sb.Container.Task(ctx, nil)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to load task for sandbox: %w", err)
-			}
-		} else {
-			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-			if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				if !errdefs.IsNotFound(err) {
-					return fmt.Errorf("failed to stop sandbox: %w", err)
-				}
-				// Move on to make sure container status is updated.
-			}
-		}
-	}
-
 	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
+		status.ExitStatus = e.ExitStatus
+		status.ExitedAt = e.ExitedAt.AsTime()
 		return status, nil
 	}); err != nil {
 		return fmt.Errorf("failed to update sandbox state: %w", err)
