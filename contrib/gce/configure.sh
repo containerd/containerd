@@ -192,13 +192,11 @@ rm -f "${CONTAINERD_HOME}/etc/crictl.yaml"
 config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
 mkdir -p $(dirname ${config_path})
 cni_bin_dir="${CONTAINERD_HOME}/opt/cni/bin"
-cni_template_path="${CONTAINERD_HOME}/opt/containerd/cluster/gce/cni.template"
 if [ "${KUBERNETES_MASTER:-}" != "true" ]; then
   if [ "${NETWORK_POLICY_PROVIDER:-"none"}" != "none" ] || [ "${ENABLE_NETD:-}" == "true" ]; then
     # Use Kubernetes cni daemonset on node if network policy provider is specified
     # or netd is enabled.
     cni_bin_dir="${KUBE_HOME}/bin"
-    cni_template_path=""
   fi
 fi
 # Use systemd cgroup if specified in env
@@ -222,7 +220,6 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
 [plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${cni_bin_dir}"
   conf_dir = "/etc/cni/net.d"
-  conf_template = "${cni_template_path}"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
 [plugins."io.containerd.grpc.v1.cri".containerd]
