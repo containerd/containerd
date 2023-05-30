@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -72,12 +73,13 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 	go ep.Run(ctx)
 	s := &service{
-		context:    ctx,
-		events:     make(chan interface{}, 128),
-		ec:         reaper.Default.Subscribe(),
-		ep:         ep,
-		shutdown:   sd,
-		containers: make(map[string]*runc.Container),
+		context:             ctx,
+		events:              make(chan interface{}, 128),
+		processEventsLocker: sync.Map{},
+		ec:                  reaper.Default.Subscribe(),
+		ep:                  ep,
+		shutdown:            sd,
+		containers:          make(map[string]*runc.Container),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -100,8 +102,8 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 
 // service is the shim implementation of a remote shim over GRPC
 type service struct {
-	mu          sync.Mutex
-	eventSendMu sync.Mutex
+	mu                  sync.Mutex
+	processEventsLocker sync.Map
 
 	context  context.Context
 	events   chan interface{}
@@ -158,10 +160,14 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	}
 
 	// hold the send lock so that the start events are sent before any exit events in the error case
-	s.eventSendMu.Lock()
+	lockKey := r.ExecID
+	if lockKey == "" {
+		lockKey = r.ID
+	}
+	s.processEventsLocker.Store(lockKey, struct{}{})
 	p, err := container.Start(ctx, r)
 	if err != nil {
-		s.eventSendMu.Unlock()
+		s.processEventsLocker.Delete(lockKey)
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -201,7 +207,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			Pid:         uint32(p.Pid()),
 		})
 	}
-	s.eventSendMu.Unlock()
+	s.processEventsLocker.Delete(lockKey)
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
 	}, nil
@@ -517,48 +523,67 @@ func (s *service) send(evt interface{}) {
 	s.events <- evt
 }
 
-func (s *service) sendL(evt interface{}) {
-	s.eventSendMu.Lock()
-	s.events <- evt
-	s.eventSendMu.Unlock()
-}
-
 func (s *service) checkProcesses(e runcC.Exit) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	containers := s.containers
+	s.mu.Unlock()
 
-	for _, container := range s.containers {
-		if !container.HasPid(e.Pid) {
-			continue
-		}
-
+	missing := make(map[process.Process]*runc.Container)
+	for _, container := range containers {
 		for _, p := range container.All() {
+			if _, starting := s.processEventsLocker.Load(p.ID()); starting {
+				missing[p] = container
+				continue
+			}
 			if p.Pid() != e.Pid {
 				continue
 			}
 
-			if ip, ok := p.(*process.Init); ok {
-				// Ensure all children are killed
-				if runc.ShouldKillAllOnExit(s.context, container.Bundle) {
-					if err := ip.KillAll(s.context); err != nil {
-						log.L.WithError(err).WithField("id", ip.ID()).
-							Error("failed to kill init's children")
-					}
-				}
-			}
-
-			p.SetExited(e.Status)
-			s.sendL(&eventstypes.TaskExit{
-				ContainerID: container.ID,
-				ID:          p.ID(),
-				Pid:         uint32(e.Pid),
-				ExitStatus:  uint32(e.Status),
-				ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
-			})
+			s.sendProcessEvent(e, p, container)
 			return
 		}
-		return
 	}
+
+	tryMissing := func(e runcC.Exit, p process.Process, c *runc.Container) {
+		for {
+			if _, starting := s.processEventsLocker.Load(p.ID()); !starting {
+				break
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+
+		if p.Pid() != e.Pid {
+			return
+		}
+		s.sendProcessEvent(e, p, c)
+	}
+	for p, c := range missing {
+		go tryMissing(e, p, c)
+	}
+}
+
+func (s *service) sendProcessEvent(e runcC.Exit, p process.Process, c *runc.Container) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if ip, ok := p.(*process.Init); ok {
+		// Ensure all children are killed
+		if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
+			if err := ip.KillAll(s.context); err != nil {
+				log.G(s.context).WithError(err).WithField("id", ip.ID()).
+					Error("failed to kill init's children")
+			}
+		}
+	}
+
+	p.SetExited(e.Status)
+	s.send(&eventstypes.TaskExit{
+		ContainerID: c.ID,
+		ID:          p.ID(),
+		Pid:         uint32(e.Pid),
+		ExitStatus:  uint32(e.Status),
+		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+	})
 }
 
 func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
