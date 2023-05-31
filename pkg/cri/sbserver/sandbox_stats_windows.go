@@ -36,7 +36,8 @@ import (
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox,
+) (*runtime.PodSandboxStats, error) {
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
