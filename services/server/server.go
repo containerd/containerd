@@ -41,7 +41,6 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
 	diffproxy "github.com/containerd/containerd/diff/proxy"
-	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
@@ -196,8 +195,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			ttrpcServer: ttrpcServer,
 			config:      config,
 		}
-		// TODO: Remove this in 2.0 and let event plugin crease it
-		events      = exchange.NewExchange()
 		initialized = plugin.NewPluginSet()
 		required    = make(map[string]struct{})
 	)
@@ -215,7 +212,6 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			config.Root,
 			config.State,
 		)
-		initContext.Events = events
 		initContext.Address = config.GRPC.Address
 		initContext.TTRPCAddress = config.TTRPC.Address
 		initContext.RegisterReadiness = s.RegisterReadiness
