@@ -26,8 +26,10 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/atomicfile"
 )
 
 // cniConfigTemplate contains the values containerd will overwrite
@@ -89,27 +91,8 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		log.G(ctx).Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
-	log.G(ctx).Infof("Generating cni config from template %q", confTemplate)
-	// generate cni config file from the template with updated pod cidr.
-	t, err := template.ParseFiles(confTemplate)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse cni config template %q: %w", confTemplate, err)
-	}
-	if err := os.MkdirAll(c.config.NetworkPluginConfDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create cni config directory: %q: %w", c.config.NetworkPluginConfDir, err)
-	}
-	confFile := filepath.Join(c.config.NetworkPluginConfDir, cniConfigFileName)
-	f, err := os.OpenFile(confFile, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open cni config file %q: %w", confFile, err)
-	}
-	defer f.Close()
-	if err := t.Execute(f, cniConfigTemplate{
-		PodCIDR:       cidrs[0],
-		PodCIDRRanges: cidrs,
-		Routes:        routes,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to generate cni config file %q: %w", confFile, err)
+	if err := writeCNIConfigFile(ctx, c.config.NetworkPluginConfDir, confTemplate, cidrs[0], cidrs, routes); err != nil {
+		return nil, err
 	}
 	return &runtime.UpdateRuntimeConfigResponse{}, nil
 }
@@ -138,4 +121,29 @@ func getRoutes(cidrs []string) ([]string, error) {
 		routes = append(routes, zeroCIDRv6)
 	}
 	return routes, nil
+}
+
+func writeCNIConfigFile(ctx context.Context, confDir string, confTemplate string, podCIDR string, podCIDRRanges []string, routes []string) error {
+	log.G(ctx).Infof("Generating cni config from template %q", confTemplate)
+	// generate cni config file from the template with updated pod cidr.
+	t, err := template.ParseFiles(confTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse cni config template %q: %w", confTemplate, err)
+	}
+	if err := os.MkdirAll(confDir, 0755); err != nil {
+		return fmt.Errorf("failed to create cni config directory: %q: %w", confDir, err)
+	}
+	confFile := filepath.Join(confDir, cniConfigFileName)
+	f, err := atomicfile.New(confFile, 0o644)
+	defer func() {
+		err = f.Close()
+	}()
+	if err := t.Execute(f, cniConfigTemplate{
+		PodCIDR:       podCIDR,
+		PodCIDRRanges: podCIDRRanges,
+		Routes:        routes,
+	}); err != nil {
+		return fmt.Errorf("failed to generate cni config file %q: %w", confFile, err)
+	}
+	return err
 }
