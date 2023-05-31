@@ -140,12 +140,9 @@ type CniConfig struct {
 	// When it is set, containerd will get cidr(s) from kubelet to replace {{.PodCIDR}},
 	// {{.PodCIDRRanges}} or {{.Routes}} in the template, and write the config into
 	// NetworkPluginConfDir.
-	// Ideally the cni config should be placed by system admin or cni daemon like calico,
-	// weaveworks etc. However, there are still users using kubenet
-	// (https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
-	// today, who don't have a cni daemonset in production. NetworkPluginConfTemplate is
-	// a temporary backward-compatible solution for them.
-	// DEPRECATED: use CNI configs
+	//
+	// NetworkPluginConfTemplate was once deprecated in containerd v1.7.0,
+	// but its deprecation was cancelled in v1.7.2.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
 	//
