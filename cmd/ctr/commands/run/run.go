@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	clabels "github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
@@ -170,7 +171,11 @@ var Command = cli.Command{
 			return err
 		}
 		if rm && !detach {
-			defer container.Delete(ctx, containerd.WithSnapshotCleanup)
+			defer func() {
+				if err := container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
+					log.L.WithError(err).Error("failed to cleanup container")
+				}
+			}()
 		}
 		var con console.Console
 		if tty {
@@ -199,10 +204,13 @@ var Command = cli.Command{
 			defer func() {
 				if enableCNI {
 					if err := network.Remove(ctx, commands.FullID(ctx, container), ""); err != nil {
-						log.L.WithError(err).Error("network review")
+						log.L.WithError(err).Error("failed to remove network")
 					}
 				}
-				task.Delete(ctx)
+
+				if _, err := task.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
+					log.L.WithError(err).Error("failed to cleanup task")
+				}
 			}()
 
 			if statusC, err = task.Wait(ctx); err != nil {
