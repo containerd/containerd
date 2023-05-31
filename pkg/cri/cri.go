@@ -55,6 +55,7 @@ func init() {
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
+	ready := ic.RegisterReadiness()
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
@@ -100,7 +101,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	go func() {
-		if err := s.Run(); err != nil {
+		if err := s.Run(ready); err != nil {
 			log.G(ctx).WithError(err).Fatal("Failed to run CRI service")
 		}
 		// TODO(random-liu): Whether and how we can stop containerd.
