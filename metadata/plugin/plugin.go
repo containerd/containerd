@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/timeout"
@@ -85,6 +86,7 @@ func init() {
 		ID:   "bolt",
 		Requires: []plugin.Type{
 			plugin.ContentPlugin,
+			plugin.EventPlugin,
 			plugin.SnapshotPlugin,
 		},
 		Config: &BoltConfig{
@@ -115,6 +117,11 @@ func init() {
 					continue
 				}
 				snapshotters[name] = sn.(snapshots.Snapshotter)
+			}
+
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
 			}
 
 			shared := true
@@ -163,7 +170,7 @@ func init() {
 			}
 
 			dbopts := []metadata.DBOpt{
-				metadata.WithEventsPublisher(ic.Events),
+				metadata.WithEventsPublisher(ep.(events.Publisher)),
 			}
 
 			if !shared {

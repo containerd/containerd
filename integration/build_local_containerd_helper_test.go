@@ -31,7 +31,6 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 
 	_ "github.com/containerd/containerd/diff/walking/plugin"
-	"github.com/containerd/containerd/events/exchange"
 	_ "github.com/containerd/containerd/events/plugin"
 	_ "github.com/containerd/containerd/gc/scheduler"
 	_ "github.com/containerd/containerd/leases/plugin"
@@ -72,9 +71,6 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 
 	// init plugins
 	var (
-		// TODO: Remove this in 2.0 and let event plugin crease it
-		events = exchange.NewExchange()
-
 		initialized = plugin.NewPluginSet()
 
 		// NOTE: plugin.Set doesn't provide the way to get all the same
@@ -97,7 +93,6 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 			config.Root,
 			config.State,
 		)
-		initContext.Events = events
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {

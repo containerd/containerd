@@ -17,6 +17,7 @@
 package plugin
 
 import (
+	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
 )
 
@@ -25,8 +26,7 @@ func init() {
 		Type: plugin.EventPlugin,
 		ID:   "exchange",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			// TODO: In 2.0, create exchange since ic.Events will be removed
-			return ic.Events, nil
+			return exchange.NewExchange(), nil
 		},
 	})
 }
