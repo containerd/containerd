@@ -120,12 +120,10 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				exitedAt = time.Now()
 			}
 
-			e := &eventtypes.TaskExit{
-				ContainerID: id,
-				ID:          id,
-				Pid:         pid,
-				ExitStatus:  exitStatus,
-				ExitedAt:    protobuf.ToTimestamp(exitedAt),
+			e := &eventtypes.SandboxExit{
+				SandboxID:  id,
+				ExitStatus: exitStatus,
+				ExitedAt:   protobuf.ToTimestamp(exitedAt),
 			}
 
 			logrus.Debugf("received exit event %+v", e)
@@ -135,14 +133,14 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 				defer dcancel()
 
-				sb, err := em.c.sandboxStore.Get(e.ID)
+				sb, err := em.c.sandboxStore.Get(e.GetSandboxID())
 				if err == nil {
-					if err := handleSandboxExit(dctx, e, sb, em.c); err != nil {
+					if err := handleSandboxExit(dctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
 						return err
 					}
 					return nil
 				} else if !errdefs.IsNotFound(err) {
-					return fmt.Errorf("failed to get sandbox %s: %w", e.ID, err)
+					return fmt.Errorf("failed to get sandbox %s: %w", e.SandboxID, err)
 				}
 				return nil
 			}()
@@ -218,6 +216,8 @@ func convertEvent(e typeurl.Any) (string, interface{}, error) {
 	switch e := evt.(type) {
 	case *eventtypes.TaskOOM:
 		id = e.ContainerID
+	case *eventtypes.SandboxExit:
+		id = e.SandboxID
 	case *eventtypes.ImageCreate:
 		id = e.Name
 	case *eventtypes.ImageUpdate:
@@ -323,7 +323,19 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		sb, err := em.c.sandboxStore.Get(e.ID)
 		if err == nil {
-			if err := handleSandboxExit(ctx, e, sb, em.c); err != nil {
+			if err := handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
+				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
+			}
+			return nil
+		} else if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
+		}
+		return nil
+	case *eventtypes.SandboxExit:
+		logrus.Infof("SandboxExit event %+v", e)
+		sb, err := em.c.sandboxStore.Get(e.GetSandboxID())
+		if err == nil {
+			if err := handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
 				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
 			}
 			return nil
@@ -416,30 +428,13 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	return nil
 }
 
-// handleSandboxExit handles TaskExit event for sandbox.
-func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxstore.Sandbox, c *criService) error {
-	// TODO: Move pause container cleanup to podsandbox/ package.
-	if sb.Container != nil {
-		// No stream attached to sandbox container.
-		task, err := sb.Container.Task(ctx, nil)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to load task for sandbox: %w", err)
-			}
-		} else {
-			// TODO(random-liu): [P1] This may block the loop, we may want to spawn a worker
-			if _, err = task.Delete(ctx, containerd.WithProcessKill); err != nil {
-				if !errdefs.IsNotFound(err) {
-					return fmt.Errorf("failed to stop sandbox: %w", err)
-				}
-				// Move on to make sure container status is updated.
-			}
-		}
-	}
-
+// handleSandboxExit handles sandbox exit event.
+func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, exitStatus uint32, exitTime time.Time, c *criService) error {
 	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
 		status.Pid = 0
+		status.ExitStatus = exitStatus
+		status.ExitedAt = exitTime
 		return status, nil
 	}); err != nil {
 		return fmt.Errorf("failed to update sandbox state: %w", err)
