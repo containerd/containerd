@@ -41,6 +41,7 @@ func init() {
 		Type: plugin.ServicePlugin,
 		ID:   services.ImagesService,
 		Requires: []plugin.Type{
+			plugin.EventPlugin,
 			plugin.MetadataPlugin,
 			plugin.GCPlugin,
 		},
@@ -54,9 +55,14 @@ func init() {
 				return nil, err
 			}
 
+			ep, err := ic.Get(plugin.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
+
 			return &local{
 				store:     metadata.NewImageStore(m.(*metadata.DB)),
-				publisher: ic.Events,
+				publisher: ep.(events.Publisher),
 				gc:        g.(gcScheduler),
 			}, nil
 		},

@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events/exchange"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -36,10 +35,8 @@ type InitContext struct {
 	TTRPCAddress      string
 	RegisterReadiness func() func()
 
-	// deprecated: will be removed in 2.0, use plugin.EventType
-	Events *exchange.Exchange
-
-	Meta *Meta // plugins can fill in metadata at init.
+	// Meta is metadata plugins can fill in at init
+	Meta *Meta
 
 	plugins *Set
 }
