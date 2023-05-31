@@ -111,7 +111,8 @@ From a PowerShell session run the following commands:
 
 ```PowerShell
 # Download and extract desired containerd Windows binaries
-$Version="1.6.4"
+# $Version must be a lastest value like todat 31 May 2023, when i tried to install containerd on WIN , it failed since https://github.com/containerd/containerd/releases/download/v1.6.4 does not exists but https://github.com/containerd/containerd/releases/download/v1.7.1 exists. So $Vesrion = "1.7.1" is valid today, look for current version if it fails .
+$Version="1.7.1"
 curl.exe -L https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-amd64.tar.gz -o containerd-windows-amd64.tar.gz
 tar.exe xvf .\containerd-windows-amd64.tar.gz
 
