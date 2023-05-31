@@ -332,7 +332,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 		return nil
 	case *eventtypes.SandboxExit:
-		log.L.Infof("SandboxExit event %+v", e)
+		logrus.Infof("SandboxExit event %+v", e)
 		sb, err := em.c.sandboxStore.Get(e.GetSandboxID())
 		if err == nil {
 			if err := handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
