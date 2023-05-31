@@ -19,6 +19,7 @@
 package run
 
 import (
+	"context"
 	gocontext "context"
 	"errors"
 	"fmt"
@@ -27,12 +28,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/platforms"
@@ -350,9 +353,18 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if limit != 0 {
 			opts = append(opts, oci.WithMemoryLimit(limit))
 		}
+		var cdiDeviceIDs []string
 		for _, dev := range context.StringSlice("device") {
+			if cdi.IsQualifiedName(dev) {
+				cdiDeviceIDs = append(cdiDeviceIDs, dev)
+				continue
+			}
 			opts = append(opts, oci.WithDevices(dev, "", "rwm"))
 		}
+		if len(cdiDeviceIDs) > 0 {
+			opts = append(opts, withStaticCDIRegistry())
+		}
+		opts = append(opts, oci.WithCDIDevices(cdiDeviceIDs...))
 
 		rootfsPropagation := context.String("rootfs-propagation")
 		if rootfsPropagation != "" {
@@ -494,4 +506,22 @@ func validNamespace(ns string) bool {
 
 func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
 	return fmt.Sprintf("/proc/%d/ns/net", task.Pid()), nil
+}
+
+// withStaticCDIRegistry inits the CDI registry and disables auto-refresh.
+// This is used from the `run` command to avoid creating a registry with auto-refresh enabled.
+// It also provides a way to override the CDI spec file paths if required.
+func withStaticCDIRegistry() oci.SpecOpts {
+	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+		registry := cdi.GetRegistry(cdi.WithAutoRefresh(false))
+		if err := registry.Refresh(); err != nil {
+			// We don't consider registry refresh failure a fatal error.
+			// For instance, a dynamically generated invalid CDI Spec file for
+			// any particular vendor shouldn't prevent injection of devices of
+			// different vendors. CDI itself knows better and it will fail the
+			// injection if necessary.
+			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
+		}
+		return nil
+	}
 }
