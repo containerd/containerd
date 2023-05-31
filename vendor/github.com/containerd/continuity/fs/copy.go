@@ -184,6 +184,10 @@ func copyDirectory(dst, src string, inodes map[uint64]string, o *copyDirOpts) er
 // CopyFile copies the source file to the target.
 // The most efficient means of copying is used for the platform.
 func CopyFile(target, source string) error {
+	return copyFile(target, source)
+}
+
+func openAndCopyFile(target, source string) error {
 	src, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to open source %s: %w", source, err)
