@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/containerd/pkg/unpack"
 )
 
@@ -65,6 +66,12 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 	topts := &transfer.Config{}
 	for _, opt := range opts {
 		opt(topts)
+	}
+
+	// update resolve for OCI registry
+	if ociRegistry, ok := src.(*registry.OCIRegistry); ok {
+		// update resolve for OCI registry
+		ociRegistry.UpdateResolve(ctx, ts.config.RegistryConfigPath)
 	}
 
 	// Figure out matrix of whether source destination combination is supported

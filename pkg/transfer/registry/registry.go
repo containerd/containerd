@@ -33,6 +33,7 @@ import (
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -110,6 +111,27 @@ func (r *OCIRegistry) Image() string {
 
 func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error) {
 	return r.resolver.Resolve(ctx, r.reference)
+}
+
+func (r *OCIRegistry) UpdateResolve(ctx context.Context, registryConfigPath string) {
+	if registryConfigPath == "" {
+		log.L.Warn("registry config path is empty")
+		return
+	}
+	hostOptions := config.HostOptions{
+		HostDir: config.HostDirFromRoot(registryConfigPath),
+	}
+	hostOptions.Credentials = func(host string) (string, string, error) {
+		c, err := r.creds.GetCredentials(context.Background(), r.reference, host)
+		if err != nil {
+			return "", "", err
+		}
+		return c.Username, c.Secret, nil
+	}
+	r.resolver = docker.NewResolver(docker.ResolverOptions{
+		Hosts:   config.ConfigureHosts(ctx, hostOptions),
+		Headers: r.headers,
+	})
 }
 
 func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher, error) {
