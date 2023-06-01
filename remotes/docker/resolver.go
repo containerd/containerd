@@ -98,25 +98,30 @@ type ResolverOptions struct {
 	Tracker StatusTracker
 
 	// Authorizer is used to authorize registry requests
-	// Deprecated: use Hosts
+	//
+	// Deprecated: use Hosts.
 	Authorizer Authorizer
 
 	// Credentials provides username and secret given a host.
 	// If username is empty but a secret is given, that secret
 	// is interpreted as a long lived token.
-	// Deprecated: use Hosts
+	//
+	// Deprecated: use Hosts.
 	Credentials func(string) (string, string, error)
 
 	// Host provides the hostname given a namespace.
-	// Deprecated: use Hosts
+	//
+	// Deprecated: use Hosts.
 	Host func(string) (string, error)
 
 	// PlainHTTP specifies to use plain http and not https
-	// Deprecated: use Hosts
+	//
+	// Deprecated: use Hosts.
 	PlainHTTP bool
 
 	// Client is the http client to used when making registry requests
-	// Deprecated: use Hosts
+	//
+	// Deprecated: use Hosts.
 	Client *http.Client
 }
 
