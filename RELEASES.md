@@ -193,6 +193,13 @@ process:
 	```console
 	$ git cherry-pick -xsS <commit>
 	```
+
+   (Tips) If you see an error similar to the following one, add `-m 1` to the `git cherry-pick` command.
+   ```sh
+   error: commit 9e834e761aaed9733ee2aed0329960b21ba1e61e is a merge but no -m option was given.
+   fatal: cherry-pick failed
+   ```
+
    (Optional) If other commits exist in the main branch which are related
    to the cherry-picked commit; eg: fixes to the main PR. It is recommended
    to cherry-pick those commits also into this same `my-backport-branch`.
