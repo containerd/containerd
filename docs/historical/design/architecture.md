@@ -40,8 +40,8 @@ may be exported for access via corresponding _services_.
 ## Modules
 
 In addition to the subsystems, we have several components that may cross
-subsystem boundaries, referenced to as components. We have the following
-components:
+subsystem boundaries, referenced to as modules. We have the following
+modules:
 
 - __*Executor*__: The executor implements the actual container runtime.
 - __*Supervisor*__: The supervisor monitors and reports container state.
