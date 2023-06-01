@@ -267,7 +267,9 @@ func (c *criService) listWindowsMetricsForSandbox(ctx context.Context, sandbox s
 
 func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.WindowsContainerStats, error) {
 	var cs runtime.WindowsContainerStats
-	if stats != nil {
+	// the metric should exist but stats or stats.container will be nil for HostProcess sandbox containers
+	// this can also be the case when the container has not started yet
+	if stats != nil && stats.Container != nil {
 		wstats := stats.GetWindows()
 		if wstats == nil {
 			return nil, fmt.Errorf("windows stats is empty")
