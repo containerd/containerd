@@ -4176,6 +4176,7 @@ file {
     java_outer_classname: "StatusProto"
     java_multiple_files: true
     go_package: "google.golang.org/genproto/googleapis/rpc/status;status"
+    cc_enable_arenas: true
     objc_class_prefix: "RPC"
   }
   syntax: "proto3"
@@ -4571,6 +4572,100 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/mountmanager/v1/mountmanager.proto"
+  package: "containerd.services.mountmanager.v1"
+  dependency: "google/protobuf/any.proto"
+  message_type {
+    name: "MountRequest"
+    field {
+      name: "plugin_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pluginName"
+    }
+    field {
+      name: "data"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  message_type {
+    name: "MountResponse"
+    field {
+      name: "plugin_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pluginName"
+    }
+    field {
+      name: "data"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  message_type {
+    name: "UnmountRequest"
+    field {
+      name: "plugin_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pluginName"
+    }
+    field {
+      name: "data"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  message_type {
+    name: "UnmountResponse"
+    field {
+      name: "plugin_name"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "pluginName"
+    }
+    field {
+      name: "data"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  service {
+    name: "MountManager"
+    method {
+      name: "Mount"
+      input_type: ".containerd.services.mountmanager.v1.MountRequest"
+      output_type: ".containerd.services.mountmanager.v1.MountResponse"
+    }
+    method {
+      name: "Unmount"
+      input_type: ".containerd.services.mountmanager.v1.UnmountRequest"
+      output_type: ".containerd.services.mountmanager.v1.UnmountResponse"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/services/mountmanager/v1;mountmanager"
   }
   syntax: "proto3"
 }

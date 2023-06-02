@@ -90,6 +90,8 @@ const (
 	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
 	// SandboxControllerPlugin implements a sandbox controller
 	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
+	// MountPlugin implements the interface for mounting unmount snapshots
+	MountPlugin Type = "io.containerd.mountmanager.v1"
 )
 
 const (
