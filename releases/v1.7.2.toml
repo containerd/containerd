@@ -1,0 +1,27 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release
+previous = "v1.7.1"
+
+pre_release = false
+
+preface = """\
+The second patch release for containerd 1.7 includes enhancements to CRI sandbox mode,
+Windows snapshot mounting support, and CRI and container IO bug fixes.
+
+### CRI/Sandbox Updates
+* **Publish sandbox events** ([#8613](https://github.com/containerd/containerd/pull/8613))
+* **Make stats respect sandbox's platform** ([#8604](https://github.com/containerd/containerd/pull/8604))
+
+### Other Notable Updates
+* **Mount snapshots on Windows** ([#8616](https://github.com/containerd/containerd/pull/8616))
+* **Notify readiness when registered plugins are ready** ([#8584](https://github.com/containerd/containerd/pull/8584))
+* **Fix cio.Cancel() should close pipes** ([#8624](https://github.com/containerd/containerd/pull/8624))
+* **CDI: Use CRI Config.CDIDevices field for CDI injection** ([#8519](https://github.com/containerd/containerd/pull/8519))
+
+See the changelog for complete list of changes"""
