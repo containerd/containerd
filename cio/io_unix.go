@@ -98,7 +98,14 @@ func copyIO(fifos *FIFOSet, ioset *Streams) (*cio, error) {
 		config:  fifos.Config,
 		wg:      wg,
 		closers: append(pipes.closers(), fifos),
-		cancel:  cancel,
+		cancel: func() {
+			cancel()
+			for _, c := range pipes.closers() {
+				if c != nil {
+					c.Close()
+				}
+			}
+		},
 	}, nil
 }
 
