@@ -1,3 +1,6 @@
+//go:build !darwin
+// +build !darwin
+
 /*
    Copyright The containerd Authors.
 
@@ -14,14 +17,6 @@
    limitations under the License.
 */
 
-package testutil
+package fs
 
-import "testing"
-
-// RequiresRoot does nothing on Windows
-func RequiresRoot(t testing.TB) {
-}
-
-// RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.
-func RequiresRootM() {
-}
+var copyFile = openAndCopyFile

@@ -14,14 +14,22 @@
    limitations under the License.
 */
 
-package testutil
+package fs
 
-import "testing"
+import (
+	"errors"
+	"fmt"
 
-// RequiresRoot does nothing on Windows
-func RequiresRoot(t testing.TB) {
-}
+	"golang.org/x/sys/unix"
+)
 
-// RequiresRootM is similar to RequiresRoot but intended to be called from *testing.M.
-func RequiresRootM() {
+func copyFile(target, source string) error {
+	if err := unix.Clonefile(source, target, unix.CLONE_NOFOLLOW); err != nil {
+		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EXDEV) {
+			return fmt.Errorf("clonefile failed: %w", err)
+		}
+
+		return openAndCopyFile(target, source)
+	}
+	return nil
 }

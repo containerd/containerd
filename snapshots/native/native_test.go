@@ -35,10 +35,10 @@ func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, fu
 	return snapshotter, func() error { return snapshotter.Close() }, nil
 }
 
-func TestNaive(t *testing.T) {
+func TestNative(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("snapshotter not implemented on windows")
+		t.Skip("Native snapshotter not implemented on windows")
 	}
 	testutil.RequiresRoot(t)
-	testsuite.SnapshotterSuite(t, "Naive", newSnapshotter)
+	testsuite.SnapshotterSuite(t, "Native", newSnapshotter)
 }

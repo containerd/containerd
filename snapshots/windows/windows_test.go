@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,35 +17,27 @@
    limitations under the License.
 */
 
-package client
+package windows
 
 import (
 	"context"
 	"testing"
 
-	. "github.com/containerd/containerd"
+	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/testsuite"
 )
 
 func newSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter, func() error, error) {
-	client, err := New(address)
+	snapshotter, err := NewSnapshotter(root)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sn := client.SnapshotService(DefaultSnapshotter)
-
-	return sn, func() error {
-		// no need to close remote snapshotter
-		return client.Close()
-	}, nil
+	return snapshotter, func() error { return snapshotter.Close() }, nil
 }
 
-func TestSnapshotterClient(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-
-	testsuite.SnapshotterSuite(t, DefaultSnapshotter, newSnapshotter)
+func TestWindows(t *testing.T) {
+	testutil.RequiresRoot(t)
+	testsuite.SnapshotterSuite(t, "Windows", newSnapshotter)
 }
