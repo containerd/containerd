@@ -47,9 +47,6 @@ func init() {
 		Config: &OTLPConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			cfg := ic.Config.(*OTLPConfig)
-			if cfg.Endpoint == "" {
-				return nil, fmt.Errorf("no OpenTelemetry endpoint: %w", plugin.ErrSkipPlugin)
-			}
 			exp, err := newExporter(ic.Context, cfg)
 			if err != nil {
 				return nil, err
@@ -121,27 +118,30 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if cfg.Protocol == "http/protobuf" || cfg.Protocol == "" {
-		u, err := url.Parse(cfg.Endpoint)
-		if err != nil {
-			return nil, fmt.Errorf("OpenTelemetry endpoint %q %w : %v", cfg.Endpoint, errdefs.ErrInvalidArgument, err)
-		}
-		opts := []otlptracehttp.Option{
-			otlptracehttp.WithEndpoint(u.Host),
-		}
-		if u.Scheme == "http" {
-			opts = append(opts, otlptracehttp.WithInsecure())
+	switch cfg.Protocol {
+	case "", "http/protobuf":
+		var opts []otlptracehttp.Option
+		if cfg.Endpoint != "" {
+			u, err := url.Parse(cfg.Endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("OpenTelemetry endpoint %q %w : %v", cfg.Endpoint, errdefs.ErrInvalidArgument, err)
+			}
+			opts = append(opts, otlptracehttp.WithEndpoint(u.Host))
+			if u.Scheme == "http" {
+				opts = append(opts, otlptracehttp.WithInsecure())
+			}
 		}
 		return otlptracehttp.New(ctx, opts...)
-	} else if cfg.Protocol == "grpc" {
-		opts := []otlptracegrpc.Option{
-			otlptracegrpc.WithEndpoint(cfg.Endpoint),
+	case "grpc":
+		var opts []otlptracegrpc.Option
+		if cfg.Endpoint != "" {
+			opts = append(opts, otlptracegrpc.WithEndpoint(cfg.Endpoint))
 		}
 		if cfg.Insecure {
 			opts = append(opts, otlptracegrpc.WithInsecure())
 		}
 		return otlptracegrpc.New(ctx, opts...)
-	} else {
+	default:
 		// Other protocols such as "http/json" are not supported.
 		return nil, fmt.Errorf("OpenTelemetry protocol %q : %w", cfg.Protocol, errdefs.ErrNotImplemented)
 	}
@@ -152,7 +152,6 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 //
 // Note that this function sets process-wide tracing configuration.
 func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProcessor) (io.Closer, error) {
-
 	res, err := resource.New(ctx,
 		resource.WithHost(),
 		resource.WithAttributes(
