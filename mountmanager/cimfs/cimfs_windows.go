@@ -1,6 +1,3 @@
-//go:build windows
-// +build windows
-
 /*
    Copyright The containerd Authors.
 
@@ -59,6 +56,9 @@ var _ mountmanager.MountManager = &cimfsMountManager{}
 func NewCimfsMountManager() (mountmanager.MountManager, error) {
 	return &cimfsMountManager{}, nil
 }
+
+// Close implements mountmanager.MountManager
+func (*cimfsMountManager) Close() {}
 
 // Mount implements mountmanager.MountManager
 func (*cimfsMountManager) Mount(ctx context.Context, data interface{}) (interface{}, error) {

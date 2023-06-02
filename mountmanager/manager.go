@@ -37,4 +37,6 @@ type MountManager interface {
 	// forwarded to the call as it is. It's the caller's responsibility to make sense of that data.
 	Mount(ctx context.Context, data interface{}) (interface{}, error)
 	Unmount(ctx context.Context, data interface{}) (interface{}, error)
+	// Allows the mount manager to cleanup any resources before containerd is shutting down
+	Close()
 }

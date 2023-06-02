@@ -13,36 +13,35 @@
 	See the License for the specific language governing permissions and
 	limitations under the License.
 */
-
 syntax = "proto3";
 
-package containerd.services.mountmanager.v1;
+package containerd.services.mounts.v1;
 
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/mountmanager/v1;mountmanager";
+option go_package = "github.com/containerd/containerd/api/services/mounts/v1;mounts";
 
-service MountManager {
-  rpc Mount(MountRequest) returns (MountResponse);
-  rpc Unmount(UnmountRequest) returns (UnmountResponse);
+service Mounts {
+	rpc Mount(MountRequest) returns (MountResponse);
+	rpc Unmount(UnmountRequest) returns (UnmountResponse);
 }
 
 message MountRequest {
-  string plugin_name = 1;
-  google.protobuf.Any data = 2;
+	string plugin_name = 1;
+	google.protobuf.Any data = 2;
 }
 
 message MountResponse {
-  string plugin_name = 1;
-  google.protobuf.Any data = 2;
+	string plugin_name = 1;
+	google.protobuf.Any data = 2;
 }
 
 message UnmountRequest {
-  string plugin_name = 1;
-  google.protobuf.Any data = 2;
+	string plugin_name = 1;
+	google.protobuf.Any data = 2;
 }
 
 message UnmountResponse {
-  string plugin_name = 1;
-  google.protobuf.Any data = 2;
+	string plugin_name = 1;
+	google.protobuf.Any data = 2;
 }

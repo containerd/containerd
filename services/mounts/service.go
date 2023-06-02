@@ -14,14 +14,14 @@
    limitations under the License.
 */
 
-package images
+package mounts
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	mmapi "github.com/containerd/containerd/api/services/mountmanager/v1"
+	mountsapi "github.com/containerd/containerd/api/services/mounts/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mountmanager"
@@ -36,7 +36,7 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
-		ID:   services.MountManagerService,
+		ID:   services.MountsService,
 		Requires: []plugin.Type{
 			plugin.ServicePlugin,
 			plugin.MountPlugin,
@@ -44,7 +44,7 @@ func init() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			mountPlugins, err := ic.GetByType(plugin.MountPlugin)
 			if errors.Is(err, errdefs.ErrNotFound) {
-				log.G(ic.Context).Debugf("no mount plugins registered")
+				log.G(ic.Context).Debugf("no mount manager plugins registered")
 			} else if err != nil {
 				return nil, err
 			}
@@ -54,10 +54,10 @@ func init() {
 			for name, p := range mountPlugins {
 				mp, err := p.Instance()
 				if err != nil {
-					return nil, fmt.Errorf("get instance of mount plugin: %w", err)
+					return nil, fmt.Errorf("get instance of mount manager plugin: %w", err)
 				}
 				srv.mountManagers[name] = mp.(mountmanager.MountManager)
-				log.G(ic.Context).Debugf("initialized mount plugin: %s", name)
+				log.G(ic.Context).Debugf("found mount manager plugin: %s", name)
 			}
 			return srv, nil
 		},
@@ -66,22 +66,22 @@ func init() {
 
 type service struct {
 	mountManagers map[string]mountmanager.MountManager
-	mmapi.UnimplementedMountManagerServer
+	mountsapi.UnimplementedMountsServer
 }
 
-var _ mmapi.MountManagerServer = &service{}
+var _ mountsapi.MountsServer = &service{}
 
 func (s *service) Register(server *grpc.Server) error {
-	mmapi.RegisterMountManagerServer(server, s)
+	mountsapi.RegisterMountsServer(server, s)
 	return nil
 }
 
 func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
-	mmapi.RegisterTTRPCMountManagerService(server, s)
+	mountsapi.RegisterTTRPCMountsService(server, s)
 	return nil
 }
 
-func (s *service) Mount(ctx context.Context, req *mmapi.MountRequest) (*mmapi.MountResponse, error) {
+func (s *service) Mount(ctx context.Context, req *mountsapi.MountRequest) (*mountsapi.MountResponse, error) {
 	var mtypeManager mountmanager.MountManager
 	mtypeManager, ok := s.mountManagers[req.PluginName]
 	if !ok {
@@ -104,14 +104,14 @@ func (s *service) Mount(ctx context.Context, req *mmapi.MountRequest) (*mmapi.Mo
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	resp := &mmapi.MountResponse{
+	resp := &mountsapi.MountResponse{
 		PluginName: req.PluginName,
 		Data:       protobuf.FromAny(resDataAny),
 	}
 	return resp, nil
 }
 
-func (s *service) Unmount(ctx context.Context, req *mmapi.UnmountRequest) (*mmapi.UnmountResponse, error) {
+func (s *service) Unmount(ctx context.Context, req *mountsapi.UnmountRequest) (*mountsapi.UnmountResponse, error) {
 	var mtypeManager mountmanager.MountManager
 	mtypeManager, ok := s.mountManagers[req.PluginName]
 	if !ok {
@@ -133,7 +133,7 @@ func (s *service) Unmount(ctx context.Context, req *mmapi.UnmountRequest) (*mmap
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	resp := &mmapi.UnmountResponse{
+	resp := &mountsapi.UnmountResponse{
 		PluginName: req.PluginName,
 		Data:       protobuf.FromAny(resDataAny),
 	}

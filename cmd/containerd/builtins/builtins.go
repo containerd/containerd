@@ -37,7 +37,7 @@ import (
 	_ "github.com/containerd/containerd/services/images"
 	_ "github.com/containerd/containerd/services/introspection"
 	_ "github.com/containerd/containerd/services/leases"
-	_ "github.com/containerd/containerd/services/mountmanager"
+	_ "github.com/containerd/containerd/services/mounts"
 	_ "github.com/containerd/containerd/services/namespaces"
 	_ "github.com/containerd/containerd/services/opt"
 	_ "github.com/containerd/containerd/services/sandbox"

@@ -4176,7 +4176,6 @@ file {
     java_outer_classname: "StatusProto"
     java_multiple_files: true
     go_package: "google.golang.org/genproto/googleapis/rpc/status;status"
-    cc_enable_arenas: true
     objc_class_prefix: "RPC"
   }
   syntax: "proto3"
@@ -4576,8 +4575,8 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/mountmanager/v1/mountmanager.proto"
-  package: "containerd.services.mountmanager.v1"
+  name: "github.com/containerd/containerd/api/services/mounts/v1/mounts.proto"
+  package: "containerd.services.mounts.v1"
   dependency: "google/protobuf/any.proto"
   message_type {
     name: "MountRequest"
@@ -4652,20 +4651,20 @@ file {
     }
   }
   service {
-    name: "MountManager"
+    name: "Mounts"
     method {
       name: "Mount"
-      input_type: ".containerd.services.mountmanager.v1.MountRequest"
-      output_type: ".containerd.services.mountmanager.v1.MountResponse"
+      input_type: ".containerd.services.mounts.v1.MountRequest"
+      output_type: ".containerd.services.mounts.v1.MountResponse"
     }
     method {
       name: "Unmount"
-      input_type: ".containerd.services.mountmanager.v1.UnmountRequest"
-      output_type: ".containerd.services.mountmanager.v1.UnmountResponse"
+      input_type: ".containerd.services.mounts.v1.UnmountRequest"
+      output_type: ".containerd.services.mounts.v1.UnmountResponse"
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/mountmanager/v1;mountmanager"
+    go_package: "github.com/containerd/containerd/api/services/mounts/v1;mounts"
   }
   syntax: "proto3"
 }

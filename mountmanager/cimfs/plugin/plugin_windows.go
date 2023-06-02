@@ -14,4 +14,21 @@
    limitations under the License.
 */
 
-package mountmanager
+package plugin
+
+import (
+	"github.com/containerd/containerd/mountmanager/cimfs"
+	"github.com/containerd/containerd/plugin"
+)
+
+// Plugin is defined in a separate package so that the types defined by this plugin (under mountmanager/cimfs)
+// can be imported by other binaries (such as the shim) without automatically calling this init method.
+func init() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.MountPlugin,
+		ID:   "mount-cimfs",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			return cimfs.NewCimfsMountManager()
+		},
+	})
+}
