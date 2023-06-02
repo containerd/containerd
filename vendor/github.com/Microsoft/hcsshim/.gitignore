@@ -37,6 +37,9 @@ rootfs-conv/*
 deps/*
 out/*
 
+# protobuf files
+/protobuf/*
+
 # test results
 test/results
 

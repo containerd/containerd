@@ -67,13 +67,13 @@ func (c *criService) containerMetrics(
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.CpuUsage{
-				Timestamp:            wstats.Timestamp.UnixNano(),
+				Timestamp:            wstats.Timestamp.AsTime().UnixNano(),
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: wstats.Processor.TotalRuntimeNS},
 			}
 		}
 		if wstats.Memory != nil {
 			cs.Memory = &runtime.MemoryUsage{
-				Timestamp: wstats.Timestamp.UnixNano(),
+				Timestamp: wstats.Timestamp.AsTime().UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
 				},

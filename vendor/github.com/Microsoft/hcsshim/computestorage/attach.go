@@ -38,3 +38,30 @@ func AttachLayerStorageFilter(ctx context.Context, layerPath string, layerData L
 	}
 	return nil
 }
+
+// AttachUnionFSFilter sets up unionfs on a writable container layer.
+//
+// `volumePath` is volume path at which writable layer is mounted. If the
+// path does not end in a `\` the platform will append it automatically.
+//
+// `layerData` is the parent read-only layer data.
+func AttachUnionFSFilter(ctx context.Context, volumePath string, layerData LayerData) (err error) {
+	title := "hcsshim::AttachUnionFSFilter"
+	ctx, span := oc.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
+	defer span.End()
+	defer func() { oc.SetSpanStatus(span, err) }()
+	span.AddAttributes(
+		trace.StringAttribute("volumePath", volumePath),
+	)
+
+	bytes, err := json.Marshal(layerData)
+	if err != nil {
+		return err
+	}
+
+	err = hcsAttachOverlayFilter(volumePath, string(bytes))
+	if err != nil {
+		return errors.Wrap(err, "failed to attach unionfs filter")
+	}
+	return nil
+}

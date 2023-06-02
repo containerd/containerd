@@ -1,0 +1,10 @@
+version = "2"
+
+generators = ["go", "go-grpc"]
+
+[packages]
+"google/protobuf/empty.proto" = "github.com/containerd/protobuild/internal"
+
+[[descriptors]]
+prefix = "github.com/containerd/protobuild/examples/v2"
+target = "examples/v2/next.pb.txt"

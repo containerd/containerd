@@ -16,7 +16,9 @@ import (
 	"github.com/Microsoft/hcsshim/internal/security"
 )
 
-const defaultVHDXBlockSizeInMB = 1
+const (
+	DefaultVHDXBlockSizeInMB = 1
+)
 
 // SetupContainerBaseLayer is a helper to setup a containers scratch. It
 // will create and format the vhdx's inside and the size is configurable with the sizeInGB
@@ -64,7 +66,7 @@ func SetupContainerBaseLayer(ctx context.Context, layerPath, baseVhdPath, diffVh
 		Version: 2,
 		Version2: vhd.CreateVersion2{
 			MaximumSize:      sizeInGB * memory.GiB,
-			BlockSizeInBytes: defaultVHDXBlockSizeInMB * memory.MiB,
+			BlockSizeInBytes: DefaultVHDXBlockSizeInMB * memory.MiB,
 		},
 	}
 	handle, err := vhd.CreateVirtualDisk(baseVhdPath, vhd.VirtualDiskAccessNone, vhd.CreateVirtualDiskFlagNone, createParams)
@@ -99,7 +101,7 @@ func SetupContainerBaseLayer(ctx context.Context, layerPath, baseVhdPath, diffVh
 	}
 	// Create the differencing disk that will be what's copied for the final rw layer
 	// for a container.
-	if err = vhd.CreateDiffVhd(diffVhdPath, baseVhdPath, defaultVHDXBlockSizeInMB); err != nil {
+	if err = vhd.CreateDiffVhd(diffVhdPath, baseVhdPath, DefaultVHDXBlockSizeInMB); err != nil {
 		return errors.Wrap(err, "failed to create differencing disk")
 	}
 
@@ -140,7 +142,7 @@ func SetupUtilityVMBaseLayer(ctx context.Context, uvmPath, baseVhdPath, diffVhdP
 		Version: 2,
 		Version2: vhd.CreateVersion2{
 			MaximumSize:      sizeInGB * memory.GiB,
-			BlockSizeInBytes: defaultVHDXBlockSizeInMB * memory.MiB,
+			BlockSizeInBytes: DefaultVHDXBlockSizeInMB * memory.MiB,
 		},
 	}
 	handle, err := vhd.CreateVirtualDisk(baseVhdPath, vhd.VirtualDiskAccessNone, vhd.CreateVirtualDiskFlagNone, createParams)
@@ -183,7 +185,7 @@ func SetupUtilityVMBaseLayer(ctx context.Context, uvmPath, baseVhdPath, diffVhdP
 
 	// Create the differencing disk that will be what's copied for the final rw layer
 	// for a container.
-	if err = vhd.CreateDiffVhd(diffVhdPath, baseVhdPath, defaultVHDXBlockSizeInMB); err != nil {
+	if err = vhd.CreateDiffVhd(diffVhdPath, baseVhdPath, DefaultVHDXBlockSizeInMB); err != nil {
 		return errors.Wrap(err, "failed to create differencing disk")
 	}
 

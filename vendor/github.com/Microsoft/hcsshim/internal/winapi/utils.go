@@ -3,9 +3,12 @@
 package winapi
 
 import (
+	"encoding/binary"
 	"errors"
 	"reflect"
+	"strings"
 	"syscall"
+	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -79,4 +82,22 @@ func ConvertStringSetToSlice(buf []byte) ([]string, error) {
 		}
 	}
 	return nil, errors.New("string set malformed: missing null terminator at end of buffer")
+}
+
+// parseUtf16LE parses a UTF-16LE byte array into a string (without passing
+// through a uint16 or rune array).
+func ParseUtf16LE(b []byte) string {
+	var sb strings.Builder
+	sb.Grow(len(b) / 2)
+	for len(b) > 0 {
+		r := rune(binary.LittleEndian.Uint16(b))
+		if utf16.IsSurrogate(r) && len(b) > 2 {
+			sb.WriteRune(utf16.DecodeRune(r, rune(binary.LittleEndian.Uint16(b[2:]))))
+			b = b[4:]
+		} else {
+			sb.WriteRune(r)
+			b = b[2:]
+		}
+	}
+	return sb.String()
 }

@@ -273,14 +273,14 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.WindowsCpuUsage{
-				Timestamp:            wstats.Timestamp.UnixNano(),
+				Timestamp:            wstats.Timestamp.AsTime().UnixNano(),
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: wstats.Processor.TotalRuntimeNS},
 			}
 		}
 
 		if wstats.Memory != nil {
 			cs.Memory = &runtime.WindowsMemoryUsage{
-				Timestamp: wstats.Timestamp.UnixNano(),
+				Timestamp: wstats.Timestamp.AsTime().UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
 				},

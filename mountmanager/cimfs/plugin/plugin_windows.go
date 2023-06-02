@@ -26,9 +26,9 @@ import (
 func init() {
 	plugin.Register(&plugin.Registration{
 		Type: plugin.MountPlugin,
-		ID:   "mount-cimfs",
+		ID:   cimfs.PluginName,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return cimfs.NewCimfsMountManager()
+			return cimfs.NewCimfsMountManager(ic.Root)
 		},
 	})
 }
