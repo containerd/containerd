@@ -193,6 +193,11 @@ process:
 	```console
 	$ git cherry-pick -xsS <commit>
 	```
+
+   If all of the work from a particular PR/set of PRs is wanted,
+   cherry-pick the individual commits instead of the merge commit.
+   Take #8624 for example, 82ec62b is favored over 9e834e7.
+
    (Optional) If other commits exist in the main branch which are related
    to the cherry-picked commit; eg: fixes to the main PR. It is recommended
    to cherry-pick those commits also into this same `my-backport-branch`.
