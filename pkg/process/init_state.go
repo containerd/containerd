@@ -235,12 +235,12 @@ func (s *runningState) transition(name string) error {
 }
 
 func (s *runningState) Pause(ctx context.Context) error {
-	s.p.pausing.set(true)
+	s.p.pausing.Store(true)
 	// NOTE "pausing" will be returned in the short window
 	// after `transition("paused")`, before `pausing` is reset
 	// to false. That doesn't break the state machine, just
 	// delays the "paused" state a little bit.
-	defer s.p.pausing.set(false)
+	defer s.p.pausing.Store(false)
 
 	if err := s.p.runtime.Pause(ctx, s.p.id); err != nil {
 		return s.p.runtimeError(err, "OCI runtime pause failed")

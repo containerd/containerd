@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/containerd/console"
@@ -62,7 +63,7 @@ type Init struct {
 	io       *processIO
 	runtime  *runc.Runc
 	// pausing preserves the pausing state.
-	pausing      *atomicBool
+	pausing      atomic.Bool
 	status       int
 	exited       time.Time
 	pid          int
@@ -97,7 +98,6 @@ func New(id string, runtime *runc.Runc, stdio stdio.Stdio) *Init {
 	p := &Init{
 		id:        id,
 		runtime:   runtime,
-		pausing:   new(atomicBool),
 		stdio:     stdio,
 		status:    0,
 		waitBlock: make(chan struct{}),
@@ -240,7 +240,7 @@ func (p *Init) ExitedAt() time.Time {
 
 // Status of the process
 func (p *Init) Status(ctx context.Context) (string, error) {
-	if p.pausing.get() {
+	if p.pausing.Load() {
 		return "pausing", nil
 	}
 
