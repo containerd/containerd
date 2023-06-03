@@ -398,7 +398,7 @@ The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in 
 > **Note**
 >
 > CNI Config Template (`plugins."io.containerd.grpc.v1.cri".cni.conf_template`) was once deprecated in v1.7.0,
-> but its deprecation was cancelled in v1.7.2.
+> but its deprecation was cancelled in v1.7.3.
 
 <details><summary>Example: runc option <code>SystemdCgroup</code></summary><p>
 
