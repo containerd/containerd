@@ -69,9 +69,9 @@ func DefaultConfig() PluginConfig {
 			DefaultRuntimeName: "runc",
 			Runtimes: map[string]Runtime{
 				"runc": {
-					Type:        "io.containerd.runc.v2",
-					Options:     m,
-					SandboxMode: string(ModePodSandbox),
+					Type:      "io.containerd.runc.v2",
+					Options:   m,
+					Sandboxer: string(ModePodSandbox),
 				},
 			},
 			DisableSnapshotAnnotations: true,

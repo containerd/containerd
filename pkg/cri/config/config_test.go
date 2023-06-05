@@ -61,7 +61,7 @@ func TestValidateConfig(t *testing.T) {
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
 						RuntimeDefault: {
-							SandboxMode: string(ModePodSandbox),
+							Sandboxer: string(ModePodSandbox),
 						},
 					},
 				},
