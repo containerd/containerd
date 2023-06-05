@@ -94,7 +94,7 @@ func WithTimeout(timeout time.Duration) StopOpt {
 // Shim lifetimes are now managed manually via sandbox API by the containerd's client.
 type Controller interface {
 	// Create is used to initialize sandbox environment. (mounts, any)
-	Create(ctx context.Context, sandboxID string, opts ...CreateOpt) error
+	Create(ctx context.Context, sandboxInfo Sandbox, opts ...CreateOpt) error
 	// Start will start previously created sandbox.
 	Start(ctx context.Context, sandboxID string) (ControllerInstance, error)
 	// Platform returns target sandbox OS that will be used by Controller.

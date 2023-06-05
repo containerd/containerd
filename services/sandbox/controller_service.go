@@ -103,7 +103,7 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	err = ctrl.Create(ctx, req.GetSandboxID(), sandbox.WithOptions(req.GetOptions()))
+	err = ctrl.Create(ctx, sandbox.Sandbox{ID: req.GetSandboxID()}, sandbox.WithOptions(req.GetOptions()))
 	if err != nil {
 		return &api.ControllerCreateResponse{}, errdefs.ToGRPC(err)
 	}
@@ -217,8 +217,11 @@ func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShu
 
 func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetricsRequest) (*api.ControllerMetricsResponse, error) {
 	log.G(ctx).WithField("req", req).Debug("sandbox metrics")
-
-	metrics, err := s.local.Metrics(ctx, req.GetSandboxID())
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	metrics, err := ctrl.Metrics(ctx, req.GetSandboxID())
 	if err != nil {
 		return &api.ControllerMetricsResponse{}, errdefs.ToGRPC(err)
 	}

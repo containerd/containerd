@@ -249,7 +249,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
 
-	if err := controller.Create(ctx, id, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
+	if err := controller.Create(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
