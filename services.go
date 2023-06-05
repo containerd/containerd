@@ -50,7 +50,7 @@ type services struct {
 	leasesService        leases.Manager
 	introspectionService introspection.Service
 	sandboxStore         sandbox.Store
-	sandboxController    sandbox.Controller
+	sandboxers           map[string]sandbox.Controller
 }
 
 // ServicesOpt allows callers to set options on the services
@@ -83,6 +83,16 @@ func WithSnapshotters(snapshotters map[string]snapshots.Snapshotter) ServicesOpt
 		s.snapshotters = make(map[string]snapshots.Snapshotter)
 		for n, sn := range snapshotters {
 			s.snapshotters[n] = sn
+		}
+	}
+}
+
+// WithSandboxers sets the sandbox controllers.
+func WithSandboxers(sandboxers map[string]sandbox.Controller) ServicesOpt {
+	return func(s *services) {
+		s.sandboxers = make(map[string]sandbox.Controller)
+		for n, sn := range sandboxers {
+			s.sandboxers[n] = sn
 		}
 	}
 }
@@ -171,13 +181,6 @@ func WithSandboxStore(client sandbox.Store) ServicesOpt {
 	}
 }
 
-// WithSandboxController sets the sandbox controller.
-func WithSandboxController(client sandbox.Controller) ServicesOpt {
-	return func(s *services) {
-		s.sandboxController = client
-	}
-}
-
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
 func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
@@ -192,9 +195,6 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			plugins.SandboxStorePlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
-			},
-			plugins.SandboxControllerPlugin: func(i interface{}) ServicesOpt {
-				return WithSandboxController(i.(sandbox.Controller))
 			},
 		} {
 			i, err := ic.Get(t)
@@ -217,6 +217,9 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			},
 			srv.SnapshotsService: func(s interface{}) ServicesOpt {
 				return WithSnapshotters(s.(map[string]snapshots.Snapshotter))
+			},
+			srv.SandboxControllersService: func(s interface{}) ServicesOpt {
+				return WithSandboxers(s.(map[string]sandbox.Controller))
 			},
 			srv.ContainersService: func(s interface{}) ServicesOpt {
 				return WithContainerClient(s.(containersapi.ContainersClient))

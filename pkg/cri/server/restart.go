@@ -60,10 +60,7 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list sandbox containers: %w", err)
 	}
 
-	podSandboxController, ok := c.sandboxControllers[criconfig.ModePodSandbox]
-	if !ok {
-		log.G(ctx).Fatal("unable to restore pod sandboxes, no controller found")
-	}
+	podSandboxController := c.client.SandboxController(string(criconfig.ModePodSandbox))
 
 	podSandboxLoader, ok := podSandboxController.(podSandboxRecover)
 	if !ok {
@@ -115,7 +112,7 @@ func (c *criService) recover(ctx context.Context) error {
 
 		var (
 			state      = sandboxstore.StateUnknown
-			controller = c.sandboxControllers[criconfig.ModeShim]
+			controller = c.client.SandboxController(sbx.Sandboxer)
 		)
 
 		status, err := controller.Status(ctx, sbx.ID, false)
