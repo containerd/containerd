@@ -43,6 +43,7 @@ func TestSandboxCreate(t *testing.T) {
 			Name:    "test",
 			Options: &types.Any{TypeUrl: "url/3", Value: []byte{4, 5, 6}},
 		},
+		Sandboxer: "test-sandboxer",
 	}
 
 	_, err := store.Create(ctx, in)
@@ -91,7 +92,8 @@ func TestSandboxUpdate(t *testing.T) {
 		Extensions: map[string]typeurl.Any{
 			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}}, // will append `ext1`
 		},
-		Runtime: api.RuntimeOpts{Name: "test"}, // no change
+		Runtime:   api.RuntimeOpts{Name: "test"}, // no change
+		Sandboxer: "test-sandboxer",              // no change
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +122,8 @@ func TestSandboxUpdate(t *testing.T) {
 			"ext1": &types.Any{TypeUrl: "url1", Value: []byte{1, 2}},
 			"ext2": &types.Any{TypeUrl: "url2", Value: []byte{4, 5, 6}},
 		},
-		Runtime: api.RuntimeOpts{Name: "test"},
+		Runtime:   api.RuntimeOpts{Name: "test"},
+		Sandboxer: "test-sandboxer",
 	}
 
 	assertEqualInstances(t, out, expected)
@@ -158,7 +161,8 @@ func TestSandboxList(t *testing.T) {
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
-			Runtime: api.RuntimeOpts{Name: "test"},
+			Runtime:   api.RuntimeOpts{Name: "test"},
+			Sandboxer: "test-sandboxer",
 		},
 	}
 
@@ -203,7 +207,8 @@ func TestSandboxListWithFilter(t *testing.T) {
 				TypeUrl: "test",
 				Value:   []byte{9},
 			}},
-			Runtime: api.RuntimeOpts{Name: "test"},
+			Runtime:   api.RuntimeOpts{Name: "test"},
+			Sandboxer: "test-sandboxer",
 		},
 	}
 

@@ -114,6 +114,7 @@
 	  │     ├──createdat : <binary time>     - Created at
 	  │     ├──updatedat : <binary time>     - Updated at
 	  │     ├──spec : <binary>               - Proto marshaled spec
+	  │     ├──sandboxer : <string>          - Sandboxer name
 	  │     ├──runtime
 	  │     │  ├──name : <string>            - Runtime name
 	  │     │  └──options : <binary>         - Proto marshaled options
@@ -173,6 +174,7 @@ var (
 	bucketKeyRef         = []byte("ref")
 	bucketKeyExpireAt    = []byte("expireat")
 	bucketKeySandboxID   = []byte("sandboxid")
+	bucketKeySandboxer   = []byte("sandboxer")
 
 	deprecatedBucketKeyObjectIngest = []byte("ingest") // stores ingest links, deprecated in v1.2
 )
