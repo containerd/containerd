@@ -129,19 +129,6 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		client: conn,
 	}
 
-	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
-	defer cancel()
-
-	// Check connectivity, TaskService is the only required service, so create a temp one to check connection.
-	s, err := newShimTask(shim)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := s.PID(ctx); err != nil {
-		return nil, err
-	}
-
 	return shim, nil
 }
 
