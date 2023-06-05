@@ -273,7 +273,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	return
 }
 
-func (c *Controller) Create(ctx context.Context, _id string, _ ...sandbox.CreateOpt) error {
+func (c *Controller) Create(ctx context.Context, _info sandbox.Sandbox, _ ...sandbox.CreateOpt) error {
 	// Not used by pod-sandbox implementation as there is no need to split pause containers logic.
 	return nil
 }
