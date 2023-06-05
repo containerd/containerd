@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
@@ -118,11 +119,11 @@ func (s *sandboxClient) Stop(ctx context.Context) error {
 }
 
 func (s *sandboxClient) Shutdown(ctx context.Context) error {
-	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil {
+	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil && errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to shutdown sandbox: %w", err)
 	}
 
-	if err := s.client.SandboxStore().Delete(ctx, s.ID()); err != nil {
+	if err := s.client.SandboxStore().Delete(ctx, s.ID()); err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("failed to delete sandbox from store: %w", err)
 	}
 
