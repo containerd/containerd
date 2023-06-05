@@ -92,6 +92,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	sandboxInfo.Runtime.Name = ociRuntime.Type
+	sandboxInfo.Sandboxer = ociRuntime.Sandboxer
 
 	runtimeStart := time.Now()
 	// Retrieve runtime options
@@ -681,25 +682,6 @@ func (c *criService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtime
 		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return handler, nil
-}
-
-// getSandboxController returns the sandbox controller configuration for sandbox.
-// If absent in legacy case, it will return the default controller.
-func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sb.Controller, error) {
-	ociRuntime, err := c.getSandboxRuntime(config, runtimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-	// Validate mode
-	if err = ValidateMode(ociRuntime.Sandboxer); err != nil {
-		return nil, err
-	}
-	// Use sandbox controller to delete sandbox
-	controller, exist := c.sandboxControllers[criconfig.SandboxControllerMode(ociRuntime.Sandboxer)]
-	if !exist {
-		return nil, fmt.Errorf("sandbox controller %s not exist", ociRuntime.Sandboxer)
-	}
-	return controller, nil
 }
 
 func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.Result) {

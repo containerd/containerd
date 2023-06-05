@@ -719,9 +719,13 @@ func (c *Client) SandboxStore() sandbox.Store {
 }
 
 // SandboxController returns the underlying sandbox controller client
-func (c *Client) SandboxController() sandbox.Controller {
-	if c.sandboxController != nil {
-		return c.sandboxController
+func (c *Client) SandboxController(name string) sandbox.Controller {
+	// default sandboxer is shim
+	if len(name) == 0 {
+		name = "shim"
+	}
+	if c.sandboxers != nil {
+		return c.sandboxers[name]
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()

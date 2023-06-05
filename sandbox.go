@@ -81,7 +81,7 @@ func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (s *sandboxClient) Start(ctx context.Context) error {
-	resp, err := s.client.SandboxController().Start(ctx, s.ID())
+	resp, err := s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 	go func() {
 		defer close(c)
 
-		exitStatus, err := s.client.SandboxController().Wait(ctx, s.ID())
+		exitStatus, err := s.client.SandboxController(s.metadata.Sandboxer).Wait(ctx, s.ID())
 		if err != nil {
 			c <- ExitStatus{
 				code: UnknownExitStatus,
@@ -114,11 +114,11 @@ func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
 }
 
 func (s *sandboxClient) Stop(ctx context.Context) error {
-	return s.client.SandboxController().Stop(ctx, s.ID())
+	return s.client.SandboxController(s.metadata.Sandboxer).Stop(ctx, s.ID())
 }
 
 func (s *sandboxClient) Shutdown(ctx context.Context) error {
-	if err := s.client.SandboxController().Shutdown(ctx, s.ID()); err != nil {
+	if err := s.client.SandboxController(s.metadata.Sandboxer).Shutdown(ctx, s.ID()); err != nil {
 		return fmt.Errorf("failed to shutdown sandbox: %w", err)
 	}
 
@@ -166,7 +166,7 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController().Status(ctx, id, false)
+	status, err := c.SandboxController(sandbox.Sandboxer).Status(ctx, id, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
 	}
