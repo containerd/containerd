@@ -292,6 +292,10 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 		return err
 	}
 
+	if err := bucket.Put(bucketKeySandboxer, []byte(instance.Sandboxer)); err != nil {
+		return err
+	}
+
 	runtimeBucket, err := bucket.CreateBucketIfNotExists(bucketKeyRuntime)
 	if err != nil {
 		return err
@@ -349,6 +353,12 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 	inst.Extensions, err = boltutil.ReadExtensions(bucket)
 	if err != nil {
 		return api.Sandbox{}, err
+	}
+	sandboxer := bucket.Get(bucketKeySandboxer)
+	if sandboxer == nil {
+		inst.Sandboxer = ""
+	} else {
+		inst.Sandboxer = string(sandboxer)
 	}
 
 	return inst, nil
