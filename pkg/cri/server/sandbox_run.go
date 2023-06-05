@@ -352,7 +352,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	// TODO: get rid of this. sandbox object should no longer have Container field.
-	if ociRuntime.SandboxMode == string(criconfig.ModePodSandbox) {
+	if ociRuntime.Sandboxer == string(criconfig.ModePodSandbox) {
 		container, err := c.client.LoadContainer(ctx, id)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load container %q for sandbox: %w", id, err)
@@ -691,13 +691,13 @@ func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runt
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	// Validate mode
-	if err = ValidateMode(ociRuntime.SandboxMode); err != nil {
+	if err = ValidateMode(ociRuntime.Sandboxer); err != nil {
 		return nil, err
 	}
 	// Use sandbox controller to delete sandbox
-	controller, exist := c.sandboxControllers[criconfig.SandboxControllerMode(ociRuntime.SandboxMode)]
+	controller, exist := c.sandboxControllers[criconfig.SandboxControllerMode(ociRuntime.Sandboxer)]
 	if !exist {
-		return nil, fmt.Errorf("sandbox controller %s not exist", ociRuntime.SandboxMode)
+		return nil, fmt.Errorf("sandbox controller %s not exist", ociRuntime.Sandboxer)
 	}
 	return controller, nil
 }

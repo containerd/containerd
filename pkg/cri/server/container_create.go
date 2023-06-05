@@ -275,7 +275,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	)
 
 	// When using sandboxed shims, containerd's runtime needs to know which sandbox shim instance to use.
-	if ociRuntime.SandboxMode == string(criconfig.ModeShim) {
+	if ociRuntime.Sandboxer == string(criconfig.ModeShim) {
 		opts = append(opts, containerd.WithSandbox(sandboxID))
 	}
 
