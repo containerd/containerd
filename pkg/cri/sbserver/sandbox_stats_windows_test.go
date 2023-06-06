@@ -192,6 +192,37 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			},
 			expectError: false,
 		},
+		"pod sandbox with empty stats still works (hostprocess container scenario)": {
+			metrics: map[string]*wstats.Statistics{
+				"c1": {
+					Container: windowsStat(currentStatsTimestamp, 400, 20),
+				},
+				"s1": {},
+			},
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200),
+			containers: []containerstore.Container{
+				{
+					Metadata: containerstore.Metadata{ID: "c1"},
+					Stats: &stats.ContainerStats{
+						Timestamp:            initialStatsTimestamp,
+						UsageCoreNanoSeconds: 200,
+					},
+				},
+			},
+			expectedPodStats: expectedStats{
+				UsageCoreNanoSeconds: 400,
+				UsageNanoCores:       200,
+				WorkingSetBytes:      20,
+			},
+			expectedContainerStats: []expectedStats{
+				{
+					UsageCoreNanoSeconds: 400,
+					UsageNanoCores:       200,
+					WorkingSetBytes:      20,
+				},
+			},
+			expectError: false,
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			actualPodStats, actualContainerStats, err := c.toPodSandboxStats(test.sandbox, test.metrics, test.containers, currentStatsTimestamp)
