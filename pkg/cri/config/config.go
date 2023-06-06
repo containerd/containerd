@@ -145,7 +145,7 @@ type CniConfig struct {
 	// need to fetch the node object through some external process (which has scalability, auth, complexity issues).
 	// It is currently heavily used in kubernetes-containerd CI testing
 	// NetworkPluginConfTemplate was once deprecated in containerd v1.7.0,
-	// but its deprecation was cancelled in v1.7.2.
+	// but its deprecation was cancelled in v1.7.3.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
 	//
