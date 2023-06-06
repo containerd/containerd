@@ -146,17 +146,17 @@ type CniConfig struct {
 	// NetworkPluginSetupSerially is a boolean flag to specify whether containerd sets up networks serially
 	// if there are multiple CNI plugin config files existing and NetworkPluginMaxConfNum is larger than 1.
 	NetworkPluginSetupSerially bool `toml:"setup_serially" json:"setupSerially"`
-	// NetworkPluginConfTemplate is the file path of golang template used to generate
-	// cni config.
+	// NetworkPluginConfTemplate is the file path of golang template used to generate cni config.
 	// When it is set, containerd will get cidr(s) from kubelet to replace {{.PodCIDR}},
 	// {{.PodCIDRRanges}} or {{.Routes}} in the template, and write the config into
 	// NetworkPluginConfDir.
 	// Ideally the cni config should be placed by system admin or cni daemon like calico,
-	// weaveworks etc. However, there are still users using kubenet
-	// (https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
-	// today, who don't have a cni daemonset in production. NetworkPluginConfTemplate is
-	// a temporary backward-compatible solution for them.
-	// DEPRECATED: use CNI configs
+	// weaveworks etc. However, this is useful for the cases when there is no cni daemonset to place cni config.
+	// This allowed for very simple generic networking using the Kubernetes built in node pod CIDR IPAM, avoiding the
+	// need to fetch the node object through some external process (which has scalability, auth, complexity issues).
+	// It is currently heavily used in kubernetes-containerd CI testing
+	// NetworkPluginConfTemplate was once deprecated in containerd v1.7.0,
+	// but its deprecation was cancelled in v1.7.3.
 	NetworkPluginConfTemplate string `toml:"conf_template" json:"confTemplate"`
 	// IPPreference specifies the strategy to use when selecting the main IP address for a pod.
 	//
