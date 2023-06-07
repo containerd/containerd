@@ -87,6 +87,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 	// Instead of ticker, just delay
 	jobs := map[digest.Digest]*jobStatus{}
 	tc := time.NewTicker(time.Millisecond * 300)
+	defer tc.Stop()
 
 	update := func() {
 		// TODO: Filter by references
