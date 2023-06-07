@@ -119,6 +119,7 @@ func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error)
 	ticker := time.NewTicker(250 * time.Millisecond)
 	quit := make(chan struct{})
 	go func() {
+		defer ticker.Stop()
 		for {
 			select {
 			case <-tctx.Done():
@@ -132,7 +133,6 @@ func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error)
 					return
 				}
 			case <-quit:
-				ticker.Stop()
 				return
 			}
 		}
