@@ -36,7 +36,7 @@ func setupSnapshotter(t *testing.T) ([]Opt, error) {
 
 	loopbackSize := int64(8 << 20) // 8 MB
 	if os.Getpagesize() > 4096 {
-		loopbackSize = int64(650 << 20) // 650 MB
+		loopbackSize = int64(16 << 20) // 16 MB
 	}
 
 	scratch := filepath.Join(t.TempDir(), "scratch")
