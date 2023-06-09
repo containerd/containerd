@@ -1412,5 +1412,9 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-statusC
+	select {
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for task exit event")
+	case <-statusC:
+	}
 }
