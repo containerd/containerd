@@ -31,7 +31,16 @@ import (
 	"google.golang.org/grpc"
 )
 
+var emptyResponse typeurl.Any
+
 func init() {
+	// save marshalled empty response to avoid marshaling everytime
+	var err error
+	emptyResponse, err = typeurl.MarshalAny(&ptypes.Empty{})
+	if err != nil {
+		panic(err)
+	}
+
 	plugin.Register(&plugin.Registration{
 		Type: plugin.GRPCPlugin,
 		ID:   "streaming",
@@ -69,12 +78,6 @@ func (s *service) Stream(srv api.Streaming_StreamServer) error {
 		return err
 	}
 
-	// TODO: Save this response to avoid marshaling everytime
-	response, err := typeurl.MarshalAny(&ptypes.Empty{})
-	if err != nil {
-		return err
-	}
-
 	cc := make(chan struct{})
 	ss := &serviceStream{
 		s:  srv,
@@ -87,7 +90,7 @@ func (s *service) Stream(srv api.Streaming_StreamServer) error {
 	}
 
 	// Send response packet after registering stream
-	if err := srv.Send(protobuf.FromAny(response)); err != nil {
+	if err := srv.Send(protobuf.FromAny(emptyResponse)); err != nil {
 		return err
 	}
 
