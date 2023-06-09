@@ -362,7 +362,7 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 		return nil, err
 	}
 	if err := p.Start(ctx); err != nil {
-		return nil, err
+		return p, err
 	}
 	if c.Cgroup() == nil && p.Pid() > 0 {
 		var cg interface{}
