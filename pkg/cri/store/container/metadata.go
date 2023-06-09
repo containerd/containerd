@@ -20,8 +20,14 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func init() {
+	typeurl.Register(&Metadata{},
+		"github.com/containerd/cri/pkg/store/container", "Metadata")
+}
 
 // NOTE(random-liu):
 // 1) Metadata is immutable after created.

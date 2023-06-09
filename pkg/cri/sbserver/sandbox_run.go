@@ -43,11 +43,6 @@ import (
 	sb "github.com/containerd/containerd/sandbox"
 )
 
-func init() {
-	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
-}
-
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
 func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (_ *runtime.RunPodSandboxResponse, retErr error) {

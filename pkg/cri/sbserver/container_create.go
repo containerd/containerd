@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -45,11 +44,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/platforms"
 )
-
-func init() {
-	typeurl.Register(&containerstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/container", "Metadata")
-}
 
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {

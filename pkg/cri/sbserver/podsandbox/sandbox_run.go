@@ -24,7 +24,6 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
-	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -42,11 +41,6 @@ import (
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 )
-
-func init() {
-	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
-}
 
 type CleanupErr struct {
 	error

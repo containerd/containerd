@@ -28,7 +28,6 @@ import (
 	"time"
 
 	cni "github.com/containerd/go-cni"
-	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	selinux "github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -46,11 +45,6 @@ import (
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/snapshots"
 )
-
-func init() {
-	typeurl.Register(&sandboxstore.Metadata{},
-		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
-}
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.

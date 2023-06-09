@@ -21,8 +21,14 @@ import (
 	"fmt"
 
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func init() {
+	typeurl.Register(&Metadata{},
+		"github.com/containerd/cri/pkg/store/sandbox", "Metadata")
+}
 
 // NOTE(random-liu):
 // 1) Metadata is immutable after created.
