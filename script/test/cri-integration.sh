@@ -37,7 +37,6 @@ fi
 # RUNTIME is the runtime handler to use in the test.
 RUNTIME=${RUNTIME:-""}
 
-CRI_ROOT="${CONTAINERD_ROOT}/io.containerd.grpc.v1.cri"
 mkdir -p "${REPORT_DIR}"
 test_setup "${REPORT_DIR}"
 
@@ -54,7 +53,6 @@ CMD+="${PWD}/bin/cri-integration.test"
 
 ${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
-  --cri-root="${CRI_ROOT}" \
   --runtime-handler="${RUNTIME}" \
   --containerd-bin="${CONTAINERD_BIN}" \
   --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
