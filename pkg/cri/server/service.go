@@ -332,7 +332,7 @@ func (c *criService) register(s *grpc.Server) error {
 // imageFSPath returns containerd image filesystem path.
 // Note that if containerd changes directory layout, we also needs to change this.
 func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, fmt.Sprintf("%s.%s", plugin.SnapshotPlugin, snapshotter))
+	return filepath.Join(rootDir, plugin.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {

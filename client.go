@@ -185,7 +185,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 	c := &Client{
 		defaultns: copts.defaultns,
 		conn:      conn,
-		runtime:   fmt.Sprintf("%s.%s", plugin.RuntimePlugin, runtime.GOOS),
+		runtime:   plugin.RuntimePlugin.String() + "." + runtime.GOOS,
 	}
 
 	if copts.defaultPlatform != nil {
