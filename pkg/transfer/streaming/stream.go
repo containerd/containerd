@@ -53,14 +53,14 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			default:
 			}
 
-			any, err := stream.Recv()
+			anyType, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
 					log.G(ctx).WithError(err).Error("send stream ended without EOF")
 				}
 				return
 			}
-			i, err := typeurl.UnmarshalAny(any)
+			i, err := typeurl.UnmarshalAny(anyType)
 			if err != nil {
 				log.G(ctx).WithError(err).Error("failed to unmarshal stream object")
 				continue
@@ -124,13 +124,13 @@ func SendStream(ctx context.Context, r io.Reader, stream streaming.Stream) {
 			data := &transferapi.Data{
 				Data: b[:n],
 			}
-			any, err := typeurl.MarshalAny(data)
+			anyType, err := typeurl.MarshalAny(data)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to marshal data for send")
 				// TODO: Send error message on stream before close to allow remote side to return error
 				return
 			}
-			if err := stream.Send(any); err != nil {
+			if err := stream.Send(anyType); err != nil {
 				log.G(ctx).WithError(err).Errorf("send failed")
 				return
 			}
@@ -149,20 +149,20 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 				update := &transferapi.WindowUpdate{
 					Update: windowSize,
 				}
-				any, err := typeurl.MarshalAny(update)
+				anyType, err := typeurl.MarshalAny(update)
 				if err != nil {
 					w.CloseWithError(fmt.Errorf("failed to marshal window update: %w", err))
 					return
 				}
 				// check window update error after recv, stream may be complete
-				if werr = stream.Send(any); werr == nil {
+				if werr = stream.Send(anyType); werr == nil {
 					window += windowSize
 				} else if errors.Is(werr, io.EOF) {
 					// TODO: Why does send return EOF here
 					werr = nil
 				}
 			}
-			any, err := stream.Recv()
+			anyType, err := stream.Recv()
 			if err != nil {
 				if errors.Is(err, io.EOF) {
 					err = nil
@@ -176,7 +176,7 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 				w.CloseWithError(fmt.Errorf("failed to send window update: %w", werr))
 				return
 			}
-			i, err := typeurl.UnmarshalAny(any)
+			i, err := typeurl.UnmarshalAny(anyType)
 			if err != nil {
 				w.CloseWithError(fmt.Errorf("failed to unmarshal received object: %w", err))
 				return

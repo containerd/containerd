@@ -311,9 +311,9 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 		t.Log("Get sandbox container")
 		c, err := GetContainer(sb.Id)
 		require.NoError(t, err)
-		any, ok := c.Extensions["io.cri-containerd.sandbox.metadata"]
+		md, ok := c.Extensions["io.cri-containerd.sandbox.metadata"]
 		require.True(t, ok, "sandbox metadata should exist in extension")
-		i, err := typeurl.UnmarshalAny(any)
+		i, err := typeurl.UnmarshalAny(md)
 		require.NoError(t, err)
 		require.IsType(t, &sandbox.Metadata{}, i)
 		metadata, ok := i.(*sandbox.Metadata)

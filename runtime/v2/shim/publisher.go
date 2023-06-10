@@ -110,7 +110,7 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	any, err := protobuf.MarshalAnyToProto(event)
+	evt, err := protobuf.MarshalAnyToProto(event)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 			Timestamp: protobuf.ToTimestamp(time.Now()),
 			Namespace: ns,
 			Topic:     topic,
-			Event:     any,
+			Event:     evt,
 		},
 		ctx: ctx,
 	}

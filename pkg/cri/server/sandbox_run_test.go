@@ -162,9 +162,9 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 				test.configChange(meta.Config)
 			}
 
-			any, err := typeurl.MarshalAny(meta)
+			md, err := typeurl.MarshalAny(meta)
 			assert.NoError(t, err)
-			data, err := typeurl.UnmarshalAny(any)
+			data, err := typeurl.UnmarshalAny(md)
 			assert.NoError(t, err)
 			assert.IsType(t, &sandboxstore.Metadata{}, data)
 			curMeta, ok := data.(*sandboxstore.Metadata)

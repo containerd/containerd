@@ -261,11 +261,11 @@ func (cc *credCallback) GetCredentials(ctx context.Context, ref, host string) (C
 		Host:      host,
 		Reference: ref,
 	}
-	any, err := typeurl.MarshalAny(ar)
+	anyType, err := typeurl.MarshalAny(ar)
 	if err != nil {
 		return Credentials{}, err
 	}
-	if err := cc.stream.Send(any); err != nil {
+	if err := cc.stream.Send(anyType); err != nil {
 		return Credentials{}, err
 	}
 	resp, err := cc.stream.Recv()

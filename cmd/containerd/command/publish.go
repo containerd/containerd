@@ -78,11 +78,11 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var any types.Any
-	if err := proto.Unmarshal(data, &any); err != nil {
+	var payload types.Any
+	if err := proto.Unmarshal(data, &payload); err != nil {
 		return nil, err
 	}
-	return &any, nil
+	return &payload, nil
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {

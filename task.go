@@ -365,7 +365,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 			i.Close()
 		}
 	}()
-	any, err := protobuf.MarshalAnyToProto(spec)
+	pSpec, err := protobuf.MarshalAnyToProto(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +377,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		Stdin:       cfg.Stdin,
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
-		Spec:        any,
+		Spec:        pSpec,
 	}
 	if _, err := t.client.TaskService().Exec(ctx, request); err != nil {
 		i.Cancel()
@@ -465,11 +465,11 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 	}
 	request.ParentCheckpoint = i.ParentCheckpoint.String()
 	if i.Options != nil {
-		any, err := protobuf.MarshalAnyToProto(i.Options)
+		o, err := protobuf.MarshalAnyToProto(i.Options)
 		if err != nil {
 			return nil, err
 		}
-		request.Options = any
+		request.Options = o
 	}
 
 	status, err := t.Status(ctx)
@@ -550,11 +550,11 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 		}
 	}
 	if i.Resources != nil {
-		any, err := typeurl.MarshalAny(i.Resources)
+		r, err := typeurl.MarshalAny(i.Resources)
 		if err != nil {
 			return err
 		}
-		request.Resources = protobuf.FromAny(any)
+		request.Resources = protobuf.FromAny(r)
 	}
 	if i.Annotations != nil {
 		request.Annotations = i.Annotations

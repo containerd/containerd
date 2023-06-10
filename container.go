@@ -255,9 +255,8 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		}
 		for _, m := range mounts {
 			if spec.Linux != nil && spec.Linux.MountLabel != "" {
-				context := label.FormatMountLabel("", spec.Linux.MountLabel)
-				if context != "" {
-					m.Options = append(m.Options, context)
+				if ml := label.FormatMountLabel("", spec.Linux.MountLabel); ml != "" {
+					m.Options = append(m.Options, ml)
 				}
 			}
 			request.Rootfs = append(request.Rootfs, &types.Mount{
@@ -288,11 +287,11 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	}
 	request.RuntimePath = info.RuntimePath
 	if info.Options != nil {
-		any, err := typeurl.MarshalAny(info.Options)
+		o, err := typeurl.MarshalAny(info.Options)
 		if err != nil {
 			return nil, err
 		}
-		request.Options = protobuf.FromAny(any)
+		request.Options = protobuf.FromAny(o)
 	}
 	t := &task{
 		client: c.client,
@@ -455,7 +454,7 @@ func loadFifos(response *tasks.GetResponse) *cio.FIFOSet {
 			// we ignore errors here because we don't
 			// want to remove the directory if it isn't
 			// empty
-			os.Remove(dir)
+			_ = os.Remove(dir)
 		}
 		return err
 	}
