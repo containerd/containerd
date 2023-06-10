@@ -337,17 +337,17 @@ func readContainer(container *containers.Container, bkt *bolt.Bucket) error {
 				container.Runtime.Name = string(n)
 			}
 
-			any, err := boltutil.ReadAny(rbkt, bucketKeyOptions)
+			o, err := boltutil.ReadAny(rbkt, bucketKeyOptions)
 			if err != nil {
 				return err
 			}
-			container.Runtime.Options = any
+			container.Runtime.Options = o
 		case string(bucketKeySpec):
-			var any types.Any
-			if err := proto.Unmarshal(v, &any); err != nil {
+			var spec types.Any
+			if err := proto.Unmarshal(v, &spec); err != nil {
 				return err
 			}
-			container.Spec = &any
+			container.Spec = &spec
 		case string(bucketKeySnapshotKey):
 			container.SnapshotKey = string(v)
 		case string(bucketKeySnapshotter):

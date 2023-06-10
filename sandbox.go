@@ -222,19 +222,19 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 }
 
 // WithSandboxExtension attaches an extension to sandbox
-func WithSandboxExtension(name string, ext interface{}) NewSandboxOpts {
+func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
 		if s.Extensions == nil {
 			s.Extensions = make(map[string]typeurl.Any)
 		}
 
-		any, err := typeurl.MarshalAny(ext)
+		ext, err := typeurl.MarshalAny(extension)
 		if err != nil {
 			return fmt.Errorf("failed to marshal sandbox extension: %w", err)
 		}
 
-		s.Extensions[name] = any
-		return err
+		s.Extensions[name] = ext
+		return nil
 	}
 }
 
