@@ -177,7 +177,7 @@ func TestContainerStart(t *testing.T) {
 }
 
 func readShimPath(taskID string) (string, error) {
-	runtime := fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
+	runtime := plugin.RuntimePluginV2.String() + ".task"
 	shimBinaryNamePath := filepath.Join(defaultState, runtime, testNamespace, taskID, "shim-binary-path")
 
 	shimPath, err := os.ReadFile(shimBinaryNamePath)

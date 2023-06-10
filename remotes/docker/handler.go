@@ -103,7 +103,7 @@ func appendDistributionSourceLabel(originLabel, repo string) string {
 }
 
 func distributionSourceLabelKey(source string) string {
-	return fmt.Sprintf("%s.%s", labels.LabelDistributionSource, source)
+	return labels.LabelDistributionSource + "." + source
 }
 
 // selectRepositoryMountCandidate will select the repo which has longest
