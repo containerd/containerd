@@ -159,7 +159,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 	}
 
 	if err := mount.All(mounts, preparing); err != nil {
-		t.Fatalf("failure reason: %+v", err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", mounts, preparing, err)
 	}
 
 	if err := initialApplier.Apply(preparing); err != nil {
@@ -197,7 +197,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 	if err := mount.All(mounts, next); err != nil {
-		t.Fatalf("failure reason: %+v", err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", mounts, next, err)
 	}
 
 	if err := fstest.CheckDirectoryEqualWithApplier(next, initialApplier); err != nil {
@@ -267,7 +267,7 @@ func checkSnapshotterBasic(ctx context.Context, t *testing.T, snapshotter snapsh
 		t.Fatalf("failure reason: %+v", err)
 	}
 	if err := mount.All(mounts, nextnext); err != nil {
-		t.Fatalf("failure reason: %+v", err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", mounts, nextnext, err)
 	}
 
 	if err := fstest.CheckDirectoryEqualWithApplier(nextnext,
@@ -306,7 +306,7 @@ func checkSnapshotterStatActive(ctx context.Context, t *testing.T, snapshotter s
 	}
 
 	if err = mount.All(mounts, preparing); err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", mounts, preparing, err)
 	}
 	defer testutil.Unmount(t, preparing)
 
@@ -340,7 +340,7 @@ func checkSnapshotterStatCommitted(ctx context.Context, t *testing.T, snapshotte
 	}
 
 	if err = mount.All(mounts, preparing); err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", mounts, preparing, err)
 	}
 	defer testutil.Unmount(t, preparing)
 
@@ -816,7 +816,7 @@ func checkSnapshotterViewReadonly(ctx context.Context, t *testing.T, snapshotter
 
 	// Just checking the option string of m is not enough, we need to test real mount. (#1368)
 	if err := mount.All(m, viewMountPoint); err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to mount %+v on %+v: %+v", m, viewMountPoint, err)
 	}
 
 	testfile := filepath.Join(viewMountPoint, "testfile")
@@ -980,7 +980,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		}
 
 		if err := mount.All(mounts, view); err != nil {
-			t.Fatalf("failed to mount %+v on %s: %+v", mounts, view, err)
+			t.Fatalf("failed to mount %+v on %+v: %+v", mounts, view, err)
 		}
 		defer testutil.Unmount(t, view)
 
