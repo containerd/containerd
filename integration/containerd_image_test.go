@@ -46,7 +46,7 @@ func TestContainerdImage(t *testing.T) {
 
 	t.Logf("pull the image into containerd")
 	_, err = containerdClient.Pull(ctx, testImage, containerd.WithPullUnpack, containerd.WithPullLabel("foo", "bar"))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		// Make sure the image is cleaned up in any case.
 		if err := containerdClient.ImageService().Delete(ctx, testImage); err != nil {
