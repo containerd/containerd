@@ -58,13 +58,13 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 
 // WithCheckpointTask includes the running task
 func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
-	any, err := protobuf.MarshalAnyToProto(copts)
+	opt, err := protobuf.MarshalAnyToProto(copts)
 	if err != nil {
 		return nil
 	}
 	task, err := client.TaskService().Checkpoint(ctx, &tasks.CheckpointTaskRequest{
 		ContainerID: c.ID,
-		Options:     any,
+		Options:     opt,
 	})
 	if err != nil {
 		return err
@@ -80,7 +80,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 		})
 	}
 	// save copts
-	data, err := proto.Marshal(any)
+	data, err := proto.Marshal(opt)
 	if err != nil {
 		return err
 	}
@@ -100,8 +100,8 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 // WithCheckpointRuntime includes the container runtime info
 func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
-		any := protobuf.FromAny(c.Runtime.Options)
-		data, err := proto.Marshal(any)
+		opt := protobuf.FromAny(c.Runtime.Options)
+		data, err := proto.Marshal(opt)
 		if err != nil {
 			return err
 		}

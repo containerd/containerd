@@ -282,9 +282,9 @@ func (em *eventMonitor) start() <-chan error {
 				ids := em.backOff.getExpiredIDs()
 				for _, id := range ids {
 					queue := em.backOff.deBackOff(id)
-					for i, any := range queue.events {
-						if err := em.handleEvent(any); err != nil {
-							logrus.WithError(err).Errorf("Failed to handle backOff event %+v for %s", any, id)
+					for i, evt := range queue.events {
+						if err := em.handleEvent(evt); err != nil {
+							logrus.WithError(err).Errorf("Failed to handle backOff event %+v for %s", evt, id)
 							em.backOff.reBackOff(id, queue.events[i:], queue.duration)
 							break
 						}

@@ -144,9 +144,9 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 	return typeurl.MarshalAny(s)
 }
 
-func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, any typeurl.Any) error {
+func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, anyType typeurl.Any) error {
 	var s transfertypes.ImageExportStream
-	if err := typeurl.UnmarshalTo(any, &s); err != nil {
+	if err := typeurl.UnmarshalTo(anyType, &s); err != nil {
 		return err
 	}
 

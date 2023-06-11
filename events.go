@@ -46,13 +46,13 @@ type eventRemote struct {
 }
 
 func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Event) error {
-	any, err := typeurl.MarshalAny(event)
+	evt, err := typeurl.MarshalAny(event)
 	if err != nil {
 		return err
 	}
 	req := &eventsapi.PublishRequest{
 		Topic: topic,
-		Event: protobuf.FromAny(any),
+		Event: protobuf.FromAny(evt),
 	}
 	if _, err := e.client.Publish(ctx, req); err != nil {
 		return errdefs.FromGRPC(err)

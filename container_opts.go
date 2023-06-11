@@ -58,18 +58,18 @@ type InfoConfig struct {
 func WithRuntime(name string, options interface{}) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
 		var (
-			any typeurl.Any
-			err error
+			opts typeurl.Any
+			err  error
 		)
 		if options != nil {
-			any, err = typeurl.MarshalAny(options)
+			opts, err = typeurl.MarshalAny(options)
 			if err != nil {
 				return err
 			}
 		}
 		c.Runtime = containers.RuntimeInfo{
 			Name:    name,
-			Options: any,
+			Options: opts,
 		}
 		return nil
 	}
@@ -299,7 +299,7 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 			return fmt.Errorf("extension key must not be zero-length: %w", errdefs.ErrInvalidArgument)
 		}
 
-		any, err := typeurl.MarshalAny(extension)
+		ext, err := typeurl.MarshalAny(extension)
 		if err != nil {
 			if errors.Is(err, typeurl.ErrNotFound) {
 				return fmt.Errorf("extension %q is not registered with the typeurl package, see `typeurl.Register`: %w", name, err)
@@ -310,7 +310,7 @@ func WithContainerExtension(name string, extension interface{}) NewContainerOpts
 		if c.Extensions == nil {
 			c.Extensions = make(map[string]typeurl.Any)
 		}
-		c.Extensions[name] = any
+		c.Extensions[name] = ext
 		return nil
 	}
 }

@@ -142,12 +142,12 @@ func (c *criService) updateContainerResources(ctx context.Context,
 
 // updateContainerSpec updates container spec.
 func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
-	any, err := typeurl.MarshalAny(spec)
+	s, err := typeurl.MarshalAny(spec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal spec %+v: %w", spec, err)
 	}
 	if err := cntr.Update(ctx, func(ctx gocontext.Context, client *containerd.Client, c *containers.Container) error {
-		c.Spec = any
+		c.Spec = s
 		return nil
 	}); err != nil {
 		return fmt.Errorf("failed to update container spec: %w", err)
