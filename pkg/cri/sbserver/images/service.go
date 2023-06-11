@@ -32,13 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// imageLabelKey is the label key indicating the image is managed by cri plugin.
-	imageLabelKey = "io.cri-containerd.image"
-	// imageLabelValue is the label value indicating the image is managed by cri plugin.
-	imageLabelValue = "managed"
-)
-
 type CRIImageService struct {
 	// config contains all configurations.
 	config criconfig.Config
