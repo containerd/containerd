@@ -70,7 +70,7 @@ func TestOverlay(t *testing.T) {
 				testOverlayOverlayRead(t, newSnapshotter)
 			})
 			t.Run("TestOverlayView", func(t *testing.T) {
-				testOverlayView(t, newSnapshotter)
+				testOverlayView(t, newSnapshotterWithOpts(append(opts, WithMountOptions([]string{"volatile"}))...))
 			})
 		})
 	}
@@ -329,7 +329,7 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 
 	supportsIndex := supportsIndex()
-	expectedOptions := 2
+	expectedOptions := 3
 	if !supportsIndex {
 		expectedOptions--
 	}
@@ -346,12 +346,15 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 	lowers := getParents(ctx, o, root, "/tmp/view2")
 	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
-	optIdx := 1
+	optIdx := 2
 	if !supportsIndex {
 		optIdx--
 	}
 	if userxattr {
 		optIdx++
+	}
+	if m.Options[0] != "volatile" {
+		t.Error("expected option first option to be provided option \"volatile\"")
 	}
 	if m.Options[optIdx] != expected {
 		t.Errorf("expected option %q but received %q", expected, m.Options[optIdx])
