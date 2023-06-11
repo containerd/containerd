@@ -177,7 +177,7 @@ type ShimManager struct {
 
 // ID of the shim manager
 func (m *ShimManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "shim")
+	return plugin.RuntimePluginV2.String() + ".shim"
 }
 
 // Start launches a new shim instance
@@ -413,7 +413,7 @@ func NewTaskManager(shims *ShimManager) *TaskManager {
 
 // ID of the task manager
 func (m *TaskManager) ID() string {
-	return fmt.Sprintf("%s.%s", plugin.RuntimePluginV2, "task")
+	return plugin.RuntimePluginV2.String() + ".task"
 }
 
 // Create launches new shim instance and creates new task

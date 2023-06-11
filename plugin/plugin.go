@@ -130,7 +130,7 @@ func (r *Registration) Init(ic *InitContext) *Plugin {
 
 // URI returns the full plugin URI
 func (r *Registration) URI() string {
-	return fmt.Sprintf("%s.%s", r.Type, r.ID)
+	return r.Type.String() + "." + r.ID
 }
 
 var register = struct {
