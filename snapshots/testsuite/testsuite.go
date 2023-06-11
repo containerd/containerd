@@ -980,7 +980,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 		}
 
 		if err := mount.All(mounts, view); err != nil {
-			t.Fatalf("failed to mount on the target(%s): %+v", view, err)
+			t.Fatalf("failed to mount %+v on %s: %+v", mounts, view, err)
 		}
 		defer testutil.Unmount(t, view)
 

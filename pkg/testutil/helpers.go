@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"testing"
@@ -78,9 +79,26 @@ func DumpDir(t *testing.T, root string) {
 // DumpDirOnFailure prints the contents of the directory to the testing logger if
 // the test has failed.
 func DumpDirOnFailure(t *testing.T, root string) {
-	if t.Failed() {
-		DumpDir(t, root)
+	if ! t.Failed() {
+		return
 	}
+
+	DumpDir(t, root)
+
+	// Make sure the disk is having enough space.
+	out, err := exec.Command("df").CombinedOutput()
+	if err != nil {
+		t.Logf("failed to execute df: %s", err)
+		return
+	}
+	t.Logf("df: %s", string(out))
+
+	out, err = exec.Command("dmesg").CombinedOutput()
+	if err != nil {
+		t.Logf("failed to execute dmesg: %s", err)
+		return
+	}
+	t.Logf("dmesg: %s", string(out))
 }
 
 // Unmount unmounts a given mountPoint and sets t.Error if it fails
