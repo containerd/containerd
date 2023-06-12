@@ -49,7 +49,7 @@ jobs:
         with:
           version: v1.50.1
           skip-cache: true
-          args: --timeout=5m
+          args: --timeout=8m
 
   #
   # Project checks
