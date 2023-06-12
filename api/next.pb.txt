@@ -885,12 +885,49 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/metrics.proto"
+  package: "containerd.types"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Metric"
+    field {
+      name: "timestamp"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "timestamp"
+    }
+    field {
+      name: "id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "data"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "data"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/runtime/sandbox/v1/sandbox.proto"
   package: "containerd.runtime.sandbox.v1"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  dependency: "github.com/containerd/containerd/api/types/metrics.proto"
   message_type {
     name: "CreateSandboxRequest"
     field {
@@ -1199,6 +1236,27 @@ file {
   message_type {
     name: "ShutdownSandboxResponse"
   }
+  message_type {
+    name: "SandboxMetricsRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "SandboxMetricsResponse"
+    field {
+      name: "metrics"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Metric"
+      json_name: "metrics"
+    }
+  }
   service {
     name: "Sandbox"
     method {
@@ -1240,6 +1298,11 @@ file {
       name: "ShutdownSandbox"
       input_type: ".containerd.runtime.sandbox.v1.ShutdownSandboxRequest"
       output_type: ".containerd.runtime.sandbox.v1.ShutdownSandboxResponse"
+    }
+    method {
+      name: "SandboxMetrics"
+      input_type: ".containerd.runtime.sandbox.v1.SandboxMetricsRequest"
+      output_type: ".containerd.runtime.sandbox.v1.SandboxMetricsResponse"
     }
   }
   options {
@@ -5941,42 +6004,6 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/api/services/streaming/v1;streaming"
-  }
-  syntax: "proto3"
-}
-file {
-  name: "github.com/containerd/containerd/api/types/metrics.proto"
-  package: "containerd.types"
-  dependency: "google/protobuf/any.proto"
-  dependency: "google/protobuf/timestamp.proto"
-  message_type {
-    name: "Metric"
-    field {
-      name: "timestamp"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "timestamp"
-    }
-    field {
-      name: "id"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "id"
-    }
-    field {
-      name: "data"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "data"
-    }
-  }
-  options {
-    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }

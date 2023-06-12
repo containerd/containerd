@@ -91,6 +91,7 @@ func (p *pauseService) StopSandbox(ctx context.Context, req *api.StopSandboxRequ
 }
 
 func (p *pauseService) WaitSandbox(ctx context.Context, req *api.WaitSandboxRequest) (*api.WaitSandboxResponse, error) {
+	log.G(ctx).Debugf("wait sandbox request: %+v", req)
 	return &api.WaitSandboxResponse{
 		ExitStatus: 0,
 	}, nil
@@ -105,6 +106,12 @@ func (p *pauseService) PingSandbox(ctx context.Context, req *api.PingRequest) (*
 	return &api.PingResponse{}, nil
 }
 
-func (p *pauseService) ShutdownSandbox(ctx context.Context, request *api.ShutdownSandboxRequest) (*api.ShutdownSandboxResponse, error) {
+func (p *pauseService) ShutdownSandbox(ctx context.Context, req *api.ShutdownSandboxRequest) (*api.ShutdownSandboxResponse, error) {
+	log.G(ctx).Debugf("shutdown sandbox request: %+v", req)
 	return &api.ShutdownSandboxResponse{}, nil
+}
+
+func (p *pauseService) SandboxMetrics(ctx context.Context, req *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
+	log.G(ctx).Debugf("sandbox metrics request: %+v", req)
+	return &api.SandboxMetricsResponse{}, nil
 }
