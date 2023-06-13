@@ -5006,6 +5006,7 @@ file {
   dependency: "github.com/containerd/containerd/api/types/sandbox.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/platform.proto"
+  dependency: "github.com/containerd/containerd/api/types/metrics.proto"
   message_type {
     name: "StoreCreateRequest"
     field {
@@ -5393,6 +5394,27 @@ file {
   message_type {
     name: "ControllerShutdownResponse"
   }
+  message_type {
+    name: "ControllerMetricsRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+  }
+  message_type {
+    name: "ControllerMetricsResponse"
+    field {
+      name: "metrics"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Metric"
+      json_name: "metrics"
+    }
+  }
   service {
     name: "Store"
     method {
@@ -5457,6 +5479,11 @@ file {
       name: "Shutdown"
       input_type: ".containerd.services.sandbox.v1.ControllerShutdownRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerShutdownResponse"
+    }
+    method {
+      name: "Metrics"
+      input_type: ".containerd.services.sandbox.v1.ControllerMetricsRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerMetricsResponse"
     }
   }
   options {

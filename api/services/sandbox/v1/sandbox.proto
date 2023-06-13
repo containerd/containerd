@@ -31,6 +31,7 @@ import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/sandbox.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/platform.proto";
+import "github.com/containerd/containerd/api/types/metrics.proto";
 
 option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
 
@@ -93,6 +94,7 @@ service Controller {
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
+	rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
 }
 
 message ControllerCreateRequest {
@@ -161,3 +163,11 @@ message ControllerShutdownRequest {
 }
 
 message ControllerShutdownResponse {}
+
+message ControllerMetricsRequest {
+	string sandbox_id = 1;
+}
+
+message ControllerMetricsResponse {
+	types.Metric metrics = 1;
+}

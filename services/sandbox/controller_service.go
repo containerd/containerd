@@ -162,3 +162,15 @@ func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShu
 	log.G(ctx).WithField("req", req).Debug("shutdown sandbox")
 	return &api.ControllerShutdownResponse{}, errdefs.ToGRPC(s.local.Shutdown(ctx, req.GetSandboxID()))
 }
+
+func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetricsRequest) (*api.ControllerMetricsResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("sandbox metrics")
+
+	metrics, err := s.local.Metrics(ctx, req.GetSandboxID())
+	if err != nil {
+		return &api.ControllerMetricsResponse{}, errdefs.ToGRPC(err)
+	}
+	return &api.ControllerMetricsResponse{
+		Metrics: metrics,
+	}, nil
+}
