@@ -100,6 +100,8 @@ type Controller interface {
 	Status(ctx context.Context, sandboxID string, verbose bool) (ControllerStatus, error)
 	// Shutdown deletes and cleans all tasks and sandbox instance.
 	Shutdown(ctx context.Context, sandboxID string) error
+	// Metrics queries the sandbox for metrics.
+	Metrics(ctx context.Context, sandboxID string) (*types.Metric, error)
 }
 
 type ControllerInstance struct {
