@@ -80,10 +80,6 @@ func TestConvert(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, l := range mani.Layers {
-		if plats[0].OS == "windows" {
-			assert.Equal(t, ocispec.MediaTypeImageLayerNonDistributable, l.MediaType)
-		} else {
-			assert.Equal(t, ocispec.MediaTypeImageLayer, l.MediaType)
-		}
+		assert.Equal(t, ocispec.MediaTypeImageLayer, l.MediaType)
 	}
 }
