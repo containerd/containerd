@@ -20,6 +20,7 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sandbox"
@@ -139,4 +140,12 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 	}, nil
+}
+
+func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
+	resp, err := s.client.Metrics(ctx, &api.ControllerMetricsRequest{SandboxID: sandboxID})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return resp.Metrics, nil
 }
