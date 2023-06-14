@@ -129,6 +129,11 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 	for _, cntr := range containers {
 		containerMetric := statsMap[cntr.ID]
 
+		if cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
+			// containers that are just created, in a failed state or exited (init containers) will not have stats
+			continue
+		}
+
 		if containerMetric == nil {
 			return nil, nil, fmt.Errorf("failed to find metrics for container with id %s: %w", cntr.ID, err)
 		}
