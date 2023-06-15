@@ -138,9 +138,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 				p.tracker.SetStatus(ref, Status{
 					Committed: true,
 					Status: content.Status{
-						Ref:    ref,
-						Total:  desc.Size,
-						Offset: desc.Size,
+						Ref: ref,
 						// TODO: Set updated time?
 					},
 				})
