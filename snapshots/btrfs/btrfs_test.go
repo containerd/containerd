@@ -102,7 +102,7 @@ func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snap
 			if err := snapshotter.Close(); err != nil {
 				return err
 			}
-			err := mount.UnmountAll(root, unix.MNT_DETACH)
+			err := mount.UnmountAll(root, 0)
 			if cerr := loop.Close(); cerr != nil {
 				err = fmt.Errorf("device cleanup failed: %w", cerr)
 			}
