@@ -89,6 +89,12 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 		return nil, fmt.Errorf("could not set loop fd for device: %s: %w", loopDev, err)
 	}
 
+	defer func() {
+		if retErr != nil {
+			_ = unix.IoctlSetInt(int(loop.Fd()), unix.LOOP_CLR_FD, 0)
+		}
+	}()
+
 	// 3. Set Info
 	info := unix.LoopInfo64{}
 	copy(info.File_name[:], backingFile)
@@ -100,27 +106,20 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 		info.Flags |= unix.LO_FLAGS_AUTOCLEAR
 	}
 
-	if param.Direct {
-		info.Flags |= unix.LO_FLAGS_DIRECT_IO
-	}
-
 	err = unix.IoctlLoopSetStatus64(int(loop.Fd()), &info)
-	if err == nil {
-		return loop, nil
+	if err != nil {
+		return nil, fmt.Errorf("failed to set loop device info: %w", err)
 	}
 
+	// 4. Set Direct IO
 	if param.Direct {
-		// Retry w/o direct IO flag in case kernel does not support it. The downside is that
-		// it will suffer from double cache problem.
-		info.Flags &= ^(uint32(unix.LO_FLAGS_DIRECT_IO))
-		err = unix.IoctlLoopSetStatus64(int(loop.Fd()), &info)
-		if err == nil {
-			return loop, nil
+		err = unix.IoctlSetInt(int(loop.Fd()), unix.LOOP_SET_DIRECT_IO, 1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup loop with direct: %w", err)
 		}
 	}
 
-	_ = unix.IoctlSetInt(int(loop.Fd()), unix.LOOP_CLR_FD, 0)
-	return nil, fmt.Errorf("failed to set loop device info: %v", err)
+	return loop, nil
 }
 
 // setupLoop looks for (and possibly creates) a free loop device, and
