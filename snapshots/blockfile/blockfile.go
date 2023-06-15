@@ -19,6 +19,7 @@ package blockfile
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -27,9 +28,10 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
-
-	"github.com/containerd/continuity/fs"
 )
+
+// viewHookHelper is only used in test for recover the filesystem.
+type viewHookHelper func(backingFile string, fsType string, defaultOpts []string) error
 
 // SnapshotterConfig holds the configurable properties for the blockfile snapshotter
 type SnapshotterConfig struct {
@@ -44,6 +46,17 @@ type SnapshotterConfig struct {
 
 	// mountOptions are the base options added to the mount (defaults to ["loop"])
 	mountOptions []string
+
+	// testViewHookHelper is used to fsck or mount with rw to handle
+	// the recovery. If we mount ro for view snapshot, we might hit
+	// the issue like
+	//
+	//  (ext4) INFO: recovery required on readonly filesystem
+	//  (ext4) write access unavailable, cannot proceed (try mounting with noload)
+	//
+	// FIXME(fuweid): I don't hit the readonly issue in ssd storage. But it's
+	// easy to reproduce it in slow-storage.
+	testViewHookHelper viewHookHelper
 }
 
 // Opt is an option to configure the overlay snapshotter
@@ -55,7 +68,7 @@ func WithScratchFile(src string) Opt {
 	return func(root string, config *SnapshotterConfig) {
 		config.scratchGenerator = func(dst string) error {
 			// Copy src to dst
-			if err := fs.CopyFile(dst, src); err != nil {
+			if err := copyFileWithSync(dst, src); err != nil {
 				return fmt.Errorf("failed to copy scratch: %w", err)
 			}
 			return nil
@@ -78,12 +91,30 @@ func WithMountOptions(options []string) Opt {
 
 }
 
+// WithRecreateScratch is used to determine that scratch should be recreated
+// even if already exists.
+func WithRecreateScratch(recreate bool) Opt {
+	return func(root string, config *SnapshotterConfig) {
+		config.recreateScratch = recreate
+	}
+}
+
+// withViewHookHelper introduces hook for preparing snapshot for View. It
+// should be used in test only.
+func withViewHookHelper(fn viewHookHelper) Opt {
+	return func(_ string, config *SnapshotterConfig) {
+		config.testViewHookHelper = fn
+	}
+}
+
 type snapshotter struct {
 	root    string
 	scratch string
 	fsType  string
 	options []string
 	ms      *storage.MetaStore
+
+	testViewHookHelper viewHookHelper
 }
 
 // NewSnapshotter returns a Snapshotter which copies layers on the underlying
@@ -140,6 +171,8 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		fsType:  config.fsType,
 		options: config.mountOptions,
 		ms:      ms,
+
+		testViewHookHelper: config.testViewHookHelper,
 	}, nil
 }
 
@@ -343,17 +376,26 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			return fmt.Errorf("failed to create snapshot: %w", err)
 		}
 
+		var path string
 		if len(s.ParentIDs) == 0 || s.Kind == snapshots.KindActive {
-			path := o.getBlockFile(s.ID)
+			path = o.getBlockFile(s.ID)
 
 			if len(s.ParentIDs) > 0 {
-				if err = fs.CopyFile(path, o.getBlockFile(s.ParentIDs[0])); err != nil {
+				if err = copyFileWithSync(path, o.getBlockFile(s.ParentIDs[0])); err != nil {
 					return fmt.Errorf("copying of parent failed: %w", err)
 				}
 			} else {
-				if err = fs.CopyFile(path, o.scratch); err != nil {
+				if err = copyFileWithSync(path, o.scratch); err != nil {
 					return fmt.Errorf("copying of scratch failed: %w", err)
 				}
+			}
+		} else {
+			path = o.getBlockFile(s.ParentIDs[0])
+		}
+
+		if o.testViewHookHelper != nil {
+			if err := o.testViewHookHelper(path, o.fsType, o.options); err != nil {
+				return fmt.Errorf("failed to handle the viewHookHelper: %w", err)
 			}
 		}
 
@@ -400,4 +442,21 @@ func (o *snapshotter) mounts(s storage.Snapshot) []mount.Mount {
 // Close closes the snapshotter
 func (o *snapshotter) Close() error {
 	return o.ms.Close()
+}
+
+func copyFileWithSync(target, source string) error {
+	src, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("failed to open source %s: %w", source, err)
+	}
+	defer src.Close()
+	tgt, err := os.Create(target)
+	if err != nil {
+		return fmt.Errorf("failed to open target %s: %w", target, err)
+	}
+	defer tgt.Close()
+	defer tgt.Sync()
+
+	_, err = io.Copy(tgt, src)
+	return err
 }
