@@ -67,7 +67,7 @@ func TestFetcherOpen(t *testing.T) {
 	checkReader := func(o int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", o)
+		rc, cl, err := f.open(ctx, req, "", o)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -78,6 +78,10 @@ func TestFetcherOpen(t *testing.T) {
 		expected := content[o:]
 		if len(b) != len(expected) {
 			t.Errorf("unexpected length %d, expected %d", len(b), len(expected))
+			return
+		}
+		if cl != int64(len(expected)) {
+			t.Errorf("unexpected content length %d, expected %d", cl, len(expected))
 			return
 		}
 		for i, c := range expected {
@@ -107,7 +111,7 @@ func TestFetcherOpen(t *testing.T) {
 	// Check that server returning a different content range
 	// then requested errors
 	start = 30
-	_, err = f.open(ctx, req, "", 20)
+	_, _, err = f.open(ctx, req, "", 20)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -120,6 +124,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 		mockedStatus           int
 		mockedErr              error
 		want                   io.ReadCloser
+		wantLen                int64
 		wantErr                bool
 		wantServerMessageError bool
 		wantPlainError         bool
@@ -192,9 +197,10 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			got, err := f.open(context.TODO(), req, "", 0)
+			got, cl, err := f.open(context.TODO(), req, "", 0)
 			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantLen, cl)
 			assert.Equal(t, tt.retries, 0)
 			if tt.wantErr {
 				var expectedError error
