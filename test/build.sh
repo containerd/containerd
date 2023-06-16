@@ -34,6 +34,9 @@ make clean
 # Build CRI+CNI release
 make BUILDTAGS="seccomp no_btrfs no_devmapper no_zfs" cri-cni-release
 
+# DEPLOY_DIR is the directory in the gcs bucket to store the tarball.
+DEPLOY_DIR=${DEPLOY_DIR:-""}
+
 BUILDDIR=$(mktemp -d)
 cleanup() {
   if [[ ${BUILDDIR} == /tmp/* ]]; then
