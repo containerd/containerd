@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/platforms"
@@ -205,6 +206,18 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 					snapshots.WithLabels(commands.LabelArgs(context.StringSlice("snapshotter-label")))))
 			}
 			cOpts = append(cOpts, containerd.WithImageStopSignal(image, "SIGTERM"))
+
+			imageSpec, err := image.Spec(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if imageSpec.OS == "wasi" {
+				manifest, err := images.Manifest(ctx, image.ContentStore(), image.Target(), nil)
+				if err != nil {
+					return nil, err
+				}
+				opts = append(opts, oci.WithWasmLayers(manifest.Layers))
+			}
 		}
 		if context.Bool("read-only") {
 			opts = append(opts, oci.WithRootFSReadonly())

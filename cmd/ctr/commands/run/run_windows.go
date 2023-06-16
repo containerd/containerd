@@ -165,6 +165,18 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			}
 			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}
+
+		imageSpec, err := image.Spec(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if imageSpec.OS == "wasi" {
+			manifest, err := images.Manifest(ctx, image.ContentStore(), image.Target(), nil)
+			if err != nil {
+				return nil, err
+			}
+			opts = append(opts, oci.WithWasmLayers(manifest.Layers))
+		}
 	}
 
 	if context.Bool("cni") {

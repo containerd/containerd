@@ -1669,3 +1669,27 @@ func WithCDIDevices(devices ...string) SpecOpts {
 		return nil
 	}
 }
+
+func WithWasmLayers(descriptors []v1.Descriptor) SpecOpts {
+	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		for _, descriptor := range descriptors {
+			switch descriptor.MediaType {
+			case images.MediaTypeWasmLayerModule, images.MediaTypeWasmLayerConfig:
+				// should only be one of each
+				s.Annotations[descriptor.MediaType] = descriptor.Digest.String()
+			case images.MediaTypeWasmLayerComponent:
+				// there could be more than one component to make up a module
+				modules := descriptor.Digest.String()
+				if existing, ok := s.Annotations[images.MediaTypeWasmLayerComponent]; ok {
+					modules = existing + "," + modules
+				}
+				s.Annotations[descriptor.MediaType] = modules
+			}
+		}
+
+		return nil
+	}
+}

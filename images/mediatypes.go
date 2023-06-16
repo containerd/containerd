@@ -57,6 +57,12 @@ const (
 
 	MediaTypeImageLayerEncrypted     = ocispec.MediaTypeImageLayer + "+encrypted"
 	MediaTypeImageLayerGzipEncrypted = ocispec.MediaTypeImageLayerGzip + "+encrypted"
+
+	// OCI media types
+
+	MediaTypeWasmLayerModule    = "application/vnd.w3c.wasm.module.v1+wasm"
+	MediaTypeWasmLayerComponent = "application/vnd.w3c.wasm.component.v1+wasm"
+	MediaTypeWasmLayerConfig    = "application/vnd.wasm.component.config.v1+yaml"
 )
 
 // DiffCompression returns the compression as defined by the layer diff media
