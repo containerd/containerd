@@ -25,7 +25,7 @@ import (
 
 func copyFile(target, source string) error {
 	if err := unix.Clonefile(source, target, unix.CLONE_NOFOLLOW); err != nil {
-		if !errors.Is(err, unix.ENOTSUP) {
+		if !errors.Is(err, unix.ENOTSUP) && !errors.Is(err, unix.EXDEV) {
 			return fmt.Errorf("clonefile failed: %w", err)
 		}
 
