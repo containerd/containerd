@@ -719,15 +719,8 @@ func isSharedContent(tx *bolt.Tx, dgst digest.Digest) bool {
 		if lbkt == nil {
 			continue
 		}
-		// iterate through each label
-		lbc := lbkt.Cursor()
-		for k, v := lbc.First(); k != nil; k, v = lbc.Next() {
-			if string(k) == labels.LabelSharedNamespace {
-				if string(v) == "true" && getBlobBucket(tx, ns, dgst) != nil {
-					return true
-				}
-				break
-			}
+		if sharedNS := lbkt.Get([]byte(labels.LabelSharedNamespace)); sharedNS != nil && string(sharedNS) == "true" && getBlobBucket(tx, ns, dgst) != nil {
+			return true
 		}
 	}
 	return false
