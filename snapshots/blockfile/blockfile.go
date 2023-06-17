@@ -101,6 +101,8 @@ func WithRecreateScratch(recreate bool) Opt {
 
 // withViewHookHelper introduces hook for preparing snapshot for View. It
 // should be used in test only.
+//
+//nolint:nolintlint,unused // not used on all platforms
 func withViewHookHelper(fn viewHookHelper) Opt {
 	return func(_ string, config *SnapshotterConfig) {
 		config.testViewHookHelper = fn
