@@ -190,41 +190,21 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	}
 	span.AddEvent("Pull and unpack image complete")
 
-	configDesc, err := image.Config(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("get image config descriptor: %w", err)
-	}
-	imageID := configDesc.Digest.String()
-
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	for _, r := range []string{imageID, repoTag, repoDigest} {
-		if r == "" {
-			continue
-		}
-		if err := c.createImageReference(ctx, r, image.Target(), labels); err != nil {
-			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
-		}
-		// Update image store to reflect the newest state in containerd.
-		// No need to use `updateImage`, because the image reference must
-		// have been managed by the cri plugin.
-		if err := c.imageStore.Update(ctx, r); err != nil {
-			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
-		}
-	}
+	references, err := c.updateImageReferences(ctx, namedRef, image, labels, isSchema1)
 
 	const mbToByte = 1024 * 1024
 	size, _ := image.Size(ctx)
 	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
 	imagePullThroughput.Observe(imagePullingSpeed)
 
-	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", imageRef, imageID,
-		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
+	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", imageRef, references.imageID,
+		references.repoTag, references.repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: imageID}, nil
+	return &runtime.PullImageResponse{ImageRef: references.imageID}, nil
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -332,23 +312,14 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		return fmt.Errorf("get image by reference: %w", err)
 	}
 	if err == nil && img.Labels()[crilabels.ImageLabelKey] != crilabels.ImageLabelValue {
-		// Make sure the image has the image id as its unique
-		// identifier that references the image in its lifetime.
-		configDesc, err := img.Config(ctx)
+		namedRef, err := distribution.ParseDockerRef(r)
 		if err != nil {
-			return fmt.Errorf("get image id: %w", err)
+			return err
 		}
-		id := configDesc.Digest.String()
-		labels := c.getLabels(ctx, id)
-		if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
-			return fmt.Errorf("create image id reference %q: %w", id, err)
-		}
-		if err := c.imageStore.Update(ctx, id); err != nil {
-			return fmt.Errorf("update image store for %q: %w", id, err)
-		}
-		// The image id is ready, add the label to mark the image as managed.
-		if err := c.createImageReference(ctx, r, img.Target(), labels); err != nil {
-			return fmt.Errorf("create managed label: %w", err)
+		labels := c.getLabels(ctx, r)
+		_, err = c.updateImageReferences(ctx, namedRef, img, labels, false)
+		if err != nil {
+			return err
 		}
 	}
 	// If the image is not found, we should continue updating the cache,
@@ -357,6 +328,33 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
+}
+
+type pullReferences struct {
+	imageID    string
+	repoDigest string
+	repoTag    string
+}
+
+func (c *CRIImageService) updateImageReferences(ctx context.Context, namedRef distribution.Named, image containerd.Image, labels map[string]string, isSchema1 bool) (*pullReferences, error) {
+	configDesc, err := image.Config(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get image config descriptor: %w", err)
+	}
+	imageID := configDesc.Digest.String()
+	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	for _, r := range []string{imageID, repoDigest, repoTag} {
+		if r == "" {
+			continue
+		}
+		if err := c.createImageReference(ctx, r, image.Target(), labels); err != nil {
+			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
+		}
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
+		}
+	}
+	return &pullReferences{imageID, repoDigest, repoTag}, nil
 }
 
 func hostDirFromRoots(roots []string) func(string) (string, error) {
