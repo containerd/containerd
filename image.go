@@ -464,29 +464,13 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	return layers, nil
 }
 
-func (i *image) getManifestPlatform(ctx context.Context, manifest ocispec.Manifest) (ocispec.Platform, error) {
-	cs := i.ContentStore()
-	p, err := content.ReadBlob(ctx, cs, manifest.Config)
-	if err != nil {
-		return ocispec.Platform{}, err
-	}
-
-	// Technically, this should be ocispec.Image, but we only need the
-	// ocispec.Platform that is embedded in the image struct.
-	var imagePlatform ocispec.Platform
-	if err := json.Unmarshal(p, &imagePlatform); err != nil {
-		return ocispec.Platform{}, err
-	}
-	return platforms.Normalize(imagePlatform), nil
-}
-
 func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {
 	snapshotterPlatformMatcher, err := i.client.GetSnapshotterSupportedPlatforms(ctx, snapshotterName)
 	if err != nil {
 		return err
 	}
 
-	manifestPlatform, err := i.getManifestPlatform(ctx, manifest)
+	manifestPlatform, err := images.ConfigPlatform(ctx, i.ContentStore(), manifest.Config)
 	if err != nil {
 		return err
 	}
