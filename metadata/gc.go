@@ -260,6 +260,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 							log.G(ctx).WithError(err).WithField("lease", string(k)).Infof("ignoring invalid expiration value %q", string(expV))
 						} else if expThreshold.After(exp) {
 							// lease has expired, skip
+							log.G(ctx).WithField("lease", string(k)).Debug("expired lease")
 							return nil
 						}
 					}
