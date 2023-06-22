@@ -18,10 +18,8 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
@@ -167,13 +165,8 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 			return images.Children(ctx, cs, desc)
 		}
 
-		p, err := content.ReadBlob(ctx, cs, desc)
+		idx, err := decodeIndex(ctx, cs, desc)
 		if err != nil {
-			return nil, err
-		}
-
-		var idx ocispec.Index
-		if err := json.Unmarshal(p, &idx); err != nil {
 			return nil, err
 		}
 
