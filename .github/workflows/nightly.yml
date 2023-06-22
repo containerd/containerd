@@ -43,8 +43,24 @@ jobs:
 
       - name: Install dependencies
         run: |
+          cat /etc/apt/sources.list
+          ls -l /etc/apt/sources.list.d/
+          
+          cat /etc/apt/sources.list.d/microsoft-prod.list
+          cat /etc/apt/sources.list.d/ubuntu-toolchain-r-ubuntu-test-jammy.list
+
           sudo add-apt-repository -y "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main" || true
           sudo add-apt-repository -y "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main" || true
+          sudo add-apt-repository -y "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-backports main" || true
+          sudo add-apt-repository -y "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-security main" || true
+          
+          cat /etc/apt/sources.list
+          ls -l /etc/apt/sources.list.d/
+
+          # echo "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc) main"           | sudo tee /etc/apt/sources.list.d/containerd.list > /dev/null
+          # echo "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-updates main"   | sudo tee /etc/apt/sources.list.d/containerd.list > /dev/null
+          # echo "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-backports main" | sudo tee /etc/apt/sources.list.d/containerd.list > /dev/null
+          # echo "deb [arch=arm64,s390x,ppc64el,riscv64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -sc)-security main"  | sudo tee /etc/apt/sources.list.d/containerd.list > /dev/null
 
           sudo dpkg --add-architecture arm64
           sudo dpkg --add-architecture s390x
