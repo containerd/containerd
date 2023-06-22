@@ -49,6 +49,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	leasesproxy "github.com/containerd/containerd/leases/proxy"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
@@ -537,7 +538,7 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref string) (d ocispec.Descriptor, err error) {
 	labels := map[string]string{}
 	for i, m := range index.Manifests {
-		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
+		labels[fmt.Sprintf("%s.%d", gclabels.LabelGCRefContent, i)] = m.Digest.String()
 	}
 	data, err := json.Marshal(index)
 	if err != nil {

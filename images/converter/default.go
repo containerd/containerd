@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -180,7 +181,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 				mu.Lock()
 				// update GC labels
 				ClearGCLabels(labels, l.Digest)
-				labelKey := fmt.Sprintf("containerd.io/gc.ref.content.l.%d", i)
+				labelKey := fmt.Sprintf("%s.l.%d", gclabels.LabelGCRefContent, i)
 				labels[labelKey] = newL.Digest.String()
 				manifest.Layers[i] = *newL
 				modified = true
@@ -212,7 +213,7 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 	}
 	if newConfig != nil {
 		ClearGCLabels(labels, manifest.Config.Digest)
-		labels["containerd.io/gc.ref.content.config"] = newConfig.Digest.String()
+		labels[gclabels.LabelGCRefContent+".config"] = newConfig.Digest.String()
 		manifest.Config = *newConfig
 		modified = true
 	}
@@ -251,7 +252,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 	for i, mani := range index.Manifests {
 		i := i
 		mani := mani
-		labelKey := fmt.Sprintf("containerd.io/gc.ref.content.m.%d", i)
+		labelKey := fmt.Sprintf("%s.m.%d", gclabels.LabelGCRefContent, i)
 		eg.Go(func() error {
 			if mani.Platform != nil && !c.platformMC.Match(*mani.Platform) {
 				mu.Lock()
@@ -447,7 +448,7 @@ func ConvertDockerMediaTypeToOCI(mt string) string {
 // ClearGCLabels clears GC labels for the given digest.
 func ClearGCLabels(labels map[string]string, dgst digest.Digest) {
 	for k, v := range labels {
-		if v == dgst.String() && strings.HasPrefix(k, "containerd.io/gc.ref.content") {
+		if v == dgst.String() && strings.HasPrefix(k, gclabels.LabelGCRefContent) {
 			delete(labels, k)
 		}
 	}

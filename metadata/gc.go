@@ -27,6 +27,7 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -54,15 +55,6 @@ const (
 const (
 	resourceContentFlat  = ResourceContent | 0x20
 	resourceSnapshotFlat = ResourceSnapshot | 0x20
-)
-
-var (
-	labelGCRoot       = []byte("containerd.io/gc.root")
-	labelGCRef        = []byte("containerd.io/gc.ref.")
-	labelGCSnapRef    = []byte("containerd.io/gc.ref.snapshot.")
-	labelGCContentRef = []byte("containerd.io/gc.ref.content")
-	labelGCExpire     = []byte("containerd.io/gc.expire")
-	labelGCFlat       = []byte("containerd.io/gc.flat")
 )
 
 // CollectionContext manages a resource collection during a single run of
@@ -107,7 +99,7 @@ type gcContext struct {
 }
 
 type referenceLabelHandler struct {
-	key []byte
+	key string
 	fn  func(string, []byte, []byte, func(gc.Node))
 }
 
@@ -115,11 +107,11 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 	var contexts map[gc.ResourceType]CollectionContext
 	labelHandlers := []referenceLabelHandler{
 		{
-			key: labelGCContentRef,
+			key: gclabels.LabelGCRefContent,
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-				if ks := string(k); ks != string(labelGCContentRef) {
+				if ks := string(k); ks != gclabels.LabelGCRefContent {
 					// Allow reference naming separated by . or /, ignore names
-					if ks[len(labelGCContentRef)] != '.' && ks[len(labelGCContentRef)] != '/' {
+					if ks[len(gclabels.LabelGCRefContent)] != '.' && ks[len(gclabels.LabelGCRefContent)] != '/' {
 						return
 					}
 				}
@@ -128,9 +120,9 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 			},
 		},
 		{
-			key: labelGCSnapRef,
+			key: gclabels.LabelGCRefSnap + ".",
 			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-				snapshotter := k[len(labelGCSnapRef):]
+				snapshotter := k[len(gclabels.LabelGCRefSnap)+1:]
 				if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
 					snapshotter = snapshotter[:i]
 				}
@@ -149,11 +141,11 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 			}
 
 			if reflabel := collector.ReferenceLabel(); reflabel != "" {
-				key := append(labelGCRef, reflabel...)
+				key := gclabels.LabelGCRef + "." + reflabel
 				labelHandlers = append(labelHandlers, referenceLabelHandler{
 					key: key,
 					fn: func(ns string, k, v []byte, fn func(gc.Node)) {
-						if ks := string(k); ks != string(key) {
+						if ks := string(k); ks != key {
 							// Allow reference naming separated by . or /, ignore names
 							if ks[len(key)] != '.' && ks[len(key)] != '/' {
 								return
@@ -168,7 +160,7 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		}
 		// Sort labelHandlers to ensure key seeking is always forwardS
 		sort.Slice(labelHandlers, func(i, j int) bool {
-			return bytes.Compare(labelHandlers[i].key, labelHandlers[j].key) < 0
+			return labelHandlers[i].key < labelHandlers[j].key
 		})
 	}
 	return &gcContext{
@@ -253,7 +245,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 				var flat bool
 
 				if lblbkt := libkt.Bucket(bucketKeyObjectLabels); lblbkt != nil {
-					if expV := lblbkt.Get(labelGCExpire); expV != nil {
+					if expV := lblbkt.Get(gclabels.LabelGCExpireBytes); expV != nil {
 						exp, err := time.Parse(time.RFC3339, string(expV))
 						if err != nil {
 							// label not used, log and continue to use lease
@@ -264,7 +256,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 						}
 					}
 
-					if flatV := lblbkt.Get(labelGCFlat); flatV != nil {
+					if flatV := lblbkt.Get(gclabels.LabelGCFlatBytes); flatV != nil {
 						flat = true
 					}
 				}
@@ -658,8 +650,8 @@ func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node))
 	if lbkt != nil {
 		lc := lbkt.Cursor()
 		for i := range c.labelHandlers {
-			labelRef := string(c.labelHandlers[i].key)
-			for k, v := lc.Seek(c.labelHandlers[i].key); k != nil && strings.HasPrefix(string(k), labelRef); k, v = lc.Next() {
+			labelRef := c.labelHandlers[i].key
+			for k, v := lc.Seek([]byte(labelRef)); k != nil && strings.HasPrefix(string(k), labelRef); k, v = lc.Next() {
 				c.labelHandlers[i].fn(ns, k, v, fn)
 			}
 		}
@@ -670,7 +662,7 @@ func (c *gcContext) sendLabelRefs(ns string, bkt *bolt.Bucket, fn func(gc.Node))
 func isRootRef(bkt *bolt.Bucket) bool {
 	lbkt := bkt.Bucket(bucketKeyObjectLabels)
 	if lbkt != nil {
-		rv := lbkt.Get(labelGCRoot)
+		rv := lbkt.Get(gclabels.LabelGCRootBytes)
 		if rv != nil {
 			// TODO: interpret rv as a timestamp and skip if expired
 			return true

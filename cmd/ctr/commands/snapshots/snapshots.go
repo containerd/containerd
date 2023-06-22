@@ -25,12 +25,12 @@ import (
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/rootfs"
@@ -135,7 +135,7 @@ var diffCommand = cli.Command{
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 
 		if context.Bool("keep") {
-			labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
+			labels[gclabels.LabelGCRoot] = gclabels.TimestampNow()
 		}
 		opts := []diff.Opt{
 			diff.WithMediaType(context.String("media-type")),
@@ -303,7 +303,7 @@ var prepareCommand = cli.Command{
 
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		labels := map[string]string{
-			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+			gclabels.LabelGCRoot: gclabels.TimestampNow(),
 		}
 
 		mounts, err := snapshotter.Prepare(ctx, key, parent, snapshots.WithLabels(labels))
@@ -419,7 +419,7 @@ var commitCommand = cli.Command{
 		defer cancel()
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 		labels := map[string]string{
-			"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+			gclabels.LabelGCRoot: gclabels.TimestampNow(),
 		}
 		return snapshotter.Commit(ctx, key, active, snapshots.WithLabels(labels))
 	},

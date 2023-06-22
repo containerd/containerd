@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -76,7 +77,7 @@ func ConvertManifest(ctx context.Context, store content.Store, desc ocispec.Desc
 
 	labels := map[string]string{}
 	for i, c := range append([]ocispec.Descriptor{manifest.Config}, manifest.Layers...) {
-		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = c.Digest.String()
+		labels[fmt.Sprintf("%s.%d", gclabels.LabelGCRefContent, i)] = c.Digest.String()
 	}
 
 	ref := remotes.MakeRefKey(ctx, desc)

@@ -19,6 +19,8 @@ package leases
 import (
 	"context"
 	"time"
+
+	"github.com/containerd/containerd/metadata/gclabels"
 )
 
 // Opt is used to set options on a lease
@@ -84,7 +86,7 @@ func WithExpiration(d time.Duration) Opt {
 		if l.Labels == nil {
 			l.Labels = map[string]string{}
 		}
-		l.Labels["containerd.io/gc.expire"] = time.Now().Add(d).Format(time.RFC3339)
+		l.Labels[gclabels.LabelGCExpire] = gclabels.TimestampFuture(d)
 
 		return nil
 	}

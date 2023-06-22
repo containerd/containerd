@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/pkg/kmutex"
@@ -429,10 +430,10 @@ func (u *Unpacker) unpack(
 	cinfo := content.Info{
 		Digest: config.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey): chainID,
+			gclabels.LabelGCRefSnap + "." + unpack.SnapshotterKey: chainID,
 		},
 	}
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", unpack.SnapshotterKey))
+	_, err = cs.Update(ctx, cinfo, "labels."+gclabels.LabelGCRefSnap+"."+unpack.SnapshotterKey)
 	if err != nil {
 		return err
 	}

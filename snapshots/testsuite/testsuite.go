@@ -30,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log/logtest"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/randutil"
@@ -125,7 +126,7 @@ func makeTest(
 }
 
 var opt = snapshots.WithLabels(map[string]string{
-	"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	gclabels.LabelGCRoot: gclabels.TimestampNow(),
 })
 
 // checkSnapshotterBasic tests the basic workflow of a snapshot snapshotter.
@@ -671,13 +672,13 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 		}
 
 		createdAt := st.Created
-		rootTime := time.Now().UTC().Format(time.RFC3339)
+		rootTime := gclabels.TimestampNow()
 		expected := map[string]string{
 			"l1": "v1",
 			"l2": "v2",
 			"l3": "v3",
 			// Keep root label
-			"containerd.io/gc.root": rootTime,
+			gclabels.LabelGCRoot: rootTime,
 		}
 		st.Parent = "doesnotexist"
 		st.Labels = expected
@@ -714,7 +715,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 			"l1": "updated",
 			"l3": "v3",
 
-			"containerd.io/gc.root": rootTime,
+			gclabels.LabelGCRoot: rootTime,
 		}
 		st.Labels = map[string]string{
 			"l1": "updated",
@@ -729,7 +730,7 @@ func checkUpdate(ctx context.Context, t *testing.T, snapshotter snapshots.Snapsh
 		expected = map[string]string{
 			"l4": "v4",
 
-			"containerd.io/gc.root": rootTime,
+			gclabels.LabelGCRoot: rootTime,
 		}
 		st.Labels = expected
 		st, err = snapshotter.Update(ctx, st, "labels")
@@ -992,7 +993,7 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 
 func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshotter, work string) {
 	opt := snapshots.WithLabels(map[string]string{
-		"containerd.io/gc.root": "check-walk",
+		gclabels.LabelGCRoot: "check-walk",
 	})
 
 	// No parent active
@@ -1023,32 +1024,32 @@ func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshot
 		t.Fatal(err)
 	}
 	if err := snapshotter.Commit(ctx, "p-wl", "p-wl-tmp", snapshots.WithLabels(map[string]string{
-		"l":                     "1",
-		"containerd.io/gc.root": "check-walk",
+		"l":                  "1",
+		gclabels.LabelGCRoot: "check-walk",
 	})); err != nil {
 		t.Fatal(err)
 	}
 
 	// active with label=2
 	if _, err := snapshotter.Prepare(ctx, "a-wl", "p-wl", snapshots.WithLabels(map[string]string{
-		"l":                     "2",
-		"containerd.io/gc.root": "check-walk",
+		"l":                  "2",
+		gclabels.LabelGCRoot: "check-walk",
 	})); err != nil {
 		t.Fatal(err)
 	}
 
 	// view with label=3
 	if _, err := snapshotter.View(ctx, "v-wl", "p-wl", snapshots.WithLabels(map[string]string{
-		"l":                     "3",
-		"containerd.io/gc.root": "check-walk",
+		"l":                  "3",
+		gclabels.LabelGCRoot: "check-walk",
 	})); err != nil {
 		t.Fatal(err)
 	}
 
 	// no parent active with label=2
 	if _, err := snapshotter.Prepare(ctx, "a-np-wl", "", snapshots.WithLabels(map[string]string{
-		"l":                     "2",
-		"containerd.io/gc.root": "check-walk",
+		"l":                  "2",
+		gclabels.LabelGCRoot: "check-walk",
 	})); err != nil {
 		t.Fatal(err)
 	}
@@ -1059,19 +1060,19 @@ func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshot
 	}{
 		{
 			matches: []string{"a-np", "p", "a", "v", "p-wl", "a-wl", "v-wl", "a-np-wl"},
-			filters: []string{"labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"labels.\"" + gclabels.LabelGCRoot + "\"==check-walk"},
 		},
 		{
 			matches: []string{"a-np", "a", "a-wl", "a-np-wl"},
-			filters: []string{"kind==active,labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"kind==active,labels.\"" + gclabels.LabelGCRoot + "\"==check-walk"},
 		},
 		{
 			matches: []string{"v", "v-wl"},
-			filters: []string{"kind==view,labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"kind==view,labels.\"" + gclabels.LabelGCRoot + "\"==check-walk"},
 		},
 		{
 			matches: []string{"p", "p-wl"},
-			filters: []string{"kind==committed,labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"kind==committed,labels.\"" + gclabels.LabelGCRoot + "\"==check-walk"},
 		},
 		{
 			matches: []string{"p", "a-np-wl"},
@@ -1087,7 +1088,7 @@ func checkWalk(ctx context.Context, t *testing.T, snapshotter snapshots.Snapshot
 		},
 		{
 			matches: []string{"a", "v", "a-wl", "v-wl"},
-			filters: []string{"parent!=\"\",labels.\"containerd.io/gc.root\"==check-walk"},
+			filters: []string{"parent!=\"\",labels.\"" + gclabels.LabelGCRoot + "\"==check-walk"},
 		},
 		{
 			matches: []string{"p-wl", "a-wl", "v-wl", "a-np-wl"},

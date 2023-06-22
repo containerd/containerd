@@ -25,13 +25,14 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
 const (
-	layerPrefix   = "containerd.io/gc.ref.content.l."
-	contentPrefix = "containerd.io/gc.ref.content."
+	layerPrefix   = gclabels.LabelGCRefContent + ".l."
+	contentPrefix = gclabels.LabelGCRefContent + "."
 )
 
 var pruneFlags = []cli.Flag{
