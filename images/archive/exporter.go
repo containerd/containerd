@@ -439,9 +439,6 @@ func manifestsRecord(ctx context.Context, store content.Provider, manifests map[
 		if err := json.Unmarshal(p, &manifest); err != nil {
 			return tarRecord{}, err
 		}
-		if err := manifest.Config.Digest.Validate(); err != nil {
-			return tarRecord{}, fmt.Errorf("invalid manifest %q: %w", m.manifest.Digest, err)
-		}
 
 		dgst := manifest.Config.Digest
 		if err := dgst.Validate(); err != nil {
