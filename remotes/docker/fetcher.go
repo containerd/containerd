@@ -38,7 +38,7 @@ type dockerFetcher struct {
 }
 
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Digest, desc.Digest))
 
 	hosts := r.filterHosts(HostCapabilityPull)
 	if len(hosts) == 0 {
@@ -62,7 +62,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				log.G(ctx).Debug("non-http(s) alternative url is unsupported")
 				continue
 			}
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.URL, u))
 			log.G(ctx).Info("request")
 
 			// Try this first, parse it
@@ -177,7 +177,7 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, ps .
 
 func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (io.ReadCloser, ocispec.Descriptor, error) {
 	var desc ocispec.Descriptor
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", dgst))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Digest, dgst))
 
 	hosts := r.filterHosts(HostCapabilityPull)
 	if len(hosts) == 0 {

@@ -60,7 +60,7 @@ func (s *sandboxService) Register(server *grpc.Server) error {
 }
 
 func (s *sandboxService) Create(ctx context.Context, req *api.StoreCreateRequest) (*api.StoreCreateResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("create sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("create sandbox")
 	sb, err := s.store.Create(ctx, sandbox.FromProto(req.Sandbox))
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -70,7 +70,7 @@ func (s *sandboxService) Create(ctx context.Context, req *api.StoreCreateRequest
 }
 
 func (s *sandboxService) Update(ctx context.Context, req *api.StoreUpdateRequest) (*api.StoreUpdateResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("update sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("update sandbox")
 
 	sb, err := s.store.Update(ctx, sandbox.FromProto(req.Sandbox), req.Fields...)
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *sandboxService) Update(ctx context.Context, req *api.StoreUpdateRequest
 }
 
 func (s *sandboxService) List(ctx context.Context, req *api.StoreListRequest) (*api.StoreListResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("list sandboxes")
+	log.G(ctx).WithField(log.Request, req).Debug("list sandboxes")
 
 	resp, err := s.store.List(ctx, req.Filters...)
 	if err != nil {
@@ -97,7 +97,7 @@ func (s *sandboxService) List(ctx context.Context, req *api.StoreListRequest) (*
 }
 
 func (s *sandboxService) Get(ctx context.Context, req *api.StoreGetRequest) (*api.StoreGetResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("get sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("get sandbox")
 	resp, err := s.store.Get(ctx, req.SandboxID)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
@@ -108,7 +108,7 @@ func (s *sandboxService) Get(ctx context.Context, req *api.StoreGetRequest) (*ap
 }
 
 func (s *sandboxService) Delete(ctx context.Context, req *api.StoreDeleteRequest) (*api.StoreDeleteResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("delete sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("delete sandbox")
 	if err := s.store.Delete(ctx, req.SandboxID); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

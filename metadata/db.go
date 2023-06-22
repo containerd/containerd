@@ -422,7 +422,7 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		stats.SnapshotD = map[string]time.Duration{}
 		wg.Add(len(m.dirtySS))
 		for snapshotterName := range m.dirtySS {
-			log.G(ctx).WithField("snapshotter", snapshotterName).Debug("schedule snapshotter cleanup")
+			log.G(ctx).WithField(log.Snapshotter, snapshotterName).Debug("schedule snapshotter cleanup")
 			go func(snapshotterName string) {
 				st1 := time.Now()
 				m.cleanupSnapshotter(ctx, snapshotterName)
@@ -516,7 +516,7 @@ func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration
 	}
 
 	d, err := sn.garbageCollect(ctx)
-	logger := log.G(ctx).WithField("snapshotter", name)
+	logger := log.G(ctx).WithField(log.Snapshotter, name)
 	if err != nil {
 		logger.WithError(err).Warn("snapshot garbage collection failed")
 	} else {

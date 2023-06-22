@@ -52,10 +52,10 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	defer func() {
 		if err == nil {
 			log.G(ctx).WithFields(log.Fields{
-				"d":      time.Since(t1),
-				"digest": desc.Digest,
-				"size":   desc.Size,
-				"media":  desc.MediaType,
+				"d":           time.Since(t1),
+				log.Digest:    desc.Digest,
+				log.Size:      desc.Size,
+				log.MediaType: desc.MediaType,
 			}).Debugf("diff applied")
 		}
 	}()

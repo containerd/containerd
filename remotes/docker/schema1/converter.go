@@ -358,7 +358,7 @@ func (c *Converter) fetchBlob(ctx context.Context, desc ocispec.Descriptor) erro
 	}
 
 	if compressMethod == compression.Uncompressed {
-		log.G(ctx).WithField("id", desc.Digest).Debugf("changed media type for uncompressed schema1 layer blob")
+		log.G(ctx).WithField(log.ID, desc.Digest).Debugf("changed media type for uncompressed schema1 layer blob")
 		desc.MediaType = images.MediaTypeDockerSchema2Layer
 	}
 
@@ -403,14 +403,14 @@ func (c *Converter) reuseLabelBlobState(ctx context.Context, desc ocispec.Descri
 
 	isEmpty, err := strconv.ParseBool(emptyVal)
 	if err != nil {
-		log.G(ctx).WithField("id", desc.Digest).Warnf("failed to parse bool from label %s: %v", labelDockerSchema1EmptyLayer, isEmpty)
+		log.G(ctx).WithField(log.ID, desc.Digest).Warnf("failed to parse bool from label %s: %v", labelDockerSchema1EmptyLayer, isEmpty)
 		return false, nil
 	}
 
 	bState := blobState{empty: isEmpty}
 
 	if bState.diffID, err = digest.Parse(diffID); err != nil {
-		log.G(ctx).WithField("id", desc.Digest).Warnf("failed to parse digest from label %s: %v", labels.LabelUncompressed, diffID)
+		log.G(ctx).WithField(log.ID, desc.Digest).Warnf("failed to parse digest from label %s: %v", labels.LabelUncompressed, diffID)
 		return false, nil
 	}
 

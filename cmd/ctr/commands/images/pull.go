@@ -157,7 +157,7 @@ command. As part of this process, we do the following:
 			return err
 		}
 
-		log.G(ctx).WithField("image", ref).Debug("unpacking")
+		log.G(ctx).WithField(log.Image, ref).Debug("unpacking")
 
 		// TODO: Show unpack status
 

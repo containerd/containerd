@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -92,9 +93,9 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
-			"digest":    desc.Digest,
-			"mediatype": desc.MediaType,
-			"size":      desc.Size,
+			log.Digest:    desc.Digest,
+			log.MediaType: desc.MediaType,
+			log.Size:      desc.Size,
 		}))
 
 		switch desc.MediaType {
@@ -158,9 +159,9 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
-			"digest":    desc.Digest,
-			"mediatype": desc.MediaType,
-			"size":      desc.Size,
+			log.Digest:    desc.Digest,
+			log.MediaType: desc.MediaType,
+			log.Size:      desc.Size,
 		}))
 
 		err := push(ctx, provider, pusher, desc)
@@ -279,7 +280,10 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if images.IsNonDistributable(desc.MediaType) {
-			log.G(ctx).WithField("digest", desc.Digest).WithField("mediatype", desc.MediaType).Debug("Skipping non-distributable blob")
+			log.G(ctx).WithFields(logrus.Fields{
+				log.Digest:    desc.Digest,
+				log.MediaType: desc.MediaType,
+			}).Debug("Skipping non-distributable blob")
 			return nil, images.ErrSkipDesc
 		}
 
@@ -300,7 +304,10 @@ func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
 			if !images.IsNonDistributable(child.MediaType) {
 				out = append(out, child)
 			} else {
-				log.G(ctx).WithField("digest", child.Digest).WithField("mediatype", child.MediaType).Debug("Skipping non-distributable blob")
+				log.G(ctx).WithFields(logrus.Fields{
+					log.Digest:    child.Digest,
+					log.MediaType: child.MediaType,
+				}).Debug("Skipping non-distributable blob")
 			}
 		}
 		return out, nil

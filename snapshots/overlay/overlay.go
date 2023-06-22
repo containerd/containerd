@@ -286,7 +286,7 @@ func (o *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		if err == nil {
 			for _, dir := range removals {
 				if err := os.RemoveAll(dir); err != nil {
-					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
+					log.G(ctx).WithError(err).WithField(log.Path, dir).Warn("failed to remove directory")
 				}
 			}
 		}
@@ -336,7 +336,7 @@ func (o *snapshotter) Cleanup(ctx context.Context) error {
 
 	for _, dir := range cleanup {
 		if err := os.RemoveAll(dir); err != nil {
-			log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
+			log.G(ctx).WithError(err).WithField(log.Path, dir).Warn("failed to remove directory")
 		}
 	}
 
@@ -400,7 +400,7 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			}
 			if path != "" {
 				if err1 := os.RemoveAll(path); err1 != nil {
-					log.G(ctx).WithError(err1).WithField("path", path).Error("failed to reclaim snapshot directory, directory may need removal")
+					log.G(ctx).WithError(err1).WithField(log.Path, path).Error("failed to reclaim snapshot directory, directory may need removal")
 					err = fmt.Errorf("failed to remove path: %v: %w", err1, err)
 				}
 			}

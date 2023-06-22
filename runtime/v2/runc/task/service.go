@@ -647,7 +647,7 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		// Ensure all children are killed
 		if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
 			if err := ip.KillAll(s.context); err != nil {
-				log.G(s.context).WithError(err).WithField("id", ip.ID()).
+				log.G(s.context).WithError(err).WithField(log.ID, ip.ID()).
 					Error("failed to kill init's children")
 			}
 		}

@@ -422,7 +422,7 @@ var (
 				return err
 			}
 
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Ref, ref))
 
 			log.G(ctx).Debugf("resolving")
 			name, desc, err := resolver.Resolve(ctx, ref)
@@ -468,7 +468,7 @@ var (
 				return err
 			}
 
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Ref, ref))
 
 			log.G(ctx).Debugf("resolving")
 			fetcher, err := resolver.Fetcher(ctx, ref)
@@ -527,7 +527,7 @@ var (
 				return err
 			}
 
-			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
+			ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Ref, ref))
 
 			log.G(ctx).Debugf("resolving")
 			pusher, err := resolver.Pusher(ctx, ref)

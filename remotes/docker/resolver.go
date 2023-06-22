@@ -274,7 +274,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 	for _, u := range paths {
 		for _, host := range hosts {
-			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
+			ctx := log.WithLogger(ctx, log.G(ctx).WithField(log.Host, host.Host))
 
 			req := base.request(host, http.MethodHead, u...)
 			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
@@ -392,7 +392,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				Size:      size,
 			}
 
-			log.G(ctx).WithField("desc.digest", desc.Digest).Debug("resolved")
+			log.G(ctx).WithField(log.Digest, desc.Digest).Debug("resolved")
 			return ref, desc, nil
 		}
 	}
@@ -559,7 +559,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 		}
 	}
 
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("url", u))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.URL, u))
 	log.G(ctx).WithFields(requestFields(req)).Debug("do request")
 	if err := r.authorize(ctx, req); err != nil {
 		return nil, fmt.Errorf("failed to authorize: %w", err)

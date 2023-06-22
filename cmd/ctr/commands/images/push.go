@@ -168,7 +168,7 @@ var pushCommand = cli.Command{
 		eg.Go(func() error {
 			defer close(doneCh)
 
-			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
+			log.G(ctx).WithField(log.Image, ref).WithField(log.Digest, desc.Digest).Debug("pushing")
 
 			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 				if !context.Bool("allow-non-distributable-blobs") && images.IsNonDistributable(desc.MediaType) {

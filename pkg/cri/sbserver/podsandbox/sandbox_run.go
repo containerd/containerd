@@ -60,7 +60,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	var cleanupErr error
 	defer func() {
 		if retErr != nil && cleanupErr != nil {
-			log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
+			log.G(ctx).WithField(log.ID, id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
 			retErr = multierror.Append(retErr, CleanupErr{cleanupErr})
 		}
 	}()
@@ -95,7 +95,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("use OCI runtime %+v", ociRuntime)
 
 	labels["oci_runtime_type"] = ociRuntime.Type
 
@@ -107,7 +107,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
 	metadata.ProcessLabel = spec.Process.SelinuxLabel
 	defer func() {

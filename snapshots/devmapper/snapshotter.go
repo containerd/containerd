@@ -105,7 +105,7 @@ func NewSnapshotter(ctx context.Context, config *Config) (*Snapshotter, error) {
 
 // Stat returns the info for an active or committed snapshot from store
 func (s *Snapshotter) Stat(ctx context.Context, key string) (snapshots.Info, error) {
-	log.G(ctx).WithField("key", key).Debug("stat")
+	log.G(ctx).WithField(log.Key, key).Debug("stat")
 
 	var (
 		info snapshots.Info
@@ -135,7 +135,7 @@ func (s *Snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 
 // Usage returns the resource usage of an active or committed snapshot excluding the usage of parent snapshots.
 func (s *Snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
-	log.G(ctx).WithField("key", key).Debug("usage")
+	log.G(ctx).WithField(log.Key, key).Debug("usage")
 
 	var (
 		id    string
@@ -177,7 +177,7 @@ func (s *Snapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, e
 
 // Mounts return the list of mounts for the active or view snapshot
 func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
-	log.G(ctx).WithField("key", key).Debug("mounts")
+	log.G(ctx).WithField(log.Key, key).Debug("mounts")
 
 	var (
 		snap storage.Snapshot
@@ -200,7 +200,10 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 
 // Prepare creates thin device for an active snapshot identified by key
 func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).WithFields(log.Fields{"key": key, "parent": parent}).Debug("prepare")
+	log.G(ctx).WithFields(log.Fields{
+		log.Key:    key,
+		log.Parent: parent,
+	}).Debug("prepare")
 
 	var (
 		mounts []mount.Mount
@@ -217,7 +220,10 @@ func (s *Snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 
 // View creates readonly thin device for the given snapshot key
 func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
-	log.G(ctx).WithFields(log.Fields{"key": key, "parent": parent}).Debug("view")
+	log.G(ctx).WithFields(log.Fields{
+		log.Key:    key,
+		log.Parent: parent,
+	}).Debug("view")
 
 	var (
 		mounts []mount.Mount
@@ -236,7 +242,10 @@ func (s *Snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 // Block device unmount operation captures snapshot changes by itself, so no
 // additional actions needed within Commit operation.
 func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
-	log.G(ctx).WithFields(log.Fields{"name": name, "key": key}).Debug("commit")
+	log.G(ctx).WithFields(log.Fields{
+		"name":  name,
+		log.Key: key,
+	}).Debug("commit")
 
 	return s.store.WithTransaction(ctx, true, func(ctx context.Context) error {
 		id, snapInfo, _, err := storage.GetInfo(ctx, key)
@@ -293,7 +302,7 @@ func (s *Snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 
 // Remove removes thin device and snapshot metadata by key
 func (s *Snapshotter) Remove(ctx context.Context, key string) error {
-	log.G(ctx).WithField("key", key).Debug("remove")
+	log.G(ctx).WithField(log.Key, key).Debug("remove")
 
 	return s.store.WithTransaction(ctx, true, func(ctx context.Context) error {
 		return s.removeDevice(ctx, key)

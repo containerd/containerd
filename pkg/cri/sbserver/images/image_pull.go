@@ -620,7 +620,7 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 			case <-ticker.C:
 				activeReqs, bytesRead := reporter.reqReporter.status()
 
-				log.G(ctx).WithField("ref", reporter.ref).
+				log.G(ctx).WithField(log.Ref, reporter.ref).
 					WithField("activeReqs", activeReqs).
 					WithField("totalBytesRead", bytesRead).
 					WithField("lastSeenBytesRead", lastSeenBytesRead).

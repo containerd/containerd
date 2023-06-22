@@ -19,26 +19,30 @@ package log
 // Often used fields for structured logging.
 const (
 	// Images/content
-	ChainID = "chainid"
-	Digest  = "digest"
-	Ref     = "ref"
-	URL     = "url"
+	ChainID   = "chainid"
+	Name      = "name" // NOTE: Used in snapshotter contexts also.
+	Image     = "image"
+	Digest    = "digest"
+	Host      = "host"
+	MediaType = "mediatype"
+	Ref       = "ref"
+	Size      = "size"
+	URL       = "url"
 
-	// Transfer
-	Stream = "stream"
-
-	// Containerd
+	// Containerd/services
 	ID        = "id"
 	Namespace = "namespace"
 	Request   = "req"
+	Stream    = "stream"
 
 	// Snapshots
-	Snapshotter = "snapshotter"
-	Path        = "path"
+	Key         = "key" // NOTE: There's small uses of this in a non-snapshot context.
 	Parent      = "parent"
-	Key         = "key"
-	Name        = "name"
+	Snapshotter = "snapshotter"
 
 	// CRI
 	PodSandboxID = "podsandboxid"
+
+	// Misc.
+	Path = "path"
 )

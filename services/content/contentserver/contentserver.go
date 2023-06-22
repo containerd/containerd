@@ -132,7 +132,7 @@ func (s *service) List(req *api.ListContentRequest, session api.Content_ListServ
 }
 
 func (s *service) Delete(ctx context.Context, req *api.DeleteContentRequest) (*ptypes.Empty, error) {
-	log.G(ctx).WithField("digest", req.Digest).Debugf("delete content")
+	log.G(ctx).WithField(log.Digest, req.Digest).Debugf("delete content")
 	dg, err := digest.Parse(req.Digest)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -295,7 +295,7 @@ func (s *service) Write(session api.Content_WriteServer) (err error) {
 	}
 
 	fields := log.Fields{
-		"ref": ref,
+		log.Ref: ref,
 	}
 	total = req.Total
 	expected = digest.Digest(req.Expected)

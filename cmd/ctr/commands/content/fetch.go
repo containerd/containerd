@@ -184,7 +184,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		return nil, nil
 	})
 
-	log.G(pctx).WithField("image", ref).Debug("fetching")
+	log.G(pctx).WithField(log.Image, ref).Debug("fetching")
 	labels := commands.LabelArgs(config.Labels)
 	opts := []containerd.RemoteOpt{
 		containerd.WithPullLabels(labels),

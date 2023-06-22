@@ -869,7 +869,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 			if err := cs.Store.Delete(ctx, info.Digest); err != nil {
 				return err
 			}
-			log.G(ctx).WithField("digest", info.Digest).Debug("removed content")
+			log.G(ctx).WithField(log.Digest, info.Digest).Debug("removed content")
 		}
 		return nil
 	})
@@ -889,7 +889,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 				if err := cs.Store.Abort(ctx, ref); err != nil {
 					return err
 				}
-				log.G(ctx).WithField("ref", ref).Debug("cleanup aborting ingest")
+				log.G(ctx).WithField(log.Ref, ref).Debug("cleanup aborting ingest")
 			}
 			return nil
 		})
@@ -904,7 +904,7 @@ func (cs *contentStore) garbageCollect(ctx context.Context) (d time.Duration, er
 				if err = cs.Store.Abort(ctx, status.Ref); err != nil {
 					return
 				}
-				log.G(ctx).WithField("ref", status.Ref).Debug("cleanup aborting ingest")
+				log.G(ctx).WithField(log.Ref, status.Ref).Debug("cleanup aborting ingest")
 			}
 		}
 	}

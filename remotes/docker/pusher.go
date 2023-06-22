@@ -114,7 +114,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	req := p.request(host, http.MethodHead, existCheck...)
 	req.header.Set("Accept", strings.Join([]string{desc.MediaType, `*/*`}, ", "))
 
-	log.G(ctx).WithField("url", req.String()).Debugf("checking and pushing to")
+	log.G(ctx).WithField(log.URL, req.String()).Debugf("checking and pushing to")
 
 	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
@@ -241,7 +241,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 
 				lhost.Scheme = lurl.Scheme
 				lhost.Host = lurl.Host
-				log.G(ctx).WithField("host", lhost.Host).WithField("scheme", lhost.Scheme).Debug("upload changed destination")
+				log.G(ctx).WithField(log.Host, lhost.Host).WithField("scheme", lhost.Scheme).Debug("upload changed destination")
 
 				// Strip authorizer if change to host or scheme
 				lhost.Authorizer = nil

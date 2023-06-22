@@ -191,7 +191,7 @@ func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 func NewDebugClientTrace(ctx gocontext.Context) *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		DNSStart: func(dnsInfo httptrace.DNSStartInfo) {
-			log.G(ctx).WithField("host", dnsInfo.Host).Debugf("DNS lookup")
+			log.G(ctx).WithField(log.Host, dnsInfo.Host).Debugf("DNS lookup")
 		},
 		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
 			if dnsInfo.Err != nil {

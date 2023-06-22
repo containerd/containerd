@@ -150,10 +150,10 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
+	log.G(ctx).WithField(log.ID, id).Warn("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
-		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
+		log.G(ctx).WithError(err).WithField(log.ID, id).Warn("failed to clean up after shim disconnected")
 	}
 
 	if _, err := rt.Get(ctx, id); err != nil {
@@ -379,7 +379,7 @@ func (s *shim) Delete(ctx context.Context) error {
 	}
 
 	if err := s.bundle.Delete(); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
+		log.G(ctx).WithField(log.ID, s.ID()).WithError(err).Error("failed to delete bundle")
 		result = multierror.Append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
 
@@ -439,7 +439,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
+		log.G(ctx).WithField(log.ID, s.ID()).WithError(shimErr).Debug("failed to delete task")
 		if !errors.Is(shimErr, ttrpc.ErrClosed) {
 			shimErr = errdefs.FromGRPC(shimErr)
 			if !errdefs.IsNotFound(shimErr) {
@@ -466,12 +466,12 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// Let controller decide when to shutdown.
 	if !sandboxed {
 		if err := s.waitShutdown(ctx); err != nil {
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+			log.G(ctx).WithField(log.ID, s.ID()).WithError(err).Error("failed to shutdown shim task")
 		}
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
+		log.G(ctx).WithField(log.ID, s.ID()).WithError(err).Error("failed to delete shim")
 	}
 
 	// remove self from the runtime task list

@@ -65,7 +65,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, errors.New("sandbox config must include metadata")
 	}
 	name := makeSandboxName(metadata)
-	log.G(ctx).WithField("podsandboxid", id).Debugf("generated id for sandbox name %q", name)
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("generated id for sandbox name %q", name)
 
 	// cleanupErr records the last error returned by the critical cleanup operations in deferred functions,
 	// like CNI teardown and stopping the running sandbox task.
@@ -113,7 +113,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("use OCI runtime %+v", ociRuntime)
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("use OCI runtime %+v", ociRuntime)
 
 	runtimeStart := time.Now()
 	// Create sandbox container.
@@ -125,7 +125,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 	sandbox.ProcessLabel = spec.Process.SelinuxLabel
 	defer func() {
 		if retErr != nil {
@@ -544,7 +544,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
-	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
+	log.G(ctx).WithField(log.PodSandboxID, id).Debugf("begin cni setup")
 	netStart := time.Now()
 	if c.config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
@@ -769,8 +769,8 @@ func logDebugCNIResult(ctx context.Context, sandboxID string, result *cni.Result
 	}
 	cniResult, err := json.Marshal(result)
 	if err != nil {
-		log.G(ctx).WithField("podsandboxid", sandboxID).WithError(err).Errorf("Failed to marshal CNI result: %v", err)
+		log.G(ctx).WithField(log.PodSandboxID, sandboxID).WithError(err).Errorf("Failed to marshal CNI result: %v", err)
 		return
 	}
-	log.G(ctx).WithField("podsandboxid", sandboxID).Debugf("cni result: %s", string(cniResult))
+	log.G(ctx).WithField(log.PodSandboxID, sandboxID).Debugf("cni result: %s", string(cniResult))
 }

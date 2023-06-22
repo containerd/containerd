@@ -162,7 +162,7 @@ func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected dig
 
 	for i := 0; i < maxResets; i++ {
 		if i >= 1 {
-			log.G(ctx).WithField("digest", expected).Debugf("retrying copy due to reset")
+			log.G(ctx).WithField(log.Digest, expected).Debugf("retrying copy due to reset")
 		}
 		copied, err := copyWithBuffer(cw, r)
 		if errors.Is(err, ErrReset) {
@@ -202,7 +202,7 @@ func Copy(ctx context.Context, cw Writer, or io.Reader, size int64, expected dig
 		return nil
 	}
 
-	log.G(ctx).WithField("digest", expected).Errorf("failed to copy after %d retries", maxResets)
+	log.G(ctx).WithField(log.Digest, expected).Errorf("failed to copy after %d retries", maxResets)
 	return fmt.Errorf("failed to copy after %d retries", maxResets)
 }
 

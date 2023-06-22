@@ -150,11 +150,11 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 	defer func() {
 		if err != nil {
 			if !errdefs.IsAlreadyExists(err) {
-				log.G(ctx).WithError(err).WithField("key", key).Infof("apply failure, attempting cleanup")
+				log.G(ctx).WithError(err).WithField(log.Key, key).Infof("apply failure, attempting cleanup")
 			}
 
 			if rerr := sn.Remove(ctx, key); rerr != nil {
-				log.G(ctx).WithError(rerr).WithField("key", key).Warnf("extraction snapshot removal failed")
+				log.G(ctx).WithError(rerr).WithField(log.Key, key).Warnf("extraction snapshot removal failed")
 			}
 		}
 	}()

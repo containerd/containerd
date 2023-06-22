@@ -239,8 +239,8 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 			logrus.SetLevel(logrus.DebugLevel)
 		}
 		logger := log.G(ctx).WithFields(log.Fields{
-			"pid":       os.Getpid(),
-			"namespace": namespaceFlag,
+			"pid":         os.Getpid(),
+			log.Namespace: namespaceFlag,
 		})
 		go reap(ctx, logger, signals)
 		ss, err := manager.Stop(ctx, id)
@@ -350,7 +350,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		}
 
 		if src, ok := instance.(ttrpcService); ok {
-			logrus.WithField("id", id).Debug("registering ttrpc service")
+			logrus.WithField(log.ID, id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}
@@ -418,9 +418,9 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 		}
 	}()
 	logger := log.G(ctx).WithFields(log.Fields{
-		"pid":       os.Getpid(),
-		"path":      path,
-		"namespace": namespaceFlag,
+		"pid":         os.Getpid(),
+		log.Path:      path,
+		log.Namespace: namespaceFlag,
 	})
 	go func() {
 		for range dump {

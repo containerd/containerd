@@ -230,9 +230,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *ProgressTracker) images.HandlerFunc {
 	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
-			"digest":    desc.Digest,
-			"mediatype": desc.MediaType,
-			"size":      desc.Size,
+			log.Digest:    desc.Digest,
+			log.MediaType: desc.MediaType,
+			log.Size:      desc.Size,
 		}))
 
 		switch desc.MediaType {

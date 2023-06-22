@@ -43,13 +43,13 @@ func (m *ShimManager) loadExistingTasks(ctx context.Context) error {
 		if len(ns) > 0 && ns[0] == '.' {
 			continue
 		}
-		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
+		log.G(ctx).WithField(log.Namespace, ns).Debug("loading tasks in namespace")
 		if err := m.loadShims(namespaces.WithNamespace(ctx, ns)); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
+			log.G(ctx).WithField(log.Namespace, ns).WithError(err).Error("loading tasks in namespace")
 			continue
 		}
 		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+			log.G(ctx).WithField(log.Namespace, ns).WithError(err).Error("cleanup working directory in namespace")
 			continue
 		}
 	}
@@ -61,7 +61,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Namespace, ns))
 
 	shimDirs, err := os.ReadDir(filepath.Join(m.state, ns))
 	if err != nil {
@@ -142,7 +142,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 				schedCore:    m.schedCore,
 			})
 		instance, err := loadShim(ctx, bundle, func() {
-			log.G(ctx).WithField("id", id).Info("shim disconnected")
+			log.G(ctx).WithField(log.ID, id).Info("shim disconnected")
 
 			cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
@@ -168,7 +168,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		_, sgetErr := m.sandboxStore.Get(ctx, id)
 		pInfo, pidErr := shim.Pids(ctx)
 		if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-			log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
+			log.G(ctx).WithField(log.ID, id).Info("cleaning leaked shim process")
 			// We are unable to get Pids from the shim and it's not a sandbox
 			// shim. We should clean it up her.
 			// No need to do anything for removeTask since we never added this shim.

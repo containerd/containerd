@@ -94,10 +94,10 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	defer func() {
 		if err == nil {
 			log.G(ctx).WithFields(log.Fields{
-				"d":      time.Since(t1),
-				"digest": desc.Digest,
-				"size":   desc.Size,
-				"media":  desc.MediaType,
+				"d":           time.Since(t1),
+				log.Digest:    desc.Digest,
+				log.Size:      desc.Size,
+				log.MediaType: desc.MediaType,
 			}).Debug("diff applied")
 		}
 	}()
@@ -218,7 +218,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 			cw.Close()
 			if newReference {
 				if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
-					log.G(ctx).WithError(abortErr).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+					log.G(ctx).WithError(abortErr).WithField(log.Ref, config.Reference).Warnf("failed to delete diff upload")
 				}
 			}
 		}
@@ -295,10 +295,10 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	}
 
 	log.G(ctx).WithFields(log.Fields{
-		"d":     time.Since(t1),
-		"dgst":  desc.Digest,
-		"size":  desc.Size,
-		"media": desc.MediaType,
+		"d":           time.Since(t1),
+		log.Digest:    desc.Digest,
+		log.Size:      desc.Size,
+		log.MediaType: desc.MediaType,
 	}).Debug("diff created")
 
 	return desc, nil

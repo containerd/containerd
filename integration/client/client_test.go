@@ -148,7 +148,7 @@ func TestMain(m *testing.M) {
 	testSnapshotter = snapshotter
 
 	// pull a seed image
-	log.G(ctx).WithField("image", testImage).Info("start to pull seed image")
+	log.G(ctx).WithField(log.Image, testImage).Info("start to pull seed image")
 	if _, err = client.Pull(ctx, testImage, WithPullUnpack); err != nil {
 		ctrd.Kill()
 		ctrd.Wait()

@@ -84,7 +84,7 @@ func (s *service) Stream(srv api.Streaming_StreamServer) error {
 		cc: cc,
 	}
 
-	log.G(srv.Context()).WithField("stream", i.ID).Debug("registering stream")
+	log.G(srv.Context()).WithField(log.Stream, i.ID).Debug("registering stream")
 	if err := s.manager.Register(srv.Context(), i.ID, ss); err != nil {
 		return err
 	}

@@ -233,7 +233,7 @@ func (s *snapshotter) Update(ctx context.Context, info snapshots.Info, fieldpath
 		return nil
 	}); err != nil {
 		if updated {
-			log.G(ctx).WithField("snapshotter", s.name).WithField("key", local.Name).WithError(err).Error("transaction failed after updating snapshot backend")
+			log.G(ctx).WithField(log.Snapshotter, s.name).WithField(log.Key, local.Name).WithError(err).Error("transaction failed after updating snapshot backend")
 		}
 		return snapshots.Info{}, err
 	}
@@ -498,7 +498,7 @@ func (s *snapshotter) createSnapshot(ctx context.Context, key, parent string, re
 		// If the created reference is not stored, attempt clean up
 		if created != "" {
 			if err := s.Snapshotter.Remove(ctx, created); err != nil {
-				log.G(ctx).WithField("snapshotter", s.name).WithField("key", created).WithError(err).Error("failed to cleanup unreferenced snapshot")
+				log.G(ctx).WithField(log.Snapshotter, s.name).WithField(log.Key, created).WithError(err).Error("failed to cleanup unreferenced snapshot")
 			}
 		}
 		return nil, rerr
@@ -611,7 +611,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		// sync data is higher and may require manual cleanup.
 		if err := s.Snapshotter.Commit(ctx, nameKey, bkey, inheritedOpt); err != nil {
 			if errdefs.IsNotFound(err) {
-				log.G(ctx).WithField("snapshotter", s.name).WithField("key", key).WithError(err).Error("uncommittable snapshot: missing in backend, snapshot should be removed")
+				log.G(ctx).WithField(log.Snapshotter, s.name).WithField(log.Key, key).WithError(err).Error("uncommittable snapshot: missing in backend, snapshot should be removed")
 			}
 			// NOTE: Consider handling already exists here from the backend. Currently
 			// already exists from the backend may be confusing to the client since it
@@ -628,7 +628,7 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return nil
 	}); err != nil {
 		if bname != "" {
-			log.G(ctx).WithField("snapshotter", s.name).WithField("key", key).WithField("bname", bname).WithError(err).Error("uncommittable snapshot: transaction failed after commit, snapshot should be removed")
+			log.G(ctx).WithField(log.Snapshotter, s.name).WithField(log.Key, key).WithField("bname", bname).WithError(err).Error("uncommittable snapshot: transaction failed after commit, snapshot should be removed")
 
 		}
 		return err
@@ -956,14 +956,14 @@ func (s *snapshotter) pruneBranch(ctx context.Context, node *treeNode) error {
 	}
 
 	if node.remove {
-		logger := log.G(ctx).WithField("snapshotter", s.name)
+		logger := log.G(ctx).WithField(log.Snapshotter, s.name)
 		if err := s.Snapshotter.Remove(ctx, node.info.Name); err != nil {
 			if !errdefs.IsFailedPrecondition(err) {
 				return err
 			}
-			logger.WithError(err).WithField("key", node.info.Name).Warnf("failed to remove snapshot")
+			logger.WithError(err).WithField(log.Key, node.info.Name).Warnf("failed to remove snapshot")
 		} else {
-			logger.WithField("key", node.info.Name).Debug("removed snapshot")
+			logger.WithField(log.Key, node.info.Name).Debug("removed snapshot")
 		}
 	}
 

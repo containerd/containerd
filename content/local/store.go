@@ -265,7 +265,7 @@ func (s *store) Walk(ctx context.Context, fn content.WalkFunc, fs ...string) err
 		dgst := digest.NewDigestFromEncoded(alg, filepath.Base(path))
 		if err := dgst.Validate(); err != nil {
 			// log error but don't report
-			log.L.WithError(err).WithField("path", path).Error("invalid digest for blob path")
+			log.L.WithError(err).WithField(log.Path, path).Error("invalid digest for blob path")
 			// if we see this, it could mean some sort of corruption of the
 			// store or extra paths not expected previously.
 		}
@@ -356,7 +356,7 @@ func (s *store) WalkStatusRefs(ctx context.Context, fn func(string) error) error
 
 		ref, err := readFileString(rf)
 		if err != nil {
-			log.G(ctx).WithError(err).WithField("path", rf).Error("failed to read ingest ref")
+			log.G(ctx).WithError(err).WithField(log.Path, rf).Error("failed to read ingest ref")
 			continue
 		}
 

@@ -92,7 +92,7 @@ func (iis *ImageImportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 
 	stream, err := sm.Get(ctx, s.Stream)
 	if err != nil {
-		log.G(ctx).WithError(err).WithField("stream", s.Stream).Debug("failed to get import stream")
+		log.G(ctx).WithError(err).WithField(log.Stream, s.Stream).Debug("failed to get import stream")
 		return err
 	}
 

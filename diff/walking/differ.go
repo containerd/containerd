@@ -120,7 +120,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 					cw.Close()
 					if newReference {
 						if abortErr := s.store.Abort(ctx, config.Reference); abortErr != nil {
-							log.G(ctx).WithError(abortErr).WithField("ref", config.Reference).Warnf("failed to delete diff upload")
+							log.G(ctx).WithError(abortErr).WithField(log.Ref, config.Reference).Warnf("failed to delete diff upload")
 						}
 					}
 				}

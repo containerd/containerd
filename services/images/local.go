@@ -105,7 +105,7 @@ func (l *local) List(ctx context.Context, req *imagesapi.ListImagesRequest, _ ..
 }
 
 func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _ ...grpc.CallOption) (*imagesapi.CreateImageResponse, error) {
-	log.G(ctx).WithField("name", req.Image.Name).WithField("target", req.Image.Target.Digest).Debugf("create image")
+	log.G(ctx).WithField(log.Name, req.Image.Name).WithField("target", req.Image.Target.Digest).Debugf("create image")
 	if req.Image.Name == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "Image.Name required")
 	}
@@ -174,7 +174,7 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 }
 
 func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
-	log.G(ctx).WithField("name", req.Name).Debugf("delete image")
+	log.G(ctx).WithField(log.Name, req.Name).Debugf("delete image")
 
 	if err := l.store.Delete(ctx, req.Name); err != nil {
 		return nil, errdefs.ToGRPC(err)

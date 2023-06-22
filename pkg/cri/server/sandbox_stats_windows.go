@@ -316,7 +316,7 @@ func getUsageNanoCores(usageCoreNanoSeconds uint64, oldStats *stats.ContainerSta
 func windowsNetworkUsage(ctx context.Context, sandbox sandboxstore.Sandbox, timestamp time.Time) *runtime.WindowsNetworkUsage {
 	eps, err := hcn.GetNamespaceEndpointIds(sandbox.NetNSPath)
 	if err != nil {
-		log.G(ctx).WithField("podsandboxid", sandbox.ID).WithError(err).Errorf("unable to retrieve windows endpoint metrics for netNsPath: %v", sandbox.NetNSPath)
+		log.G(ctx).WithField(log.PodSandboxID, sandbox.ID).WithError(err).Errorf("unable to retrieve windows endpoint metrics for netNsPath: %v", sandbox.NetNSPath)
 		return nil
 	}
 	networkUsage := &runtime.WindowsNetworkUsage{

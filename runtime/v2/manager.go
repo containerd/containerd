@@ -248,7 +248,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	if err != nil {
 		return nil, err
 	}
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField(log.Namespace, ns))
 
 	topts := opts.TaskOptions
 	if topts == nil || topts.GetValue() == nil {
@@ -267,7 +267,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		schedCore:    m.schedCore,
 	})
 	shim, err := b.Start(ctx, protobuf.FromAny(topts), func() {
-		log.G(ctx).WithField("id", id).Info("shim disconnected")
+		log.G(ctx).WithField(log.ID, id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()

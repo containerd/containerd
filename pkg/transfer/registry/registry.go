@@ -216,7 +216,7 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 		if sid := s.Resolver.AuthStream; sid != "" {
 			stream, err := sm.Get(ctx, sid)
 			if err != nil {
-				log.G(ctx).WithError(err).WithField("stream", sid).Debug("failed to get auth stream")
+				log.G(ctx).WithError(err).WithField(log.Stream, sid).Debug("failed to get auth stream")
 				return err
 			}
 			r.creds = &credCallback{

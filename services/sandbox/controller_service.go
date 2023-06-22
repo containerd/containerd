@@ -73,7 +73,7 @@ func (s *controllerService) Register(server *grpc.Server) error {
 }
 
 func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreateRequest) (*api.ControllerCreateResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("create sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("create sandbox")
 	// TODO: Rootfs
 	err := s.local.Create(ctx, req.GetSandboxID(), sandbox.WithOptions(req.GetOptions()))
 	if err != nil {
@@ -92,7 +92,7 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 }
 
 func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartRequest) (*api.ControllerStartResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("start sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("start sandbox")
 	inst, err := s.local.Start(ctx, req.GetSandboxID())
 	if err != nil {
 		return &api.ControllerStartResponse{}, errdefs.ToGRPC(err)
@@ -113,12 +113,12 @@ func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartR
 }
 
 func (s *controllerService) Stop(ctx context.Context, req *api.ControllerStopRequest) (*api.ControllerStopResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("delete sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("delete sandbox")
 	return &api.ControllerStopResponse{}, errdefs.ToGRPC(s.local.Stop(ctx, req.GetSandboxID()))
 }
 
 func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitRequest) (*api.ControllerWaitResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("wait sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("wait sandbox")
 	exitStatus, err := s.local.Wait(ctx, req.GetSandboxID())
 	if err != nil {
 		return &api.ControllerWaitResponse{}, errdefs.ToGRPC(err)
@@ -139,7 +139,7 @@ func (s *controllerService) Wait(ctx context.Context, req *api.ControllerWaitReq
 }
 
 func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatusRequest) (*api.ControllerStatusResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("sandbox status")
+	log.G(ctx).WithField(log.Request, req).Debug("sandbox status")
 	cstatus, err := s.local.Status(ctx, req.GetSandboxID(), req.GetVerbose())
 	if err != nil {
 		return &api.ControllerStatusResponse{}, errdefs.ToGRPC(err)
@@ -159,12 +159,12 @@ func (s *controllerService) Status(ctx context.Context, req *api.ControllerStatu
 }
 
 func (s *controllerService) Shutdown(ctx context.Context, req *api.ControllerShutdownRequest) (*api.ControllerShutdownResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("shutdown sandbox")
+	log.G(ctx).WithField(log.Request, req).Debug("shutdown sandbox")
 	return &api.ControllerShutdownResponse{}, errdefs.ToGRPC(s.local.Shutdown(ctx, req.GetSandboxID()))
 }
 
 func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetricsRequest) (*api.ControllerMetricsResponse, error) {
-	log.G(ctx).WithField("req", req).Debug("sandbox metrics")
+	log.G(ctx).WithField(log.Request, req).Debug("sandbox metrics")
 
 	metrics, err := s.local.Metrics(ctx, req.GetSandboxID())
 	if err != nil {

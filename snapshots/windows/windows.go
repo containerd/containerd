@@ -277,7 +277,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		if restore { // failed to commit
 			if err1 := os.Rename(renamed, path); err1 != nil {
 				// May cause inconsistent data on disk
-				log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
+				log.G(ctx).WithError(err1).WithField(log.Path, renamed).Error("Failed to rename after failed commit")
 			}
 		}
 		return err
@@ -285,7 +285,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 
 	if err = hcsshim.DestroyLayer(s.info, renamedID); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
-		log.G(ctx).WithError(err).WithField("path", renamed).Warnf("Failed to remove root filesystem")
+		log.G(ctx).WithError(err).WithField(log.Path, renamed).Warnf("Failed to remove root filesystem")
 	}
 
 	return nil

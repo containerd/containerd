@@ -607,7 +607,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 			cbkt = cbkt.Bucket(bucketKeyObjectBlob)
 		}
 		if cbkt != nil {
-			log.G(ctx).WithField("key", node.Key).Debug("remove content")
+			log.G(ctx).WithField(log.Key, node.Key).Debug("remove content")
 			return nil, cbkt.DeleteBucket([]byte(node.Key))
 		}
 	case ResourceSnapshot:
@@ -619,7 +619,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 			}
 			ssbkt := sbkt.Bucket([]byte(ss))
 			if ssbkt != nil {
-				log.G(ctx).WithField("key", key).WithField("snapshotter", ss).Debug("remove snapshot")
+				log.G(ctx).WithField(log.Key, key).WithField(log.Snapshotter, ss).Debug("remove snapshot")
 				return &eventstypes.SnapshotRemove{
 					Key:         key,
 					Snapshotter: ss,
@@ -637,7 +637,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 			ibkt = ibkt.Bucket(bucketKeyObjectIngests)
 		}
 		if ibkt != nil {
-			log.G(ctx).WithField("ref", node.Key).Debug("remove ingest")
+			log.G(ctx).WithField(log.Ref, node.Key).Debug("remove ingest")
 			return nil, ibkt.DeleteBucket([]byte(node.Key))
 		}
 	default:
@@ -645,7 +645,7 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 		if ok {
 			cc.Remove(node)
 		} else {
-			log.G(ctx).WithField("ref", node.Key).WithField("type", node.Type).Info("no remove defined for resource")
+			log.G(ctx).WithField(log.Ref, node.Key).WithField("type", node.Type).Info("no remove defined for resource")
 		}
 	}
 

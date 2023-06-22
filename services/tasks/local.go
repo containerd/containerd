@@ -379,7 +379,7 @@ func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Tas
 		tt, err := getProcessState(ctx, t)
 		if err != nil {
 			if !errdefs.IsNotFound(err) { // handle race with deletion
-				log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+				log.G(ctx).WithError(err).WithField(log.ID, t.ID()).Error("converting task to protobuf")
 			}
 			continue
 		}

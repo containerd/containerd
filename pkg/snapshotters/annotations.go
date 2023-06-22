@@ -87,7 +87,7 @@ func getLayers(ctx context.Context, key string, descs []ocispec.Descriptor, vali
 			}
 			// This avoids the label hits the size limitation.
 			if err := validate(key, layers+item); err != nil {
-				log.G(ctx).WithError(err).WithField("label", key).WithField("digest", l.Digest.String()).Debug("omitting digest in the layers list")
+				log.G(ctx).WithError(err).WithField("label", key).WithField(log.Digest, l.Digest.String()).Debug("omitting digest in the layers list")
 				break
 			}
 			layers += item

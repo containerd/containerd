@@ -326,7 +326,10 @@ func (u *Unpacker) unpack(
 							return fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
 						}
 						// Try again, this should be rare, log it
-						log.G(ctx).WithField("key", key).WithField("chainid", chainID).Debug("extraction snapshot already exists, chain id not found")
+						log.G(ctx).WithFields(log.Fields{
+							log.Key:     key,
+							log.ChainID: chainID,
+						}).Debug("extraction snapshot already exists, chain id not found")
 					} else {
 						// no need to handle, snapshot now found with chain id
 						return nil
@@ -437,8 +440,8 @@ func (u *Unpacker) unpack(
 		return err
 	}
 	log.G(ctx).WithFields(log.Fields{
-		"config":  config.Digest,
-		"chainID": chainID,
+		"config":    config.Digest,
+		log.ChainID: chainID,
 	}).Debug("image unpacked")
 
 	return nil

@@ -160,7 +160,7 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 	for _, dev := range faultyDevices {
 		log.G(ctx).
 			WithField("dev_id", dev.DeviceID).
-			WithField("parent", dev.ParentName).
+			WithField(log.Parent, dev.ParentName).
 			WithField("error", dev.Error).
 			Warnf("devmapper device %q has invalid state %q, marking as faulty", dev.Name, dev.State)
 

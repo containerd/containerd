@@ -60,7 +60,7 @@ func GenerateTokenOptions(ctx context.Context, host, username, secret string, c 
 	if ok {
 		to.Scopes = append(to.Scopes, strings.Split(scope, " ")...)
 	} else {
-		log.G(ctx).WithField("host", host).Debug("no scope specified for token auth challenge")
+		log.G(ctx).WithField(log.Host, host).Debug("no scope specified for token auth challenge")
 	}
 
 	return to, nil
