@@ -95,7 +95,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	sandboxInfo.Runtime.Name = ociRuntime.Type
 
 	// Retrieve runtime options
-	runtimeOpts, err := generateRuntimeOptions(ociRuntime, c.config)
+	runtimeOpts, err := generateRuntimeOptions(ociRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox runtime options: %w", err)
 	}
