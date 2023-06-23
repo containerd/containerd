@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -89,7 +90,7 @@ func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots
 		return "", snapshots.Info{}, snapshots.Usage{}, err
 	}
 
-	return fmt.Sprintf("%d", id), si, su, nil
+	return strconv.FormatUint(id, 10), si, su, nil
 }
 
 // UpdateInfo updates an existing snapshot info's data
@@ -184,7 +185,7 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
 		}
 
-		s.ID = fmt.Sprintf("%d", readID(sbkt))
+		s.ID = strconv.FormatUint(readID(sbkt), 10)
 		s.Kind = readKind(sbkt)
 
 		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView {
@@ -279,7 +280,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 			}
 		}
 
-		s.ID = fmt.Sprintf("%d", id)
+		s.ID = strconv.FormatUint(id, 10)
 		s.Kind = kind
 		return nil
 	})
@@ -336,7 +337,7 @@ func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 		return "", 0, err
 	}
 
-	return fmt.Sprintf("%d", id), si.Kind, nil
+	return strconv.FormatUint(id, 10), si.Kind, nil
 }
 
 // CommitActive renames the active snapshot transaction referenced by `key`
@@ -411,7 +412,7 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		return "", err
 	}
 
-	return fmt.Sprintf("%d", id), nil
+	return strconv.FormatUint(id, 10), nil
 }
 
 // IDMap returns all the IDs mapped to their key
@@ -424,7 +425,7 @@ func IDMap(ctx context.Context) (map[string]string, error) {
 				return nil
 			}
 			id := readID(bkt.Bucket(k))
-			m[fmt.Sprintf("%d", id)] = string(k)
+			m[strconv.FormatUint(id, 10)] = string(k)
 			return nil
 		})
 	}); err != nil {
@@ -490,7 +491,7 @@ func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt
 
 func parents(bkt, pbkt *bolt.Bucket, parent uint64) (parents []string, err error) {
 	for {
-		parents = append(parents, fmt.Sprintf("%d", parent))
+		parents = append(parents, strconv.FormatUint(parent, 10))
 
 		parentKey := pbkt.Get(bucketKeyParent)
 		if len(parentKey) == 0 {
