@@ -28,7 +28,10 @@ import (
 // openLogFile opens/creates a container log file.
 // It specifies `FILE_SHARE_DELETE` option to make sure
 // log files can be rotated by kubelet.
-// TODO(windows): Use golang support after 1.14. (https://github.com/golang/go/issues/32088)
+//
+// Unfortunately this needs to be maintained as Go doesn't
+// have a way to set FILE_SHARE_DELETE for os.OpenFile.
+// https://github.com/golang/go/issues/32088
 func openLogFile(path string) (*os.File, error) {
 	path = fixLongPath(path)
 	if len(path) == 0 {
