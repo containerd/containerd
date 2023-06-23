@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 
 	refDocker "github.com/containerd/containerd/reference/docker"
 )
@@ -37,7 +38,7 @@ func FuzzFetcher(data []byte) int {
 
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("content-range", fmt.Sprintf("bytes %d-%d/%d", 0, dataLen-1, dataLen))
-		rw.Header().Set("content-length", fmt.Sprintf("%d", dataLen))
+		rw.Header().Set("content-length", strconv.Itoa(dataLen))
 		rw.Write(data)
 	}))
 	defer s.Close()
