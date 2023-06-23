@@ -420,7 +420,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 				if err := WithUser(config.User)(ctx, client, c, s); err != nil {
 					return err
 				}
-				return WithAdditionalGIDs(fmt.Sprintf("%d", s.Process.User.UID))(ctx, client, c, s)
+				return WithAdditionalGIDs(strconv.FormatInt(int64(s.Process.User.UID), 10))(ctx, client, c, s)
 			}
 			// we should query the image's /etc/group for additional GIDs
 			// even if there is no specified user in the image config
