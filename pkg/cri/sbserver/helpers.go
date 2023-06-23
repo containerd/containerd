@@ -151,7 +151,7 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 		s.Name,      // 1: pod name
 		s.Namespace, // 2: pod namespace
 		s.Uid,       // 3: pod uid
-		strconv.FormatUint(uint64(s.Attempt), 10), // 4: attempt number of creating the container
+		strconv.FormatUint(uint64(c.Attempt), 10), // 4: attempt number of creating the container
 	}, nameDelimiter)
 }
 
