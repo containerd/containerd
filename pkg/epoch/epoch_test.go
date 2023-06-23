@@ -19,6 +19,7 @@ package epoch
 import (
 	"os"
 	"runtime"
+	"strconv"
 	"testing"
 	"time"
 
@@ -56,10 +57,15 @@ func TestSourceDateEpoch(t *testing.T) {
 	})
 
 	t.Run("WithEmptySourceDateEpoch", func(t *testing.T) {
-		t.Setenv(SourceDateEpochEnv, "")
+		const emptyValue = ""
+		t.Setenv(SourceDateEpochEnv, emptyValue)
 
 		vp, err := SourceDateEpoch()
 		require.NoError(t, err)
+		require.Nil(t, vp)
+
+		vp, err = ParseSourceDateEpoch(emptyValue)
+		require.Error(t, err, "value is empty")
 		require.Nil(t, vp)
 
 		now := time.Now().UTC()
@@ -68,13 +74,18 @@ func TestSourceDateEpoch(t *testing.T) {
 	})
 
 	t.Run("WithSourceDateEpoch", func(t *testing.T) {
-		sourceDateEpoch, err := time.Parse(time.RFC3339, "2022-01-23T12:34:56Z")
+		const rfc3339Str = "2022-01-23T12:34:56Z"
+		sourceDateEpoch, err := time.Parse(time.RFC3339, rfc3339Str)
 		require.NoError(t, err)
 
 		SetSourceDateEpoch(sourceDateEpoch)
 		t.Cleanup(UnsetSourceDateEpoch)
 
 		vp, err := SourceDateEpoch()
+		require.NoError(t, err)
+		require.True(t, vp.Equal(sourceDateEpoch.UTC()))
+
+		vp, err = ParseSourceDateEpoch(strconv.Itoa(int(sourceDateEpoch.Unix())))
 		require.NoError(t, err)
 		require.True(t, vp.Equal(sourceDateEpoch))
 
@@ -83,10 +94,15 @@ func TestSourceDateEpoch(t *testing.T) {
 	})
 
 	t.Run("WithInvalidSourceDateEpoch", func(t *testing.T) {
-		t.Setenv(SourceDateEpochEnv, "foo")
+		const invalidValue = "foo"
+		t.Setenv(SourceDateEpochEnv, invalidValue)
 
 		vp, err := SourceDateEpoch()
 		require.ErrorContains(t, err, "invalid SOURCE_DATE_EPOCH value")
+		require.Nil(t, vp)
+
+		vp, err = ParseSourceDateEpoch(invalidValue)
+		require.ErrorContains(t, err, "invalid value:")
 		require.Nil(t, vp)
 
 		now := time.Now().UTC()
