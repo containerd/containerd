@@ -26,11 +26,15 @@ import (
 )
 
 func rightAfter(t1, t2 time.Time) bool {
+	if t2.Equal(t1) {
+		return true
+	}
+	threshold := 10 * time.Millisecond
 	if runtime.GOOS == "windows" {
 		// Low timer resolution on Windows
-		return (t2.After(t1) && t2.Before(t1.Add(100*time.Millisecond))) || t2.Equal(t1)
+		threshold *= 10
 	}
-	return t2.After(t1) && t2.Before(t1.Add(10*time.Millisecond))
+	return t2.After(t1) && t2.Before(t1.Add(threshold))
 }
 
 func TestSourceDateEpoch(t *testing.T) {
@@ -46,9 +50,9 @@ func TestSourceDateEpoch(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, vp)
 
-		now := time.Now()
+		now := time.Now().UTC()
 		v := SourceDateEpochOrNow()
-		require.True(t, rightAfter(now, v))
+		require.True(t, rightAfter(now, v), "now: %s, v: %s", now, v)
 	})
 
 	t.Run("WithEmptySourceDateEpoch", func(t *testing.T) {
@@ -58,9 +62,9 @@ func TestSourceDateEpoch(t *testing.T) {
 		require.NoError(t, err)
 		require.Nil(t, vp)
 
-		now := time.Now()
+		now := time.Now().UTC()
 		v := SourceDateEpochOrNow()
-		require.True(t, rightAfter(now, v))
+		require.True(t, rightAfter(now, v), "now: %s, v: %s", now, v)
 	})
 
 	t.Run("WithSourceDateEpoch", func(t *testing.T) {
@@ -85,8 +89,8 @@ func TestSourceDateEpoch(t *testing.T) {
 		require.ErrorContains(t, err, "invalid SOURCE_DATE_EPOCH value")
 		require.Nil(t, vp)
 
-		now := time.Now()
+		now := time.Now().UTC()
 		v := SourceDateEpochOrNow()
-		require.True(t, rightAfter(now, v))
+		require.True(t, rightAfter(now, v), "now: %s, v: %s", now, v)
 	})
 }
