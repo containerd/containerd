@@ -18,18 +18,15 @@ package containerd
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"syscall"
 
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -77,19 +74,6 @@ func WithTaskCheckpoint(im Image) NewTaskOpts {
 		}
 		return fmt.Errorf("checkpoint not found in index %s", id)
 	}
-}
-
-func decodeIndex(ctx context.Context, store content.Provider, desc imagespec.Descriptor) (*imagespec.Index, error) {
-	var index imagespec.Index
-	p, err := content.ReadBlob(ctx, store, desc)
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(p, &index); err != nil {
-		return nil, err
-	}
-
-	return &index, nil
 }
 
 // WithCheckpointName sets the image name for the checkpoint

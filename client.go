@@ -546,6 +546,19 @@ func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref s
 	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
+func decodeIndex(ctx context.Context, store content.Provider, desc ocispec.Descriptor) (*ocispec.Index, error) {
+	var index ocispec.Index
+	p, err := content.ReadBlob(ctx, store, desc)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(p, &index); err != nil {
+		return nil, err
+	}
+
+	return &index, nil
+}
+
 // GetLabel gets a label value from namespace store
 // If there is no default label, an empty string returned with nil error
 func (c *Client) GetLabel(ctx context.Context, label string) (string, error) {
