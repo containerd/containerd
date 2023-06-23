@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,8 +40,8 @@ func TestFetcherOpen(t *testing.T) {
 		if start > 0 {
 			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-127/128", start))
 		}
-		rw.Header().Set("content-length", fmt.Sprintf("%d", len(content[start:])))
-		rw.Write(content[start:])
+		rw.Header().Set("content-length", strconv.Itoa(len(content[start:])))
+		_, _ = rw.Write(content[start:])
 	}))
 	defer s.Close()
 
