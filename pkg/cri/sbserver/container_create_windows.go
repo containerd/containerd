@@ -17,7 +17,7 @@
 package sbserver
 
 import (
-	"fmt"
+	"strconv"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -39,9 +39,8 @@ func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([
 	case "windows":
 		rootfsSize := config.GetWindows().GetResources().GetRootfsSizeInBytes()
 		if rootfsSize != 0 {
-			sizeStr := fmt.Sprintf("%d", rootfsSize)
 			labels := map[string]string{
-				"containerd.io/snapshot/windows/rootfs.sizebytes": sizeStr,
+				"containerd.io/snapshot/windows/rootfs.sizebytes": strconv.FormatInt(rootfsSize, 10),
 			}
 			opts = append(opts, snapshots.WithLabels(labels))
 		}
