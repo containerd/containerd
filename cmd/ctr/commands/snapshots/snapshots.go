@@ -23,6 +23,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -207,7 +208,7 @@ var usageCommand = cli.Command{
 		var displaySize func(int64) string
 		if context.Bool("b") {
 			displaySize = func(s int64) string {
-				return fmt.Sprintf("%d", s)
+				return strconv.FormatInt(s, 10)
 			}
 		} else {
 			displaySize = func(s int64) string {

@@ -602,7 +602,7 @@ func (tc *nriTest) setup() {
 		tc.prefix = strings.ToLower(tc.name)
 	}
 	if tc.namespace == "" {
-		tc.namespace = tc.prefix + "-" + fmt.Sprintf("%d", os.Getpid())
+		tc.namespace = tc.prefix + "-" + strconv.Itoa(os.Getpid())
 	}
 
 	tc.sbCfg = make(map[string]*runtime.PodSandboxConfig)

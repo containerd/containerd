@@ -18,9 +18,9 @@ package client
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -133,7 +133,7 @@ func TestDaemonCustomCgroup(t *testing.T) {
 		t.Skip("skip TestDaemonCustomCgroup since no cgroup path available")
 	}
 
-	customCgroup := fmt.Sprintf("%d", time.Now().Nanosecond())
+	customCgroup := strconv.Itoa(time.Now().Nanosecond())
 	configTOML := `
 version = 2
 [cgroup]
