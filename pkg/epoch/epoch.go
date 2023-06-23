@@ -60,10 +60,10 @@ func SourceDateEpochOrNow() time.Time {
 
 // SetSourceDateEpoch sets the SOURCE_DATE_EPOCH env var.
 func SetSourceDateEpoch(tm time.Time) {
-	os.Setenv(SourceDateEpochEnv, fmt.Sprintf("%d", tm.Unix()))
+	_ = os.Setenv(SourceDateEpochEnv, strconv.Itoa(int(tm.Unix())))
 }
 
 // UnsetSourceDateEpoch unsets the SOURCE_DATE_EPOCH env var.
 func UnsetSourceDateEpoch() {
-	os.Unsetenv(SourceDateEpochEnv)
+	_ = os.Unsetenv(SourceDateEpochEnv)
 }
