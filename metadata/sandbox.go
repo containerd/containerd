@@ -58,7 +58,7 @@ func (s *sandboxStore) Create(ctx context.Context, sandbox api.Sandbox) (api.San
 		return api.Sandbox{}, fmt.Errorf("failed to validate sandbox: %w", err)
 	}
 
-	if err := s.db.Update(func(tx *bbolt.Tx) error {
+	if err := update(ctx, s.db, func(tx *bbolt.Tx) error {
 		parent, err := createSandboxBucket(tx, ns)
 		if err != nil {
 			return fmt.Errorf("create error: %w", err)
@@ -137,10 +137,6 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		}
 
 		updated.UpdatedAt = time.Now().UTC()
-
-		if err := s.validate(&updated); err != nil {
-			return err
-		}
 
 		if err := s.write(parent, &updated, true); err != nil {
 			return err
@@ -255,6 +251,10 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 }
 
 func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwrite bool) error {
+	if err := s.validate(instance); err != nil {
+		return err
+	}
+
 	var (
 		bucket *bbolt.Bucket
 		err    error
@@ -267,13 +267,11 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 			return err
 		}
 	} else {
-		bucket = parent.Bucket(id)
-		if bucket != nil {
-			return fmt.Errorf("sandbox bucket %q already exists: %w", instance.ID, errdefs.ErrAlreadyExists)
-		}
-
 		bucket, err = parent.CreateBucket(id)
 		if err != nil {
+			if err == bbolt.ErrBucketExists {
+				return fmt.Errorf("sandbox bucket %q already exists: %w", instance.ID, errdefs.ErrAlreadyExists)
+			}
 			return err
 		}
 	}
