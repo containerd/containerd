@@ -63,12 +63,15 @@ func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequ
 // toCRIImage converts internal image object to CRI runtime.Image.
 func toCRIImage(image imagestore.Image) *runtime.Image {
 	repoTags, repoDigests := parseImageReferences(image.References)
+
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
 		RepoTags:    repoTags,
 		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
+		Pinned:      image.Pinned,
 	}
+
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {
 		runtimeImage.Uid = &runtime.Int64Value{Value: *uid}
