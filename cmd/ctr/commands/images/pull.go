@@ -101,13 +101,9 @@ command. As part of this process, we do the following:
 
 			var sopts []image.StoreOpt
 			if !context.Bool("all-platforms") {
-				var p []ocispec.Platform
-				for _, s := range context.StringSlice("platform") {
-					ps, err := platforms.Parse(s)
-					if err != nil {
-						return fmt.Errorf("unable to parse platform %s: %w", s, err)
-					}
-					p = append(p, ps)
+				p, err := platforms.ParseAll(context.StringSlice("platform"))
+				if err != nil {
+					return err
 				}
 				if len(p) == 0 {
 					p = append(p, platforms.DefaultSpec())
@@ -168,12 +164,9 @@ command. As part of this process, we do the following:
 				return fmt.Errorf("unable to resolve image platforms: %w", err)
 			}
 		} else {
-			for _, s := range context.StringSlice("platform") {
-				ps, err := platforms.Parse(s)
-				if err != nil {
-					return fmt.Errorf("unable to parse platform %s: %w", s, err)
-				}
-				p = append(p, ps)
+			p, err = platforms.ParseAll(context.StringSlice("platform"))
+			if err != nil {
+				return err
 			}
 		}
 		if len(p) == 0 {
