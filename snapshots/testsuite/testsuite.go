@@ -959,7 +959,6 @@ func check128LayersMount(name string) func(ctx context.Context, t *testing.T, sn
 				t.Fatalf("[layer %d] preparing doesn't equal to flat after apply: %+v", i, err)
 			}
 
-			sync()
 			testutil.Unmount(t, preparing)
 
 			parent = filepath.Join(work, fmt.Sprintf("committed-%d", i))

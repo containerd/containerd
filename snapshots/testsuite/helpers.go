@@ -27,6 +27,8 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 )
 
+const umountflags int = 0
+
 func applyToMounts(m []mount.Mount, work string, a fstest.Applier) (err error) {
 	td, err := os.MkdirTemp(work, "prepare")
 	if err != nil {

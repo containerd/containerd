@@ -26,9 +26,6 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/continuity/testutil/loopback"
-	"golang.org/x/sys/unix"
 )
 
 func setupSnapshotter(t *testing.T) ([]Opt, error) {
@@ -37,52 +34,94 @@ func setupSnapshotter(t *testing.T) ([]Opt, error) {
 		t.Skipf("Could not find mkfs.ext4: %v", err)
 	}
 
-	loopbackSize := int64(128 << 20) // 128 MB
+	loopbackSize := int64(8 << 20) // 8 MB
 	if os.Getpagesize() > 4096 {
 		loopbackSize = int64(650 << 20) // 650 MB
 	}
 
-	loop, err := loopback.New(loopbackSize)
+	scratch := filepath.Join(t.TempDir(), "scratch")
+	scratchDevFile, err := os.OpenFile(scratch, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create %s: %w", scratch, err)
 	}
-	defer loop.Close()
 
-	if out, err := exec.Command(mkfs, loop.Device).CombinedOutput(); err != nil {
+	if err := scratchDevFile.Truncate(loopbackSize); err != nil {
+		scratchDevFile.Close()
+		return nil, fmt.Errorf("failed to resize %s file: %w", scratch, err)
+	}
+
+	if err := scratchDevFile.Sync(); err != nil {
+		scratchDevFile.Close()
+		return nil, fmt.Errorf("failed to sync %s file: %w", scratch, err)
+	}
+	scratchDevFile.Close()
+
+	if out, err := exec.Command(mkfs, scratch).CombinedOutput(); err != nil {
 		return nil, fmt.Errorf("failed to make ext4 filesystem (out: %q): %w", out, err)
 	}
-	// sync after a mkfs on the loopback before trying to mount the device
-	unix.Sync()
 
-	if err := testMount(t, loop.Device); err != nil {
-		return nil, err
-	}
+	defaultOpts := []string{"loop", "direct-io", "sync"}
 
-	scratch := filepath.Join(t.TempDir(), "scratch")
-	err = fs.CopyFile(scratch, loop.File)
-	if err != nil {
+	if err := testMount(t, scratch, defaultOpts); err != nil {
 		return nil, err
 	}
 
 	return []Opt{
 		WithScratchFile(scratch),
 		WithFSType("ext4"),
-		WithMountOptions([]string{"loop", "sync"}),
+		WithMountOptions(defaultOpts),
+		WithRecreateScratch(false), // reduce IO presure in CI
+		withViewHookHelper(testViewHook),
 	}, nil
 }
 
-func testMount(t *testing.T, device string) error {
+func testMount(t *testing.T, scratchFile string, opts []string) error {
 	root, err := os.MkdirTemp(t.TempDir(), "")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(root)
 
-	if out, err := exec.Command("mount", device, root).CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to mount device %s (out: %q): %w", device, out, err)
+	m := []mount.Mount{
+		{
+			Type:    "ext4",
+			Source:  scratchFile,
+			Options: opts,
+		},
 	}
+
+	if err := mount.All(m, root); err != nil {
+		return fmt.Errorf("failed to mount device %s: %w", scratchFile, err)
+	}
+
 	if err := os.Remove(filepath.Join(root, "lost+found")); err != nil {
 		return err
 	}
-	return mount.UnmountAll(root, unix.MNT_DETACH)
+	return mount.UnmountAll(root, 0)
+}
+
+func testViewHook(backingFile string, fsType string, defaultOpts []string) error {
+	root, err := os.MkdirTemp("", "blockfile-testViewHook-XXXX")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(root)
+
+	// FIXME(fuweid): Mount with rw to force fs to handle recover
+	mountOpts := []mount.Mount{
+		{
+			Type:    fsType,
+			Source:  backingFile,
+			Options: defaultOpts,
+		},
+	}
+
+	if err := mount.All(mountOpts, root); err != nil {
+		return fmt.Errorf("failed to mount device %s: %w", backingFile, err)
+	}
+
+	if err := mount.UnmountAll(root, 0); err != nil {
+		return fmt.Errorf("failed to unmount device %s: %w", backingFile, err)
+	}
+	return nil
 }

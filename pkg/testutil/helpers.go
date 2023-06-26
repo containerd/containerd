@@ -28,6 +28,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const umountflags int = 0
+
 var rootEnabled bool
 
 func init() {
