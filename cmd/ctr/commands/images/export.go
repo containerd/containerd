@@ -22,7 +22,6 @@ import (
 	"io"
 	"os"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -133,13 +132,9 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 
 		if pss := context.StringSlice("platform"); len(pss) > 0 {
-			var all []ocispec.Platform
-			for _, ps := range pss {
-				p, err := platforms.Parse(ps)
-				if err != nil {
-					return fmt.Errorf("invalid platform %q: %w", ps, err)
-				}
-				all = append(all, p)
+			all, err := platforms.ParseAll(pss)
+			if err != nil {
+				return err
 			}
 			exportOpts = append(exportOpts, archive.WithPlatform(platforms.Ordered(all...)))
 		} else {

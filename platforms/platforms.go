@@ -158,6 +158,19 @@ func (m *matcher) String() string {
 	return Format(m.Platform)
 }
 
+// ParseAll parses a list of platform specifiers into a list of platform.
+func ParseAll(specifiers []string) ([]specs.Platform, error) {
+	platforms := make([]specs.Platform, len(specifiers))
+	for i, s := range specifiers {
+		p, err := Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid platform %s: %w", s, err)
+		}
+		platforms[i] = p
+	}
+	return platforms, nil
+}
+
 // Parse parses the platform specifier syntax into a platform declaration.
 //
 // Platform specifiers are in the format `<os>|<arch>|<os>/<arch>[/<variant>]`.

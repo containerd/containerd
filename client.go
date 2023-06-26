@@ -403,13 +403,9 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 		if len(fetchCtx.Platforms) == 0 {
 			fetchCtx.PlatformMatcher = platforms.All
 		} else {
-			var ps []ocispec.Platform
-			for _, s := range fetchCtx.Platforms {
-				p, err := platforms.Parse(s)
-				if err != nil {
-					return images.Image{}, fmt.Errorf("invalid platform %s: %w", s, err)
-				}
-				ps = append(ps, p)
+			ps, err := platforms.ParseAll(fetchCtx.Platforms)
+			if err != nil {
+				return images.Image{}, err
 			}
 
 			fetchCtx.PlatformMatcher = platforms.Any(ps...)
@@ -439,13 +435,9 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	}
 	if pushCtx.PlatformMatcher == nil {
 		if len(pushCtx.Platforms) > 0 {
-			var ps []ocispec.Platform
-			for _, platform := range pushCtx.Platforms {
-				p, err := platforms.Parse(platform)
-				if err != nil {
-					return fmt.Errorf("invalid platform %s: %w", platform, err)
-				}
-				ps = append(ps, p)
+			ps, err := platforms.ParseAll(pushCtx.Platforms)
+			if err != nil {
+				return err
 			}
 			pushCtx.PlatformMatcher = platforms.Any(ps...)
 		} else {
