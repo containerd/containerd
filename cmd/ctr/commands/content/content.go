@@ -451,7 +451,12 @@ var (
 		Usage:       "Retrieve blobs from a remote",
 		ArgsUsage:   "[flags] <remote> [<digest>, ...]",
 		Description: `Fetch blobs by digests from a remote.`,
-		Flags:       commands.RegistryFlags,
+		Flags: append(commands.RegistryFlags, []cli.Flag{
+			cli.StringFlag{
+				Name:  "media-type",
+				Usage: "Specify target mediatype for request header",
+			},
+		}...),
 		Action: func(context *cli.Context) error {
 			var (
 				ref     = context.Args().First()
@@ -486,7 +491,7 @@ var (
 				if err != nil {
 					return err
 				}
-				rc, _, err := fetcherByDigest.FetchByDigest(ctx, dgst)
+				rc, _, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(context.String("media-type")))
 				if err != nil {
 					return err
 				}
