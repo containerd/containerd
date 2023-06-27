@@ -1,5 +1,3 @@
-//go:build linux
-
 /*
    Copyright The containerd Authors.
 
@@ -28,11 +26,7 @@ import (
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/shim"
-)
-
-var (
-	// check to make sure the *exampleTaskService implements the GRPC API
-	_ = (taskAPI.TaskService)(&exampleTaskService{})
+	"github.com/containerd/ttrpc"
 )
 
 func init() {
@@ -52,13 +46,32 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			return NewTaskService(ic.Context, pp.(shim.Publisher), ss.(shutdown.Service))
+			return newTaskService(ic.Context, pp.(shim.Publisher), ss.(shutdown.Service))
 		},
 	})
 }
 
-// NewTaskService creates a new instance of a task service
-func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {
+func NewManager(name string) shim.Manager {
+	return manager{name: name}
+}
+
+type manager struct {
+	name string
+}
+
+func (m manager) Name() string {
+	return m.name
+}
+
+func (m manager) Start(ctx context.Context, id string, opts shim.StartOpts) (string, error) {
+	return "", errdefs.ErrNotImplemented
+}
+
+func (m manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
+	return shim.StopStatus{}, errdefs.ErrNotImplemented
+}
+
+func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {
 	// The shim.Publisher and shutdown.Service are usually useful for your task service,
 	// but we don't need them in the exampleTaskService.
 	return &exampleTaskService{}, nil
@@ -67,14 +80,10 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 type exampleTaskService struct {
 }
 
-// StartShim is a binary call that executes a new shim returning the address
-func (s *exampleTaskService) StartShim(ctx context.Context, opts shim.StartOpts) (string, error) {
-	return "", nil
-}
-
-// Cleanup is a binary call that cleans up any resources used by the shim when the service crashes
-func (s *exampleTaskService) Cleanup(ctx context.Context) (*taskAPI.DeleteResponse, error) {
-	return nil, errdefs.ErrNotImplemented
+// RegisterTTRPC allows TTRPC services to be registered with the underlying server
+func (s *exampleTaskService) RegisterTTRPC(server *ttrpc.Server) error {
+	taskAPI.RegisterTaskService(server, s)
+	return nil
 }
 
 // Create a new container
