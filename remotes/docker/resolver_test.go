@@ -46,12 +46,35 @@ func TestHTTPResolver(t *testing.T) {
 		base := s.URL[7:] // strip "http://"
 		return base, options, s.Close
 	}
-
 	runBasicTest(t, "testname", s)
 }
 
 func TestHTTPSResolver(t *testing.T) {
 	runBasicTest(t, "testname", tlsServer)
+}
+
+func TestResolverOptionsRace(t *testing.T) {
+	header := http.Header{}
+	header.Set("X-Test", "test")
+
+	s := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+
+		options := ResolverOptions{
+			Headers: header,
+		}
+		base := s.URL[7:] // strip "http://"
+		return base, options, s.Close
+	}
+
+	for i := 0; i < 5; i++ {
+		t.Run(fmt.Sprintf("test ResolverOptions race %d", i), func(t *testing.T) {
+			// parallel sub tests so the race condition (if not handled) can be caught
+			// by race detector
+			t.Parallel()
+			runBasicTest(t, "testname", s)
+		})
+	}
 }
 
 func TestBasicResolver(t *testing.T) {
