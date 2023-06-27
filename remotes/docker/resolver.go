@@ -148,7 +148,11 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 
 	if options.Headers == nil {
 		options.Headers = make(http.Header)
+	} else {
+		// make a copy of the headers to avoid race due to concurrent map write
+		options.Headers = options.Headers.Clone()
 	}
+
 	if _, ok := options.Headers["User-Agent"]; !ok {
 		options.Headers.Set("User-Agent", "containerd/"+version.Version)
 	}
