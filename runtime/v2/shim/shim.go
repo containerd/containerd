@@ -100,12 +100,12 @@ type Config struct {
 	NoSetupLogger bool
 }
 
-type ttrpcService interface {
+type TTRPCService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
-type ttrpcServerOptioner interface {
-	ttrpcService
+type TTRPCServerOptioner interface {
+	TTRPCService
 
 	UnaryInterceptor() ttrpc.UnaryServerInterceptor
 }
@@ -302,7 +302,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 
 	var (
 		initialized   = plugin.NewPluginSet()
-		ttrpcServices = []ttrpcService{}
+		ttrpcServices = []TTRPCService{}
 
 		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
 	)
@@ -349,13 +349,13 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 			return fmt.Errorf("failed to load plugin %s: %w", id, err)
 		}
 
-		if src, ok := instance.(ttrpcService); ok {
+		if src, ok := instance.(TTRPCService); ok {
 			logrus.WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}
 
-		if src, ok := instance.(ttrpcServerOptioner); ok {
+		if src, ok := instance.(TTRPCServerOptioner); ok {
 			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
 		}
 	}

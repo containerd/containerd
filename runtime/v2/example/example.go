@@ -77,6 +77,10 @@ func newTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	return &exampleTaskService{}, nil
 }
 
+var (
+	_ = shim.TTRPCService(&exampleTaskService{})
+)
+
 type exampleTaskService struct {
 }
 

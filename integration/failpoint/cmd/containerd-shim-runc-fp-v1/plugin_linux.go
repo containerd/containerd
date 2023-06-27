@@ -72,8 +72,11 @@ func init() {
 			}, nil
 		},
 	})
-
 }
+
+var (
+	_ = shim.TTRPCServerOptioner(&taskServiceWithFp{})
+)
 
 type taskServiceWithFp struct {
 	fps   map[string]*failpoint.Failpoint
