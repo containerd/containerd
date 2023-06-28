@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/images/converter/uncompress"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -70,13 +69,9 @@ When '--all-platforms' is given all images in a manifest list must be available.
 
 		if !context.Bool("all-platforms") {
 			if pss := context.StringSlice("platform"); len(pss) > 0 {
-				var all []ocispec.Platform
-				for _, ps := range pss {
-					p, err := platforms.Parse(ps)
-					if err != nil {
-						return fmt.Errorf("invalid platform %q: %w", ps, err)
-					}
-					all = append(all, p)
+				all, err := platforms.ParseAll(pss)
+				if err != nil {
+					return err
 				}
 				convertOpts = append(convertOpts, converter.WithPlatform(platforms.Ordered(all...)))
 			} else {
