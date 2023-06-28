@@ -363,7 +363,7 @@ func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.A
 		Labels:          is.imageLabels,
 		ManifestLimit:   uint32(is.manifestLimit),
 		AllMetadata:     is.allMetadata,
-		Platforms:       platformsToProto(is.platforms),
+		Platforms:       platforms.ToProto(is.platforms),
 		ExtraReferences: referencesToProto(is.extraReferences),
 		Unpacks:         unpackToProto(is.unpacks),
 	}
@@ -380,35 +380,11 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.imageLabels = s.Labels
 	is.manifestLimit = int(s.ManifestLimit)
 	is.allMetadata = s.AllMetadata
-	is.platforms = platformFromProto(s.Platforms)
+	is.platforms = platforms.FromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
 
 	return nil
-}
-
-func platformsToProto(platforms []ocispec.Platform) []*types.Platform {
-	ap := make([]*types.Platform, len(platforms))
-	for i := range platforms {
-		p := types.Platform{
-			OS:           platforms[i].OS,
-			Architecture: platforms[i].Architecture,
-			Variant:      platforms[i].Variant,
-		}
-
-		ap[i] = &p
-	}
-	return ap
-}
-
-func platformFromProto(platforms []*types.Platform) []ocispec.Platform {
-	op := make([]ocispec.Platform, len(platforms))
-	for i := range platforms {
-		op[i].OS = platforms[i].OS
-		op[i].Architecture = platforms[i].Architecture
-		op[i].Variant = platforms[i].Variant
-	}
-	return op
 }
 
 func referencesToProto(references []Reference) []*transfertypes.ImageReference {
