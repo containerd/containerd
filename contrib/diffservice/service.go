@@ -20,12 +20,11 @@ import (
 	"context"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -49,7 +48,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 	var (
 		ocidesc ocispec.Descriptor
 		err     error
-		desc    = toDescriptor(er.Diff)
+		desc    = oci.DescriptorFromProto(er.Diff)
 		mounts  = mount.FromProto(er.Mounts)
 	)
 
@@ -68,7 +67,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 	}
 
 	return &diffapi.ApplyResponse{
-		Applied: fromDescriptor(ocidesc),
+		Applied: oci.DescriptorToProto(ocidesc),
 	}, nil
 }
 
@@ -104,24 +103,6 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	}
 
 	return &diffapi.DiffResponse{
-		Diff: fromDescriptor(ocidesc),
+		Diff: oci.DescriptorToProto(ocidesc),
 	}, nil
-}
-
-func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
-	return ocispec.Descriptor{
-		MediaType:   d.MediaType,
-		Digest:      digest.Digest(d.Digest),
-		Size:        d.Size,
-		Annotations: d.Annotations,
-	}
-}
-
-func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
-	return &types.Descriptor{
-		MediaType:   d.MediaType,
-		Digest:      d.Digest.String(),
-		Size:        d.Size,
-		Annotations: d.Annotations,
-	}
 }
