@@ -22,7 +22,9 @@ import (
 	"strings"
 	"time"
 
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/protobuf"
 )
 
 const (
@@ -98,6 +100,29 @@ func (k *Kind) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// KindToProto converts from [Kind] to the protobuf definition [snapshots.Kind].
+func KindToProto(kind Kind) snapshotsapi.Kind {
+	if kind == KindActive {
+		return snapshotsapi.Kind_ACTIVE
+	}
+	if kind == KindView {
+		return snapshotsapi.Kind_VIEW
+	}
+	return snapshotsapi.Kind_COMMITTED
+}
+
+// KindFromProto converts from the protobuf definition [snapshots.Kind] to
+// [Kind].
+func KindFromProto(kind snapshotsapi.Kind) Kind {
+	if kind == snapshotsapi.Kind_ACTIVE {
+		return KindActive
+	}
+	if kind == snapshotsapi.Kind_VIEW {
+		return KindView
+	}
+	return KindCommitted
+}
+
 // Info provides information about a particular snapshot.
 // JSON marshalling is supported for interacting with tools like ctr,
 type Info struct {
@@ -112,6 +137,31 @@ type Info struct {
 	Labels  map[string]string `json:",omitempty"`
 	Created time.Time         `json:",omitempty"` // Created time
 	Updated time.Time         `json:",omitempty"` // Last update time
+}
+
+// InfoToProto converts from [Info] to the protobuf definition [snapshots.Info].
+func InfoToProto(info Info) *snapshotsapi.Info {
+	return &snapshotsapi.Info{
+		Name:      info.Name,
+		Parent:    info.Parent,
+		Kind:      KindToProto(info.Kind),
+		CreatedAt: protobuf.ToTimestamp(info.Created),
+		UpdatedAt: protobuf.ToTimestamp(info.Updated),
+		Labels:    info.Labels,
+	}
+}
+
+// InfoFromProto converts from the protobuf definition [snapshots.Info] to
+// [Info].
+func InfoFromProto(info *snapshotsapi.Info) Info {
+	return Info{
+		Name:    info.Name,
+		Parent:  info.Parent,
+		Kind:    KindFromProto(info.Kind),
+		Created: protobuf.FromTimestamp(info.CreatedAt),
+		Updated: protobuf.FromTimestamp(info.UpdatedAt),
+		Labels:  info.Labels,
+	}
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.
@@ -131,6 +181,23 @@ func (u *Usage) Add(other Usage) {
 	// bound. This should be pretty close, assuming the inodes for a
 	// snapshot are roughly unique to it. Don't trust this assumption.
 	u.Inodes += other.Inodes
+}
+
+// UsageFromProto converts from the protobuf definition [snapshots.Usage] to
+// [Usage].
+func UsageFromProto(resp *snapshotsapi.UsageResponse) Usage {
+	return Usage{
+		Inodes: resp.Inodes,
+		Size:   resp.Size,
+	}
+}
+
+// UsageToProto converts from [Usage] to the protobuf definition [snapshots.Usage].
+func UsageToProto(usage Usage) *snapshotsapi.UsageResponse {
+	return &snapshotsapi.UsageResponse{
+		Inodes: usage.Inodes,
+		Size:   usage.Size,
+	}
 }
 
 // WalkFunc defines the callback for a snapshot walk.
