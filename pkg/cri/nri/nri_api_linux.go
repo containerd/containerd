@@ -33,7 +33,6 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -283,7 +282,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 	}
 
 	resourceCheckOpt := nrigen.WithResourceChecker(
-		func(r *runtimespec.LinuxResources) error {
+		func(r *specs.LinuxResources) error {
 			if r != nil {
 				if a.cri.Config().DisableHugetlbController {
 					r.HugepageLimits = nil
@@ -294,18 +293,18 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 	)
 
 	rdtResolveOpt := nrigen.WithRdtResolver(
-		func(className string) (*runtimespec.LinuxIntelRdt, error) {
+		func(className string) (*specs.LinuxIntelRdt, error) {
 			if className == "" {
 				return nil, nil
 			}
-			return &runtimespec.LinuxIntelRdt{
+			return &specs.LinuxIntelRdt{
 				ClosID: className,
 			}, nil
 		},
 	)
 
 	blkioResolveOpt := nrigen.WithBlockIOResolver(
-		func(className string) (*runtimespec.LinuxBlockIO, error) {
+		func(className string) (*specs.LinuxBlockIO, error) {
 			if className == "" {
 				return nil, nil
 			}

@@ -22,17 +22,15 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/pkg/cri/opts"
+	ostesting "github.com/containerd/containerd/pkg/os/testing"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	"github.com/containerd/containerd/pkg/cri/opts"
-	ostesting "github.com/containerd/containerd/pkg/os/testing"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -194,7 +192,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		{
 			desc: "sandbox sizing annotations should be set if LinuxContainerResources were provided",
 			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Linux.Resources = &v1.LinuxContainerResources{
+				c.Linux.Resources = &runtime.LinuxContainerResources{
 					CpuPeriod:          100,
 					CpuQuota:           200,
 					CpuShares:          5000,
@@ -236,7 +234,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		{
 			desc: "sandbox sizing annotations are zero if the resources are set to 0",
 			configChange: func(c *runtime.PodSandboxConfig) {
-				c.Linux.Resources = &v1.LinuxContainerResources{}
+				c.Linux.Resources = &runtime.LinuxContainerResources{}
 			},
 			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]

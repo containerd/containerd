@@ -42,9 +42,7 @@ import (
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/opts"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
-	"github.com/containerd/containerd/pkg/cri/util"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 )
@@ -156,19 +154,19 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		t.Logf("Check namespaces")
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 			Type: runtimespec.NetworkNamespace,
-			Path: opts.GetNetworkNamespace(sandboxPid),
+			Path: customopts.GetNetworkNamespace(sandboxPid),
 		})
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 			Type: runtimespec.IPCNamespace,
-			Path: opts.GetIPCNamespace(sandboxPid),
+			Path: customopts.GetIPCNamespace(sandboxPid),
 		})
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 			Type: runtimespec.UTSNamespace,
-			Path: opts.GetUTSNamespace(sandboxPid),
+			Path: customopts.GetUTSNamespace(sandboxPid),
 		})
 		assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 			Type: runtimespec.PIDNamespace,
-			Path: opts.GetPIDNamespace(sandboxPid),
+			Path: customopts.GetPIDNamespace(sandboxPid),
 		})
 
 		t.Logf("Check PodSandbox annotations")
@@ -234,7 +232,7 @@ func TestContainerCapabilities(t *testing.T) {
 				AddCapabilities:  []string{"ALL"},
 				DropCapabilities: []string{"CHOWN"},
 			},
-			includes: util.SubtractStringSlice(allCaps, "CAP_CHOWN"),
+			includes: ctrdutil.SubtractStringSlice(allCaps, "CAP_CHOWN"),
 			excludes: []string{"CAP_CHOWN"},
 		},
 		{
@@ -244,7 +242,7 @@ func TestContainerCapabilities(t *testing.T) {
 				DropCapabilities: []string{"ALL"},
 			},
 			includes: []string{"CAP_SYS_ADMIN"},
-			excludes: util.SubtractStringSlice(allCaps, "CAP_SYS_ADMIN"),
+			excludes: ctrdutil.SubtractStringSlice(allCaps, "CAP_SYS_ADMIN"),
 		},
 	} {
 		test := test
@@ -783,7 +781,7 @@ func TestMountPropagation(t *testing.T) {
 			var spec runtimespec.Spec
 			spec.Linux = &runtimespec.Linux{}
 
-			err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "")(context.Background(), nil, nil, &spec)
+			err := customopts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "")(context.Background(), nil, nil, &spec)
 			if test.expectErr {
 				require.Error(t, err)
 			} else {
@@ -812,7 +810,7 @@ func TestPidNamespace(t *testing.T) {
 			pidNS: runtime.NamespaceMode_NODE,
 			expected: runtimespec.LinuxNamespace{
 				Type: runtimespec.PIDNamespace,
-				Path: opts.GetPIDNamespace(testPid),
+				Path: customopts.GetPIDNamespace(testPid),
 			},
 		},
 		{
@@ -827,7 +825,7 @@ func TestPidNamespace(t *testing.T) {
 			pidNS: runtime.NamespaceMode_POD,
 			expected: runtimespec.LinuxNamespace{
 				Type: runtimespec.PIDNamespace,
-				Path: opts.GetPIDNamespace(testPid),
+				Path: customopts.GetPIDNamespace(testPid),
 			},
 		},
 	} {
@@ -880,7 +878,7 @@ func TestUserNamespace(t *testing.T) {
 			// Expect userns to NOT be present.
 			expNotNS: &runtimespec.LinuxNamespace{
 				Type: runtimespec.UserNamespace,
-				Path: opts.GetUserNamespace(testPid),
+				Path: customopts.GetUserNamespace(testPid),
 			},
 		},
 		{
@@ -916,7 +914,7 @@ func TestUserNamespace(t *testing.T) {
 			},
 			expNS: &runtimespec.LinuxNamespace{
 				Type: runtimespec.UserNamespace,
-				Path: opts.GetUserNamespace(testPid),
+				Path: customopts.GetUserNamespace(testPid),
 			},
 			expUIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
 			expGIDMapping: []runtimespec.LinuxIDMapping{expIDMap},
