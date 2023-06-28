@@ -29,7 +29,7 @@ if (( $EUID != 0 )); then
 fi
 
 cd "$(go env GOPATH)"
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.4.0
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.2
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
 : "${DESTDIR:=""}"
