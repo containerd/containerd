@@ -897,8 +897,7 @@ func TestContainerKillAll(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
+	task, err := container.NewTask(ctx, cio.NullIO)
 	if err != nil {
 		t.Fatal(err)
 	}
