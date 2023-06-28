@@ -488,7 +488,7 @@ func TestCheckpointRestoreWithImagePath(t *testing.T) {
 
 	stdout := bytes.NewBuffer(nil)
 	spec.Process.Args = []string{"ps", "-ef"}
-	process, err := ntask.Exec(ctx, t.Name()+"_exec", spec.Process, cio.NewCreator(withByteBuffers(stdout)))
+	process, err := ntask.Exec(ctx, t.Name()+"_exec", spec.Process, cio.NewCreator(withStdout(stdout)))
 	if err != nil {
 		t.Fatal(err)
 	}
