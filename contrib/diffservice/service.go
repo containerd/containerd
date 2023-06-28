@@ -50,7 +50,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 		ocidesc ocispec.Descriptor
 		err     error
 		desc    = toDescriptor(er.Diff)
-		mounts  = toMounts(er.Mounts)
+		mounts  = mount.FromProto(er.Mounts)
 	)
 
 	var opts []diff.ApplyOpt
@@ -79,8 +79,8 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	var (
 		ocidesc ocispec.Descriptor
 		err     error
-		aMounts = toMounts(dr.Left)
-		bMounts = toMounts(dr.Right)
+		aMounts = mount.FromProto(dr.Left)
+		bMounts = mount.FromProto(dr.Right)
 	)
 
 	var opts []diff.Opt
@@ -106,19 +106,6 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 	return &diffapi.DiffResponse{
 		Diff: fromDescriptor(ocidesc),
 	}, nil
-}
-
-func toMounts(apim []*types.Mount) []mount.Mount {
-	mounts := make([]mount.Mount, len(apim))
-	for i, m := range apim {
-		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return mounts
 }
 
 func toDescriptor(d *types.Descriptor) ocispec.Descriptor {

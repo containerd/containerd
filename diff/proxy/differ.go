@@ -60,7 +60,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 
 	req := &diffapi.ApplyRequest{
 		Diff:     fromDescriptor(desc),
-		Mounts:   fromMounts(mounts),
+		Mounts:   mount.ToProto(mounts),
 		Payloads: payloads,
 	}
 	resp, err := r.client.Apply(ctx, req)
@@ -85,8 +85,8 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 		sourceDateEpoch = timestamppb.New(*config.SourceDateEpoch)
 	}
 	req := &diffapi.DiffRequest{
-		Left:            fromMounts(a),
-		Right:           fromMounts(b),
+		Left:            mount.ToProto(a),
+		Right:           mount.ToProto(b),
 		MediaType:       config.MediaType,
 		Ref:             config.Reference,
 		Labels:          config.Labels,
@@ -118,17 +118,4 @@ func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
 		Size:        d.Size,
 		Annotations: d.Annotations,
 	}
-}
-
-func fromMounts(mounts []mount.Mount) []*types.Mount {
-	apiMounts := make([]*types.Mount, len(mounts))
-	for i, m := range mounts {
-		apiMounts[i] = &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return apiMounts
 }

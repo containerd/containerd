@@ -98,7 +98,7 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 		ocidesc ocispec.Descriptor
 		err     error
 		desc    = toDescriptor(er.Diff)
-		mounts  = toMounts(er.Mounts)
+		mounts  = mount.FromProto(er.Mounts)
 	)
 
 	var opts []diff.ApplyOpt
@@ -131,8 +131,8 @@ func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.Cal
 	var (
 		ocidesc ocispec.Descriptor
 		err     error
-		aMounts = toMounts(dr.Left)
-		bMounts = toMounts(dr.Right)
+		aMounts = mount.FromProto(dr.Left)
+		bMounts = mount.FromProto(dr.Right)
 	)
 
 	var opts []diff.Opt
@@ -163,19 +163,6 @@ func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.Cal
 	return &diffapi.DiffResponse{
 		Diff: fromDescriptor(ocidesc),
 	}, nil
-}
-
-func toMounts(apim []*types.Mount) []mount.Mount {
-	mounts := make([]mount.Mount, len(apim))
-	for i, m := range apim {
-		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return mounts
 }
 
 func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
