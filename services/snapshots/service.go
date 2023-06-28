@@ -21,7 +21,6 @@ import (
 	"errors"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -102,7 +101,7 @@ func (s *service) Prepare(ctx context.Context, pr *snapshotsapi.PrepareSnapshotR
 	}
 
 	return &snapshotsapi.PrepareSnapshotResponse{
-		Mounts: fromMounts(mounts),
+		Mounts: mount.ToProto(mounts),
 	}, nil
 }
 
@@ -121,7 +120,7 @@ func (s *service) View(ctx context.Context, pr *snapshotsapi.ViewSnapshotRequest
 		return nil, errdefs.ToGRPC(err)
 	}
 	return &snapshotsapi.ViewSnapshotResponse{
-		Mounts: fromMounts(mounts),
+		Mounts: mount.ToProto(mounts),
 	}, nil
 }
 
@@ -137,7 +136,7 @@ func (s *service) Mounts(ctx context.Context, mr *snapshotsapi.MountsRequest) (*
 		return nil, errdefs.ToGRPC(err)
 	}
 	return &snapshotsapi.MountsResponse{
-		Mounts: fromMounts(mounts),
+		Mounts: mount.ToProto(mounts),
 	}, nil
 }
 
@@ -302,19 +301,6 @@ func fromUsage(usage snapshots.Usage) *snapshotsapi.UsageResponse {
 		Inodes: usage.Inodes,
 		Size:   usage.Size,
 	}
-}
-
-func fromMounts(mounts []mount.Mount) []*types.Mount {
-	out := make([]*types.Mount, len(mounts))
-	for i, m := range mounts {
-		out[i] = &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return out
 }
 
 func toInfo(info *snapshotsapi.Info) snapshots.Info {

@@ -21,7 +21,6 @@ import (
 	"io"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/protobuf"
@@ -89,7 +88,7 @@ func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Moun
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -108,7 +107,7 @@ func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -127,7 +126,7 @@ func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ..
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
@@ -218,19 +217,6 @@ func toUsage(resp *snapshotsapi.UsageResponse) snapshots.Usage {
 		Inodes: resp.Inodes,
 		Size:   resp.Size,
 	}
-}
-
-func toMounts(mm []*types.Mount) []mount.Mount {
-	mounts := make([]mount.Mount, len(mm))
-	for i, m := range mm {
-		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return mounts
 }
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
