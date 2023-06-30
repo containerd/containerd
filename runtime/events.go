@@ -16,6 +16,11 @@
 
 package runtime
 
+import (
+	"github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/log"
+)
+
 const (
 	// TaskCreateEventTopic for task create
 	TaskCreateEventTopic = "/tasks/create"
@@ -40,3 +45,33 @@ const (
 	// TaskUnknownTopic for unknown task events
 	TaskUnknownTopic = "/tasks/?"
 )
+
+// GetTopic converts an event from an interface type to the specific
+// event topic id
+func GetTopic(e interface{}) string {
+	switch e.(type) {
+	case *events.TaskCreate:
+		return TaskCreateEventTopic
+	case *events.TaskStart:
+		return TaskStartEventTopic
+	case *events.TaskOOM:
+		return TaskOOMEventTopic
+	case *events.TaskExit:
+		return TaskExitEventTopic
+	case *events.TaskDelete:
+		return TaskDeleteEventTopic
+	case *events.TaskExecAdded:
+		return TaskExecAddedEventTopic
+	case *events.TaskExecStarted:
+		return TaskExecStartedEventTopic
+	case *events.TaskPaused:
+		return TaskPausedEventTopic
+	case *events.TaskResumed:
+		return TaskResumedEventTopic
+	case *events.TaskCheckpointed:
+		return TaskCheckpointedEventTopic
+	default:
+		log.L.Warnf("no topic for type %#v", e)
+	}
+	return TaskUnknownTopic
+}
