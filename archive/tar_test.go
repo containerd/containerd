@@ -1176,7 +1176,7 @@ func TestSourceDateEpoch(t *testing.T) {
 
 	opts := []WriteDiffOpt{WithSourceDateEpoch(&sourceDateEpoch)}
 	validators := []tarEntryValidator{
-		composeValidators(whiteoutEntry("f1"), requireModTime(sourceDateEpoch)),
+		composeValidators(whiteoutEntry("f1"), requireModTime(time.Unix(0, 0).UTC())), // not sourceDateEpoch
 		composeValidators(fileEntry("f2", []byte("content2"), 0644), requireModTime(past)),
 		composeValidators(fileEntry("f3", []byte("content3"), 0644), requireModTime(sourceDateEpoch)),
 	}

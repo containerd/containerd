@@ -103,9 +103,9 @@ func WriteDiff(ctx context.Context, w io.Writer, a, b string, opts ...WriteDiffO
 func writeDiffNaive(ctx context.Context, w io.Writer, a, b string, o WriteDiffOptions) error {
 	var opts []ChangeWriterOpt
 	if o.SourceDateEpoch != nil {
-		opts = append(opts,
-			WithModTimeUpperBound(*o.SourceDateEpoch),
-			WithWhiteoutTime(*o.SourceDateEpoch))
+		opts = append(opts, WithModTimeUpperBound(*o.SourceDateEpoch))
+		// Since containerd v2.0, the whiteout timestamps are set to zero (1970-01-01),
+		// not to the source date epoch
 	}
 	cw := NewChangeWriter(w, b, opts...)
 	err := fs.Changes(ctx, a, b, cw.HandleChange)
@@ -505,7 +505,6 @@ type ChangeWriter struct {
 	tw                *tar.Writer
 	source            string
 	modTimeUpperBound *time.Time
-	whiteoutT         time.Time
 	inodeSrc          map[uint64]string
 	inodeRefs         map[uint64][]string
 	addedDirs         map[string]struct{}
@@ -521,13 +520,6 @@ func WithModTimeUpperBound(tm time.Time) ChangeWriterOpt {
 	}
 }
 
-// WithWhiteoutTime sets the whiteout timestamp.
-func WithWhiteoutTime(tm time.Time) ChangeWriterOpt {
-	return func(cw *ChangeWriter) {
-		cw.whiteoutT = tm
-	}
-}
-
 // NewChangeWriter returns ChangeWriter that writes tar stream of the source directory
 // to the privided writer. Change information (add/modify/delete/unmodified) for each
 // file needs to be passed through HandleChange method.
@@ -535,7 +527,6 @@ func NewChangeWriter(w io.Writer, source string, opts ...ChangeWriterOpt) *Chang
 	cw := &ChangeWriter{
 		tw:        tar.NewWriter(w),
 		source:    source,
-		whiteoutT: time.Now(), // can be overridden with WithWhiteoutTime(time.Time) ChangeWriterOpt .
 		inodeSrc:  map[uint64]string{},
 		inodeRefs: map[uint64][]string{},
 		addedDirs: map[string]struct{}{},
@@ -557,13 +548,16 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 		whiteOutDir := filepath.Dir(p)
 		whiteOutBase := filepath.Base(p)
 		whiteOut := filepath.Join(whiteOutDir, whiteoutPrefix+whiteOutBase)
+		// Since containerd v2.0, the whiteout timestamps are set to zero (1970-01-01),
+		// not to the source date epoch.
+		whiteOutT := time.Unix(0, 0).UTC()
 		hdr := &tar.Header{
 			Typeflag:   tar.TypeReg,
 			Name:       whiteOut[1:],
 			Size:       0,
-			ModTime:    cw.whiteoutT,
-			AccessTime: cw.whiteoutT,
-			ChangeTime: cw.whiteoutT,
+			ModTime:    whiteOutT,
+			AccessTime: whiteOutT,
+			ChangeTime: whiteOutT,
 		}
 		if err := cw.includeParents(hdr); err != nil {
 			return err
