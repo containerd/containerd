@@ -22,6 +22,7 @@ import (
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sandbox"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,7 +47,7 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, 
 	}
 	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
 		SandboxID: sandboxID,
-		Rootfs:    options.Rootfs,
+		Rootfs:    mount.ToProto(options.Rootfs),
 		Options: &anypb.Any{
 			TypeUrl: options.Options.GetTypeUrl(),
 			Value:   options.Options.GetValue(),

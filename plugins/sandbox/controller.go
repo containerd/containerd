@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -144,7 +145,7 @@ func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  sandboxID,
 		BundlePath: shim.Bundle(),
-		Rootfs:     coptions.Rootfs,
+		Rootfs:     mount.ToProto(coptions.Rootfs),
 		Options:    options,
 		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
