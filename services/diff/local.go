@@ -21,14 +21,13 @@ import (
 	"fmt"
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
 )
@@ -97,8 +96,8 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	var (
 		ocidesc ocispec.Descriptor
 		err     error
-		desc    = toDescriptor(er.Diff)
-		mounts  = toMounts(er.Mounts)
+		desc    = oci.DescriptorFromProto(er.Diff)
+		mounts  = mount.FromProto(er.Mounts)
 	)
 
 	var opts []diff.ApplyOpt
@@ -122,7 +121,7 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 	}
 
 	return &diffapi.ApplyResponse{
-		Applied: fromDescriptor(ocidesc),
+		Applied: oci.DescriptorToProto(ocidesc),
 	}, nil
 
 }
@@ -131,8 +130,8 @@ func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.Cal
 	var (
 		ocidesc ocispec.Descriptor
 		err     error
-		aMounts = toMounts(dr.Left)
-		bMounts = toMounts(dr.Right)
+		aMounts = mount.FromProto(dr.Left)
+		bMounts = mount.FromProto(dr.Right)
 	)
 
 	var opts []diff.Opt
@@ -161,37 +160,6 @@ func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.Cal
 	}
 
 	return &diffapi.DiffResponse{
-		Diff: fromDescriptor(ocidesc),
+		Diff: oci.DescriptorToProto(ocidesc),
 	}, nil
-}
-
-func toMounts(apim []*types.Mount) []mount.Mount {
-	mounts := make([]mount.Mount, len(apim))
-	for i, m := range apim {
-		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return mounts
-}
-
-func toDescriptor(d *types.Descriptor) ocispec.Descriptor {
-	return ocispec.Descriptor{
-		MediaType:   d.MediaType,
-		Digest:      digest.Digest(d.Digest),
-		Size:        d.Size,
-		Annotations: d.Annotations,
-	}
-}
-
-func fromDescriptor(d ocispec.Descriptor) *types.Descriptor {
-	return &types.Descriptor{
-		MediaType:   d.MediaType,
-		Digest:      d.Digest.String(),
-		Size:        d.Size,
-		Annotations: d.Annotations,
-	}
 }

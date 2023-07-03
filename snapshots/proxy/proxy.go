@@ -21,10 +21,8 @@ import (
 	"io"
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/protobuf"
 	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
 )
@@ -52,14 +50,14 @@ func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info
 	if err != nil {
 		return snapshots.Info{}, errdefs.FromGRPC(err)
 	}
-	return toInfo(resp.Info), nil
+	return snapshots.InfoFromProto(resp.Info), nil
 }
 
 func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	resp, err := p.client.Update(ctx,
 		&snapshotsapi.UpdateSnapshotRequest{
 			Snapshotter: p.snapshotterName,
-			Info:        fromInfo(info),
+			Info:        snapshots.InfoToProto(info),
 			UpdateMask: &protobuftypes.FieldMask{
 				Paths: fieldpaths,
 			},
@@ -67,7 +65,7 @@ func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fiel
 	if err != nil {
 		return snapshots.Info{}, errdefs.FromGRPC(err)
 	}
-	return toInfo(resp.Info), nil
+	return snapshots.InfoFromProto(resp.Info), nil
 }
 
 func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
@@ -78,7 +76,7 @@ func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 	if err != nil {
 		return snapshots.Usage{}, errdefs.FromGRPC(err)
 	}
-	return toUsage(resp), nil
+	return snapshots.UsageFromProto(resp), nil
 }
 
 func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
@@ -89,7 +87,7 @@ func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Moun
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -108,7 +106,7 @@ func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -127,7 +125,7 @@ func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ..
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
-	return toMounts(resp.Mounts), nil
+	return mount.FromProto(resp.Mounts), nil
 }
 
 func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
@@ -174,7 +172,7 @@ func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs .
 			return nil
 		}
 		for _, info := range resp.Info {
-			if err := fn(ctx, toInfo(info)); err != nil {
+			if err := fn(ctx, snapshots.InfoFromProto(info)); err != nil {
 				return err
 			}
 		}
@@ -190,66 +188,4 @@ func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
 		Snapshotter: p.snapshotterName,
 	})
 	return errdefs.FromGRPC(err)
-}
-
-func toKind(kind snapshotsapi.Kind) snapshots.Kind {
-	if kind == snapshotsapi.Kind_ACTIVE {
-		return snapshots.KindActive
-	}
-	if kind == snapshotsapi.Kind_VIEW {
-		return snapshots.KindView
-	}
-	return snapshots.KindCommitted
-}
-
-func toInfo(info *snapshotsapi.Info) snapshots.Info {
-	return snapshots.Info{
-		Name:    info.Name,
-		Parent:  info.Parent,
-		Kind:    toKind(info.Kind),
-		Created: protobuf.FromTimestamp(info.CreatedAt),
-		Updated: protobuf.FromTimestamp(info.UpdatedAt),
-		Labels:  info.Labels,
-	}
-}
-
-func toUsage(resp *snapshotsapi.UsageResponse) snapshots.Usage {
-	return snapshots.Usage{
-		Inodes: resp.Inodes,
-		Size:   resp.Size,
-	}
-}
-
-func toMounts(mm []*types.Mount) []mount.Mount {
-	mounts := make([]mount.Mount, len(mm))
-	for i, m := range mm {
-		mounts[i] = mount.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		}
-	}
-	return mounts
-}
-
-func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
-	if kind == snapshots.KindActive {
-		return snapshotsapi.Kind_ACTIVE
-	}
-	if kind == snapshots.KindView {
-		return snapshotsapi.Kind_VIEW
-	}
-	return snapshotsapi.Kind_COMMITTED
-}
-
-func fromInfo(info snapshots.Info) *snapshotsapi.Info {
-	return &snapshotsapi.Info{
-		Name:      info.Name,
-		Parent:    info.Parent,
-		Kind:      fromKind(info.Kind),
-		CreatedAt: protobuf.ToTimestamp(info.Created),
-		UpdatedAt: protobuf.ToTimestamp(info.Updated),
-		Labels:    info.Labels,
-	}
 }

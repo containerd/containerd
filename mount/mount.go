@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/continuity/fs"
 )
 
@@ -129,4 +130,34 @@ func readonlyOverlay(opt []string) []string {
 		}
 	}
 	return out
+}
+
+// ToProto converts from [Mount] to the containerd
+// APIs protobuf definition of a Mount.
+func ToProto(mounts []Mount) []*types.Mount {
+	apiMounts := make([]*types.Mount, len(mounts))
+	for i, m := range mounts {
+		apiMounts[i] = &types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		}
+	}
+	return apiMounts
+}
+
+// FromProto converts from the protobuf definition [types.Mount] to
+// [Mount].
+func FromProto(mm []*types.Mount) []Mount {
+	mounts := make([]Mount, len(mm))
+	for i, m := range mm {
+		mounts[i] = Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		}
+	}
+	return mounts
 }
