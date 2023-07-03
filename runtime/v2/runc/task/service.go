@@ -42,6 +42,7 @@ import (
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -687,7 +688,7 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 	ns, _ := namespaces.Namespace(ctx)
 	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
-		err := publisher.Publish(ctx, runc.GetTopic(e), e)
+		err := publisher.Publish(ctx, runtime.GetTopic(e), e)
 		if err != nil {
 			log.G(ctx).WithError(err).Error("post event")
 		}
