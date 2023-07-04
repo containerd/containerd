@@ -26,8 +26,9 @@ task:
       # v7.0.0 does not boot. v6.0.0 was not released.
       BOX: rockylinux/8@5.0.0
   install_libvirt_vagrant_script: |
-    apt-get update
-    apt-get install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
+    # if another process is keeping a lock, wait for 60 seconds for it to release the lock.
+    apt-get -o DPkg::Lock::Timeout=60 update
+    apt-get -o DPkg::Lock::Timeout=60 install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
     systemctl enable --now libvirtd
 
   vagrant_cache:
@@ -61,8 +62,9 @@ task:
     memory: 16G
 
   install_libvirt_vagrant_script: |
-    apt-get update
-    apt-get install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
+    # if another process is keeping a lock, wait for 60 seconds for it to release the lock.
+    apt-get -o DPkg::Lock::Timeout=60 update
+    apt-get -o DPkg::Lock::Timeout=60 install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
     systemctl enable --now libvirtd
 
   vagrant_cache:
