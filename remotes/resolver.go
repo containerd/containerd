@@ -65,7 +65,7 @@ type FetcherByDigest interface {
 	// FetcherByDigest usually returns an incomplete descriptor.
 	// Typically, the media type is always set to "application/octet-stream",
 	// and the annotations are unset.
-	FetchByDigest(ctx context.Context, dgst digest.Digest) (io.ReadCloser, ocispec.Descriptor, error)
+	FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...FetchByDigestOpts) (io.ReadCloser, ocispec.Descriptor, error)
 }
 
 // Pusher pushes content
@@ -91,4 +91,21 @@ type PusherFunc func(ctx context.Context, desc ocispec.Descriptor) (content.Writ
 // Push content
 func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
 	return fn(ctx, desc)
+}
+
+// FetchByDigestConfig provides configuration for fetching content by digest
+type FetchByDigestConfig struct {
+	//Mediatype specifies mediatype header to append for fetch request
+	Mediatype string
+}
+
+// FetchByDigestOpts allows callers to set options for fetch object
+type FetchByDigestOpts func(context.Context, *FetchByDigestConfig) error
+
+// WithMediaType sets the media type header for fetch request
+func WithMediaType(mediatype string) FetchByDigestOpts {
+	return func(ctx context.Context, cfg *FetchByDigestConfig) error {
+		cfg.Mediatype = mediatype
+		return nil
+	}
 }

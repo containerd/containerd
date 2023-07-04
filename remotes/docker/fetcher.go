@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -151,10 +152,16 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	})
 }
 
-func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, ps ...string) (*request, int64, error) {
+func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, mediatype string, ps ...string) (*request, int64, error) {
 	headReq := r.request(host, http.MethodHead, ps...)
 	if err := headReq.addNamespace(r.refspec.Hostname()); err != nil {
 		return nil, 0, err
+	}
+
+	if mediatype == "" {
+		headReq.header.Set("Accept", "*/*")
+	} else {
+		headReq.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
 	}
 
 	headResp, err := headReq.doWithRetries(ctx, nil)
@@ -175,9 +182,15 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, ps .
 	return getReq, headResp.ContentLength, nil
 }
 
-func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (io.ReadCloser, ocispec.Descriptor, error) {
+func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...remotes.FetchByDigestOpts) (io.ReadCloser, ocispec.Descriptor, error) {
 	var desc ocispec.Descriptor
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", dgst))
+	var config remotes.FetchByDigestConfig
+	for _, o := range opts {
+		if err := o(ctx, &config); err != nil {
+			return nil, desc, err
+		}
+	}
 
 	hosts := r.filterHosts(HostCapabilityPull)
 	if len(hosts) == 0 {
@@ -196,7 +209,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 	)
 
 	for _, host := range r.hosts {
-		getReq, sz, err = r.createGetReq(ctx, host, "blobs", dgst.String())
+		getReq, sz, err = r.createGetReq(ctx, host, config.Mediatype, "blobs", dgst.String())
 		if err == nil {
 			break
 		}
@@ -209,7 +222,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 	if getReq == nil {
 		// Fall back to the "manifests" endpoint
 		for _, host := range r.hosts {
-			getReq, sz, err = r.createGetReq(ctx, host, "manifests", dgst.String())
+			getReq, sz, err = r.createGetReq(ctx, host, config.Mediatype, "manifests", dgst.String())
 			if err == nil {
 				break
 			}
@@ -231,7 +244,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest) (i
 	}
 
 	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (io.ReadCloser, error) {
-		return r.open(ctx, getReq, "", offset)
+		return r.open(ctx, getReq, config.Mediatype, offset)
 	})
 	if err != nil {
 		return nil, desc, err
