@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -50,6 +51,8 @@ var (
 	supportsCriu bool
 	noShimCgroup bool
 )
+
+var testLock sync.Mutex
 
 func init() {
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
@@ -190,6 +193,7 @@ func TestMain(m *testing.M) {
 }
 
 func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {
+	fmt.Printf(" !! newClient() \n")
 	if testing.Short() {
 		t.Skip()
 	}

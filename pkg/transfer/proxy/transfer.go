@@ -61,6 +61,11 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 		apiOpts.ProgressStream = sid
 		go func() {
 			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				a, err := stream.Recv()
 				if err != nil {
 					if !errors.Is(err, io.EOF) {
@@ -81,6 +86,11 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 						Progress: v.Progress,
 						Total:    v.Total,
 					})
+					select {
+					case <-ctx.Done():
+						return
+					default:
+					}
 				default:
 					log.G(ctx).Warnf("unhandled progress object %T: %v", i, a.GetTypeUrl())
 				}

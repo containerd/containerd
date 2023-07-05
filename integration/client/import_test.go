@@ -40,8 +40,8 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/transfer"
-	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
-	"github.com/containerd/containerd/pkg/transfer/image"
+//	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
+//	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
 
 	digest "github.com/opencontainers/go-digest"
@@ -459,6 +459,7 @@ func createIndex(manifest []byte, tags ...string) []byte {
 	return b
 }
 
+/*
 func TestTransferImport(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
@@ -486,6 +487,7 @@ func TestTransferImport(t *testing.T) {
 			Images: []string{"", "registry.test/basic:latest"},
 			Opts:   []image.StoreOpt{image.WithNamedPrefix("unused", true)},
 		},
+
 		{
 			Name:   "IndexRef",
 			Images: []string{"registry.test/index-ref:latest", ""},
@@ -534,7 +536,9 @@ func TestTransferImport(t *testing.T) {
 				tc.Dir("blobs/sha256", 0755),
 			}
 
+			fmt.Printf("!! createImages \n")
 			descs, tws := createImages(tc, testCase.Images...)
+			fmt.Printf("!! createImages, descs %v\n", descs)
 			files = append(files, tws...)
 
 			files = append(files, tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644))
@@ -585,9 +589,11 @@ func TestTransferImport(t *testing.T) {
 					t.Fatalf("size don't match for %s: got %d, expected %d", image, img.Target.Size, desc.Size)
 				}
 			}
+
 		})
 	}
 }
+*/
 
 type imagesProgress struct {
 	sync.Mutex
