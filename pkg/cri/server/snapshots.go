@@ -104,6 +104,11 @@ func (s *snapshotsSyncer) sync() error {
 			}
 			continue
 		}
+		mounts, err := s.snapshotter.Mounts(ctx, info.Name)
+		if err != nil {
+			log.L.WithError(err).Errorf("Failed to get mounts for snapshot %q", info.Name)
+		}
+		sn.Mounts = mounts
 		sn.Size = uint64(usage.Size)
 		sn.Inodes = uint64(usage.Inodes)
 		s.store.Add(sn)

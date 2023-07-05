@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/mount"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-
+	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -69,8 +69,11 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 		}
 		status.CreatedAt = info.CreatedAt.UnixNano()
 	}
-
-	info, err := toCRIContainerInfo(ctx, container, r.GetVerbose())
+	snapshot, err := c.snapshotStore.Get(r.GetContainerId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container snapshot info: %w", err)
+	}
+	info, err := toCRIContainerInfo(ctx, container, snapshot, r.GetVerbose())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get verbose container info: %w", err)
 	}
@@ -127,19 +130,20 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 // ContainerInfo is extra information for a container.
 type ContainerInfo struct {
 	// TODO(random-liu): Add sandboxID in CRI container status.
-	SandboxID      string                   `json:"sandboxID"`
-	Pid            uint32                   `json:"pid"`
-	Removing       bool                     `json:"removing"`
-	SnapshotKey    string                   `json:"snapshotKey"`
-	Snapshotter    string                   `json:"snapshotter"`
-	RuntimeType    string                   `json:"runtimeType"`
-	RuntimeOptions interface{}              `json:"runtimeOptions"`
-	Config         *runtime.ContainerConfig `json:"config"`
-	RuntimeSpec    *runtimespec.Spec        `json:"runtimeSpec"`
+	SandboxID         string                   `json:"sandboxID"`
+	Pid               uint32                   `json:"pid"`
+	Removing          bool                     `json:"removing"`
+	SnapshotKey       string                   `json:"snapshotKey"`
+	SnapshotMountInfo []mount.Mount            `json:"snapshotMountInfo"`
+	Snapshotter       string                   `json:"snapshotter"`
+	RuntimeType       string                   `json:"runtimeType"`
+	RuntimeOptions    interface{}              `json:"runtimeOptions"`
+	Config            *runtime.ContainerConfig `json:"config"`
+	RuntimeSpec       *runtimespec.Spec        `json:"runtimeSpec"`
 }
 
 // toCRIContainerInfo converts internal container object information to CRI container status response info map.
-func toCRIContainerInfo(ctx context.Context, container containerstore.Container, verbose bool) (map[string]string, error) {
+func toCRIContainerInfo(ctx context.Context, container containerstore.Container, snapshot snapshotstore.Snapshot, verbose bool) (map[string]string, error) {
 	if !verbose {
 		return nil, nil
 	}
@@ -167,7 +171,7 @@ func toCRIContainerInfo(ctx context.Context, container containerstore.Container,
 	}
 	ci.SnapshotKey = ctrInfo.SnapshotKey
 	ci.Snapshotter = ctrInfo.Snapshotter
-
+	ci.SnapshotMountInfo = snapshot.Mounts
 	runtimeOptions, err := getRuntimeOptions(ctrInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runtime options: %w", err)
