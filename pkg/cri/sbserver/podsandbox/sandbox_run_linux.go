@@ -148,6 +148,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
 			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
 		}
+		// TODO (rata): We need to set this only if the pod will
+		// **not** use user namespaces either.
+		// This will be done when user namespaces is ported to sbserver.
 		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() {
 			sysctls["net.ipv4.ping_group_range"] = "0 2147483647"
 		}

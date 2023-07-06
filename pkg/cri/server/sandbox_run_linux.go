@@ -97,6 +97,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	usernsOpts := nsOptions.GetUsernsOptions()
 	uids, gids, err := parseUsernsIDs(usernsOpts)
+	var usernsEnabled bool
 	if err != nil {
 		return nil, fmt.Errorf("user namespace configuration: %w", err)
 	}
@@ -107,6 +108,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
 		case runtime.NamespaceMode_POD:
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
+			usernsEnabled = true
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
@@ -166,7 +168,7 @@ func (c *criService) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
 			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
 		}
-		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() {
+		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() && !usernsEnabled {
 			sysctls["net.ipv4.ping_group_range"] = "0 2147483647"
 		}
 	}
