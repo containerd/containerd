@@ -241,6 +241,20 @@ func LogURI(uri *url.URL) Creator {
 	}
 }
 
+// TerminalLogURI provides the raw logging URI
+// as well as sets the terminal option to true.
+func TerminalLogURI(uri *url.URL) Creator {
+	return func(_ string) (IO, error) {
+		return &logURI{
+			config: Config{
+				Stdout:   uri.String(),
+				Stderr:   uri.String(),
+				Terminal: true,
+			},
+		}, nil
+	}
+}
+
 // BinaryIO forwards container STDOUT|STDERR directly to a logging binary
 func BinaryIO(binary string, args map[string]string) Creator {
 	return func(_ string) (IO, error) {

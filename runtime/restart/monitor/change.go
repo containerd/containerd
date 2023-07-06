@@ -44,13 +44,21 @@ type startChange struct {
 
 func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
 	log := cio.NullIO
-
+	spec, err := s.container.Spec(ctx)
+	if err != nil {
+		return err
+	}
+	useTTY := spec.Process.Terminal
 	if s.logURI != "" {
 		uri, err := url.Parse(s.logURI)
 		if err != nil {
 			return fmt.Errorf("failed to parse %v into url: %w", s.logURI, err)
 		}
-		log = cio.LogURI(uri)
+		if useTTY {
+			log = cio.TerminalLogURI(uri)
+		} else {
+			log = cio.LogURI(uri)
+		}
 	}
 
 	if s.count > 0 {
