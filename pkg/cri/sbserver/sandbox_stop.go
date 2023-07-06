@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/log"
@@ -141,7 +142,8 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 	err = netPlugin.Remove(ctx, id, path, opts...)
 	networkPluginOperations.WithValues(networkTearDownOp).Inc()
 	networkPluginOperationsLatency.WithValues(networkTearDownOp).UpdateSince(netStart)
-	if err != nil {
+	// TODO(rongfu.leng) this is use netPlugin.Check() will be better, but cniVersion < 0.4.0 check is not supported, current loopback use cniVersion is 0.3.1
+	if err != nil && !strings.Contains(err.Error(), "failed to find plugin") {
 		networkPluginOperationsErrors.WithValues(networkTearDownOp).Inc()
 		return err
 	}
