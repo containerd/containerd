@@ -1,3 +1,5 @@
+//go:build linux || freebsd
+
 /*
    Copyright The containerd Authors.
 
@@ -17,10 +19,12 @@
 package plugin
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/zfs"
-	"github.com/pkg/errors"
 )
 
 // Config represents configuration for the zfs plugin
@@ -50,7 +54,7 @@ func init() {
 			ic.Meta.Exports["root"] = root
 			snapshotter, err := zfs.NewSnapshotter(root)
 			if err != nil {
-				return nil, errors.Wrap(plugin.ErrSkipPlugin, err.Error())
+				return nil, fmt.Errorf("%s: %w", err.Error(), plugin.ErrSkipPlugin)
 			}
 			return snapshotter, nil
 		},
