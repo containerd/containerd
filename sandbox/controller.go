@@ -22,12 +22,13 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 )
 
 type CreateOptions struct {
-	Rootfs []*types.Mount
+	Rootfs []mount.Mount
 	// Options are used to pass arbitrary options to the shim when creating a new sandbox.
 	// CRI will use this to pass PodSandboxConfig.
 	// Don't confuse this with Runtime options, which are passed at shim instance start
@@ -39,8 +40,7 @@ type CreateOptions struct {
 type CreateOpt func(*CreateOptions) error
 
 // WithRootFS is used to create a sandbox with the provided rootfs mount
-// TODO: Switch to mount.Mount once target added
-func WithRootFS(m []*types.Mount) CreateOpt {
+func WithRootFS(m []mount.Mount) CreateOpt {
 	return func(co *CreateOptions) error {
 		co.Rootfs = m
 		return nil
