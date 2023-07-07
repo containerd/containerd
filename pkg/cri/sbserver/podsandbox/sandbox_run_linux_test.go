@@ -116,6 +116,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		ContainerID: 1000,
 		Size:        10,
 	}
+
 	for _, test := range []struct {
 		desc         string
 		configChange func(*runtime.PodSandboxConfig)
@@ -142,6 +143,27 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 				})
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "0")
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
+			},
+		},
+		{
+			desc: "spec shouldn't have ping_group_range if userns are in use",
+			configChange: func(c *runtime.PodSandboxConfig) {
+				c.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
+					NamespaceOptions: &runtime.NamespaceOption{
+						UsernsOptions: &runtime.UserNamespace{
+							Mode: runtime.NamespaceMode_POD,
+							Uids: []*runtime.IDMapping{&idMap},
+							Gids: []*runtime.IDMapping{&idMap},
+						},
+					},
+				}
+			},
+			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+				require.NotNil(t, spec.Linux)
+				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
+					Type: runtimespec.UserNamespace,
+				})
+				assert.NotContains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
 			},
 		},
 		{
