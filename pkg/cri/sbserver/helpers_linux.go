@@ -30,12 +30,15 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
+	"github.com/containerd/containerd/snapshots"
 )
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
@@ -180,4 +183,22 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 // TODO: add build constraints to cgroups package and remove this helper
 func isUnifiedCgroupsMode() bool {
 	return cgroups.Mode() == cgroups.Unified
+}
+
+func snapshotterRemapOpts(nsOpts *runtime.NamespaceOption) ([]snapshots.Opt, error) {
+	snapshotOpt := []snapshots.Opt{}
+	usernsOpts := nsOpts.GetUsernsOptions()
+	if usernsOpts == nil {
+		return snapshotOpt, nil
+	}
+
+	uids, gids, err := parseUsernsIDs(usernsOpts)
+	if err != nil {
+		return nil, fmt.Errorf("user namespace configuration: %w", err)
+	}
+
+	if usernsOpts.GetMode() == runtime.NamespaceMode_POD {
+		snapshotOpt = append(snapshotOpt, containerd.WithRemapperLabels(0, uids[0].HostID, 0, gids[0].HostID, uids[0].Size))
+	}
+	return snapshotOpt, nil
 }

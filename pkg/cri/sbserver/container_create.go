@@ -206,7 +206,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Grab any platform specific snapshotter opts.
-	sOpts := snapshotterOpts(c.config.ContainerdConfig.Snapshotter, config)
+	sOpts, err := snapshotterOpts(c.config.ContainerdConfig.Snapshotter, config)
+	if err != nil {
+		return nil, err
+	}
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{

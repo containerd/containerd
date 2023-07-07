@@ -32,7 +32,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 }
 
 // snapshotterOpts returns any Windows specific snapshotter options for the r/w layer
-func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []snapshots.Opt {
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
 	var opts []snapshots.Opt
 
 	switch snapshotterName {
@@ -47,5 +47,5 @@ func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) []
 		}
 	}
 
-	return opts
+	return opts, nil
 }

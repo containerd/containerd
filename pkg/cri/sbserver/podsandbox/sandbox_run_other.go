@@ -21,6 +21,7 @@ package podsandbox
 import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/snapshots"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -47,4 +48,10 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 // remove these files. Unmount should *NOT* return error if the mount point is already unmounted.
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	return []snapshots.Opt{}, nil
 }
