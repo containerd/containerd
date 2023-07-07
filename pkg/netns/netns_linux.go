@@ -52,13 +52,7 @@ import (
 // path to the network namespace.
 // If pid is not 0, returns the netns from that pid persistently mounted. Otherwise,
 // a new netns is created.
-func newNS(baseDir string, pid uint32) (nsPath string, err error) {
-	b := make([]byte, 16)
-
-	_, err = rand.Read(b)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random netns name: %w", err)
-	}
+func newNS(baseDir, name string, pid uint32) (nsPath string, err error) {
 
 	// Create the directory for mounting network namespaces
 	// This needs to be a shared mountpoint in case it is mounted in to
@@ -68,8 +62,8 @@ func newNS(baseDir string, pid uint32) (nsPath string, err error) {
 	}
 
 	// create an empty file at the mount point and fail if it already exists
-	nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-	nsPath = path.Join(baseDir, nsName)
+
+	nsPath = path.Join(baseDir, name)
 	mountPointFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 	if err != nil {
 		return "", err
@@ -138,6 +132,24 @@ func newNS(baseDir string, pid uint32) (nsPath string, err error) {
 	return nsPath, nil
 }
 
+func BuildNetnsName(value string) (string, error) {
+
+	if value == "" {
+		b := make([]byte, 16)
+
+		_, err := rand.Read(b)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate random netns name: %w", err)
+		}
+
+		nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+
+		return nsName, nil
+	} else {
+		return fmt.Sprintf("cni-%s", value), nil
+	}
+}
+
 // unmountNS unmounts the NS held by the netns object. unmountNS is idempotent.
 func unmountNS(path string) error {
 	if _, err := os.Stat(path); err != nil {
@@ -177,13 +189,13 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace.
-func NewNetNS(baseDir string) (*NetNS, error) {
-	return NewNetNSFromPID(baseDir, 0)
+func NewNetNS(baseDir, name string) (*NetNS, error) {
+	return NewNetNSFromPID(baseDir, name, 0)
 }
 
 // NewNetNS returns the netns from pid or a new netns if pid is 0.
-func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
-	path, err := newNS(baseDir, pid)
+func NewNetNSFromPID(baseDir, name string, pid uint32) (*NetNS, error) {
+	path, err := newNS(baseDir, name, pid)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup netns: %w", err)
 	}
