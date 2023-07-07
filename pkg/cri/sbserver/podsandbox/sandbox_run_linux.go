@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/snapshots"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -344,4 +345,11 @@ func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 		}
 	}
 	return nil
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return snapshotterRemapOpts(nsOpts)
 }
