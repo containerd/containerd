@@ -18,7 +18,7 @@ require (
 	github.com/containerd/nri v0.1.0
 	github.com/containerd/ttrpc v1.1.2
 	github.com/containerd/typeurl v1.0.2
-	github.com/containerd/zfs v1.0.0
+	github.com/containerd/zfs v1.1.0
 	github.com/containernetworking/cni v1.1.1
 	github.com/containernetworking/plugins v1.1.1
 	github.com/coreos/go-systemd/v22 v22.3.2
@@ -30,8 +30,8 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/go-cmp v0.5.6
-	github.com/google/uuid v1.2.0
+	github.com/google/go-cmp v0.5.9
+	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -39,7 +39,7 @@ require (
 	github.com/intel/goresctrl v0.2.0
 	github.com/klauspost/compress v1.11.13
 	github.com/moby/locker v1.0.1
-	github.com/moby/sys/mountinfo v0.5.0
+	github.com/moby/sys/mountinfo v0.6.2
 	github.com/moby/sys/signal v0.6.0
 	github.com/moby/sys/symlink v0.2.0
 	github.com/opencontainers/go-digest v1.0.0
@@ -49,7 +49,7 @@ require (
 	github.com/opencontainers/selinux v1.10.1
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.11.1
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.7.0
 	github.com/tchap/go-patricia v2.2.6+incompatible
 	github.com/urfave/cli v1.22.2
@@ -65,9 +65,9 @@ require (
 	golang.org/x/net v0.8.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.6.0
-	google.golang.org/grpc v1.47.0
-	google.golang.org/protobuf v1.28.0
-	gotest.tools/v3 v3.0.3
+	google.golang.org/grpc v1.50.1
+	google.golang.org/protobuf v1.28.1
+	gotest.tools/v3 v3.5.0
 	k8s.io/api v0.22.5
 	k8s.io/apimachinery v0.22.5
 	k8s.io/apiserver v0.22.5
@@ -98,7 +98,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
-	github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible // indirect
+	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -121,7 +121,6 @@ require (
 	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

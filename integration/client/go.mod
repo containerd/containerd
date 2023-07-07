@@ -7,7 +7,7 @@ require (
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups v1.0.4
 	// the actual version of containerd is replaced with the code at the root of this repository
-	github.com/containerd/containerd v1.6.1
+	github.com/containerd/containerd v1.6.18
 	github.com/containerd/continuity v0.3.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.1.2
@@ -16,9 +16,9 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
-	github.com/sirupsen/logrus v1.8.1
+	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/sys v0.6.0
-	gotest.tools/v3 v3.0.3
+	gotest.tools/v3 v3.5.0
 )
 
 replace (
