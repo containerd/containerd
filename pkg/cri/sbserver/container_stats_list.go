@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl/v2"
@@ -115,6 +116,14 @@ func (c *criService) toCRIContainerStats(
 		if !ok {
 			handler, err = c.getMetricsHandler(ctx, cntr.SandboxID)
 			if err != nil {
+				// If the sandbox is not found, it may have been removed. we need to check container whether it is still exist
+				if errdefs.IsNotFound(err) {
+					_, err = c.containerStore.Get(cntr.ID)
+					if err != nil && errdefs.IsNotFound(err) {
+						log.G(ctx).Warnf("container %q is not found, skip it", cntr.ID)
+						continue
+					}
+				}
 				return nil, fmt.Errorf("failed to get metrics handler for container %q: %w", cntr.ID, err)
 			}
 			sandboxToMetricsHandler[cntr.SandboxID] = handler
