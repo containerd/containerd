@@ -282,15 +282,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
 		}
 
-		uid := config.GetMetadata().GetUid()
-
-		nsName, err := netns.BuildNetnsName(uid)
-
-		if err != nil {
-			return nil, err
-		}
-
-		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir, nsName)
+		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir, name)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
 		}
@@ -408,15 +400,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
 		}
 
-		uid := config.GetMetadata().GetUid()
-
-		nsName, err := netns.BuildNetnsName(uid)
-
-		if err != nil {
-			return nil, err
-		}
-
-		sandbox.NetNS, err = netns.NewNetNSFromPID(netnsMountDir, nsName, task.Pid())
+		sandbox.NetNS, err = netns.NewNetNSFromPID(netnsMountDir, name, task.Pid())
 		if err != nil {
 			return nil, fmt.Errorf("failed to create network namespace for sandbox %q: %w", id, err)
 		}

@@ -32,7 +32,6 @@
 package netns
 
 import (
-	"crypto/rand"
 	"fmt"
 	"os"
 	"path"
@@ -130,24 +129,6 @@ func newNS(baseDir, name string, pid uint32) (nsPath string, err error) {
 	}
 
 	return nsPath, nil
-}
-
-func BuildNetnsName(value string) (string, error) {
-
-	if value == "" {
-		b := make([]byte, 16)
-
-		_, err := rand.Read(b)
-		if err != nil {
-			return "", fmt.Errorf("failed to generate random netns name: %w", err)
-		}
-
-		nsName := fmt.Sprintf("cni-%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
-
-		return nsName, nil
-	} else {
-		return fmt.Sprintf("cni-%s", value), nil
-	}
 }
 
 // unmountNS unmounts the NS held by the netns object. unmountNS is idempotent.
