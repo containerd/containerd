@@ -1,4 +1,4 @@
-//go:build openbsd
+//go:build !linux && !windows
 
 /*
    Copyright The containerd Authors.
@@ -18,26 +18,13 @@
 
 package mount
 
-import (
-	"github.com/containerd/containerd/errdefs"
-)
+import "fmt"
 
-// Mount is not implemented on this platform
-func (m *Mount) mount(target string) error {
-	return errdefs.ErrNotImplemented
+func isFUSE(dir string) bool {
+	return false
 }
 
-// Unmount is not implemented on this platform
-func Unmount(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
-}
-
-// UnmountAll is not implemented on this platform
-func UnmountAll(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
-}
-
-// UnmountRecursive is not implemented on this platform
-func UnmountRecursive(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
+// unmountFUSE is not implemented on this platform
+func unmountFUSE(target string) error {
+	return fmt.Errorf("FUSE is not supported on this platform")
 }
