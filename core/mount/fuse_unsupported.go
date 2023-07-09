@@ -1,4 +1,4 @@
-//go:build !windows && !linux
+//go:build !linux && !windows
 
 /*
    Copyright The containerd Authors.
@@ -16,19 +16,15 @@
    limitations under the License.
 */
 
-package os
+package mount
 
-import (
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/errdefs"
-)
+import "fmt"
 
-// Mount will call unix.Mount to mount the file.
-func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return errdefs.ErrNotImplemented
+func isFUSE(dir string) bool {
+	return false
 }
 
-// Unmount will call Unmount to unmount the file.
-func (RealOS) Unmount(target string) error {
-	return mount.Unmount(target, 0)
+// unmountFUSE is not implemented on this platform
+func unmountFUSE(target string) error {
+	return fmt.Errorf("FUSE is not supported on this platform")
 }

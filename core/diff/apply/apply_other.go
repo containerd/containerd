@@ -1,4 +1,4 @@
-//go:build !linux && !darwin
+//go:build !linux
 
 /*
    Copyright The containerd Authors.
@@ -21,6 +21,7 @@ package apply
 import (
 	"context"
 	"io"
+	"os"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/archive"
@@ -28,6 +29,21 @@ import (
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _sync bool) error {
 	// TODO: for windows, how to sync?
+
+	if !mount.HasBindMounts && len(mounts) == 1 && mounts[0].Type == "bind" {
+		opts := []archive.ApplyOpt{}
+
+		if os.Getuid() != 0 {
+			opts = append(opts, archive.WithNoSameOwner())
+		}
+
+		path := mounts[0].Source
+		_, err := archive.Apply(ctx, path, r, opts...)
+		return err
+
+		// TODO: Do we need to sync all the filesystems?
+	}
+
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
 		return err
