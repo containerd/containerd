@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"testing"
 	"time"
 
@@ -173,7 +174,7 @@ func TestToCRIContainerInfo(t *testing.T) {
 	assert.NoError(t, err)
 
 	info, err := toCRIContainerInfo(context.Background(),
-		container,
+		container, snapshotstore.Snapshot{},
 		false)
 	assert.NoError(t, err)
 	assert.Nil(t, info)
