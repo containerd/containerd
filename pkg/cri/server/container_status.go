@@ -69,7 +69,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 		}
 		status.CreatedAt = info.CreatedAt.UnixNano()
 	}
-	snapshot, err := c.snapshotStore.Get(r.GetContainerId())
+	snapshot, err := c.snapshotStore.Get(status.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container snapshot info: %w", err)
 	}
