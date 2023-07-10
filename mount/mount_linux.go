@@ -449,5 +449,5 @@ func (m *Mount) mountWithHelper(helperBinary, typePrefix, target string) error {
 			_ = unmount(target, 0)
 		}
 	}
-	return fmt.Errorf("mount helper [%s %v] failed with ECHILD (retired %d times)", helperBinary, args, retriesOnECHILD)
+	return fmt.Errorf("mount helper [%s %v] failed with ECHILD (retried %d times)", helperBinary, args, retriesOnECHILD)
 }

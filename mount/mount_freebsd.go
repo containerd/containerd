@@ -75,7 +75,7 @@ func (m *Mount) mount(target string) error {
 			_ = unmount(target, 0)
 		}
 	}
-	return fmt.Errorf("mount [%v] failed with ECHILD (retired %d times)", args, retriesOnECHILD)
+	return fmt.Errorf("mount [%v] failed with ECHILD (retried %d times)", args, retriesOnECHILD)
 }
 
 // Unmount the provided mount path with the flags
