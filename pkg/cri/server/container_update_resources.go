@@ -19,7 +19,6 @@
 package server
 
 import (
-	"context"
 	gocontext "context"
 	"fmt"
 
@@ -36,7 +35,7 @@ import (
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.
-func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
+func (c *criService) UpdateContainerResources(ctx gocontext.Context, r *runtime.UpdateContainerResourcesRequest) (retRes *runtime.UpdateContainerResourcesResponse, retErr error) {
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %w", err)
@@ -73,7 +72,7 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	return &runtime.UpdateContainerResourcesResponse{}, nil
 }
 
-func (c *criService) updateContainerResources(ctx context.Context,
+func (c *criService) updateContainerResources(ctx gocontext.Context,
 	cntr containerstore.Container,
 	r *runtime.UpdateContainerResourcesRequest,
 	status containerstore.Status) (newStatus containerstore.Status, retErr error) {
@@ -141,7 +140,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 }
 
 // updateContainerSpec updates container spec.
-func updateContainerSpec(ctx context.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
+func updateContainerSpec(ctx gocontext.Context, cntr containerd.Container, spec *runtimespec.Spec) error {
 	s, err := typeurl.MarshalAny(spec)
 	if err != nil {
 		return fmt.Errorf("failed to marshal spec %+v: %w", spec, err)
