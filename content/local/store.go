@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/randutil"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -458,23 +457,9 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 	if wOpts.Ref == "" {
 		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
-	var lockErr error
-	for count := uint64(0); count < 10; count++ {
-		if err := tryLock(wOpts.Ref); err != nil {
-			if !errdefs.IsUnavailable(err) {
-				return nil, err
-			}
 
-			lockErr = err
-		} else {
-			lockErr = nil
-			break
-		}
-		time.Sleep(time.Millisecond * time.Duration(randutil.Intn(1<<count)))
-	}
-
-	if lockErr != nil {
-		return nil, lockErr
+	if err := tryLock(wOpts.Ref); err != nil {
+		return nil, err
 	}
 
 	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
