@@ -94,6 +94,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandboxInfo.Runtime.Name = ociRuntime.Type
 
+	runtimeStart := time.Now()
 	// Retrieve runtime options
 	runtimeOpts, err := generateRuntimeOptions(ociRuntime)
 	if err != nil {
@@ -221,8 +222,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
-
-	runtimeStart := time.Now()
 
 	if err := controller.Create(ctx, id, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
