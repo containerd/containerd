@@ -148,6 +148,9 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 
 	if options.Headers == nil {
 		options.Headers = make(http.Header)
+	} else {
+		// make a copy of the headers to avoid race due to concurrent map write
+		options.Headers = options.Headers.Clone()
 	}
 	if _, ok := options.Headers["User-Agent"]; !ok {
 		options.Headers.Set("User-Agent", "containerd/"+version.Version)
@@ -543,9 +546,10 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header = http.Header{} // headers need to be copied to avoid concurrent map access
-	for k, v := range r.header {
-		req.Header[k] = v
+	if r.header == nil {
+		req.Header = http.Header{}
+	} else {
+		req.Header = r.header.Clone() // headers need to be copied to avoid concurrent map access
 	}
 	if r.body != nil {
 		body, err := r.body()
