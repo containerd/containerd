@@ -20,14 +20,13 @@ package runc
 
 import (
 	"context"
-	"encoding/json"
-	"os"
 	"path/filepath"
 
 	"github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/runtime"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
 
@@ -64,18 +63,14 @@ func GetTopic(e interface{}) string {
 // ShouldKillAllOnExit reads the bundle's OCI spec and returns true if
 // there is an error reading the spec or if the container has a private PID namespace
 func ShouldKillAllOnExit(ctx context.Context, bundlePath string) bool {
-	var bundleSpec specs.Spec
-	bundleConfigContents, err := os.ReadFile(filepath.Join(bundlePath, "config.json"))
+	spec, err := oci.ReadSpec(filepath.Join(bundlePath, oci.ConfigFilename))
 	if err != nil {
 		log.G(ctx).WithError(err).Error("shouldKillAllOnExit: failed to read config.json")
 		return true
 	}
-	if err := json.Unmarshal(bundleConfigContents, &bundleSpec); err != nil {
-		log.G(ctx).WithError(err).Error("shouldKillAllOnExit: failed to unmarshal bundle json")
-		return true
-	}
-	if bundleSpec.Linux != nil {
-		for _, ns := range bundleSpec.Linux.Namespaces {
+
+	if spec.Linux != nil {
+		for _, ns := range spec.Linux.Namespaces {
 			if ns.Type == specs.PIDNamespace && ns.Path == "" {
 				return false
 			}
