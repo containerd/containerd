@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/schedcore"
 	"github.com/containerd/containerd/runtime/v2/runc"
@@ -61,7 +62,11 @@ var groupLabels = []string{
 	"io.kubernetes.cri.sandbox-id",
 }
 
+// spec is a shallow version of [oci.Spec] containing only the
+// fields we need for the hook. We use a shallow struct to reduce
+// the overhead of unmarshaling.
 type spec struct {
+	// Annotations contains arbitrary metadata for the container.
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
@@ -100,7 +105,7 @@ func newCommand(ctx context.Context, id, containerdBinary, containerdAddress, co
 }
 
 func readSpec() (*spec, error) {
-	f, err := os.Open("config.json")
+	f, err := os.Open(oci.ConfigFilename)
 	if err != nil {
 		return nil, err
 	}
