@@ -18,9 +18,10 @@ package server
 
 import (
 	"context"
-	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"testing"
 	"time"
+
+	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

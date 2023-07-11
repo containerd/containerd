@@ -17,10 +17,11 @@
 package snapshot
 
 import (
+	"sync"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	snapshot "github.com/containerd/containerd/snapshots"
-	"sync"
 )
 
 // Snapshot contains the information about the snapshot.
