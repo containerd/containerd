@@ -30,7 +30,7 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace for the sandbox.
-func NewNetNS(baseDir string) (*NetNS, error) {
+func NewNetNS(baseDir, name string) (*NetNS, error) {
 	temp := hcn.HostComputeNamespace{}
 	hcnNamespace, err := temp.Create()
 	if err != nil {
@@ -41,7 +41,7 @@ func NewNetNS(baseDir string) (*NetNS, error) {
 }
 
 // NewNetNSFromPID returns the netns from pid or a new netns if pid is 0.
-func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
+func NewNetNSFromPID(baseDir, name string, pid uint32) (*NetNS, error) {
 	return nil, errNotImplementedOnWindows
 }
 
