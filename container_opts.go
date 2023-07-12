@@ -206,38 +206,6 @@ func WithSnapshot(id string) NewContainerOpts {
 	}
 }
 
-// WithNewSnapshot allocates a new snapshot to be used by the container as the
-// root filesystem in read-write mode
-func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts {
-	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.RootFS(ctx)
-		if err != nil {
-			return err
-		}
-
-		parent := identity.ChainID(diffIDs).String()
-		c.Snapshotter, err = client.resolveSnapshotterName(ctx, c.Snapshotter)
-		if err != nil {
-			return err
-		}
-		s, err := client.getSnapshotter(ctx, c.Snapshotter)
-		if err != nil {
-			return err
-		}
-
-		parent, err = resolveSnapshotOptions(ctx, client, c.Snapshotter, s, parent, opts...)
-		if err != nil {
-			return err
-		}
-		if _, err := s.Prepare(ctx, id, parent, opts...); err != nil {
-			return err
-		}
-		c.SnapshotKey = id
-		c.Image = i.Name()
-		return nil
-	}
-}
-
 // WithSnapshotCleanup deletes the rootfs snapshot allocated for the container
 func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Container) error {
 	if c.SnapshotKey != "" {
@@ -255,11 +223,21 @@ func WithSnapshotCleanup(ctx context.Context, client *Client, c containers.Conta
 	return nil
 }
 
+// WithNewSnapshot allocates a new snapshot to be used by the container as the
+// root filesystem in read-write mode
+func WithNewSnapshot(id string, i Image, opts ...snapshots.Opt) NewContainerOpts {
+	return withNewSnapshot(id, i, false, opts...)
+}
+
 // WithNewSnapshotView allocates a new snapshot to be used by the container as the
 // root filesystem in read-only mode
 func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainerOpts {
+	return withNewSnapshot(id, i, true, opts...)
+}
+
+func withNewSnapshot(id string, i Image, readonly bool, opts ...snapshots.Opt) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), client.platform)
+		diffIDs, err := i.RootFS(ctx)
 		if err != nil {
 			return err
 		}
@@ -273,12 +251,17 @@ func WithNewSnapshotView(id string, i Image, opts ...snapshots.Opt) NewContainer
 		if err != nil {
 			return err
 		}
-
 		parent, err = resolveSnapshotOptions(ctx, client, c.Snapshotter, s, parent, opts...)
 		if err != nil {
 			return err
 		}
-		if _, err := s.View(ctx, id, parent, opts...); err != nil {
+
+		if readonly {
+			_, err = s.View(ctx, id, parent, opts...)
+		} else {
+			_, err = s.Prepare(ctx, id, parent, opts...)
+		}
+		if err != nil {
 			return err
 		}
 		c.SnapshotKey = id
