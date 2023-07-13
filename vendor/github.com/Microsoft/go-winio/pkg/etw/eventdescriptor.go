@@ -47,8 +47,6 @@ const (
 )
 
 // EventDescriptor represents various metadata for an ETW event.
-//
-//nolint:structcheck // task is currently unused
 type eventDescriptor struct {
 	id      uint16
 	version uint8
