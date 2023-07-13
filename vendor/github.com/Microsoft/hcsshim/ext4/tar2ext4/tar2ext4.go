@@ -13,6 +13,7 @@ import (
 	"github.com/Microsoft/hcsshim/ext4/dmverity"
 	"github.com/Microsoft/hcsshim/ext4/internal/compactext4"
 	"github.com/Microsoft/hcsshim/ext4/internal/format"
+	"github.com/Microsoft/hcsshim/internal/log"
 	"github.com/pkg/errors"
 )
 
@@ -200,7 +201,19 @@ func Convert(r io.Reader, w io.ReadWriteSeeker, options ...Option) error {
 	return nil
 }
 
-// ReadExt4SuperBlock reads and returns ext4 super block from VHD
+// ReadExt4SuperBlock reads and returns ext4 super block from given device.
+func ReadExt4SuperBlock(devicePath string) (*format.SuperBlock, error) {
+	dev, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer dev.Close()
+
+	return ReadExt4SuperBlockReadSeeker(dev)
+}
+
+// ReadExt4SuperBlockReadSeeker reads and returns ext4 super block given
+// an io.ReadSeeker.
 //
 // The layout on disk is as follows:
 // | Group 0 padding     | - 1024 bytes
@@ -215,26 +228,54 @@ func Convert(r io.Reader, w io.ReadWriteSeeker, options ...Option) error {
 // More details can be found here https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 //
 // Our goal is to skip the Group 0 padding, read and return the ext4 SuperBlock
-func ReadExt4SuperBlock(vhdPath string) (*format.SuperBlock, error) {
-	vhd, err := os.OpenFile(vhdPath, os.O_RDONLY, 0)
+func ReadExt4SuperBlockReadSeeker(rsc io.ReadSeeker) (*format.SuperBlock, error) {
+	// save current reader position
+	currBytePos, err := rsc.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return nil, err
 	}
-	defer vhd.Close()
 
-	// Skip padding at the start
-	if _, err := vhd.Seek(1024, io.SeekStart); err != nil {
+	if _, err := rsc.Seek(1024, io.SeekCurrent); err != nil {
 		return nil, err
 	}
 	var sb format.SuperBlock
-	if err := binary.Read(vhd, binary.LittleEndian, &sb); err != nil {
+	if err := binary.Read(rsc, binary.LittleEndian, &sb); err != nil {
 		return nil, err
 	}
-	// Make sure the magic bytes are correct.
+
+	// reset the reader to initial position
+	if _, err := rsc.Seek(currBytePos, io.SeekStart); err != nil {
+		return nil, err
+	}
+
 	if sb.Magic != format.SuperBlockMagic {
 		return nil, errors.New("not an ext4 file system")
 	}
 	return &sb, nil
+}
+
+// IsDeviceExt4 is will read the device's superblock and determine if it is
+// and ext4 superblock.
+func IsDeviceExt4(devicePath string) bool {
+	// ReadExt4SuperBlock will check the superblock magic number for us,
+	// so we know if no error is returned, this is an ext4 device.
+	_, err := ReadExt4SuperBlock(devicePath)
+	if err != nil {
+		log.L.Warnf("failed to read Ext4 superblock: %s", err)
+	}
+	return err == nil
+}
+
+// Ext4FileSystemSize reads ext4 superblock and returns the size of the underlying
+// ext4 file system and its block size.
+func Ext4FileSystemSize(r io.ReadSeeker) (int64, int, error) {
+	sb, err := ReadExt4SuperBlockReadSeeker(r)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read ext4 superblock: %w", err)
+	}
+	blockSize := 1024 * (1 << sb.LogBlockSize)
+	fsSize := int64(blockSize) * int64(sb.BlocksCountLow)
+	return fsSize, blockSize, nil
 }
 
 // ConvertAndComputeRootDigest writes a compact ext4 file system image that contains the files in the
