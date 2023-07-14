@@ -87,7 +87,7 @@ documentation.
 
 - **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
 - **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
-- **[plugins.linux]** has several options for configuring the runtime, shim, and related options:
+- **[plugins."io.containerd.runtime.v1.linux"]** has several options for configuring the runtime, shim, and related options:
   - **shim** specifies the shim binary (Default: **"containerd-shim"**),
   - **runtime** is the OCI compliant runtime binary (Default: **"runc"**),
   - **runtime_root** is the root directory used by the runtime (Default: **""**),
@@ -186,7 +186,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     no_prometheus = false
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["walking"]
-  [plugins.linux]
+  [plugins."io.containerd.runtime.v1.linux"]
     shim = "containerd-shim"
     runtime = "runc"
     runtime_root = ""

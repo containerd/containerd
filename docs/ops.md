@@ -205,7 +205,9 @@ See [containerd's Plugin documentation](./PLUGINS.md)
 The linux runtime allows a few options to be set to configure the shim and the runtime that you are using.
 
 ```toml
-[plugins.linux]
+version = 2
+
+[plugins."io.containerd.runtime.v1.linux"]
 	# shim binary name/path
 	shim = ""
 	# runtime binary name/path
