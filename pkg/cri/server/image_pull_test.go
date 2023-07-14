@@ -436,9 +436,6 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	}
 }
 func TestImageGetLabels(t *testing.T) {
-
-	criService := newTestCRIService()
-
 	tests := []struct {
 		name               string
 		expectedLabel      map[string]string
@@ -448,43 +445,41 @@ func TestImageGetLabels(t *testing.T) {
 		{
 			name:               "pinned image labels should get added on sandbox image",
 			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9",
-			pullImageName:      "k8s.gcr.io/pause:3.9",
+			configSandboxImage: "registry.k8s.io/pause:3.9",
+			pullImageName:      "registry.k8s.io/pause:3.9",
 		},
 		{
 			name:               "pinned image labels should get added on sandbox image without tag",
 			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause",
-			pullImageName:      "k8s.gcr.io/pause:latest",
+			configSandboxImage: "registry.k8s.io/pause",
+			pullImageName:      "registry.k8s.io/pause:latest",
 		},
 		{
 			name:               "pinned image labels should get added on sandbox image specified with tag and digest both",
 			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			configSandboxImage: "registry.k8s.io/pause:3.9@sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097",
+			pullImageName:      "registry.k8s.io/pause@sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097",
 		},
-
 		{
 			name:               "pinned image labels should get added on sandbox image specified with digest",
 			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			configSandboxImage: "registry.k8s.io/pause@sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097",
+			pullImageName:      "registry.k8s.io/pause@sha256:7031c1b283388d2c2e09b57badb803c05ebed362dc88d84b480cc47f72a21097",
 		},
-
 		{
 			name:               "pinned image labels should not get added on other image",
 			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9",
-			pullImageName:      "k8s.gcr.io/random:latest",
+			configSandboxImage: "registry.k8s.io/pause:3.9",
+			pullImageName:      "registry.k8s.io/random:latest",
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			criService.config.SandboxImage = tt.configSandboxImage
-			labels := criService.getLabels(context.Background(), tt.pullImageName)
-			assert.Equal(t, tt.expectedLabel, labels)
-
+	svc := newTestCRIService()
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			svc.config.SandboxImage = tc.configSandboxImage
+			assert.Equal(t, tc.expectedLabel, svc.getLabels(context.Background(), tc.pullImageName))
 		})
 	}
 }
