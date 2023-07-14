@@ -214,9 +214,11 @@ func (u *unpacker) unpack(
 
 		select {
 		case <-ctx.Done():
+			abort()
 			return ctx.Err()
 		case err := <-fetchErr:
 			if err != nil {
+				abort()
 				return err
 			}
 		case <-fetchC[i-fetchOffset]:
