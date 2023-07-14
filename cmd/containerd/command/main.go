@@ -18,6 +18,7 @@ package command
 
 import (
 	gocontext "context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -58,6 +59,8 @@ func init() {
 		fmt.Println(c.App.Name, version.Package, c.App.Version, version.Revision)
 	}
 }
+
+var errDaemonRunning = errors.New("address in use, another daemon may be running")
 
 // App returns a *cli.App instance.
 func App() *cli.App {
@@ -181,6 +184,12 @@ can be used and modified as necessary as a custom configuration.`
 		type srvResp struct {
 			s   *server.Server
 			err error
+		}
+
+		// See if another daemon (or just another process..) is already
+		// bound to one of our sockets.
+		if err := checkAddrInUse(config); err != nil {
+			return err
 		}
 
 		// run server initialization in a goroutine so we don't end up blocking important things like SIGTERM handling
@@ -390,4 +399,27 @@ func dumpStacks(writeToFile bool) {
 		f.WriteString(string(buf))
 		log.L.Infof("goroutine stack dump written to %s", name)
 	}
+}
+
+// Check if any of the configured local addresses already have
+// something bound.
+func checkAddrInUse(config *srvconfig.Config) error {
+	// Given some of the addrs may be the same
+	// we only might need to check once.
+	uniq := map[string]struct{}{
+		config.GRPC.Address:  {},
+		config.Debug.Address: {},
+		config.TTRPC.Address: {},
+	}
+	for addr := range uniq {
+		if !isLocalAddress(addr) {
+			continue
+		}
+		conn, err := dial(addr)
+		if err == nil {
+			conn.Close()
+			return fmt.Errorf("%s: %q", errDaemonRunning, addr)
+		}
+	}
+	return nil
 }

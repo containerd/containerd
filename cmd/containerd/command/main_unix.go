@@ -20,6 +20,7 @@ package command
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
 
@@ -27,6 +28,10 @@ import (
 	"github.com/containerd/containerd/services/server"
 	"golang.org/x/sys/unix"
 )
+
+func dial(address string) (net.Conn, error) {
+	return net.Dial("unix", address)
+}
 
 var handledSignals = []os.Signal{
 	unix.SIGTERM,

@@ -19,10 +19,12 @@ package command
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"unsafe"
 
+	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/go-winio/pkg/etw"
 	"github.com/Microsoft/go-winio/pkg/etwlogrus"
 	"github.com/Microsoft/go-winio/pkg/guid"
@@ -31,6 +33,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows"
 )
+
+func dial(address string) (net.Conn, error) {
+	return winio.DialPipe(address, nil)
+}
 
 var (
 	handledSignals = []os.Signal{
