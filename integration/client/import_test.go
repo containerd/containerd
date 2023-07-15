@@ -482,6 +482,7 @@ func TestTransferImport(t *testing.T) {
 		Opts   []image.StoreOpt
 	}{
 		{
+			//
 			Name:   "Basic",
 			Images: []string{"", "registry.test/basic:latest"},
 			Opts:   []image.StoreOpt{image.WithNamedPrefix("unused", true)},
