@@ -18,15 +18,20 @@ package log
 
 import (
 	"context"
+	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestLoggerContext(t *testing.T) {
+	const expected = "one"
 	ctx := context.Background()
-
-	ctx = WithLogger(ctx, G(ctx).WithField("test", "one"))
-	assert.Equal(t, GetLogger(ctx).Data["test"], "one")
-	assert.Same(t, G(ctx), GetLogger(ctx)) // these should be the same.
+	ctx = WithLogger(ctx, G(ctx).WithField("test", expected))
+	if actual := GetLogger(ctx).Data["test"]; actual != expected {
+		t.Errorf("expected: %v, got: %v", expected, actual)
+	}
+	a := G(ctx)
+	b := GetLogger(ctx)
+	if !reflect.DeepEqual(a, b) || a != b {
+		t.Errorf("should be the same: %+v, %+v", a, b)
+	}
 }
