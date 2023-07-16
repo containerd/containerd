@@ -34,38 +34,42 @@ var (
 	L = logrus.NewEntry(logrus.StandardLogger())
 )
 
-type (
-	loggerKey struct{}
+type loggerKey struct{}
 
-	// Fields type to pass to `WithFields`, alias from `logrus`.
-	Fields = logrus.Fields
+// Fields type to pass to "WithFields".
+type Fields = logrus.Fields
 
-	// Level is a logging level
-	Level = logrus.Level
-)
+// RFC3339NanoFixed is [time.RFC3339Nano] with nanoseconds padded using
+// zeros to ensure the formatted time is always the same number of
+// characters.
+const RFC3339NanoFixed = "2006-01-02T15:04:05.000000000Z07:00"
 
+// Level is a logging level.
+type Level = logrus.Level
+
+// Supported log levels.
 const (
-	// RFC3339NanoFixed is time.RFC3339Nano with nanoseconds padded using zeros to
-	// ensure the formatted time is always the same number of characters.
-	RFC3339NanoFixed = "2006-01-02T15:04:05.000000000Z07:00"
+	// TraceLevel level. Designates finer-grained informational events
+	// than [DebugLevel].
+	TraceLevel Level = logrus.TraceLevel
 
-	// TextFormat represents the text logging format
-	TextFormat = "text"
+	// DebugLevel level. Usually only enabled when debugging. Very verbose
+	// logging.
+	DebugLevel Level = logrus.DebugLevel
 
-	// JSONFormat represents the JSON logging format
-	JSONFormat = "json"
-
-	// TraceLevel level.
-	TraceLevel = logrus.TraceLevel
-
-	// DebugLevel level.
-	DebugLevel = logrus.DebugLevel
-
-	// InfoLevel level.
-	InfoLevel = logrus.InfoLevel
+	// InfoLevel level. General operational entries about what's going on
+	// inside the application.
+	InfoLevel Level = logrus.InfoLevel
 )
 
-// SetLevel sets log level globally.
+// SetLevel sets log level globally. It returns an error if the given
+// level is not supported.
+//
+// level can be one of:
+//
+//   - "trace" ([TraceLevel])
+//   - "debug" ([DebugLevel])
+//   - "info" ([InfoLevel])
 func SetLevel(level string) error {
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
@@ -81,7 +85,16 @@ func GetLevel() Level {
 	return logrus.GetLevel()
 }
 
-// SetFormat sets log output format
+// Supported log output formats.
+const (
+	// TextFormat represents the text logging format.
+	TextFormat = "text"
+
+	// JSONFormat represents the JSON logging format.
+	JSONFormat = "json"
+)
+
+// SetFormat sets the log output format ([TextFormat] or [JSONFormat]).
 func SetFormat(format string) error {
 	switch format {
 	case TextFormat:
