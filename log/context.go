@@ -89,15 +89,15 @@ func SetFormat(format string) error {
 			TimestampFormat: RFC3339NanoFixed,
 			FullTimestamp:   true,
 		})
+		return nil
 	case JSONFormat:
 		logrus.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: RFC3339NanoFixed,
 		})
+		return nil
 	default:
 		return fmt.Errorf("unknown log format: %s", format)
 	}
-
-	return nil
 }
 
 // WithLogger returns a new context with the provided logger. Use in
