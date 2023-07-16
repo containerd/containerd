@@ -96,17 +96,20 @@ func GetLevel() Level {
 	return logrus.GetLevel()
 }
 
+// OutputFormat specifies a log output format.
+type OutputFormat string
+
 // Supported log output formats.
 const (
 	// TextFormat represents the text logging format.
-	TextFormat = "text"
+	TextFormat OutputFormat = "text"
 
 	// JSONFormat represents the JSON logging format.
-	JSONFormat = "json"
+	JSONFormat OutputFormat = "json"
 )
 
 // SetFormat sets the log output format ([TextFormat] or [JSONFormat]).
-func SetFormat(format string) error {
+func SetFormat(format OutputFormat) error {
 	switch format {
 	case TextFormat:
 		logrus.SetFormatter(&logrus.TextFormatter{
