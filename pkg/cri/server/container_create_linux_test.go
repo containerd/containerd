@@ -1506,6 +1506,87 @@ func TestGenerateUserString(t *testing.T) {
 	}
 }
 
+func TestProcessUser(t *testing.T) {
+	testID := "test-id"
+	testSandboxID := "sandbox-id"
+	testContainerName := "container-name"
+	testPid := uint32(1234)
+	ociRuntime := config.Runtime{}
+	c := newTestCRIService()
+	testContainer := &containers.Container{ID: "64ddfe361f0099f8d59075398feeb3dcb3863b6851df7b946744755066c03e9d"}
+	ctx := context.Background()
+
+	etcPasswd := `
+root:x:0:0:root:/root:/bin/sh
+alice:x:1000:1000:alice:/home/alice:/bin/sh
+` // #nosec G101
+	etcGroup := `
+root:x:0
+alice:x:1000:
+additional-group-for-alice:x:11111:alice
+additional-group-for-root:x:22222:root
+`
+	tempRootDir := t.TempDir()
+	require.NoError(t,
+		os.MkdirAll(filepath.Join(tempRootDir, "etc"), 0755),
+	)
+	require.NoError(t,
+		os.WriteFile(filepath.Join(tempRootDir, "etc", "passwd"), []byte(etcPasswd), 0644),
+	)
+	require.NoError(t,
+		os.WriteFile(filepath.Join(tempRootDir, "etc", "group"), []byte(etcGroup), 0644),
+	)
+
+	for desc, test := range map[string]struct {
+		imageConfigUser string
+		securityContext *runtime.LinuxContainerSecurityContext
+		expected        runtimespec.User
+	}{
+		"Only SecurityContext was set, SecurityContext defines User": {
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				RunAsUser:          &runtime.Int64Value{Value: 1000},
+				RunAsGroup:         &runtime.Int64Value{Value: 2000},
+				SupplementalGroups: []int64{3333},
+			},
+			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333, 11111}},
+		},
+		"Only imageConfig.User was set, imageConfig.User defines User": {
+			imageConfigUser: "1000",
+			securityContext: nil,
+			expected:        runtimespec.User{UID: 1000, GID: 1000, AdditionalGids: []uint32{1000, 11111}},
+		},
+		"Both SecurityContext and ImageConfig.User was set, SecurityContext defines User": {
+			imageConfigUser: "0",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				RunAsUser:          &runtime.Int64Value{Value: 1000},
+				RunAsGroup:         &runtime.Int64Value{Value: 2000},
+				SupplementalGroups: []int64{3333},
+			},
+			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333, 11111}},
+		},
+		"No SecurityContext nor ImageConfig.User were set, runtime default defines User": {
+			expected: runtimespec.User{UID: 0, GID: 0, AdditionalGids: []uint32{0, 22222}},
+		},
+	} {
+		desc := desc
+		t.Run(desc, func(t *testing.T) {
+			containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
+			containerConfig.Linux.SecurityContext = test.securityContext
+			imageConfig.User = test.imageConfigUser
+
+			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			require.NoError(t, err)
+
+			spec.Root.Path = tempRootDir // simulating /etc/{passwd, group}
+			opts, err := c.containerSpecOpts(containerConfig, imageConfig)
+			require.NoError(t, err)
+			oci.ApplyOpts(ctx, nil, testContainer, spec, opts...)
+
+			require.Equal(t, test.expected, spec.Process.User)
+		})
+	}
+}
+
 func TestNonRootUserAndDevices(t *testing.T) {
 	testPid := uint32(1234)
 	c := newTestCRIService()
