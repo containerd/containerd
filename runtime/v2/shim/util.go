@@ -28,13 +28,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/atomicfile"
+	"github.com/containerd/containerd/protobuf/proto"
+	"github.com/containerd/containerd/protobuf/types"
 )
 
 type CommandConfig struct {
@@ -124,17 +126,16 @@ func WritePidFile(path string, pid int) error {
 	if err != nil {
 		return err
 	}
-	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
-	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
+	f, err := atomicfile.New(path, 0o666)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(f, "%d", pid)
-	f.Close()
 	if err != nil {
+		f.Cancel()
 		return err
 	}
-	return os.Rename(tempPath, path)
+	return f.Close()
 }
 
 // WriteAddress writes a address file atomically
@@ -143,17 +144,16 @@ func WriteAddress(path, address string) error {
 	if err != nil {
 		return err
 	}
-	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
-	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
+	f, err := atomicfile.New(path, 0o666)
 	if err != nil {
 		return err
 	}
-	_, err = f.WriteString(address)
-	f.Close()
+	_, err = f.Write([]byte(address))
 	if err != nil {
+		f.Cancel()
 		return err
 	}
-	return os.Rename(tempPath, path)
+	return f.Close()
 }
 
 // ErrNoAddress is returned when the address file has no content
