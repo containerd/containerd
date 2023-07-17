@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
+	"github.com/containerd/containerd/snapshots"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -100,4 +101,9 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 // No sandbox files needed for windows.
 func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxConfig) error {
 	return nil
+}
+
+// No sandbox snapshotter options needed for windows.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	return []snapshots.Opt{}, nil
 }

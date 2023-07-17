@@ -94,9 +94,6 @@ func TestPodUserNS(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if os.Getenv("ENABLE_CRI_SANDBOXES") == "'sandboxed'" {
-				t.Skip("skipping test: userns not supported/needed in sanboxed runtimes")
-			}
 			cmd := exec.Command("true")
 			cmd.SysProcAttr = &syscall.SysProcAttr{
 				Cloneflags: syscall.CLONE_NEWUSER,

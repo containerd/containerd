@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
 	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/snapshots"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -92,6 +93,25 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.IPCNamespace))
 	}
 
+	usernsOpts := nsOptions.GetUsernsOptions()
+	uids, gids, err := parseUsernsIDs(usernsOpts)
+	var usernsEnabled bool
+	if err != nil {
+		return nil, fmt.Errorf("user namespace configuration: %w", err)
+	}
+
+	if usernsOpts != nil {
+		switch mode := usernsOpts.GetMode(); mode {
+		case runtime.NamespaceMode_NODE:
+			specOpts = append(specOpts, customopts.WithoutNamespace(runtimespec.UserNamespace))
+		case runtime.NamespaceMode_POD:
+			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
+			usernsEnabled = true
+		default:
+			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
+		}
+	}
+
 	// It's fine to generate the spec before the sandbox /dev/shm
 	// is actually created.
 	sandboxDevShm := c.getSandboxDevShm(id)
@@ -100,9 +120,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 	// Remove the default /dev/shm mount from defaultMounts, it is added in oci/mounts.go.
 	specOpts = append(specOpts, oci.WithoutMounts(devShm))
-	// In future the when user-namespace is enabled, the `nosuid, nodev, noexec` flags are
-	// required, otherwise the remount will fail with EPERM. Just use them unconditionally,
-	// they are nice to have anyways.
+	// When user-namespace is enabled, the `nosuid, nodev, noexec` flags are
+	// required, otherwise the remount will fail with EPERM. Just use them
+	// unconditionally, they are nice to have anyways.
 	specOpts = append(specOpts, oci.WithMounts([]runtimespec.Mount{
 		{
 			Source:      sandboxDevShm,
@@ -146,10 +166,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
 			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
 		}
-		// TODO (rata): We need to set this only if the pod will
-		// **not** use user namespaces either.
-		// This will be done when user namespaces is ported to sbserver.
-		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() {
+		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() && !usernsEnabled {
 			sysctls["net.ipv4.ping_group_range"] = "0 2147483647"
 		}
 	}
@@ -325,4 +342,11 @@ func (c *Controller) cleanupSandboxFiles(id string, config *runtime.PodSandboxCo
 		}
 	}
 	return nil
+}
+
+// sandboxSnapshotterOpts generates any platform specific snapshotter options
+// for a sandbox container.
+func sandboxSnapshotterOpts(config *runtime.PodSandboxConfig) ([]snapshots.Opt, error) {
+	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
+	return snapshotterRemapOpts(nsOpts)
 }

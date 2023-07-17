@@ -31,7 +31,7 @@ const (
 
 // WithRemapperLabels creates the labels used by any supporting snapshotter
 // to shift the filesystem ownership (user namespace mapping) automatically; currently
-// supported by the fuse-overlayfs snapshotter
+// supported by the fuse-overlayfs and overlay snapshotters
 func WithRemapperLabels(ctrUID, hostUID, ctrGID, hostGID, length uint32) snapshots.Opt {
 	return snapshots.WithLabels(map[string]string{
 		snapshots.LabelSnapshotUIDMapping: fmt.Sprintf("%d:%d:%d", ctrUID, hostUID, length),
