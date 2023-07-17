@@ -24,6 +24,8 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/pkg/atomicfile"
+
 	"github.com/urfave/cli"
 )
 
@@ -259,15 +261,14 @@ func WritePidFile(path string, pid int) error {
 	if err != nil {
 		return err
 	}
-	tempPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".%s", filepath.Base(path)))
-	f, err := os.OpenFile(tempPath, os.O_RDWR|os.O_CREATE|os.O_EXCL|os.O_SYNC, 0666)
+	f, err := atomicfile.New(path, 0o666)
 	if err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(f, "%d", pid)
-	f.Close()
 	if err != nil {
+		f.Cancel()
 		return err
 	}
-	return os.Rename(tempPath, path)
+	return f.Close()
 }
