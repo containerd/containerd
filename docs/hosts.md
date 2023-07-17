@@ -34,6 +34,8 @@ been **DEPRECATED**._ You should now point your registry `config_path` to the pa
 
 Modify your `config.toml` (default location: `/etc/containerd/config.toml`) as follows:
 ```toml
+version = 2
+
 [plugins."io.containerd.grpc.v1.cri".registry]
    config_path = "/etc/containerd/certs.d"
 ```

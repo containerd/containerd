@@ -10,10 +10,12 @@ This file is typically located at `/etc/containerd/config.toml`.
 
 Here's minimal sample entry that can be made in the configuration file:
 
-```
+```toml
+version = 2
+
 [plugins]
   ...
-  [plugins.devmapper]
+  [plugins."io.containerd.snapshotter.v1.devmapper"]
     pool_name = "containerd-pool"
     base_image_size = "8192MB"
   ...
