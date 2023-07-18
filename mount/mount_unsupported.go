@@ -1,4 +1,4 @@
-//go:build openbsd
+//go:build darwin || openbsd
 
 /*
    Copyright The containerd Authors.
@@ -18,26 +18,29 @@
 
 package mount
 
-import (
-	"github.com/containerd/containerd/errdefs"
+import "errors"
+
+var (
+	// ErrNotImplementOnUnix is returned for methods that are not implemented
+	ErrNotImplementOnUnix = errors.New("not implemented under unix")
 )
 
 // Mount is not implemented on this platform
 func (m *Mount) mount(target string) error {
-	return errdefs.ErrNotImplemented
+	return ErrNotImplementOnUnix
 }
 
 // Unmount is not implemented on this platform
 func Unmount(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
+	return ErrNotImplementOnUnix
 }
 
 // UnmountAll is not implemented on this platform
 func UnmountAll(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
+	return ErrNotImplementOnUnix
 }
 
 // UnmountRecursive is not implemented on this platform
 func UnmountRecursive(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
+	return ErrNotImplementOnUnix
 }
