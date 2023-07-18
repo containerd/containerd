@@ -300,7 +300,7 @@ var checkCommand = cli.Command{
 					size,
 					unpacked)
 			} else {
-				if complete {
+				if complete && unpacked {
 					fmt.Println(image.Name())
 				}
 			}
