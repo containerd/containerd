@@ -19,12 +19,13 @@
 package os
 
 import (
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 )
 
 // Mount will call unix.Mount to mount the file.
 func (RealOS) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return mount.ErrNotImplementOnUnix
+	return errdefs.ErrNotImplemented
 }
 
 // Unmount will call Unmount to unmount the file.

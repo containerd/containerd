@@ -1,5 +1,3 @@
-//go:build openbsd
-
 /*
    Copyright The containerd Authors.
 
@@ -19,25 +17,26 @@
 package mount
 
 import (
-	"github.com/containerd/containerd/errdefs"
+	"fmt"
+	"os/exec"
 )
 
-// Mount is not implemented on this platform
+// Mount to the provided target.
 func (m *Mount) mount(target string) error {
-	return errdefs.ErrNotImplemented
-}
+	// See https://github.com/slonopotamus/containerd-darwin-mount-helper for reference implementation
+	const commandName = "containerd-darwin-mount-helper"
 
-// Unmount is not implemented on this platform
-func Unmount(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
-}
+	args := []string{"-t", m.Type}
+	for _, option := range m.Options {
+		args = append(args, "-o", option)
+	}
+	args = append(args, m.Source, target)
 
-// UnmountAll is not implemented on this platform
-func UnmountAll(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
-}
+	cmd := exec.Command(commandName, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s [%v] failed: %q: %w", commandName, args, string(output), err)
+	}
 
-// UnmountRecursive is not implemented on this platform
-func UnmountRecursive(mount string, flags int) error {
-	return errdefs.ErrNotImplemented
+	return nil
 }
