@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/shutdown"
+	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
@@ -51,12 +52,15 @@ func init() {
 	})
 }
 
+var (
+	_ = shim.TTRPCService(&pauseService{})
+	_ = api.TTRPCSandboxService(&pauseService{})
+)
+
 // pauseService is an extension for task v2 runtime to support Pod "pause" containers via sandbox API.
 type pauseService struct {
 	shutdown shutdown.Service
 }
-
-var _ api.TTRPCSandboxService = (*pauseService)(nil)
 
 func (p *pauseService) RegisterTTRPC(server *ttrpc.Server) error {
 	api.RegisterTTRPCSandboxService(server, p)
