@@ -1677,9 +1677,6 @@ func WithWasmLayers(descriptors []v1.Descriptor) SpecOpts {
 		}
 		for _, descriptor := range descriptors {
 			switch descriptor.MediaType {
-			case images.MediaTypeWasmLayerModule, images.MediaTypeWasmLayerConfig:
-				// should only be one of each
-				s.Annotations[descriptor.MediaType] = descriptor.Digest.String()
 			case images.MediaTypeWasmLayerComponent:
 				// there could be more than one component to make up a module
 				modules := descriptor.Digest.String()
