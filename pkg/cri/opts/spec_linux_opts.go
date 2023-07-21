@@ -330,7 +330,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 				s.Linux.Resources.Memory.Swap = &limit
 			}
 		}
-		if swapLimit != 0 {
+		if swapLimit != 0 && SwapControllerAvailable() {
 			s.Linux.Resources.Memory.Swap = &swapLimit
 		}
 
