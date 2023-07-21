@@ -298,6 +298,21 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 	}
 }
 
+func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		hostPath, _ = filepath.Abs(hostPath)
+		containerPath, _ = filepath.Abs(containerPath)
+		mount := &runtime.Mount{
+			HostPath:       hostPath,
+			ContainerPath:  containerPath,
+			SelinuxRelabel: selinux.GetEnabled(),
+			UidMappings:    uidMaps,
+			GidMappings:    gidMaps,
+		}
+		c.Mounts = append(c.Mounts, mount)
+	}
+}
+
 func WithWindowsUsername(username string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		if c.Windows == nil {
