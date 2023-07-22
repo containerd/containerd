@@ -4,7 +4,7 @@ dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1 => github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230111232327-1f10f66a31bf
 ## explicit; go 1.18
 github.com/AdaLogics/go-fuzz-headers
-# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
+# github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 ## explicit; go 1.18
 github.com/AdamKorcz/go-118-fuzz-build/testing
 # github.com/Microsoft/go-winio v0.6.1
@@ -507,7 +507,7 @@ golang.org/x/crypto/openpgp/errors
 golang.org/x/crypto/openpgp/packet
 golang.org/x/crypto/openpgp/s2k
 golang.org/x/crypto/pbkdf2
-# golang.org/x/mod v0.10.0
+# golang.org/x/mod v0.12.0
 ## explicit; go 1.17
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/modfile
@@ -557,19 +557,19 @@ golang.org/x/text/unicode/norm
 # golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.8.0
+# golang.org/x/tools v0.11.0
 ## explicit; go 1.18
 golang.org/x/tools/cmd/stringer
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/packagesdriver
 golang.org/x/tools/go/packages
-golang.org/x/tools/go/types/objectpath
 golang.org/x/tools/imports
 golang.org/x/tools/internal/event
 golang.org/x/tools/internal/event/core
 golang.org/x/tools/internal/event/keys
 golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/event/tag
 golang.org/x/tools/internal/fastwalk
 golang.org/x/tools/internal/gcimporter
 golang.org/x/tools/internal/gocommand

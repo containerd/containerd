@@ -23,7 +23,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652 // indirect
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/container-orchestrated-devices/container-device-interface v0.6.0 // indirect
@@ -59,11 +59,11 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.14.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
-	golang.org/x/tools v0.9.1 // indirect
+	golang.org/x/tools v0.11.0 // indirect
 	google.golang.org/genproto v0.0.0-20230720185612-659f7aaaa771 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230720185612-659f7aaaa771 // indirect
 	google.golang.org/grpc v1.56.2 // indirect

@@ -5,7 +5,7 @@ go 1.19
 require (
 	dario.cat/mergo v1.0.0
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1 // replaced; see replace rules for actual version used.
-	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20221215162035-5330a85ea652
+	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/Microsoft/hcsshim v0.10.0-rc.9
 	github.com/container-orchestrated-devices/container-device-interface v0.6.0
@@ -125,13 +125,13 @@ require (
 	go.opentelemetry.io/otel/metric v0.37.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
 	golang.org/x/crypto v0.11.0 // indirect
-	golang.org/x/mod v0.10.0 // indirect
+	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.12.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/term v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
-	golang.org/x/tools v0.8.0 // indirect
+	golang.org/x/tools v0.11.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230706204954-ccb25ca9f130 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
