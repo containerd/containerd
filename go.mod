@@ -36,7 +36,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/intel/goresctrl v0.3.0
-	github.com/klauspost/compress v1.16.5
+	github.com/klauspost/compress v1.16.7
 	github.com/minio/sha256-simd v1.0.0
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.6.2
