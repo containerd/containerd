@@ -28,7 +28,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2019]
+        os: [ubuntu-22.04, macos-12, windows-2019]
 
     steps:
       - uses: actions/setup-go@v4
@@ -49,7 +49,7 @@ jobs:
   project:
     name: Project Checks
     if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
 
     steps:
@@ -79,7 +79,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
 
     defaults:
@@ -116,7 +116,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
 
     steps:
@@ -133,7 +133,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -208,7 +208,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-22.04, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.6", "1.19.11"]
     steps:
       - uses: actions/setup-go@v4
@@ -387,7 +387,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
