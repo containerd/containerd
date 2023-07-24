@@ -313,6 +313,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					if firstErr == nil {
 						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
 					}
+					log.G(ctx).Infof("trying next host - response was %s", resp.Status)
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
