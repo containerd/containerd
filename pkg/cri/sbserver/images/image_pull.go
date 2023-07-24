@@ -328,6 +328,11 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
+	if ref, err := distribution.ParseAnyReference(r); err == nil && ref.String() != r {
+		log.G(ctx).Infof("Ignore inconsistent image ref, the image(%s) is parsed as %q", r, ref.String())
+		return nil
+	}
+
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image by reference: %w", err)
