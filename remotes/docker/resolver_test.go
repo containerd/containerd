@@ -32,6 +32,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	digest "github.com/opencontainers/go-digest"
@@ -331,6 +332,7 @@ func TestHostTLSFailureFallbackResolver(t *testing.T) {
 	}
 
 	runBasicTest(t, "testname", sf)
+	runNotFoundTest(t, "testname", sf)
 }
 
 func TestHTTPFallbackResolver(t *testing.T) {
@@ -635,6 +637,28 @@ func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, Re
 		if err := testFetch(ctx, f, ref); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func runNotFoundTest(t *testing.T, name string, sf func(h http.Handler) (string, ResolverOptions, func())) {
+	var (
+		ctx = context.Background()
+		tag = "latest"
+		r   = http.NewServeMux()
+	)
+
+	base, ro, close := sf(logHandler{t, r})
+	defer close()
+
+	resolver := NewResolver(ro)
+	image := fmt.Sprintf("%s/%s:%s", base, name, tag)
+
+	_, _, err := resolver.Resolve(ctx, image)
+	if err == nil {
+		t.Fatalf("Expected error resolving %s, got nil", image)
+	}
+	if !errors.Is(err, errdefs.ErrNotFound) {
+		t.Fatalf("Expected error resolving %s to be ErrNotFound, got %v", image, err)
 	}
 }
 
