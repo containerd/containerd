@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	"github.com/container-orchestrated-devices/container-device-interface/pkg/parser"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
@@ -355,7 +356,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		}
 		var cdiDeviceIDs []string
 		for _, dev := range context.StringSlice("device") {
-			if cdi.IsQualifiedName(dev) {
+			if parser.IsQualifiedName(dev) {
 				cdiDeviceIDs = append(cdiDeviceIDs, dev)
 				continue
 			}
