@@ -212,7 +212,7 @@ func (s *store) add(img Image) error {
 		return nil
 	}
 	// Or else, merge and sort the references.
-	i.References = docker.Sort(util.MergeStringSlices(i.References, img.References))
+	i.References = docker.StrictSort(util.MergeStringSlices(i.References, img.References))
 	i.Pinned = i.Pinned || img.Pinned
 	s.images[img.ID] = i
 	return nil

@@ -28,6 +28,7 @@ import (
 // 4. Name
 // 5. Digest
 // 6. Parse error
+// Deprecated: use StrictSort
 func Sort(references []string) []string {
 	var prefs []Reference
 	var bad []string
@@ -35,6 +36,43 @@ func Sort(references []string) []string {
 	for _, ref := range references {
 		pref, err := ParseAnyReference(ref)
 		if err != nil {
+			bad = append(bad, ref)
+		} else {
+			prefs = append(prefs, pref)
+		}
+	}
+	sort.Slice(prefs, func(a, b int) bool {
+		ar := refRank(prefs[a])
+		br := refRank(prefs[b])
+		if ar == br {
+			return prefs[a].String() < prefs[b].String()
+		}
+		return ar < br
+	})
+	sort.Strings(bad)
+	var refs []string
+	for _, pref := range prefs {
+		refs = append(refs, pref.String())
+	}
+	return append(refs, bad...)
+}
+
+// StrictSort sorts string references preferring higher information references
+// The precedence is as follows:
+// 1. Name + Tag + Digest
+// 2. Name + Tag
+// 3. Name + Digest
+// 4. Name
+// 5. Digest
+// 6. Parse error and inconsistent ref
+// Unlike Sort, it does not modify the items of `references`
+func StrictSort(references []string) []string {
+	var prefs []Reference
+	var bad []string
+
+	for _, ref := range references {
+		pref, err := ParseAnyReference(ref)
+		if err != nil || pref.String() != ref {
 			bad = append(bad, ref)
 		} else {
 			prefs = append(prefs, pref)
