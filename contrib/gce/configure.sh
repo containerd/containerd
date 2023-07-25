@@ -125,7 +125,7 @@ if [ "${CONTAINERD_TEST:-"false"}"  != "true" ]; then
   # CONTAINERD_VERSION is the cri-containerd version to use.
   version=${CONTAINERD_VERSION:-""}
 else
-  deploy_path=${CONTAINERD_DEPLOY_PATH:-"cri-containerd-staging"}
+  deploy_path=${CONTAINERD_DEPLOY_PATH:-"k8s-staging-cri-tools"}
 
   # PULL_REFS_METADATA is the metadata key of PULL_REFS from prow.
   PULL_REFS_METADATA="PULL_REFS"
