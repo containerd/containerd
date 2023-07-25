@@ -17,9 +17,9 @@
 package epoch
 
 import (
+	"fmt"
 	"os"
 	"runtime"
-	"strconv"
 	"testing"
 	"time"
 
@@ -85,7 +85,7 @@ func TestSourceDateEpoch(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, vp.Equal(sourceDateEpoch.UTC()))
 
-		vp, err = ParseSourceDateEpoch(strconv.Itoa(int(sourceDateEpoch.Unix())))
+		vp, err = ParseSourceDateEpoch(fmt.Sprintf("%d", sourceDateEpoch.Unix()))
 		require.NoError(t, err)
 		require.True(t, vp.Equal(sourceDateEpoch))
 
