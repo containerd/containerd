@@ -1,0 +1,47 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.6.21"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The twenty-second patch release for containerd 1.6 contains various fixes and updates.
+
+### Notable Updates
+
+* **RunC: Update runc binary to v1.1.8** ([#8842](https://github.com/containerd/containerd/pull/8842))
+* **CRI: Fix additionalGids: it should fallback to imageConfig.User when securityContext.RunAsUser,RunAsUsername are empty** ([#8823](https://github.com/containerd/containerd/pull/8823))
+* **CRI: Write generated CNI config atomically** ([#8826](https://github.com/containerd/containerd/pull/8826))
+* **Fix concurrent writes for `UpdateContainerStats`** ([#8819](https://github.com/containerd/containerd/pull/8819))
+* **Make checkContainerTimestamps less strict on Windows** ([#8827](https://github.com/containerd/containerd/pull/8827))
+* **Port-Forward: Correctly handle known errors** ([#8805](https://github.com/containerd/containerd/pull/8805))
+* **Resolve docker.NewResolver race condition** ([#8800](https://github.com/containerd/containerd/pull/8800))
+* **SecComp: Always allow `name_to_handle_at`** ([#8754](https://github.com/containerd/containerd/pull/8754))
+* **Adding support to run hcsshim from local clone** ([#8713](https://github.com/containerd/containerd/pull/8713))
+* **Pinned image support** ([#8720](https://github.com/containerd/containerd/pull/8720))
+* **Runtime/V2/RunC: Handle early exits w/o big locks** ([#8695](https://github.com/containerd/containerd/pull/8695))
+* **CRITool: Move up to CRI-TOOLS v1.27.0** ([#7997](https://github.com/containerd/containerd/pull/7997))
+* **Fix cpu architecture detection issue on emulated ARM platform** ([#8533](https://github.com/containerd/containerd/pull/8533))
+* **Task: Don't `close()` io before `cancel()`** ([#8659](https://github.com/containerd/containerd/pull/8659))
+* **Fix panic when remote differ returns empty result** ([#8640](https://github.com/containerd/containerd/pull/8640))
+* **Plugins: Notify readiness when registered plugins are ready** ([#8583](https://github.com/containerd/containerd/pull/8583))
+* **Unwrap io errors in server connection receive error handling** ([ttrpc#143](https://github.com/containerd/ttrpc/pull/143))
+
+See the changelog for complete list of changes"""
