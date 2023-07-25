@@ -221,13 +221,6 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 
 func TestContainerdSandboxImage(t *testing.T) {
 	var pauseImage = images.Get(images.Pause)
-	ctx := context.Background()
-
-	t.Log("make sure the pause image exist")
-	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
-	require.NoError(t, err)
-	t.Log("ensure correct labels are set on pause image")
-	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
 
 	t.Log("pause image should be seen by cri plugin")
 	pimg, err := imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})

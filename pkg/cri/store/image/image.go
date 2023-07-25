@@ -117,6 +117,17 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 	return s.update(ref, img)
 }
 
+// PinImage sets pinned image for a reference.
+func (s *Store) PinImage(ctx context.Context, ref string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	id, ok := s.refCache[ref]
+	if !ok {
+		return errdefs.ErrNotFound
+	}
+	return s.store.pin(id, ref)
+}
+
 // update updates the internal cache. img == nil means that
 // the image does not exist in containerd.
 func (s *Store) update(ref string, img *Image) error {

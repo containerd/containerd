@@ -28,7 +28,6 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/labels"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -485,45 +484,45 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 	}
 }
 
-func TestImageGetLabels(t *testing.T) {
+func TestImageIsSandboxImage(t *testing.T) {
 
 	criService := newTestCRIService()
 
 	tests := []struct {
 		name               string
-		expectedLabel      map[string]string
+		expected           bool
 		configSandboxImage string
 		pullImageName      string
 	}{
 		{
 			name:               "pinned image labels should get added on sandbox image",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			expected:           true,
 			configSandboxImage: "k8s.gcr.io/pause:3.9",
 			pullImageName:      "k8s.gcr.io/pause:3.9",
 		},
 		{
 			name:               "pinned image labels should get added on sandbox image without tag",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			expected:           true,
 			configSandboxImage: "k8s.gcr.io/pause",
 			pullImageName:      "k8s.gcr.io/pause:latest",
 		},
 		{
 			name:               "pinned image labels should get added on sandbox image specified with tag and digest both",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			expected:           true,
 			configSandboxImage: "k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 		},
 
 		{
 			name:               "pinned image labels should get added on sandbox image specified with digest",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			expected:           true,
 			configSandboxImage: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 		},
 
 		{
 			name:               "pinned image labels should not get added on other image",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue},
+			expected:           false,
 			configSandboxImage: "k8s.gcr.io/pause:3.9",
 			pullImageName:      "k8s.gcr.io/random:latest",
 		},
@@ -532,8 +531,8 @@ func TestImageGetLabels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			criService.config.SandboxImage = tt.configSandboxImage
-			labels := criService.getLabels(context.Background(), tt.pullImageName)
-			assert.Equal(t, tt.expectedLabel, labels)
+			isSandboxImage := criService.isSandboxImage(context.Background(), tt.pullImageName)
+			assert.Equal(t, tt.expected, isSandboxImage)
 
 		})
 	}

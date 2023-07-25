@@ -205,10 +205,15 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
-		// No need to use `updateImage`, because the image reference must
+		// No need to use `UpdateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		if err := c.imageStore.Update(ctx, r); err != nil {
 			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
+		}
+		if c.isSandboxImage(ctx, r) {
+			if err := c.imageStore.PinImage(ctx, r); err != nil {
+				return nil, fmt.Errorf("failed to pin image for %q: %w", r, err)
+			}
 		}
 	}
 
@@ -307,20 +312,18 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
-	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
+	return map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
+}
+
+func (c *CRIImageService) isSandboxImage(ctx context.Context, name string) bool {
 	configSandboxImage := c.config.SandboxImage
 	// parse sandbox image
 	sandboxNamedRef, err := distribution.ParseDockerRef(configSandboxImage)
 	if err != nil {
-		log.G(ctx).Errorf("failed to parse sandbox image from config %s", sandboxNamedRef)
-		return nil
+		log.G(ctx).Errorf("failed to parse sandbox image from config %s", configSandboxImage)
+		return false
 	}
-	sandboxRef := sandboxNamedRef.String()
-	// Adding pinned image label to sandbox image
-	if sandboxRef == name {
-		labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
-	}
-	return labels
+	return sandboxNamedRef.String() == name
 }
 
 // updateImage updates image store to reflect the newest state of an image reference
@@ -355,6 +358,11 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	// so that the image can be removed from the cache.
 	if err := c.imageStore.Update(ctx, r); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
+	}
+	if c.isSandboxImage(ctx, r) {
+		if err := c.imageStore.PinImage(ctx, r); err != nil {
+			return fmt.Errorf("pin image for %q: %w", r, err)
+		}
 	}
 	return nil
 }
