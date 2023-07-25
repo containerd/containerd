@@ -218,6 +218,7 @@ func (s *store) add(img Image) error {
 	}
 	// Or else, merge and sort the references.
 	i.References = sortReferences(util.MergeStringSlices(i.References, img.References))
+	i.Pinned = i.Pinned || img.Pinned
 	s.images[img.ID] = i
 	return nil
 }
