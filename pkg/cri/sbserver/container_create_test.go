@@ -220,6 +220,7 @@ func TestVolumeMounts(t *testing.T) {
 	testContainerRootDir := "test-container-root"
 	for desc, test := range map[string]struct {
 		criMounts         []*runtime.Mount
+		platform          platforms.Platform
 		imageVolumes      map[string]struct{}
 		expectedMountDest []string
 	}{
@@ -263,13 +264,28 @@ func TestVolumeMounts(t *testing.T) {
 				"/test-volume-2/",
 			},
 		},
+		"should make relative paths absolute on Linux": {
+			platform: platforms.Platform{OS: "linux"},
+			imageVolumes: map[string]struct{}{
+				"./test-volume-1":     {},
+				"C:/test-volume-2":    {},
+				"../../test-volume-3": {},
+				"/abs/test-volume-4":  {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/C:/test-volume-2",
+				"/test-volume-3",
+				"/abs/test-volume-4",
+			},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			config := &imagespec.ImageConfig{
 				Volumes: test.imageVolumes,
 			}
 			c := newTestCRIService()
-			got := c.volumeMounts(testContainerRootDir, test.criMounts, config)
+			got := c.volumeMounts(test.platform, testContainerRootDir, test.criMounts, config)
 			assert.Len(t, got, len(test.expectedMountDest))
 			for _, dest := range test.expectedMountDest {
 				found := false
