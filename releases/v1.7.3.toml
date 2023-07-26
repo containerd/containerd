@@ -1,0 +1,42 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.2"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The third patch release for containerd 1.7 contains various fixes and updates.
+
+### Notable Updates
+
+* **RunC: Update runc binary to v1.1.8** ([#8843](https://github.com/containerd/containerd/pull/8843))
+* **CRI: Fix additionalGids: it should fallback to imageConfig.User when securityContext.RunAsUser,RunAsUsername are empty** ([#8824](https://github.com/containerd/containerd/pull/8824))
+* **CRI: write generated CNI config atomically** ([#8825](https://github.com/containerd/containerd/pull/8825))
+* **Port-Forward: Correctly handle known errors** ([#8806](https://github.com/containerd/containerd/pull/8806))
+* **Resolve docker.NewResolver race condition** ([#8799](https://github.com/containerd/containerd/pull/8799))
+* **Fix net.ipv4.ping_group_range with userns** ([#8786](https://github.com/containerd/containerd/pull/8786))
+* **Runtime/V2/RunC: handle early exits w/o big locks** ([#8712](https://github.com/containerd/containerd/pull/8712))
+* **SecComp: always allow name_to_handle_at** ([#8753](https://github.com/containerd/containerd/pull/8753))
+* **CRI: Windows Pod Stats: Add a check to skip stats for containers that are not running** ([#8654](https://github.com/containerd/containerd/pull/8654))
+* **Task: don't `close()` io before `cancel()`** ([#8658](https://github.com/containerd/containerd/pull/8658))
+* **Remove CNI conf_template deprecation** ([#8638](https://github.com/containerd/containerd/pull/8638))
+* **Fix issue for HPC pod metrics** ([#8634](https://github.com/containerd/containerd/pull/8634))
+
+See the changelog for complete list of changes"""
