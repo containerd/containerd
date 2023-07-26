@@ -73,7 +73,7 @@ func ParseSourceDateEpoch(sourceDateEpoch string) (*time.Time, error) {
 
 // SetSourceDateEpoch sets the SOURCE_DATE_EPOCH env var.
 func SetSourceDateEpoch(tm time.Time) {
-	_ = os.Setenv(SourceDateEpochEnv, strconv.Itoa(int(tm.Unix())))
+	_ = os.Setenv(SourceDateEpochEnv, fmt.Sprintf("%d", tm.Unix()))
 }
 
 // UnsetSourceDateEpoch unsets the SOURCE_DATE_EPOCH env var.
