@@ -222,10 +222,11 @@ func appendMemoryPodStats(podRuntimeStats *runtime.WindowsContainerStats, contai
 	// HostProcess pods are an example where there is no actual pod sandbox running and therefor no stats
 	if podRuntimeStats.Memory == nil {
 		podRuntimeStats.Memory = &runtime.WindowsMemoryUsage{
-			Timestamp:       timestamp.UnixNano(),
-			WorkingSetBytes: &runtime.UInt64Value{Value: 0},
-			AvailableBytes:  &runtime.UInt64Value{Value: 0},
-			PageFaults:      &runtime.UInt64Value{Value: 0},
+			Timestamp:         timestamp.UnixNano(),
+			WorkingSetBytes:   &runtime.UInt64Value{Value: 0},
+			AvailableBytes:    &runtime.UInt64Value{Value: 0},
+			PageFaults:        &runtime.UInt64Value{Value: 0},
+			CommitMemoryBytes: &runtime.UInt64Value{Value: 0},
 		}
 	}
 
@@ -293,6 +294,9 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 				Timestamp: (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
+				},
+				CommitMemoryBytes: &runtime.UInt64Value{
+					Value: wstats.Memory.MemoryUsageCommitBytes,
 				},
 			}
 		}
