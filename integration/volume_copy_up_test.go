@@ -93,7 +93,7 @@ func TestVolumeCopyUp(t *testing.T) {
 			},
 		},
 		{
-			containerPath: "C:/weird_test_dir",
+			containerPath: "/C:/weird_test_dir",
 			files: []volumeFile{
 				{
 					fileName: "weird_test_file",
