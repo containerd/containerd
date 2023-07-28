@@ -35,17 +35,12 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/reference/docker"
-	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/pelletier/go-toml"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -87,9 +82,6 @@ const (
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
-
-	// runtimeRunhcsV1 is the runtime type for runhcs.
-	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -329,44 +321,6 @@ func parseImageReferences(refs []string) ([]string, []string) {
 		}
 	}
 	return tags, digests
-}
-
-// generateRuntimeOptions generates runtime options from cri plugin config.
-func generateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
-	if r.Options == nil {
-		return nil, nil
-	}
-	optionsTree, err := toml.TreeFromMap(r.Options)
-	if err != nil {
-		return nil, err
-	}
-	options := getRuntimeOptionsType(r.Type)
-	if err := optionsTree.Unmarshal(options); err != nil {
-		return nil, err
-	}
-
-	// For generic configuration, if no config path specified (preserving old behavior), pass
-	// the whole TOML configuration section to the runtime.
-	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
-		runtimeOpts.ConfigBody, err = optionsTree.Marshal()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %v", r.Type, err)
-		}
-	}
-
-	return options, nil
-}
-
-// getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
-	switch t {
-	case plugin.RuntimeRuncV2:
-		return &runcoptions.Options{}
-	case runtimeRunhcsV1:
-		return &runhcsoptions.Options{}
-	default:
-		return &runtimeoptions.Options{}
-	}
 }
 
 // getRuntimeOptions get runtime options from container metadata.
