@@ -23,16 +23,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	// G is an alias for GetLogger.
-	//
-	// We may want to define this locally to a package to get package tagged log
-	// messages.
-	G = GetLogger
-
-	// L is an alias for the standard logger.
-	L = logrus.NewEntry(logrus.StandardLogger())
-)
+// L is an alias for the standard logger.
+var L = logrus.NewEntry(logrus.StandardLogger())
 
 type loggerKey struct{}
 
@@ -141,11 +133,13 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 // GetLogger retrieves the current logger from the context. If no logger is
 // available, the default logger is returned.
 func GetLogger(ctx context.Context) *logrus.Entry {
-	logger := ctx.Value(loggerKey{})
+	return G(ctx)
+}
 
-	if logger == nil {
-		return L.WithContext(ctx)
+// G is a shorthand for [GetLogger].
+func G(ctx context.Context) *logrus.Entry {
+	if logger := ctx.Value(loggerKey{}); logger != nil {
+		return logger.(*logrus.Entry)
 	}
-
-	return logger.(*logrus.Entry)
+	return L.WithContext(ctx)
 }
