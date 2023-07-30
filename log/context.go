@@ -60,6 +60,21 @@ const (
 	// InfoLevel level. General operational entries about what's going on
 	// inside the application.
 	InfoLevel Level = logrus.InfoLevel
+
+	// WarnLevel level. Non-critical entries that deserve eyes.
+	WarnLevel Level = logrus.WarnLevel
+
+	// ErrorLevel level. Logs errors that should definitely be noted.
+	// Commonly used for hooks to send errors to an error tracking service.
+	ErrorLevel Level = logrus.ErrorLevel
+
+	// FatalLevel level. Logs and then calls "logger.Exit(1)". It exits
+	// even if the logging level is set to Panic.
+	FatalLevel Level = logrus.FatalLevel
+
+	// PanicLevel level. This is the highest level of severity. Logs and
+	// then calls panic with the message passed to Debug, Info, ...
+	PanicLevel Level = logrus.PanicLevel
 )
 
 // SetLevel sets log level globally. It returns an error if the given
@@ -70,6 +85,10 @@ const (
 //   - "trace" ([TraceLevel])
 //   - "debug" ([DebugLevel])
 //   - "info" ([InfoLevel])
+//   - "warn" ([WarnLevel])
+//   - "error" ([ErrorLevel])
+//   - "fatal" ([FatalLevel])
+//   - "panic" ([PanicLevel])
 func SetLevel(level string) error {
 	lvl, err := logrus.ParseLevel(level)
 	if err != nil {
