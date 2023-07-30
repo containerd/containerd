@@ -31,6 +31,14 @@ type loggerKey struct{}
 // Fields type to pass to "WithFields".
 type Fields = logrus.Fields
 
+// Entry is a logging entry. It contains all the fields passed with
+// [Entry.WithFields]. It's finally logged when Trace, Debug, Info, Warn,
+// Error, Fatal or Panic is called on it. These objects can be reused and
+// passed around as much as you wish to avoid field duplication.
+//
+// Entry is a transitional type, and currently an alias for [logrus.Entry].
+type Entry = logrus.Entry
+
 // RFC3339NanoFixed is [time.RFC3339Nano] with nanoseconds padded using
 // zeros to ensure the formatted time is always the same number of
 // characters.
@@ -129,20 +137,20 @@ func SetFormat(format OutputFormat) error {
 
 // WithLogger returns a new context with the provided logger. Use in
 // combination with logger.WithField(s) for great effect.
-func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
+func WithLogger(ctx context.Context, logger *Entry) context.Context {
 	return context.WithValue(ctx, loggerKey{}, logger.WithContext(ctx))
 }
 
 // GetLogger retrieves the current logger from the context. If no logger is
 // available, the default logger is returned.
-func GetLogger(ctx context.Context) *logrus.Entry {
+func GetLogger(ctx context.Context) *Entry {
 	return G(ctx)
 }
 
 // G is a shorthand for [GetLogger].
-func G(ctx context.Context) *logrus.Entry {
+func G(ctx context.Context) *Entry {
 	if logger := ctx.Value(loggerKey{}); logger != nil {
-		return logger.(*logrus.Entry)
+		return logger.(*Entry)
 	}
 	return L.WithContext(ctx)
 }
