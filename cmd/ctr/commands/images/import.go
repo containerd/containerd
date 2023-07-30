@@ -267,7 +267,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 			for _, img := range imgs {
 				if platformMatcher == nil { // if platform not specified use default.
-					platformMatcher = platforms.Default()
+					platformMatcher = platforms.DefaultStrict()
 				}
 				image := containerd.NewImageWithPlatform(client, img, platformMatcher)
 
