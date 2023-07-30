@@ -14,6 +14,27 @@
    limitations under the License.
 */
 
+// Package log provides types and functions related to logging, passing
+// loggers through a context, and attaching context to the logger.
+//
+// # Transitional types
+//
+// This package contains various types that are aliases for types in [logrus].
+// These aliases are intended for transitioning away from hard-coding logrus
+// as logging implementation. Consumers of this package are encouraged to use
+// the type-aliases from this package instead of directly using their logrus
+// equivalent.
+//
+// The intent is to replace these aliases with locally defined types and
+// interfaces once all consumers are no longer directly importing logrus
+// types.
+//
+// IMPORTANT: due to the transitional purpose of this package, it is not
+// guaranteed for the full logrus API to be provided in the future. As
+// outlined, these aliases are provided as a step to transition away from
+// a specific implementation which, as a result, exposes the full logrus API.
+// While no decisions have been made on the ultimate design and interface
+// provided by this package, we do not expect carrying "less common" features.
 package log
 
 import (
