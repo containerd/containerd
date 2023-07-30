@@ -29,7 +29,7 @@ var L = logrus.NewEntry(logrus.StandardLogger())
 type loggerKey struct{}
 
 // Fields type to pass to "WithFields".
-type Fields = logrus.Fields
+type Fields = map[string]any
 
 // Entry is a logging entry. It contains all the fields passed with
 // [Entry.WithFields]. It's finally logged when Trace, Debug, Info, Warn,
