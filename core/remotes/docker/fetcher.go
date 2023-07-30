@@ -256,6 +256,9 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		Digest:    dgst,
 		Size:      sz,
 	}
+	if config.Mediatype != "" {
+		desc.MediaType = config.Mediatype
+	}
 	return seeker, desc, nil
 }
 
