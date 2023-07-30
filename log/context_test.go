@@ -20,6 +20,8 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestLoggerContext(t *testing.T) {
@@ -33,5 +35,29 @@ func TestLoggerContext(t *testing.T) {
 	b := GetLogger(ctx)
 	if !reflect.DeepEqual(a, b) || a != b {
 		t.Errorf("should be the same: %+v, %+v", a, b)
+	}
+}
+
+func TestCompat(t *testing.T) {
+	expected := Fields{
+		"hello1": "world1",
+		"hello2": "world2",
+		"hello3": "world3",
+	}
+
+	l := G(context.TODO())
+	l = l.WithFields(logrus.Fields{"hello1": "world1"})
+	l = l.WithFields(Fields{"hello2": "world2"})
+	l = l.WithFields(map[string]any{"hello3": "world3"})
+	if !reflect.DeepEqual(Fields(l.Data), expected) {
+		t.Errorf("expected: (%[1]T) %+[1]v, got: (%[2]T) %+[2]v", expected, l.Data)
+	}
+
+	l2 := L
+	l2 = l2.WithFields(logrus.Fields{"hello1": "world1"})
+	l2 = l2.WithFields(Fields{"hello2": "world2"})
+	l2 = l2.WithFields(map[string]any{"hello3": "world3"})
+	if !reflect.DeepEqual(Fields(l2.Data), expected) {
+		t.Errorf("expected: (%[1]T) %+[1]v, got: (%[2]T) %+[2]v", expected, l2.Data)
 	}
 }
