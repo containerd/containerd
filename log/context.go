@@ -45,7 +45,11 @@ import (
 )
 
 // L is an alias for the standard logger.
-var L = logrus.NewEntry(logrus.StandardLogger())
+var L = &Entry{
+	Logger: logrus.StandardLogger(),
+	// Default is three fields plus a little extra room.
+	Data: make(Fields, 6),
+}
 
 type loggerKey struct{}
 
@@ -116,13 +120,13 @@ func SetLevel(level string) error {
 		return err
 	}
 
-	logrus.SetLevel(lvl)
+	L.Logger.SetLevel(lvl)
 	return nil
 }
 
 // GetLevel returns the current log level.
 func GetLevel() Level {
-	return logrus.GetLevel()
+	return L.Logger.GetLevel()
 }
 
 // OutputFormat specifies a log output format.
@@ -141,13 +145,13 @@ const (
 func SetFormat(format OutputFormat) error {
 	switch format {
 	case TextFormat:
-		logrus.SetFormatter(&logrus.TextFormatter{
+		L.Logger.SetFormatter(&logrus.TextFormatter{
 			TimestampFormat: RFC3339NanoFixed,
 			FullTimestamp:   true,
 		})
 		return nil
 	case JSONFormat:
-		logrus.SetFormatter(&logrus.JSONFormatter{
+		L.Logger.SetFormatter(&logrus.JSONFormatter{
 			TimestampFormat: RFC3339NanoFixed,
 		})
 		return nil
