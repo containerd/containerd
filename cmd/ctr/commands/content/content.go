@@ -491,10 +491,11 @@ var (
 				if err != nil {
 					return err
 				}
-				rc, _, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(context.String("media-type")))
+				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(context.String("media-type")))
 				if err != nil {
 					return err
 				}
+				log.G(ctx).Debugf("desc=%+v", desc)
 				_, err = io.Copy(os.Stdout, rc)
 				rc.Close()
 				if err != nil {
