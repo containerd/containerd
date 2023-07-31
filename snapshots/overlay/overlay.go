@@ -44,6 +44,7 @@ const upperdirKey = "containerd.io/snapshot/overlay.upperdir"
 type SnapshotterConfig struct {
 	asyncRemove   bool
 	upperdirLabel bool
+	ms            MetaStore
 	mountOptions  []string
 }
 
@@ -77,9 +78,24 @@ func WithMountOptions(options []string) Opt {
 	}
 }
 
+type MetaStore interface {
+	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
+	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
+	Close() error
+}
+
+// WithMetaStore allows the MetaStore to be created outside the snapshotter
+// and passed in.
+func WithMetaStore(ms MetaStore) Opt {
+	return func(config *SnapshotterConfig) error {
+		config.ms = ms
+		return nil
+	}
+}
+
 type snapshotter struct {
 	root          string
-	ms            *storage.MetaStore
+	ms            MetaStore
 	asyncRemove   bool
 	upperdirLabel bool
 	options       []string
@@ -106,9 +122,11 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	if !supportsDType {
 		return nil, fmt.Errorf("%s does not support d_type. If the backing filesystem is xfs, please reformat with ftype=1 to enable d_type support", root)
 	}
-	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
-	if err != nil {
-		return nil, err
+	if config.ms == nil {
+		config.ms, err = storage.NewMetaStore(filepath.Join(root, "metadata.db"))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := os.Mkdir(filepath.Join(root, "snapshots"), 0700); err != nil && !os.IsExist(err) {
@@ -132,7 +150,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 
 	return &snapshotter{
 		root:          root,
-		ms:            ms,
+		ms:            config.ms,
 		asyncRemove:   config.asyncRemove,
 		upperdirLabel: config.upperdirLabel,
 		options:       config.mountOptions,
