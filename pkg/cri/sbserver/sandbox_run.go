@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"math"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -144,8 +143,17 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
+	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
+	}
+	platform, err := controller.Platform(ctx, sandbox.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
+	}
+
 	userNsEnabled := false
-	if goruntime.GOOS != "windows" {
+	if platform.OS == "linux" {
 		usernsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
 		if usernsOpts != nil && usernsOpts.GetMode() == runtime.NamespaceMode_POD {
 			userNsEnabled = true
@@ -231,11 +239,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-	}
-
-	controller, err := c.getSandboxController(config, r.GetRuntimeHandler())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
 	// Save sandbox metadata to store
