@@ -102,6 +102,9 @@
 // unless it is explicitly provided. This is treated as equivalent to armhf. A
 // previous architecture, armel, will be normalized to arm/v6.
 //
+// Similarly, the most common arm64 version v8, and most common amd64 version v1
+// are represented without the variant.
+//
 // While these normalizations are provided, their support on arm platforms has
 // not yet been fully implemented and tested.
 package platforms
