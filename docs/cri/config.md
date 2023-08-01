@@ -32,6 +32,22 @@ cgroupDriver: "systemd"
 
 kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/).
 
+> Note: Kubernetes v1.28 supports automatic detection of the cgroup driver as
+> an alpha feature. With the `KubeletCgroupDriverFromCRI` kubelet feature gate
+> enabled, the kubelet automatically detects the cgroup driver from the CRI
+> runtime and the `KubeletConfiguration` configuration step above is not
+> needed.
+>
+> When determining the cgroup driver, containerd uses the `SystemdCgroup`
+> setting from runc-based runtime classes, starting from the default runtime
+> class. If no runc-based runtime classes have been configured containerd
+> relies on auto-detection based on determining if systemd is running.
+> Note that all runc-based runtime classes should be configured to have the
+> same `SystemdCgroup` setting in order to avoid unexpected behavior.
+>
+> The automatic cgroup driver configuration for kubelet feature is supported in
+> containerd v2.0 and later.
+
 ### Snapshotter
 
 The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
