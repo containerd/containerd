@@ -149,7 +149,7 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 
 			var typ uint16
 			switch hdr.Typeflag {
-			case tar.TypeReg, tar.TypeRegA:
+			case tar.TypeReg:
 				typ = compactext4.S_IFREG
 			case tar.TypeSymlink:
 				typ = compactext4.S_IFLNK
