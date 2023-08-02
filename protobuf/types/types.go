@@ -18,9 +18,9 @@
 package types
 
 import (
-	"google.golang.org/genproto/protobuf/field_mask"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
+	field_mask "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 type Empty = emptypb.Empty
