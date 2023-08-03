@@ -63,6 +63,7 @@ const (
 
 var (
 	runtimeService     cri.RuntimeService
+	runtimeService2    cri.RuntimeService // to test GetContainerEvents broadcast
 	imageService       cri.ImageManagerService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
@@ -87,6 +88,10 @@ func ConnectDaemons() error {
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}
+	runtimeService2, err = remote.NewRuntimeService(*criEndpoint, timeout)
+	if err != nil {
+		return fmt.Errorf("failed to create runtime service: %w", err)
+	}
 	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create image service: %w", err)
@@ -95,6 +100,10 @@ func ConnectDaemons() error {
 	// need to check whether it is actually connected.
 	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	_, err = runtimeService2.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
