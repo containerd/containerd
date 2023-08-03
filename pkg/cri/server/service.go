@@ -130,6 +130,8 @@ type criService struct {
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
+	// containerEventsClients keeps a map of connected stream clients
+	containerEventsClients sync.Map
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -279,6 +281,10 @@ func (c *criService) Run(ready func()) error {
 			close(cniNetConfMonitorErrCh)
 		}()
 	}
+
+	// Start events broadcaster.
+	log.L.Info("Start events broadcaster")
+	go c.broadcastEvents()
 
 	// Start streaming server.
 	log.L.Info("Start streaming server")

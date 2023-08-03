@@ -21,13 +21,40 @@ import (
 )
 
 func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
-	// TODO (https://github.com/containerd/containerd/issues/7318):
-	// replace with a real implementation that broadcasts containerEventsChan
-	// to all subscribers.
-	for event := range c.containerEventsChan {
-		if err := s.Send(&event); err != nil {
-			return err
-		}
+	errCh := make(chan error, 1)
+
+	c.containerEventsClients.Store(s, errCh)
+
+	err := <-errCh
+
+	c.containerEventsClients.Delete(s)
+
+	return err
+}
+
+func (c *criService) broadcastEvents() {
+	for containerEvent := range c.containerEventsChan {
+		c.containerEventsClients.Range(func(key, value any) bool {
+			stream, ok := key.(runtime.RuntimeService_GetContainerEventsServer)
+			if !ok {
+				return true
+			}
+
+			errCh, ok := value.(chan error)
+			if !ok {
+				return true
+			}
+
+			select {
+			case <-stream.Context().Done():
+				errCh <- stream.Context().Err()
+			default:
+				if err := stream.Send(&containerEvent); err != nil {
+					errCh <- err
+				}
+			}
+
+			return true
+		})
 	}
-	return nil
 }
