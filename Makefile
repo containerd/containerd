@@ -25,6 +25,7 @@ ROOTDIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # The convention of `DESTDIR` was changed in containerd v1.6.
 PREFIX        ?= /usr/local
 DATADIR       ?= $(PREFIX)/share
+DOCDIR        ?= $(DATADIR)/doc
 MANDIR        ?= $(DATADIR)/man
 
 TEST_IMAGE_LIST ?=
@@ -149,7 +150,7 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -291,6 +292,10 @@ install-man: man
 	@echo "$(WHALE) $@"
 	$(foreach manpage,$(addprefix man/,$(MANPAGES)), $(call installmanpage,$(manpage),$(subst .,,$(suffix $(manpage))),$(notdir $(manpage))))
 
+install-doc:
+	@echo "$(WHALE) $@"
+	@mkdir -p $(DESTDIR)/$(DOCDIR)/containerd
+	@cp -R docs/* $(DESTDIR)/$(DOCDIR)/containerd
 
 define pack_release
 	@rm -rf releases/$(1) releases/$(1).tar.gz
