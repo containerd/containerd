@@ -115,7 +115,6 @@ on github, compiling it and starting it up.
 ```bash
 git clone https://github.com/containerd/nri
 cd nri
-git checkout pr/proto/draft
 make
 ./build/bin/logger -idx 00
 ```
