@@ -518,6 +518,75 @@ jobs:
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
 
+  integration-vagrant:
+    name: Vagrant integration
+    # "Larger" runner is needed for nested virtualization
+    # https://github.com/organizations/containerd/settings/actions/runners
+    runs-on: ubuntu-latest-4-cores
+    timeout-minutes: 60
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        box:
+          - fedora/37-cloud-base
+          # v7.0.0 does not boot. v6.0.0 was not released.
+          - rockylinux/8@5.0.0
+    env:
+      BOX: ${{ matrix.box }}
+
+    steps:
+      - name: Show the host info
+        run: |
+          set -x
+          uname -a
+          cat /etc/os-release
+          cat /proc/cpuinfo
+          free -mt
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: /root/.vagrant.d
+          key: vagrant-${{ matrix.box }}
+      - name: Set up vagrant
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
+          sudo systemctl enable --now libvirtd
+      - name: Boot VM
+        run: sudo BOX=$BOX vagrant up --no-tty
+      - name: test-integration
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+      - name: test-cri-integration
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+      - name: test-cri
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+
+  tests-cri-in-userns:
+    name: "CRI-in-UserNS"
+
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    needs: [project, linters, protos, man]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up cgroup v2 delegation
+        run: |
+          sudo mkdir -p /etc/systemd/system/user@.service.d
+          cat <<EOF | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
+          [Service]
+          Delegate=cpu cpuset io memory pids
+          EOF
+          sudo systemctl daemon-reload
+      - name: Build cri-in-userns image
+        run: podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+      - name: Run cri-in-userns image
+        # Rootless Podman is used for testing CRI-in-UserNS
+        # (We could use rootless Docker or rootless nerdctl, but we are using Podman here because it is preinstalled)
+        run: podman run --rm --privileged cri-in-userns
+
   tests-mac-os:
     name: MacOS unit tests
     runs-on: macos-12
