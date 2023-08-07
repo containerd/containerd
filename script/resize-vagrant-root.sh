@@ -34,6 +34,8 @@ if [[ "$df_line" =~ ^/dev/([a-z]+)([0-9+]) ]]; then
         echo "Unknown filesystem: $df_line"
         exit 1
     fi
+elif [[ "$df_line" =~ ^/dev/mapper/ ]]; then
+    echo "TODO: support device mapper: $df_line"
 else
     echo "Failed to parse: $df_line"
     exit 1
