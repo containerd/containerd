@@ -50,6 +50,7 @@ RUN ./install-runc
 FROM golang AS build-env
 RUN apt-get update && apt-get install -y --no-install-recommends \
     btrfs-progs \
+    go-md2man \
     libseccomp-dev \
     xfsprogs \
     && rm -rf /var/lib/apt/lists/*

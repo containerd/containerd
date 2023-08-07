@@ -81,6 +81,7 @@ Vagrant.configure("2") do |config|
             lsof \
             make \
             strace \
+            go-md2man \
             ${INSTALL_PACKAGES}
     SHELL
   end

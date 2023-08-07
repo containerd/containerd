@@ -575,7 +575,7 @@ jobs:
           sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant
           sudo systemctl enable --now libvirtd
           sudo apt-get build-dep -y vagrant ruby-libvirt
-          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev go-md2man
           sudo vagrant plugin install vagrant-libvirt
       - name: Boot VM
         run: sudo BOX=$BOX vagrant up --no-tty

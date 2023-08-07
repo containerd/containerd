@@ -412,7 +412,7 @@ clean-test: ## clean up debris from previously failed tests
 	@rm -rf bin/cni-bridge-fp
 	@rm -rf bin/containerd-shim-runc-fp-v1
 
-install: ## install binaries
+install: install-man ## install binaries
 	@echo "$(WHALE) $@ $(BINARIES)"
 	@$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	@$(INSTALL) $(BINARIES) $(DESTDIR)$(BINDIR)
