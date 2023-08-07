@@ -530,7 +530,7 @@ jobs:
       fail-fast: false
       matrix:
         box:
-          - fedora/37-cloud-base
+          - fedora/38-cloud-base
           # v7.0.0 does not boot. v6.0.0 was not released.
           - rockylinux/8@5.0.0
     env:
@@ -551,9 +551,17 @@ jobs:
           key: vagrant-${{ matrix.box }}
       - name: Set up vagrant
         run: |
+          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
+          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
           sudo apt-get update
-          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant vagrant-libvirt
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant
           sudo systemctl enable --now libvirtd
+          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo vagrant plugin install vagrant-libvirt
       - name: Boot VM
         run: sudo BOX=$BOX vagrant up --no-tty
       - name: test-integration
