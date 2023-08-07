@@ -124,7 +124,7 @@ ifdef SKIPTESTS
 endif
 
 #Replaces ":" (*nix), ";" (windows) with newline for easy parsing
-GOPATHS=$(shell go env GOPATH | tr ":" "\n" | tr ";" "\n")
+GOPATHS=$(shell $(GO) env GOPATH | tr ":" "\n" | tr ";" "\n")
 
 TESTFLAGS_RACE=
 GO_BUILD_FLAGS=
