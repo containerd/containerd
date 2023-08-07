@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/containerd/typeurl/v2"
@@ -148,10 +149,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
+	platform, err := controller.Platform(ctx, sandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
+	}
+
 	var volumeMounts []*runtime.Mount
 	if !c.config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
-		volumeMounts = c.volumeMounts(containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+		volumeMounts = c.volumeMounts(platform, containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
 	} else if len(image.ImageSpec.Config.Volumes) != 0 {
 		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
 	}
@@ -161,11 +167,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
-
-	platform, err := controller.Platform(ctx, sandboxID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
-	}
 
 	spec, err := c.buildContainerSpec(
 		platform,
@@ -337,7 +338,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
 	if len(config.Volumes) == 0 {
 		return nil
 	}
@@ -352,6 +353,16 @@ func (c *criService) volumeMounts(containerRootDir string, criMounts []*runtime.
 		}
 		volumeID := util.GenerateID()
 		src := filepath.Join(containerRootDir, "volumes", volumeID)
+		// When the platform OS is Linux, ensure dst is a _Linux_ abs path.
+		// We can't use filepath.IsAbs() because, when executing on Windows, it checks for
+		// Windows abs paths.
+		if platform.OS == "linux" && !strings.HasPrefix(dst, "/") {
+			// On Windows, ToSlash() is needed to ensure the path is a valid Linux path.
+			// On Linux, ToSlash() is a no-op.
+			oldDst := dst
+			dst = filepath.ToSlash(filepath.Join("/", dst))
+			log.L.Debugf("Volume destination %q is not absolute, converted to %q", oldDst, dst)
+		}
 		// addOCIBindMounts will create these volumes.
 		mounts = append(mounts, &runtime.Mount{
 			ContainerPath:  dst,
