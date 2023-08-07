@@ -530,7 +530,7 @@ jobs:
       fail-fast: false
       matrix:
         box:
-          - fedora/37-cloud-base
+          - fedora/38-cloud-base
           # v7.0.0 does not boot. v6.0.0 was not released.
           - rockylinux/8@5.0.0
     env:
