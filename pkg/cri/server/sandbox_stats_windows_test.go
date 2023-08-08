@@ -24,6 +24,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -384,7 +385,7 @@ func sandboxPod(id string, timestamp time.Time, cachedCPU uint64) sandboxstore.S
 func windowsStat(timestamp time.Time, cpu uint64, memory uint64) *wstats.Statistics_Windows {
 	return &wstats.Statistics_Windows{
 		Windows: &wstats.WindowsContainerStatistics{
-			Timestamp: timestamp,
+			Timestamp: protobuf.ToTimestamp(timestamp),
 			Processor: &wstats.WindowsContainerProcessorStatistics{
 				TotalRuntimeNS: cpu,
 			},
