@@ -129,7 +129,7 @@ endif
 GOPATHS=$(shell $(GO) env GOPATH | tr ":" "\n" | tr ";" "\n")
 
 TESTFLAGS_RACE=
-GO_BUILD_FLAGS=
+GO_BUILD_FLAGS ?=
 # See Golang issue re: '-trimpath': https://github.com/golang/go/issues/13809
 GO_GCFLAGS=$(shell				\
 	set -- ${GOPATHS};			\
