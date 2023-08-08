@@ -2,9 +2,8 @@ syntax = "proto3";
 
 package containerd.runhcs.stats.v1;
 
-import weak "gogoproto/gogo.proto";
 import "google/protobuf/timestamp.proto";
-import "github.com/containerd/cgroups/stats/v1/metrics.proto";
+import "github.com/containerd/cgroups/v3/cgroup1/stats/metrics.proto";
 
 option go_package = "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats;stats";
 
@@ -13,22 +12,22 @@ message Statistics {
 		WindowsContainerStatistics windows = 1;
 		io.containerd.cgroups.v1.Metrics linux = 2;
 	}
-	VirtualMachineStatistics vm = 3 [(gogoproto.customname) = "VM"];
+	VirtualMachineStatistics vm = 3;
 }
 
 message WindowsContainerStatistics {
-	google.protobuf.Timestamp timestamp = 1 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	google.protobuf.Timestamp container_start_time = 2 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
-	uint64 uptime_ns = 3 [(gogoproto.customname) = "UptimeNS"];
+	google.protobuf.Timestamp timestamp = 1;
+	google.protobuf.Timestamp container_start_time = 2;
+	uint64 uptime_ns = 3;
 	WindowsContainerProcessorStatistics processor = 4;
 	WindowsContainerMemoryStatistics memory = 5;
 	WindowsContainerStorageStatistics storage = 6;
 }
 
 message WindowsContainerProcessorStatistics {
-	uint64 total_runtime_ns = 1 [(gogoproto.customname) = "TotalRuntimeNS"];
-	uint64 runtime_user_ns = 2 [(gogoproto.customname) = "RuntimeUserNS"];
-	uint64 runtime_kernel_ns = 3 [(gogoproto.customname) = "RuntimeKernelNS"];
+	uint64 total_runtime_ns = 1;
+	uint64 runtime_user_ns = 2;
+	uint64 runtime_kernel_ns = 3;
 }
 
 message WindowsContainerMemoryStatistics {
@@ -50,7 +49,7 @@ message VirtualMachineStatistics {
 }
 
 message VirtualMachineProcessorStatistics {
-	uint64 total_runtime_ns = 1 [(gogoproto.customname) = "TotalRuntimeNS"];
+	uint64 total_runtime_ns = 1;
 }
 
 message VirtualMachineMemoryStatistics {
