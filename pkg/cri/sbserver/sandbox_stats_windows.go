@@ -31,6 +31,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -282,14 +283,14 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.WindowsCpuUsage{
-				Timestamp:            wstats.Timestamp.UnixNano(),
+				Timestamp:            (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: wstats.Processor.TotalRuntimeNS},
 			}
 		}
 
 		if wstats.Memory != nil {
 			cs.Memory = &runtime.WindowsMemoryUsage{
-				Timestamp: wstats.Timestamp.UnixNano(),
+				Timestamp: (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
 				},
