@@ -464,7 +464,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 				return errors.New("no arguments specified")
 			}
 
-			if config.ArgsEscaped && (len(config.Entrypoint) > 0 || cmdFromImage) {
+			if config.ArgsEscaped && (len(config.Entrypoint) > 0 || cmdFromImage) { //nolint:staticcheck
 				s.Process.Args = nil
 				s.Process.CommandLine = cmd[0]
 				if len(cmd) > 1 {
