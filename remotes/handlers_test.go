@@ -86,9 +86,9 @@ func TestSkipNonDistributableBlobs(t *testing.T) {
 			{MediaType: images.MediaTypeDockerSchema2Layer, Digest: "test:1"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeign, Digest: "test:2"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeignGzip, Digest: "test:3"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},     //nolint:staticcheck
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"}, //nolint:staticcheck
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"}, //nolint:staticcheck
 		}, nil
 	}))(ctx, ocispec.Descriptor{MediaType: images.MediaTypeDockerSchema2Manifest})
 	if err != nil {
@@ -145,9 +145,9 @@ func TestSkipNonDistributableBlobs(t *testing.T) {
 			{MediaType: images.MediaTypeDockerSchema2Layer, Digest: "test:1"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeign, Digest: "test:2"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeignGzip, Digest: "test:3"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},     //nolint:staticcheck
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"}, //nolint:staticcheck
+			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"}, //nolint:staticcheck
 		},
 	}
 
