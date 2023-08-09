@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1 // replaced; see replace rules for actual version used.
-	github.com/Microsoft/hcsshim v0.10.0-rc.9
+	github.com/Microsoft/hcsshim v0.10.0
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
@@ -27,7 +27,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/container-orchestrated-devices/container-device-interface v0.6.0 // indirect
-	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -40,7 +39,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.0 // indirect
