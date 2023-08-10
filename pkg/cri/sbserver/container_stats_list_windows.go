@@ -22,6 +22,7 @@ import (
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -34,7 +35,7 @@ func (c *criService) containerMetrics(
 ) (*runtime.ContainerStats, error) {
 	var cs runtime.ContainerStats
 	var usedBytes, inodesUsed uint64
-	sn, err := c.GetSnapshot(meta.ID)
+	sn, err := c.snapshotStore.Get(meta.ID)
 	// If snapshotstore doesn't have cached snapshot information
 	// set WritableLayer usage to zero
 	if err == nil {
@@ -67,13 +68,13 @@ func (c *criService) containerMetrics(
 		}
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.CpuUsage{
-				Timestamp:            wstats.Timestamp.UnixNano(),
+				Timestamp:            (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				UsageCoreNanoSeconds: &runtime.UInt64Value{Value: wstats.Processor.TotalRuntimeNS},
 			}
 		}
 		if wstats.Memory != nil {
 			cs.Memory = &runtime.MemoryUsage{
-				Timestamp: wstats.Timestamp.UnixNano(),
+				Timestamp: (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
 				},
