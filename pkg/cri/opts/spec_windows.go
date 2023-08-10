@@ -335,3 +335,10 @@ func getArgs(imgEntrypoint []string, imgCmd []string, ctrEntrypoint []string, ct
 	}
 	return append(entrypoint, cmd...), firstArgFromImg, nil
 }
+
+// WithCDI does nothing on Windows.
+func WithCDI(_ map[string]string) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, container *containers.Container, spec *oci.Spec) error {
+		return nil
+	}
+}
