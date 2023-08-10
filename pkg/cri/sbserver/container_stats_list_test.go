@@ -17,13 +17,17 @@
 package sbserver
 
 import (
+	"context"
 	"math"
+	"reflect"
 	"testing"
 	"time"
 
 	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
+	"github.com/containerd/containerd/api/types"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -327,4 +331,104 @@ func TestContainerMetricsMemory(t *testing.T) {
 			assert.Equal(t, test.expected, got)
 		})
 	}
+}
+
+func TestListContainerStats(t *testing.T) {
+	c := newTestCRIService()
+	type args struct {
+		ctx        context.Context
+		stats      []*types.Metric
+		containers []containerstore.Container
+	}
+	tests := []struct {
+		name    string
+		args    args
+		before  func()
+		after   func()
+		want    *runtime.ListContainerStatsResponse
+		wantErr bool
+	}{
+		{
+			name: "args containers having c1,but containerStore not found c1, so filter c1",
+			args: args{
+				ctx: context.Background(),
+				stats: []*types.Metric{
+					{
+						ID: "c1",
+					},
+				},
+				containers: []containerstore.Container{
+					{
+						Metadata: containerstore.Metadata{
+							ID:        "c1",
+							SandboxID: "s1",
+						},
+					},
+				},
+			},
+			want: &runtime.ListContainerStatsResponse{},
+		},
+		{
+			name: "args containers having c1,c2, but containerStore not found c1, so filter c1",
+			args: args{
+				ctx: context.Background(),
+				stats: []*types.Metric{
+					{
+						ID: "c1",
+					},
+					{
+						ID: "c2",
+					},
+				},
+				containers: []containerstore.Container{
+					{
+						Metadata: containerstore.Metadata{
+							ID:        "c1",
+							SandboxID: "s1",
+						},
+					},
+					{
+						Metadata: containerstore.Metadata{
+							ID:        "c2",
+							SandboxID: "s2",
+						},
+					},
+				},
+			},
+			before: func() {
+				c.containerStore.Add(containerstore.Container{
+					Metadata: containerstore.Metadata{
+						ID: "c2",
+					},
+				})
+				c.sandboxStore.Add(sandboxstore.Sandbox{
+					Metadata: sandboxstore.Metadata{
+						ID: "s2",
+					},
+				})
+			},
+			wantErr: true,
+			want:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.before != nil {
+				tt.before()
+			}
+			got, err := c.toCRIContainerStats(tt.args.ctx, tt.args.stats, tt.args.containers)
+			if tt.after != nil {
+				tt.after()
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ListContainerStats() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ListContainerStats() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
 }
