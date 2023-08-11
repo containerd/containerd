@@ -458,6 +458,12 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// If not, the shim has been delivered the exit and delete events.
 	// So we should remove the record and prevent duplicate events from
 	// ttrpc-callback-on-close.
+	//
+	// TODO: It's hard to guarantee that the event is unique and sent only
+	// once. The moby/moby should not rely on that assumption that there is
+	// only one exit event. The moby/moby should handle the duplicate events.
+	//
+	// REF: https://github.com/containerd/containerd/issues/4769
 	if shimErr == nil {
 		removeTask(ctx, s.ID())
 	}
@@ -466,7 +472,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	// Let controller decide when to shutdown.
 	if !sandboxed {
 		if err := s.waitShutdown(ctx); err != nil {
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task")
+			// FIXME(fuweid):
+			//
+			// If the error is context canceled, should we use context.TODO()
+			// to wait for it?
+			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 		}
 	}
 
