@@ -12,7 +12,7 @@ on:
 env:
   # Go version we currently use to build containerd across all CI.
   # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.20.7"
+  GO_VERSION: "1.21.0"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
