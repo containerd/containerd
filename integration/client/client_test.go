@@ -195,6 +195,7 @@ func TestMain(m *testing.M) {
 func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {
 	fmt.Printf(" !! newClient() \n")
 	if testing.Short() {
+		fmt.Printf(" !! newClient() skipping \n")
 		t.Skip()
 	}
 	if rt := os.Getenv("TEST_RUNTIME"); rt != "" {

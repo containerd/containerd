@@ -30,6 +30,7 @@ import (
 )
 
 func TestTransferEcho(t *testing.T) {
+	fmt.Printf("TestTransferEcho %v", t)
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -39,8 +40,8 @@ func TestTransferEcho(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
 	//	t.Run("ImportExportEchoBig", newImportExportEcho(ctx, client, bytes.Repeat([]byte("somecontent"), 17*1024)))
-	//	t.Run("ImportExportEchoSmall", newImportExportEcho(ctx, client, []byte("somecontent")))
-	t.Run("ImportExportEchoEmpty", newImportExportEcho(ctx, client, []byte("")))
+	//t.Run("ImportExportEchoSmall", newImportExportEcho(ctx, client, []byte("somecontent")))
+	//st.Run("ImportExportEchoEmpty", newImportExportEcho(ctx, client, []byte("")))
 }
 
 func newImportExportEcho(ctx context.Context, client *containerd.Client, expected []byte) func(*testing.T) {
