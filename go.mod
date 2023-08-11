@@ -1,6 +1,6 @@
 module github.com/containerd/containerd
 
-go 1.19
+go 1.20
 
 require (
 	dario.cat/mergo v1.0.0
