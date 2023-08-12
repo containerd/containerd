@@ -750,7 +750,6 @@ func parseVersion(data []byte) (Version, error) {
 // Availability:
 //
 //   - runc:  supported since runc v1.1.0
-//   - crun:  https://github.com/containers/crun/issues/1177
 //   - youki: https://github.com/containers/youki/issues/815
 func (r *Runc) Features(context context.Context) (*features.Features, error) {
 	data, err := r.cmdOutput(r.command(context, "features"), false, nil)
