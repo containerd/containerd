@@ -52,7 +52,8 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, 
 			TypeUrl: options.Options.GetTypeUrl(),
 			Value:   options.Options.GetValue(),
 		},
-		NetnsPath: options.NetNSPath,
+		NetnsPath:   options.NetNSPath,
+		Annotations: options.Annotations,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)

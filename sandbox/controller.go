@@ -33,8 +33,9 @@ type CreateOptions struct {
 	// CRI will use this to pass PodSandboxConfig.
 	// Don't confuse this with Runtime options, which are passed at shim instance start
 	// to setup global shim configuration.
-	Options   typeurl.Any
-	NetNSPath string
+	Options     typeurl.Any
+	NetNSPath   string
+	Annotations map[string]string
 }
 
 type CreateOpt func(*CreateOptions) error
@@ -64,6 +65,14 @@ func WithOptions(options any) CreateOpt {
 func WithNetNSPath(netNSPath string) CreateOpt {
 	return func(co *CreateOptions) error {
 		co.NetNSPath = netNSPath
+		return nil
+	}
+}
+
+// WithAnnotations sets the provided annotations for sandbox creation.
+func WithAnnotations(annotations map[string]string) CreateOpt {
+	return func(co *CreateOptions) error {
+		co.Annotations = annotations
 		return nil
 	}
 }
