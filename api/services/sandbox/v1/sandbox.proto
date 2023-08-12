@@ -102,6 +102,7 @@ message ControllerCreateRequest {
 	repeated containerd.types.Mount rootfs = 2;
 	google.protobuf.Any options = 3;
 	string netns_path = 4;
+	map<string, string> annotations = 5;
 }
 
 message ControllerCreateResponse {
