@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/image"
 
 	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
-	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
 
 	digest "github.com/opencontainers/go-digest"
@@ -490,47 +489,6 @@ func TestTransferImport(t *testing.T) {
 			Images: []string{"", "registry.test/basic:latest"},
 			Opts:   []image.StoreOpt{image.WithNamedPrefix("unused", true)},
 		},
-		/*
-			{
-				Name:   "IndexRef",
-				Images: []string{"registry.test/index-ref:latest", ""},
-			},
-			{
-				Name:   "AllRefs",
-				Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1"},
-				Opts:   []image.StoreOpt{image.WithNamedPrefix("registry.test/all-refs", false)},
-			},
-			{
-				Name:   "DigestRefs",
-				Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "registry.test/all-refs@"},
-				Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, false)},
-			},
-			{
-				Name:   "DigestRefsSkipNamed",
-				Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1"},
-				Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/all-refs", false, true)},
-			},
-			{
-				Name:   "DigestOnly",
-				Images: []string{"", "", "imported-image@"},
-				Opts:   []image.StoreOpt{image.WithDigestRef("imported-image", false, true)},
-			},
-			{
-				Name:   "OverwriteDigestRefs",
-				Images: []string{"registry.test/all-refs:index", "registry.test/all-refs:1", "someimportname@"},
-				Opts:   []image.StoreOpt{image.WithDigestRef("someimportname", true, false)},
-			},
-			{
-				Name:   "TagOnlyRef",
-				Images: []string{"", "registry.test/myimage thebest"},
-				Opts:   []image.StoreOpt{image.WithNamedPrefix("registry.test/myimage", false)},
-			},
-			{
-				Name:   "TagOnlyOverwriteDigestRefs",
-				Images: []string{"registry.test/all-refs:index", "registry.test/basename latest", "registry.test/basename@"},
-				Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/basename", true, false)},
-			},
-		*/
 	} {
 		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
