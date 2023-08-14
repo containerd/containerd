@@ -19,6 +19,7 @@ package archive
 import (
 	"context"
 	"io"
+	"sync"
 
 	"github.com/containerd/typeurl/v2"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
@@ -81,6 +82,7 @@ type ImageExportStream struct {
 	allPlatforms              bool
 	skipCompatibilityManifest bool
 	skipNonDistributable      bool
+	m                         sync.Mutex
 }
 
 func (iis *ImageExportStream) ExportStream(context.Context) (io.WriteCloser, string, error) {
@@ -118,6 +120,8 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 
 	// Receive stream and copy to writer
 	go func() {
+		iis.m.Lock()
+		defer iis.m.Unlock()
 		if _, err := io.Copy(iis.stream, tstreaming.ReceiveStream(ctx, stream)); err != nil {
 			log.G(ctx).WithError(err).WithField("streamid", sid).Errorf("error copying stream")
 		}
