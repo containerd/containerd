@@ -30,6 +30,11 @@ import (
 // WithProfile receives the name of a file stored on disk comprising a json
 // formatted seccomp profile, as specified by the opencontainers/runtime-spec.
 // The profile is read from the file, unmarshaled, and set to the spec.
+//
+// FIXME: pkg/cri/[sb]server/container_create_linux_test.go depends on go:noinline
+// since Go 1.21.
+//
+//go:noinline
 func WithProfile(profile string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		s.Linux.Seccomp = &specs.LinuxSeccomp{}
@@ -46,6 +51,11 @@ func WithProfile(profile string) oci.SpecOpts {
 
 // WithDefaultProfile sets the default seccomp profile to the spec.
 // Note: must follow the setting of process capabilities
+//
+// FIXME: pkg/cri/[sb]server/container_create_linux_test.go depends on go:noinline
+// since Go 1.21.
+//
+//go:noinline
 func WithDefaultProfile() oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		s.Linux.Seccomp = DefaultProfile(s)
