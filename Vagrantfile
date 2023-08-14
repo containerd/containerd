@@ -29,11 +29,13 @@ Vagrant.configure("2") do |config|
     v.cpus = cpus
     # Needs env var VAGRANT_EXPERIMENTAL="disks"
     o.vm.disk :disk, size: "#{disk_size}GB", primary: true
+    v.customize ["modifyvm", :id, "--firmware", "efi"]
   end
   config.vm.provider :libvirt do |v|
     v.memory = memory
     v.cpus = cpus
     v.machine_virtual_size = disk_size
+    v.loader = "/usr/share/OVMF/OVMF_CODE.fd"
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync"
