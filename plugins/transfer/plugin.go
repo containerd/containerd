@@ -65,6 +65,7 @@ func init() {
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
+				log.G(ic.Context).Debug("Transfer plugin, p return: %v", p)
 				if err != nil {
 					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugin.TransferPlugin, uc.Platform)
 				}
@@ -80,6 +81,7 @@ func init() {
 				}
 				var applier diff.Applier
 				target := platforms.OnlyStrict(p)
+				log.G(ic.Context).Debug("target matchComparer %v", target)
 				if uc.Differ != "" {
 					plugin, ok := diffPlugins[uc.Differ]
 					if !ok {
@@ -92,8 +94,10 @@ func init() {
 					applier = inst.(diff.Applier)
 				} else {
 					for name, plugin := range diffPlugins {
+						log.G(ic.Context).Debug("differ name: %v", name)
 						var matched bool
 						for _, p := range plugin.Meta.Platforms {
+							log.G(ic.Context).Debug("p from for loop %v", p)
 							if target.Match(p) {
 								matched = true
 							}

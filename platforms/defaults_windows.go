@@ -49,8 +49,17 @@ type windowsmatcher struct {
 // and build version.
 func (m windowsmatcher) Match(p specs.Platform) bool {
 	match := m.defaultMatcher.Match(p)
+	/*
+		if match && m.OS == "windows" {
+			if strings.HasPrefix(p.OSVersion, m.osVersionPrefix) {
+				log.G(context.Background()).Debugf("returning true p.OSVersion %v, m.osVersionPrefix %v", p.OSVersion, m.osVersionPrefix)
+				return true
+			}
+			return p.OSVersion == ""
+		}
 
-	if match && p.OS == "windows" {
+	*/
+	if match && m.OS == "windows" {
 		// HPC containers do not have OS version filled
 		if p.OSVersion == "" {
 			return true

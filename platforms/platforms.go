@@ -115,6 +115,7 @@ import (
 	"strings"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sys/windows"
 
 	"github.com/containerd/containerd/errdefs"
 )
@@ -196,6 +197,11 @@ func Parse(specifier string) (specs.Platform, error) {
 				p.Variant = cpuVariant()
 			}
 
+			if p.OS == "windows" {
+				major, minor, build := windows.RtlGetNtVersionNumbers()
+				p.OSVersion = fmt.Sprintf("%d.%d.%d", major, minor, build)
+			}
+
 			return p, nil
 		}
 
@@ -216,6 +222,11 @@ func Parse(specifier string) (specs.Platform, error) {
 		p.Architecture, p.Variant = normalizeArch(parts[1], "")
 		if p.Architecture == "arm" && p.Variant == "v7" {
 			p.Variant = ""
+		}
+
+		if p.OS == "windows" {
+			major, minor, build := windows.RtlGetNtVersionNumbers()
+			p.OSVersion = fmt.Sprintf("%d.%d.%d", major, minor, build)
 		}
 
 		return p, nil
