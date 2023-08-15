@@ -164,7 +164,7 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 			}
 			anyType, err := stream.Recv()
 			if err != nil {
-				if errors.Is(err, io.EOF) {
+				if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 					err = nil
 				} else {
 					err = fmt.Errorf("received failed: %w", err)
