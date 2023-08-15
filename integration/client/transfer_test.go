@@ -28,7 +28,7 @@ import (
 
 	_ "github.com/containerd/containerd/plugins/transfer"
 )
-/*
+
 func TestTransferEcho(t *testing.T) {
 	fmt.Printf("TestTransferEcho %v", t)
 	client, err := newClient(t, address)
@@ -40,10 +40,9 @@ func TestTransferEcho(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
 	//	t.Run("ImportExportEchoBig", newImportExportEcho(ctx, client, bytes.Repeat([]byte("somecontent"), 17*1024)))
-	//t.Run("ImportExportEchoSmall", newImportExportEcho(ctx, client, []byte("somecontent")))
+	t.Run("ImportExportEchoSmall", newImportExportEcho(ctx, client, []byte("somecontent")))
 	//st.Run("ImportExportEchoEmpty", newImportExportEcho(ctx, client, []byte("")))
 }
-*/
 
 func newImportExportEcho(ctx context.Context, client *containerd.Client, expected []byte) func(*testing.T) {
 	return func(t *testing.T) {

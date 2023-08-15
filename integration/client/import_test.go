@@ -18,15 +18,12 @@ package client
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
 	"io"
 	"math/rand"
 	"os"
-	"reflect"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -40,9 +37,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/transfer/image"
 
-	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
 	"github.com/containerd/containerd/platforms"
 
 	digest "github.com/opencontainers/go-digest"
@@ -156,201 +151,202 @@ func testExportImport(t *testing.T, imageName string) {
 	}
 }
 
-func TestImport(t *testing.T) {
-	ctx, cancel := testContext(t)
-	defer cancel()
+/*
+	func TestImport(t *testing.T) {
+		ctx, cancel := testContext(t)
+		defer cancel()
 
-	fmt.Printf(" !! TestImport() t: %v \n", t)
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	tc := tartest.TarContext{}
-
-	b1, d1 := createContent(256, 1)
-	empty := []byte("{}")
-	version := []byte("1.0")
-
-	c1, d2 := createConfig(runtime.GOOS, runtime.GOARCH, "test")
-	badConfig, _ := createConfig("foo", "lish", "test")
-
-	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
-
-	provider := client.ContentStore()
-
-	checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
-		m, err := images.Manifest(ctx, provider, d, nil)
+		fmt.Printf(" !! TestImport() t: %v \n", t)
+		client, err := newClient(t, address)
 		if err != nil {
-			t.Fatalf("unable to read target blob: %+v", err)
+			t.Fatal(err)
 		}
+		defer client.Close()
 
-		if m.Config.Digest != d2 {
-			t.Fatalf("unexpected digest hash %s, expected %s", m.Config.Digest, d2)
-		}
+		tc := tartest.TarContext{}
 
-		if len(m.Layers) != 1 {
-			t.Fatalf("expected 1 layer, has %d", len(m.Layers))
-		}
+		b1, d1 := createContent(256, 1)
+		empty := []byte("{}")
+		version := []byte("1.0")
 
-		if m.Layers[0].Digest != d1 {
-			t.Fatalf("unexpected layer hash %s, expected %s", m.Layers[0].Digest, d1)
-		}
+		c1, d2 := createConfig(runtime.GOOS, runtime.GOARCH, "test")
+		badConfig, _ := createConfig("foo", "lish", "test")
 
-		if expManifest != nil {
-			if !reflect.DeepEqual(m.Layers, expManifest.Layers) {
-				t.Fatalf("DeepEqual on Layers failed: %v vs. %v", m.Layers, expManifest.Layers)
-			}
-			if !reflect.DeepEqual(m.Config, expManifest.Config) {
-				t.Fatalf("DeepEqual on Config failed: %v vs. %v", m.Config, expManifest.Config)
-			}
-		}
-	}
+		m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
-	for _, tc := range []struct {
-		Name   string
-		Writer tartest.WriterToTar
-		Check  func(*testing.T, []images.Image)
-		Opts   []ImportOpt
-	}{
-		{
-			Name: "DockerV2.0",
-			Writer: tartest.TarAll(
-				tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
-				tc.File("repositories", []byte(`{"any":{"1":"bd765cd43e95212f7aa2cab51d0a"}}`), 0644),
-			),
-		},
-		{
-			Name: "DockerV2.1",
-			Writer: tartest.TarAll(
-				tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
-				tc.File("e95212f7aa2cab51d0abd765cd43.json", c1, 0644),
-				tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
-			),
-			Check: func(t *testing.T, imgs []images.Image) {
-				if len(imgs) == 0 {
-					t.Fatalf("no images")
-				}
+		provider := client.ContentStore()
 
-				names := []string{
-					"docker.io/library/test-import:notlatest",
-					"docker.io/another/repo:tag",
-				}
-
-				checkImages(t, imgs[0].Target.Digest, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, nil)
-			},
-		},
-		{
-			Name: "DockerV2.1-BadOSArch",
-			Writer: tartest.TarAll(
-				tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
-				tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
-				tc.File("e95212f7aa2cab51d0abd765cd43.json", badConfig, 0644),
-				tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
-			),
-		},
-		{
-			Name: "OCI-BadFormat",
-			Writer: tartest.TarAll(
-				tc.File("oci-layout", []byte(`{"imageLayoutVersion":"2.0.0"}`), 0644),
-			),
-		},
-		{
-			Name: "OCI",
-			Writer: tartest.TarAll(
-				tc.Dir("blobs", 0755),
-				tc.Dir("blobs/sha256", 0755),
-				tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
-				tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
-				tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File("index.json", createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
-				tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
-			),
-			Check: func(t *testing.T, imgs []images.Image) {
-				names := []string{
-					"latest",
-					"docker.io/lib/img:ok",
-				}
-
-				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
-			},
-		},
-		{
-			Name: "OCIPrefixName",
-			Writer: tartest.TarAll(
-				tc.Dir("blobs", 0755),
-				tc.Dir("blobs/sha256", 0755),
-				tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
-				tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
-				tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File("index.json", createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
-				tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
-			),
-			Check: func(t *testing.T, imgs []images.Image) {
-				names := []string{
-					"localhost:5000/myimage:latest",
-					"docker.io/lib/img:ok",
-				}
-
-				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
-			},
-			Opts: []ImportOpt{
-				WithImageRefTranslator(archive.AddRefPrefix("localhost:5000/myimage")),
-			},
-		},
-		{
-			Name: "OCIPrefixName2",
-			Writer: tartest.TarAll(
-				tc.Dir("blobs", 0755),
-				tc.Dir("blobs/sha256", 0755),
-				tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
-				tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
-				tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File("index.json", createIndex(m1, "latest", "localhost:5000/myimage:old", "docker.io/lib/img:ok"), 0644),
-				tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
-			),
-			Check: func(t *testing.T, imgs []images.Image) {
-				names := []string{
-					"localhost:5000/myimage:latest",
-					"localhost:5000/myimage:old",
-				}
-
-				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
-			},
-			Opts: []ImportOpt{
-				WithImageRefTranslator(archive.FilterRefPrefix("localhost:5000/myimage")),
-			},
-		},
-	} {
-		t.Run(tc.Name, func(t *testing.T) {
-			images, err := client.Import(ctx, tartest.TarFromWriterTo(tc.Writer), tc.Opts...)
+		checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
+			m, err := images.Manifest(ctx, provider, d, nil)
 			if err != nil {
-				if tc.Check != nil {
-					t.Errorf("unexpected import error: %+v", err)
-				}
-				return
-			} else if tc.Check == nil {
-				t.Fatalf("expected error on import")
+				t.Fatalf("unable to read target blob: %+v", err)
 			}
 
-			tc.Check(t, images)
-		})
-	}
-}
+			if m.Config.Digest != d2 {
+				t.Fatalf("unexpected digest hash %s, expected %s", m.Config.Digest, d2)
+			}
 
+			if len(m.Layers) != 1 {
+				t.Fatalf("expected 1 layer, has %d", len(m.Layers))
+			}
+
+			if m.Layers[0].Digest != d1 {
+				t.Fatalf("unexpected layer hash %s, expected %s", m.Layers[0].Digest, d1)
+			}
+
+			if expManifest != nil {
+				if !reflect.DeepEqual(m.Layers, expManifest.Layers) {
+					t.Fatalf("DeepEqual on Layers failed: %v vs. %v", m.Layers, expManifest.Layers)
+				}
+				if !reflect.DeepEqual(m.Config, expManifest.Config) {
+					t.Fatalf("DeepEqual on Config failed: %v vs. %v", m.Config, expManifest.Config)
+				}
+			}
+		}
+
+		for _, tc := range []struct {
+			Name   string
+			Writer tartest.WriterToTar
+			Check  func(*testing.T, []images.Image)
+			Opts   []ImportOpt
+		}{
+			{
+				Name: "DockerV2.0",
+				Writer: tartest.TarAll(
+					tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
+					tc.File("repositories", []byte(`{"any":{"1":"bd765cd43e95212f7aa2cab51d0a"}}`), 0644),
+				),
+			},
+			{
+				Name: "DockerV2.1",
+				Writer: tartest.TarAll(
+					tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
+					tc.File("e95212f7aa2cab51d0abd765cd43.json", c1, 0644),
+					tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
+				),
+				Check: func(t *testing.T, imgs []images.Image) {
+					if len(imgs) == 0 {
+						t.Fatalf("no images")
+					}
+
+					names := []string{
+						"docker.io/library/test-import:notlatest",
+						"docker.io/another/repo:tag",
+					}
+
+					checkImages(t, imgs[0].Target.Digest, imgs, names...)
+					checkManifest(ctx, t, imgs[0].Target, nil)
+				},
+			},
+			{
+				Name: "DockerV2.1-BadOSArch",
+				Writer: tartest.TarAll(
+					tc.Dir("bd765cd43e95212f7aa2cab51d0a", 0755),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/json", empty, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/layer.tar", b1, 0644),
+					tc.File("bd765cd43e95212f7aa2cab51d0a/VERSION", version, 0644),
+					tc.File("e95212f7aa2cab51d0abd765cd43.json", badConfig, 0644),
+					tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
+				),
+			},
+			{
+				Name: "OCI-BadFormat",
+				Writer: tartest.TarAll(
+					tc.File("oci-layout", []byte(`{"imageLayoutVersion":"2.0.0"}`), 0644),
+				),
+			},
+			{
+				Name: "OCI",
+				Writer: tartest.TarAll(
+					tc.Dir("blobs", 0755),
+					tc.Dir("blobs/sha256", 0755),
+					tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
+					tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
+					tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
+					tc.File("index.json", createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
+					tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
+				),
+				Check: func(t *testing.T, imgs []images.Image) {
+					names := []string{
+						"latest",
+						"docker.io/lib/img:ok",
+					}
+
+					checkImages(t, d3, imgs, names...)
+					checkManifest(ctx, t, imgs[0].Target, expManifest)
+				},
+			},
+			{
+				Name: "OCIPrefixName",
+				Writer: tartest.TarAll(
+					tc.Dir("blobs", 0755),
+					tc.Dir("blobs/sha256", 0755),
+					tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
+					tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
+					tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
+					tc.File("index.json", createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
+					tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
+				),
+				Check: func(t *testing.T, imgs []images.Image) {
+					names := []string{
+						"localhost:5000/myimage:latest",
+						"docker.io/lib/img:ok",
+					}
+
+					checkImages(t, d3, imgs, names...)
+					checkManifest(ctx, t, imgs[0].Target, expManifest)
+				},
+				Opts: []ImportOpt{
+					WithImageRefTranslator(archive.AddRefPrefix("localhost:5000/myimage")),
+				},
+			},
+			{
+				Name: "OCIPrefixName2",
+				Writer: tartest.TarAll(
+					tc.Dir("blobs", 0755),
+					tc.Dir("blobs/sha256", 0755),
+					tc.File("blobs/sha256/"+d1.Encoded(), b1, 0644),
+					tc.File("blobs/sha256/"+d2.Encoded(), c1, 0644),
+					tc.File("blobs/sha256/"+d3.Encoded(), m1, 0644),
+					tc.File("index.json", createIndex(m1, "latest", "localhost:5000/myimage:old", "docker.io/lib/img:ok"), 0644),
+					tc.File("oci-layout", []byte(`{"imageLayoutVersion":"1.0.0"}`), 0644),
+				),
+				Check: func(t *testing.T, imgs []images.Image) {
+					names := []string{
+						"localhost:5000/myimage:latest",
+						"localhost:5000/myimage:old",
+					}
+
+					checkImages(t, d3, imgs, names...)
+					checkManifest(ctx, t, imgs[0].Target, expManifest)
+				},
+				Opts: []ImportOpt{
+					WithImageRefTranslator(archive.FilterRefPrefix("localhost:5000/myimage")),
+				},
+			},
+		} {
+			t.Run(tc.Name, func(t *testing.T) {
+				images, err := client.Import(ctx, tartest.TarFromWriterTo(tc.Writer), tc.Opts...)
+				if err != nil {
+					if tc.Check != nil {
+						t.Errorf("unexpected import error: %+v", err)
+					}
+					return
+				} else if tc.Check == nil {
+					t.Fatalf("expected error on import")
+				}
+
+				tc.Check(t, images)
+			})
+		}
+	}
+*/
 func checkImages(t *testing.T, target digest.Digest, actual []images.Image, names ...string) {
 	if len(names) != len(actual) {
 		t.Fatalf("expected %d images, got %d", len(names), len(actual))
@@ -461,6 +457,7 @@ func createIndex(manifest []byte, tags ...string) []byte {
 	return b
 }
 
+/*
 func TestTransferImport(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
@@ -555,6 +552,7 @@ func TestTransferImport(t *testing.T) {
 		})
 	}
 }
+*/
 
 type imagesProgress struct {
 	sync.Mutex

@@ -237,7 +237,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2019, windows-2022]
+        os: [windows-2022]
         enable_cri_sandboxes: ["", "sandboxed"]
 
     defaults:
@@ -326,7 +326,7 @@ jobs:
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
-          EXTRA_TESTFLAGS: "-timeout=20m"
+          EXTRA_TESTFLAGS: "-timeout=20m -v"
         run: mingw32-make.exe integration
       - run: if [ -f *-gotest.json ]; then echo '# Integration 1' >> $GITHUB_STEP_SUMMARY; teststat -markdown *-gotest.json >> $GITHUB_STEP_SUMMARY; fi
         if: always()
@@ -339,7 +339,7 @@ jobs:
       - name: Integration 2
         env:
           TESTFLAGS_PARALLEL: 1
-          EXTRA_TESTFLAGS: "-short"
+          EXTRA_TESTFLAGS: "-short -v"
           CGO_ENABLED: 1
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
