@@ -123,8 +123,10 @@ func (iis *ImageExportStream) MarshalAny(ctx context.Context, sm streaming.Strea
 		iis.mu.Lock()
 		defer iis.mu.Unlock()
 
-		if _, err := io.Copy(iis.stream, tstreaming.ReceiveStream(ctx, stream)); err != nil {
-			log.G(ctx).WithError(err).WithField("streamid", sid).Errorf("error copying stream")
+		ioReader := tstreaming.ReceiveStream(ctx, stream)
+		log.G(ctx).Debugf("dst: %v, source %v", iis.stream, ioReader)
+		if _, err := io.Copy(iis.stream, ioReader); err != nil {
+			log.G(ctx).WithError(err).WithField("streamid", sid).Errorf("error copying stream, err: %v", err)
 		}
 		iis.stream.Close()
 	}()

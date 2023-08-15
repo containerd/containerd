@@ -18,6 +18,7 @@ package logtest
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -35,6 +36,7 @@ func (*testHook) Levels() []logrus.Level {
 }
 
 func (h *testHook) Fire(e *logrus.Entry) error {
+	fmt.Printf("logrus.Entry: %v", e)
 	s, err := h.fmt.Format(e)
 	if err != nil {
 		return err

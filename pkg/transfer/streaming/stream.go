@@ -144,6 +144,14 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 		defer stream.Close()
 		var window int32
 		for {
+			/*
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+			*/
+			////
 			var werr error
 			if window < windowSize {
 				update := &transferapi.WindowUpdate{
@@ -162,9 +170,10 @@ func ReceiveStream(ctx context.Context, stream streaming.Stream) io.Reader {
 					werr = nil
 				}
 			}
+			///
 			anyType, err := stream.Recv()
 			if err != nil {
-				if errors.Is(err, io.EOF) {
+				if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 					err = nil
 				} else {
 					err = fmt.Errorf("received failed: %w", err)
