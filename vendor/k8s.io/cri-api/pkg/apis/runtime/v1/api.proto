@@ -782,6 +782,12 @@ message ImageSpec {
     // The container image reference specified by the user (e.g. image[:tag] or digest).
     // Only set if available within the RPC context.
     string user_specified_image = 18;
+    // Named runtime configuration to use for this PodSandbox.
+    // If the runtime handler is unknown, this request should be rejected.  An
+    // empty string should select the default handler, equivalent to the
+    // behavior before this feature was added.
+    // See https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
+    string runtime_handler = 19;
 }
 
 message KeyValue {
