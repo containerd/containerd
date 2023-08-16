@@ -87,13 +87,25 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
+	platformMap := make(map[string]platforms.MatchComparer)
+	for k, r := range c.PluginConfig.ContainerdConfig.Runtimes {
+		log.G(context.Background()).Debugf("!! InitCriService k: %v", k)
+		log.G(context.Background()).Debugf("!! InitCriService r.GuestPlatform: %v", r.GuestPlatform)
+
+		if r.GuestPlatform.OS != "" && r.GuestPlatform.OSVersion != "" {
+			platformMap[k] = platforms.Only(r.GuestPlatform)
+		} else {
+			platformMap[k] = platforms.Only(platforms.DefaultSpec())
+		}
+	}
+
 	var s server.CRIService
 	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		log.G(ctx).Info("using experimental CRI Sandbox server - unset ENABLE_CRI_SANDBOXES to disable")
 		s, err = sbserver.NewCRIService(c, client, getNRIAPI(ic))
 	} else {
 		log.G(ctx).Info("using legacy CRI server")
-		s, err = server.NewCRIService(c, client, getNRIAPI(ic))
+		s, err = server.NewCRIService(c, client, platformMap, getNRIAPI(ic))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)

@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/pkg/cri/instrument"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/streaming"
@@ -93,6 +94,9 @@ type criService struct {
 	netPlugin map[string]cni.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
+	// initializes matchComparer for each runtime class depending on whether GuestPlatform
+	// is defined or not. If GuestPlatform is not defined, it takes the default platform.
+	platformMatcherMap map[string]platforms.MatchComparer
 	// streamServer is the streaming server serves container streaming request.
 	streamServer streaming.Server
 	// eventMonitor is the monitor monitors containerd events.
@@ -120,12 +124,13 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, platformMatcherMap map[string]platforms.MatchComparer, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
 		config:                      config,
 		client:                      client,
+		platformMatcherMap:			 platformMatcherMap,
 		os:                          osinterface.RealOS{},
 		sandboxStore:                sandboxstore.NewStore(labels),
 		containerStore:              containerstore.NewStore(labels),
