@@ -94,9 +94,7 @@ var metricsCommand = cli.Command{
 			case *v2.Metrics:
 				printCgroup2MetricsTable(w, v)
 			case *wstats.Statistics:
-				if err := printWindowsStats(w, v); err != nil {
-					return fmt.Errorf("cannot convert metrics data from windows.Statistics: %w", err)
-				}
+				printWindowsStats(w, v)
 			}
 			return w.Flush()
 		case formatJSON:
@@ -151,7 +149,7 @@ func printCgroup2MetricsTable(w *tabwriter.Writer, data *v2.Metrics) {
 	}
 }
 
-func printWindowsStats(w *tabwriter.Writer, windowsStats *wstats.Statistics) error {
+func printWindowsStats(w *tabwriter.Writer, windowsStats *wstats.Statistics) {
 	if windowsStats.GetLinux() != nil {
 		stats := windowsStats.GetLinux()
 		printCgroupMetricsTable(w, stats)
@@ -162,7 +160,6 @@ func printWindowsStats(w *tabwriter.Writer, windowsStats *wstats.Statistics) err
 	if windowsStats.VM != nil {
 		printWindowsVMStatistics(w, windowsStats.VM)
 	}
-	return nil
 }
 
 func printWindowsContainerStatistics(w *tabwriter.Writer, stats *wstats.WindowsContainerStatistics) {
