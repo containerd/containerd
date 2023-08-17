@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
+	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
@@ -393,6 +394,51 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 			// Move on to make sure container status is updated.
 		}
 	}
+
+	// NOTE: Both sb.Container.Task and task.Delete interface always ensures
+	// that the status of target task. However, the interfaces return
+	// ErrNotFound, which doesn't mean that the shim instance doesn't exist.
+	//
+	// There are two caches for task in containerd:
+	//
+	//   1. io.containerd.service.v1.tasks-service
+	//   2. io.containerd.runtime.v2.task
+	//
+	// First one is to maintain the shim connection and shutdown the shim
+	// in Delete API. And the second one is to maintain the lifecycle of
+	// task in shim server.
+	//
+	// So, if the shim instance is running and task has been deleted in shim
+	// server, the sb.Container.Task and task.Delete will receive the
+	// ErrNotFound. If we don't delete the shim instance in io.containerd.service.v1.tasks-service,
+	// shim will be leaky.
+	//
+	// Based on containerd/containerd#7496 issue, when host is under IO
+	// pressure, the umount2 syscall will take more than 10 seconds so that
+	// the CRI plugin will cancel this task.Delete call. However, the shim
+	// server isn't aware about this. After return from umount2 syscall, the
+	// shim server continue delete the task record. And then CRI plugin
+	// retries to delete task and retrieves ErrNotFound and marks it as
+	// stopped. Therefore, The shim is leaky.
+	//
+	// It's hard to handle the connection lost or request canceled cases in
+	// shim server. We should call Delete API to io.containerd.service.v1.tasks-service
+	// to ensure that shim instance is shutdown.
+	//
+	// REF:
+	// 1. https://github.com/containerd/containerd/issues/7496#issuecomment-1671100968
+	// 2. https://github.com/containerd/containerd/issues/8931
+	if errdefs.IsNotFound(err) {
+		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
+		if err != nil {
+			err = errdefs.FromGRPC(err)
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to cleanup container %s in task-service: %w", cntr.Container.ID(), err)
+			}
+		}
+		logrus.Infof("Ensure that container %s in task-service has been cleanup successfully", cntr.Container.ID())
+	}
+
 	err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		if status.FinishedAt == 0 {
 			status.Pid = 0
@@ -433,6 +479,50 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 			}
 			// Move on to make sure container status is updated.
 		}
+	}
+
+	// NOTE: Both sb.Container.Task and task.Delete interface always ensures
+	// that the status of target task. However, the interfaces return
+	// ErrNotFound, which doesn't mean that the shim instance doesn't exist.
+	//
+	// There are two caches for task in containerd:
+	//
+	//   1. io.containerd.service.v1.tasks-service
+	//   2. io.containerd.runtime.v2.task
+	//
+	// First one is to maintain the shim connection and shutdown the shim
+	// in Delete API. And the second one is to maintain the lifecycle of
+	// task in shim server.
+	//
+	// So, if the shim instance is running and task has been deleted in shim
+	// server, the sb.Container.Task and task.Delete will receive the
+	// ErrNotFound. If we don't delete the shim instance in io.containerd.service.v1.tasks-service,
+	// shim will be leaky.
+	//
+	// Based on containerd/containerd#7496 issue, when host is under IO
+	// pressure, the umount2 syscall will take more than 10 seconds so that
+	// the CRI plugin will cancel this task.Delete call. However, the shim
+	// server isn't aware about this. After return from umount2 syscall, the
+	// shim server continue delete the task record. And then CRI plugin
+	// retries to delete task and retrieves ErrNotFound and marks it as
+	// stopped. Therefore, The shim is leaky.
+	//
+	// It's hard to handle the connection lost or request canceled cases in
+	// shim server. We should call Delete API to io.containerd.service.v1.tasks-service
+	// to ensure that shim instance is shutdown.
+	//
+	// REF:
+	// 1. https://github.com/containerd/containerd/issues/7496#issuecomment-1671100968
+	// 2. https://github.com/containerd/containerd/issues/8931
+	if errdefs.IsNotFound(err) {
+		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: sb.Container.ID()})
+		if err != nil {
+			err = errdefs.FromGRPC(err)
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to cleanup sandbox %s in task-service: %w", sb.Container.ID(), err)
+			}
+		}
+		logrus.Infof("Ensure that sandbox %s in task-service has been cleanup successfully", sb.Container.ID())
 	}
 	err = sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
 		status.State = sandboxstore.StateNotReady
