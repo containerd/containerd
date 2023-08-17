@@ -48,7 +48,14 @@ func (c *Client) WithLease(ctx context.Context, opts ...leases.Opt) (context.Con
 	}
 
 	ctx = leases.WithLease(ctx, l.ID)
+
+	delete := func(context.Context) error {
+		go func() {
+			ls.Delete(ctx, l)
+		}()
+		return nil
+	}(ctx)
 	return ctx, func(ctx context.Context) error {
-		return ls.Delete(ctx, l)
+		return delete
 	}, nil
 }
