@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 
@@ -87,39 +86,9 @@ func isHugetlbControllerPresent() bool {
 }
 
 var (
-	_cgroupv1HasHugetlbOnce sync.Once
-	_cgroupv1HasHugetlb     bool
-	_cgroupv2HasHugetlbOnce sync.Once
-	_cgroupv2HasHugetlb     bool
-	isUnifiedOnce           sync.Once
-	isUnified               bool
+	isUnifiedOnce sync.Once
+	isUnified     bool
 )
-
-// cgroupv1HasHugetlb returns whether the hugetlb controller is present on
-// cgroup v1.
-func cgroupv1HasHugetlb() bool {
-	_cgroupv1HasHugetlbOnce.Do(func() {
-		if _, err := os.ReadDir("/sys/fs/cgroup/hugetlb"); err != nil {
-			_cgroupv1HasHugetlb = false
-		} else {
-			_cgroupv1HasHugetlb = true
-		}
-	})
-	return _cgroupv1HasHugetlb
-}
-
-// cgroupv2HasHugetlb returns whether the hugetlb controller is present on
-// cgroup v2.
-func cgroupv2HasHugetlb() bool {
-	_cgroupv2HasHugetlbOnce.Do(func() {
-		controllers, err := os.ReadFile("/sys/fs/cgroup/cgroup.controllers")
-		if err != nil {
-			return
-		}
-		_cgroupv2HasHugetlb = strings.Contains(string(controllers), "hugetlb")
-	})
-	return _cgroupv2HasHugetlb
-}
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
 func IsCgroup2UnifiedMode() bool {
