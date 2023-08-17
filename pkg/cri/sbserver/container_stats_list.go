@@ -349,15 +349,13 @@ func (c *criService) linuxContainerMetrics(
 
 	if stats != nil {
 		var data interface{}
-		switch {
-		case typeurl.Is(stats.Data, (*cg1.Metrics)(nil)):
-			data = &cg1.Metrics{}
-		case typeurl.Is(stats.Data, (*cg2.Metrics)(nil)):
-			data = &cg2.Metrics{}
-		case typeurl.Is(stats.Data, (*wstats.Statistics)(nil)):
-			data = &wstats.Statistics{}
-		default:
-			return nil, errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+
+		if data = allocMetricCgroup1(stats); data == nil {
+			if data = allocMetricCgroup2(stats); data == nil {
+				if data = allocMetricWstat(stats); data == nil {
+					return nil, errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+				}
+			}
 		}
 
 		if err := typeurl.UnmarshalTo(stats.Data, data); err != nil {
