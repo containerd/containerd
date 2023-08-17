@@ -98,7 +98,10 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 	if len(image.References) == 0 {
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	getImageOpts := []containerd.GetImageOpt {
+		containerd.GetImageWithPlatformMatcher(c.platformMatcherMap[image.RuntimeHandler]),
+	}
+	return c.client.GetImage(ctx, image.References[0], getImageOpts...)
 }
 
 // buildLabel builds the labels from config to be passed to containerd

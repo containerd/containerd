@@ -91,6 +91,7 @@ message CreateImageRequest {
 	Image image = 1;
 
 	google.protobuf.Timestamp source_date_epoch = 2;
+	string runtimeHandler = 3;
 }
 
 message CreateImageResponse {

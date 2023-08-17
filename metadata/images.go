@@ -120,7 +120,7 @@ func (s *imageStore) List(ctx context.Context, fs ...string) ([]images.Image, er
 	return m, nil
 }
 
-func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Image, error) {
+func (s *imageStore) Create(ctx context.Context, image images.Image, opts ...images.CreateOpt) (images.Image, error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return images.Image{}, err
@@ -163,7 +163,13 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 	return image, nil
 }
 
-func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
+func (s *imageStore) Update(ctx context.Context, image images.Image, opts ...images.UpdateOpt) (images.Image, error) {
+	var updateOptions images.UpdateOptions
+	for _, o := range opts {
+		if err := o(ctx, &updateOptions); err != nil {
+			return images.Image{}, err
+		}
+	}
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return images.Image{}, err
@@ -192,8 +198,8 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 		createdat := updated.CreatedAt
 		updated.Name = image.Name
 
-		if len(fieldpaths) > 0 {
-			for _, path := range fieldpaths {
+		if len(updateOptions.Fieldpaths) > 0 {
+			for _, path := range updateOptions.Fieldpaths {
 				if strings.HasPrefix(path, "labels.") {
 					if updated.Labels == nil {
 						updated.Labels = map[string]string{}

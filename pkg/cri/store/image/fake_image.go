@@ -21,7 +21,7 @@ import "fmt"
 // NewFakeStore returns an image store with predefined images.
 // Update is not allowed for this fake store.
 func NewFakeStore(images []Image) (*Store, error) {
-	s := NewStore(nil)
+	s := NewStore(nil, nil)
 	for _, i := range images {
 		for _, ref := range i.References {
 			s.refCache[ref] = i.ID

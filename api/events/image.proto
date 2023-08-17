@@ -26,11 +26,13 @@ option (containerd.plugin.fieldpath_all) = true;
 message ImageCreate {
 	string name = 1;
 	map<string, string> labels = 2;
+	string runtimeHandler = 3;
 }
 
 message ImageUpdate {
 	string name = 1;
 	map<string, string> labels = 2;
+	string runtimeHandler = 3;
 }
 
 message ImageDelete {

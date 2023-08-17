@@ -58,6 +58,7 @@ type Image struct {
 // DeleteOptions provide options on image delete
 type DeleteOptions struct {
 	Synchronous bool
+	RuntimeHandler string
 }
 
 // DeleteOpt allows configuring a delete operation
@@ -72,15 +73,56 @@ func SynchronousDelete() DeleteOpt {
 	}
 }
 
+func DeleteWithRuntimeHandler(runtimeHandler string) DeleteOpt {
+	return func(ctx context.Context, o *DeleteOptions) error {
+		o.RuntimeHandler = runtimeHandler
+		return nil
+	}
+}
+
+// CreateOptions
+type CreateOptions struct {
+	RuntimeHandler string
+}
+type CreateOpt func(context.Context, *CreateOptions) error
+
+func CreateWithRuntimeHandler(runtimeHandler string) CreateOpt {
+	return func(ctx context.Context, o *CreateOptions) error {
+		o.RuntimeHandler = runtimeHandler
+		return nil
+	}
+}
+
+// UpdateOptions
+type UpdateOptions struct {
+	Fieldpaths []string
+	RuntimeHandler string
+}
+type UpdateOpt func(context.Context, *UpdateOptions) error
+
+func UpdateWithFieldpaths(fieldpaths []string) UpdateOpt {
+	return func(ctx context.Context, o *UpdateOptions) error {
+		o.Fieldpaths = fieldpaths
+		return nil
+	}
+}
+
+func UpdateWithRuntimeHandler(runtimeHandler string) UpdateOpt {
+	return func(ctx context.Context, o *UpdateOptions) error {
+		o.RuntimeHandler = runtimeHandler
+		return nil
+	}
+}
+
 // Store and interact with images
 type Store interface {
-	Get(ctx context.Context, name string) (Image, error)
+	Get(ctx context.Context, name string) (Image, error) // TODO: do we need Opts for Get and List ??
 	List(ctx context.Context, filters ...string) ([]Image, error)
-	Create(ctx context.Context, image Image) (Image, error)
+	Create(ctx context.Context, image Image, opts ...CreateOpt) (Image, error)
 
 	// Update will replace the data in the store with the provided image. If
 	// one or more fieldpaths are provided, only those fields will be updated.
-	Update(ctx context.Context, image Image, fieldpaths ...string) (Image, error)
+	Update(ctx context.Context, image Image, opts ...UpdateOpt) (Image, error)
 
 	Delete(ctx context.Context, name string, opts ...DeleteOpt) error
 }

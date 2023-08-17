@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"context"
 	"path/filepath"
 
 	"github.com/containerd/containerd"
@@ -102,7 +103,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	var s server.CRIService
 	if os.Getenv("ENABLE_CRI_SANDBOXES") != "" {
 		log.G(ctx).Info("using experimental CRI Sandbox server - unset ENABLE_CRI_SANDBOXES to disable")
-		s, err = sbserver.NewCRIService(c, client, getNRIAPI(ic))
+		s, err = sbserver.NewCRIService(c, client, platformMap, getNRIAPI(ic))
 	} else {
 		log.G(ctx).Info("using legacy CRI server")
 		s, err = server.NewCRIService(c, client, platformMap, getNRIAPI(ic))

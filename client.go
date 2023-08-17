@@ -477,13 +477,37 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper)
 }
 
+type GetImageOptions struct {
+	PlatformMatcher platforms.MatchComparer
+}
+
+type GetImageOpt func(context.Context, *GetImageOptions) error
+
+func GetImageWithPlatformMatcher(matcher platforms.MatchComparer) GetImageOpt {
+	return func(ctx context.Context, o *GetImageOptions) error {
+		o.PlatformMatcher = matcher
+		return nil
+	}
+}
+
 // GetImage returns an existing image
-func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
-	i, err := c.ImageService().Get(ctx, ref)
+func (c *Client) GetImage(ctx context.Context, ref string, opts ...GetImageOpt) (Image, error) {
+	i, err := c.ImageService().Get(ctx, ref) // TODO: Does this function need Opt for runtimehandler at all? Maybe not, should check!
 	if err != nil {
 		return nil, err
 	}
-	return NewImage(c, i), nil
+
+	if len(opts) == 0 {
+		return NewImage(c, i), nil
+	} else {
+		var getImgOpts GetImageOptions
+		for _, o := range opts {
+			if err := o(ctx, &getImgOpts); err != nil {
+				return nil, err
+			}
+		}
+		return NewImageWithPlatform(c, i, getImgOpts.PlatformMatcher), nil
+	}
 }
 
 // ListImages returns all existing images

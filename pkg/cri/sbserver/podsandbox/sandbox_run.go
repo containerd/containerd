@@ -81,7 +81,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
+	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, c.sandboxStore.Get(id).RuntimeHandler, config) // TODO: test!
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
 	}
@@ -279,7 +279,7 @@ func (c *Controller) Create(ctx context.Context, _id string, _ ...sandbox.Create
 	return nil
 }
 
-func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
+func (c *Controller) ensureImageExists(ctx context.Context, ref string, runtimeHandler string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.imageService.LocalResolve(ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
@@ -288,7 +288,7 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 		return &image, nil
 	}
 	// Pull image to ensure the image exists
-	resp, err := c.imageService.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
+	resp, err := c.imageService.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref, RuntimeHandler: runtimeHandler}, SandboxConfig: config})
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}

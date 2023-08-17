@@ -23,6 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/platforms"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
@@ -47,16 +48,20 @@ type CRIImageService struct {
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+	// initializes matchComparer for each runtime class depending on whether GuestPlatform
+	// is defined or not. If GuestPlatform is not defined, it takes the default platform.
+	platformMatcherMap map[string]platforms.MatchComparer
 }
 
-func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client, platformMatchComparer map[string]platforms.MatchComparer) (*CRIImageService, error) {
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
-		imageStore:                  imagestore.NewStore(client),
+		imageStore:                  imagestore.NewStore(client, platformMatchComparer),
 		imageFSPath:                 imageFSPath,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
+		platformMatcherMap: platformMatchComparer,
 	}
 
 	if client.SnapshotService(svc.config.ContainerdConfig.Snapshotter) == nil {

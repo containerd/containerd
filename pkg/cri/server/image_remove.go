@@ -57,7 +57,7 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref); err != nil {
+			if err := c.imageStore.Update(ctx, ref, ""); err != nil { //TODO: Pass the correct runtime handler to delete instead of ""
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue

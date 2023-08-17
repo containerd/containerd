@@ -134,7 +134,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, platformM
 		os:                          osinterface.RealOS{},
 		sandboxStore:                sandboxstore.NewStore(labels),
 		containerStore:              containerstore.NewStore(labels),
-		imageStore:                  imagestore.NewStore(client),
+		imageStore:                  imagestore.NewStore(client, platformMatcherMap),
 		snapshotStore:               snapshotstore.NewStore(),
 		sandboxNameIndex:            registrar.NewRegistrar(),
 		containerNameIndex:          registrar.NewRegistrar(),

@@ -69,6 +69,8 @@ type Controller struct {
 	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	baseOCISpecs map[string]*oci.Spec
 
+	// TODO: fill up this !!
+	platformMatcherMap map[string]platforms.MatchComparer
 	store *Store
 }
 
@@ -80,6 +82,7 @@ func New(
 	cri CRIService,
 	imageService ImageService,
 	baseOCISpecs map[string]*oci.Spec,
+	platformMatcherMap map[string]platforms.MatchComparer,
 ) *Controller {
 	return &Controller{
 		config:       config,
@@ -90,6 +93,7 @@ func New(
 		cri:          cri,
 		baseOCISpecs: baseOCISpecs,
 		store:        NewStore(),
+		platformMatcherMap: platformMatcherMap,
 	}
 }
 

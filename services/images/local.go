@@ -128,6 +128,7 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 	if err := l.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
 		Name:   resp.Image.Name,
 		Labels: resp.Image.Labels,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}
@@ -156,7 +157,11 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 		ctx = epoch.WithSourceDateEpoch(ctx, &tm)
 	}
 
-	updated, err := l.store.Update(ctx, image, fieldpaths...)
+	updateOpts := []images.UpdateOpt {
+		images.UpdateWithFieldpaths(fieldpaths),
+	}
+
+	updated, err := l.store.Update(ctx, image, updateOpts...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}

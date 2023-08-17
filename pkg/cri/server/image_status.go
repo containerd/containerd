@@ -70,6 +70,7 @@ func toCRIImage(image imagestore.Image) *runtime.Image {
 		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
 		Pinned:      image.Pinned,
+		// TODO: kiashok . Here Image.Spec is not being set, so should we set runtimeHandler Image.Spec.RuntimeHandler here?
 	}
 
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)

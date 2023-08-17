@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/pkg/cri/instrument"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/sbserver/images"
@@ -74,7 +75,7 @@ type imageService interface {
 
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
 
-	UpdateImage(ctx context.Context, r string) error
+	UpdateImage(ctx context.Context, r string, runtimeHandler string) error
 
 	GetImage(id string) (imagestore.Image, error)
 	GetSnapshot(key string) (snapshotstore.Snapshot, error)
@@ -108,6 +109,7 @@ type criService struct {
 	netPlugin map[string]cni.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
+	platformMatcherMap map[string]platforms.MatchComparer
 	// streamServer is the streaming server serves container streaming request.
 	streamServer streaming.Server
 	// eventMonitor is the monitor monitors containerd events.
@@ -131,7 +133,7 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, platformMap map[string]platforms.MatchComparer, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 
@@ -143,7 +145,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	log.L.Infof("Get image filesystem path %q", imageFSPath)
 
 	// TODO: expose this as a separate containerd plugin.
-	imageService, err := images.NewService(config, imageFSPath, client)
+	imageService, err := images.NewService(config, imageFSPath, client, platformMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
 	}
@@ -152,6 +154,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		imageService:       imageService,
 		config:             config,
 		client:             client,
+		platformMatcherMap: platformMap,
 		imageFSPath:        imageFSPath,
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels),
@@ -201,7 +204,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	}
 
 	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
-	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, imageService, c.baseOCISpecs)
+	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, imageService, c.baseOCISpecs, platformMap)
 	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
 
 	c.nri = nri

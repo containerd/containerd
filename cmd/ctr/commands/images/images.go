@@ -183,7 +183,10 @@ var setLabelsCommand = cli.Command{
 			Labels: labels,
 		}
 
-		updated, err := is.Update(ctx, image, fieldpaths...)
+		updateOpts := []images.UpdateOpt {
+			images.UpdateWithFieldpaths(fieldpaths),
+		}
+		updated, err := is.Update(ctx, image, updateOpts...)
 		if err != nil {
 			return err
 		}

@@ -207,8 +207,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 		return nil, err
 	}
 
+	updateOpts := []images.UpdateOpt {
+		images.UpdateWithFieldpaths([]string{"target"}),
+	}
+
 	for i := range imgs {
-		img, err := is.Update(ctx, imgs[i], "target")
+		img, err := is.Update(ctx, imgs[i], updateOpts...)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				return nil, err

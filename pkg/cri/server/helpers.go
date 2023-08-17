@@ -196,7 +196,11 @@ func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Ima
 	if len(image.References) == 0 {
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+
+	getImageOpts := []containerd.GetImageOpt{
+		containerd.GetImageWithPlatformMatcher(c.platformMatcherMap[image.RuntimeHandler]),
+	}
+	return c.client.GetImage(ctx, image.References[0], getImageOpts...)
 }
 
 // getUserFromImage gets uid or user name of the image user.
@@ -220,7 +224,7 @@ func getUserFromImage(user string) (*int64, string) {
 
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
-func (c *criService) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
+func (c *criService) ensureImageExists(ctx context.Context, ref string, runtimeHandler string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
 	image, err := c.localResolve(ref)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
@@ -229,7 +233,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, config *
 		return &image, nil
 	}
 	// Pull image to ensure the image exists
-	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
+	resp, err := c.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref, RuntimeHandler: runtimeHandler}, SandboxConfig: config})
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
