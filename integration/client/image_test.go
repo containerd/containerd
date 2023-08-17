@@ -235,7 +235,7 @@ func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		unsupportedImage = "registry.k8s.io/pause-amd64:3.2"
 	} else {
-		unsupportedImage = "mcr.microsoft.com/windows/nanoserver:1809"
+		unsupportedImage = "ghcr.io/containerd/windows/nanoserver:1809"
 	}
 
 	ctx, cancel := testContext(t)

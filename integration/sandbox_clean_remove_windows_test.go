@@ -52,30 +52,30 @@ func getTestImage() (string, error) {
 
 	switch buildNum {
 	case osversion.RS1:
-		return "mcr.microsoft.com/windows/nanoserver:sac2016", nil
+		return "ghcr.io/containerd/windows/nanoserver:sac2016", nil
 	case osversion.RS3:
-		return "mcr.microsoft.com/windows/nanoserver:1709", nil
+		return "ghcr.io/containerd/windows/nanoserver:1709", nil
 	case osversion.RS4:
-		return "mcr.microsoft.com/windows/nanoserver:1803", nil
+		return "ghcr.io/containerd/windows/nanoserver:1803", nil
 	case osversion.RS5:
-		return "mcr.microsoft.com/windows/nanoserver:1809", nil
+		return "ghcr.io/containerd/windows/nanoserver:1809", nil
 	case osversion.V19H1:
-		return "mcr.microsoft.com/windows/nanoserver:1903", nil
+		return "ghcr.io/containerd/windows/nanoserver:1903", nil
 	case osversion.V19H2:
-		return "mcr.microsoft.com/windows/nanoserver:1909", nil
+		return "ghcr.io/containerd/windows/nanoserver:1909", nil
 	case osversion.V20H1:
-		return "mcr.microsoft.com/windows/nanoserver:2004", nil
+		return "ghcr.io/containerd/windows/nanoserver:2004", nil
 	case osversion.V20H2:
-		return "mcr.microsoft.com/windows/nanoserver:20H2", nil
+		return "ghcr.io/containerd/windows/nanoserver:20H2", nil
 	case osversion.V21H2Server:
-		return "mcr.microsoft.com/windows/nanoserver:ltsc2022", nil
+		return "ghcr.io/containerd/windows/nanoserver:ltsc2022", nil
 	default:
 		// Due to some efforts in improving down-level compatibility for Windows containers (see
 		// https://techcommunity.microsoft.com/t5/containers/windows-server-2022-and-beyond-for-containers/ba-p/2712487)
 		// the ltsc2022 image should continue to work on builds ws2022 and onwards (Windows 11 for example). With this in mind,
 		// if there's no mapping for the host build just use the Windows Server 2022 image.
 		if buildNum > osversion.V21H2Server {
-			return "mcr.microsoft.com/windows/nanoserver:ltsc2022", nil
+			return "ghcr.io/containerd/windows/nanoserver:ltsc2022", nil
 		}
 		return "", fmt.Errorf("No test image defined for Windows build version: %s", b)
 	}
