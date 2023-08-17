@@ -17,6 +17,8 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -27,6 +29,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/integration/images"
+	runc "github.com/containerd/go-runc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
@@ -234,6 +237,9 @@ func TestPodUserNS(t *testing.T) {
 			if test.hostVolumes && !supportsIDMap(volumeHostPath) {
 				t.Skipf("ID mappings are not supported host volume filesystem: %v", volumeHostPath)
 			}
+			if err := supportsRuncIDMap(); err != nil {
+				t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+			}
 
 			testPodLogDir := t.TempDir()
 			sandboxOpts := append(test.sandboxOpts, WithPodLogDirectory(testPodLogDir))
@@ -296,4 +302,23 @@ func TestPodUserNS(t *testing.T) {
 			test.checkOutput(t, string(content))
 		})
 	}
+}
+
+func supportsRuncIDMap() error {
+	var r runc.Runc
+	features, err := r.Features(context.Background())
+	if err != nil {
+		// If the features command is not implemented, then runc is too old.
+		return fmt.Errorf("features command failed: %w", err)
+	}
+
+	if features.Linux.MountExtensions == nil || features.Linux.MountExtensions.IDMap == nil {
+		return errors.New("missing `mountExtensions.idmap` entry in `features` command")
+
+	}
+	if enabled := features.Linux.MountExtensions.IDMap.Enabled; enabled == nil || !*enabled {
+		return errors.New("idmap mounts not supported")
+	}
+
+	return nil
 }
