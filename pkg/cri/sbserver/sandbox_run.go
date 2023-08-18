@@ -143,18 +143,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
-	platform, err := controller.Platform(ctx, sandbox.ID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
-	}
-
+	// XXX: What we really want here is to call controller.Platform() and then check
+	// platform.OS, but that is only populated after controller.Create() and that needs to be
+	// done later (uses sandbox.NSPath that we will set just _after_ this).
+	// So, lets check for the Linux section on the config, if that is populated, we assume the
+	// platform is linux.
+	// This is a hack, we should improve the controller interface to return the platform
+	// earlier. But should work fine for this specific use.
 	userNsEnabled := false
-	if platform.OS == "linux" {
-		usernsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
+	if linux := config.GetLinux(); linux != nil {
+		usernsOpts := linux.GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
 		if usernsOpts != nil && usernsOpts.GetMode() == runtime.NamespaceMode_POD {
 			userNsEnabled = true
 		}
@@ -239,6 +237,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
+	}
+
+	controller, err := c.getSandboxController(config, r.GetRuntimeHandler())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
 	// Save sandbox metadata to store
