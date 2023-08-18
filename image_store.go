@@ -20,14 +20,12 @@ import (
 	"context"
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -108,11 +106,14 @@ func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.D
 			return err
 		}
 	}
-	_, err := s.client.Delete(ctx, &imagesapi.DeleteImageRequest{
+	req := &imagesapi.DeleteImageRequest{
 		Name: name,
 		Sync: do.Synchronous,
-	})
-
+	}
+	if do.Target != nil {
+		req.Target = oci.DescriptorToProto(*do.Target)
+	}
+	_, err := s.client.Delete(ctx, req)
 	return errdefs.FromGRPC(err)
 }
 
@@ -120,7 +121,7 @@ func imageToProto(image *images.Image) *imagesapi.Image {
 	return &imagesapi.Image{
 		Name:      image.Name,
 		Labels:    image.Labels,
-		Target:    descToProto(&image.Target),
+		Target:    oci.DescriptorToProto(image.Target),
 		CreatedAt: protobuf.ToTimestamp(image.CreatedAt),
 		UpdatedAt: protobuf.ToTimestamp(image.UpdatedAt),
 	}
@@ -130,7 +131,7 @@ func imageFromProto(imagepb *imagesapi.Image) images.Image {
 	return images.Image{
 		Name:      imagepb.Name,
 		Labels:    imagepb.Labels,
-		Target:    descFromProto(imagepb.Target),
+		Target:    oci.DescriptorFromProto(imagepb.Target),
 		CreatedAt: protobuf.FromTimestamp(imagepb.CreatedAt),
 		UpdatedAt: protobuf.FromTimestamp(imagepb.UpdatedAt),
 	}
@@ -145,22 +146,4 @@ func imagesFromProto(imagespb []*imagesapi.Image) []images.Image {
 	}
 
 	return images
-}
-
-func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
-	return ocispec.Descriptor{
-		MediaType:   desc.MediaType,
-		Size:        desc.Size,
-		Digest:      digest.Digest(desc.Digest),
-		Annotations: desc.Annotations,
-	}
-}
-
-func descToProto(desc *ocispec.Descriptor) *types.Descriptor {
-	return &types.Descriptor{
-		MediaType:   desc.MediaType,
-		Size:        desc.Size,
-		Digest:      desc.Digest.String(),
-		Annotations: desc.Annotations,
-	}
 }
