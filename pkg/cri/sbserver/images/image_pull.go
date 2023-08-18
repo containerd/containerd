@@ -328,33 +328,46 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
-	if ref, err := distribution.ParseAnyReference(r); err == nil && ref.String() != r {
-		log.G(ctx).Infof("Ignore inconsistent image ref, the image(%s) is parsed as %q", r, ref.String())
-		return nil
-	}
-
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image by reference: %w", err)
 	}
-	if err == nil && img.Labels()[crilabels.ImageLabelKey] != crilabels.ImageLabelValue {
-		// Make sure the image has the image id as its unique
-		// identifier that references the image in its lifetime.
-		configDesc, err := img.Config(ctx)
-		if err != nil {
-			return fmt.Errorf("get image id: %w", err)
+	if err == nil {
+		if ref, err := distribution.ParseAnyReference(r); err == nil && ref.String() != r {
+			log.G(ctx).Infof("Ignore inconsistent image ref, the image(%s) is parsed as %q", r, ref.String())
+
+			if _, ok := img.Labels()[crilabels.ImageLabelKey]; ok {
+				image := containerdimages.Image{
+					Name:   img.Name(),
+					Labels: img.Labels(),
+				}
+				delete(image.Labels, crilabels.ImageLabelKey)
+				if _, err := c.client.ImageService().Update(ctx, image, "labels."+crilabels.ImageLabelKey); err != nil {
+					return fmt.Errorf("delete image label(%s) for %q: %w", crilabels.ImageLabelKey, r, err)
+				}
+			}
+			return nil
 		}
-		id := configDesc.Digest.String()
-		labels := c.getLabels(ctx, id)
-		if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
-			return fmt.Errorf("create image id reference %q: %w", id, err)
-		}
-		if err := c.imageStore.Update(ctx, id); err != nil {
-			return fmt.Errorf("update image store for %q: %w", id, err)
-		}
-		// The image id is ready, add the label to mark the image as managed.
-		if err := c.createImageReference(ctx, r, img.Target(), labels); err != nil {
-			return fmt.Errorf("create managed label: %w", err)
+
+		if img.Labels()[crilabels.ImageLabelKey] != crilabels.ImageLabelValue {
+			// Make sure the image has the image id as its unique
+			// identifier that references the image in its lifetime.
+			configDesc, err := img.Config(ctx)
+			if err != nil {
+				return fmt.Errorf("get image id: %w", err)
+			}
+			id := configDesc.Digest.String()
+			labels := c.getLabels(ctx, id)
+			if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
+				return fmt.Errorf("create image id reference %q: %w", id, err)
+			}
+			if err := c.imageStore.Update(ctx, id); err != nil {
+				return fmt.Errorf("update image store for %q: %w", id, err)
+			}
+			// The image id is ready, add the label to mark the image as managed.
+			if err := c.createImageReference(ctx, r, img.Target(), labels); err != nil {
+				return fmt.Errorf("create managed label: %w", err)
+			}
 		}
 	}
 	// If the image is not found, we should continue updating the cache,
