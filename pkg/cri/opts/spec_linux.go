@@ -78,9 +78,9 @@ func isHugetlbControllerPresent() bool {
 	supportsHugetlbOnce.Do(func() {
 		supportsHugetlb = false
 		if IsCgroup2UnifiedMode() {
-			supportsHugetlb, _ = cgroupv2HasHugetlb()
+			supportsHugetlb = cgroupv2HasHugetlb()
 		} else {
-			supportsHugetlb, _ = cgroupv1HasHugetlb()
+			supportsHugetlb = cgroupv1HasHugetlb()
 		}
 	})
 	return supportsHugetlb
@@ -89,41 +89,36 @@ func isHugetlbControllerPresent() bool {
 var (
 	_cgroupv1HasHugetlbOnce sync.Once
 	_cgroupv1HasHugetlb     bool
-	_cgroupv1HasHugetlbErr  error
 	_cgroupv2HasHugetlbOnce sync.Once
 	_cgroupv2HasHugetlb     bool
-	_cgroupv2HasHugetlbErr  error
 	isUnifiedOnce           sync.Once
 	isUnified               bool
 )
 
 // cgroupv1HasHugetlb returns whether the hugetlb controller is present on
 // cgroup v1.
-func cgroupv1HasHugetlb() (bool, error) {
+func cgroupv1HasHugetlb() bool {
 	_cgroupv1HasHugetlbOnce.Do(func() {
 		if _, err := os.ReadDir("/sys/fs/cgroup/hugetlb"); err != nil {
-			_cgroupv1HasHugetlbErr = fmt.Errorf("readdir /sys/fs/cgroup/hugetlb: %w", err)
 			_cgroupv1HasHugetlb = false
 		} else {
-			_cgroupv1HasHugetlbErr = nil
 			_cgroupv1HasHugetlb = true
 		}
 	})
-	return _cgroupv1HasHugetlb, _cgroupv1HasHugetlbErr
+	return _cgroupv1HasHugetlb
 }
 
 // cgroupv2HasHugetlb returns whether the hugetlb controller is present on
 // cgroup v2.
-func cgroupv2HasHugetlb() (bool, error) {
+func cgroupv2HasHugetlb() bool {
 	_cgroupv2HasHugetlbOnce.Do(func() {
 		controllers, err := os.ReadFile("/sys/fs/cgroup/cgroup.controllers")
 		if err != nil {
-			_cgroupv2HasHugetlbErr = fmt.Errorf("read /sys/fs/cgroup/cgroup.controllers: %w", err)
 			return
 		}
 		_cgroupv2HasHugetlb = strings.Contains(string(controllers), "hugetlb")
 	})
-	return _cgroupv2HasHugetlb, _cgroupv2HasHugetlbErr
+	return _cgroupv2HasHugetlb
 }
 
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
