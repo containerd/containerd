@@ -9,7 +9,7 @@ on:
 env:
   # Go version we currently use to build containerd across all CI.
   # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.20.7"
+  GO_VERSION: "1.21.0"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -203,13 +203,13 @@ jobs:
   binaries:
     name: Binaries
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     needs: [project, linters, protos, man]
 
     strategy:
       matrix:
         os: [ubuntu-22.04, macos-12, windows-2019, windows-2022]
-        go-version: ["1.20.7", "1.19.12"]
+        go-version: ["1.20.7", "1.21.0"]
     steps:
       - uses: actions/setup-go@v4
         with:
@@ -217,6 +217,12 @@ jobs:
           cache: false # see actions/setup-go#368
 
       - uses: actions/checkout@v3
+
+      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
+      # builtin MinGW version leads to DLL loading errors during runtime.
+      - name: Upgrade MinGW on Windows 2019
+        if: matrix.os == 'windows-2019'
+        run: choco upgrade mingw
 
       - name: Make
         run: |
@@ -268,6 +274,12 @@ jobs:
           echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
+
+      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
+      # builtin MinGW version leads to DLL loading errors during runtime.
+      - name: Upgrade MinGW on Windows 2019
+        if: matrix.os == 'windows-2019'
+        run: choco upgrade mingw
 
       - name: Binaries
         env:
