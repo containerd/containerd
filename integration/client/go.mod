@@ -3,7 +3,7 @@ module github.com/containerd/containerd/integration/client
 go 1.19
 
 require (
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230106234847-43070de90fa1 // replaced; see replace rules for actual version used.
+	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
 	github.com/Microsoft/hcsshim v0.10.0
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.2
@@ -30,7 +30,6 @@ require (
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
@@ -77,7 +76,3 @@ require (
 // in the "require" section above are still taken into account for version
 // resolution if newer.
 replace github.com/containerd/containerd => ../../
-
-// Fork will be merged later but may impact other go-fuzz-headers consumers:
-// https://github.com/containerd/containerd/pull/7957#pullrequestreview-1244814968
-replace github.com/AdaLogics/go-fuzz-headers => github.com/AdamKorcz/go-fuzz-headers-1 v0.0.0-20230111232327-1f10f66a31bf
