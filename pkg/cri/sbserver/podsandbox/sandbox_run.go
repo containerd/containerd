@@ -26,7 +26,6 @@ import (
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/hashicorp/go-multierror"
 	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -61,7 +60,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	defer func() {
 		if retErr != nil && cleanupErr != nil {
 			log.G(ctx).WithField("id", id).WithError(cleanupErr).Errorf("failed to fully teardown sandbox resources after earlier error: %s", retErr)
-			retErr = multierror.Append(retErr, CleanupErr{cleanupErr})
+			retErr = errors.Join(retErr, CleanupErr{cleanupErr})
 		}
 	}()
 

@@ -21,12 +21,12 @@ package devmapper
 import (
 	"context"
 	_ "crypto/sha256"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/containerd/continuity/fs/fstest"
-	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
@@ -199,11 +199,11 @@ func createSnapshotter(ctx context.Context, t *testing.T, config *Config) (snaps
 
 	// Remove device mapper pool and detach loop devices after test completes
 	removePool := func() error {
-		result := multierror.Append(
+		result := errors.Join(
 			snap.pool.RemovePool(ctx),
 			mount.DetachLoopDevice(loopDataDevice, loopMetaDevice))
 
-		return result.ErrorOrNil()
+		return result
 	}
 
 	// Pool cleanup should be called before closing metadata store (as we need to retrieve device names)
