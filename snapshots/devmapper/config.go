@@ -19,11 +19,11 @@
 package devmapper
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/docker/go-units"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pelletier/go-toml"
 )
 
@@ -100,29 +100,29 @@ func (c *Config) parse() error {
 
 // Validate makes sure configuration fields are valid
 func (c *Config) Validate() error {
-	var result *multierror.Error
+	var result []error
 
 	if c.PoolName == "" {
-		result = multierror.Append(result, fmt.Errorf("pool_name is required"))
+		result = append(result, fmt.Errorf("pool_name is required"))
 	}
 
 	if c.RootPath == "" {
-		result = multierror.Append(result, fmt.Errorf("root_path is required"))
+		result = append(result, fmt.Errorf("root_path is required"))
 	}
 
 	if c.BaseImageSize == "" {
-		result = multierror.Append(result, fmt.Errorf("base_image_size is required"))
+		result = append(result, fmt.Errorf("base_image_size is required"))
 	}
 
 	if c.FileSystemType != "" {
 		switch c.FileSystemType {
 		case fsTypeExt4, fsTypeXFS, fsTypeExt2:
 		default:
-			result = multierror.Append(result, fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType))
+			result = append(result, fmt.Errorf("unsupported Filesystem Type: %q", c.FileSystemType))
 		}
 	} else {
-		result = multierror.Append(result, fmt.Errorf("filesystem type cannot be empty"))
+		result = append(result, fmt.Errorf("filesystem type cannot be empty"))
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }

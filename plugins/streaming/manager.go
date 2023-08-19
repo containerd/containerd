@@ -18,6 +18,7 @@ package streaming
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/containerd/containerd/errdefs"
@@ -27,8 +28,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 func init() {
@@ -256,12 +255,12 @@ func (cc *collectionContext) Finish() error {
 	}
 	cc.manager.rwlock.Unlock()
 
-	var errs *multierror.Error
+	var errs []error
 	for _, s := range closeStreams {
 		if err := s.Close(); err != nil {
-			errs = multierror.Append(errs, err)
+			errs = append(errs, err)
 		}
 	}
 
-	return errs.ErrorOrNil()
+	return errors.Join(errs...)
 }
