@@ -22,7 +22,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,13 +79,13 @@ func TestFieldValidation(t *testing.T) {
 	err := config.Validate()
 	assert.NotNil(t, err)
 
-	multErr := (err).(*multierror.Error)
-	assert.Len(t, multErr.Errors, 4)
+	multErr := err.(interface{ Unwrap() []error }).Unwrap()
+	assert.Len(t, multErr, 4)
 
-	assert.NotNil(t, multErr.Errors[0], "pool_name is empty")
-	assert.NotNil(t, multErr.Errors[1], "root_path is empty")
-	assert.NotNil(t, multErr.Errors[2], "base_image_size is empty")
-	assert.NotNil(t, multErr.Errors[3], "filesystem type cannot be empty")
+	assert.NotNil(t, multErr[0], "pool_name is empty")
+	assert.NotNil(t, multErr[1], "root_path is empty")
+	assert.NotNil(t, multErr[2], "base_image_size is empty")
+	assert.NotNil(t, multErr[3], "filesystem type cannot be empty")
 }
 
 func TestExistingPoolFieldValidation(t *testing.T) {

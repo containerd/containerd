@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
-	"github.com/hashicorp/go-multierror"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -344,14 +343,14 @@ func (s *Snapshotter) ResetPool(ctx context.Context) error {
 		return err
 	}
 
-	var result *multierror.Error
+	var result []error
 	for _, name := range names {
 		if err := s.pool.RemoveDevice(ctx, name); err != nil {
-			result = multierror.Append(result, err)
+			result = append(result, err)
 		}
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 // Close releases devmapper snapshotter resources.
@@ -359,16 +358,16 @@ func (s *Snapshotter) ResetPool(ctx context.Context) error {
 func (s *Snapshotter) Close() error {
 	log.L.Debug("close")
 
-	var result *multierror.Error
+	var result []error
 	s.closeOnce.Do(func() {
 		for _, fn := range s.cleanupFn {
 			if err := fn(); err != nil {
-				result = multierror.Append(result, err)
+				result = append(result, err)
 			}
 		}
 	})
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts ...snapshots.Opt) ([]mount.Mount, error) {
@@ -423,15 +422,15 @@ func (s *Snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 		}
 		log.G(ctx).Debugf("Creating file system of type: %s with options: %s for thin device %q", s.config.FileSystemType, fsOptions, deviceName)
 		if err := mkfs(ctx, s.config.FileSystemType, fsOptions, dmsetup.GetFullDevicePath(deviceName)); err != nil {
+			errs := []error{err}
 			status, sErr := dmsetup.Status(s.pool.poolName)
 			if sErr != nil {
-				multierror.Append(err, sErr)
+				errs = append(errs, sErr)
 			}
 
 			// Rollback thin device creation if mkfs failed
-			log.G(ctx).WithError(err).Errorf("failed to initialize thin device %q for snapshot %s pool status %s", deviceName, snap.ID, status.RawOutput)
-			return nil, multierror.Append(err,
-				s.pool.RemoveDevice(ctx, deviceName))
+			log.G(ctx).WithError(errors.Join(errs...)).Errorf("failed to initialize thin device %q for snapshot %s pool status %s", deviceName, snap.ID, status.RawOutput)
+			return nil, errors.Join(append(errs, s.pool.RemoveDevice(ctx, deviceName))...)
 		}
 	} else {
 		parentDeviceName := s.getDeviceName(snap.ParentIDs[0])
@@ -551,16 +550,16 @@ func (s *Snapshotter) Cleanup(ctx context.Context) error {
 		return err
 	}
 
-	var result *multierror.Error
+	var result []error
 	for _, dev := range removedDevices {
 		log.G(ctx).WithField("device", dev.Name).Debug("cleanup device")
 		if err := s.pool.RemoveDevice(ctx, dev.Name); err != nil {
 			log.G(ctx).WithField("device", dev.Name).Error("failed to cleanup device")
-			result = multierror.Append(result, err)
+			result = append(result, err)
 		} else {
 			log.G(ctx).WithField("device", dev.Name).Debug("cleanuped device")
 		}
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
