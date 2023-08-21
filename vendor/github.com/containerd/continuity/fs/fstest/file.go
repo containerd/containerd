@@ -65,7 +65,12 @@ func writeFileStream(name string, stream func() io.Reader, perm os.FileMode) App
 			return err
 		}
 		defer func() {
-			err := f.Close()
+			err := f.Sync()
+			if err != nil && retErr == nil {
+				retErr = err
+			}
+
+			err = f.Close()
 			if err != nil && retErr == nil {
 				retErr = err
 			}

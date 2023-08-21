@@ -1,3 +1,5 @@
+//go:build windows || darwin
+
 /*
    Copyright The containerd Authors.
 
@@ -14,8 +16,11 @@
    limitations under the License.
 */
 
-package testutil
+package blockfile
 
-import "golang.org/x/sys/unix"
+import "testing"
 
-const umountflags int = unix.MNT_DETACH
+func setupSnapshotter(t *testing.T) ([]Opt, error) {
+	t.Skip("No support for loopback mounts")
+	return nil, nil
+}
