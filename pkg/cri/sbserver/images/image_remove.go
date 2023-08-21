@@ -35,7 +35,13 @@ import (
 // semantic defined in CRI now.
 func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+	// get runtime handler from pull request or use defaut runtime class name if one
+	// was not specified
+	runtimeHdlr := r.GetImage().GetRuntimeHandler()
+	if runtimeHdlr == "" {
+		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
+	}
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr) // TODO: test this codepath!
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
@@ -57,7 +63,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImag
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref, ""); err != nil { // TODO: you should pass runtime handler of the image you want to delete
+			if err := c.imageStore.Update(ctx, ref, runtimeHdlr); err != nil { // TODO: test this codepath!
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue

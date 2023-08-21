@@ -49,8 +49,8 @@ type CRIService interface {
 type ImageService interface {
 	runtime.ImageServiceServer
 
-	LocalResolve(refOrID string) (imagestore.Image, error)
-	GetImage(id string) (imagestore.Image, error)
+	LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error)
+	GetImage(id string, runtimeHandler string) (imagestore.Image, error)
 }
 
 type Controller struct {

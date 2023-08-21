@@ -35,7 +35,13 @@ import (
 // kubernetes/kubernetes#46255)
 func (c *criService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	image, err := c.localResolve(r.GetImage().GetImage())
+	// get runtime handler from pull request or use defaut runtime class name if one
+	// was not specified
+	runtimeHdlr := r.GetImage().GetRuntimeHandler()
+	if runtimeHdlr == "" {
+		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
+	}
+	image, err := c.localResolve(r.GetImage().GetImage(), runtimeHdlr)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())

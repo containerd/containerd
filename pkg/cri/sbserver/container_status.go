@@ -43,7 +43,11 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	// * ImageRef in container status is repo digest.
 	spec := container.Config.GetImage()
 	imageRef := container.ImageRef
-	image, err := c.GetImage(imageRef)
+	sb, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get runtime handler string from container's sandbox with ID %v", container.SandboxID)
+	}
+	image, err := c.GetImage(imageRef, sb.RuntimeHandler)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get image %q: %w", imageRef, err)

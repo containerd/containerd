@@ -211,6 +211,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageID := configDesc.Digest.String()
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	log.G(ctx).Debugf("!! criservice.PullImage(), namedRef %v, imageID %v, repoTag %v, repoDigest %v", namedRef, imageID, repoTag, repoDigest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue

@@ -82,7 +82,7 @@ func NewService(config criconfig.Config, imageFSPath string, client *containerd.
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+func (c *CRIImageService) LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
@@ -107,7 +107,7 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	return c.imageStore.Get(imageID, runtimeHandler)
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
@@ -122,8 +122,8 @@ func (c *CRIImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cri
 }
 
 // GetImage gets image metadata by image id.
-func (c *CRIImageService) GetImage(id string) (imagestore.Image, error) {
-	return c.imageStore.Get(id)
+func (c *CRIImageService) GetImage(id, runtimeHandler string) (imagestore.Image, error) {
+	return c.imageStore.Get(id, runtimeHandler)
 }
 
 // GetSnapshot returns the snapshot with specified key.

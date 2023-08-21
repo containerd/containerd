@@ -162,7 +162,7 @@ func getRepoDigestAndTag(namedRef docker.Named, digest imagedigest.Digest, schem
 
 // localResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
+func (c *criService) localResolve(refOrID string, runtimeHandler string) (imagestore.Image, error) {
 	getImageID := func(refOrId string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
@@ -187,7 +187,7 @@ func (c *criService) localResolve(refOrID string) (imagestore.Image, error) {
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	return c.imageStore.Get(imageID, runtimeHandler)
 }
 
 // toContainerdImage converts an image object in image store to containerd image handler.
@@ -225,7 +225,7 @@ func getUserFromImage(user string) (*int64, string) {
 // ensureImageExists returns corresponding metadata of the image reference, if image is not
 // pulled yet, the function will pull the image.
 func (c *criService) ensureImageExists(ctx context.Context, ref string, runtimeHandler string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
-	image, err := c.localResolve(ref)
+	image, err := c.localResolve(ref, runtimeHandler)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
@@ -238,7 +238,7 @@ func (c *criService) ensureImageExists(ctx context.Context, ref string, runtimeH
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
 	imageID := resp.GetImageRef()
-	newImage, err := c.imageStore.Get(imageID)
+	newImage, err := c.imageStore.Get(imageID, runtimeHandler)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)

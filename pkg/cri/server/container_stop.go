@@ -133,7 +133,11 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// default SIGTERM is still better than returning error and leaving
 			// the container unstoppable. (See issue #990)
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.imageStore.Get(container.ImageRef)
+			sb, err := c.sandboxStore.Get(sandboxID)
+			if err != nil {
+				return fmt.Errorf("failed to get runtime handler string from container's sandbox with ID %v", container.SandboxID)
+			}
+			image, err := c.imageStore.Get(container.ImageRef, sb.RuntimeHandler)
 			if err != nil {
 				if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get image %q: %w", container.ImageRef, err)

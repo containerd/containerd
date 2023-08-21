@@ -280,7 +280,7 @@ func (c *Controller) Create(ctx context.Context, _id string, _ ...sandbox.Create
 }
 
 func (c *Controller) ensureImageExists(ctx context.Context, ref string, runtimeHandler string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {
-	image, err := c.imageService.LocalResolve(ref)
+	image, err := c.imageService.LocalResolve(ref, runtimeHandler)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get image %q: %w", ref, err)
 	}
@@ -293,7 +293,7 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, runtimeH
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
 	imageID := resp.GetImageRef()
-	newImage, err := c.imageService.GetImage(imageID)
+	newImage, err := c.imageService.GetImage(imageID, runtimeHandler)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)

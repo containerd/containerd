@@ -77,10 +77,10 @@ type imageService interface {
 
 	UpdateImage(ctx context.Context, r string, runtimeHandler string) error
 
-	GetImage(id string) (imagestore.Image, error)
+	GetImage(id, runtimeHandler string) (imagestore.Image, error)
 	GetSnapshot(key string) (snapshotstore.Snapshot, error)
 
-	LocalResolve(refOrID string) (imagestore.Image, error)
+	LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error)
 }
 
 // criService implements CRIService.
