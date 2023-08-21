@@ -323,6 +323,9 @@ type RemoteContext struct {
 	// from multiple platforms.
 	PlatformMatcher platforms.MatchComparer
 
+	// runtime handler used to pull the image
+	RuntimeHandler string
+
 	// Unpack is done after an image is pulled to extract into a snapshotter.
 	// It is done simultaneously for schema 2 images when they are pulled.
 	// If an image is not unpacked on pull, it can be unpacked any time
@@ -422,7 +425,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	if err != nil {
 		return images.Image{}, err
 	}
-	return c.createNewImage(ctx, img)
+	return c.createNewImage(ctx, img, fetchCtx.RuntimeHandler) // TODO: check if the runtime handler is being set correctly for Fetch()
 }
 
 // Push uploads the provided content to a remote resource

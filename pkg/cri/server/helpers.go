@@ -89,7 +89,7 @@ const (
 	defaultIfName = "eth0"
 
 	// runtimeRunhcsV1 is the runtime type for runhcs.
-	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
+	RuntimeRunhcsV1 = "io.containerd.runhcs.v1"
 )
 
 // makeSandboxName generates sandbox name from sandbox metadata. The name
@@ -335,8 +335,8 @@ func parseImageReferences(refs []string) ([]string, []string) {
 	return tags, digests
 }
 
-// generateRuntimeOptions generates runtime options from cri plugin config.
-func generateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
+// GenerateRuntimeOptions generates runtime options from cri plugin config.
+func GenerateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
 	if r.Options == nil {
 		return nil, nil
 	}
@@ -366,7 +366,7 @@ func getRuntimeOptionsType(t string) interface{} {
 	switch t {
 	case plugin.RuntimeRuncV2:
 		return &runcoptions.Options{}
-	case runtimeRunhcsV1:
+	case RuntimeRunhcsV1:
 		return &runhcsoptions.Options{}
 	default:
 		return &runtimeoptions.Options{}

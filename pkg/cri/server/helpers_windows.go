@@ -22,7 +22,9 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/containerd/containerd/log"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 )
 
 // openLogFile opens/creates a container log file.
@@ -168,4 +170,17 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 
 func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
+}
+
+func IsWindowsSandboxIsolation(ctx context.Context, runtimeOpts interface{}) bool {
+	rhcso, ok := runtimeOpts.(*runhcsoptions.Options)
+	if ok {
+		if rhcso.SandboxIsolation == 1 { // hyperV isolated
+			return true
+		}
+	} else {
+		// log error
+		log.G(ctx).Errorf("Failed to get runhcs runtime options")
+	}
+	return false
 }

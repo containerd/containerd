@@ -37,4 +37,5 @@ message ImageUpdate {
 
 message ImageDelete {
 	string name = 1;
+	string runtimeHandler = 2;
 }

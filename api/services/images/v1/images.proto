@@ -109,6 +109,7 @@ message UpdateImageRequest {
 	google.protobuf.FieldMask update_mask = 2;
 
 	google.protobuf.Timestamp source_date_epoch = 3;
+	string runtimeHandler = 4;
 }
 
 message UpdateImageResponse {
@@ -141,4 +142,5 @@ message DeleteImageRequest {
 	//
 	// Default is false
 	bool sync = 2;
+	string runtimeHandler = 3;
 }

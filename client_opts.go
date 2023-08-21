@@ -124,6 +124,13 @@ func WithPlatform(platform string) RemoteOpt {
 	}
 }
 
+func WithRuntimeHandler(runtimeHandler string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.RuntimeHandler = runtimeHandler
+		return nil
+	}
+}
+
 // WithPlatformMatcher specifies the matcher to use for
 // determining which platforms to pull content for.
 // This value supersedes anything set with `WithPlatform`.

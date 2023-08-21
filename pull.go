@@ -153,7 +153,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		unpackSpan.End()
 	}
 
-	img, err = c.createNewImage(ctx, img)
+	img, err = c.createNewImage(ctx, img, pullCtx.RuntimeHandler)
 	if err != nil {
 		return nil, err
 	}
@@ -277,17 +277,24 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	}, nil
 }
 
-func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
+func (c *Client) createNewImage(ctx context.Context, img images.Image, runtimeHandler string) (images.Image, error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "pull.createNewImage"))
 	defer span.End()
 	is := c.ImageService()
 	for {
-		if created, err := is.Create(ctx, img); err != nil {
+		createOpts := []images.CreateOpt {
+			images.CreateWithRuntimeHandler(runtimeHandler),
+		}
+		if created, err := is.Create(ctx, img, createOpts...); err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return images.Image{}, err
 			}
 
-			updated, err := is.Update(ctx, img)
+			updateOpts := []images.UpdateOpt {
+				images.UpdateWithRuntimeHandler(runtimeHandler),
+			}
+
+			updated, err := is.Update(ctx, img, updateOpts...)
 			if err != nil {
 				// if image was removed, try create again
 				if errdefs.IsNotFound(err) {

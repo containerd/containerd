@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/tracing"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -35,6 +36,8 @@ import (
 // semantic defined in CRI now.
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
+
+	log.G(ctx).Debugf("!! RemoveImage request: %v", r)
 	// get runtime handler from pull request or use defaut runtime class name if one
 	// was not specified
 	runtimeHdlr := r.GetImage().GetRuntimeHandler()
@@ -50,15 +53,18 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
+	log.G(ctx).Debugf("!! RemoveImage c.localResolve() returns: %v", image)
 	span.SetAttributes(tracing.Attribute("image.id", image.ID))
 	// Remove all image references.
 	for i, ref := range image.References {
-		var opts []images.DeleteOpt
+		opts := []images.DeleteOpt {
+			images.DeleteWithRuntimeHandler(runtimeHdlr),
+		}
 		if i == len(image.References)-1 {
 			// Delete the last image reference synchronously to trigger garbage collection.
 			// This is best effort. It is possible that the image reference is deleted by
 			// someone else before this point.
-			opts = []images.DeleteOpt{images.SynchronousDelete()}
+			opts = append(opts, images.SynchronousDelete())
 		}
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {

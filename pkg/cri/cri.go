@@ -89,15 +89,34 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	platformMap := make(map[string]platforms.MatchComparer)
-	for k, r := range c.PluginConfig.ContainerdConfig.Runtimes {
+	for k, ociRuntime := range c.PluginConfig.ContainerdConfig.Runtimes {
 		log.G(context.Background()).Debugf("!! InitCriService k: %v", k)
-		log.G(context.Background()).Debugf("!! InitCriService r.GuestPlatform: %v", r.GuestPlatform)
+		log.G(context.Background()).Debugf("!! InitCriService r.GuestPlatform: %v", ociRuntime.GuestPlatform)
 
-		if r.GuestPlatform.OS != "" && r.GuestPlatform.OSVersion != "" {
-			platformMap[k] = platforms.Only(r.GuestPlatform)
+		if ociRuntime.GuestPlatform.OS != "" && ociRuntime.GuestPlatform.OSVersion != "" {
+			// TODO: check if the runtime class has sandbox isolation field set and allow new platform
+			// matcher only if it is hyperV isolation
+			if ociRuntime.Type == server.RuntimeRunhcsV1 {
+				runtimeOpts, err := server.GenerateRuntimeOptions(ociRuntime)
+				if err != nil {
+					log.G(ctx).Errorf("Failed to get runtime options for runtime: %v", k)
+				}
+				if server.IsWindowsSandboxIsolation(ctx, runtimeOpts) {
+					platformMap[k] = platforms.Only(ociRuntime.GuestPlatform)
+				} else {
+					log.G(ctx).Infof("platform matcher cannot be overriden with GuestPlatform for process isolated ")
+					platformMap[k] = platforms.Only(platforms.DefaultSpec())
+				}
+			} else {
+				platformMap[k] = platforms.Only(ociRuntime.GuestPlatform)
+			}
 		} else {
 			platformMap[k] = platforms.Only(platforms.DefaultSpec())
 		}
+	}
+
+	for k, matcher := range platformMap {
+		log.G(ctx).Debugf("matcher for runtime: %v, is %v", k, matcher)
 	}
 
 	var s server.CRIService

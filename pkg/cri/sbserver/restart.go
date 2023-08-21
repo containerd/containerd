@@ -32,7 +32,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/netns"
-	"github.com/containerd/containerd/platforms"
+	//"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -169,7 +169,10 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 
 	// Recover all images.
-	cImages, err := c.client.ListImages(ctx)
+	listImagesOpt := []containerd.ListImageOpt {
+		containerd.ListImageWithPlatformMatcherMap(c.platformMatcherMap),
+	}
+	cImages, err := c.client.ListImagesWithPlatformMatcher(ctx, listImagesOpt...)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -413,15 +416,15 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 }
 
 // loadImages loads images from containerd.
-func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
+func (c *criService) loadImages(ctx context.Context, cImages []containerd.ImagesWrapper) {
 	snapshotter := c.config.ContainerdConfig.Snapshotter
 	var wg sync.WaitGroup
-	for _, i := range cImages {
+	for _, iWrapper := range cImages {
 		wg.Add(1)
-		i := i
+		i := iWrapper.Images
 		go func() {
 			defer wg.Done()
-			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), i.Platform())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
@@ -440,7 +443,7 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
 				// TODO(random-liu): Consider whether we should try unpack here.
 			}
-			if err := c.UpdateImage(ctx, i.Name(), ""); err != nil {
+			if err := c.UpdateImage(ctx, i.Name(), iWrapper.RuntimeHandler); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 				return
 			}

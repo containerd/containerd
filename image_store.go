@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
@@ -73,6 +74,14 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image, opts ...i
 		}
 	}
 
+	/*
+	_, file, no, ok := runtime.Caller(1)
+	if ok {
+		fmt.Printf("called from %s#%d\n", file, no)
+		log.G(ctx).Debugf("!! remoteImages.Create() file: %v no %v, runtimeHandler %v", file, no, createOpts.RuntimeHandler)
+	}
+	*/
+
 	req := &imagesapi.CreateImageRequest{
 		Image: imageToProto(&image),
 		// TODO:
@@ -90,6 +99,7 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image, opts ...i
 }
 
 func (s *remoteImages) Update(ctx context.Context, image images.Image, opts ...images.UpdateOpt) (images.Image, error) {
+
 	var updateOpts images.UpdateOptions
 	for _, o := range opts {
 		if err := o(ctx, &updateOpts); err != nil {
@@ -97,16 +107,26 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, opts ...i
 		}
 	}
 
+	/*
+	_, file, no, ok := runtime.Caller(1)
+	if ok {
+		fmt.Printf("called from %s#%d\n", file, no)
+		log.G(ctx).Debugf("!! remoteImages.Update() file: %v no %v, runtimeHandler %v", file, no, updateOpts.RuntimeHandler)
+	}
+	*/
+
 	var updateMask *ptypes.FieldMask
 	if len(updateOpts.Fieldpaths) > 0 {
 		updateMask = &ptypes.FieldMask{
 			Paths: updateOpts.Fieldpaths,
 		}
 	}
+	log.G(ctx).Debugf("!! remoteImages.Update(), runtimeHandler %v", updateOpts.RuntimeHandler)
 	req := &imagesapi.UpdateImageRequest{
 		Image:      imageToProto(&image),
 		UpdateMask: updateMask,
 		// TODO: add runtimeHandler string
+		RuntimeHandler: updateOpts.RuntimeHandler,
 	}
 	if tm := epoch.FromContext(ctx); tm != nil {
 		req.SourceDateEpoch = timestamppb.New(*tm)
@@ -129,6 +149,7 @@ func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.D
 	_, err := s.client.Delete(ctx, &imagesapi.DeleteImageRequest{
 		Name: name,
 		Sync: do.Synchronous,
+		RuntimeHandler: do.RuntimeHandler,
 	})
 
 	return errdefs.FromGRPC(err)

@@ -171,6 +171,7 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 	if err := l.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
 		Name:   resp.Image.Name,
 		Labels: resp.Image.Labels,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}
@@ -187,6 +188,7 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 
 	if err := l.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
 		Name: req.Name,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}
