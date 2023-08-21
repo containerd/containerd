@@ -94,7 +94,7 @@ RUN make BUILDTAGS="no_btrfs no_devmapper" bin/cri-integration.test
 RUN ./script/setup/install-failpoint-binaries
 # The test scripts need these env vars to be explicitly set
 ENV GITHUB_WORKSPACE=""
-ENV ENABLE_CRI_SANDBOXES=""
+ENV DISABLE_CRI_SANDBOXES=""
 ENV CONTAINERD_RUNTIME="io.containerd.runc.v2"
 CMD ["make", "cri-integration"]
 
