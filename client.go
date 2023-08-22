@@ -45,6 +45,7 @@ import (
 	contentproxy "github.com/containerd/containerd/content/proxy"
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
@@ -513,6 +514,84 @@ func (c *Client) GetImage(ctx context.Context, ref string, opts ...GetImageOpt) 
 	}
 }
 
+type ListImageOptions struct {
+	Filters []string
+	PlatformMatcherMap map[string]platforms.MatchComparer
+}
+
+type ListImageOpt func(context.Context, *ListImageOptions) error
+
+func ListImageWithPlatformMatcherMap(platformMatcherMap map[string]platforms.MatchComparer) ListImageOpt {
+	return func(ctx context.Context, o *ListImageOptions) error {
+		o.PlatformMatcherMap = platformMatcherMap
+		return nil
+	}
+}
+
+func ListImageWithFilters(filters []string) ListImageOpt {
+	return func(ctx context.Context, o *ListImageOptions) error {
+		o.Filters = filters
+		return nil
+	}
+}
+
+func checkIfValidPlatforMatcher(ctx context.Context, provider content.Provider, image ocispec.Descriptor, matcher platforms.MatchComparer) bool {
+	_, err := images.Manifest(ctx, provider, image, matcher)
+	if err != nil {
+		/*
+		if errdefs.IsNotFound(err) {
+			return false
+		}
+		*/
+		return false
+	}
+	return true
+}
+
+type ImagesWrapper struct {
+	Images Image
+	RuntimeHandler string
+}
+
+func (c *Client) ListImagesWithPlatformMatcher(ctx context.Context, opts ...ListImageOpt) ([]ImagesWrapper, error) {
+	log.G(ctx).Debugf("!! ListImagesWithplatformMatcher client %v", c)
+	var listImgOpts ListImageOptions
+	for _, o := range opts {
+		if err := o(ctx, &listImgOpts); err != nil {
+			return nil, err
+		}
+	}
+
+	imgs, err := c.ImageService().List(ctx, listImgOpts.Filters...)
+	if err != nil {
+		return nil, err
+	}
+
+	imagesW := make([]ImagesWrapper, len(imgs))
+
+	if len(opts) == 0 { 
+		for i, img := range imgs {
+			imagesW[i].Images = NewImage(c, img)
+			imagesW[i].RuntimeHandler = c.runtime
+		}
+	} else {
+		for i, img := range imgs {
+			for runtimeHandler, matcher := range listImgOpts.PlatformMatcherMap {
+				tmp := NewImage(c, img)
+				if checkIfValidPlatforMatcher(ctx, tmp.ContentStore(), tmp.Target(), matcher) {
+					log.G(ctx).Debugf("!! client.ListImageWithMatcher, img %v matched matcher %v", img, matcher)
+					imagesW[i].Images = NewImageWithPlatform(c, img, matcher)
+					imagesW[i].RuntimeHandler = runtimeHandler
+				}
+			}
+			if imagesW[i].Images == nil {
+				return nil, fmt.Errorf("valid platform matcher for image %v not found", img)
+			}
+		}
+	}
+	return imagesW, nil
+}
+
 // ListImages returns all existing images
 func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, error) {
 	imgs, err := c.ImageService().List(ctx, filters...)
@@ -520,6 +599,7 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 		return nil, err
 	}
 	images := make([]Image, len(imgs))
+
 	for i, img := range imgs {
 		images[i] = NewImage(c, img)
 	}

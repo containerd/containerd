@@ -25,11 +25,12 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	//"github.com/containerd/containerd/images"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
+//	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -110,7 +111,10 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 
 	// Recover all images.
-	cImages, err := c.client.ListImages(ctx)
+	listImagesOpt := []containerd.ListImageOpt {
+		containerd.ListImageWithPlatformMatcherMap(c.platformMatcherMap),
+	}
+	cImages, err := c.client.ListImagesWithPlatformMatcher(ctx, listImagesOpt...)
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
@@ -439,23 +443,24 @@ func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container)
 }
 
 // loadImages loads images from containerd.
-func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
+func (c *criService) loadImages(ctx context.Context, cImages []containerd.ImagesWrapper) {
+	log.G(ctx).Debugf("!!! criservice.loadImages()")
 	snapshotter := c.config.ContainerdConfig.Snapshotter
 	var wg sync.WaitGroup
-	for _, i := range cImages {
+	for _, iWrapper := range cImages {
 		wg.Add(1)
-		i := i
+		i := iWrapper.Images
 		go func() {
-			defer wg.Done()
-			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), i.Platform())
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
 				return
 			}
 			if !ok {
 				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
-				return
+					return
 			}
+				
 			// Checking existence of top-level snapshot for each image being recovered.
 			unpacked, err := i.IsUnpacked(ctx, snapshotter)
 			if err != nil {
@@ -466,7 +471,7 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
 				// TODO(random-liu): Consider whether we should try unpack here.
 			}
-			if err := c.updateImage(ctx, i.Name(), ""); err != nil {
+			if err := c.updateImage(ctx, i.Name(), iWrapper.RuntimeHandler); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 				return
 			}
