@@ -520,6 +520,10 @@ jobs:
           mount
           df
           losetup -l
+      - name: Kernel Message
+        if: failure()
+        run: sudo dmesg -T -f kern
+
       - uses: actions/upload-artifact@v3
         if: always()
         with:
