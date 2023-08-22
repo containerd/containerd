@@ -209,20 +209,7 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 		result = append(result, uerr)
 	}
 
-	return unwrapError(errors.Join(result...))
-}
-
-func unwrapError(e error) error {
-	if e == nil {
-		return nil
-	}
-
-	if joinErr, ok := e.(interface{ Unwrap() []error }); ok {
-		if errs := joinErr.Unwrap(); len(errs) == 1 {
-			return errs[0]
-		}
-	}
-	return e
+	return errors.Join(result...)
 }
 
 // CreateThinDevice creates new devmapper thin-device with given name and size.
