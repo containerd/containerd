@@ -140,11 +140,6 @@ func (ms *MetaStore) WithTransaction(ctx context.Context, writable bool, fn Tran
 
 	if err := errors.Join(result...); err != nil {
 		log.G(ctx).WithError(err).Debug("snapshotter error")
-
-		// Unwrap if just one error
-		if errs, ok := err.(interface{ Unwrap() []error }); ok && len(errs.Unwrap()) == 1 {
-			return errs.Unwrap()[0]
-		}
 		return err
 	}
 
