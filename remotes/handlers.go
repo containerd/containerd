@@ -283,10 +283,6 @@ func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
 			return nil, images.ErrSkipDesc
 		}
 
-		if images.IsLayerType(desc.MediaType) {
-			return nil, nil
-		}
-
 		children, err := f(ctx, desc)
 		if err != nil {
 			return nil, err
