@@ -30,11 +30,12 @@ var (
 	sandboxRuntimeStopTimer   metrics.LabeledTimer
 	sandboxRemoveTimer        metrics.LabeledTimer
 
-	containerListTimer   metrics.Timer
-	containerRemoveTimer metrics.LabeledTimer
-	containerCreateTimer metrics.LabeledTimer
-	containerStopTimer   metrics.LabeledTimer
-	containerStartTimer  metrics.LabeledTimer
+	containerListTimer          metrics.Timer
+	containerRemoveTimer        metrics.LabeledTimer
+	containerCreateTimer        metrics.LabeledTimer
+	containerStopTimer          metrics.LabeledTimer
+	containerStartTimer         metrics.LabeledTimer
+	containerEventsDroppedCount metrics.Counter
 
 	networkPluginOperations        metrics.LabeledCounter
 	networkPluginOperationsErrors  metrics.LabeledCounter
@@ -68,6 +69,7 @@ func init() {
 	containerCreateTimer = ns.NewLabeledTimer("container_create", "time to create a container", "runtime")
 	containerStopTimer = ns.NewLabeledTimer("container_stop", "time to stop a container", "runtime")
 	containerStartTimer = ns.NewLabeledTimer("container_start", "time to start a container", "runtime")
+	containerEventsDroppedCount = ns.NewCounter("container_events_dropped", "count container discarding event total from server start")
 
 	networkPluginOperations = ns.NewLabeledCounter("network_plugin_operations_total", "cumulative number of network plugin operations by operation type", "operation_type")
 	networkPluginOperationsErrors = ns.NewLabeledCounter("network_plugin_operations_errors_total", "cumulative number of network plugin operations by operation type", "operation_type")

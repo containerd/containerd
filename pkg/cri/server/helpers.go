@@ -534,6 +534,7 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 	select {
 	case c.containerEventsChan <- event:
 	default:
+		containerEventsDroppedCount.Inc()
 		logrus.Debugf("containerEventsChan is full, discarding event %+v", event)
 	}
 }
