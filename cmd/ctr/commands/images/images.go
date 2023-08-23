@@ -42,6 +42,7 @@ var Command = cli.Command{
 		checkCommand,
 		exportCommand,
 		importCommand,
+		inspectCommand,
 		listCommand,
 		mountCommand,
 		unmountCommand,
