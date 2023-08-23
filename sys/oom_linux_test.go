@@ -29,25 +29,29 @@ import (
 	exec "golang.org/x/sys/execabs"
 )
 
-func TestSetPositiveOomScoreAdjustment(t *testing.T) {
-	// Setting a *positive* OOM score adjust does not require privileged
-	_, adjustment, err := adjustOom(123)
+// The value of /proc/<pid>/oom_score_adj may be reduced no lower than the last
+// value set by a CAP_SYS_RESOURCE process. To reduce the value any lower
+// requires CAP_SYS_RESOURCE.
+
+func TestIncreaseOomScoreAdjustment(t *testing.T) {
+	// Increase OOM score adjust does not require privileged
+	initial, adjustment, err := adjustOom(123)
 	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, 123)
+	assert.EqualValues(t, initial+123, adjustment)
 }
 
-func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
+func TestReduceOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 	if !runningPrivileged() || userns.RunningInUserNS() {
 		t.Skip("requires root and not running in user namespace")
 		return
 	}
 
-	_, adjustment, err := adjustOom(-123)
+	initial, adjustment, err := adjustOom(-123)
 	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, -123)
+	assert.EqualValues(t, initial-123, adjustment)
 }
 
-func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
+func TestReduceOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
 	if runningPrivileged() && !userns.RunningInUserNS() {
 		t.Skip("needs to be run as non-root or in user namespace")
 		return
@@ -55,7 +59,7 @@ func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) 
 
 	initial, adjustment, err := adjustOom(-123)
 	assert.NoError(t, err)
-	assert.EqualValues(t, adjustment, initial)
+	assert.EqualValues(t, initial, adjustment)
 }
 
 func TestSetOOMScoreBoundaries(t *testing.T) {
@@ -84,7 +88,7 @@ func TestSetOOMScoreBoundaries(t *testing.T) {
 	}
 }
 
-func adjustOom(adjustment int) (int, int, error) {
+func adjustOom(delta int) (int, int, error) {
 	cmd := exec.Command("sleep", "100")
 	if err := cmd.Start(); err != nil {
 		return 0, 0, err
@@ -101,7 +105,7 @@ func adjustOom(adjustment int) (int, int, error) {
 		return 0, 0, err
 	}
 
-	if err := SetOOMScore(pid, adjustment); err != nil {
+	if err := SetOOMScore(pid, initial+delta); err != nil {
 		return 0, 0, err
 	}
 
