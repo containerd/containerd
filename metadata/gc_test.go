@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/metadata/boltutil"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,22 +49,22 @@ func TestGCRoots(t *testing.T) {
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
-		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
-		addImage("ns2", "image3", dgst(10), labelmap(string(labelGCContentRef), dgst(11).String())),
+		addImage("ns1", "image2", dgst(2), labelmap(gclabels.LabelGCRefSnap+".overlay", "sn2")),
+		addImage("ns2", "image3", dgst(10), labelmap(gclabels.LabelGCRefContent, dgst(11).String())),
 		addContainer("ns1", "container1", "overlay", "sn4", nil),
-		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
+		addContainer("ns1", "container2", "overlay", "sn5", labelmap(gclabels.LabelGCRefSnap+".overlay", "sn6")),
 		addContainer("ns1", "container3", "overlay", "sn7", labelmap(
-			string(labelGCSnapRef)+"overlay/anything-1", "sn8",
-			string(labelGCSnapRef)+"overlay/anything-2", "sn9",
-			string(labelGCContentRef), dgst(7).String())),
+			gclabels.LabelGCRefSnap+".overlay/anything-1", "sn8",
+			gclabels.LabelGCRefSnap+".overlay/anything-2", "sn9",
+			gclabels.LabelGCRefContent, dgst(7).String())),
 		addContainer("ns1", "container4", "", "", labelmap(
-			string(labelGCContentRef)+".0", dgst(8).String(),
-			string(labelGCContentRef)+".1", dgst(9).String())),
+			gclabels.LabelGCRefContent+".0", dgst(8).String(),
+			gclabels.LabelGCRefContent+".1", dgst(9).String())),
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
 		addContent("ns2", dgst(1), nil),
-		addContent("ns2", dgst(2), labelmap(string(labelGCRoot), "always")),
+		addContent("ns2", dgst(2), labelmap(gclabels.LabelGCRoot, "always")),
 		addContent("ns2", dgst(8), nil),
 		addContent("ns2", dgst(9), nil),
 		addIngest("ns1", "ingest-1", "", nil),       // will be seen as expired
@@ -75,7 +76,7 @@ func TestGCRoots(t *testing.T) {
 		addIngest("ns2", "ingest-7", dgst(9), nil), // added to expired lease
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
-		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
+		addSnapshot("ns1", "overlay", "sn3", "", labelmap(gclabels.LabelGCRoot, "always")),
 		addSnapshot("ns1", "overlay", "sn4", "", nil),
 		addSnapshot("ns1", "overlay", "sn5", "", nil),
 		addSnapshot("ns1", "overlay", "sn6", "", nil),
@@ -86,24 +87,24 @@ func TestGCRoots(t *testing.T) {
 		addLeaseSnapshot("ns2", "l2", "overlay", "sn6"),
 		addLeaseContent("ns2", "l1", dgst(4)),
 		addLeaseContent("ns2", "l2", dgst(5)),
-		addLease("ns2", "l3", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
+		addLease("ns2", "l3", labelmap(gclabels.LabelGCExpire, gclabels.TimestampFuture(time.Hour))),
 		addLeaseContent("ns2", "l3", dgst(6)),
 		addLeaseSnapshot("ns2", "l3", "overlay", "sn7"),
 		addLeaseIngest("ns2", "l3", "ingest-4"),
 		addLeaseIngest("ns2", "l3", "ingest-5"),
-		addLease("ns2", "l4", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
+		addLease("ns2", "l4", labelmap(gclabels.LabelGCExpire, gclabels.TimestampNow())),
 		addLeaseContent("ns2", "l4", dgst(7)),
 		addLeaseSnapshot("ns2", "l4", "overlay", "sn8"),
 		addLeaseIngest("ns2", "l4", "ingest-6"),
 		addLeaseIngest("ns2", "l4", "ingest-7"),
 
-		addLease("ns3", "l1", labelmap(string(labelGCFlat), time.Now().Add(time.Hour).Format(time.RFC3339))),
+		addLease("ns3", "l1", labelmap(gclabels.LabelGCFlat, gclabels.TimestampFuture(time.Hour))),
 		addLeaseContent("ns3", "l1", dgst(1)),
 		addLeaseSnapshot("ns3", "l1", "overlay", "sn1"),
 		addLeaseIngest("ns3", "l1", "ingest-1"),
 
 		addSandbox("ns3", "sandbox1", nil),
-		addSandbox("ns4", "sandbox1", labelmap(string(labelGCSnapRef)+"overlay", "sn1")),
+		addSandbox("ns4", "sandbox1", labelmap(gclabels.LabelGCRefSnap+".overlay", "sn1")),
 	}
 
 	expected := []gc.Node{
@@ -170,22 +171,22 @@ func TestGCRemove(t *testing.T) {
 
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
-		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
+		addImage("ns1", "image2", dgst(2), labelmap(gclabels.LabelGCRefSnap+".overlay", "sn2")),
 		addContainer("ns1", "container1", "overlay", "sn4", nil),
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
 		addContent("ns2", dgst(1), nil),
-		addContent("ns2", dgst(2), labelmap(string(labelGCRoot), "always")),
+		addContent("ns2", dgst(2), labelmap(gclabels.LabelGCRoot, "always")),
 		addIngest("ns1", "ingest-1", "", nil),
 		addIngest("ns2", "ingest-2", "", timeIn(0)),
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "", nil),
-		addSnapshot("ns1", "overlay", "sn3", "", labelmap(string(labelGCRoot), "always")),
+		addSnapshot("ns1", "overlay", "sn3", "", labelmap(gclabels.LabelGCRoot, "always")),
 		addSnapshot("ns1", "overlay", "sn4", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
-		addLease("ns1", "l1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
-		addLease("ns2", "l2", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
+		addLease("ns1", "l1", labelmap(gclabels.LabelGCExpire, gclabels.TimestampFuture(time.Hour))),
+		addLease("ns2", "l2", labelmap(gclabels.LabelGCExpire, gclabels.TimestampNow())),
 	}
 
 	all := []gc.Node{
@@ -263,10 +264,10 @@ func TestGCRefs(t *testing.T) {
 		addContent("ns1", dgst(1), nil),
 		addContent("ns1", dgst(2), nil),
 		addContent("ns1", dgst(3), nil),
-		addContent("ns1", dgst(4), labelmap(string(labelGCContentRef), dgst(1).String())),
-		addContent("ns1", dgst(5), labelmap(string(labelGCContentRef)+".anything-1", dgst(2).String(), string(labelGCContentRef)+".anything-2", dgst(3).String())),
-		addContent("ns1", dgst(6), labelmap(string(labelGCContentRef)+"bad", dgst(1).String())),
-		addContent("ns1", dgst(7), labelmap(string(labelGCContentRef)+"/anything-1", dgst(2).String(), string(labelGCContentRef)+"/anything-2", dgst(3).String())),
+		addContent("ns1", dgst(4), labelmap(gclabels.LabelGCRefContent, dgst(1).String())),
+		addContent("ns1", dgst(5), labelmap(gclabels.LabelGCRefContent+".anything-1", dgst(2).String(), gclabels.LabelGCRefContent+".anything-2", dgst(3).String())),
+		addContent("ns1", dgst(6), labelmap(gclabels.LabelGCRefContent+"bad", dgst(1).String())),
+		addContent("ns1", dgst(7), labelmap(gclabels.LabelGCRefContent+"/anything-1", dgst(2).String(), gclabels.LabelGCRefContent+"/anything-2", dgst(3).String())),
 		addContent("ns2", dgst(1), nil),
 		addContent("ns2", dgst(2), nil),
 		addIngest("ns1", "ingest-1", "", nil),
@@ -274,22 +275,22 @@ func TestGCRefs(t *testing.T) {
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
 		addSnapshot("ns1", "overlay", "sn2", "sn1", nil),
 		addSnapshot("ns1", "overlay", "sn3", "sn2", nil),
-		addSnapshot("ns1", "overlay", "sn4", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
-		addSnapshot("ns1", "overlay", "sn5", "", labelmap(string(labelGCSnapRef)+"overlay/anything-1", "sn1", string(labelGCSnapRef)+"overlay/anything-2", "sn2")),
+		addSnapshot("ns1", "overlay", "sn4", "", labelmap(gclabels.LabelGCRefSnap+".btrfs", "sn1", gclabels.LabelGCRefSnap+".overlay", "sn1")),
+		addSnapshot("ns1", "overlay", "sn5", "", labelmap(gclabels.LabelGCRefSnap+".overlay/anything-1", "sn1", gclabels.LabelGCRefSnap+".overlay/anything-2", "sn2")),
 		addSnapshot("ns1", "btrfs", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn1", "", nil),
 		addSnapshot("ns2", "overlay", "sn2", "sn1", nil),
 		addSnapshot("ns2", "overlay", "sn3", "", labelmap(
-			string(labelGCContentRef), dgst(1).String(),
-			string(labelGCContentRef)+".keep-me", dgst(6).String())),
+			gclabels.LabelGCRefContent, dgst(1).String(),
+			gclabels.LabelGCRefContent+".keep-me", dgst(6).String())),
 
 		// Test flat references don't follow label references
 		addContent("ns3", dgst(1), nil),
-		addContent("ns3", dgst(2), labelmap(string(labelGCContentRef)+".0", dgst(1).String())),
+		addContent("ns3", dgst(2), labelmap(gclabels.LabelGCRefContent+".0", dgst(1).String())),
 
 		addSnapshot("ns3", "overlay", "sn1", "", nil),
 		addSnapshot("ns3", "overlay", "sn2", "sn1", nil),
-		addSnapshot("ns3", "overlay", "sn3", "", labelmap(string(labelGCSnapRef)+"btrfs", "sn1", string(labelGCSnapRef)+"overlay", "sn1")),
+		addSnapshot("ns3", "overlay", "sn3", "", labelmap(gclabels.LabelGCRefSnap+".btrfs", "sn1", gclabels.LabelGCRefSnap+".overlay", "sn1")),
 	}
 
 	refs := map[gc.Node][]gc.Node{
@@ -395,16 +396,16 @@ func TestCollectibleResources(t *testing.T) {
 		addContent("ns1", dgst(1), nil),
 		addImage("ns1", "image1", dgst(1), nil),
 		addContent("ns1", dgst(2), map[string]string{
-			"containerd.io/gc.ref.test": "test2",
+			gclabels.LabelGCRef + ".test": ".test2",
 		}),
 		addImage("ns1", "image2", dgst(2), nil),
-		addLease("ns1", "lease1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
-		addLease("ns1", "lease2", labelmap(string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addLease("ns1", "lease1", labelmap(gclabels.LabelGCExpire, gclabels.TimestampFuture(time.Hour))),
+		addLease("ns1", "lease2", labelmap(gclabels.LabelGCExpire, gclabels.TimestampFuture(-1*time.Hour))),
 	}
 	refs := map[gc.Node][]gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()): nil,
 		gcnode(ResourceContent, "ns1", dgst(2).String()): {
-			gcnode(testResource, "ns1", "test2"),
+			gcnode(testResource, "ns1", ".test2"),
 		},
 	}
 	all := []gc.Node{

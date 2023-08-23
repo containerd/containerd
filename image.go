@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/rootfs"
@@ -227,7 +228,7 @@ func (i *image) Usage(ctx context.Context, opts ...UsageOpt) (int64, error) {
 
 			if config.snapshots {
 				for k, v := range info.Labels {
-					const prefix = "containerd.io/gc.ref.snapshot."
+					const prefix = gclabels.LabelGCRefSnap + "."
 					if !strings.HasPrefix(k, prefix) {
 						continue
 					}
@@ -427,11 +428,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	cinfo := content.Info{
 		Digest: desc.Digest,
 		Labels: map[string]string{
-			fmt.Sprintf("containerd.io/gc.ref.snapshot.%s", snapshotterName): rootFS,
+			gclabels.LabelGCRefSnap + "." + snapshotterName: rootFS,
 		},
 	}
 
-	_, err = cs.Update(ctx, cinfo, fmt.Sprintf("labels.containerd.io/gc.ref.snapshot.%s", snapshotterName))
+	_, err = cs.Update(ctx, cinfo, "labels."+gclabels.LabelGCRefSnap+"."+snapshotterName)
 	return err
 }
 

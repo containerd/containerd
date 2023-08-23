@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log/logtest"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -143,7 +144,7 @@ func makeTest(t *testing.T, name string, storeFn func(ctx context.Context, root 
 }
 
 var labels = map[string]string{
-	"containerd.io/gc.root": time.Now().UTC().Format(time.RFC3339),
+	gclabels.LabelGCRoot: gclabels.TimestampNow(),
 }
 
 func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store) {
@@ -594,12 +595,12 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 		t.Fatalf("Failed to write: %+v", err)
 	}
 
-	rootTime := time.Now().UTC().Format(time.RFC3339)
+	rootTime := gclabels.TimestampNow()
 	labels := map[string]string{
 		"k1": "v1",
 		"k2": "v2",
 
-		"containerd.io/gc.root": rootTime,
+		gclabels.LabelGCRoot: rootTime,
 	}
 
 	preCommit := time.Now()
@@ -636,7 +637,7 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	info.Labels = map[string]string{
 		"k1": "v1",
 
-		"containerd.io/gc.root": rootTime,
+		gclabels.LabelGCRoot: rootTime,
 	}
 	preUpdate = time.Now()
 	if _, err := cs.Update(ctx, info, "labels.k3", "labels.k1"); err != nil {

@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
@@ -76,7 +77,7 @@ When you are done, use the unmount command.
 			leases.WithID(target),
 			leases.WithExpiration(24*time.Hour),
 			leases.WithLabels(map[string]string{
-				"containerd.io/gc.ref.snapshot." + snapshotter: target,
+				gclabels.LabelGCRefSnap + "." + snapshotter: target,
 			}),
 		)
 		if err != nil && !errdefs.IsAlreadyExists(err) {

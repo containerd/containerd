@@ -108,6 +108,8 @@ The supported garbage collection labels are:
 | `containerd.io/gc.expire` | _timestamp_ formatted as [rfc3339](https://tools.ietf.org/html/rfc3339) | Leases | When to expire the lease. The garbage collector will delete the lease after expiration. |
 | `containerd.io/gc.flat` | _nonempty_ | Leases | Ignore label references of leased resources. This only applies when the reference is originating from the lease, if the leased resources are referenced elsewhere, then their label references will be used. |
 
+These labels are exported in the [gclabels](https://godoc.org/github.com/containerd/containerd/metadata/gclabels) package.
+
 ## Garbage Collection configuration
 
 The garbage collector (gc) is scheduled on a background goroutine and runs based

@@ -19,6 +19,7 @@ package leases
 import (
 	"testing"
 
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,10 +36,10 @@ func TestWithLabels(t *testing.T) {
 		name: "AddLabelsToEmptyMap",
 		uut:  &Lease{},
 		labels: map[string]string{
-			"containerd.io/gc.root": "2015-12-04T00:00:00Z",
+			gclabels.LabelGCRoot: "2015-12-04T00:00:00Z",
 		},
 		expected: map[string]string{
-			"containerd.io/gc.root": "2015-12-04T00:00:00Z",
+			gclabels.LabelGCRoot: "2015-12-04T00:00:00Z",
 		},
 	}
 
@@ -46,17 +47,17 @@ func TestWithLabels(t *testing.T) {
 		name: "AddLabelsToNonEmptyMap",
 		uut: &Lease{
 			Labels: map[string]string{
-				"containerd.io/gc.expire": "2015-12-05T00:00:00Z",
+				gclabels.LabelGCExpire: "2015-12-05T00:00:00Z",
 			},
 		},
 		labels: map[string]string{
-			"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
-			"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
+			gclabels.LabelGCRoot:                   "2015-12-04T00:00:00Z",
+			gclabels.LabelGCRefSnap + ".overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
 		},
 		expected: map[string]string{
-			"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
-			"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
-			"containerd.io/gc.expire":                 "2015-12-05T00:00:00Z",
+			gclabels.LabelGCRoot:                   "2015-12-04T00:00:00Z",
+			gclabels.LabelGCRefSnap + ".overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
+			gclabels.LabelGCExpire:                 "2015-12-05T00:00:00Z",
 		},
 	}
 

@@ -27,7 +27,6 @@ import (
 	"runtime/pprof"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
@@ -37,6 +36,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log/logtest"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/snapshots"
@@ -352,7 +352,7 @@ func TestMetadataCollector(t *testing.T) {
 			blob(bytesFor(1), true),
 			blob(bytesFor(2), false),
 			blob(bytesFor(3), true),
-			blob(bytesFor(4), false, "containerd.io/gc.root", time.Now().String()),
+			blob(bytesFor(4), false, gclabels.LabelGCRoot, gclabels.TimestampNow()),
 			newSnapshot("1", "", false, false),
 			newSnapshot("2", "1", false, false),
 			newSnapshot("3", "2", false, false),
@@ -362,10 +362,10 @@ func TestMetadataCollector(t *testing.T) {
 			image("image-1", digestFor(2)),
 
 			// Test lease preservation
-			blob(bytesFor(5), false, "containerd.io/gc.ref.content.0", digestFor(6).String()),
+			blob(bytesFor(5), false, gclabels.LabelGCRefContent+".0", digestFor(6).String()),
 			blob(bytesFor(6), false),
 			blob(bytesFor(7), false),
-			newSnapshot("6", "", false, false, "containerd.io/gc.ref.content.0", digestFor(7).String()),
+			newSnapshot("6", "", false, false, gclabels.LabelGCRefContent+".0", digestFor(7).String()),
 			lease("lease-1", []leases.Resource{
 				{
 					ID:   digestFor(5).String(),
@@ -378,10 +378,10 @@ func TestMetadataCollector(t *testing.T) {
 			}, false),
 
 			// Test flat lease
-			blob(bytesFor(8), false, "containerd.io/gc.ref.content.0", digestFor(9).String()),
+			blob(bytesFor(8), false, gclabels.LabelGCRefContent+".0", digestFor(9).String()),
 			blob(bytesFor(9), true),
 			blob(bytesFor(10), true),
-			newSnapshot("7", "", false, false, "containerd.io/gc.ref.content.0", digestFor(10).String()),
+			newSnapshot("7", "", false, false, gclabels.LabelGCRefContent+".0", digestFor(10).String()),
 			newSnapshot("8", "7", false, false),
 			newSnapshot("9", "8", false, false),
 			lease("lease-2", []leases.Resource{
@@ -393,11 +393,11 @@ func TestMetadataCollector(t *testing.T) {
 					ID:   "9",
 					Type: "snapshots/native",
 				},
-			}, false, "containerd.io/gc.flat", time.Now().String()),
+			}, false, gclabels.LabelGCFlat, gclabels.TimestampNow()),
 
 			// Test Collectible Resource
-			blob(bytesFor(11), false, "containerd.io/gc.ref.test", "test1"),
-			blob(bytesFor(12), true, "containerd.io/gc.ref.test", "test2"),
+			blob(bytesFor(11), false, gclabels.LabelGCRef+".test", "test1"),
+			blob(bytesFor(12), true, gclabels.LabelGCRef+".test", "test2"),
 			lease("lease-3", []leases.Resource{
 				{
 					ID:   digestFor(11).String(),

@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata/gclabels"
 	"github.com/containerd/containerd/remotes"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -211,9 +212,9 @@ func (c *Converter) Convert(ctx context.Context, opts ...ConvertOpt) (ocispec.De
 	}
 
 	labels := map[string]string{}
-	labels["containerd.io/gc.ref.content.0"] = manifest.Config.Digest.String()
+	labels[gclabels.LabelGCRefContent+".0"] = manifest.Config.Digest.String()
 	for i, ch := range manifest.Layers {
-		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i+1)] = ch.Digest.String()
+		labels[fmt.Sprintf("%s.%d", gclabels.LabelGCRefContent, i+1)] = ch.Digest.String()
 	}
 
 	ref := remotes.MakeRefKey(ctx, desc)

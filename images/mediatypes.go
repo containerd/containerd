@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/metadata/gclabels"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -190,19 +191,19 @@ func IsKnownConfig(mt string) bool {
 func ChildGCLabels(desc ocispec.Descriptor) []string {
 	mt := desc.MediaType
 	if IsKnownConfig(mt) {
-		return []string{"containerd.io/gc.ref.content.config"}
+		return []string{gclabels.LabelGCRefContent + ".config"}
 	}
 
 	switch mt {
 	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-		return []string{"containerd.io/gc.ref.content.m."}
+		return []string{gclabels.LabelGCRefContent + ".m."}
 	}
 
 	if IsLayerType(mt) {
-		return []string{"containerd.io/gc.ref.content.l."}
+		return []string{gclabels.LabelGCRefContent + ".l."}
 	}
 
-	return []string{"containerd.io/gc.ref.content."}
+	return []string{gclabels.LabelGCRefContent + "."}
 }
 
 // ChildGCLabelsFilterLayers returns the labels for a given descriptor to
