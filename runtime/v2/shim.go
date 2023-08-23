@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/ttrpc"
-	"github.com/hashicorp/go-multierror"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -354,36 +353,34 @@ func (s *shim) Close() error {
 }
 
 func (s *shim) Delete(ctx context.Context) error {
-	var (
-		result *multierror.Error
-	)
+	var result []error
 
 	if ttrpcClient, ok := s.client.(*ttrpc.Client); ok {
 		if err := ttrpcClient.Close(); err != nil {
-			result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
+			result = append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
 		}
 
 		if err := ttrpcClient.UserOnCloseWait(ctx); err != nil {
-			result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+			result = append(result, fmt.Errorf("close wait error: %w", err))
 		}
 	}
 
 	if grpcClient, ok := s.client.(*grpcConn); ok {
 		if err := grpcClient.Close(); err != nil {
-			result = multierror.Append(result, fmt.Errorf("failed to close grpc client: %w", err))
+			result = append(result, fmt.Errorf("failed to close grpc client: %w", err))
 		}
 
 		if err := grpcClient.UserOnCloseWait(ctx); err != nil {
-			result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+			result = append(result, fmt.Errorf("close wait error: %w", err))
 		}
 	}
 
 	if err := s.bundle.Delete(); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-		result = multierror.Append(result, fmt.Errorf("failed to delete bundle: %w", err))
+		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 var _ runtime.Task = &shimTask{}

@@ -23,12 +23,12 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/hashicorp/go-multierror"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -117,10 +117,10 @@ func (ms *MetaStore) WithTransaction(ctx context.Context, writable bool, fn Tran
 		return err
 	}
 
-	var result *multierror.Error
+	var result []error
 	err = fn(ctx)
 	if err != nil {
-		result = multierror.Append(result, err)
+		result = append(result, err)
 	}
 
 	// Always rollback if transaction is not writable
@@ -128,23 +128,18 @@ func (ms *MetaStore) WithTransaction(ctx context.Context, writable bool, fn Tran
 		if terr := trans.Rollback(); terr != nil {
 			log.G(ctx).WithError(terr).Error("failed to rollback transaction")
 
-			result = multierror.Append(result, fmt.Errorf("rollback failed: %w", terr))
+			result = append(result, fmt.Errorf("rollback failed: %w", terr))
 		}
 	} else {
 		if terr := trans.Commit(); terr != nil {
 			log.G(ctx).WithError(terr).Error("failed to commit transaction")
 
-			result = multierror.Append(result, fmt.Errorf("commit failed: %w", terr))
+			result = append(result, fmt.Errorf("commit failed: %w", terr))
 		}
 	}
 
-	if err := result.ErrorOrNil(); err != nil {
+	if err := errors.Join(result...); err != nil {
 		log.G(ctx).WithError(err).Debug("snapshotter error")
-
-		// Unwrap if just one error
-		if len(result.Errors) == 1 {
-			return result.Errors[0]
-		}
 		return err
 	}
 

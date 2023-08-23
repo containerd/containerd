@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/log"
@@ -145,7 +144,7 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 		return fmt.Errorf("failed to query devices from metastore: %w", err)
 	}
 
-	var result *multierror.Error
+	var result []error
 	for _, dev := range activatedDevices {
 		if p.IsActivated(dev.Name) {
 			continue
@@ -153,7 +152,7 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 
 		log.G(ctx).Warnf("devmapper device %q marked as %q but not active, activating it", dev.Name, dev.State)
 		if err := p.activateDevice(ctx, dev); err != nil {
-			result = multierror.Append(result, err)
+			result = append(result, fmt.Errorf("devmapper: %w", err))
 		}
 	}
 
@@ -165,11 +164,11 @@ func (p *PoolDevice) ensureDeviceStates(ctx context.Context) error {
 			Warnf("devmapper device %q has invalid state %q, marking as faulty", dev.Name, dev.State)
 
 		if err := p.metadata.MarkFaulty(ctx, dev.Name); err != nil {
-			result = multierror.Append(result, err)
+			result = append(result, fmt.Errorf("devmapper: %w", err))
 		}
 	}
 
-	return multierror.Prefix(result.ErrorOrNil(), "devmapper:")
+	return errors.Join(result...)
 }
 
 // transition invokes 'updateStateFn' callback to perform devmapper operation and reflects device state changes/errors in meta store.
@@ -186,13 +185,13 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 		return fmt.Errorf("failed to set device %q state to %q: %w", deviceName, tryingState, uerr)
 	}
 
-	var result *multierror.Error
+	var result []error
 
 	// Invoke devmapper operation
 	err := updateStateFn()
 
 	if err != nil {
-		result = multierror.Append(result, err)
+		result = append(result, err)
 	}
 
 	// If operation succeeded transition to success state, otherwise save error details
@@ -207,25 +206,10 @@ func (p *PoolDevice) transition(ctx context.Context, deviceName string, tryingSt
 	})
 
 	if uerr != nil {
-		result = multierror.Append(result, uerr)
+		result = append(result, uerr)
 	}
 
-	return unwrapError(result)
-}
-
-// unwrapError converts multierror.Error to the original error when it is possible.
-// multierror 1.1.0 has the similar function named Unwrap, but it requires Go 1.14.
-func unwrapError(e *multierror.Error) error {
-	if e == nil {
-		return nil
-	}
-
-	// If the error can be expressed without multierror, return the original error.
-	if len(e.Errors) == 1 {
-		return e.Errors[0]
-	}
-
-	return e.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 // CreateThinDevice creates new devmapper thin-device with given name and size.
@@ -253,7 +237,7 @@ func (p *PoolDevice) CreateThinDevice(ctx context.Context, deviceName string, vi
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
 		if devErr != nil {
-			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, info.Name))
+			retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, info.Name))
 			return
 		}
 	}()
@@ -285,12 +269,12 @@ func (p *PoolDevice) rollbackActivate(ctx context.Context, info *DeviceInfo, act
 	if delErr != nil {
 		// Failed to rollback, mark the device as faulty and keep metadata in order to
 		// preserve the faulty device ID
-		return multierror.Append(activateErr, delErr, p.metadata.MarkFaulty(ctx, info.Name))
+		return errors.Join(activateErr, delErr, p.metadata.MarkFaulty(ctx, info.Name))
 	}
 
 	// The devmapper device has been successfully deleted, deallocate device ID
 	if err := p.RemoveDevice(ctx, info.Name); err != nil {
-		return multierror.Append(activateErr, err)
+		return errors.Join(activateErr, err)
 	}
 
 	return activateErr
@@ -347,7 +331,7 @@ func (p *PoolDevice) CreateSnapshotDevice(ctx context.Context, deviceName string
 
 		// We're unable to create the devmapper device, most likely something wrong with the deviceID
 		if devErr != nil {
-			retErr = multierror.Append(retErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
+			retErr = errors.Join(retErr, p.metadata.MarkFaulty(ctx, snapInfo.Name))
 			return
 		}
 	}()
@@ -561,20 +545,20 @@ func (p *PoolDevice) RemovePool(ctx context.Context) error {
 		return fmt.Errorf("can't query device names: %w", err)
 	}
 
-	var result *multierror.Error
+	var result []error
 
 	// Deactivate devices if any
 	for _, name := range deviceNames {
 		if err := p.DeactivateDevice(ctx, name, true, true); err != nil {
-			result = multierror.Append(result, fmt.Errorf("failed to remove %q: %w", name, err))
+			result = append(result, fmt.Errorf("failed to remove %q: %w", name, err))
 		}
 	}
 
 	if err := dmsetup.RemoveDevice(p.poolName, dmsetup.RemoveWithForce, dmsetup.RemoveWithRetries, dmsetup.RemoveDeferred); err != nil {
-		result = multierror.Append(result, fmt.Errorf("failed to remove pool %q: %w", p.poolName, err))
+		result = append(result, fmt.Errorf("failed to remove pool %q: %w", p.poolName, err))
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 // MarkDeviceState changes the device's state in metastore

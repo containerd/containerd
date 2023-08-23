@@ -28,7 +28,6 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
-	"github.com/hashicorp/go-multierror"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
@@ -261,8 +260,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
 
 			// Strip last error as cleanup error to handle separately
-			if merr, ok := err.(*multierror.Error); ok {
-				if errs := merr.WrappedErrors(); len(errs) > 0 {
+			if merr, ok := err.(interface{ Unwrap() []error }); ok {
+				if errs := merr.Unwrap(); len(errs) > 0 {
 					err = errs[0]
 				}
 			}

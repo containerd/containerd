@@ -20,6 +20,7 @@ package process
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
-	"github.com/hashicorp/go-multierror"
 	exec "golang.org/x/sys/execabs"
 )
 
@@ -255,11 +255,11 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 		if err == nil {
 			return
 		}
-		result := multierror.Append(err)
+		result := []error{err}
 		for _, fn := range closers {
-			result = multierror.Append(result, fn())
+			result = append(result, fn())
 		}
-		err = multierror.Flatten(result)
+		err = errors.Join(result...)
 	}()
 
 	out, err := newPipe()
@@ -313,39 +313,35 @@ type binaryIO struct {
 }
 
 func (b *binaryIO) CloseAfterStart() error {
-	var (
-		result *multierror.Error
-	)
+	var result []error
 
 	for _, v := range []*pipe{b.out, b.err} {
 		if v != nil {
 			if err := v.r.Close(); err != nil {
-				result = multierror.Append(result, err)
+				result = append(result, err)
 			}
 		}
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 func (b *binaryIO) Close() error {
-	var (
-		result *multierror.Error
-	)
+	var result []error
 
 	for _, v := range []*pipe{b.out, b.err} {
 		if v != nil {
 			if err := v.Close(); err != nil {
-				result = multierror.Append(result, err)
+				result = append(result, err)
 			}
 		}
 	}
 
 	if err := b.cancel(); err != nil {
-		result = multierror.Append(result, err)
+		result = append(result, err)
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 func (b *binaryIO) cancel() error {
@@ -355,15 +351,15 @@ func (b *binaryIO) cancel() error {
 
 	// Send SIGTERM first, so logger process has a chance to flush and exit properly
 	if err := b.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		result := multierror.Append(fmt.Errorf("failed to send SIGTERM: %w", err))
+		result := []error{fmt.Errorf("failed to send SIGTERM: %w", err)}
 
 		log.L.WithError(err).Warn("failed to send SIGTERM signal, killing logging shim")
 
 		if err := b.cmd.Process.Kill(); err != nil {
-			result = multierror.Append(result, fmt.Errorf("failed to kill process after faulty SIGTERM: %w", err))
+			result = append(result, fmt.Errorf("failed to kill process after faulty SIGTERM: %w", err))
 		}
 
-		return result.ErrorOrNil()
+		return errors.Join(result...)
 	}
 
 	done := make(chan error, 1)
@@ -424,15 +420,15 @@ type pipe struct {
 }
 
 func (p *pipe) Close() error {
-	var result *multierror.Error
+	var result []error
 
 	if err := p.w.Close(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("failed to close write pipe: %w", err))
+		result = append(result, fmt.Errorf("pipe: failed to close write pipe: %w", err))
 	}
 
 	if err := p.r.Close(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("failed to close read pipe: %w", err))
+		result = append(result, fmt.Errorf("pipe: failed to close read pipe: %w", err))
 	}
 
-	return multierror.Prefix(result.ErrorOrNil(), "pipe:")
+	return errors.Join(result...)
 }
