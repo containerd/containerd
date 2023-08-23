@@ -99,7 +99,7 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 		s.Name,                       // 0
 		s.Namespace,                  // 1
 		s.Uid,                        // 2
-		fmt.Sprintf("%d", s.Attempt), // 3
+		strconv.Itoa(int(s.Attempt)), // 3
 	}, nameDelimiter)
 }
 
@@ -108,11 +108,11 @@ func makeSandboxName(s *runtime.PodSandboxMetadata) string {
 // unique.
 func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetadata) string {
 	return strings.Join([]string{
-		c.Name,                       // 0: container name
-		s.Name,                       // 1: pod name
-		s.Namespace,                  // 2: pod namespace
-		s.Uid,                        // 3: pod uid
-		fmt.Sprintf("%d", c.Attempt), // 4: attempt number of creating the container
+		c.Name,      // 0: container name
+		s.Name,      // 1: pod name
+		s.Namespace, // 2: pod namespace
+		s.Uid,       // 3: pod uid
+		strconv.FormatUint(uint64(c.Attempt), 10), // 4: attempt number of creating the container
 	}, nameDelimiter)
 }
 
