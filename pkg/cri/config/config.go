@@ -113,6 +113,9 @@ type ContainerdConfig struct {
 	// IgnoreRdtNotEnabledErrors is a boolean flag to ignore RDT related errors
 	// when RDT support has not been enabled.
 	IgnoreRdtNotEnabledErrors bool `toml:"ignore_rdt_not_enabled_errors" json:"ignoreRdtNotEnabledErrors"`
+
+	// Enable volatile for overlayfs snapshotter
+	OverlayFsVolatile bool `toml:"overlayfs_volatile" json:"overlayFsVolatile"`
 }
 
 // CniConfig contains toml config related to cni

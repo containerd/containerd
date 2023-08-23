@@ -352,6 +352,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		id, name)
 
 	var taskOpts []containerd.NewTaskOpts
+
+	if c.config.ContainerdConfig.OverlayFsVolatile {
+		mounts, err := setupContainerRootfs(ctx, container, c.client.SnapshotService(info.Snapshotter))
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up sandbox rootfs: %w", err)
+		}
+		taskOpts = append(taskOpts, containerd.WithRootFS(mounts))
+	}
+
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}

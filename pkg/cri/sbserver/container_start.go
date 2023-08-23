@@ -118,6 +118,15 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}
+
+	if c.config.ContainerdConfig.OverlayFsVolatile {
+		mounts, err := setupContainerRootfs(ctx, container, c.client.SnapshotService(info.Snapshotter))
+		if err != nil {
+			return nil, fmt.Errorf("failed to set up sandbox rootfs: %w", err)
+		}
+		taskOpts = append(taskOpts, containerd.WithRootFS(mounts))
+	}
+
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
