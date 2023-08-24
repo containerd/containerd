@@ -37,6 +37,10 @@ type Config struct {
 
 	// MountOptions are options used for the mount
 	MountOptions []string `toml:"mount_options"`
+
+	// RecreateScratch always recreates the specified `ScratchFile`
+	// on initialization of the plugin instead of using an existing.
+	RecreateScratch bool `toml:"recreate_scratch"`
 }
 
 func init() {
@@ -66,6 +70,7 @@ func init() {
 			if len(config.MountOptions) > 0 {
 				opts = append(opts, blockfile.WithMountOptions(config.MountOptions))
 			}
+			opts = append(opts, blockfile.WithRecreateScratch(config.RecreateScratch))
 
 			return blockfile.NewSnapshotter(root, opts...)
 		},
