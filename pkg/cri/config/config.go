@@ -78,7 +78,7 @@ type Runtime struct {
 	// See https://github.com/containerd/containerd/issues/6657 for details.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 	// SandboxMode defines which sandbox runtime to use when scheduling pods
-	// This features requires experimental CRI server to be enabled (use ENABLE_CRI_SANDBOXES=1)
+	// This features requires the new CRI server implementation (enabled by default in 2.0)
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	SandboxMode string `toml:"sandbox_mode" json:"sandboxMode"`
