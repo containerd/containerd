@@ -119,7 +119,7 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 		}
 		// Don't return for unknown state, some cleanup needs to be done.
 		if state == sandboxstore.StateUnknown {
-			return cleanupUnknownSandbox(ctx, id, sandbox)
+			return cleanupUnknownSandbox(ctx, id, sandbox, c)
 		}
 		return nil
 	}
@@ -135,7 +135,7 @@ func (c *criService) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to wait for task: %w", err)
 			}
-			return cleanupUnknownSandbox(ctx, id, sandbox)
+			return cleanupUnknownSandbox(ctx, id, sandbox, c)
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
@@ -197,7 +197,7 @@ func (c *criService) teardownPodNetwork(ctx context.Context, sandbox sandboxstor
 }
 
 // cleanupUnknownSandbox cleanup stopped sandbox in unknown state.
-func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.Sandbox) error {
+func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.Sandbox, c *criService) error {
 	// Reuse handleSandboxExit to do the cleanup.
 	return handleSandboxExit(ctx, &eventtypes.TaskExit{
 		ContainerID: id,
@@ -205,5 +205,5 @@ func cleanupUnknownSandbox(ctx context.Context, id string, sandbox sandboxstore.
 		Pid:         0,
 		ExitStatus:  unknownExitCode,
 		ExitedAt:    time.Now(),
-	}, sandbox)
+	}, sandbox, c)
 }
