@@ -78,6 +78,7 @@ Vagrant.configure("2") do |config|
             libselinux-devel \
             lsof \
             make \
+            strace \
             ${INSTALL_PACKAGES}
     SHELL
   end
