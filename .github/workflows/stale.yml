@@ -1,0 +1,35 @@
+name: 'Close stale issues and PRs'
+on:
+  schedule:
+    - cron: "0 0 * * *" # Every day at midnight
+  pull_request:
+    paths:
+      - '.github/workflows/stale.yml'
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v8
+        # All stale bot options: https://github.com/actions/stale#all-options
+        with:
+          # Idle number of days before marking issues/PRs stale
+          days-before-stale: 90
+          # Idle number of days before closing stale issues/PRs
+          days-before-close: 7
+          # Only issues/PRs with ANY of these labels are checked
+          any-of-labels: 'status/more-info-needed,status/needs-update'
+          # Comment on the staled issues
+          stale-issue-message: 'This issue is stale because it has been open 90 days with no activity. This issue will be closed in 7 days unless new comments are made or the stale label is removed.'
+          # Comment on the staled PRs
+          stale-pr-message: 'This PR is stale because it has been open 90 days with no activity. This PR will be closed in 7 days unless new comments are made or the stale label is removed.'
+          # Comment on the staled issues while closed
+          close-issue-message: 'This issue was closed because it has been stalled for 7 days with no activity.'
+          # Comment on the staled PRs while closed
+          close-pr-message: 'This PR was closed because it has been stalled for 7 days with no activity.'
+          # Enable dry-run when changing this file from a PR.
+          debug-only: github.event_name == 'pull_request'
