@@ -41,6 +41,15 @@ import (
 //
 // NOTE: https://github.com/containerd/containerd/issues/8931 is the same issue.
 func TestIssue7496(t *testing.T) {
+	t.Logf("Checking CRI config's default runtime")
+	criCfg, err := CRIConfig()
+	require.NoError(t, err)
+
+	typ := criCfg.ContainerdConfig.Runtimes[criCfg.ContainerdConfig.DefaultRuntimeName].Type
+	if !strings.HasSuffix(typ, "runc.v2") {
+		t.Skipf("default runtime should be runc.v2, but it's not: %s", typ)
+	}
+
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 
 	t.Logf("Create a pod config and run sandbox container")
