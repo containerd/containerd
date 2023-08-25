@@ -24,6 +24,10 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
+	gocni "github.com/containerd/go-cni"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -33,22 +37,21 @@ import (
 	clabels "github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
-	gocni "github.com/containerd/go-cni"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {
 	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
 		mounts := make([]specs.Mount, 0)
+		dests := make([]string, 0)
 		for _, mount := range context.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
 				return err
 			}
 			mounts = append(mounts, m)
+			dests = append(dests, m.Destination)
 		}
-		return oci.WithMounts(mounts)(ctx, client, container, s)
+		return oci.Compose(oci.WithoutMounts(dests...), oci.WithMounts(mounts))(ctx, client, container, s)
 	}
 }
 
