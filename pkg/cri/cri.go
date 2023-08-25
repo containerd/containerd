@@ -88,23 +88,40 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
+	// guestPlatform in runtime struct for a runtime helps to support pulling of imager
+	// per runtime class. 
+	// guestPlatform is used to specify an alternate platform to use with platform matcher
+	// so that different versions of the same image can be pulled for different runtime handlers.
+	// guestPlatform.OS and guestPlatform.Architecture are compusory fields to be specified and
+	// if platform is windows, OSVersion needs to be specified too.
+	// Overriding the host's default platform matcher with guestPlatform is not allowed for
+	// windows process isolation as exact OSVersion match between host and guest is required.
 	platformMap := make(map[string]platforms.MatchComparer)
 	for k, ociRuntime := range c.PluginConfig.ContainerdConfig.Runtimes {
-		if ociRuntime.GuestPlatform.OS != "" && ociRuntime.GuestPlatform.OSVersion != "" { // TODO: check for OS and architecture instead
+		// consider guesPlatform values only if OS and Architecture are specified
+		if ociRuntime.GuestPlatform.OS != "" &&  ociRuntime.GuestPlatform.Architecture != "" {
 			// For windows: check if the runtime class has sandbox isolation field set and use
 			// guestplatform for  platform matcher only if it is hyperV isolation. Process isolated
 			// cases would still need to have exact match between host and guest OS versions.
 			if ociRuntime.Type == server.RuntimeRunhcsV1 {
-				//TODO: ensure that OS version is specified
 				runtimeOpts, err := server.GenerateRuntimeOptions(ociRuntime)
 				if err != nil {
-					log.G(ctx).Errorf("Failed to get runtime options for runtime: %v", k)
+					return nil, fmt.Errorf("Failed to get runtime options for runtime: %v", k)
 				}
 				if server.IsWindowsSandboxIsolation(ctx, runtimeOpts) {
+					// ensure that OSVersion is mentioned for windows runtime handlers
+					if ociRuntime.GuestPlatform.OSVersion == "" {
+						return nil, fmt.Errorf("guestPlatform.OSVersion needs to be specified for windows hyperV runtimes")
+					}
 					platformMap[k] = platforms.Only(ociRuntime.GuestPlatform)
 				} else {
-					log.G(ctx).Infof("platform matcher cannot be overriden with GuestPlatform for process isolated ")
-					platformMap[k] = platforms.Only(platforms.DefaultSpec())
+					// Fail initialization if guestPlatform was specified for process isolation.
+					// For process isolated cases, we only allow the host's default platform matcher to
+					// be used as exact version match between host and guest is required.
+					// Rather than silently ignoring guestPlatform in this case and using the host's default
+					// platform matcher, it would be better to explicitly throw an error here so that user can
+					// remove guestPlatform field from containerd.toml   
+					return nil, fmt.Errorf("GuestPlatform cannot override the host platform for process isolation")
 				}
 			} else {
 				platformMap[k] = platforms.Only(ociRuntime.GuestPlatform)
