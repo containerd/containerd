@@ -96,7 +96,10 @@ backports until the end of life date. They may also accept a wider range of
 patches than non-_LTS_ releases to support the longer term maintainability of the
 branch, including library dependency, toolchain (including Go) and other version updates
 which are needed to ensure each release is built with fully supported dependencies and
-remains usable by containerd clients. There should be at least a 6-month overlap between
+remains usable by containerd clients. _LTS_ releases can also accept feature backports
+to support new Kubernetes releases. The default action has to be reject it though,
+for long-term stability. This is still negotiable when the feature is a hard dependency
+for a new release of Kubernetes. There should be at least a 6-month overlap between
 the end of life of an _LTS_ release and the initial release of a new _LTS_ release.
 Up to 6 months before the announced end of life of an _LTS_ branch, the branch may
 convert to a regular _Active_ release with stricter backport criteria.
