@@ -68,8 +68,7 @@ type Controller struct {
 	cri CRIService
 	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	baseOCISpecs map[string]*oci.Spec
-
-	// TODO: fill up this !!
+	// platform matcher map to has a matcher per runtime handler
 	platformMatcherMap map[string]platforms.MatchComparer
 	store *Store
 }

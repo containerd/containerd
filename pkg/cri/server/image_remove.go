@@ -37,7 +37,6 @@ import (
 func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
 
-	log.G(ctx).Debugf("!! RemoveImage request: %v", r)
 	// get runtime handler from pull request or use defaut runtime class name if one
 	// was not specified
 	runtimeHdlr := r.GetImage().GetRuntimeHandler()
@@ -53,7 +52,6 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-	log.G(ctx).Debugf("!! RemoveImage c.localResolve() returns: %v", image)
 	span.SetAttributes(tracing.Attribute("image.id", image.ID))
 	// Remove all image references.
 	for i, ref := range image.References {
@@ -69,7 +67,7 @@ func (c *criService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequ
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref, runtimeHdlr); err != nil { //TODO: Test this code path!
+			if err := c.imageStore.Update(ctx, ref, runtimeHdlr); err != nil { //TODO: Test!
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue

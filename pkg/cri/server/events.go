@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"runtime"
 
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -37,7 +36,7 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/typeurl/v2"
 	"github.com/sirupsen/logrus"
-	runtime2 "k8s.io/cri-api/pkg/apis/runtime/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/utils/clock"
 )
 
@@ -352,27 +351,12 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		}
 	case *eventtypes.ImageCreate:
 		logrus.Infof("ImageCreate event server %+v", e)
-		_, file, no, ok := runtime.Caller(1)
-		if ok {
-			fmt.Printf("called from %s#%d\n", file, no)
-			log.G(ctx).Debugf("!! cri/store events.go line 357 file: %v no %v", file, no)
-		}
-		return em.c.updateImage(ctx, e.Name, e.RuntimeHandler)
+	return em.c.updateImage(ctx, e.Name, e.RuntimeHandler)
 	case *eventtypes.ImageUpdate:
 		logrus.Infof("ImageUpdate event server %+v", e)
-		_, file, no, ok := runtime.Caller(1)
-		if ok {
-			fmt.Printf("called from %s#%d\n", file, no)
-			log.G(ctx).Debugf("!! cri/store events.go line 357 file: %v no %v", file, no)
-		}
 		return em.c.updateImage(ctx, e.Name, e.RuntimeHandler)
 	case *eventtypes.ImageDelete:
 		logrus.Infof("ImageDelete event server %+v", e)
-		_, file, no, ok := runtime.Caller(1)
-		if ok {
-			fmt.Printf("called from %s#%d\n", file, no)
-			log.G(ctx).Debugf("!! cri/store events.go line 357 file: %v no %v", file, no)
-		}
 		return em.c.updateImage(ctx, e.Name, e.RuntimeHandler)
 	}
 
@@ -429,7 +413,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	}
 	// Using channel to propagate the information of container stop
 	cntr.Stop()
-	c.generateAndSendContainerEvent(ctx, cntr.ID, sandboxID, runtime2.ContainerEventType_CONTAINER_STOPPED_EVENT)
+	c.generateAndSendContainerEvent(ctx, cntr.ID, sandboxID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
 	return nil
 }
 
@@ -460,7 +444,7 @@ func handleSandboxExit(ctx context.Context, e *eventtypes.TaskExit, sb sandboxst
 	}
 	// Using channel to propagate the information of sandbox stop
 	sb.Stop()
-	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime2.ContainerEventType_CONTAINER_STOPPED_EVENT)
+	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
 	return nil
 }
 

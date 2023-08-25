@@ -41,7 +41,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImag
 	if runtimeHdlr == "" {
 		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
 	}
-	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr) // TODO: test this codepath!
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr) // TODO: test and check!
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
@@ -63,7 +63,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImag
 		err = c.client.ImageService().Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref, runtimeHdlr); err != nil { // TODO: test this codepath!
+			if err := c.imageStore.Update(ctx, ref, runtimeHdlr); err != nil { // TODO: test!
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue

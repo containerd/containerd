@@ -90,13 +90,12 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 
 	platformMap := make(map[string]platforms.MatchComparer)
 	for k, ociRuntime := range c.PluginConfig.ContainerdConfig.Runtimes {
-		log.G(context.Background()).Debugf("!! InitCriService k: %v", k)
-		log.G(context.Background()).Debugf("!! InitCriService r.GuestPlatform: %v", ociRuntime.GuestPlatform)
-
-		if ociRuntime.GuestPlatform.OS != "" && ociRuntime.GuestPlatform.OSVersion != "" {
-			// TODO: check if the runtime class has sandbox isolation field set and allow new platform
-			// matcher only if it is hyperV isolation
+		if ociRuntime.GuestPlatform.OS != "" && ociRuntime.GuestPlatform.OSVersion != "" { // TODO: check for OS and architecture instead
+			// For windows: check if the runtime class has sandbox isolation field set and use
+			// guestplatform for  platform matcher only if it is hyperV isolation. Process isolated
+			// cases would still need to have exact match between host and guest OS versions.
 			if ociRuntime.Type == server.RuntimeRunhcsV1 {
+				//TODO: ensure that OS version is specified
 				runtimeOpts, err := server.GenerateRuntimeOptions(ociRuntime)
 				if err != nil {
 					log.G(ctx).Errorf("Failed to get runtime options for runtime: %v", k)
@@ -113,10 +112,6 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		} else {
 			platformMap[k] = platforms.Only(platforms.DefaultSpec())
 		}
-	}
-
-	for k, matcher := range platformMap {
-		log.G(ctx).Debugf("matcher for runtime: %v, is %v", k, matcher)
 	}
 
 	var s server.CRIService

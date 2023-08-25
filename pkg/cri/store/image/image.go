@@ -86,37 +86,31 @@ func NewStore(client *containerd.Client, platformMatcherMap map[string]platforms
 }
 
 // Update updates cache for a reference.
-func (s *Store) Update(ctx context.Context, ref string, runtimeHandler string) error { //TODO: pass runtimeHandler and make this a compulsory field eventually
+func (s *Store) Update(ctx context.Context, ref string, runtimeHandler string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	log.G(ctx).Debugf("pkg.cri.store Update(), ref is %v, runtimeHdlr is %v", ref, runtimeHandler)
 	getImageOpts := []containerd.GetImageOpt{
 		containerd.GetImageWithPlatformMatcher(s.platformMatcherMap[runtimeHandler]),
 	}
 	i, err := s.client.GetImage(ctx, ref, getImageOpts...)
-	log.G(ctx).Debugf("pkg.cri.store Update(), containerd.Image is %v, err: %v", i, err)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image from containerd: %w", err)
 	}
 	var img *Image
 	if err == nil {
 		img, err = getImage(ctx, i, runtimeHandler)
-		log.G(ctx).Debugf("pkg.cri.store Update(), after getImage(), img is %v, err: %v", img, err)
 		if err != nil {
 			return fmt.Errorf("get image info from containerd: %w", err)
 		}
 	}
-	log.G(ctx).Debugf("pkg.cri.store Update(), img is %v", img)
 	return s.update(ref, img, runtimeHandler)
 }
 
 // update updates the internal cache. img == nil means that
 // the image does not exist in containerd.
 func (s *Store) update(ref string, img *Image, runtimeHandler string) error {
-	//key := fmt.Sprintf(imageKeyFormat, ref, runtimeHandler)
 	oldID, oldExist := s.refCache[ref]
-	log.G(context.Background()).Debugf("pkg.cri.store update(), ref %v, oldID is %v, oldExist: %v", ref, oldID, oldExist)
 	if img == nil {
 		// The image reference doesn't exist in containerd.
 		if oldExist {
@@ -134,7 +128,6 @@ func (s *Store) update(ref string, img *Image, runtimeHandler string) error {
 		s.store.delete(oldID, ref, img.RuntimeHandler)
 	}
 	// New image. Add new image.
-	log.G(context.Background()).Debugf("!!!! pkg.cri.store update(), adding NEWWWW IMAGE s.refCache[ref] %v = img.ID %v", s.refCache[ref], img.ID)
 	s.refCache[ref] = img.ID
 	return s.store.add(*img)
 }
@@ -183,7 +176,6 @@ func getImage(ctx context.Context, i containerd.Image, runtimeHandler string) (*
 func (s *Store) Resolve(ref string) (string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
-	log.G(context.Background()).Debugf("pkg.cri.store Reolve(), ref is %v, s.refCache[ref] %v", ref, s.refCache[ref])
 	id, ok := s.refCache[ref]
 	if !ok {
 		return "", errdefs.ErrNotFound
@@ -235,14 +227,12 @@ func (s *store) add(img Image) error {
 	i, ok := s.images[key]
 	if !ok {
 		// If the image doesn't exist, add it.
-		log.G(context.Background()).Debugf("!! pkg/cri/store add(), key:%v, img %v", key, img)
 		s.images[key] = img
 		return nil
 	}
 	// Or else, merge and sort the references.
 	i.References = docker.Sort(util.MergeStringSlices(i.References, img.References))
 	i.Pinned = i.Pinned || img.Pinned
-	log.G(context.Background()).Debugf("!! pkg/cri/store 2 add(), key:%v, img %v", key, img)
 	s.images[key] = i
 	return nil
 }
@@ -276,7 +266,6 @@ func (s *store) delete(id, ref, runtimeHandler string) {
 	}
 
 	key := fmt.Sprintf(imageKeyFormat, digest.String(), runtimeHandler)
-	log.G(context.Background()).Debugf("!! pkg/cri/store delete(), key:%v, s.images[key] %v", key, s.images[key])
 	i, ok := s.images[key]
 	if !ok {
 		return

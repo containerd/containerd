@@ -43,7 +43,7 @@ func NewImageStoreFromClient(client imagesapi.ImagesClient) images.Store {
 	}
 }
 
-// TODO: does this need GetImageOpt too??
+// TODO: test and check!
 func (s *remoteImages) Get(ctx context.Context, name string) (images.Image, error) {
 	resp, err := s.client.Get(ctx, &imagesapi.GetImageRequest{
 		Name: name,
@@ -74,17 +74,8 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image, opts ...i
 		}
 	}
 
-	/*
-	_, file, no, ok := runtime.Caller(1)
-	if ok {
-		fmt.Printf("called from %s#%d\n", file, no)
-		log.G(ctx).Debugf("!! remoteImages.Create() file: %v no %v, runtimeHandler %v", file, no, createOpts.RuntimeHandler)
-	}
-	*/
-
 	req := &imagesapi.CreateImageRequest{
 		Image: imageToProto(&image),
-		// TODO:
 		RuntimeHandler: createOpts.RuntimeHandler,
 	}
 	if tm := epoch.FromContext(ctx); tm != nil {
@@ -107,25 +98,15 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, opts ...i
 		}
 	}
 
-	/*
-	_, file, no, ok := runtime.Caller(1)
-	if ok {
-		fmt.Printf("called from %s#%d\n", file, no)
-		log.G(ctx).Debugf("!! remoteImages.Update() file: %v no %v, runtimeHandler %v", file, no, updateOpts.RuntimeHandler)
-	}
-	*/
-
 	var updateMask *ptypes.FieldMask
 	if len(updateOpts.Fieldpaths) > 0 {
 		updateMask = &ptypes.FieldMask{
 			Paths: updateOpts.Fieldpaths,
 		}
 	}
-	log.G(ctx).Debugf("!! remoteImages.Update(), runtimeHandler %v", updateOpts.RuntimeHandler)
 	req := &imagesapi.UpdateImageRequest{
 		Image:      imageToProto(&image),
 		UpdateMask: updateMask,
-		// TODO: add runtimeHandler string
 		RuntimeHandler: updateOpts.RuntimeHandler,
 	}
 	if tm := epoch.FromContext(ctx); tm != nil {

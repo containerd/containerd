@@ -189,11 +189,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	if runtimeHdlr == "" {
 		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
 	}
-	log.G(ctx).Debugf("!! criService.PullImage, runtimeHdlr %v",runtimeHdlr)
 	pullOpts = append(pullOpts, containerd.WithPlatformMatcher(c.platformMatcherMap[runtimeHdlr]))
-
-	log.G(ctx).Debugf("!! criService.PullImage, before calling client.Pull(), platformMatcher being used is %v",c.platformMatcherMap[runtimeHdlr])
-	//
 
 	pullReporter.start(pctx)
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
@@ -351,12 +347,12 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string, runtimeHandler string) error {
 	if runtimeHandler == "" {
 		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
+		log.G(ctx).Debugf("criService.updateImage runtimeHandler was empty, default runtimehandler being used %v", runtimeHandler)
 	}
 
 	getImageOpts := []containerd.GetImageOpt {
 		containerd.GetImageWithPlatformMatcher(c.platformMatcherMap[runtimeHandler]),
 	}
-	log.G(ctx).Errorf("!! criService.updateImage() c.client.GetImage() with matcher %v", c.platformMatcherMap[runtimeHandler])
 	
 	img, err := c.client.GetImage(ctx, r, getImageOpts...)
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -374,7 +370,7 @@ func (c *CRIImageService) UpdateImage(ctx context.Context, r string, runtimeHand
 		if err := c.createImageReference(ctx, id, runtimeHandler, img.Target(), labels); err != nil {
 			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
-		if err := c.imageStore.Update(ctx, id, runtimeHandler); err != nil { // TODO: check for all references of this!
+		if err := c.imageStore.Update(ctx, id, runtimeHandler); err != nil { // TODO: test and check!
 			return fmt.Errorf("update image store for %q: %w", id, err)
 		}
 		// The image id is ready, add the label to mark the image as managed.

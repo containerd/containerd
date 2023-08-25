@@ -44,7 +44,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 	if runtimeHdlr == "" {
 		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
 	}
-	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr) // TODO: test this codepath!
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr) // TODO: test!
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())

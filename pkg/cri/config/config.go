@@ -83,8 +83,7 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	SandboxMode string `toml:"sandbox_mode" json:"sandboxMode"`
-	// GuestPlatform defines the OSVersion used for guest platform to run containers in.
-	// TODO: check for compulsory GuestPlatform.OS, GuestPlatform.OSVersion for windows?? 
+	// GuestPlatform defines the OS, Architecture, Variant, OSVersion etc used for guest platform to run containers in.
 	GuestPlatform specs.Platform `toml:"guest_platform" json:"guestPlatform"`
 }
 

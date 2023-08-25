@@ -94,8 +94,8 @@ type criService struct {
 	netPlugin map[string]cni.CNI
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// initializes matchComparer for each runtime class depending on whether GuestPlatform
-	// is defined or not. If GuestPlatform is not defined, it takes the default platform.
+	// initializes matchComparer for each runtime class using default platform or
+	// guestPlatform specified for the runtime handler (see pkg/cri/config/config.go).
 	platformMatcherMap map[string]platforms.MatchComparer
 	// streamServer is the streaming server serves container streaming request.
 	streamServer streaming.Server

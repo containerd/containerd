@@ -106,8 +106,6 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}
 	}()
 
-	log.G(ctx).Debugf("!! criService.PullImage() with pullImageReq %v", r)
-
 	inProgressImagePulls.Inc()
 	defer inProgressImagePulls.Dec()
 	startTime := time.Now()
@@ -190,11 +188,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	if runtimeHdlr == "" {
 		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
 	}
-	log.G(ctx).Debugf("!! criService.PullImage, runtimeHdlr %v",runtimeHdlr)
 	pullOpts = append(pullOpts, containerd.WithRuntimeHandler(runtimeHdlr), containerd.WithPlatformMatcher(c.platformMatcherMap[runtimeHdlr]))
-
-	log.G(ctx).Debugf("!! criService.PullImage, before calling client.Pull(), platformMatcher being used is %v",c.platformMatcherMap[runtimeHdlr])
-	//
 
 	pullReporter.start(pctx)
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
@@ -211,7 +205,6 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 	imageID := configDesc.Digest.String()
 
 	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
-	log.G(ctx).Debugf("!! criservice.PullImage(), namedRef %v, imageID %v, repoTag %v, repoDigest %v", namedRef, imageID, repoTag, repoDigest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
@@ -294,8 +287,6 @@ func (c *criService) createImageReference(ctx context.Context, name string, runt
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	// TODO or check if runtimeHandler is empty? Maybe you should fill it up with the default runtime handler?
-	log.G(ctx).Debugf("!! criService.createImageReference runtimeHandler is %v", runtimeHandler)
 	createOpts := []images.CreateOpt {
 		images.CreateWithRuntimeHandler(runtimeHandler),
 	}
@@ -339,12 +330,11 @@ func (c *criService) getLabels(ctx context.Context, name string) map[string]stri
 func (c *criService) updateImage(ctx context.Context, r string, runtimeHandler string) error {
 	if runtimeHandler == "" {
 		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
-		log.G(ctx).Debugf("!!criService.updateImage runtimeHandler was empty, so setting to %v", runtimeHandler)
+		log.G(ctx).Debugf("criService.updateImage runtimeHandler was empty, default runtimehandler being used %v", runtimeHandler)
 	}
 	getImageOpts := []containerd.GetImageOpt {
 		containerd.GetImageWithPlatformMatcher(c.platformMatcherMap[runtimeHandler]),
 	}
-	log.G(ctx).Errorf("!! criService.updateImage() c.client.GetImage() with matcher %v", c.platformMatcherMap[runtimeHandler])
 	
 	img, err := c.client.GetImage(ctx, r, getImageOpts...)
 	if err != nil && !errdefs.IsNotFound(err) {
@@ -362,7 +352,6 @@ func (c *criService) updateImage(ctx context.Context, r string, runtimeHandler s
 		if err := c.createImageReference(ctx, id, runtimeHandler, img.Target(), labels); err != nil {
 			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
-		log.G(ctx).Debugf("!! criservice.UpdateImage(), before calling pkg/cri/store")
 		if err := c.imageStore.Update(ctx, id, runtimeHandler); err != nil {
 			return fmt.Errorf("update image store for %q: %w", id, err)
 		}

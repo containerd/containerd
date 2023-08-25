@@ -25,12 +25,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	//"github.com/containerd/containerd/images"
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
-//	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -458,7 +456,7 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Images
 			}
 			if !ok {
 				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
-					return
+				return
 			}
 				
 			// Checking existence of top-level snapshot for each image being recovered.

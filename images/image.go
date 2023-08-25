@@ -116,7 +116,7 @@ func UpdateWithRuntimeHandler(runtimeHandler string) UpdateOpt {
 
 // Store and interact with images
 type Store interface {
-	Get(ctx context.Context, name string) (Image, error) // TODO: do we need Opts for Get and List ??
+	Get(ctx context.Context, name string) (Image, error) // TODO: test and check!
 	List(ctx context.Context, filters ...string) ([]Image, error)
 	Create(ctx context.Context, image Image, opts ...CreateOpt) (Image, error)
 
@@ -337,7 +337,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 			return false, []ocispec.Descriptor{image}, nil, []ocispec.Descriptor{image}, nil
 		}
 
-		return false, nil, nil, nil, fmt.Errorf("failed to check image 1 %v: %w", image.Digest, err)
+		return false, nil, nil, nil, fmt.Errorf("failed to check image %v: %w", image.Digest, err)
 	}
 
 	// TODO(stevvooe): It is possible that referenced components could have
@@ -352,7 +352,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 				missing = append(missing, desc)
 				continue
 			} else {
-				return false, nil, nil, nil, fmt.Errorf("failed to check image 2 %v: %w", desc.Digest, err)
+				return false, nil, nil, nil, fmt.Errorf("failed to check image %v: %w", desc.Digest, err)
 			}
 		}
 		ra.Close()
