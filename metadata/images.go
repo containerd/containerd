@@ -136,6 +136,10 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 			return err
 		}
 
+		if err := addImageLease(ctx, tx, image.Name, image.Labels); err != nil {
+			return err
+		}
+
 		ibkt, err := bkt.CreateBucket([]byte(image.Name))
 		if err != nil {
 			if err != bolt.ErrBucketExists {
@@ -236,6 +240,11 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 			return err
 		}
 
+		// Collectible label may be added, if so add to lease
+		if err := addImageLease(ctx, tx, updated.Name, updated.Labels); err != nil {
+			return err
+		}
+
 		updated.CreatedAt = createdat
 		if tm := epoch.FromContext(ctx); tm != nil {
 			updated.UpdatedAt = tm.UTC()
@@ -261,6 +270,10 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 		bkt := getImagesBucket(tx, namespace)
 		if bkt == nil {
 			return fmt.Errorf("image %q: %w", name, errdefs.ErrNotFound)
+		}
+
+		if err := removeImageLease(ctx, tx, name); err != nil {
+			return err
 		}
 
 		if err = bkt.DeleteBucket([]byte(name)); err != nil {

@@ -279,6 +279,20 @@ func (lm *leaseManager) ListResources(ctx context.Context, lease leases.Lease) (
 			}
 		}
 
+		// images resources
+		if ibkt := topbkt.Bucket(bucketKeyObjectImages); ibkt != nil {
+			if err := ibkt.ForEach(func(k, _ []byte) error {
+				rs = append(rs, leases.Resource{
+					ID:   string(k),
+					Type: string(bucketKeyObjectImages),
+				})
+
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+
 		// ingest resources
 		if lbkt := topbkt.Bucket(bucketKeyObjectIngests); lbkt != nil {
 			if err := lbkt.ForEach(func(k, _ []byte) error {
@@ -461,6 +475,59 @@ func removeIngestLease(ctx context.Context, tx *bolt.Tx, ref string) error {
 	return bkt.Delete([]byte(ref))
 }
 
+func addImageLease(ctx context.Context, tx *bolt.Tx, ref string, labels map[string]string) error {
+	lid, ok := leases.FromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	// If image doesn't have expiration, it does not need to be leased
+	if _, ok := labels[string(labelGCExpire)]; !ok {
+		return nil
+	}
+
+	namespace, ok := namespaces.Namespace(ctx)
+	if !ok {
+		panic("namespace must already be required")
+	}
+
+	bkt := getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectLeases, []byte(lid))
+	if bkt == nil {
+		return fmt.Errorf("lease does not exist: %w", errdefs.ErrNotFound)
+	}
+
+	bkt, err := bkt.CreateBucketIfNotExists(bucketKeyObjectImages)
+	if err != nil {
+		return err
+	}
+
+	if err := bkt.Put([]byte(ref), nil); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func removeImageLease(ctx context.Context, tx *bolt.Tx, ref string) error {
+	lid, ok := leases.FromContext(ctx)
+	if !ok {
+		return nil
+	}
+
+	namespace, ok := namespaces.Namespace(ctx)
+	if !ok {
+		panic("namespace must already be checked")
+	}
+
+	bkt := getBucket(tx, bucketKeyVersion, []byte(namespace), bucketKeyObjectLeases, []byte(lid), bucketKeyObjectImages)
+	if bkt == nil {
+		// Key does not exist so we return nil
+		return nil
+	}
+
+	return bkt.Delete([]byte(ref))
+}
+
 func parseLeaseResource(r leases.Resource) ([]string, string, error) {
 	var (
 		ref  = r.ID
@@ -470,7 +537,8 @@ func parseLeaseResource(r leases.Resource) ([]string, string, error) {
 
 	switch k := keys[0]; k {
 	case string(bucketKeyObjectContent),
-		string(bucketKeyObjectIngests):
+		string(bucketKeyObjectIngests),
+		string(bucketKeyObjectImages):
 
 		if len(keys) != 1 {
 			return nil, "", fmt.Errorf("invalid resource type %s: %w", typ, errdefs.ErrInvalidArgument)
