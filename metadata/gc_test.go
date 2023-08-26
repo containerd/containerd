@@ -17,12 +17,15 @@
 package metadata
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"path/filepath"
 	"sort"
 	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/containerd/containerd/gc"
@@ -612,14 +615,61 @@ func checkNodesEqual(t *testing.T, n1, n2 []gc.Node) {
 	sort.Sort(nodeList(n2))
 
 	if len(n1) != len(n2) {
-		t.Fatalf("Nodes do not match\n\tExpected:\n\t%v\n\tActual:\n\t%v", n2, n1)
+		buf := bytes.NewBuffer(nil)
+		tw := tabwriter.NewWriter(buf, 8, 4, 1, ' ', 0)
+		max := len(n1)
+		if len(n2) > max {
+			max = len(n2)
+		}
+		fmt.Fprintln(tw, "Expected:\tActual:")
+		for i := 0; i < max; i++ {
+			var left, right string
+			if i < len(n1) {
+				right = printNode(n1[i])
+			}
+			if i < len(n2) {
+				left = printNode(n2[i])
+			}
+			fmt.Fprintln(tw, left+"\t"+right)
+		}
+		tw.Flush()
+		t.Fatal("Nodes do not match\n" + buf.String())
 	}
 
 	for i := range n1 {
 		if n1[i] != n2[i] {
-			t.Errorf("[%d] root does not match expected: expected %v, got %v", i, n2[i], n1[i])
+			t.Errorf("[%d] root does not match expected: expected %v, got %v", i, printNode(n2[i]), printNode(n1[i]))
 		}
 	}
+}
+
+func printNode(n gc.Node) string {
+	var t string
+	switch n.Type {
+	case ResourceContent:
+		t = "content"
+	case ResourceSnapshot:
+		t = "snapshot"
+	case ResourceContainer:
+		t = "container"
+	case ResourceTask:
+		t = "task"
+	case ResourceImage:
+		t = "image"
+	case ResourceLease:
+		t = "lease"
+	case ResourceIngest:
+		t = "ingest"
+	case resourceContentFlat:
+		t = "content-flat"
+	case resourceSnapshotFlat:
+		t = "snapshot-flat"
+	case resourceImageFlat:
+		t = "image-flat"
+	default:
+		return fmt.Sprintf("%v", n)
+	}
+	return fmt.Sprintf("%s(%s/%s)", t, n.Namespace, n.Key)
 }
 
 type nodeList []gc.Node
