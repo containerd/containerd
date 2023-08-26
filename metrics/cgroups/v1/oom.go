@@ -25,9 +25,9 @@ import (
 	"golang.org/x/sys/unix"
 
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
+	"github.com/containerd/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/sirupsen/logrus"
 )
 
 func newOOMCollector(ns *metrics.Namespace) (*oomCollector, error) {
@@ -116,7 +116,7 @@ func (o *oomCollector) start() {
 			if err == unix.EINTR {
 				continue
 			}
-			logrus.WithError(err).Error("cgroups: epoll wait failed, OOM notifications disabled")
+			log.L.WithError(err).Error("cgroups: epoll wait failed, OOM notifications disabled")
 			return
 		}
 		for i := 0; i < n; i++ {

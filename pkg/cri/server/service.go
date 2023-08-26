@@ -36,7 +36,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -304,10 +303,10 @@ func (c *criService) Run(ready func()) error {
 // Close stops the CRI service.
 // TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
-	logrus.Info("Stop CRI service")
+	log.L.Info("Stop CRI service")
 	for name, h := range c.cniNetConfMonitor {
 		if err := h.stop(); err != nil {
-			logrus.WithError(err).Errorf("failed to stop cni network conf monitor for %s", name)
+			log.L.WithError(err).Errorf("failed to stop cni network conf monitor for %s", name)
 		}
 	}
 	c.eventMonitor.stop()

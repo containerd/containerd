@@ -23,9 +23,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/log"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
 )
 
@@ -51,7 +51,7 @@ func NewDiscardLogger() io.WriteCloser {
 // maxLen is the max length limit of a line. A line longer than the
 // limit will be cut into multiple lines.
 func NewCRILogger(path string, w io.Writer, stream StreamType, maxLen int) (io.WriteCloser, <-chan struct{}) {
-	logrus.Debugf("Start writing stream %q to log file %q", stream, path)
+	log.L.Debugf("Start writing stream %q to log file %q", stream, path)
 	prc, pwc := io.Pipe()
 	stop := make(chan struct{})
 	go func() {
@@ -147,7 +147,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			outputEntries.Inc()
 			outputBytes.Inc(float64(n))
 		} else {
-			logrus.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
+			log.L.WithError(err).Errorf("Fail to write %q log to log file %q", s, path)
 			// Continue on write error to drain the container output.
 		}
 	}
@@ -167,9 +167,9 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 		}
 		if err != nil {
 			if err == io.EOF {
-				logrus.Debugf("Getting EOF from stream %q while redirecting to log file %q", s, path)
+				log.L.Debugf("Getting EOF from stream %q while redirecting to log file %q", s, path)
 			} else {
-				logrus.WithError(err).Errorf("An error occurred when redirecting stream %q to log file %q", s, path)
+				log.L.WithError(err).Errorf("An error occurred when redirecting stream %q to log file %q", s, path)
 			}
 			if length == 0 {
 				// No content left to write, break.
@@ -209,5 +209,5 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 			break
 		}
 	}
-	logrus.Debugf("Finish redirecting stream %q to log file %q", s, path)
+	log.L.Debugf("Finish redirecting stream %q to log file %q", s, path)
 }

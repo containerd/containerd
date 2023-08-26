@@ -25,10 +25,10 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/oom"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/shim"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -79,7 +79,7 @@ func (e *epoller) Run(ctx context.Context) {
 				if err == unix.EINTR {
 					continue
 				}
-				logrus.WithError(err).Error("cgroups: epoll wait")
+				log.G(ctx).WithError(err).Error("cgroups: epoll wait")
 			}
 			for i := 0; i < n; i++ {
 				e.process(ctx, uintptr(events[i].Fd))
@@ -130,7 +130,7 @@ func (e *epoller) process(ctx context.Context, fd uintptr) {
 	if err := e.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
 		ContainerID: i.id,
 	}); err != nil {
-		logrus.WithError(err).Error("publish OOM event")
+		log.G(ctx).WithError(err).Error("publish OOM event")
 	}
 }
 

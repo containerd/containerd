@@ -167,7 +167,7 @@ func setLogger(ctx context.Context, id string) (context.Context, error) {
 		FullTimestamp:   true,
 	})
 	if debugFlag {
-		l.Logger.SetLevel(logrus.DebugLevel)
+		l.Logger.SetLevel(log.DebugLevel)
 	}
 	f, err := openLog(ctx, id)
 	if err != nil {
@@ -235,13 +235,13 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	// Handle explicit actions
 	switch action {
 	case "delete":
-		if debugFlag {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
 		logger := log.G(ctx).WithFields(log.Fields{
 			"pid":       os.Getpid(),
 			"namespace": namespaceFlag,
 		})
+		if debugFlag {
+			logger.Logger.SetLevel(log.DebugLevel)
+		}
 		go reap(ctx, logger, signals)
 		ss, err := manager.Stop(ctx, id)
 		if err != nil {
@@ -350,7 +350,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		}
 
 		if src, ok := instance.(TTRPCService); ok {
-			logrus.WithField("id", id).Debug("registering ttrpc service")
+			log.G(ctx).WithField("id", id).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}
@@ -432,7 +432,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 	return reap(ctx, logger, signals)
 }
 
-func dumpStacks(logger *logrus.Entry) {
+func dumpStacks(logger *log.Entry) {
 	var (
 		buf       []byte
 		stackSize int

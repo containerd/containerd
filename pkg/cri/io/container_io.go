@@ -24,7 +24,6 @@ import (
 
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/pkg/cri/util"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
@@ -161,7 +160,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 				c.stdin.Close()
 				// Also closes the containerd side.
 				if err := opts.CloseStdin(); err != nil {
-					logrus.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
+					log.L.WithError(err).Errorf("Failed to close stdin for container %q", c.id)
 				}
 			} else {
 				if opts.Stdout != nil {
@@ -177,7 +176,7 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 
 	attachStream := func(key string, close <-chan struct{}) {
 		<-close
-		logrus.Infof("Attach stream %q closed", key)
+		log.L.Infof("Attach stream %q closed", key)
 		// Make sure stdin gets closed.
 		if stdinStreamRC != nil {
 			stdinStreamRC.Close()

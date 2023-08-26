@@ -39,12 +39,12 @@ import (
 	_ "github.com/containerd/containerd/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/integration/remote"
 	dialer "github.com/containerd/containerd/integration/remote/util"
+	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
@@ -72,7 +72,7 @@ var containerdBin = flag.String("containerd-bin", "containerd", "The containerd 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
-		logrus.WithError(err).Fatalf("Failed to connect daemons")
+		log.L.WithError(err).Fatalf("Failed to connect daemons")
 	}
 	os.Exit(m.Run())
 }

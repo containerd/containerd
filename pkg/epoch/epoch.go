@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 )
 
 // SourceDateEpochEnv is the SOURCE_DATE_EPOCH env var.
@@ -49,7 +49,7 @@ func SourceDateEpoch() (*time.Time, error) {
 func SourceDateEpochOrNow() time.Time {
 	epoch, err := SourceDateEpoch()
 	if err != nil {
-		logrus.WithError(err).Warnf("Invalid %s", SourceDateEpochEnv)
+		log.L.WithError(err).Warnf("Invalid %s", SourceDateEpochEnv)
 	}
 	if epoch != nil {
 		return *epoch
