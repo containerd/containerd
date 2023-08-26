@@ -655,6 +655,13 @@ func create(obj object, tx *bolt.Tx, db *DB, cs content.Store, sn snapshots.Snap
 		if err != nil {
 			return nil, fmt.Errorf("failed to create image: %w", err)
 		}
+		if !obj.removed {
+			node = &gc.Node{
+				Type:      ResourceImage,
+				Namespace: namespace,
+				Key:       image.Name,
+			}
+		}
 	case testContainer:
 		container := containers.Container{
 			ID:          v.id,

@@ -315,13 +315,11 @@ func TestLeaseResource(t *testing.T) {
 			err: errdefs.ErrNotImplemented,
 		},
 		{
-			// not allow to reference to image
 			lease: lease,
 			resource: leases.Resource{
 				ID:   "qBUHpWBn03YaCt9cL3PPGKWoxBqTlLfu",
-				Type: "image",
+				Type: "images",
 			},
-			err: errdefs.ErrNotImplemented,
 		},
 		{
 			lease: lease,
