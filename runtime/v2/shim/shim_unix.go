@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/sys/reaper"
 	"github.com/containerd/fifo"
 	"github.com/sirupsen/logrus"
@@ -66,7 +67,7 @@ func serveListener(path string) (net.Listener, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.WithField("socket", path).Debug("serving api on socket")
+	log.L.WithField("socket", path).Debug("serving api on socket")
 	return l, nil
 }
 

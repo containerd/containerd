@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	nri "github.com/containerd/nri/pkg/adaptation"
-	"github.com/sirupsen/logrus"
 )
 
 // Domain implements the functions the generic NRI interface needs to
@@ -57,10 +56,10 @@ type Domain interface {
 func RegisterDomain(d Domain) {
 	err := domains.add(d)
 	if err != nil {
-		logrus.WithError(err).Fatalf("Failed to register namespace %q with NRI", d.GetName())
+		log.L.WithError(err).Fatalf("Failed to register namespace %q with NRI", d.GetName())
 	}
 
-	logrus.Infof("Registered namespace %q with NRI", d.GetName())
+	log.L.Infof("Registered namespace %q with NRI", d.GetName())
 }
 
 type domainTable struct {

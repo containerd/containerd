@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/log"
 )
 
 const (
@@ -119,7 +119,7 @@ func (rp *Policy) MaximumRetryCount() int {
 func Reconcile(status containerd.Status, labels map[string]string) bool {
 	rp, err := NewPolicy(labels[PolicyLabel])
 	if err != nil {
-		logrus.WithError(err).Error("policy reconcile")
+		log.L.WithError(err).Error("policy reconcile")
 		return false
 	}
 	switch rp.Name() {
@@ -128,7 +128,7 @@ func Reconcile(status containerd.Status, labels map[string]string) bool {
 	case "on-failure":
 		restartCount, err := strconv.Atoi(labels[CountLabel])
 		if err != nil && labels[CountLabel] != "" {
-			logrus.WithError(err).Error("policy reconcile")
+			log.L.WithError(err).Error("policy reconcile")
 			return false
 		}
 		if status.ExitStatus != 0 && (rp.maximumRetryCount == 0 || restartCount < rp.maximumRetryCount) {

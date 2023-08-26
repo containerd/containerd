@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/restart"
-	"github.com/sirupsen/logrus"
 )
 
 type duration struct {
@@ -92,7 +92,7 @@ func (m *monitor) run(interval time.Duration) {
 	}
 	for {
 		if err := m.reconcile(context.Background()); err != nil {
-			logrus.WithError(err).Error("reconcile")
+			log.L.WithError(err).Error("reconcile")
 		}
 		time.Sleep(interval)
 	}
@@ -112,7 +112,7 @@ func (m *monitor) reconcile(ctx context.Context) error {
 			ctx := namespaces.WithNamespace(ctx, name)
 			changes, err := m.monitor(ctx)
 			if err != nil {
-				logrus.WithError(err).Error("monitor for changes")
+				log.G(ctx).WithError(err).Error("monitor for changes")
 				return
 			}
 			var wgChangesLoop sync.WaitGroup
@@ -122,7 +122,7 @@ func (m *monitor) reconcile(ctx context.Context) error {
 				go func() {
 					defer wgChangesLoop.Done()
 					if err := c.apply(ctx, m.client); err != nil {
-						logrus.WithError(err).Error("apply change")
+						log.G(ctx).WithError(err).Error("apply change")
 					}
 				}()
 			}
@@ -160,7 +160,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 
 		// Task or Status return error, only desired to running
 		if err != nil {
-			logrus.WithError(err).Error("monitor")
+			log.G(ctx).WithError(err).Error("monitor")
 			if desiredStatus == containerd.Stopped {
 				continue
 			}
@@ -182,7 +182,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 
 			restartCount, _ := strconv.Atoi(labels[restart.CountLabel])
 			if labels["containerd.io/restart.logpath"] != "" {
-				logrus.Warn(`Label "containerd.io/restart.logpath" is no longer supported since containerd v2.0. Use "containerd.io/restart.loguri" instead.`)
+				log.G(ctx).Warn(`Label "containerd.io/restart.logpath" is no longer supported since containerd v2.0. Use "containerd.io/restart.loguri" instead.`)
 			}
 			changes = append(changes, &startChange{
 				container: c,
