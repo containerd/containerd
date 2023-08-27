@@ -275,15 +275,13 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 			return nil, err
 		}
 	}
-	if info.RootFS != nil {
-		for _, m := range info.RootFS {
-			request.Rootfs = append(request.Rootfs, &types.Mount{
-				Type:    m.Type,
-				Source:  m.Source,
-				Target:  m.Target,
-				Options: m.Options,
-			})
-		}
+	for _, m := range info.RootFS {
+		request.Rootfs = append(request.Rootfs, &types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		})
 	}
 	request.RuntimePath = info.RuntimePath
 	if info.Options != nil {
