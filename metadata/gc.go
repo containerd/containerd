@@ -711,7 +711,9 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 	case ResourceImage:
 		ibkt := nsbkt.Bucket(bucketKeyObjectImages)
 		if ibkt != nil {
-			return nil, ibkt.DeleteBucket([]byte(node.Key))
+			return &eventstypes.ImageDelete{
+				Name: node.Key,
+			}, ibkt.DeleteBucket([]byte(node.Key))
 		}
 	case ResourceLease:
 		lbkt := nsbkt.Bucket(bucketKeyObjectLeases)
