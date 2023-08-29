@@ -33,9 +33,10 @@ go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.2
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
 : "${DESTDIR:=""}"
+: "${CRI_TOOLS_REPO:=https://github.com/kubernetes-sigs/cri-tools.git}"
 
 TMPROOT=$(mktemp -d)
-git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}/cri-tools"
+git clone "${CRI_TOOLS_REPO}" "${TMPROOT}/cri-tools"
 pushd "${TMPROOT}"/cri-tools
 git checkout "$CRITEST_COMMIT"
 make
