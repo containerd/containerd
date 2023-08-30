@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/labels"
 	"github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/errdefs"
+	docker "github.com/distribution/reference"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	imagedigest "github.com/opencontainers/go-digest"
