@@ -68,8 +68,13 @@ Most of this is experimental and there are few leaps to make this work.`,
 			Usage: "Pull content from all platforms",
 		},
 		cli.BoolFlag{
-			Name:  "all-metadata",
-			Usage: "Pull metadata for all platforms",
+			Name:   "all-metadata",
+			Usage:  "(Deprecated: use skip-metadata) Pull metadata for all platforms",
+			Hidden: true,
+		},
+		cli.BoolFlag{
+			Name:  "skip-metadata",
+			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
 		cli.BoolFlag{
 			Name:  "metadata-only",
@@ -141,7 +146,7 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		config.AllMetadata = true
 		// Any with an empty set is None
 		config.PlatformMatcher = platforms.Any()
-	} else if clicontext.Bool("all-metadata") {
+	} else if !clicontext.Bool("skip-metadata") {
 		config.AllMetadata = true
 	}
 
