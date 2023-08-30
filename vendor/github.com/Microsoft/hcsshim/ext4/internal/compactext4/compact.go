@@ -17,6 +17,8 @@ import (
 )
 
 // Writer writes a compact ext4 file system.
+//
+// It expects all paths to use directory separator '/', even on Windows.
 type Writer struct {
 	f                    io.ReadWriteSeeker
 	bw                   *bufio.Writer
@@ -1102,7 +1104,7 @@ func (w *Writer) writeInodeTable(tableSize uint32) error {
 }
 
 // NewWriter returns a Writer that writes an ext4 file system to the provided
-// WriteSeeker.
+// ReadWriteSeeker.
 func NewWriter(f io.ReadWriteSeeker, opts ...Option) *Writer {
 	w := &Writer{
 		f:           f,

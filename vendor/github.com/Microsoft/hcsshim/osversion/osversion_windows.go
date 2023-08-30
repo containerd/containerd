@@ -26,16 +26,15 @@ var (
 // The calling application must be manifested to get the correct version information.
 func Get() OSVersion {
 	once.Do(func() {
-		var err error
+		v := *windows.RtlGetVersion()
 		osv = OSVersion{}
-		osv.Version, err = windows.GetVersion()
-		if err != nil {
-			// GetVersion never fails.
-			panic(err)
-		}
-		osv.MajorVersion = uint8(osv.Version & 0xFF)
-		osv.MinorVersion = uint8(osv.Version >> 8 & 0xFF)
-		osv.Build = uint16(osv.Version >> 16)
+		osv.MajorVersion = uint8(v.MajorVersion)
+		osv.MinorVersion = uint8(v.MinorVersion)
+		osv.Build = uint16(v.BuildNumber)
+		// Fill version value so that existing clients don't break
+		osv.Version = v.BuildNumber << 16
+		osv.Version = osv.Version | (uint32(v.MinorVersion) << 8)
+		osv.Version = osv.Version | v.MajorVersion
 	})
 	return osv
 }
