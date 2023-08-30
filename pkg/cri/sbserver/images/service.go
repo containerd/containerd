@@ -27,7 +27,7 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/kmutex"
-	"github.com/containerd/containerd/reference/docker"
+	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 )
 

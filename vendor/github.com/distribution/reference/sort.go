@@ -14,20 +14,22 @@
    limitations under the License.
 */
 
-package docker
+package reference
 
 import (
 	"sort"
 )
 
-// Sort sorts string references preferring higher information references
+// Sort sorts string references preferring higher information references.
+//
 // The precedence is as follows:
-// 1. Name + Tag + Digest
-// 2. Name + Tag
-// 3. Name + Digest
-// 4. Name
-// 5. Digest
-// 6. Parse error
+//
+//  1. [Named] + [Tagged] + [Digested] (e.g., "docker.io/library/busybox:latest@sha256:<digest>")
+//  2. [Named] + [Tagged]              (e.g., "docker.io/library/busybox:latest")
+//  3. [Named] + [Digested]            (e.g., "docker.io/library/busybo@sha256:<digest>")
+//  4. [Named]                         (e.g., "docker.io/library/busybox")
+//  5. [Digested]                      (e.g., "docker.io@sha256:<digest>")
+//  6. Parse error
 func Sort(references []string) []string {
 	var prefs []Reference
 	var bad []string

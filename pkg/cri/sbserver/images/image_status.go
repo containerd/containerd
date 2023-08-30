@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	"github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/tracing"
+	docker "github.com/distribution/reference"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
