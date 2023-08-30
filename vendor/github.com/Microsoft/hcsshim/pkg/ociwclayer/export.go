@@ -71,7 +71,7 @@ func writeTarFromLayer(ctx context.Context, r wclayer.LayerReader, w io.Writer) 
 		if fileInfo == nil {
 			// Write a whiteout file.
 			hdr := &tar.Header{
-				Name: filepath.ToSlash(filepath.Join(filepath.Dir(name), whiteoutPrefix+filepath.Base(name))),
+				Name: filepath.ToSlash(filepath.Join(filepath.Dir(name), WhiteoutPrefix+filepath.Base(name))),
 			}
 			err := t.WriteHeader(hdr)
 			if err != nil {
