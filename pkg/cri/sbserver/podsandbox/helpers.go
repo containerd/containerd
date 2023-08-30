@@ -31,7 +31,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/reference/docker"
+	docker "github.com/distribution/reference"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 

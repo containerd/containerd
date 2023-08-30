@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/reference/docker"
+	docker "github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

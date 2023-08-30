@@ -32,9 +32,9 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/reference/docker"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
+	docker "github.com/distribution/reference"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
