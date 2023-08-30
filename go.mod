@@ -7,7 +7,7 @@ require (
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 	github.com/Microsoft/go-winio v0.6.1
-	github.com/Microsoft/hcsshim v0.10.0
+	github.com/Microsoft/hcsshim v0.12.0-rc.0
 	github.com/container-orchestrated-devices/container-device-interface v0.6.0
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.2
@@ -67,7 +67,7 @@ require (
 	golang.org/x/sys v0.10.0
 	google.golang.org/genproto v0.0.0-20230720185612-659f7aaaa771
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230720185612-659f7aaaa771
-	google.golang.org/grpc v1.56.2
+	google.golang.org/grpc v1.57.0
 	google.golang.org/protobuf v1.31.0
 	k8s.io/api v0.26.4
 	k8s.io/apimachinery v0.26.4

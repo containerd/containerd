@@ -96,8 +96,16 @@ var (
 	procNtSetInformationFile                   = modntdll.NewProc("NtSetInformationFile")
 	procRtlNtStatusToDosError                  = modntdll.NewProc("RtlNtStatusToDosError")
 	procORCloseHive                            = modoffreg.NewProc("ORCloseHive")
+	procORCloseKey                             = modoffreg.NewProc("ORCloseKey")
 	procORCreateHive                           = modoffreg.NewProc("ORCreateHive")
+	procORCreateKey                            = modoffreg.NewProc("ORCreateKey")
+	procORDeleteKey                            = modoffreg.NewProc("ORDeleteKey")
+	procORGetValue                             = modoffreg.NewProc("ORGetValue")
+	procORMergeHives                           = modoffreg.NewProc("ORMergeHives")
+	procOROpenHive                             = modoffreg.NewProc("OROpenHive")
+	procOROpenKey                              = modoffreg.NewProc("OROpenKey")
 	procORSaveHive                             = modoffreg.NewProc("ORSaveHive")
+	procORSetValue                             = modoffreg.NewProc("ORSetValue")
 )
 
 func LogonUser(username *uint16, domain *uint16, password *uint16, logonType uint32, logonProvider uint32, token *windows.Token) (err error) {
@@ -622,35 +630,162 @@ func RtlNtStatusToDosError(status uint32) (winerr error) {
 	return
 }
 
-func ORCloseHive(key syscall.Handle) (regerrno error) {
-	r0, _, _ := syscall.Syscall(procORCloseHive.Addr(), 1, uintptr(key), 0, 0)
+func ORCloseHive(handle ORHKey) (win32err error) {
+	r0, _, _ := syscall.Syscall(procORCloseHive.Addr(), 1, uintptr(handle), 0, 0)
 	if r0 != 0 {
-		regerrno = syscall.Errno(r0)
+		win32err = syscall.Errno(r0)
 	}
 	return
 }
 
-func ORCreateHive(key *syscall.Handle) (regerrno error) {
+func ORCloseKey(handle ORHKey) (win32err error) {
+	r0, _, _ := syscall.Syscall(procORCloseKey.Addr(), 1, uintptr(handle), 0, 0)
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORCreateHive(key *ORHKey) (win32err error) {
 	r0, _, _ := syscall.Syscall(procORCreateHive.Addr(), 1, uintptr(unsafe.Pointer(key)), 0, 0)
 	if r0 != 0 {
-		regerrno = syscall.Errno(r0)
+		win32err = syscall.Errno(r0)
 	}
 	return
 }
 
-func ORSaveHive(key syscall.Handle, file string, OsMajorVersion uint32, OsMinorVersion uint32) (regerrno error) {
+func ORCreateKey(handle ORHKey, subKey string, class uintptr, options uint32, securityDescriptor uintptr, result *ORHKey, disposition *uint32) (win32err error) {
 	var _p0 *uint16
-	_p0, regerrno = syscall.UTF16PtrFromString(file)
-	if regerrno != nil {
+	_p0, win32err = syscall.UTF16PtrFromString(subKey)
+	if win32err != nil {
 		return
 	}
-	return _ORSaveHive(key, _p0, OsMajorVersion, OsMinorVersion)
+	return _ORCreateKey(handle, _p0, class, options, securityDescriptor, result, disposition)
 }
 
-func _ORSaveHive(key syscall.Handle, file *uint16, OsMajorVersion uint32, OsMinorVersion uint32) (regerrno error) {
-	r0, _, _ := syscall.Syscall6(procORSaveHive.Addr(), 4, uintptr(key), uintptr(unsafe.Pointer(file)), uintptr(OsMajorVersion), uintptr(OsMinorVersion), 0, 0)
+func _ORCreateKey(handle ORHKey, subKey *uint16, class uintptr, options uint32, securityDescriptor uintptr, result *ORHKey, disposition *uint32) (win32err error) {
+	r0, _, _ := syscall.Syscall9(procORCreateKey.Addr(), 7, uintptr(handle), uintptr(unsafe.Pointer(subKey)), uintptr(class), uintptr(options), uintptr(securityDescriptor), uintptr(unsafe.Pointer(result)), uintptr(unsafe.Pointer(disposition)), 0, 0)
 	if r0 != 0 {
-		regerrno = syscall.Errno(r0)
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORDeleteKey(handle ORHKey, subKey string) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(subKey)
+	if win32err != nil {
+		return
+	}
+	return _ORDeleteKey(handle, _p0)
+}
+
+func _ORDeleteKey(handle ORHKey, subKey *uint16) (win32err error) {
+	r0, _, _ := syscall.Syscall(procORDeleteKey.Addr(), 2, uintptr(handle), uintptr(unsafe.Pointer(subKey)), 0)
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORGetValue(handle ORHKey, subKey string, value string, valueType *uint32, data *byte, dataLen *uint32) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(subKey)
+	if win32err != nil {
+		return
+	}
+	var _p1 *uint16
+	_p1, win32err = syscall.UTF16PtrFromString(value)
+	if win32err != nil {
+		return
+	}
+	return _ORGetValue(handle, _p0, _p1, valueType, data, dataLen)
+}
+
+func _ORGetValue(handle ORHKey, subKey *uint16, value *uint16, valueType *uint32, data *byte, dataLen *uint32) (win32err error) {
+	r0, _, _ := syscall.Syscall6(procORGetValue.Addr(), 6, uintptr(handle), uintptr(unsafe.Pointer(subKey)), uintptr(unsafe.Pointer(value)), uintptr(unsafe.Pointer(valueType)), uintptr(unsafe.Pointer(data)), uintptr(unsafe.Pointer(dataLen)))
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORMergeHives(hiveHandles []ORHKey, result *ORHKey) (win32err error) {
+	var _p0 *ORHKey
+	if len(hiveHandles) > 0 {
+		_p0 = &hiveHandles[0]
+	}
+	r0, _, _ := syscall.Syscall(procORMergeHives.Addr(), 3, uintptr(unsafe.Pointer(_p0)), uintptr(len(hiveHandles)), uintptr(unsafe.Pointer(result)))
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func OROpenHive(hivePath string, result *ORHKey) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(hivePath)
+	if win32err != nil {
+		return
+	}
+	return _OROpenHive(_p0, result)
+}
+
+func _OROpenHive(hivePath *uint16, result *ORHKey) (win32err error) {
+	r0, _, _ := syscall.Syscall(procOROpenHive.Addr(), 2, uintptr(unsafe.Pointer(hivePath)), uintptr(unsafe.Pointer(result)), 0)
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func OROpenKey(handle ORHKey, subKey string, result *ORHKey) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(subKey)
+	if win32err != nil {
+		return
+	}
+	return _OROpenKey(handle, _p0, result)
+}
+
+func _OROpenKey(handle ORHKey, subKey *uint16, result *ORHKey) (win32err error) {
+	r0, _, _ := syscall.Syscall(procOROpenKey.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(subKey)), uintptr(unsafe.Pointer(result)))
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORSaveHive(handle ORHKey, hivePath string, osMajorVersion uint32, osMinorVersion uint32) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(hivePath)
+	if win32err != nil {
+		return
+	}
+	return _ORSaveHive(handle, _p0, osMajorVersion, osMinorVersion)
+}
+
+func _ORSaveHive(handle ORHKey, hivePath *uint16, osMajorVersion uint32, osMinorVersion uint32) (win32err error) {
+	r0, _, _ := syscall.Syscall6(procORSaveHive.Addr(), 4, uintptr(handle), uintptr(unsafe.Pointer(hivePath)), uintptr(osMajorVersion), uintptr(osMinorVersion), 0, 0)
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
+	}
+	return
+}
+
+func ORSetValue(handle ORHKey, valueName string, valueType uint32, data *byte, dataLen uint32) (win32err error) {
+	var _p0 *uint16
+	_p0, win32err = syscall.UTF16PtrFromString(valueName)
+	if win32err != nil {
+		return
+	}
+	return _ORSetValue(handle, _p0, valueType, data, dataLen)
+}
+
+func _ORSetValue(handle ORHKey, valueName *uint16, valueType uint32, data *byte, dataLen uint32) (win32err error) {
+	r0, _, _ := syscall.Syscall6(procORSetValue.Addr(), 5, uintptr(handle), uintptr(unsafe.Pointer(valueName)), uintptr(valueType), uintptr(unsafe.Pointer(data)), uintptr(dataLen), 0)
+	if r0 != 0 {
+		win32err = syscall.Errno(r0)
 	}
 	return
 }

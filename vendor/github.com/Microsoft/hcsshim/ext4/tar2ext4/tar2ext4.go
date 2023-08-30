@@ -18,10 +18,11 @@ import (
 )
 
 type params struct {
-	convertWhiteout bool
-	appendVhdFooter bool
-	appendDMVerity  bool
-	ext4opts        []compactext4.Option
+	convertWhiteout  bool
+	convertBackslash bool
+	appendVhdFooter  bool
+	appendDMVerity   bool
+	ext4opts         []compactext4.Option
 }
 
 // Option is the type for optional parameters to Convert.
@@ -33,13 +34,19 @@ func ConvertWhiteout(p *params) {
 	p.convertWhiteout = true
 }
 
+// ConvertBackslash instructs the converter to replace `\` in path names with `/`.
+// This is useful if the tar file was created on Windows, where `\` is the filepath separator.
+func ConvertBackslash(p *params) {
+	p.convertBackslash = true
+}
+
 // AppendVhdFooter instructs the converter to add a fixed VHD footer to the
 // file.
 func AppendVhdFooter(p *params) {
 	p.appendVhdFooter = true
 }
 
-// AppendDMVerity instructs the converter to add a dmverity merkle tree for
+// AppendDMVerity instructs the converter to add a dmverity Merkle tree for
 // the ext4 filesystem after the filesystem and before the optional VHD footer
 func AppendDMVerity(p *params) {
 	p.appendDMVerity = true
@@ -85,23 +92,32 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 			return err
 		}
 
-		if err = fs.MakeParents(hdr.Name); err != nil {
-			return errors.Wrapf(err, "failed to ensure parent directories for %s", hdr.Name)
+		name := hdr.Name
+		linkName := hdr.Linkname
+		if p.convertBackslash {
+			// compactext assumes all paths are `/` separated
+			// unconditionally replace all instances of `/`, regardless of GOOS
+			name = strings.ReplaceAll(name, `\`, "/")
+			linkName = strings.ReplaceAll(linkName, `\`, "/")
+		}
+
+		if err = fs.MakeParents(name); err != nil {
+			return errors.Wrapf(err, "failed to ensure parent directories for %s", name)
 		}
 
 		if p.convertWhiteout {
-			dir, name := path.Split(hdr.Name)
-			if strings.HasPrefix(name, whiteoutPrefix) {
-				if name == opaqueWhiteout {
+			dir, file := path.Split(name)
+			if strings.HasPrefix(file, whiteoutPrefix) {
+				if file == opaqueWhiteout {
 					// Update the directory with the appropriate xattr.
 					f, err := fs.Stat(dir)
 					if err != nil {
-						return errors.Wrapf(err, "failed to stat parent directory of whiteout %s", hdr.Name)
+						return errors.Wrapf(err, "failed to stat parent directory of whiteout %s", file)
 					}
 					f.Xattrs["trusted.overlay.opaque"] = []byte("y")
 					err = fs.Create(dir, f)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create opaque dir %s", hdr.Name)
+						return errors.Wrapf(err, "failed to create opaque dir %s", file)
 					}
 				} else {
 					// Create an overlay-style whiteout.
@@ -110,9 +126,9 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 						Devmajor: 0,
 						Devminor: 0,
 					}
-					err = fs.Create(path.Join(dir, name[len(whiteoutPrefix):]), f)
+					err = fs.Create(path.Join(dir, file[len(whiteoutPrefix):]), f)
 					if err != nil {
-						return errors.Wrapf(err, "failed to create whiteout file for %s", hdr.Name)
+						return errors.Wrapf(err, "failed to create whiteout file for %s", file)
 					}
 				}
 
@@ -121,7 +137,7 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 		}
 
 		if hdr.Typeflag == tar.TypeLink {
-			err = fs.Link(hdr.Linkname, hdr.Name)
+			err = fs.Link(linkName, name)
 			if err != nil {
 				return err
 			}
@@ -135,7 +151,7 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 				Size:     hdr.Size,
 				Uid:      uint32(hdr.Uid),
 				Gid:      uint32(hdr.Gid),
-				Linkname: hdr.Linkname,
+				Linkname: linkName,
 				Devmajor: uint32(hdr.Devmajor),
 				Devminor: uint32(hdr.Devminor),
 				Xattrs:   make(map[string][]byte),
@@ -164,7 +180,7 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 			}
 			f.Mode &= ^compactext4.TypeMask
 			f.Mode |= typ
-			err = fs.Create(hdr.Name, f)
+			err = fs.Create(name, f)
 			if err != nil {
 				return err
 			}
