@@ -69,6 +69,10 @@ const (
 type Config struct {
 	// BlockIOConfigFile specifies the path to blockio configuration file
 	BlockIOConfigFile string `toml:"blockio_config_file" json:"blockioConfigFile"`
+	// BlockIOReconfigure specifies if the configuration file and
+	// system's block devices must be re-read for changes before
+	// applying blockio parameters
+	BlockIOReconfigure bool `toml:"blockio_reconfigure" json:"blockioReconfigure"`
 	// RdtConfigFile specifies the path to RDT configuration file
 	RdtConfigFile string `toml:"rdt_config_file" json:"rdtConfigFile"`
 }
@@ -128,7 +132,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		l.monitor.Monitor(t, nil)
 	}
 
-	if err := blockio.SetConfig(config.BlockIOConfigFile); err != nil {
+	if err := blockio.SetConfig(config.BlockIOConfigFile, config.BlockIOReconfigure); err != nil {
 		log.G(ic.Context).WithError(err).Errorf("blockio initialization failed")
 	}
 	if err := rdt.SetConfig(config.RdtConfigFile); err != nil {

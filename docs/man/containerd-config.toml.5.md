@@ -105,6 +105,8 @@ documentation.
     (Default: **""**). Controls I/O scheduler priority and bandwidth throttling.
     See [blockio configuration](https://github.com/intel/goresctrl/blob/main/doc/blockio.md#configuration)
     for details of the file format.
+  - **blockio_reconfigure** (Linux only) specifies if the configuration file must be re-read
+    and block devices rescanned in the system when it can make a difference. (Default: **false**)
   - **rdt_config_file** (Linux only) specifies path to a configuration used for configuring
     RDT (Default: **""**). Enables support for Intel RDT, a technology
     for cache and memory bandwidth management.
@@ -197,6 +199,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     sched_core = true
   [plugins."io.containerd.service.v1.tasks-service"]
     blockio_config_file = ""
+    blockio_reconfigure = false
     rdt_config_file = ""
 ```
 
