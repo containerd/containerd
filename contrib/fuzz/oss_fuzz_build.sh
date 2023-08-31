@@ -58,6 +58,10 @@ cd ../../
 
 rm -r vendor
 
+# Add temporary CXXFLAGS
+OLDCXXFLAGS=$CXXFLAGS
+export CXXFLAGS="$CXXFLAGS -lresolv"
+
 # Change path of socket since OSS-fuzz does not grant access to /run
 sed -i 's/\/run\/containerd/\/tmp\/containerd/g' $SRC/containerd/defaults/defaults_unix.go
 
@@ -95,3 +99,6 @@ compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor
 
 cp $SRC/containerd/contrib/fuzz/*.options $OUT/
 cp $SRC/containerd/contrib/fuzz/*.dict $OUT/
+
+# Resume CXXFLAGS
+export CXXFLAGS=$OLDCXXFLAGS
