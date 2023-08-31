@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -61,8 +60,7 @@ var LineTreeFormat = TreeFormat{
 
 type ContentReader interface {
 	content.Provider
-
-	Info(ctx context.Context, dgst digest.Digest) (content.Info, error)
+	content.InfoProvider
 }
 
 type ImageTreePrinter struct {
