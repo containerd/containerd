@@ -88,7 +88,6 @@ require (
 	github.com/containerd/typeurl v1.0.2 // indirect
 	github.com/containers/ocicrypt v1.1.6 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.3 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
