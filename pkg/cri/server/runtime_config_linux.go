@@ -21,8 +21,8 @@ import (
 	"sort"
 
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/systemd"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
