@@ -4,49 +4,33 @@ permissions:  # added using https://github.com/step-security/secure-workflows
   contents: read
 
 jobs:
-# ci_fuzz is temporarily disabled as it is not compatible with recent Go:
-#
-#####
-# >github.com/containerd/containerd/contrib/apparmor
-# >github.com/containerd/containerd/contrib/apparmor
-# >Running go-fuzz -tags gofuzz -func FuzzLoadDefaultProfile -o fuzz_FuzzLoadDefaultProfile.a github.com/containerd/containerd/contrib/apparmor
-# >/usr/bin/ld: /usr/bin/ld: DWARF error: invalid or unhandled FORM value: 0x25
-# >fuzz_FuzzLoadDefaultProfile.a(000021.o): in function `_cgo_9c8efe9babca_C2func_res_search':
-# >cgo_unix_cgo_res.cgo2.c:(.text+0x32): undefined reference to `__res_search'
-# >/usr/bin/ld: fuzz_FuzzLoadDefaultProfile.a(000021.o): in function `_cgo_9c8efe9babca_Cfunc_res_search':
-# >cgo_unix_cgo_res.cgo2.c:(.text+0x81): undefined reference to `__res_search'
-# >clang-15: error: linker command failed with exit code 1 (use -v to see invocation)
-# >2023-08-11 14:25:45,433 - root - ERROR - Building fuzzers failed.
-# >2023-08-11 14:25:45,433 - root - ERROR - Error building fuzzers for (commit: 432d86b87f75cc8ddf8f8101a5540eb206ffc894, pr_ref: refs/pull/8957/merge).
-#####
-#
-#  # Run all fuzzing tests. Some of them use Go 1.18's testing.F.
-#  # Others use https://github.com/AdaLogics/go-fuzz-headers.
-#  ci_fuzz:
-#    name: CI Fuzz
-#    if: github.repository == 'containerd/containerd'
-#    runs-on: ubuntu-latest
-#    timeout-minutes: 60
-#    steps:
-#    - name: Build Fuzzers
-#      id: build
-#      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
-#      with:
-#        oss-fuzz-project-name: 'containerd'
-#        language: go
-#    - name: Run Fuzzers
-#      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
-#      with:
-#        oss-fuzz-project-name: 'containerd'
-#        fuzz-seconds: 300
-#        language: go
-#      continue-on-error: true
-#    - name: Upload Crash
-#      uses: actions/upload-artifact@v1
-#      if: failure() && steps.build.outcome == 'success'
-#      with:
-#        name: artifacts
-#        path: ./out/artifacts
+  # Run all fuzzing tests. Some of them use Go 1.18's testing.F.
+  # Others use https://github.com/AdaLogics/go-fuzz-headers.
+  ci_fuzz:
+    name: CI Fuzz
+    if: github.repository == 'containerd/containerd'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - name: Build Fuzzers
+      id: build
+      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+      with:
+        oss-fuzz-project-name: 'containerd'
+        language: go
+    - name: Run Fuzzers
+      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+      with:
+        oss-fuzz-project-name: 'containerd'
+        fuzz-seconds: 300
+        language: go
+      continue-on-error: true
+    - name: Upload Crash
+      uses: actions/upload-artifact@v1
+      if: failure() && steps.build.outcome == 'success'
+      with:
+        name: artifacts
+        path: ./out/artifacts
 
   # Make sure all fuzzing tests which use Go 1.18's testing.F are
   # runnable with go test -fuzz.
