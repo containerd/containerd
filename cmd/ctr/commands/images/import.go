@@ -252,7 +252,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return err
 			}
 		}
-
+		defer r.Close()
 		imgs, err := client.Import(ctx, r, opts...)
 		closeErr := r.Close()
 		if err != nil {
