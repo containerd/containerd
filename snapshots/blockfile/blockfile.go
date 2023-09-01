@@ -22,12 +22,14 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/continuity/fs"
 )
 
 // viewHookHelper is only used in test for recover the filesystem.
@@ -447,6 +449,17 @@ func (o *snapshotter) Close() error {
 }
 
 func copyFileWithSync(target, source string) error {
+	// The Go stdlib does not seem to have an efficient os.File.ReadFrom
+	// routine for other platforms like it does on Linux with
+	// copy_file_range. For Darwin at least we can use clonefile
+	// in its place, otherwise if we have a sparse file we'd have
+	// a fun surprise waiting below.
+	//
+	// TODO: Enlighten other platforms (windows?)
+	if runtime.GOOS == "darwin" {
+		return fs.CopyFile(target, source)
+	}
+
 	src, err := os.Open(source)
 	if err != nil {
 		return fmt.Errorf("failed to open source %s: %w", source, err)
