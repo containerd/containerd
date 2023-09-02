@@ -76,7 +76,11 @@ func (c *criService) recover(ctx context.Context) error {
 		eg.Go(func() error {
 			sb, err := podSandboxLoader.RecoverContainer(ctx2, sandbox)
 			if err != nil {
-				log.G(ctx2).WithError(err).Errorf("Failed to load sandbox %q", sandbox.ID())
+				log.G(ctx2).
+					WithError(err).
+					WithField("sandbox", sandbox.ID()).
+					Error("Failed to load sandbox")
+
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded sandbox %+v", sb)
@@ -116,7 +120,11 @@ func (c *criService) recover(ctx context.Context) error {
 
 		status, err := controller.Status(ctx, sbx.ID, false)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to recover sandbox state")
+			log.G(ctx).
+				WithError(err).
+				WithField("sandbox", sbx.ID).
+				Error("failed to recover sandbox state")
+
 			if errdefs.IsNotFound(err) {
 				state = sandboxstore.StateNotReady
 			}
@@ -151,7 +159,11 @@ func (c *criService) recover(ctx context.Context) error {
 		eg.Go(func() error {
 			cntr, err := c.loadContainer(ctx2, container)
 			if err != nil {
-				log.G(ctx2).WithError(err).Errorf("Failed to load container %q", container.ID())
+				log.G(ctx2).
+					WithError(err).
+					WithField("container", container.ID()).
+					Error("Failed to load container")
+
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
