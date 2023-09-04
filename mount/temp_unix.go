@@ -20,7 +20,6 @@ package mount
 
 import (
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/moby/sys/mountinfo"
@@ -28,15 +27,13 @@ import (
 
 // SetTempMountLocation sets the temporary mount location
 func SetTempMountLocation(root string) error {
-	root, err := filepath.Abs(root)
+	err := os.MkdirAll(root, 0700)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(root, 0700); err != nil {
-		return err
-	}
-	tempMountLocation = root
-	return nil
+	// We need to pass canonicalized path to mountinfo.PrefixFilter in CleanupTempMounts
+	tempMountLocation, err = CanonicalizePath(root)
+	return err
 }
 
 // CleanupTempMounts all temp mounts and remove the directories
@@ -45,6 +42,7 @@ func CleanupTempMounts(flags int) (warnings []error, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// Make the deepest mount be first
 	sort.Slice(mounts, func(i, j int) bool {
 		return len(mounts[i].Mountpoint) > len(mounts[j].Mountpoint)

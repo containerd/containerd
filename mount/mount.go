@@ -18,6 +18,7 @@ package mount
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/containerd/containerd/api/types"
@@ -67,6 +68,18 @@ func UnmountMounts(mounts []Mount, target string, flags int) error {
 		}
 	}
 	return nil
+}
+
+// CanonicalizePath makes path absolute and resolves symlinks in it.
+// Path must exist.
+func CanonicalizePath(path string) (string, error) {
+	// Abs also does Clean, so we do not need to call it separately
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.EvalSymlinks(path)
 }
 
 // ReadOnly returns a boolean value indicating whether this mount has the "ro"
