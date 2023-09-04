@@ -143,6 +143,11 @@ func (c *Controller) seccompEnabled() bool {
 // unmountRecursive unmounts the target and all mounts underneath, starting with
 // the deepest mount first.
 func unmountRecursive(ctx context.Context, target string) error {
+	target, err := mount.CanonicalizePath(target)
+	if err != nil {
+		return err
+	}
+
 	toUnmount, err := mountinfo.GetMounts(mountinfo.PrefixFilter(target))
 	if err != nil {
 		return err
