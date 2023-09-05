@@ -114,7 +114,7 @@ func init() {
 		if hook, err := etwlogrus.NewHookFromProvider(provider); err == nil {
 			logrus.AddHook(hook)
 		} else {
-			logrus.Error(err)
+			log.L.Error(err)
 		}
 	}
 }

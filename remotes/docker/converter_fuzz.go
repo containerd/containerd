@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 func FuzzConvertManifest(data []byte) int {
@@ -34,7 +33,7 @@ func FuzzConvertManifest(data []byte) int {
 
 	// Do not log the message below
 	// level=warning msg="do nothing for media type: ..."
-	log.G(ctx).Logger.SetLevel(logrus.PanicLevel)
+	log.G(ctx).Logger.SetLevel(log.PanicLevel)
 
 	f := fuzz.NewConsumer(data)
 	desc := ocispec.Descriptor{}

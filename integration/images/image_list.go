@@ -22,8 +22,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/containerd/containerd/log"
 	"github.com/pelletier/go-toml"
-	"github.com/sirupsen/logrus"
 )
 
 var imageListFile = flag.String("image-list", "", "The TOML file containing the non-default images to be used in tests.")
@@ -58,7 +58,7 @@ func initImages(imageListFile string) {
 	}
 
 	if imageListFile != "" {
-		logrus.Infof("loading image list from file: %s", imageListFile)
+		log.L.Infof("loading image list from file: %s", imageListFile)
 
 		fileContent, err := os.ReadFile(imageListFile)
 		if err != nil {
@@ -71,7 +71,7 @@ func initImages(imageListFile string) {
 		}
 	}
 
-	logrus.Infof("Using the following image list: %+v", imageList)
+	log.L.Infof("Using the following image list: %+v", imageList)
 	imageMap = initImageMap(imageList)
 }
 

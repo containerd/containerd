@@ -25,7 +25,6 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 )
 
@@ -66,7 +65,7 @@ var pruneReferencesCommand = cli.Command{
 
 		dryRun := clicontext.Bool("dry")
 		if dryRun {
-			log.G(ctx).Logger.SetLevel(logrus.DebugLevel)
+			log.G(ctx).Logger.SetLevel(log.DebugLevel)
 			log.G(ctx).Debug("dry run, no changes will be applied")
 		}
 

@@ -22,10 +22,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/log"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
@@ -98,7 +97,7 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, sandbox sandboxst
 					ExitStatus: exitStatus,
 					ExitedAt:   protobuf.ToTimestamp(exitedAt),
 				}
-				logrus.WithError(err).Errorf("Failed to wait sandbox exit %+v", e)
+				log.G(ctx).WithError(err).Errorf("Failed to wait sandbox exit %+v", e)
 				// TODO: how to backoff
 				c.cri.BackOffEvent(id, e)
 			}

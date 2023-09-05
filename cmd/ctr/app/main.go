@@ -37,9 +37,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"
 )
@@ -121,7 +121,7 @@ containerd CLI
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
-			logrus.SetLevel(logrus.DebugLevel)
+			return log.SetLevel("debug")
 		}
 		return nil
 	}

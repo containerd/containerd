@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/randutil"
-	"github.com/sirupsen/logrus"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -555,7 +554,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 			total = status.Total
 			offset = status.Offset
 		} else {
-			logrus.Infof("failed to resume the status from path %s: %s. will recreate them", path, err.Error())
+			log.G(ctx).Infof("failed to resume the status from path %s: %s. will recreate them", path, err.Error())
 		}
 	}
 

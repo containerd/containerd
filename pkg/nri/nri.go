@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/version"
 	nri "github.com/containerd/nri/pkg/adaptation"
@@ -110,7 +109,7 @@ func New(cfg *Config) (API, error) {
 	}
 
 	if cfg.Disable {
-		logrus.Info("NRI interface is disabled by configuration.")
+		log.L.Info("NRI interface is disabled by configuration.")
 		return l, nil
 	}
 
@@ -132,7 +131,7 @@ func New(cfg *Config) (API, error) {
 
 	l.state = make(map[string]State)
 
-	logrus.Info("created NRI interface")
+	log.L.Info("created NRI interface")
 
 	return l, nil
 }

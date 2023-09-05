@@ -29,7 +29,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/reference/docker"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/sirupsen/logrus"
 )
 
 type CRIImageService struct {
@@ -64,7 +63,7 @@ func NewService(config criconfig.Config, imageFSPath string, client *containerd.
 	}
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
-	logrus.Info("Start snapshots syncer")
+	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,
 		svc.client.SnapshotService(svc.config.ContainerdConfig.Snapshotter),
