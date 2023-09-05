@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"golang.org/x/sys/unix"
+
 	kernel "github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
@@ -196,5 +198,100 @@ func NeedsUserXAttr(d string) (bool, error) {
 	if err := mount.UnmountAll(dest, 0); err != nil {
 		log.L.WithError(err).Warnf("Failed to unmount check directory %v", dest)
 	}
+	return true, nil
+}
+
+// SupportsIDMappedMounts tells if this kernel supports idmapped mounts for overlayfs
+// or not.
+//
+// This function returns error whether the kernel supports idmapped mounts
+// for overlayfs or not, i.e. if e.g. -ENOSYS may be returned as well as -EPERM.
+// So, caller should check for (true, err == nil), otherwise treat it as there's
+// no support from the kernel side.
+func SupportsIDMappedMounts() (bool, error) {
+	// Fast path
+	fiveDotNineteen := kernel.KernelVersion{Kernel: 5, Major: 19}
+	if ok, err := kernel.GreaterEqualThan(fiveDotNineteen); err == nil && ok {
+		return true, nil
+	}
+
+	// Do slow path, because idmapped mounts may be backported to older kernels.
+	uidMap := syscall.SysProcIDMap{
+		ContainerID: 0,
+		HostID:      666,
+		Size:        1,
+	}
+	gidMap := syscall.SysProcIDMap{
+		ContainerID: 0,
+		HostID:      666,
+		Size:        1,
+	}
+	td, err := os.MkdirTemp("", "ovl-idmapped-check")
+	if err != nil {
+		return false, fmt.Errorf("failed to create check directory: %w", err)
+	}
+	defer func() {
+		if err := os.RemoveAll(td); err != nil {
+			log.L.WithError(err).Warnf("failed to remove check directory %s", td)
+		}
+	}()
+
+	for _, dir := range []string{"lower", "upper", "work", "merged"} {
+		if err = os.Mkdir(filepath.Join(td, dir), 0755); err != nil {
+			return false, fmt.Errorf("failed to create %s directory: %w", dir, err)
+		}
+	}
+	defer func() {
+		if err = os.RemoveAll(td); err != nil {
+			log.L.WithError(err).Warnf("failed remove overlay check directory %s", td)
+		}
+	}()
+
+	if err = os.Lchown(filepath.Join(td, "upper"), uidMap.HostID, gidMap.HostID); err != nil {
+		return false, fmt.Errorf("failed to chown upper directory %s: %w", filepath.Join(td, "upper"), err)
+	}
+
+	lowerDir := filepath.Join(td, "lower")
+	uidmap := fmt.Sprintf("%d:%d:%d", uidMap.ContainerID, uidMap.HostID, uidMap.Size)
+	gidmap := fmt.Sprintf("%d:%d:%d", gidMap.ContainerID, gidMap.HostID, gidMap.Size)
+
+	usernsFd, childProcCleanUp, err := mount.GetUsernsFD(uidmap, gidmap)
+	if err != nil {
+		return false, err
+	}
+	defer childProcCleanUp()
+
+	if err = mount.IDMapMount(lowerDir, lowerDir, usernsFd); err != nil {
+		return false, fmt.Errorf("failed to remap lowerdir %s: %w", lowerDir, err)
+	}
+	defer func() {
+		if err = unix.Unmount(lowerDir, 0); err != nil {
+			log.L.WithError(err).Warnf("failed to unmount lowerdir %s", lowerDir)
+		}
+	}()
+
+	opts := fmt.Sprintf("index=off,lowerdir=%s,upperdir=%s,workdir=%s", lowerDir, filepath.Join(td, "upper"), filepath.Join(td, "work"))
+	if err = unix.Mount("", filepath.Join(td, "merged"), "overlay", uintptr(unix.MS_RDONLY), opts); err != nil {
+		return false, fmt.Errorf("failed to mount idmapped overlay to %s: %w", filepath.Join(td, "merged"), err)
+	}
+	defer func() {
+		if err = unix.Unmount(filepath.Join(td, "merged"), 0); err != nil {
+			log.L.WithError(err).Warnf("failed to unmount overlay check directory %s", filepath.Join(td, "merged"))
+		}
+	}()
+
+	// NOTE: we can't just return true if mount didn't fail since overlay supports
+	// idmappings for {lower,upper}dir. That means we need to check merged directory
+	// to make sure it completely  supports idmapped mounts.
+	st, err := os.Stat(filepath.Join(td, "merged"))
+	if err != nil {
+		return false, fmt.Errorf("failed to stat %s: %w", filepath.Join(td, "merged"), err)
+	}
+	if stat, ok := st.Sys().(*syscall.Stat_t); !ok {
+		return false, fmt.Errorf("incompatible types after stat call: *syscall.Stat_t expected")
+	} else if int(stat.Uid) != uidMap.HostID || int(stat.Gid) != gidMap.HostID {
+		return false, fmt.Errorf("bad mapping: expected {uid: %d, gid: %d}; real {uid: %d, gid: %d}", uidMap.HostID, gidMap.HostID, int(stat.Uid), int(stat.Gid))
+	}
+
 	return true, nil
 }
