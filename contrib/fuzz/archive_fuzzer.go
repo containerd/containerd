@@ -24,7 +24,6 @@ import (
 	"path"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd/log"
 
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/content/local"
