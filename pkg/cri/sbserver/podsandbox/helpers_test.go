@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/reference/docker"
+	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
