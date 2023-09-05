@@ -72,6 +72,12 @@ func TestOverlay(t *testing.T) {
 			t.Run("TestOverlayView", func(t *testing.T) {
 				testOverlayView(t, newSnapshotterWithOpts(append(opts, WithMountOptions([]string{"volatile"}))...))
 			})
+			t.Run("TestOverlayMetacopyOn", func(t *testing.T) {
+				testOverlayMetacopy(t, newSnapshotterWithOpts(append(opts, WithMountOptions([]string{"metacopy=on"}))...), true)
+			})
+			t.Run("TestOverlayMetacopyOff", func(t *testing.T) {
+				testOverlayMetacopy(t, newSnapshotterWithOpts(append(opts, WithMountOptions([]string{"metacopy=off"}))...), false)
+			})
 		})
 	}
 }
@@ -172,7 +178,14 @@ func testOverlayOverlayMount(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		t.Fatal(err)
 	} else if userxattr {
 		expected = append(expected, "userxattr")
+	} else if supportsMetacopy() {
+		if len(expected) <= 1 {
+			expected = append(expected, "metacopy=on")
+		} else {
+			t.Errorf("unexpected number of options")
+		}
 	}
+
 	expected = append(expected, []string{
 		work,
 		upper,
@@ -329,16 +342,9 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 
 	supportsIndex := supportsIndex()
-	expectedOptions := 3
+	expectedOptions := 4
 	if !supportsIndex {
 		expectedOptions--
-	}
-	userxattr, err := overlayutils.NeedsUserXAttr(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if userxattr {
-		expectedOptions++
 	}
 
 	if len(m.Options) != expectedOptions {
@@ -346,17 +352,87 @@ func testOverlayView(t *testing.T, newSnapshotter testsuite.SnapshotterFunc) {
 	}
 	lowers := getParents(ctx, o, root, "/tmp/view2")
 	expected = fmt.Sprintf("lowerdir=%s:%s", lowers[0], lowers[1])
-	optIdx := 2
+	optIdx := 3
 	if !supportsIndex {
 		optIdx--
-	}
-	if userxattr {
-		optIdx++
 	}
 	if m.Options[0] != "volatile" {
 		t.Error("expected option first option to be provided option \"volatile\"")
 	}
 	if m.Options[optIdx] != expected {
 		t.Errorf("expected option %q but received %q", expected, m.Options[optIdx])
+	}
+}
+
+func testOverlayMetacopy(t *testing.T, newSnapshotter testsuite.SnapshotterFunc, metacopyOn bool) {
+	ctx := context.TODO()
+	root := t.TempDir()
+	o, _, err := newSnapshotter(ctx, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "/tmp/base"
+	// bind mount -- doen't have metacopy option
+	mounts, err := o.Prepare(ctx, key, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := mounts[0]
+	if m.Type != "bind" {
+		t.Fatal("mount without parents must be a \"bind\" mount")
+	}
+	if len(m.Options) != 2 {
+		t.Fatalf("too many mount options - %d, expected 2", len(m.Options))
+	}
+	err = o.Commit(ctx, "base", key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key = "/tmp/top"
+	// active snapshot -- may or may not have metacopy option
+	mounts, err = o.Prepare(ctx, key, "base")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		bp    = getBasePath(ctx, o, root, key)
+		work  = "workdir=" + filepath.Join(bp, "work")
+		upper = "upperdir=" + filepath.Join(bp, "fs")
+		lower = "lowerdir=" + getParents(ctx, o, root, key)[0]
+	)
+	expected := []string{
+		"index=off",
+	}
+	if !supportsIndex() {
+		expected = expected[1:]
+	}
+	userxattr, err := overlayutils.NeedsUserXAttr(root)
+	if err != nil {
+		t.Fatal(err)
+	} else if userxattr {
+		expected = append(expected, "userxattr")
+	} else if supportsMetacopy() {
+		if metacopyOn {
+			expected = append([]string{"metacopy=on"}, expected...)
+		} else if metacopyState, err := overlayutils.GetMetacopyState(root); err != nil {
+			t.Fatal(err)
+		} else if !metacopyState {
+			expected = append([]string{"metacopy=off"}, expected...)
+		}
+	}
+	expected = append(expected, []string{
+		work,
+		upper,
+		lower,
+	}...)
+	m = mounts[0]
+	if len(m.Options) != len(expected) {
+		t.Fatalf("expected %d options, received %d", len(expected), len(m.Options))
+	}
+	for i, v := range expected {
+		if m.Options[i] != v {
+			t.Errorf("expected %q but received %q", v, m.Options[i])
+		}
 	}
 }
