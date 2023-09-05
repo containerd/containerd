@@ -28,15 +28,11 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf/types"
-	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pelletier/go-toml"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,79 +106,6 @@ func TestBuildLabels(t *testing.T) {
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[containerKindLabel], "should not add new labels into original label")
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
-}
-
-func TestGenerateRuntimeOptions(t *testing.T) {
-	nilOpts := `
-systemd_cgroup = true
-[containerd]
-  no_pivot = true
-  default_runtime_name = "default"
-[containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
-`
-	nonNilOpts := `
-systemd_cgroup = true
-[containerd]
-  no_pivot = true
-  default_runtime_name = "default"
-[containerd.runtimes.legacy.options]
-  Runtime = "legacy"
-  RuntimeRoot = "/legacy"
-[containerd.runtimes.runc.options]
-  BinaryName = "runc"
-  Root = "/runc"
-  NoNewKeyring = true
-[containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
-[containerd.runtimes.runcv2.options]
-  BinaryName = "runc"
-  Root = "/runcv2"
-  NoNewKeyring = true
-`
-	var nilOptsConfig, nonNilOptsConfig criconfig.Config
-	tree, err := toml.Load(nilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nilOptsConfig)
-	require.NoError(t, err)
-	require.Len(t, nilOptsConfig.Runtimes, 1)
-
-	tree, err = toml.Load(nonNilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nonNilOptsConfig)
-	require.NoError(t, err)
-	require.Len(t, nonNilOptsConfig.Runtimes, 3)
-
-	for _, test := range []struct {
-		desc            string
-		r               criconfig.Runtime
-		c               criconfig.Config
-		expectedOptions interface{}
-	}{
-		{
-			desc:            "when options is nil, should return nil option for io.containerd.runc.v2",
-			r:               nilOptsConfig.Runtimes["runcv2"],
-			c:               nilOptsConfig,
-			expectedOptions: nil,
-		},
-		{
-			desc: "when options is not nil, should be able to decode for io.containerd.runc.v2",
-			r:    nonNilOptsConfig.Runtimes["runcv2"],
-			c:    nonNilOptsConfig,
-			expectedOptions: &runcoptions.Options{
-				BinaryName:   "runc",
-				Root:         "/runcv2",
-				NoNewKeyring: true,
-			},
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			opts, err := generateRuntimeOptions(test.r)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedOptions, opts)
-		})
-	}
 }
 
 func TestEnvDeduplication(t *testing.T) {

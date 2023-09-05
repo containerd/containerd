@@ -442,5 +442,10 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			return fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
+
+	// Validate platform-specific configuration
+	if err := validatePlatformSpecific(ctx, c); err != nil {
+		return err
+	}
 	return nil
 }
