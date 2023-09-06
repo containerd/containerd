@@ -124,6 +124,14 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
 
+		// inherits annotations which are provided as snapshot labels.
+		labels := snapshots.FilterInheritedLabels(diff.Annotations)
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels["containerd.io/snapshot.ref"] = chainID.String()
+		opts = append(opts, snapshots.WithLabels(labels))
+
 		// Prepare snapshot with from parent, label as root
 		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
 		if err != nil {
@@ -137,8 +145,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 				layers = nil
 				continue
 			} else if errdefs.IsAlreadyExists(err) {
-				// Try a different key
-				continue
+				// Snapshot exists
 			}
 
 			// Already exists should have the caller retry
