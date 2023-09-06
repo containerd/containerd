@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/containerd/reference/docker"
+	"github.com/distribution/reference"
 )
 
 var tagCommand = cli.Command{
@@ -40,6 +40,10 @@ var tagCommand = cli.Command{
 		cli.BoolTFlag{
 			Name:  "local",
 			Usage: "Run tag locally rather than through transfer API",
+		},
+		cli.BoolFlag{
+			Name:  "skip-reference-check",
+			Usage: "Skip the strict check for reference names",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -61,8 +65,10 @@ var tagCommand = cli.Command{
 
 		if !context.BoolT("local") {
 			for _, targetRef := range context.Args()[1:] {
-				if _, err := docker.ParseAnyReference(targetRef); err != nil {
-					return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
+				if !context.Bool("skip-reference-check") {
+					if _, err := reference.ParseAnyReference(targetRef); err != nil {
+						return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
+					}
 				}
 				err = client.Transfer(ctx, image.NewStore(ref), image.NewStore(targetRef))
 				if err != nil {
@@ -86,8 +92,10 @@ var tagCommand = cli.Command{
 		}
 		// Support multiple references for one command run
 		for _, targetRef := range context.Args()[1:] {
-			if _, err := docker.ParseAnyReference(targetRef); err != nil {
-				return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
+			if !context.Bool("skip-reference-check") {
+				if _, err := reference.ParseAnyReference(targetRef); err != nil {
+					return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
+				}
 			}
 			image.Name = targetRef
 			// Attempt to create the image first
