@@ -63,8 +63,13 @@ command. As part of this process, we do the following:
 			Usage: "Pull content and metadata from all platforms",
 		},
 		cli.BoolFlag{
-			Name:  "all-metadata",
-			Usage: "Pull metadata for all platforms",
+			Name:   "all-metadata",
+			Usage:  "(Deprecated: use skip-metadata) Pull metadata for all platforms",
+			Hidden: true,
+		},
+		cli.BoolFlag{
+			Name:  "skip-metadata",
+			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
 		cli.BoolFlag{
 			Name:  "print-chainid",
@@ -123,7 +128,7 @@ command. As part of this process, we do the following:
 				// Any with an empty set is None
 				// TODO: Specify way to specify not default platform
 				// config.PlatformMatcher = platforms.Any()
-			} else if context.Bool("all-metadata") {
+			} else if !context.Bool("skip-metadata") {
 				sopts = append(sopts, image.WithAllMetadata)
 			}
 
