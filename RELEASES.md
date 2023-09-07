@@ -461,4 +461,4 @@ more quickly.
 | [NRI in CRI Support](https://github.com/containerd/containerd/pull/6019)               | containerd v1.7 | containerd v2.0          |
 | [gRPC Shim](https://github.com/containerd/containerd/pull/8052)                        | containerd v1.7 | containerd v2.0          |
 | [CRI Runtime Specific Snapshotter](https://github.com/containerd/containerd/pull/6899) | containerd v1.7 | containerd v2.0          |
-| [CRI Support for User Namespaces](https://github.com/containerd/containerd/pull/7679)  | containerd v1.7 | containerd v2.0          |
+| [CRI Support for User Namespaces](./docs/user-namespaces/README.md)                    | containerd v1.7 | containerd v2.0          |
