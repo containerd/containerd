@@ -43,11 +43,11 @@ go run main.go $SRC/containerd/images
 
 apt-get update && apt-get install -y wget
 cd $SRC
-wget --quiet https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
+wget --quiet https://go.dev/dl/go1.21.1.linux-amd64.tar.gz
 
 mkdir temp-go
 rm -rf /root/.go/*
-tar -C temp-go/ -xzf go1.21.0.linux-amd64.tar.gz
+tar -C temp-go/ -xzf go1.21.1.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
