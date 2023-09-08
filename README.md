@@ -47,7 +47,7 @@ See our documentation on [containerd.io](https://containerd.io):
 * [namespaces](docs/namespaces.md)
 * [client options](docs/client-opts.md)
 
-See how to build containerd from source at [BUILDING](BUILDING.md).
+To get started contributing to containerd, see [CONTRIBUTING](CONTRIBUTING.md).
 
 If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
 
