@@ -692,7 +692,7 @@ func selectPodIPs(ctx context.Context, configs []*cni.IPConfig, preference strin
 		}
 	case "ipv6":
 		for i, ip := range configs {
-			if ip.IP.To16() != nil {
+			if ip.IP.To4() == nil {
 				return ipString(ip), append(extra, toStrings(configs[i+1:])...)
 			}
 			extra = append(extra, ipString(ip))
