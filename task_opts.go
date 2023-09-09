@@ -92,7 +92,7 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 		}
 		opts, ok := r.Options.(*options.CheckpointOptions)
 		if !ok {
-			return errors.New("invalid v2 shim checkpoint options format")
+			return errors.New("invalid runtime v2 checkpoint options format")
 		}
 		opts.ImagePath = path
 		return nil
@@ -107,9 +107,24 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 		}
 		opts, ok := ti.Options.(*options.Options)
 		if !ok {
-			return errors.New("invalid v2 shim create options format")
+			return errors.New("invalid runtime v2 options format")
 		}
 		opts.CriuImagePath = path
+		return nil
+	}
+}
+
+// WithRestoreWorkPath sets criu work path for create option
+func WithRestoreWorkPath(path string) NewTaskOpts {
+	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
+		if ti.Options == nil {
+			ti.Options = &options.Options{}
+		}
+		opts, ok := ti.Options.(*options.Options)
+		if !ok {
+			return errors.New("invalid runtime v2 options format")
+		}
+		opts.CriuWorkPath = path
 		return nil
 	}
 }
