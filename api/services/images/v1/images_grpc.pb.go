@@ -36,6 +36,8 @@ type ImagesClient interface {
 	Update(ctx context.Context, in *UpdateImageRequest, opts ...grpc.CallOption) (*UpdateImageResponse, error)
 	// Delete deletes the image by name.
 	Delete(ctx context.Context, in *DeleteImageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Count the number of images.
+	Count(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CountImagesResponse, error)
 }
 
 type imagesClient struct {
@@ -91,6 +93,15 @@ func (c *imagesClient) Delete(ctx context.Context, in *DeleteImageRequest, opts 
 	return out, nil
 }
 
+func (c *imagesClient) Count(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CountImagesResponse, error) {
+	out := new(CountImagesResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.images.v1.Images/Count", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ImagesServer is the server API for Images service.
 // All implementations must embed UnimplementedImagesServer
 // for forward compatibility
@@ -108,6 +119,8 @@ type ImagesServer interface {
 	Update(context.Context, *UpdateImageRequest) (*UpdateImageResponse, error)
 	// Delete deletes the image by name.
 	Delete(context.Context, *DeleteImageRequest) (*emptypb.Empty, error)
+	// Count the number of images.
+	Count(context.Context, *emptypb.Empty) (*CountImagesResponse, error)
 	mustEmbedUnimplementedImagesServer()
 }
 
@@ -129,6 +142,9 @@ func (UnimplementedImagesServer) Update(context.Context, *UpdateImageRequest) (*
 }
 func (UnimplementedImagesServer) Delete(context.Context, *DeleteImageRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
+}
+func (UnimplementedImagesServer) Count(context.Context, *emptypb.Empty) (*CountImagesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Count not implemented")
 }
 func (UnimplementedImagesServer) mustEmbedUnimplementedImagesServer() {}
 
@@ -233,6 +249,24 @@ func _Images_Delete_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Images_Count_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ImagesServer).Count(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.images.v1.Images/Count",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ImagesServer).Count(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Images_ServiceDesc is the grpc.ServiceDesc for Images service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -259,6 +293,10 @@ var Images_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Delete",
 			Handler:    _Images_Delete_Handler,
+		},
+		{
+			MethodName: "Count",
+			Handler:    _Images_Count_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -34,6 +34,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {
@@ -193,4 +194,15 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 	}
 
 	return &ptypes.Empty{}, nil
+}
+
+func (l *local) Count(ctx context.Context, req *emptypb.Empty, _ ...grpc.CallOption) (*imagesapi.CountImagesResponse, error) {
+	count, err := l.store.Count(ctx)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+
+	return &imagesapi.CountImagesResponse{
+		Count: count,
+	}, nil
 }

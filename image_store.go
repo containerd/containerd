@@ -28,6 +28,7 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -114,6 +115,14 @@ func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.D
 	})
 
 	return errdefs.FromGRPC(err)
+}
+
+func (s *remoteImages) Count(ctx context.Context) (int64, error) {
+	resp, err := s.client.Count(ctx, &emptypb.Empty{})
+	if err != nil {
+		return -1, errdefs.FromGRPC(err)
+	}
+	return resp.Count, nil
 }
 
 func imageToProto(image *images.Image) *imagesapi.Image {

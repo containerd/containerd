@@ -25,6 +25,7 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {
@@ -82,4 +83,8 @@ func (s *service) Update(ctx context.Context, req *imagesapi.UpdateImageRequest)
 
 func (s *service) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest) (*ptypes.Empty, error) {
 	return s.local.Delete(ctx, req)
+}
+
+func (s *service) Count(ctx context.Context, req *emptypb.Empty) (*imagesapi.CountImagesResponse, error) {
+	return s.local.Count(ctx, req)
 }

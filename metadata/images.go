@@ -276,6 +276,30 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 	})
 }
 
+func (s *imageStore) Count(ctx context.Context) (int64, error) {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	if err := view(ctx, s.db, func(tx *bolt.Tx) error {
+		bkt := getImagesBucket(tx, namespace)
+		if bkt == nil {
+			return nil // empty store
+		}
+
+		return bkt.ForEach(func(k, v []byte) error {
+			count++
+			return nil
+		})
+	}); err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
 func validateImage(image *images.Image) error {
 	if image.Name == "" {
 		return fmt.Errorf("image name must not be empty: %w", errdefs.ErrInvalidArgument)

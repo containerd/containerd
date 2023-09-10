@@ -542,6 +542,46 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 	}
 }
 
+func TestImagesCount(t *testing.T) {
+	ctx, db := testEnv(t)
+	store := NewImageStore(NewDB(db, nil, nil))
+
+	checkCount := func(expected int64) {
+		t.Helper()
+
+		actual, err := store.Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if actual != expected {
+			t.Fatalf("count mismatch: actual(%d) != expected(%d)", actual, expected)
+		}
+	}
+
+	createImage := func() {
+		t.Helper()
+		img := imageBase()
+		img.Target = ocispec.Descriptor{Size: 10, MediaType: "application/vnd.oci.blab"}
+		img.Name = fmt.Sprintf("image-%d", time.Now().UnixNano())
+		img.Target.Digest = digest.FromString(img.Name)
+		_, err := store.Create(ctx, img)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	checkCount(0)
+
+	createImage()
+	checkCount(1)
+
+	for i := 0; i < 10; i++ {
+		createImage()
+	}
+	checkCount(11)
+}
+
 func imageBase() images.Image {
 	return images.Image{
 		Labels: map[string]string{
