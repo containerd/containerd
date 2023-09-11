@@ -75,9 +75,7 @@ When you are done, use the unmount command.
 		ctx, done, err := client.WithLease(ctx,
 			leases.WithID(target),
 			leases.WithExpiration(24*time.Hour),
-			leases.WithLabels(map[string]string{
-				"containerd.io/gc.ref.snapshot." + snapshotter: target,
-			}),
+			leases.WithLabel("containerd.io/gc.ref.snapshot."+snapshotter, target),
 		)
 		if err != nil && !errdefs.IsAlreadyExists(err) {
 			return err
