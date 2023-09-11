@@ -25,14 +25,13 @@ import (
 
 func TestWithLabels(t *testing.T) {
 	testcases := []struct {
-		name     string
-		uut      *Lease
-		labels   map[string]string
-		expected map[string]string
+		name          string
+		initialLabels map[string]string
+		labels        map[string]string
+		expected      map[string]string
 	}{
 		{
 			name: "AddLabelsToEmptyMap",
-			uut:  &Lease{},
 			labels: map[string]string{
 				"containerd.io/gc.root": "2015-12-04T00:00:00Z",
 			},
@@ -42,10 +41,8 @@ func TestWithLabels(t *testing.T) {
 		},
 		{
 			name: "AddLabelsToNonEmptyMap",
-			uut: &Lease{
-				Labels: map[string]string{
-					"containerd.io/gc.expire": "2015-12-05T00:00:00Z",
-				},
+			initialLabels: map[string]string{
+				"containerd.io/gc.expire": "2015-12-05T00:00:00Z",
 			},
 			labels: map[string]string{
 				"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
@@ -62,9 +59,32 @@ func TestWithLabels(t *testing.T) {
 	for _, tc := range testcases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			err := WithLabels(tc.labels)(tc.uut)
+			lease := newLease(tc.initialLabels)
+			err := WithLabels(tc.labels)(lease)
 			require.NoError(t, err)
-			assert.Equal(t, tc.uut.Labels, tc.expected)
+			assert.Equal(t, lease.Labels, tc.expected)
 		})
 	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name+"-WithLabel", func(t *testing.T) {
+			lease := newLease(tc.initialLabels)
+			for k, v := range tc.labels {
+				err := WithLabel(k, v)(lease)
+				require.NoError(t, err)
+			}
+			assert.Equal(t, lease.Labels, tc.expected)
+		})
+	}
+}
+
+func newLease(labels map[string]string) *Lease {
+	lease := &Lease{}
+	if labels != nil {
+		lease.Labels = map[string]string{}
+		for k, v := range labels {
+			lease.Labels[k] = v
+		}
+	}
+	return lease
 }
