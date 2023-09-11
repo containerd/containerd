@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"time"
 
@@ -207,6 +208,9 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 			var descs []ocispec.Descriptor
 			for _, d := range idx.Manifests {
+				if !IsManifestType(d.MediaType) {
+					continue
+				}
 				if d.Platform == nil || platform.Match(*d.Platform) {
 					descs = append(descs, d)
 				}
@@ -229,7 +233,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 			}
 			return descs, nil
 		}
-		return nil, fmt.Errorf("unexpected media type %v for %v: %w", desc.MediaType, desc.Digest, errdefs.ErrNotFound)
+		return nil, ErrSkipDesc
 	}), image); err != nil {
 		return ocispec.Manifest{}, err
 	}
@@ -259,10 +263,11 @@ func Config(ctx context.Context, provider content.Provider, image ocispec.Descri
 
 // Platforms returns one or more platforms supported by the image.
 func Platforms(ctx context.Context, provider content.Provider, image ocispec.Descriptor) ([]ocispec.Platform, error) {
-	var platformSpecs []ocispec.Platform
-	return platformSpecs, Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	platformSpecMap := make(map[string]ocispec.Platform)
+	err := Walk(ctx, Handlers(HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if desc.Platform != nil {
-			platformSpecs = append(platformSpecs, *desc.Platform)
+			pk := makePlatformKey(*desc.Platform)
+			platformSpecMap[pk] = *desc.Platform
 			return nil, ErrSkipDesc
 		}
 
@@ -272,10 +277,28 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 			if err != nil {
 				return nil, err
 			}
-			platformSpecs = append(platformSpecs, imagePlatform)
+			pk := makePlatformKey(imagePlatform)
+			platformSpecMap[pk] = imagePlatform
 		}
 		return nil, nil
 	}), ChildrenHandler(provider)), image)
+	if err != nil {
+		return nil, err
+	}
+
+	platformSpecs := make([]ocispec.Platform, 0, len(platformSpecMap))
+	for _, v := range platformSpecMap {
+		platformSpecs = append(platformSpecs, v)
+	}
+	return platformSpecs, nil
+}
+
+func makePlatformKey(platform ocispec.Platform) string {
+	if platform.OS == "" {
+		return "unknown"
+	}
+
+	return path.Join(platform.OS, platform.Architecture, platform.OSVersion, platform.Variant)
 }
 
 // Check returns nil if the all components of an image are available in the

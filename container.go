@@ -330,6 +330,7 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 		Versioned: ver.Versioned{
 			SchemaVersion: 2,
 		},
+		MediaType:   ocispec.MediaTypeImageIndex,
 		Annotations: make(map[string]string),
 	}
 	copts := &options.CheckpointOptions{
@@ -377,6 +378,7 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	if err != nil {
 		return nil, err
 	}
+	desc.Annotations = index.Annotations
 	i := images.Image{
 		Name:   ref,
 		Target: desc,
