@@ -24,60 +24,67 @@ import (
 )
 
 func TestWithLabels(t *testing.T) {
-	type unitTest struct {
-		name     string
-		uut      *Lease
-		labels   map[string]string
-		expected map[string]string
-	}
-
-	addLabelsToEmptyMap := &unitTest{
-		name: "AddLabelsToEmptyMap",
-		uut:  &Lease{},
-		labels: map[string]string{
-			"containerd.io/gc.root": "2015-12-04T00:00:00Z",
-		},
-		expected: map[string]string{
-			"containerd.io/gc.root": "2015-12-04T00:00:00Z",
-		},
-	}
-
-	addLabelsToNonEmptyMap := &unitTest{
-		name: "AddLabelsToNonEmptyMap",
-		uut: &Lease{
-			Labels: map[string]string{
-				"containerd.io/gc.expire": "2015-12-05T00:00:00Z",
+	testcases := []struct {
+		name          string
+		initialLabels map[string]string
+		labels        map[string]string
+		expected      map[string]string
+	}{
+		{
+			name: "AddLabelsToEmptyMap",
+			labels: map[string]string{
+				"containerd.io/gc.root": "2015-12-04T00:00:00Z",
+			},
+			expected: map[string]string{
+				"containerd.io/gc.root": "2015-12-04T00:00:00Z",
 			},
 		},
-		labels: map[string]string{
-			"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
-			"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
-		},
-		expected: map[string]string{
-			"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
-			"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
-			"containerd.io/gc.expire":                 "2015-12-05T00:00:00Z",
+		{
+			name: "AddLabelsToNonEmptyMap",
+			initialLabels: map[string]string{
+				"containerd.io/gc.expire": "2015-12-05T00:00:00Z",
+			},
+			labels: map[string]string{
+				"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
+				"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
+			},
+			expected: map[string]string{
+				"containerd.io/gc.root":                   "2015-12-04T00:00:00Z",
+				"containerd.io/gc.ref.snapshot.overlayfs": "sha256:87806a591ce894ff5c699c28fe02093d6cdadd6b1ad86819acea05ccb212ff3d",
+				"containerd.io/gc.expire":                 "2015-12-05T00:00:00Z",
+			},
 		},
 	}
 
-	testcases := []*unitTest{
-		addLabelsToEmptyMap,
-		addLabelsToNonEmptyMap,
-	}
-
-	for _, testcase := range testcases {
-		testcase := testcase
-
-		t.Run(testcase.name, func(t *testing.T) {
-			f := WithLabels(testcase.labels)
-
-			err := f(testcase.uut)
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lease := newLease(tc.initialLabels)
+			err := WithLabels(tc.labels)(lease)
 			require.NoError(t, err)
-
-			for k, v := range testcase.expected {
-				assert.Contains(t, testcase.uut.Labels, k)
-				assert.Equal(t, v, testcase.uut.Labels[k])
-			}
+			assert.Equal(t, lease.Labels, tc.expected)
 		})
 	}
+	for _, tc := range testcases {
+		tc := tc
+		t.Run(tc.name+"-WithLabel", func(t *testing.T) {
+			lease := newLease(tc.initialLabels)
+			for k, v := range tc.labels {
+				err := WithLabel(k, v)(lease)
+				require.NoError(t, err)
+			}
+			assert.Equal(t, lease.Labels, tc.expected)
+		})
+	}
+}
+
+func newLease(labels map[string]string) *Lease {
+	lease := &Lease{}
+	if labels != nil {
+		lease.Labels = map[string]string{}
+		for k, v := range labels {
+			lease.Labels[k] = v
+		}
+	}
+	return lease
 }
