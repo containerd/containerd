@@ -112,13 +112,14 @@ func ApplyLayerWithOpts(ctx context.Context, layer Layer, chain []digest.Digest,
 
 func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn snapshots.Snapshotter, a diff.Applier, opts []snapshots.Opt, applyOpts []diff.ApplyOpt) error {
 	var (
-		parent  = identity.ChainID(chain[:len(chain)-1])
-		chainID = identity.ChainID(chain)
-		layer   = layers[len(layers)-1]
-		diff    ocispec.Descriptor
-		key     string
-		mounts  []mount.Mount
-		err     error
+		parent   = identity.ChainID(chain[:len(chain)-1])
+		chainID  = identity.ChainID(chain)
+		chainStr = chainID.String()
+		layer    = layers[len(layers)-1]
+		diff     ocispec.Descriptor
+		key      string
+		mounts   []mount.Mount
+		err      error
 	)
 
 	for {
@@ -129,7 +130,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		if labels == nil {
 			labels = make(map[string]string)
 		}
-		labels["containerd.io/snapshot.ref"] = chainID.String()
+		labels["containerd.io/snapshot.ref"] = chainStr;
 		opts = append(opts, snapshots.WithLabels(labels))
 
 		// Prepare snapshot with from parent, label as root
@@ -145,7 +146,16 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 				layers = nil
 				continue
 			} else if errdefs.IsAlreadyExists(err) {
-				// Snapshot exists
+				if _, err := sn.Stat(ctx, chainStr); err != nil {
+					if !errdefs.IsNotFound(err) {
+						return fmt.Errorf("failed to stat snapshot %s: %w", chainStr, err)
+					}
+					// Try again, this should be rare, log it
+					log.G(ctx).WithField("key", key).WithField("chainid", chainStr).Debug("extraction snapshot already exists, chain id not found")
+					continue
+				} else {
+					// Snapshot exists - no need to handle, snapshot now found with chain id
+				}
 			}
 
 			// Already exists should have the caller retry
