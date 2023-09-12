@@ -21,8 +21,8 @@ package sbserver
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/blockio"
+	"github.com/containerd/log"
 )
 
 // blockIOClassFromAnnotations examines container and pod annotations of a

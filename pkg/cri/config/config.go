@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 type SandboxControllerMode string

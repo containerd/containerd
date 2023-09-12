@@ -22,10 +22,10 @@ import (
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/opencontainers/selinux/go-selinux"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
 )
 
 // networkAttachCount is the minimum number of networks the PodSandbox

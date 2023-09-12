@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 const (
