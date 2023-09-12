@@ -81,6 +81,7 @@ type (
 	HugepageLimit            = api.HugepageLimit
 	Hooks                    = api.Hooks
 	Hook                     = api.Hook
+	POSIXRlimit              = api.POSIXRlimit
 
 	EventMask = api.EventMask
 )
