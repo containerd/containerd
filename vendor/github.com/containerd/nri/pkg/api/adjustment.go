@@ -103,6 +103,15 @@ func (a *ContainerAdjustment) AddHooks(h *Hooks) {
 	}
 }
 
+func (a *ContainerAdjustment) AddRlimit(typ string, hard, soft uint64) {
+	a.initRlimits()
+	a.Rlimits = append(a.Rlimits, &POSIXRlimit{
+		Type: typ,
+		Hard: hard,
+		Soft: soft,
+	})
+}
+
 // AddDevice records the addition of the given device to a container.
 func (a *ContainerAdjustment) AddDevice(d *LinuxDevice) {
 	a.initLinux()
@@ -257,6 +266,12 @@ func (a *ContainerAdjustment) initAnnotations() {
 func (a *ContainerAdjustment) initHooks() {
 	if a.Hooks == nil {
 		a.Hooks = &Hooks{}
+	}
+}
+
+func (a *ContainerAdjustment) initRlimits() {
+	if a.Rlimits == nil {
+		a.Rlimits = []*POSIXRlimit{}
 	}
 }
 

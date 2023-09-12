@@ -100,7 +100,10 @@ func (r *LinuxResources) ToOCI() *rspec.LinuxResources {
 	if r == nil {
 		return nil
 	}
-	o := &rspec.LinuxResources{}
+	o := &rspec.LinuxResources{
+		CPU:    &rspec.LinuxCPU{},
+		Memory: &rspec.LinuxMemory{},
+	}
 	if r.Memory != nil {
 		o.Memory = &rspec.LinuxMemory{
 			Limit:            r.Memory.Limit.Get(),

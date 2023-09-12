@@ -119,7 +119,7 @@ func (r *Adaptation) newLaunchedPlugin(dir, idx, base, cfg string) (p *plugin, r
 	cmd := exec.Command(filepath.Join(dir, name))
 	cmd.ExtraFiles = []*os.File{peerFile}
 	cmd.Env = []string{
-		api.PluginNameEnvVar + "=" + name,
+		api.PluginNameEnvVar + "=" + base,
 		api.PluginIdxEnvVar + "=" + idx,
 		api.PluginSocketEnvVar + "=3",
 	}

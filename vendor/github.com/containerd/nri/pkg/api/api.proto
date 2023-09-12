@@ -246,6 +246,7 @@ message Container {
   Hooks hooks = 10;
   LinuxContainer linux = 11;
   uint32 pid = 12; // for NRI v1 emulation
+  repeated POSIXRlimit rlimits = 13;
 }
 
 // Possible container states.
@@ -358,6 +359,13 @@ message HugepageLimit {
   uint64 limit = 2;
 }
 
+// Container rlimits
+message POSIXRlimit {
+  string type = 1;
+  uint64 hard = 2;
+  uint64 soft = 3;
+}
+
 // Requested adjustments to a container being created.
 message ContainerAdjustment {
   map<string, string> annotations = 2;
@@ -365,6 +373,7 @@ message ContainerAdjustment {
   repeated KeyValue env = 4;
   Hooks hooks = 5;
   LinuxContainerAdjustment linux = 6;
+  repeated POSIXRlimit rlimits = 7;
 }
 
 // Adjustments to (linux) resources.
