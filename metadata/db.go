@@ -325,6 +325,8 @@ func (m *DB) publishEvents(events []namespacedEvent) {
 			ctx := namespaces.WithNamespace(ctx, ne.namespace)
 			var topic string
 			switch ne.event.(type) {
+			case *eventstypes.ImageDelete:
+				topic = "/images/delete"
 			case *eventstypes.SnapshotRemove:
 				topic = "/snapshot/remove"
 			default:

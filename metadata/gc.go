@@ -41,6 +41,8 @@ const (
 	ResourceContainer
 	// ResourceTask specifies a task resource
 	ResourceTask
+	// ResourceImage specifies an image
+	ResourceImage
 	// ResourceLease specifies a lease
 	ResourceLease
 	// ResourceIngest specifies a content ingest
@@ -54,6 +56,7 @@ const (
 const (
 	resourceContentFlat  = ResourceContent | 0x20
 	resourceSnapshotFlat = ResourceSnapshot | 0x20
+	resourceImageFlat    = ResourceImage | 0x20
 )
 
 var (
@@ -61,8 +64,22 @@ var (
 	labelGCRef        = []byte("containerd.io/gc.ref.")
 	labelGCSnapRef    = []byte("containerd.io/gc.ref.snapshot.")
 	labelGCContentRef = []byte("containerd.io/gc.ref.content")
-	labelGCExpire     = []byte("containerd.io/gc.expire")
-	labelGCFlat       = []byte("containerd.io/gc.flat")
+	labelGCImageRef   = []byte("containerd.io/gc.ref.image")
+
+	// labelGCExpire indicates that an object is collectible after the
+	// provided time. For image objects, this makes them available to
+	// garbage collect when expired, when not provided, image objects
+	// are root objects that never expire. For non-root objects such
+	// as content or snapshots, these objects will be treated like
+	// root objects before their expiration.
+	// Expected format is RFC 3339
+	labelGCExpire = []byte("containerd.io/gc.expire")
+
+	// labelGCFlat indicates that a lease is flat and only intends to
+	// lease the referenced objects, not their references. This can be
+	// used to avoid leasing an entire tree of objects when only the root
+	// object is needed.
+	labelGCFlat = []byte("containerd.io/gc.flat")
 )
 
 // CollectionContext manages a resource collection during a single run of
@@ -137,6 +154,19 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 				fn(gcnode(ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)))
 			},
 		},
+		{
+			key: labelGCImageRef,
+			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
+				if ks := string(k); ks != string(labelGCImageRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCImageRef)] != '.' && ks[len(labelGCImageRef)] != '/' {
+						return
+					}
+				}
+
+				fn(gcnode(ResourceImage, ns, string(v)))
+			},
+		},
 	}
 	if len(collectors) > 0 {
 		contexts = map[gc.ResourceType]CollectionContext{}
@@ -166,7 +196,7 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 			}
 			contexts[rt] = c
 		}
-		// Sort labelHandlers to ensure key seeking is always forwardS
+		// Sort labelHandlers to ensure key seeking is always forward
 		sort.Slice(labelHandlers, func(i, j int) bool {
 			return bytes.Compare(labelHandlers[i].key, labelHandlers[j].key) < 0
 		})
@@ -324,6 +354,21 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 					}
 				}
 
+				itype := ResourceImage
+				if flat {
+					itype = resourceImageFlat
+				}
+
+				ibkt = libkt.Bucket(bucketKeyObjectImages)
+				if ibkt != nil {
+					if err := ibkt.ForEach(func(k, v []byte) error {
+						fn(gcnode(itype, ns, string(k)))
+						return nil
+					}); err != nil {
+						return err
+					}
+				}
+
 				c.leased(ns, string(k), fn)
 
 				return nil
@@ -339,12 +384,10 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 					return nil
 				}
 
-				target := ibkt.Bucket(k).Bucket(bucketKeyTarget)
-				if target != nil {
-					contentKey := string(target.Get(bucketKeyDigest))
-					fn(gcnode(ResourceContent, ns, contentKey))
+				if !isExpiredImage(ctx, k, ibkt.Bucket(k), expThreshold) {
+					fn(gcnode(ResourceImage, ns, string(k)))
 				}
-				return c.sendLabelRefs(ns, ibkt.Bucket(k), fn)
+				return nil
 			}); err != nil {
 				return err
 			}
@@ -482,6 +525,31 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 		}
 
 		return c.sendLabelRefs(node.Namespace, bkt, fn)
+
+	case ResourceImage, resourceImageFlat:
+		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectImages, []byte(node.Key))
+		if bkt == nil {
+			// Node may be created from dead edge
+			return nil
+		}
+		target := bkt.Bucket(bucketKeyTarget)
+		if target != nil {
+			ctype := ResourceContent
+			if node.Type == resourceImageFlat {
+				// For flat leases, keep the target content only
+				ctype = resourceContentFlat
+			}
+			contentKey := string(target.Get(bucketKeyDigest))
+			fn(gcnode(ctype, node.Namespace, contentKey))
+		}
+
+		// Do not send labeled references for flat image refs
+		if node.Type == resourceImageFlat {
+			return nil
+		}
+
+		return c.sendLabelRefs(node.Namespace, bkt, fn)
+
 	case ResourceIngest:
 		// Send expected value
 		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectContent, bucketKeyObjectIngests, []byte(node.Key))
@@ -576,6 +644,19 @@ func (c *gcContext) scanAll(ctx context.Context, tx *bolt.Tx, fn func(ctx contex
 				}
 			}
 		}
+
+		ibkt := nbkt.Bucket(bucketKeyObjectImages)
+		if ibkt != nil {
+			if err := ibkt.ForEach(func(k, v []byte) error {
+				if v != nil {
+					return nil
+				}
+				node := gcnode(ResourceImage, ns, string(k))
+				return fn(ctx, node)
+			}); err != nil {
+				return err
+			}
+		}
 	}
 
 	c.all(func(n gc.Node) {
@@ -627,6 +708,13 @@ func (c *gcContext) remove(ctx context.Context, tx *bolt.Tx, node gc.Node) (inte
 				}, ssbkt.DeleteBucket([]byte(key))
 			}
 		}
+	case ResourceImage:
+		ibkt := nsbkt.Bucket(bucketKeyObjectImages)
+		if ibkt != nil {
+			return &eventstypes.ImageDelete{
+				Name: node.Key,
+			}, ibkt.DeleteBucket([]byte(node.Key))
+		}
 	case ResourceLease:
 		lbkt := nsbkt.Bucket(bucketKeyObjectLeases)
 		if lbkt != nil {
@@ -675,6 +763,22 @@ func isRootRef(bkt *bolt.Bucket) bool {
 		if rv != nil {
 			// TODO: interpret rv as a timestamp and skip if expired
 			return true
+		}
+	}
+	return false
+}
+
+func isExpiredImage(ctx context.Context, k []byte, bkt *bolt.Bucket, expTheshold time.Time) bool {
+	lbkt := bkt.Bucket(bucketKeyObjectLabels)
+	if lbkt != nil {
+		el := lbkt.Get(labelGCExpire)
+		if el != nil {
+			exp, err := time.Parse(time.RFC3339, string(el))
+			if err != nil {
+				log.G(ctx).WithError(err).WithField("image", string(k)).Infof("ignoring invalid expiration value %q", string(el))
+				return false
+			}
+			return expTheshold.After(exp)
 		}
 	}
 	return false

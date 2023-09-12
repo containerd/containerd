@@ -17,12 +17,15 @@
 package metadata
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"path/filepath"
 	"sort"
 	"testing"
+	"text/tabwriter"
 	"time"
 
 	"github.com/containerd/containerd/gc"
@@ -49,7 +52,12 @@ func TestGCRoots(t *testing.T) {
 	alters := []alterFunc{
 		addImage("ns1", "image1", dgst(1), nil),
 		addImage("ns1", "image2", dgst(2), labelmap(string(labelGCSnapRef)+"overlay", "sn2")),
-		addImage("ns2", "image3", dgst(10), labelmap(string(labelGCContentRef), dgst(11).String())),
+		addImage("ns2", "image3", dgst(10), labelmap(
+			string(labelGCContentRef), dgst(11).String(),
+			string(labelGCImageRef), "image4",
+		)),
+		addImage("ns2", "image4", dgst(12), labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
+		addImage("ns2", "image5", dgst(13), labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
 		addContainer("ns1", "container1", "overlay", "sn4", nil),
 		addContainer("ns1", "container2", "overlay", "sn5", labelmap(string(labelGCSnapRef)+"overlay", "sn6")),
 		addContainer("ns1", "container3", "overlay", "sn7", labelmap(
@@ -89,17 +97,20 @@ func TestGCRoots(t *testing.T) {
 		addLease("ns2", "l3", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLeaseContent("ns2", "l3", dgst(6)),
 		addLeaseSnapshot("ns2", "l3", "overlay", "sn7"),
+		addLeaseImage("ns2", "l3", "image5"),
 		addLeaseIngest("ns2", "l3", "ingest-4"),
 		addLeaseIngest("ns2", "l3", "ingest-5"),
 		addLease("ns2", "l4", labelmap(string(labelGCExpire), time.Now().Format(time.RFC3339))),
 		addLeaseContent("ns2", "l4", dgst(7)),
 		addLeaseSnapshot("ns2", "l4", "overlay", "sn8"),
+		addLeaseImage("ns2", "l4", "image4"),
 		addLeaseIngest("ns2", "l4", "ingest-6"),
 		addLeaseIngest("ns2", "l4", "ingest-7"),
 
 		addLease("ns3", "l1", labelmap(string(labelGCFlat), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLeaseContent("ns3", "l1", dgst(1)),
 		addLeaseSnapshot("ns3", "l1", "overlay", "sn1"),
+		addLeaseImage("ns3", "l1", "image1"),
 		addLeaseIngest("ns3", "l1", "ingest-1"),
 
 		addSandbox("ns3", "sandbox1", nil),
@@ -107,8 +118,6 @@ func TestGCRoots(t *testing.T) {
 	}
 
 	expected := []gc.Node{
-		gcnode(ResourceContent, "ns1", dgst(1).String()),
-		gcnode(ResourceContent, "ns1", dgst(2).String()),
 		gcnode(ResourceContent, "ns1", dgst(7).String()),
 		gcnode(ResourceContent, "ns1", dgst(8).String()),
 		gcnode(ResourceContent, "ns1", dgst(9).String()),
@@ -116,9 +125,6 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceContent, "ns2", dgst(4).String()),
 		gcnode(ResourceContent, "ns2", dgst(5).String()),
 		gcnode(ResourceContent, "ns2", dgst(6).String()),
-		gcnode(ResourceContent, "ns2", dgst(10).String()),
-		gcnode(ResourceContent, "ns2", dgst(11).String()),
-		gcnode(ResourceSnapshot, "ns1", "overlay/sn2"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn5"),
@@ -129,6 +135,11 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn5"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn6"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn7"),
+		gcnode(ResourceSnapshot, "ns4", "overlay/sn1"),
+		gcnode(ResourceImage, "ns1", "image1"),
+		gcnode(ResourceImage, "ns1", "image2"),
+		gcnode(ResourceImage, "ns2", "image3"),
+		gcnode(ResourceImage, "ns2", "image5"),
 		gcnode(ResourceLease, "ns2", "l1"),
 		gcnode(ResourceLease, "ns2", "l2"),
 		gcnode(ResourceLease, "ns2", "l3"),
@@ -139,7 +150,7 @@ func TestGCRoots(t *testing.T) {
 		gcnode(ResourceIngest, "ns3", "ingest-1"),
 		gcnode(resourceContentFlat, "ns3", dgst(1).String()),
 		gcnode(resourceSnapshotFlat, "ns3", "overlay/sn1"),
-		gcnode(ResourceSnapshot, "ns4", "overlay/sn1"),
+		gcnode(resourceImageFlat, "ns3", "image1"),
 	}
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -199,6 +210,8 @@ func TestGCRemove(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn3"),
 		gcnode(ResourceSnapshot, "ns1", "overlay/sn4"),
 		gcnode(ResourceSnapshot, "ns2", "overlay/sn1"),
+		gcnode(ResourceImage, "ns1", "image1"),
+		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "l1"),
 		gcnode(ResourceLease, "ns2", "l2"),
 		gcnode(ResourceIngest, "ns1", "ingest-1"),
@@ -269,6 +282,10 @@ func TestGCRefs(t *testing.T) {
 		addContent("ns1", dgst(7), labelmap(string(labelGCContentRef)+"/anything-1", dgst(2).String(), string(labelGCContentRef)+"/anything-2", dgst(3).String())),
 		addContent("ns2", dgst(1), nil),
 		addContent("ns2", dgst(2), nil),
+		addImage("ns1", "image1", dgst(3), nil),
+		addImage("ns1", "image2", dgst(4), labelmap(
+			string(labelGCImageRef)+".anything", "image1",
+			string(labelGCContentRef)+".anotherimage", dgst(5).String())),
 		addIngest("ns1", "ingest-1", "", nil),
 		addIngest("ns2", "ingest-2", dgst(8), nil),
 		addSnapshot("ns1", "overlay", "sn1", "", nil),
@@ -334,6 +351,14 @@ func TestGCRefs(t *testing.T) {
 			gcnode(ResourceContent, "ns2", dgst(1).String()),
 			gcnode(ResourceContent, "ns2", dgst(6).String()),
 		},
+		gcnode(ResourceImage, "ns1", "image1"): {
+			gcnode(ResourceContent, "ns1", dgst(3).String()),
+		},
+		gcnode(ResourceImage, "ns1", "image2"): {
+			gcnode(ResourceContent, "ns1", dgst(4).String()),
+			gcnode(ResourceContent, "ns1", dgst(5).String()),
+			gcnode(ResourceImage, "ns1", "image1"),
+		},
 		gcnode(ResourceIngest, "ns1", "ingest-1"): nil,
 		gcnode(ResourceIngest, "ns2", "ingest-2"): {
 			gcnode(ResourceContent, "ns2", dgst(8).String()),
@@ -349,6 +374,12 @@ func TestGCRefs(t *testing.T) {
 		gcnode(ResourceSnapshot, "ns3", "overlay/sn3"): {
 			gcnode(ResourceSnapshot, "ns3", "btrfs/sn1"),
 			gcnode(ResourceSnapshot, "ns3", "overlay/sn1"),
+		},
+		gcnode(resourceImageFlat, "ns1", "image1"): {
+			gcnode(resourceContentFlat, "ns1", dgst(3).String()),
+		},
+		gcnode(resourceImageFlat, "ns1", "image2"): {
+			gcnode(resourceContentFlat, "ns1", dgst(4).String()),
 		},
 	}
 
@@ -410,17 +441,19 @@ func TestCollectibleResources(t *testing.T) {
 	all := []gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()),
 		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceImage, "ns1", "image1"),
+		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(ResourceLease, "ns1", "lease2"),
 		gcnode(testResource, "ns1", "test1"),
-		gcnode(testResource, "ns1", "test2"), // 5: Will be removed
+		gcnode(testResource, "ns1", "test2"), // 7: Will be removed
 		gcnode(testResource, "ns1", "test3"),
 		gcnode(testResource, "ns1", "test4"),
 	}
-	removeIndex := 5
+	removeIndex := 7
 	roots := []gc.Node{
-		gcnode(ResourceContent, "ns1", dgst(1).String()),
-		gcnode(ResourceContent, "ns1", dgst(2).String()),
+		gcnode(ResourceImage, "ns1", "image1"),
+		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
 		gcnode(testResource, "ns1", "test1"),
 		gcnode(testResource, "ns1", "test3"),
@@ -612,14 +645,61 @@ func checkNodesEqual(t *testing.T, n1, n2 []gc.Node) {
 	sort.Sort(nodeList(n2))
 
 	if len(n1) != len(n2) {
-		t.Fatalf("Nodes do not match\n\tExpected:\n\t%v\n\tActual:\n\t%v", n2, n1)
+		buf := bytes.NewBuffer(nil)
+		tw := tabwriter.NewWriter(buf, 8, 4, 1, ' ', 0)
+		max := len(n1)
+		if len(n2) > max {
+			max = len(n2)
+		}
+		fmt.Fprintln(tw, "Expected:\tActual:")
+		for i := 0; i < max; i++ {
+			var left, right string
+			if i < len(n1) {
+				right = printNode(n1[i])
+			}
+			if i < len(n2) {
+				left = printNode(n2[i])
+			}
+			fmt.Fprintln(tw, left+"\t"+right)
+		}
+		tw.Flush()
+		t.Fatal("Nodes do not match\n" + buf.String())
 	}
 
 	for i := range n1 {
 		if n1[i] != n2[i] {
-			t.Errorf("[%d] root does not match expected: expected %v, got %v", i, n2[i], n1[i])
+			t.Errorf("[%d] root does not match expected: expected %v, got %v", i, printNode(n2[i]), printNode(n1[i]))
 		}
 	}
+}
+
+func printNode(n gc.Node) string {
+	var t string
+	switch n.Type {
+	case ResourceContent:
+		t = "content"
+	case ResourceSnapshot:
+		t = "snapshot"
+	case ResourceContainer:
+		t = "container"
+	case ResourceTask:
+		t = "task"
+	case ResourceImage:
+		t = "image"
+	case ResourceLease:
+		t = "lease"
+	case ResourceIngest:
+		t = "ingest"
+	case resourceContentFlat:
+		t = "content-flat"
+	case resourceSnapshotFlat:
+		t = "snapshot-flat"
+	case resourceImageFlat:
+		t = "image-flat"
+	default:
+		return fmt.Sprintf("%v", n)
+	}
+	return fmt.Sprintf("%s(%s/%s)", t, n.Namespace, n.Key)
 }
 
 type nodeList []gc.Node
@@ -735,6 +815,16 @@ func addLeaseContent(ns, lid string, dgst digest.Digest) alterFunc {
 			return err
 		}
 		return cbkt.Put([]byte(dgst.String()), nil)
+	}
+}
+
+func addLeaseImage(ns, lid, image string) alterFunc {
+	return func(bkt *bolt.Bucket) error {
+		cbkt, err := createBuckets(bkt, ns, string(bucketKeyObjectLeases), lid, string(bucketKeyObjectImages))
+		if err != nil {
+			return err
+		}
+		return cbkt.Put([]byte(image), nil)
 	}
 }
 
