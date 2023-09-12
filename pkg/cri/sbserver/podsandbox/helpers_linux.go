@@ -29,11 +29,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 
 	"github.com/moby/sys/mountinfo"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

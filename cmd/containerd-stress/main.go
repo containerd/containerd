@@ -30,9 +30,9 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/remote"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
 )

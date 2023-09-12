@@ -29,10 +29,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/imageverifier"
+	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 const outputLimitBytes = 1 << 15 // 32 KiB
@@ -188,7 +187,7 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 	}()
 
 	// Pipe verifier stderr lines to debug logs.
-	stderrLog := log.G(ctx).Logger.WithFields(logrus.Fields{
+	stderrLog := log.G(ctx).Logger.WithFields(log.Fields{
 		"image_verifier": bin,
 		"stream":         "stderr",
 	})

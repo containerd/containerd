@@ -18,7 +18,7 @@ package runtime
 
 import (
 	"github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 const (

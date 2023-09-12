@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	snapshot "github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 )
 
 // snapshotsSyncer syncs snapshot stats periodically. imagefs info and container stats

@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/log"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	"github.com/containerd/log"
 )
 
 // ExecIO holds the exec io.

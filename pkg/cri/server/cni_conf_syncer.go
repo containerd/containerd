@@ -22,8 +22,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	cni "github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	"github.com/fsnotify/fsnotify"
 )
 

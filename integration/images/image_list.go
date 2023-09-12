@@ -22,7 +22,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	"github.com/pelletier/go-toml"
 )
 

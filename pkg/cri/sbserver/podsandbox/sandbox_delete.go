@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd"
 	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {

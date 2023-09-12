@@ -35,8 +35,8 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	clabels "github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/log"
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {

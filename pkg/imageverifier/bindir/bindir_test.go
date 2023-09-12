@@ -29,9 +29,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -91,7 +90,7 @@ func newBinDir(t *testing.T, srcDir string, bins ...string) string {
 func TestBinDirVerifyImage(t *testing.T) {
 	// Enable debug logs to easily see stderr for verifiers upon test failure.
 	logger := log.L.Dup()
-	logger.Logger.SetLevel(logrus.DebugLevel)
+	logger.Logger.SetLevel(log.DebugLevel)
 	ctx := log.WithLogger(context.Background(), logger)
 
 	// Build verifiers from plain Go file.

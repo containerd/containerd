@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/content/local"
 	imageArchive "github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

@@ -28,9 +28,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/log"
 	blkdiscard "github.com/containerd/containerd/snapshots/devmapper/blkdiscard"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
+	"github.com/containerd/log"
 )
 
 // PoolDevice ties together data and metadata volumes, represents thin-pool and manages volumes, snapshots and device ids.

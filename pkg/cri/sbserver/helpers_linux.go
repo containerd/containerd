@@ -33,12 +33,12 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/apparmor"
 	"github.com/containerd/containerd/pkg/seccomp"
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 )
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
