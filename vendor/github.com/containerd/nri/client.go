@@ -25,9 +25,9 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
 	types "github.com/containerd/nri/types/v1"
+
+	oci "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
@@ -73,13 +73,29 @@ type Sandbox struct {
 	Labels map[string]string
 }
 
+// process is a subset of containerd's Process interface.
+type process interface {
+	// ID of the process
+	ID() string
+	// Pid is the system specific process id
+	Pid() uint32
+}
+
+// Task is ta subset of containerd's Task interface.
+type Task interface {
+	process
+
+	// Spec returns the current OCI specification for the task
+	Spec(context.Context) (*oci.Spec, error)
+}
+
 // Invoke the ConfList of nri plugins
-func (c *Client) Invoke(ctx context.Context, task containerd.Task, state types.State) ([]*types.Result, error) {
+func (c *Client) Invoke(ctx context.Context, task Task, state types.State) ([]*types.Result, error) {
 	return c.InvokeWithSandbox(ctx, task, state, nil)
 }
 
 // InvokeWithSandbox invokes the ConfList of nri plugins
-func (c *Client) InvokeWithSandbox(ctx context.Context, task containerd.Task, state types.State, sandbox *Sandbox) ([]*types.Result, error) {
+func (c *Client) InvokeWithSandbox(ctx context.Context, task Task, state types.State, sandbox *Sandbox) ([]*types.Result, error) {
 	if len(c.conf.Plugins) == 0 {
 		return nil, nil
 	}
