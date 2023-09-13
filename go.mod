@@ -21,7 +21,7 @@ require (
 	github.com/containerd/nri v0.5.0
 	github.com/containerd/ttrpc v1.2.2
 	github.com/containerd/typeurl/v2 v2.1.1
-	github.com/containerd/zfs v1.1.0
+	github.com/containerd/zfs v1.2.0
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.3.0
 	github.com/coreos/go-systemd/v22 v22.5.0
