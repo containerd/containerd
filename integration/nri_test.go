@@ -29,15 +29,17 @@ import (
 	"testing"
 	"time"
 
-	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/nri/pkg/api"
 	"github.com/containerd/nri/pkg/stub"
 	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/integration/images"
+	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/integration/images"
 )
 
 const (
@@ -808,11 +810,11 @@ func (m *mockPlugin) Log(format string, args ...interface{}) {
 	m.logf(fmt.Sprintf("[plugin:%s-%s] ", m.idx, m.name)+format, args...)
 }
 
-func (m *mockPlugin) Configure(cfg string) (stub.EventMask, error) {
+func (m *mockPlugin) Configure(ctx context.Context, cfg string) (stub.EventMask, error) {
 	return m.mask, nil
 }
 
-func (m *mockPlugin) Synchronize(pods []*api.PodSandbox, ctrs []*api.Container) ([]*api.ContainerUpdate, error) {
+func (m *mockPlugin) Synchronize(ctx context.Context, pods []*api.PodSandbox, ctrs []*api.Container) ([]*api.ContainerUpdate, error) {
 	m.Log("Synchronize")
 	for _, pod := range pods {
 		m.Log("  - pod %s", pod.Id)
@@ -828,11 +830,11 @@ func (m *mockPlugin) Synchronize(pods []*api.PodSandbox, ctrs []*api.Container) 
 	return m.synchronize(m, pods, ctrs)
 }
 
-func (m *mockPlugin) Shutdown() {
+func (m *mockPlugin) Shutdown(ctx context.Context) {
 	m.Log("Shutdown")
 }
 
-func (m *mockPlugin) RunPodSandbox(pod *api.PodSandbox) error {
+func (m *mockPlugin) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -843,7 +845,7 @@ func (m *mockPlugin) RunPodSandbox(pod *api.PodSandbox) error {
 	return nil
 }
 
-func (m *mockPlugin) StopPodSandbox(pod *api.PodSandbox) error {
+func (m *mockPlugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -854,7 +856,7 @@ func (m *mockPlugin) StopPodSandbox(pod *api.PodSandbox) error {
 	return nil
 }
 
-func (m *mockPlugin) RemovePodSandbox(pod *api.PodSandbox) error {
+func (m *mockPlugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -865,7 +867,7 @@ func (m *mockPlugin) RemovePodSandbox(pod *api.PodSandbox) error {
 	return nil
 }
 
-func (m *mockPlugin) CreateContainer(pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
+func (m *mockPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
 	if !m.inNamespace(pod.Namespace) {
 		return nil, nil, nil
 	}
@@ -878,7 +880,7 @@ func (m *mockPlugin) CreateContainer(pod *api.PodSandbox, ctr *api.Container) (*
 	return m.createContainer(m, pod, ctr)
 }
 
-func (m *mockPlugin) PostCreateContainer(pod *api.PodSandbox, ctr *api.Container) error {
+func (m *mockPlugin) PostCreateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -891,7 +893,7 @@ func (m *mockPlugin) PostCreateContainer(pod *api.PodSandbox, ctr *api.Container
 	return nil
 }
 
-func (m *mockPlugin) StartContainer(pod *api.PodSandbox, ctr *api.Container) error {
+func (m *mockPlugin) StartContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -903,7 +905,7 @@ func (m *mockPlugin) StartContainer(pod *api.PodSandbox, ctr *api.Container) err
 	return nil
 }
 
-func (m *mockPlugin) PostStartContainer(pod *api.PodSandbox, ctr *api.Container) error {
+func (m *mockPlugin) PostStartContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -915,7 +917,7 @@ func (m *mockPlugin) PostStartContainer(pod *api.PodSandbox, ctr *api.Container)
 	return nil
 }
 
-func (m *mockPlugin) UpdateContainer(pod *api.PodSandbox, ctr *api.Container) ([]*api.ContainerUpdate, error) {
+func (m *mockPlugin) UpdateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) ([]*api.ContainerUpdate, error) {
 	if !m.inNamespace(pod.Namespace) {
 		return nil, nil
 	}
@@ -927,7 +929,7 @@ func (m *mockPlugin) UpdateContainer(pod *api.PodSandbox, ctr *api.Container) ([
 	return m.updateContainer(m, pod, ctr)
 }
 
-func (m *mockPlugin) PostUpdateContainer(pod *api.PodSandbox, ctr *api.Container) error {
+func (m *mockPlugin) PostUpdateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
@@ -940,7 +942,7 @@ func (m *mockPlugin) PostUpdateContainer(pod *api.PodSandbox, ctr *api.Container
 	return nil
 }
 
-func (m *mockPlugin) StopContainer(pod *api.PodSandbox, ctr *api.Container) ([]*api.ContainerUpdate, error) {
+func (m *mockPlugin) StopContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) ([]*api.ContainerUpdate, error) {
 	if !m.inNamespace(pod.Namespace) {
 		return nil, nil
 	}
@@ -952,7 +954,7 @@ func (m *mockPlugin) StopContainer(pod *api.PodSandbox, ctr *api.Container) ([]*
 	return m.stopContainer(m, pod, ctr)
 }
 
-func (m *mockPlugin) RemoveContainer(pod *api.PodSandbox, ctr *api.Container) error {
+func (m *mockPlugin) RemoveContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) error {
 	if !m.inNamespace(pod.Namespace) {
 		return nil
 	}
