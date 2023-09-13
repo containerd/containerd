@@ -363,7 +363,7 @@ func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.A
 		Labels:          is.imageLabels,
 		ManifestLimit:   uint32(is.manifestLimit),
 		AllMetadata:     is.allMetadata,
-		Platforms:       platforms.ToProto(is.platforms),
+		Platforms:       types.OCIPlatformToProto(is.platforms),
 		ExtraReferences: referencesToProto(is.extraReferences),
 		Unpacks:         unpackToProto(is.unpacks),
 	}
@@ -380,7 +380,7 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.imageLabels = s.Labels
 	is.manifestLimit = int(s.ManifestLimit)
 	is.allMetadata = s.AllMetadata
-	is.platforms = platforms.FromProto(s.Platforms)
+	is.platforms = types.OCIPlatformFromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
 
