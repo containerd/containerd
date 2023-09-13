@@ -118,8 +118,6 @@ import (
 	"strings"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-
-	"github.com/containerd/containerd/api/types"
 )
 
 var (
@@ -289,32 +287,4 @@ func Normalize(platform specs.Platform) specs.Platform {
 	platform.Architecture, platform.Variant = normalizeArch(platform.Architecture, platform.Variant)
 
 	return platform
-}
-
-// ToProto converts from a slice of [Platform] to a slice of
-// the protobuf definition [types.Platform].
-func ToProto(platforms []Platform) []*types.Platform {
-	ap := make([]*types.Platform, len(platforms))
-	for i := range platforms {
-		ap[i] = &types.Platform{
-			OS:           platforms[i].OS,
-			Architecture: platforms[i].Architecture,
-			Variant:      platforms[i].Variant,
-		}
-	}
-	return ap
-}
-
-// FromProto converts a slice of the protobuf definition [types.Platform]
-// to a slice of [Platform].
-func FromProto(platforms []*types.Platform) []specs.Platform {
-	op := make([]specs.Platform, len(platforms))
-	for i := range platforms {
-		op[i] = specs.Platform{
-			OS:           platforms[i].OS,
-			Architecture: platforms[i].Architecture,
-			Variant:      platforms[i].Variant,
-		}
-	}
-	return op
 }

@@ -24,9 +24,9 @@ import (
 	"sync"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
@@ -222,7 +222,7 @@ func pluginsToPB(plugins []*plugin.Plugin) []*api.Plugin {
 			Type:         p.Registration.Type.String(),
 			ID:           p.Registration.ID,
 			Requires:     requires,
-			Platforms:    platforms.ToProto(p.Meta.Platforms),
+			Platforms:    types.OCIPlatformToProto(p.Meta.Platforms),
 			Capabilities: p.Meta.Capabilities,
 			Exports:      p.Meta.Exports,
 			InitErr:      initErr,
