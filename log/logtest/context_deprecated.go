@@ -26,6 +26,8 @@ import (
 // WithT adds a logging hook for the given test
 // Changes debug level to debug, clears output, and
 // outputs all log messages as test logs.
+//
+// Deprecated: use [logtest.WithT].
 func WithT(ctx context.Context, t testing.TB) context.Context {
 	return logtest.WithT(ctx, t)
 }
