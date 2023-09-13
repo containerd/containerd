@@ -352,7 +352,7 @@ func setLogLevel(context *cli.Context, config *srvconfig.Config) error {
 }
 
 func setLogFormat(config *srvconfig.Config) error {
-	f := config.Debug.Format
+	f := log.OutputFormat(config.Debug.Format)
 	if f == "" {
 		f = log.TextFormat
 	}
