@@ -380,11 +380,11 @@ releases/$(CRICNIRELEASE).tar.gz: install-cri-deps $(CRIDIR)/cri-containerd.DEPR
 	@tar -czf releases/$(CRICNIRELEASE).tar.gz -C $(CRIDIR) cri-containerd.DEPRECATED.txt etc usr opt
 endif
 
-cri-release: releases/$(CRIRELEASE).tar.gz
+cri-release: releases/$(CRIRELEASE).tar.gz ## Deprecated (only kept for external CI)
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(CRIRELEASE).tar.gz >$(CRIRELEASE).tar.gz.sha256sum && ln -sf $(CRIRELEASE).tar.gz cri-containerd.tar.gz
 
-cri-cni-release: releases/$(CRICNIRELEASE).tar.gz
+cri-cni-release: releases/$(CRICNIRELEASE).tar.gz ## Deprecated (only kept for external CI)
 	@echo "$(WHALE) $@"
 	@cd releases && sha256sum $(CRICNIRELEASE).tar.gz >$(CRICNIRELEASE).tar.gz.sha256sum && ln -sf $(CRICNIRELEASE).tar.gz cri-cni-containerd.tar.gz
 

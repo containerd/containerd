@@ -121,8 +121,8 @@ jobs:
           docker buildx build ${cache} --build-arg RELEASE_VER --build-arg UBUNTU_VERSION=${{ matrix.dockerfile-ubuntu }} --build-arg GO_VERSION ${BUILD_ARGS} -f .github/workflows/release/Dockerfile --platform=${PLATFORM} -o releases/ .
           echo PLATFORM_CLEAN=${PLATFORM/\//-} >> $GITHUB_ENV
 
-          # Remove symlinks since we don't want these in the release Artifacts
-          find ./releases/ -maxdepth 1 -type l | xargs rm
+          # Remove symlinks since we don't want these in the release Artifacts (if any)
+          find ./releases/ -maxdepth 1 -type l | xargs rm -f
         working-directory: src/github.com/containerd/containerd
         env:
           PLATFORM: ${{ matrix.dockerfile-platform }}
