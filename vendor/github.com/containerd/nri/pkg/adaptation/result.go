@@ -56,6 +56,9 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 	if request.Container.Hooks == nil {
 		request.Container.Hooks = &Hooks{}
 	}
+	if request.Container.Rlimits == nil {
+		request.Container.Rlimits = []*POSIXRlimit{}
+	}
 	if request.Container.Linux == nil {
 		request.Container.Linux = &LinuxContainer{}
 	}
@@ -85,6 +88,7 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 				Mounts:      []*Mount{},
 				Env:         []*KeyValue{},
 				Hooks:       &Hooks{},
+				Rlimits:     []*POSIXRlimit{},
 				Linux: &LinuxContainerAdjustment{
 					Devices: []*LinuxDevice{},
 					Resources: &LinuxResources{
@@ -209,6 +213,9 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 		if err := r.adjustCgroupsPath(rpl.Linux.CgroupsPath, plugin); err != nil {
 			return err
 		}
+	}
+	if err := r.adjustRlimits(rpl.Rlimits, plugin); err != nil {
+		return err
 	}
 
 	return nil
@@ -659,6 +666,19 @@ func (r *result) adjustCgroupsPath(path, plugin string) error {
 	return nil
 }
 
+func (r *result) adjustRlimits(rlimits []*POSIXRlimit, plugin string) error {
+	create, id, adjust := r.request.create, r.request.create.Container.Id, r.reply.adjust
+	for _, l := range rlimits {
+		if err := r.owners.claimRlimits(id, l.Type, plugin); err != nil {
+			return err
+		}
+
+		create.Container.Rlimits = append(create.Container.Rlimits, l)
+		adjust.Rlimits = append(adjust.Rlimits, l)
+	}
+	return nil
+}
+
 func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error {
 	if u.Linux == nil || u.Linux.Resources == nil {
 		return nil
@@ -873,6 +893,7 @@ type owners struct {
 	rdtClass            string
 	unified             map[string]string
 	cgroupsPath         string
+	rlimits             map[string]string
 }
 
 func (ro resultOwners) ownersFor(id string) *owners {
@@ -978,6 +999,10 @@ func (ro resultOwners) claimUnified(id, key, plugin string) error {
 
 func (ro resultOwners) claimCgroupsPath(id, plugin string) error {
 	return ro.ownersFor(id).claimCgroupsPath(plugin)
+}
+
+func (ro resultOwners) claimRlimits(id, typ, plugin string) error {
+	return ro.ownersFor(id).claimRlimit(typ, plugin)
 }
 
 func (o *owners) claimAnnotation(key, plugin string) error {
@@ -1180,6 +1205,17 @@ func (o *owners) claimUnified(key, plugin string) error {
 		return conflict(plugin, other, "unified resource", key)
 	}
 	o.unified[key] = plugin
+	return nil
+}
+
+func (o *owners) claimRlimit(typ, plugin string) error {
+	if o.rlimits == nil {
+		o.rlimits = make(map[string]string)
+	}
+	if other, taken := o.rlimits[typ]; taken {
+		return conflict(plugin, other, "rlimit", typ)
+	}
+	o.rlimits[typ] = plugin
 	return nil
 }
 
