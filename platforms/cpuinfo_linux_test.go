@@ -20,8 +20,6 @@ import (
 	"errors"
 	"runtime"
 	"testing"
-
-	"github.com/containerd/containerd/errdefs"
 )
 
 func TestCPUVariant(t *testing.T) {
@@ -107,13 +105,13 @@ func TestGetCPUVariantFromArch(t *testing.T) {
 			name:        "Test invalid input which doesn't start with armv",
 			input:       "armxxxx",
 			output:      "",
-			expectedErr: errdefs.ErrInvalidArgument,
+			expectedErr: errInvalidArgument,
 		},
 		{
 			name:        "Test invalid input whose length is less than 5",
 			input:       "armv",
 			output:      "",
-			expectedErr: errdefs.ErrInvalidArgument,
+			expectedErr: errInvalidArgument,
 		},
 	} {
 		t.Run(testcase.name, func(t *testing.T) {
