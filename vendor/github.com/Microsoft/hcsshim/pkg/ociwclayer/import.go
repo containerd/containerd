@@ -6,6 +6,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path"
@@ -102,7 +103,7 @@ func writeLayerFromTar(ctx context.Context, r io.Reader, w wclayer.LayerWriter, 
 			totalSize += size
 		}
 	}
-	if err != io.EOF {
+	if !errors.Is(err, io.EOF) {
 		return 0, err
 	}
 	return totalSize, nil

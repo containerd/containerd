@@ -36,7 +36,7 @@ func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([
 	var opts []snapshots.Opt
 
 	switch snapshotterName {
-	case "windows":
+	case "windows", "cimfs":
 		rootfsSize := config.GetWindows().GetResources().GetRootfsSizeInBytes()
 		if rootfsSize != 0 {
 			labels := map[string]string{

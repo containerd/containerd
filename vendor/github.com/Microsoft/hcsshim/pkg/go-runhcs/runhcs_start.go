@@ -7,6 +7,6 @@ import (
 )
 
 // Start will start an already created container.
-func (r *Runhcs) Start(context context.Context, id string) error {
-	return r.runOrError(r.command(context, "start", id))
+func (r *Runhcs) Start(ctx context.Context, id string) error {
+	return r.runOrError(r.command(ctx, "start", id))
 }

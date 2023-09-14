@@ -185,6 +185,8 @@ func ReadDMVerityInfoReader(r io.Reader) (*VerityInfo, error) {
 	block := make([]byte, blockSize)
 	if s, err := r.Read(block); err != nil || s != blockSize {
 		if err != nil {
+			// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+			//nolint:errorlint // non-wrapping format verb for fmt.Errorf
 			return nil, fmt.Errorf("%s: %w", ErrSuperBlockReadFailure, err)
 		}
 		return nil, fmt.Errorf("unexpected bytes read expected=%d actual=%d: %w", blockSize, s, ErrSuperBlockReadFailure)
@@ -193,6 +195,8 @@ func ReadDMVerityInfoReader(r io.Reader) (*VerityInfo, error) {
 	dmvSB := &dmveritySuperblock{}
 	b := bytes.NewBuffer(block)
 	if err := binary.Read(b, binary.LittleEndian, dmvSB); err != nil {
+		// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+		//nolint:errorlint // non-wrapping format verb for fmt.Errorf
 		return nil, fmt.Errorf("%s: %w", ErrSuperBlockParseFailure, err)
 	}
 
@@ -202,6 +206,8 @@ func ReadDMVerityInfoReader(r io.Reader) (*VerityInfo, error) {
 
 	if s, err := r.Read(block); err != nil || s != blockSize {
 		if err != nil {
+			// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+			//nolint:errorlint // non-wrapping format verb for fmt.Errorf
 			return nil, fmt.Errorf("%s: %w", ErrRootHashReadFailure, err)
 		}
 		return nil, fmt.Errorf("unexpected bytes read expected=%d, actual=%d: %w", blockSize, s, ErrRootHashReadFailure)

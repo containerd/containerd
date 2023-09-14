@@ -10,8 +10,8 @@ import (
 )
 
 // CreateScratch creates a scratch vhdx at 'destpath' that is ext4 formatted.
-func (r *Runhcs) CreateScratch(context context.Context, destpath string) error {
-	return r.CreateScratchWithOpts(context, destpath, nil)
+func (r *Runhcs) CreateScratch(ctx context.Context, destpath string) error {
+	return r.CreateScratchWithOpts(ctx, destpath, nil)
 }
 
 // CreateScratchOpts is the set of options that can be used with the
@@ -43,7 +43,7 @@ func (opt *CreateScratchOpts) args() ([]string, error) {
 
 // CreateScratchWithOpts creates a scratch vhdx at 'destpath' that is ext4
 // formatted based on `opts`.
-func (r *Runhcs) CreateScratchWithOpts(context context.Context, destpath string, opts *CreateScratchOpts) error {
+func (r *Runhcs) CreateScratchWithOpts(ctx context.Context, destpath string, opts *CreateScratchOpts) error {
 	args := []string{"create-scratch", "--destpath", destpath}
 	if opts != nil {
 		oargs, err := opts.args()
@@ -52,5 +52,5 @@ func (r *Runhcs) CreateScratchWithOpts(context context.Context, destpath string,
 		}
 		args = append(args, oargs...)
 	}
-	return r.runOrError(r.command(context, args...))
+	return r.runOrError(r.command(ctx, args...))
 }
