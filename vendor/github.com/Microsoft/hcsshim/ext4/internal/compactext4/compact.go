@@ -604,7 +604,7 @@ func (w *Writer) Create(name string, f *File) error {
 	}
 	child, err := w.makeInode(f, reuse)
 	if err != nil {
-		return fmt.Errorf("%s: %s", name, err)
+		return fmt.Errorf("%s: %w", name, err)
 	}
 	if existing != child {
 		if existing != nil {

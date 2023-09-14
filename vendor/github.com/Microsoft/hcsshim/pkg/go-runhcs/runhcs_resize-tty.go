@@ -22,7 +22,7 @@ func (opt *ResizeTTYOpts) args() ([]string, error) {
 }
 
 // ResizeTTY updates the terminal size for a container process.
-func (r *Runhcs) ResizeTTY(context context.Context, id string, width, height uint16, opts *ResizeTTYOpts) error {
+func (r *Runhcs) ResizeTTY(ctx context.Context, id string, width, height uint16, opts *ResizeTTYOpts) error {
 	args := []string{"resize-tty"}
 	if opts != nil {
 		oargs, err := opts.args()
@@ -31,5 +31,5 @@ func (r *Runhcs) ResizeTTY(context context.Context, id string, width, height uin
 		}
 		args = append(args, oargs...)
 	}
-	return r.runOrError(r.command(context, append(args, id, strconv.FormatUint(uint64(width), 10), strconv.FormatUint(uint64(height), 10))...))
+	return r.runOrError(r.command(ctx, append(args, id, strconv.FormatUint(uint64(width), 10), strconv.FormatUint(uint64(height), 10))...))
 }

@@ -85,7 +85,7 @@ func ConvertTarToExt4(r io.Reader, w io.ReadWriteSeeker, options ...Option) erro
 	fs := compactext4.NewWriter(w, p.ext4opts...)
 	for {
 		hdr, err := t.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -301,7 +301,7 @@ func Ext4FileSystemSize(r io.ReadSeeker) (int64, int, error) {
 func ConvertAndComputeRootDigest(r io.Reader) (string, error) {
 	out, err := os.CreateTemp("", "")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary file: %s", err)
+		return "", fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	defer func() {
 		_ = os.Remove(out.Name())
@@ -313,16 +313,16 @@ func ConvertAndComputeRootDigest(r io.Reader) (string, error) {
 		MaximumDiskSize(dmverity.RecommendedVHDSizeGB),
 	}
 	if err := ConvertTarToExt4(r, out, options...); err != nil {
-		return "", fmt.Errorf("failed to convert tar to ext4: %s", err)
+		return "", fmt.Errorf("failed to convert tar to ext4: %w", err)
 	}
 
 	if _, err := out.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to seek start on temp file when creating merkle tree: %s", err)
+		return "", fmt.Errorf("failed to seek start on temp file when creating merkle tree: %w", err)
 	}
 
 	tree, err := dmverity.MerkleTree(bufio.NewReaderSize(out, dmverity.MerkleTreeBufioSize))
 	if err != nil {
-		return "", fmt.Errorf("failed to create merkle tree: %s", err)
+		return "", fmt.Errorf("failed to create merkle tree: %w", err)
 	}
 
 	hash := dmverity.RootHash(tree)
