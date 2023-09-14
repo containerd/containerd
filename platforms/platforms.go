@@ -118,9 +118,6 @@ import (
 	"strings"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
-
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
 )
 
 var (
@@ -186,14 +183,14 @@ func ParseAll(specifiers []string) ([]specs.Platform, error) {
 func Parse(specifier string) (specs.Platform, error) {
 	if strings.Contains(specifier, "*") {
 		// TODO(stevvooe): need to work out exact wildcard handling
-		return specs.Platform{}, fmt.Errorf("%q: wildcards not yet supported: %w", specifier, errdefs.ErrInvalidArgument)
+		return specs.Platform{}, fmt.Errorf("%q: wildcards not yet supported: %w", specifier, errInvalidArgument)
 	}
 
 	parts := strings.Split(specifier, "/")
 
 	for _, part := range parts {
 		if !specifierRe.MatchString(part) {
-			return specs.Platform{}, fmt.Errorf("%q is an invalid component of %q: platform specifier component must match %q: %w", part, specifier, specifierRe.String(), errdefs.ErrInvalidArgument)
+			return specs.Platform{}, fmt.Errorf("%q is an invalid component of %q: platform specifier component must match %q: %w", part, specifier, specifierRe.String(), errInvalidArgument)
 		}
 	}
 
@@ -229,7 +226,7 @@ func Parse(specifier string) (specs.Platform, error) {
 			return p, nil
 		}
 
-		return specs.Platform{}, fmt.Errorf("%q: unknown operating system or architecture: %w", specifier, errdefs.ErrInvalidArgument)
+		return specs.Platform{}, fmt.Errorf("%q: unknown operating system or architecture: %w", specifier, errInvalidArgument)
 	case 2:
 		// In this case, we treat as a regular os/arch pair. We don't care
 		// about whether or not we know of the platform.
@@ -259,7 +256,7 @@ func Parse(specifier string) (specs.Platform, error) {
 		return p, nil
 	}
 
-	return specs.Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errdefs.ErrInvalidArgument)
+	return specs.Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errInvalidArgument)
 }
 
 // MustParse is like Parses but panics if the specifier cannot be parsed.
@@ -290,31 +287,4 @@ func Normalize(platform specs.Platform) specs.Platform {
 	platform.Architecture, platform.Variant = normalizeArch(platform.Architecture, platform.Variant)
 
 	return platform
-}
-
-// ToProto converts from a slice of [Platform] to a slice of
-// the protobuf definition [types.Platform].
-func ToProto(platforms []Platform) []*types.Platform {
-	ap := make([]*types.Platform, len(platforms))
-	for i := range platforms {
-		p := types.Platform{
-			OS:           platforms[i].OS,
-			Architecture: platforms[i].Architecture,
-			Variant:      platforms[i].Variant,
-		}
-		ap[i] = &p
-	}
-	return ap
-}
-
-// FromProto converts a slice of the protobuf definition [types.Platform]
-// to a slice of [Platform].
-func FromProto(platforms []*types.Platform) []Platform {
-	op := make([]Platform, len(platforms))
-	for i := range platforms {
-		op[i].OS = platforms[i].OS
-		op[i].Architecture = platforms[i].Architecture
-		op[i].Variant = platforms[i].Variant
-	}
-	return op
 }

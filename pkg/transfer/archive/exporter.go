@@ -156,7 +156,7 @@ func (iis *ImageExportStream) UnmarshalAny(ctx context.Context, sm streaming.Str
 		return err
 	}
 
-	specified := platforms.FromProto(s.Platforms)
+	specified := types.OCIPlatformFromProto(s.Platforms)
 	iis.stream = tstreaming.WriteByteStream(ctx, stream)
 	iis.mediaType = s.MediaType
 	iis.platforms = specified
