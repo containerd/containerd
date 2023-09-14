@@ -286,6 +286,10 @@ func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts {
 }
 
 func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
+	return WithIDMapVolumeMount(hostPath, containerPath, nil, nil)
+}
+
+func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		hostPath, _ = filepath.Abs(hostPath)
 		containerPath, _ = filepath.Abs(containerPath)
@@ -293,6 +297,8 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 			HostPath:       hostPath,
 			ContainerPath:  containerPath,
 			SelinuxRelabel: selinux.GetEnabled(),
+			UidMappings:    uidMaps,
+			GidMappings:    gidMaps,
 		}
 		c.Mounts = append(c.Mounts, mount)
 	}

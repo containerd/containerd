@@ -162,8 +162,26 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 					return fmt.Errorf("relabel %q with %q failed: %w", src, mountLabel, err)
 				}
 			}
-			if mount.UidMappings != nil || mount.GidMappings != nil {
-				return fmt.Errorf("idmap mounts not yet supported, but they were requested for: %q", src)
+
+			var uidMapping []runtimespec.LinuxIDMapping
+			if mount.UidMappings != nil {
+				for _, mapping := range mount.UidMappings {
+					uidMapping = append(uidMapping, runtimespec.LinuxIDMapping{
+						HostID:      mapping.HostId,
+						ContainerID: mapping.ContainerId,
+						Size:        mapping.Length,
+					})
+				}
+			}
+			var gidMapping []runtimespec.LinuxIDMapping
+			if mount.GidMappings != nil {
+				for _, mapping := range mount.GidMappings {
+					gidMapping = append(gidMapping, runtimespec.LinuxIDMapping{
+						HostID:      mapping.HostId,
+						ContainerID: mapping.ContainerId,
+						Size:        mapping.Length,
+					})
+				}
 			}
 
 			s.Mounts = append(s.Mounts, runtimespec.Mount{
@@ -171,6 +189,8 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				Destination: dst,
 				Type:        "bind",
 				Options:     options,
+				UIDMappings: uidMapping,
+				GIDMappings: gidMapping,
 			})
 		}
 		return nil

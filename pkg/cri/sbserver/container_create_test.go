@@ -231,12 +231,22 @@ func TestContainerSpecCommand(t *testing.T) {
 
 func TestVolumeMounts(t *testing.T) {
 	testContainerRootDir := "test-container-root"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
+
 	for _, test := range []struct {
 		desc              string
 		platform          platforms.Platform
 		criMounts         []*runtime.Mount
+		usernsEnabled     bool
 		imageVolumes      map[string]struct{}
 		expectedMountDest []string
+		expectedMappings  []*runtime.IDMapping
 	}{
 		{
 			desc: "should setup rw mount for image volumes",
@@ -297,25 +307,88 @@ func TestVolumeMounts(t *testing.T) {
 				"/abs/test-volume-4",
 			},
 		},
+		{
+			desc:          "should include mappings for image volumes on Linux",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+			expectedMappings: idmap,
+		},
+		{
+			desc:          "should NOT include mappings for image volumes on Linux if !userns",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: false,
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+		},
+		{
+			desc:          "should convert rel imageVolume paths to abs paths and add userns mappings",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"test-volume-1/":       {},
+				"C:/test-volume-2/":    {},
+				"../../test-volume-3/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/C:/test-volume-2",
+				"/test-volume-3",
+			},
+			expectedMappings: idmap,
+		},
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			config := &imagespec.ImageConfig{
 				Volumes: test.imageVolumes,
 			}
+			containerConfig := &runtime.ContainerConfig{Mounts: test.criMounts}
+			if test.usernsEnabled {
+				containerConfig.Linux = &runtime.LinuxContainerConfig{
+					SecurityContext: &runtime.LinuxContainerSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							UsernsOptions: &runtime.UserNamespace{
+								Mode: runtime.NamespaceMode_POD,
+								Uids: idmap,
+								Gids: idmap,
+							},
+						},
+					},
+				}
+			}
+
 			c := newTestCRIService()
-			got := c.volumeMounts(test.platform, testContainerRootDir, test.criMounts, config)
+			got := c.volumeMounts(test.platform, testContainerRootDir, containerConfig, config)
 			assert.Len(t, got, len(test.expectedMountDest))
 			for _, dest := range test.expectedMountDest {
 				found := false
 				for _, m := range got {
-					if m.ContainerPath == dest {
-						found = true
-						assert.Equal(t,
-							filepath.Dir(m.HostPath),
-							filepath.Join(testContainerRootDir, "volumes"))
-						break
+					if m.ContainerPath != dest {
+						continue
 					}
+					found = true
+					assert.Equal(t,
+						filepath.Dir(m.HostPath),
+						filepath.Join(testContainerRootDir, "volumes"))
+					if test.expectedMappings != nil {
+						assert.Equal(t, test.expectedMappings, m.UidMappings)
+						assert.Equal(t, test.expectedMappings, m.GidMappings)
+					}
+					break
 				}
 				assert.True(t, found)
 			}
@@ -481,6 +554,14 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 func TestLinuxContainerMounts(t *testing.T) {
 	const testSandboxID = "test-id"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
+
 	for _, test := range []struct {
 		desc            string
 		statFn          func(string) (os.FileInfo, error)
@@ -541,6 +622,50 @@ func TestLinuxContainerMounts(t *testing.T) {
 					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
 					Readonly:       false,
 					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
+		},
+		{
+			desc: "should setup uidMappings/gidMappings when userns is used",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					UsernsOptions: &runtime.UserNamespace{
+						Mode: runtime.NamespaceMode_POD,
+						Uids: idmap,
+						Gids: idmap,
+					},
+				},
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
 				},
 				{
 					ContainerPath:  "/dev/shm",

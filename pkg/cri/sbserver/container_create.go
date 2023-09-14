@@ -157,7 +157,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	var volumeMounts []*runtime.Mount
 	if !c.config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
-		volumeMounts = c.volumeMounts(platform, containerRootDir, config.GetMounts(), &image.ImageSpec.Config)
+		volumeMounts = c.volumeMounts(platform, containerRootDir, config, &image.ImageSpec.Config)
 	} else if len(image.ImageSpec.Config.Volumes) != 0 {
 		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
 	}
@@ -341,7 +341,17 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir string, criMounts []*runtime.Mount, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
+	var uidMappings, gidMappings []*runtime.IDMapping
+	if platform.OS == "linux" {
+		if usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
+			uidMappings = usernsOpts.GetUids()
+			gidMappings = usernsOpts.GetGids()
+		}
+	}
+
+	criMounts := containerConfig.GetMounts()
+
 	if len(config.Volumes) == 0 {
 		return nil
 	}
@@ -371,6 +381,8 @@ func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir 
 			ContainerPath:  dst,
 			HostPath:       src,
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 	return mounts
@@ -966,11 +978,17 @@ func (c *criService) buildDarwinSpec(
 	return specOpts, nil
 }
 
-// containerMounts sets up necessary container system file mounts
+// linuxContainerMounts sets up necessary container system file mounts
 // including /dev/shm, /etc/hosts and /etc/resolv.conf.
 func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
+	var uidMappings, gidMappings []*runtime.IDMapping
+	if usernsOpts := securityContext.GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
+		uidMappings = usernsOpts.GetUids()
+		gidMappings = usernsOpts.GetGids()
+	}
+
 	if !isInCRIMounts(etcHostname, config.GetMounts()) {
 		// /etc/hostname is added since 1.1.6, 1.2.4 and 1.3.
 		// For in-place upgrade, the old sandbox doesn't have the hostname file,
@@ -984,6 +1002,8 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 				HostPath:       hostpath,
 				Readonly:       securityContext.GetReadonlyRootfs(),
 				SelinuxRelabel: true,
+				UidMappings:    uidMappings,
+				GidMappings:    gidMappings,
 			})
 		}
 	}
@@ -994,6 +1014,8 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 			HostPath:       c.getSandboxHosts(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 
@@ -1005,6 +1027,8 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 			HostPath:       c.getResolvPath(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 
@@ -1018,6 +1042,17 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 			HostPath:       sandboxDevShm,
 			Readonly:       false,
 			SelinuxRelabel: sandboxDevShm != devShm,
+			// XXX: tmpfs support for idmap mounts got merged in
+			// Linux 6.3.
+			// Our Ubuntu 22.04 CI runs with 5.15 kernels, so
+			// disabling idmap mounts for this case makes the CI
+			// happy (the other fs used support idmap mounts in 5.15
+			// kernels).
+			// We can enable this at a later stage, but as this
+			// tmpfs mount is exposed empty to the container (no
+			// prepopulated files) and using the hostIPC with userns
+			// is blocked by k8s, we can just avoid using the
+			// mappings and it should work fine.
 		})
 	}
 	return mounts

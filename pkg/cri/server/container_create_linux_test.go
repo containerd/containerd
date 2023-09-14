@@ -459,6 +459,14 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 
 func TestContainerMounts(t *testing.T) {
 	const testSandboxID = "test-id"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
+
 	for _, test := range []struct {
 		desc            string
 		statFn          func(string) (os.FileInfo, error)
@@ -519,6 +527,50 @@ func TestContainerMounts(t *testing.T) {
 					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
 					Readonly:       false,
 					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
+		},
+		{
+			desc: "should setup uidMappings/gidMappings when userns is used",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					UsernsOptions: &runtime.UserNamespace{
+						Mode: runtime.NamespaceMode_POD,
+						Uids: idmap,
+						Gids: idmap,
+					},
+				},
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
 				},
 				{
 					ContainerPath:  "/dev/shm",
@@ -2255,6 +2307,144 @@ containerEdits:
 						assert.Contains(t, spec.Linux.Devices, expectedDev)
 					}
 				}
+			}
+		})
+	}
+}
+
+// TestLinuxVolumeMounts tests the linux-specific parts of VolumeMounts.
+func TestLinuxVolumeMounts(t *testing.T) {
+	testContainerRootDir := "test-container-root"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
+
+	for _, test := range []struct {
+		desc              string
+		criMounts         []*runtime.Mount
+		imageVolumes      map[string]struct{}
+		usernsEnabled     bool
+		expectedMountDest []string
+		expectedMappings  []*runtime.IDMapping
+	}{
+		{
+			desc:          "should skip image volumes if already mounted by CRI",
+			usernsEnabled: true,
+			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/test-volume-1",
+					HostPath:      "/test-hostpath-1",
+				},
+			},
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1": {},
+				"/test-volume-2": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2",
+			},
+			expectedMappings: idmap,
+		},
+		{
+			desc:          "should include mappings for image volumes",
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+			expectedMappings: idmap,
+		},
+		{
+			desc: "should convert rel imageVolume paths to abs paths",
+			imageVolumes: map[string]struct{}{
+				"test-volume-1/":       {},
+				"./test-volume-2/":     {},
+				"../../test-volume-3/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/test-volume-2",
+				"/test-volume-3",
+			},
+		},
+		{
+			desc:          "should convert rel imageVolume paths to abs paths and add userns mappings",
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"test-volume-1/":       {},
+				"./test-volume-2/":     {},
+				"../../test-volume-3/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/test-volume-2",
+				"/test-volume-3",
+			},
+			expectedMappings: idmap,
+		},
+		{
+			desc: "doesn't include mappings for image volumes if userns is disabled",
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+		},
+	} {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			config := &imagespec.ImageConfig{
+				Volumes: test.imageVolumes,
+			}
+			containerConfig := &runtime.ContainerConfig{
+				Mounts: test.criMounts,
+			}
+
+			if test.usernsEnabled {
+				containerConfig.Linux = &runtime.LinuxContainerConfig{
+					SecurityContext: &runtime.LinuxContainerSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							UsernsOptions: &runtime.UserNamespace{
+								Mode: runtime.NamespaceMode_POD,
+								Uids: idmap,
+								Gids: idmap,
+							},
+						},
+					},
+				}
+			}
+
+			c := newTestCRIService()
+			got := c.volumeMounts(testContainerRootDir, containerConfig, config)
+			assert.Len(t, got, len(test.expectedMountDest))
+			for _, dest := range test.expectedMountDest {
+				found := false
+				for _, m := range got {
+					if m.ContainerPath != dest {
+						continue
+					}
+					found = true
+					assert.Equal(t,
+						filepath.Dir(m.HostPath),
+						filepath.Join(testContainerRootDir, "volumes"))
+
+					if test.expectedMappings != nil {
+						assert.Equal(t, test.expectedMappings, m.UidMappings)
+						assert.Equal(t, test.expectedMappings, m.GidMappings)
+					}
+				}
+				assert.True(t, found)
 			}
 		})
 	}
