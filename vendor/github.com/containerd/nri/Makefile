@@ -117,7 +117,9 @@ $(BIN_PATH)/template: $(wildcard plugins/template/*.go)
 # test targets
 #
 
-test-gopkgs: ginkgo-tests
+test-gopkgs: ginkgo-tests test-ulimits
+
+SKIPPED_PKGS="ulimit-adjuster"
 
 ginkgo-tests:
 	$(Q)$(GINKGO) run \
@@ -129,8 +131,12 @@ ginkgo-tests:
 	    --junit-report junit.xml \
 	    --coverprofile coverprofile \
 	    --succinct \
+	    --skip-package $(SKIPPED_PKGS) \
 	    -r .; \
 	$(GO_CMD) tool cover -html=$(COVERAGE_PATH)/coverprofile -o $(COVERAGE_PATH)/coverage.html
+
+test-ulimits:
+	$(Q)$(GO_TEST) -v ./plugins/ulimit-adjuster
 
 codecov: SHELL := $(shell which bash)
 codecov:
@@ -165,13 +171,13 @@ golangci-lint:
 #
 
 install-protoc install-protobuf:
-	$(Q)./scripts/install-protobuf && \
+	$(Q)./scripts/install-protobuf
 
 install-ttrpc-plugin:
-	$(Q)$(GO_INSTALL) github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@74421d10189e8c118870d294c9f7f62db2d33ec1
+	$(Q)$(GO_INSTALL) -mod=mod github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@74421d10189e8c118870d294c9f7f62db2d33ec1
 
 install-protoc-dependencies:
-	$(Q)$(GO_INSTALL) google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
+	$(Q)$(GO_INSTALL) -mod=mod google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.0
 
 install-ginkgo:
 	$(Q)$(GO_INSTALL) -mod=mod github.com/onsi/ginkgo/v2/ginkgo
