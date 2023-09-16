@@ -461,7 +461,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 	if err != nil {
 		return nil, err
 	}
-	pids, err := s.getContainerPids(ctx, r.ID)
+	pids, err := s.getContainerPids(ctx, container)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -663,16 +663,12 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 	})
 }
 
-func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
-	container, err := s.getContainer(id)
-	if err != nil {
-		return nil, err
-	}
+func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
 	p, err := container.Process("")
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	ps, err := p.(*process.Init).Runtime().Ps(ctx, id)
+	ps, err := p.(*process.Init).Runtime().Ps(ctx, container.ID)
 	if err != nil {
 		return nil, err
 	}
