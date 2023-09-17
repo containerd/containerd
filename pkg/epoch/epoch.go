@@ -22,8 +22,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-
-	"github.com/containerd/containerd/log"
 )
 
 // SourceDateEpochEnv is the SOURCE_DATE_EPOCH env var.
@@ -42,19 +40,6 @@ func SourceDateEpoch() (*time.Time, error) {
 		return nil, fmt.Errorf("invalid %s value: %w", SourceDateEpochEnv, err)
 	}
 	return t, nil
-}
-
-// SourceDateEpochOrNow returns the SOURCE_DATE_EPOCH time if available,
-// otherwise returns the current time.
-func SourceDateEpochOrNow() time.Time {
-	epoch, err := SourceDateEpoch()
-	if err != nil {
-		log.L.WithError(err).Warnf("Invalid %s", SourceDateEpochEnv)
-	}
-	if epoch != nil {
-		return *epoch
-	}
-	return time.Now().UTC()
 }
 
 // ParseSourceDateEpoch parses the given source date epoch, as *time.Time.
