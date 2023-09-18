@@ -122,16 +122,20 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		err      error
 	)
 
+	// inherits annotations which are provided as snapshot labels.
+	labels := snapshots.FilterInheritedLabels(diff.Annotations)
+	if labels == nil {
+		labels = make(map[string]string)
+		labels["containerd.io/snapshot.ref"] = chainStr
+	} else {
+		if _, ok := labels["containerd.io/snapshot.ref"]; !ok {
+			labels["containerd.io/snapshot.ref"] = chainStr
+		}
+	}
+	opts = append(opts, snapshots.WithLabels(labels))
+
 	for {
 		key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
-
-		// inherits annotations which are provided as snapshot labels.
-		labels := snapshots.FilterInheritedLabels(diff.Annotations)
-		if labels == nil {
-			labels = make(map[string]string)
-		}
-		labels["containerd.io/snapshot.ref"] = chainStr;
-		opts = append(opts, snapshots.WithLabels(labels))
 
 		// Prepare snapshot with from parent, label as root
 		mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
@@ -153,12 +157,10 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 					// Try again, this should be rare, log it
 					log.G(ctx).WithField("key", key).WithField("chainid", chainStr).Debug("extraction snapshot already exists, chain id not found")
 					continue
-				} else {
-					// Snapshot exists - no need to handle, snapshot now found with chain id
 				}
 			}
 
-			// Already exists should have the caller retry
+			// Already exists - either the snapshot is good and inplace or have the caller retry
 			return fmt.Errorf("failed to prepare extraction snapshot %q: %w", key, err)
 
 		}
