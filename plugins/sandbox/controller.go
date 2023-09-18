@@ -262,6 +262,12 @@ func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.E
 
 func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
 	svc, err := c.getSandbox(ctx, sandboxID)
+	if errdefs.IsNotFound(err) {
+		return sandbox.ControllerStatus{
+			SandboxID: sandboxID,
+			ExitedAt:  time.Now(),
+		}, nil
+	}
 	if err != nil {
 		return sandbox.ControllerStatus{}, err
 	}
@@ -301,7 +307,7 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {
-		return nil, errdefs.ErrNotFound
+		return nil, err
 	}
 
 	return sandbox.NewClient(shim.Client())
