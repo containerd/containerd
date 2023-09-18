@@ -21,14 +21,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/images/usage"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
@@ -37,7 +36,6 @@ import (
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/sync/semaphore"
 )
 
 // Image describes an image used by containers
@@ -176,7 +174,7 @@ func (i *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 }
 
 func (i *image) Size(ctx context.Context) (int64, error) {
-	return i.Usage(ctx, WithUsageManifestLimit(1), WithManifestUsage())
+	return usage.CalculateImageUsage(ctx, i.i, i.client.ContentStore(), usage.WithManifestLimit(i.platform, 1), usage.WithManifestUsage())
 }
 
 func (i *image) Usage(ctx context.Context, opts ...UsageOpt) (int64, error) {
@@ -187,86 +185,18 @@ func (i *image) Usage(ctx context.Context, opts ...UsageOpt) (int64, error) {
 		}
 	}
 
-	var (
-		provider  = i.client.ContentStore()
-		handler   = images.ChildrenHandler(provider)
-		size      int64
-		mustExist bool
-	)
-
+	var usageOpts []usage.Opt
 	if config.manifestLimit != nil {
-		handler = images.LimitManifests(handler, i.platform, *config.manifestLimit)
-		mustExist = true
+		usageOpts = append(usageOpts, usage.WithManifestLimit(i.platform, *config.manifestLimit))
+	}
+	if config.snapshots {
+		usageOpts = append(usageOpts, usage.WithSnapshotters(i.client.SnapshotService))
+	}
+	if config.manifestOnly {
+		usageOpts = append(usageOpts, usage.WithManifestUsage())
 	}
 
-	var wh images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		var usage int64
-		children, err := handler(ctx, desc)
-		if err != nil {
-			if !errdefs.IsNotFound(err) || mustExist {
-				return nil, err
-			}
-			if !config.manifestOnly {
-				// Do not count size of non-existent objects
-				desc.Size = 0
-			}
-		} else if config.snapshots || !config.manifestOnly {
-			info, err := provider.Info(ctx, desc.Digest)
-			if err != nil {
-				if !errdefs.IsNotFound(err) {
-					return nil, err
-				}
-				if !config.manifestOnly {
-					// Do not count size of non-existent objects
-					desc.Size = 0
-				}
-			} else if info.Size > desc.Size {
-				// Count actual usage, Size may be unset or -1
-				desc.Size = info.Size
-			}
-
-			if config.snapshots {
-				for k, v := range info.Labels {
-					const prefix = "containerd.io/gc.ref.snapshot."
-					if !strings.HasPrefix(k, prefix) {
-						continue
-					}
-
-					sn := i.client.SnapshotService(k[len(prefix):])
-					if sn == nil {
-						continue
-					}
-
-					u, err := sn.Usage(ctx, v)
-					if err != nil {
-						if !errdefs.IsNotFound(err) && !errdefs.IsInvalidArgument(err) {
-							return nil, err
-						}
-					} else {
-						usage += u.Size
-					}
-				}
-			}
-		}
-
-		// Ignore unknown sizes. Generally unknown sizes should
-		// never be set in manifests, however, the usage
-		// calculation does not need to enforce this.
-		if desc.Size >= 0 {
-			usage += desc.Size
-		}
-
-		atomic.AddInt64(&size, usage)
-
-		return children, nil
-	}
-
-	l := semaphore.NewWeighted(3)
-	if err := images.Dispatch(ctx, wh, l, i.i.Target); err != nil {
-		return 0, err
-	}
-
-	return size, nil
+	return usage.CalculateImageUsage(ctx, i.i, i.client.ContentStore(), usageOpts...)
 }
 
 func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
