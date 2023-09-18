@@ -393,7 +393,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 		},
 	)
 	if err != nil {
-		if !errdefs.IsNotFound(err) {
+		if !errdefs.IsNotFound(err) && !errdefs.IsUnavailable(err) {
 			return fmt.Errorf("failed to load task for container: %w", err)
 		}
 	} else {
