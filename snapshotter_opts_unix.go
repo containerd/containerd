@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	capabRemapIDs    = "remap-ids"
+	capaRemapIDs     = "remap-ids"
 	capaOnlyRemapIds = "only-remap-ids"
 )
 
@@ -46,7 +46,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	for _, capab := range capabs {
-		if capab == capabRemapIDs {
+		if capab == capaRemapIDs {
 			// Snapshotter supports ID remapping, we don't need to do anything.
 			return parent, nil
 		}
