@@ -89,7 +89,7 @@ user namespaces enabled. This will affect all the snapshots that you take manual
 do that). In that case, make sure to use the same value of `/sys/module/overlay/parameters/metacopy`
 when creating and restoring the snapshot.
 
-### containerd 2.0
+### containerd 2.0 and above
 
 The storage and latency limitation from containerd 1.7 are not present in container 2.0 and above,
 if you use the overlay snapshotter (this is used by default). It will not use more storage at all,
@@ -99,8 +99,36 @@ This is achieved by using the kernel feature idmap mounts with the container roo
 image). This allows an overlay file-system to expose the image with different UID/GID without copying
 the files nor the inodes, just using a bind-mount.
 
-You can check if you are using idmap mounts for the container image if you create a pod with user
-namespaces, exec into it and run:
+Containerd by default will refuse to create a container with user namespaces, if overlayfs is the
+snapshotter and the kernel running doesn't support idmap mounts for overlayfs.  This is to make sure
+before falling back to the expensive chown (in terms of storage and pod startup latency), you
+understand the implications and decide to opt-in. Please read the containerd 1.7 limitations for an
+explanation of those.
+
+If your kernel doesn't support idmap mounts for the overlayfs snapshotter, you will see an error
+like:
+
+```
+failed to create containerd container: snapshotter "overlayfs" doesn't support idmap mounts on this host, configure `slow_chown` to allow a slower and expensive fallback
+```
+
+Linux supports idmap mounts on an overlayfs since version 5.19.
+
+You can opt-in for the slow chown by adding the `slow_chown` field to your config in the overlayfs
+snapshotter section, like this:
+
+```
+  [plugins."io.containerd.snapshotter.v1.overlayfs"]
+    slow_chown = true
+```
+
+Note that only overlayfs users need to opt-in for the slow chown, as it as it is the only one that
+containerd provides a better option (only the overlayfs snapshotter supports idmap mounts in
+containerd). If you use another snapshotter, you will fall-back to the expensive chown without the
+need to opt-in.
+
+That being said, you can double check if your container is using idmap mounts for the container
+image if you create a pod with user namespaces, exec into it and run:
 
 ```
 mount | grep overlay
