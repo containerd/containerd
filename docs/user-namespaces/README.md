@@ -83,7 +83,7 @@ will significantly reduce the storage and performance overhead, as only the inod
 the container image will be duplicated, but not the content of the file. This means it will use less
 storage and it will be faster. However, it is not a panacea.
 
-If you change the metacopy param, make sure to do it in a way that is persistant across reboots. You
+If you change the metacopy param, make sure to do it in a way that is persistent across reboots. You
 should also be aware that this setting will be used for all containers, not just containers with
 user namespaces enabled. This will affect all the snapshots that you take manually (if you happen to
 do that). In that case, make sure to use the same value of `/sys/module/overlay/parameters/metacopy`
