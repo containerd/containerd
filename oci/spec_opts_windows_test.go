@@ -18,6 +18,7 @@ package oci
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/containerd/containerd/containers"
@@ -522,5 +523,28 @@ func TestWithImageConfigArgsEscapedWindows(t *testing.T) {
 				t.Fatalf("Expected CommandLine: '%s', got: '%s'", tc.expectedCommandLine, s.Process.CommandLine)
 			}
 		})
+	}
+}
+
+func TestWindowsDefaultPathEnv(t *testing.T) {
+	t.Parallel()
+	s := Spec{}
+	s.Process = &specs.Process{
+		Env: []string{},
+	}
+
+	var (
+		defaultUnixEnv = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		ctx            = namespaces.WithNamespace(context.Background(), "test")
+	)
+
+	//check that the default PATH environment is not null
+	if os.Getenv("PATH") == "" {
+		t.Fatal("PATH environment variable is not set")
+	}
+	WithDefaultPathEnv(ctx, nil, nil, &s)
+	//check that the path is not overwritten by the unix default path
+	if Contains(s.Process.Env, defaultUnixEnv) {
+		t.Fatal("default Windows Env overwritten by the default Unix Env")
 	}
 }

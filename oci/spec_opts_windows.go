@@ -103,6 +103,11 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 	}
 }
 
+// Windows containers have default path configured at bootup
+func WithDefaultPathEnv(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+	return nil
+}
+
 func escapeAndCombineArgs(args []string) string {
 	escaped := make([]string, len(args))
 	for i, a := range args {
