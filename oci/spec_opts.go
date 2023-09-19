@@ -193,6 +193,7 @@ func WithDefaultPathEnv(_ context.Context, _ Client, _ *containers.Container, s 
 	if s.Linux != nil {
 		s.Process.Env = replaceOrAppendEnvValues(s.Process.Env, defaultUnixEnv)
 	}
+
 	return nil
 }
 
