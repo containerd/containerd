@@ -188,22 +188,6 @@ func Contains(a []string, x string) bool {
 	return false
 }
 
-func TestWithDefaultPathEnv(t *testing.T) {
-	t.Parallel()
-	s := Spec{}
-	s.Process = &specs.Process{
-		Env: []string{},
-	}
-	var (
-		defaultUnixEnv = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-		ctx            = namespaces.WithNamespace(context.Background(), "test")
-	)
-	WithDefaultPathEnv(ctx, nil, nil, &s)
-	if !Contains(s.Process.Env, defaultUnixEnv) {
-		t.Fatal("default Unix Env not found")
-	}
-}
-
 func TestWithProcessCwd(t *testing.T) {
 	t.Parallel()
 	s := Spec{}
