@@ -74,9 +74,9 @@ Different containerd versions have different limitations too, those are highligh
 ### containerd 1.7
 
 One limitation present in containerd 1.7 is that it needs to change the ownership of every file and
-directory inside the container image, during Pod startup. This means it has a storage overhead (the
-size of the container image is duplicated each time a pod is created) and can significantly impact
-the container startup latency.
+directory inside the container image, during Pod startup. This means it has a storage overhead, as
+**the size of the container image is duplicated each time a pod is created**, and can significantly
+impact the container startup latency, as doing such a copy takes time too.
 
 You can mitigate this limitation by switching `/sys/module/overlay/parameters/metacopy` to `Y`. This
 will significantly reduce the storage and performance overhead, as only the inode for each file of
