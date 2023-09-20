@@ -274,7 +274,7 @@ func TestRegistryEndpoints(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			c := newTestCRIService()
+			c, _ := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
 			got, err := c.registryEndpoints(test.host)
 			assert.NoError(t, err)
@@ -368,7 +368,7 @@ func TestDefaultScheme(t *testing.T) {
 //	} {
 //		test := test
 //		t.Run(test.desc, func(t *testing.T) {
-//			c := newTestCRIService()
+//			c, _ := newTestCRIService()
 //			c.config.ImageDecryption.KeyModel = test.keyModel
 //			got := len(c.encryptedImagesPullOpts())
 //			assert.Equal(t, test.expectedOpts, got)
@@ -424,7 +424,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			cri := newTestCRIService()
+			cri, _ := newTestCRIService()
 			cri.config.ContainerdConfig.Snapshotter = defaultSnashotter
 			cri.config.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
 			cri.config.ContainerdConfig.Runtimes["exiting-runtime"] = criconfig.Runtime{
@@ -487,7 +487,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 
 func TestImageGetLabels(t *testing.T) {
 
-	criService := newTestCRIService()
+	criService, _ := newTestCRIService()
 
 	tests := []struct {
 		name               string

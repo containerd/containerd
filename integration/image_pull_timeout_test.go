@@ -37,16 +37,13 @@ import (
 	"github.com/containerd/log/logtest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
-	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	criserver "github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 )
 
@@ -94,11 +91,7 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
 
-	_, err = criService.PullImage(ctx, &runtimeapi.PullImageRequest{
-		Image: &runtimeapi.ImageSpec{
-			Image: pullProgressTestImageName,
-		},
-	})
+	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil)
 	assert.NoError(t, err)
 }
 
@@ -217,11 +210,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 	go func() {
 		defer close(errCh)
 
-		_, err := criService.PullImage(ctx, &runtimeapi.PullImageRequest{
-			Image: &runtimeapi.ImageSpec{
-				Image: pullProgressTestImageName,
-			},
-		})
+		_, err := criService.PullImage(ctx, pullProgressTestImageName, nil, nil)
 		errCh <- err
 	}()
 
@@ -304,11 +293,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 		dctx, _, err := cli.WithLease(ctx)
 		assert.NoError(t, err)
 
-		_, err = criService.PullImage(dctx, &runtimeapi.PullImageRequest{
-			Image: &runtimeapi.ImageSpec{
-				Image: fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"),
-			},
-		})
+		_, err = criService.PullImage(dctx, fmt.Sprintf("%s/%s", mirrorURL.Host, "containerd/volume-ownership:2.1"), nil, nil)
 
 		assert.Equal(t, context.Canceled, errors.Unwrap(err), "[%v] expected canceled error, but got (%v)", idx, err)
 		assert.True(t, mirrorSrv.limiter.clearHitCircuitBreaker(), "[%v] expected to hit circuit breaker", idx)
@@ -487,7 +472,7 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 //
 // NOTE: We don't need to start the CRI plugin here because we just need the
 // ImageService API.
-func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.CRIService, error) {
+func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
 	criWorkDir := filepath.Join(tmpDir, "cri-plugin")
 
@@ -505,15 +490,5 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 		StateDir:          filepath.Join(criWorkDir, "state"),
 	}
 
-	criBase := &base.CRIBase{
-		Config:       cfg,
-		BaseOCISpecs: map[string]*oci.Spec{},
-	}
-
-	imageService, err := images.NewService(cfg, client)
-	if err != nil {
-		panic(err)
-	}
-
-	return criserver.NewCRIService(criBase, imageService, client, nil)
+	return images.NewService(cfg, map[string]string{}, client)
 }
