@@ -33,3 +33,7 @@ sudo install bin/cni-bridge-fp "${CNI_BIN_DIR}"
 SHIM_BIN_DIR=${SHIM_BIN_DIR:-"/usr/local/bin"}
 make bin/containerd-shim-runc-fp-v1
 sudo install bin/containerd-shim-runc-fp-v1 "${SHIM_BIN_DIR}"
+
+RUNCFP_BIN_DIR=${RUNCFP_BIN_DIR:-"/usr/local/bin"}
+make bin/runc-fp
+sudo install bin/runc-fp "${RUNCFP_BIN_DIR}"
