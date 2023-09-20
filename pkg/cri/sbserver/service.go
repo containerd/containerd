@@ -23,7 +23,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -32,12 +31,10 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/instrument"
 	"github.com/containerd/containerd/pkg/cri/nri"
-	"github.com/containerd/containerd/pkg/cri/sbserver/images"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/cri/streaming"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"google.golang.org/grpc"
@@ -80,6 +77,8 @@ type imageService interface {
 	GetSnapshot(key string) (snapshotstore.Snapshot, error)
 
 	LocalResolve(refOrID string) (imagestore.Image, error)
+
+	ImageFSPath() string
 }
 
 // criService implements CRIService.
@@ -131,28 +130,15 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
-
-	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
-	}
-
-	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
-	log.L.Infof("Get image filesystem path %q", imageFSPath)
-
-	// TODO: expose this as a separate containerd plugin.
-	imageService, err := images.NewService(config, imageFSPath, client)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
-	}
 
 	c := &criService{
 		imageService:       imageService,
 		config:             config,
 		client:             client,
-		imageFSPath:        imageFSPath,
+		imageFSPath:        imageService.ImageFSPath(),
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
@@ -345,12 +331,6 @@ func (c *criService) register(s *grpc.Server) error {
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
 	return nil
-}
-
-// imageFSPath returns containerd image filesystem path.
-// Note that if containerd changes directory layout, we also needs to change this.
-func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, plugin.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {

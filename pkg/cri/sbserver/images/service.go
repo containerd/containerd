@@ -19,17 +19,43 @@ package images
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/sbserver/base"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/kmutex"
+	"github.com/containerd/containerd/plugin"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 )
+
+func init() {
+	plugin.Register(&plugin.Registration{
+		Type: plugin.GRPCPlugin,
+		ID:   "cri-image-service",
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			// Get base CRI dependencies.
+			criPlugin, err := ic.GetByID(plugin.GRPCPlugin, "cri")
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+			}
+
+			cri := criPlugin.(*base.CRIBase)
+
+			service, err := NewService(cri.Config, cri.Client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create image service: %w", err)
+			}
+
+			return service, nil
+		},
+	})
+}
 
 type CRIImageService struct {
 	// config contains all configurations.
@@ -48,7 +74,14 @@ type CRIImageService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
-func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageService, error) {
+	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
+	}
+
+	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
+	log.L.Infof("Get image filesystem path %q", imageFSPath)
+
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
@@ -56,10 +89,6 @@ func NewService(config criconfig.Config, imageFSPath string, client *containerd.
 		imageFSPath:                 imageFSPath,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
-	}
-
-	if client.SnapshotService(svc.config.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", svc.config.ContainerdConfig.Snapshotter)
 	}
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
@@ -72,6 +101,12 @@ func NewService(config criconfig.Config, imageFSPath string, client *containerd.
 	snapshotsSyncer.start()
 
 	return &svc, nil
+}
+
+// imageFSPath returns containerd image filesystem path.
+// Note that if containerd changes directory layout, we also needs to change this.
+func imageFSPath(rootDir, snapshotter string) string {
+	return filepath.Join(rootDir, plugin.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
@@ -123,4 +158,8 @@ func (c *CRIImageService) GetImage(id string) (imagestore.Image, error) {
 // GetSnapshot returns the snapshot with specified key.
 func (c *CRIImageService) GetSnapshot(key string) (snapshotstore.Snapshot, error) {
 	return c.snapshotStore.Get(key)
+}
+
+func (c *CRIImageService) ImageFSPath() string {
+	return c.imageFSPath
 }

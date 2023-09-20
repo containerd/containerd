@@ -17,83 +17,59 @@
 package cri
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
-	nriservice "github.com/containerd/containerd/pkg/nri"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"k8s.io/klog/v2"
-
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/constants"
+	"github.com/containerd/containerd/pkg/cri/sbserver/base"
+	"github.com/containerd/containerd/pkg/cri/sbserver/images"
 	"github.com/containerd/containerd/pkg/cri/server"
+	nriservice "github.com/containerd/containerd/pkg/nri"
+	"github.com/containerd/containerd/plugin"
 )
 
 // Register CRI service plugin
 func init() {
-	config := criconfig.DefaultConfig()
 	plugin.Register(&plugin.Registration{
 		Type:   plugin.GRPCPlugin,
-		ID:     "cri",
-		Config: &config,
-		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.ServicePlugin,
-			plugin.NRIApiPlugin,
-		},
+		ID:     "cri-runtime-service",
 		InitFn: initCRIService,
 	})
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
-	ready := ic.RegisterReadiness()
-	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
-	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
-	ctx := ic.Context
-	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
-		return nil, fmt.Errorf("invalid plugin config: %w", err)
-	}
-
-	c := criconfig.Config{
-		PluginConfig:       *pluginConfig,
-		ContainerdRootDir:  filepath.Dir(ic.Root),
-		ContainerdEndpoint: ic.Address,
-		RootDir:            ic.Root,
-		StateDir:           ic.State,
-	}
-	log.G(ctx).Infof("Start cri plugin with config %+v", c)
-
-	if err := setGLogLevel(); err != nil {
-		return nil, fmt.Errorf("failed to set glog level: %w", err)
-	}
-
-	log.G(ctx).Info("Connect containerd service")
-	client, err := containerd.New(
-		"",
-		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
-		containerd.WithDefaultPlatform(platforms.Default()),
-		containerd.WithInMemoryServices(ic),
+	var (
+		ctx   = ic.Context
+		err   error
+		ready = ic.RegisterReadiness()
 	)
+
+	// Get base CRI dependencies.
+	criBasePlugin, err := ic.GetByID(plugin.GRPCPlugin, "cri")
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd client: %w", err)
+		return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+	}
+	criBase := criBasePlugin.(*base.CRIBase)
+
+	// Get image service.
+	criImagePlugin, err := ic.GetByID(plugin.GRPCPlugin, "cri-image-service")
+	if err != nil {
+		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 	}
 
-	var s server.CRIService
+	var (
+		s            server.CRIService
+		imageService = criImagePlugin.(*images.CRIImageService)
+	)
+
 	if os.Getenv("DISABLE_CRI_SANDBOXES") == "" {
 		log.G(ctx).Info("using CRI Sandbox server - use DISABLE_CRI_SANDBOXES=1 to fallback to legacy CRI")
-		s, err = sbserver.NewCRIService(c, client, getNRIAPI(ic))
+		s, err = sbserver.NewCRIService(criBase.Config, imageService, criBase.Client, getNRIAPI(ic))
 	} else {
 		log.G(ctx).Info("using legacy CRI server")
-		s, err = server.NewCRIService(c, client, getNRIAPI(ic))
+		s, err = server.NewCRIService(criBase.Config, criBase.Client, getNRIAPI(ic))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
@@ -107,27 +83,6 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}()
 
 	return s, nil
-}
-
-// Set glog level.
-func setGLogLevel() error {
-	l := log.GetLevel()
-	fs := flag.NewFlagSet("klog", flag.PanicOnError)
-	klog.InitFlags(fs)
-	if err := fs.Set("logtostderr", "true"); err != nil {
-		return err
-	}
-	switch l {
-	case log.TraceLevel:
-		return fs.Set("v", "5")
-	case log.DebugLevel:
-		return fs.Set("v", "4")
-	case log.InfoLevel:
-		return fs.Set("v", "2")
-	default:
-		// glog doesn't support other filters. Defaults to v=0.
-	}
-	return nil
 }
 
 // Get the NRI plugin, and set up our NRI API for it.

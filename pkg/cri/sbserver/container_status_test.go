@@ -286,6 +286,8 @@ func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error
 	return imagestore.Image{}, errors.New("not implemented")
 }
 
+func (s *fakeImageService) ImageFSPath() string { return "" }
+
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {
 	expected.State = state
 	switch state {

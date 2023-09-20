@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/cri/sbserver/images"
 )
 
 func FuzzCRISandboxServer(data []byte) int {
@@ -37,7 +38,12 @@ func FuzzCRISandboxServer(data []byte) int {
 	}
 	defer client.Close()
 
-	c, err := sbserver.NewCRIService(criconfig.Config{}, client, nil)
+	imageService, err := images.NewService(criconfig.Config{}, client)
+	if err != nil {
+		panic(err)
+	}
+
+	c, err := sbserver.NewCRIService(criconfig.Config{}, imageService, client, nil)
 	if err != nil {
 		panic(err)
 	}
