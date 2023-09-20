@@ -145,5 +145,5 @@ message SandboxMetricsRequest {
 }
 
 message SandboxMetricsResponse {
-	types.Metric metrics = 1;
+	containerd.types.Metric metrics = 1;
 }
