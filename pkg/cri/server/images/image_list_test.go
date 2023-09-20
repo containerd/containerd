@@ -29,7 +29,7 @@ import (
 )
 
 func TestListImages(t *testing.T) {
-	c := newTestCRIService()
+	_, c := newTestCRIService()
 	imagesInStore := []imagestore.Image{
 		{
 			ID:      "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

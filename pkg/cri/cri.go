@@ -18,13 +18,16 @@ package cri
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
@@ -32,6 +35,11 @@ import (
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/sandbox"
+
+	"google.golang.org/grpc"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Register CRI service plugin
@@ -49,6 +57,7 @@ func init() {
 			plugins.ServicePlugin,
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
+			plugins.TransferPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -63,6 +72,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
 	}
 	criBase := criBasePlugin.(*base.CRIBase)
+	c := criBase.Config
 
 	// Get image service.
 	criImagePlugin, err := ic.GetByID(plugins.CRIImagePlugin, "cri-image-service")
@@ -83,7 +93,50 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := server.NewCRIService(criBase, imageService, client, getNRIAPI(ic))
+	// TODO: Update this logic to use runtime snapshotter
+	if client.SnapshotService(c.ContainerdConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", c.ContainerdConfig.Snapshotter)
+	}
+
+	// TODO(dmcgowan): Get the full list directly from configured plugins
+	sbControllers := map[string]sandbox.Controller{
+		string(criconfig.ModePodSandbox): client.SandboxController(string(criconfig.ModePodSandbox)),
+		string(criconfig.ModeShim):       client.SandboxController(string(criconfig.ModeShim)),
+	}
+
+	//imageFSPaths := map[string]string{}
+	//for _, ociRuntime := range c.ContainerdConfig.Runtimes {
+	//	// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
+	//	snapshotter := ociRuntime.Snapshotter
+	//	if snapshotter != "" {
+	//		imageFSPaths[snapshotter] = filepath.Join(c.ContainerdRootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
+	//		log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+	//	}
+	//	if _, ok := sbControllers[ociRuntime.Sandboxer]; !ok {
+	//		sbControllers[ociRuntime.Sandboxer] = client.SandboxController(ociRuntime.Sandboxer)
+	//	}
+	//}
+	//snapshotter := c.ContainerdConfig.Snapshotter
+	//imageFSPaths[snapshotter] = filepath.Join(c.ContainerdRootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
+	//log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+
+	// TODO: expose this as a separate containerd plugin.
+	//imageService, err := images.NewService(c, imageFSPaths, client)
+	//if err != nil {
+	//	return nil, fmt.Errorf("unable to create CRI image service: %w", err)
+	//}
+
+	options := &server.CRIServiceOptions{
+		ImageService:       imageService,
+		NRI:                getNRIAPI(ic),
+		ImageFSPaths:       imageService.ImageFSPaths(),
+		Client:             client,
+		SandboxControllers: sbControllers,
+		BaseOCISpecs:       criBase.BaseOCISpecs,
+	}
+	is := images.NewGRPCService(imageService)
+
+	s, rs, err := server.NewCRIService(criBase.Config, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
@@ -97,7 +150,52 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		// TODO(random-liu): Whether and how we can stop containerd.
 	}()
 
-	return s, nil
+	service := &criGRPCServer{
+		RuntimeServiceServer: rs,
+		ImageServiceServer:   is,
+		Closer:               s, // TODO: Where is close run?
+		initializer:          s,
+	}
+
+	if c.DisableTCPService {
+		return service, nil
+	}
+
+	return criGRPCServerWithTCP{service}, nil
+}
+
+type initializer interface {
+	IsInitialized() bool
+}
+
+type criGRPCServer struct {
+	runtime.RuntimeServiceServer
+	runtime.ImageServiceServer
+	io.Closer
+	initializer
+}
+
+func (c *criGRPCServer) register(s *grpc.Server) error {
+	instrumented := instrument.NewService(c)
+	runtime.RegisterRuntimeServiceServer(s, instrumented)
+	runtime.RegisterImageServiceServer(s, instrumented)
+	return nil
+}
+
+// Register registers all required services onto a specific grpc server.
+// This is used by containerd cri plugin.
+func (c *criGRPCServer) Register(s *grpc.Server) error {
+	return c.register(s)
+}
+
+type criGRPCServerWithTCP struct {
+	*criGRPCServer
+}
+
+// RegisterTCP register all required services onto a GRPC server on TCP.
+// This is used by containerd CRI plugin.
+func (c criGRPCServerWithTCP) RegisterTCP(s *grpc.Server) error {
+	return c.register(s)
 }
 
 // Get the NRI plugin, and set up our NRI API for it.

@@ -33,8 +33,10 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec.
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
-func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
+func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
+
+	// TODO: Move to separate function
 	image, err := c.LocalResolve(r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
