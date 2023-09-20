@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	cni "github.com/containerd/go-cni"
 	"google.golang.org/grpc"
@@ -128,7 +129,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		os:                          osinterface.RealOS{},
 		sandboxStore:                sandboxstore.NewStore(labels),
 		containerStore:              containerstore.NewStore(labels),
-		imageStore:                  imagestore.NewStore(client),
+		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
 		snapshotStore:               snapshotstore.NewStore(),
 		sandboxNameIndex:            registrar.NewRegistrar(),
 		containerNameIndex:          registrar.NewRegistrar(),
