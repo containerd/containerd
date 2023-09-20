@@ -31,8 +31,20 @@ false` setting in your pod.spec will be **silently ignored**.
 
 ### Kubernetes 1.25 and 1.26
 
- * Containerd 1.7 or greater
- * runc 1.1 or greater
+ * Containerd 1.7
+ * You can use runc or crun as the OCI runtime:
+   * runc 1.1 or greater
+   * crun 1.4.3 or greater
+
+You can also use containerd 2.0 or above, but the same [requirements as Kubernetes 1.27 and
+greater](#Kubernetes-127-and-greater) apply, except for the Linux kernel. Bear in mind that all the
+requirements there apply, including file-systems supporting idmap mounts. You can use Linux
+versions:
+
+ * Linux 5.15: you will suffer from [the containerd 1.7 storage and latency
+   limitations](#Limitations), as it doesn't support idmap mounts for overlayfs.
+ * Linux 5.19 or greater (recommended): it doesn't suffer from any of the containerd 1.7
+   limitations, as overlayfs started supporting idmap mounts on this kernel version.
 
 ### Kubernetes 1.27 and greater
 
