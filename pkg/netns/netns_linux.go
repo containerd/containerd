@@ -177,11 +177,17 @@ type NetNS struct {
 }
 
 // NewNetNS creates a network namespace.
+// The name of the network namespace is randomly generated.
+// The returned netns is created under baseDir, with its path
+// following the pattern "baseDir/<generated-name>".
 func NewNetNS(baseDir string) (*NetNS, error) {
 	return NewNetNSFromPID(baseDir, 0)
 }
 
-// NewNetNS returns the netns from pid or a new netns if pid is 0.
+// NewNetNSFromPID returns the netns from pid or a new netns if pid is 0.
+// The name of the network namespace is randomly generated.
+// The returned netns is created under baseDir, with its path
+// following the pattern "baseDir/<generated-name>".
 func NewNetNSFromPID(baseDir string, pid uint32) (*NetNS, error) {
 	path, err := newNS(baseDir, pid)
 	if err != nil {
