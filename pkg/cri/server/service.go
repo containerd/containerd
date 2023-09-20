@@ -38,7 +38,6 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
@@ -83,6 +82,8 @@ type imageService interface {
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
 	LocalResolve(refOrID string) (imagestore.Image, error)
+
+	ImageFSPaths() map[string]string
 }
 
 // criService implements CRIService.
@@ -133,39 +134,14 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
-
-	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
-	}
-
-	imageFSPaths := map[string]string{}
-	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
-		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
-		snapshotter := ociRuntime.Snapshotter
-		if snapshotter != "" {
-			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
-		}
-	}
-
-	snapshotter := config.ContainerdConfig.Snapshotter
-	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
-	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
-
-	// TODO: expose this as a separate containerd plugin.
-	imageService, err := images.NewService(config, imageFSPaths, client)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
-	}
-
 	c := &criService{
 		imageService:       imageService,
 		config:             config,
 		client:             client,
-		imageFSPaths:       imageFSPaths,
+		imageFSPaths:       imageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
