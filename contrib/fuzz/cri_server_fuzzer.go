@@ -24,6 +24,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 )
 
 func FuzzCRIServer(data []byte) int {
@@ -37,7 +38,12 @@ func FuzzCRIServer(data []byte) int {
 	}
 	defer client.Close()
 
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
+	imageService, err := images.NewService(criconfig.Config{}, client)
+	if err != nil {
+		panic(err)
+	}
+
+	c, err := server.NewCRIService(criconfig.Config{}, imageService, client, nil)
 	if err != nil {
 		panic(err)
 	}
