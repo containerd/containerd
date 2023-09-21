@@ -17,6 +17,7 @@ require (
 	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.7
+	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.4.0
 	github.com/containerd/ttrpc v1.2.2
 	github.com/containerd/typeurl/v2 v2.1.1
@@ -52,8 +53,8 @@ require (
 	github.com/opencontainers/selinux v1.11.0
 	github.com/pelletier/go-toml v1.9.5
 	github.com/prometheus/client_golang v1.14.0
-	github.com/sirupsen/logrus v1.9.0
-	github.com/stretchr/testify v1.8.2
+	github.com/sirupsen/logrus v1.9.3
+	github.com/stretchr/testify v1.8.4
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli v1.22.12
 	github.com/vishvananda/netlink v1.2.1-beta.2
