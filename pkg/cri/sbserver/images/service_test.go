@@ -24,6 +24,7 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +43,7 @@ func newTestCRIService() *CRIImageService {
 	return &CRIImageService{
 		config:        testConfig,
 		imageFSPath:   testImageFSPath,
-		imageStore:    imagestore.NewStore(nil),
+		imageStore:    imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore: snapshotstore.NewStore(),
 	}
 }

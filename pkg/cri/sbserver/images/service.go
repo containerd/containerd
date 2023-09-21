@@ -27,6 +27,7 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/kmutex"
+	"github.com/containerd/containerd/platforms"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 )
@@ -52,7 +53,7 @@ func NewService(config criconfig.Config, imageFSPath string, client *containerd.
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
-		imageStore:                  imagestore.NewStore(client),
+		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
 		imageFSPath:                 imageFSPath,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),

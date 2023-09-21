@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,7 +46,7 @@ func newTestCRIService() *criService {
 		imageFSPath:        testImageFSPath,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels),
-		imageStore:         imagestore.NewStore(nil),
+		imageStore:         imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore:      snapshotstore.NewStore(),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels),
