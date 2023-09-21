@@ -421,12 +421,6 @@ func (process *Process) CloseStdin(ctx context.Context) (err error) {
 		return makeProcessError(process, operation, ErrAlreadyClosed, nil)
 	}
 
-	process.stdioLock.Lock()
-	defer process.stdioLock.Unlock()
-	if process.stdin == nil {
-		return nil
-	}
-
 	//HcsModifyProcess request to close stdin will fail if the process has already exited
 	if !process.stopped() {
 		modifyRequest := processModifyRequest{
@@ -448,8 +442,12 @@ func (process *Process) CloseStdin(ctx context.Context) (err error) {
 		}
 	}
 
-	process.stdin.Close()
-	process.stdin = nil
+	process.stdioLock.Lock()
+	defer process.stdioLock.Unlock()
+	if process.stdin != nil {
+		process.stdin.Close()
+		process.stdin = nil
+	}
 
 	return nil
 }
