@@ -108,6 +108,10 @@ github.com/containerd/go-runc
 ## explicit; go 1.16
 github.com/containerd/imgcrypt
 github.com/containerd/imgcrypt/images/encryption
+# github.com/containerd/log v0.1.0
+## explicit; go 1.20
+github.com/containerd/log
+github.com/containerd/log/logtest
 # github.com/containerd/nri v0.1.0
 ## explicit; go 1.14
 github.com/containerd/nri
@@ -377,7 +381,7 @@ github.com/russross/blackfriday/v2
 # github.com/shurcooL/sanitized_anchor_name v1.0.0
 ## explicit
 github.com/shurcooL/sanitized_anchor_name
-# github.com/sirupsen/logrus v1.9.0
+# github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 # github.com/spf13/pflag v1.0.5
@@ -386,8 +390,8 @@ github.com/spf13/pflag
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
 ## explicit
 github.com/stefanberger/go-pkcs11uri
-# github.com/stretchr/testify v1.8.1
-## explicit; go 1.13
+# github.com/stretchr/testify v1.8.4
+## explicit; go 1.20
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # github.com/tchap/go-patricia v2.2.6+incompatible
@@ -491,7 +495,7 @@ golang.org/x/oauth2/internal
 ## explicit
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.6.0
+# golang.org/x/sys v0.7.0
 ## explicit; go 1.17
 golang.org/x/sys/execabs
 golang.org/x/sys/internal/unsafeheader
