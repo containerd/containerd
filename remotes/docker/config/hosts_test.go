@@ -110,6 +110,9 @@ ca = "/etc/path/default"
 
 [host."https://noprefixnoncompliant.registry"]
   override_path = true
+
+[host."https://onlyheader.registry".header]
+  x-custom-1 = "justaheader"
 `
 	var tb, fb = true, false
 	expected := []hostConfig{
@@ -175,6 +178,13 @@ ca = "/etc/path/default"
 			scheme:       "https",
 			host:         "noprefixnoncompliant.registry",
 			capabilities: allCaps,
+		},
+		{
+			scheme:       "https",
+			host:         "onlyheader.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			header:       http.Header{"x-custom-1": {"justaheader"}},
 		},
 		{
 			scheme:       "https",
