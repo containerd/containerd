@@ -28,11 +28,11 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/transfer"
 	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
 	"github.com/containerd/containerd/pkg/transfer/image"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/log"
 )
 
 var importCommand = cli.Command{

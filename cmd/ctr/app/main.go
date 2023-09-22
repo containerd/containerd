@@ -37,9 +37,9 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	versionCmd "github.com/containerd/containerd/cmd/ctr/commands/version"
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
+	"github.com/containerd/log"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"
 )

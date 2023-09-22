@@ -19,7 +19,7 @@ package main
 import (
 	"os"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 const defaultPath = "/usr/local/bin/"

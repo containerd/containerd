@@ -24,9 +24,9 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/log"
 	docker "github.com/distribution/reference"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"

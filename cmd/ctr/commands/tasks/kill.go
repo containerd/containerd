@@ -23,8 +23,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/log"
 	gocni "github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
 	"github.com/urfave/cli"

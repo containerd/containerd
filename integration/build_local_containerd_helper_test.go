@@ -23,12 +23,12 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	ctrdsrv "github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/log/logtest"
 
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	_ "github.com/containerd/containerd/events/plugin"

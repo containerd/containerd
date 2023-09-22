@@ -28,11 +28,11 @@ import (
 	"github.com/containerd/btrfs/v2"
 	"github.com/containerd/continuity/fs"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/log"
 )
 
 type snapshotter struct {

@@ -10,6 +10,7 @@ require (
 	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/continuity v0.4.2
 	github.com/containerd/go-runc v1.1.0
+	github.com/containerd/log v0.1.0
 	github.com/containerd/ttrpc v1.2.2
 	github.com/containerd/typeurl/v2 v2.1.1
 	github.com/opencontainers/go-digest v1.0.0
@@ -29,7 +30,6 @@ require (
 	github.com/container-orchestrated-devices/container-device-interface v0.6.1 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
-	github.com/containerd/log v0.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
