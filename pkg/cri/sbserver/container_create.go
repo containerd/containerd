@@ -35,6 +35,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/blockio"
 	"github.com/containerd/containerd/pkg/cri/annotations"
@@ -258,6 +259,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	specOpts, err := c.platformSpecOpts(platform, config, &image.ImageSpec.Config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container spec opts: %w", err)
+	}
+
+	if image.ImageSpec.OS == "wasi" {
+		manifest, err := images.Manifest(ctx, c.client.ContentStore(), containerdImage.Target(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to set wasi layers: %w", err)
+		}
+		specOpts = append(specOpts, oci.WithWasmLayers(manifest.Layers))
 	}
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindContainer)
