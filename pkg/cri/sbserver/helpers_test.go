@@ -36,7 +36,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,15 +141,11 @@ systemd_cgroup = true
   NoNewKeyring = true
 `
 	var nilOptsConfig, nonNilOptsConfig criconfig.Config
-	tree, err := toml.Load(nilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nilOptsConfig)
+	err := toml.Unmarshal([]byte(nilOpts), &nilOptsConfig)
 	require.NoError(t, err)
 	require.Len(t, nilOptsConfig.Runtimes, 1)
 
-	tree, err = toml.Load(nonNilOpts)
-	require.NoError(t, err)
-	err = tree.Unmarshal(&nonNilOptsConfig)
+	err = toml.Unmarshal([]byte(nonNilOpts), &nonNilOptsConfig)
 	require.NoError(t, err)
 	require.Len(t, nonNilOptsConfig.Runtimes, 3)
 

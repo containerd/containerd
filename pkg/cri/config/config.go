@@ -53,9 +53,6 @@ type Runtime struct {
 	// Currently, only device plugins populate the annotations.
 	ContainerAnnotations []string `toml:"container_annotations" json:"ContainerAnnotations"`
 	// Options are config options for the runtime.
-	// If options is loaded from toml config, it will be map[string]interface{}.
-	// Options can be converted into toml.Tree using toml.TreeFromMap().
-	// Using options type as map[string]interface{} helps in correctly marshaling options from Go to JSON.
 	Options map[string]interface{} `toml:"options" json:"options"`
 	// PrivilegedWithoutHostDevices overloads the default behaviour for adding host devices to the
 	// runtime spec when the container is privileged. Defaults to false.

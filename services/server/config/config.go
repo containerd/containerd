@@ -19,11 +19,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"dario.cat/mergo"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
@@ -58,7 +60,7 @@ type Config struct {
 	// required plugin doesn't exist or fails to be initialized or started.
 	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
-	Plugins map[string]toml.Tree `toml:"plugins"`
+	Plugins map[string]interface{} `toml:"plugins"`
 	// OOMScore adjust the containerd's oom score
 	OOMScore int `toml:"oom_score"`
 	// Cgroup specifies cgroup information for the containerd daemon process
@@ -179,9 +181,17 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 	if !ok {
 		return p.Config, nil
 	}
-	if err := data.Unmarshal(p.Config); err != nil {
+	r, w := io.Pipe()
+	go func() {
+		err := toml.NewEncoder(w).Encode(data)
+		w.CloseWithError(err)
+	}()
+
+	// TODO: Add DisallowUnknownFields, requires better testing and bubbling errors
+	if err := toml.NewDecoder(r).Decode(p.Config); err != nil {
 		return nil, err
 	}
+
 	return p.Config, nil
 }
 
@@ -239,12 +249,14 @@ func LoadConfig(path string, out *Config) error {
 func loadConfigFile(path string) (*Config, error) {
 	config := &Config{}
 
-	file, err := toml.LoadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load TOML: %s: %w", path, err)
+		return nil, err
 	}
+	defer f.Close()
 
-	if err := file.Unmarshal(config); err != nil {
+	// TODO: Add DisallowUnknownFields, requires better testing and bubbling errors
+	if err := toml.NewDecoder(f).Decode(config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
 	}
 

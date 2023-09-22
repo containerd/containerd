@@ -44,7 +44,7 @@ import (
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	imagedigest "github.com/opencontainers/go-digest"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -335,22 +335,21 @@ func generateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
 	if r.Options == nil {
 		return nil, nil
 	}
-	optionsTree, err := toml.TreeFromMap(r.Options)
+
+	b, err := toml.Marshal(r.Options)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %w", r.Type, err)
 	}
+
 	options := getRuntimeOptionsType(r.Type)
-	if err := optionsTree.Unmarshal(options); err != nil {
+	if err := toml.Unmarshal(b, options); err != nil {
 		return nil, err
 	}
 
 	// For generic configuration, if no config path specified (preserving old behavior), pass
 	// the whole TOML configuration section to the runtime.
 	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
-		runtimeOpts.ConfigBody, err = optionsTree.Marshal()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %v", r.Type, err)
-		}
+		runtimeOpts.ConfigBody = b
 	}
 
 	return options, nil
