@@ -36,6 +36,7 @@ VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION ?= $(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 PACKAGE=github.com/containerd/containerd
 SHIM_CGO_ENABLED ?= 0
+COMMIT=$(shell git rev-parse HEAD)
 
 ifneq "$(strip $(shell command -v $(GO) 2>/dev/null))" ""
 	GOOS ?= $(shell $(GO) env GOOS)
@@ -215,6 +216,9 @@ root-test: ## run tests, except integration tests
 integration: ## run integration tests
 	@echo "$(WHALE) $@"
 	@cd "${ROOTDIR}/integration/client" && $(GO) mod download && $(GOTEST) -v ${TESTFLAGS} -test.root -parallel ${TESTFLAGS_PARALLEL} .
+
+bench-integration: ## benchmarks 
+	@cd "${ROOTDIR}integration/benchmark" && rm -rf bin/ && $(GO) build -o bin/benchmarkTests main.go && ./bin/benchmarkTests $(COMMIT)
 
 # TODO integrate cri integration bucket with coverage
 bin/cri-integration.test:
