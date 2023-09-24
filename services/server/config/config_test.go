@@ -17,6 +17,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"sort"
@@ -115,7 +116,7 @@ root = "/var/lib/containerd"
 	assert.NoError(t, err)
 
 	var out Config
-	err = LoadConfig(path, &out)
+	err = LoadConfig(context.Background(), path, &out)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, out.Version)
 	assert.Equal(t, "/var/lib/containerd", out.Root)
@@ -147,7 +148,7 @@ disabled_plugins = ["io.containerd.v1.xyz"]
 	assert.NoError(t, err)
 
 	var out Config
-	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
+	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
@@ -175,7 +176,7 @@ imports = ["data1.toml", "data2.toml"]
 	assert.NoError(t, err)
 
 	var out Config
-	err = LoadConfig(filepath.Join(tempDir, "data1.toml"), &out)
+	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, out.Version)
@@ -203,7 +204,7 @@ version = 2
 	assert.NoError(t, err)
 
 	var out Config
-	err = LoadConfig(path, &out)
+	err = LoadConfig(context.Background(), path, &out)
 	assert.NoError(t, err)
 
 	pluginConfig := map[string]interface{}{}
@@ -225,6 +226,6 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	assert.NoError(t, err)
 
 	var out Config
-	err = LoadConfig(path, &out)
+	err = LoadConfig(context.Background(), path, &out)
 	assert.ErrorContains(t, err, "config version `1` is no longer supported")
 }

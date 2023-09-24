@@ -91,7 +91,7 @@ var configCommand = cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
-				if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(gocontext.Background(), context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
