@@ -21,6 +21,9 @@ import (
 	"context"
 	"io"
 	"time"
+
+	"github.com/containerd/containerd/mount"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // ApplyOptions provides additional options for an Apply operation
@@ -29,6 +32,10 @@ type ApplyOptions struct {
 	ConvertWhiteout ConvertWhiteout // Convert whiteout files
 	Parents         []string        // Parent directories to handle inherited attributes without CoW
 	NoSameOwner     bool            // NoSameOwner will not attempt to preserve the owner specified in the tar archive.
+
+	UsePreunpackedLayer bool               //Use for preunpacked
+	Desc                ocispec.Descriptor //Used for preunpacked
+	Mounts              []mount.Mount      //Used for preunpacked
 
 	applyFunc func(context.Context, string, io.Reader, ApplyOptions) (int64, error)
 }
@@ -72,6 +79,14 @@ func WithNoSameOwner() ApplyOpt {
 	}
 }
 
+// WithPreunpack uses preunpacked image layer
+func WithUsePreunpackedLayer() ApplyOpt {
+	return func(options *ApplyOptions) error {
+		options.UsePreunpackedLayer = true
+		return nil
+	}
+}
+
 // WithParents provides parent directories for resolving inherited attributes
 // directory from the filesystem.
 // Inherited attributes are searched from first to last, making the first
@@ -81,6 +96,32 @@ func WithNoSameOwner() ApplyOpt {
 func WithParents(p []string) ApplyOpt {
 	return func(options *ApplyOptions) error {
 		options.Parents = p
+		return nil
+	}
+}
+
+// WithDesc provides parent directories for resolving inherited attributes
+// directory from the filesystem.
+// Inherited attributes are searched from first to last, making the first
+// element in the list the most immediate parent directory.
+// NOTE: When applying to a filesystem which supports CoW, file attributes
+// should be inherited by the filesystem.
+func WithDesc(desc ocispec.Descriptor) ApplyOpt {
+	return func(options *ApplyOptions) error {
+		options.Desc = desc
+		return nil
+	}
+}
+
+// WithMounts provides parent directories for resolving inherited attributes
+// directory from the filesystem.
+// Inherited attributes are searched from first to last, making the first
+// element in the list the most immediate parent directory.
+// NOTE: When applying to a filesystem which supports CoW, file attributes
+// should be inherited by the filesystem.
+func WithMounts(mounts []mount.Mount) ApplyOpt {
+	return func(options *ApplyOptions) error {
+		options.Mounts = mounts
 		return nil
 	}
 }

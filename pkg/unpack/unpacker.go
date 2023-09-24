@@ -23,6 +23,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -474,14 +477,109 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			if err != nil && !errors.Is(err, images.ErrSkipDesc) {
 				return err
 			}
-			close(done[i])
+			defer close(done[i])
 
+			// IKEMA: Begin of change
+			// NOTE: need to potentially handle duplicate logic
+			// Step 1: Prepare directory for storing the unpacked layer and metadata
+			log.L.Debug("PREUNPACK: using preunpack logic with /var/lib/containerd/tmpoverlayfs/blobs/")
+			tmpOverlayfsFolder := "/var/lib/containerd/tmpoverlayfs/blobs/"
+			fsPreUnpackPath := filepath.Join(tmpOverlayfsFolder, desc.Digest.String())
+			log.L.Debug("PREUNPACK: fsPreUnpackPath " + fsPreUnpackPath)
+
+			if err := cleanupAndCreateTmpOverlayfsFolder(ctx, fsPreUnpackPath); err != nil {
+				return err
+			}
+
+			// Step 2: Confirm the compressed layer exists
+			blobFolder := "/var/lib/containerd/io.containerd.content.v1.content/blobs/sha256/"
+			blobPath := filepath.Join(blobFolder, desc.Digest.Encoded())
+			log.L.Debug("PREUNPACK: blobPath " + blobPath)
+			if blobInfo, err := os.Stat(blobPath); err != nil {
+				fmt.Println("Error finding stat blobPath:", err)
+				return err
+			} else if blobInfo.IsDir() {
+				return fmt.Errorf("blobPath %s should not be a directory", blobPath)
+			}
+
+			// Step 3: Execute the unpack step
+			cmdStr := fmt.Sprintf(
+				// Future: See ./archive/compression/compression.go on how to "using pigz for decompression"
+				//
+				// The decompressed data from unpigz -d -c blobPath is sent through tee, which splits the data into three separate streams:
+				// 1. To calculate and save its SHA-256 checksum in layer.checksum.
+				// 2. To count and save its size in bytes in layer.size.
+				// 3. To extract its contents using tar into the directory layer and also save the list of files processed to layer.list.
+				// Each of these operations occurs "in parallel," thanks to the pipeline and process substitutions, making the command quite efficient.
+				"unpigz -d -c %s | tee >(sha256sum > %s.checksum)  >(wc -c > %s.size) | tar xvf - -C %s > %s.list",
+				blobPath, fsPreUnpackPath, fsPreUnpackPath, fsPreUnpackPath, fsPreUnpackPath)
+
+			if err = execCommand(ctx, cmdStr); err != nil {
+				return err
+			}
+
+			cmdGenUnpack := fmt.Sprintf(
+				"cat %s.checksum %s.size %s.list > %s.unpack",
+				fsPreUnpackPath, fsPreUnpackPath, fsPreUnpackPath, fsPreUnpackPath)
+			if err = execCommand(ctx, cmdGenUnpack); err != nil {
+				return err
+			}
+
+			// IKEMA: End of change
 			return nil
 		})
 		layerSpan.End()
 	}
 
 	return eg.Wait()
+}
+
+func cleanupAndCreateTmpOverlayfsFolder(ctx context.Context, fsPreUnpackPath string) error {
+	// Clean up tmp file
+	if err := os.RemoveAll(fsPreUnpackPath); err != nil {
+		log.G(ctx).WithField("fsPreUnpackPath", fsPreUnpackPath).Error("failed to remove tmp folder")
+	}
+	// unpack is a concatenation of checksum, size and list
+	if err := os.RemoveAll(fsPreUnpackPath + ".unpack"); err != nil {
+		log.G(ctx).WithField("fsPreUnpackPath", fsPreUnpackPath).Error("failed to remove unpack")
+	}
+	if err := os.RemoveAll(fsPreUnpackPath + ".list"); err != nil {
+		log.G(ctx).WithField("fsPreUnpackPath", fsPreUnpackPath).Error("failed to remove list")
+	}
+	if err := os.RemoveAll(fsPreUnpackPath + ".checksum"); err != nil {
+		log.G(ctx).WithField("fsPreUnpackPath", fsPreUnpackPath).Error("failed to remove checksum")
+	}
+	if err := os.RemoveAll(fsPreUnpackPath + ".size"); err != nil {
+		log.G(ctx).WithField("fsPreUnpackPath", fsPreUnpackPath).Error("failed to remove size")
+	}
+	// If no having the folder, the createfile system call will return ENOENT
+	if err := mkdir(fsPreUnpackPath, 0755); err != nil {
+		// Check that still doesn't exist
+		dir, err1 := os.Lstat(fsPreUnpackPath)
+		if !(err1 == nil && dir.IsDir()) {
+			return err
+		}
+	}
+	return nil
+}
+
+func mkdir(path string, perm os.FileMode) error {
+	if err := os.MkdirAll(path, perm); err != nil {
+		return err
+	}
+	// Only final created directory gets explicit permission
+	// call to avoid permission mask
+	return os.Chmod(path, perm)
+}
+
+func execCommand(ctx context.Context, cmdStr string) error {
+	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+	out, err := cmd.Output()
+	if err != nil {
+		log.G(ctx).WithField("cmdStr", cmdStr).WithField("out", out).WithField("err", err).Info("Command failed")
+		return fmt.Errorf("Command failed: %s, out: %s, error: %s", cmdStr, out, err)
+	}
+	return nil
 }
 
 func (u *Unpacker) acquire(ctx context.Context) error {

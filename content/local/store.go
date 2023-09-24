@@ -128,6 +128,18 @@ func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.
 		return nil, fmt.Errorf("calculating blob path for ReaderAt: %w", err)
 	}
 
+	// TODO (ikema): refactor this to a preunpacked store
+	// BEGIN OF PREUNPACK READING
+	tmpOverlayfsFolder := "/var/lib/containerd/tmpoverlayfs/blobs/"
+	fsPreUnpackPath := tmpOverlayfsFolder + desc.Digest.String() + ".unpack"
+	bpInfo, err := os.Stat(fsPreUnpackPath)
+	if err == nil && !bpInfo.IsDir() {
+		log.G(ctx).Infof("PREUNPACK [CONTENT] path before: %s", p)
+		p = fsPreUnpackPath
+		log.G(ctx).Infof("PREUNPACK [CONTENT] path after: %s", p)
+	}
+	// END OF PREUNPACK READING
+
 	reader, err := OpenReader(p)
 	if err != nil {
 		return nil, fmt.Errorf("blob %s expected at %s: %w", desc.Digest, p, err)

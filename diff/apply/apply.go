@@ -17,16 +17,19 @@
 package apply
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -73,48 +76,89 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 	}
 	defer ra.Close()
 
-	var processors []diff.StreamProcessor
-	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
-	processors = append(processors, processor)
-	for {
-		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
-			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
-		}
-		processors = append(processors, processor)
-		if processor.MediaType() == ocispec.MediaTypeImageLayer {
-			break
-		}
+	//TODO (ikema): Change this into a processor
+	// Validate the .unpack file format
+	// Line 1: sha256sum
+	// Line 2: Size
+	// Line 3+: diff list
+	scanner := bufio.NewScanner(content.NewReader(ra))
+	var sha256sum string
+	if scanner.Scan() {
+		sha256sum = scanner.Text()
+		sha256sum = strings.Split(sha256sum, " ")[0]
+	} else {
+		return emptyDesc, fmt.Errorf("no sha256 in .unpack")
 	}
-	defer processor.Close()
-
-	digester := digest.Canonical.Digester()
-	rc := &readCounter{
-		r: io.TeeReader(processor, digester.Hash()),
+	var tarSize int
+	if scanner.Scan() {
+		tarSize, err = strconv.Atoi(scanner.Text())
+		if err != nil {
+			return emptyDesc, err
+		}
+	} else {
+		return emptyDesc, fmt.Errorf("no tarSize in .unpack")
 	}
 
-	if err := apply(ctx, mounts, rc); err != nil {
+	rb, err := s.store.ReaderAt(ctx, desc)
+	if err != nil {
+		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
+	}
+	defer rb.Close()
+
+	if err := applyPreunpacked(ctx, mounts, content.NewReader(rb), desc); err != nil {
 		return emptyDesc, err
 	}
 
-	// Read any trailing data
-	if _, err := io.Copy(io.Discard, rc); err != nil {
-		return emptyDesc, err
-	}
-
-	for _, p := range processors {
-		if ep, ok := p.(interface {
-			Err() error
-		}); ok {
-			if err := ep.Err(); err != nil {
-				return emptyDesc, err
-			}
-		}
-	}
 	return ocispec.Descriptor{
 		MediaType: ocispec.MediaTypeImageLayer,
-		Size:      rc.c,
-		Digest:    digester.Digest(),
+		Size:      int64(tarSize),
+		Digest:    digest.NewDigestFromEncoded(digest.SHA256, sha256sum),
 	}, nil
+
+	/*
+		var processors []diff.StreamProcessor
+		processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
+		processors = append(processors, processor)
+		for {
+			if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
+				return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
+			}
+			processors = append(processors, processor)
+			if processor.MediaType() == ocispec.MediaTypeImageLayer {
+				break
+			}
+		}
+		defer processor.Close()
+
+		digester := digest.Canonical.Digester()
+		rc := &readCounter{
+			r: io.TeeReader(processor, digester.Hash()),
+		}
+
+		if err := apply(ctx, mounts, rc); err != nil {
+			return emptyDesc, err
+		}
+
+		// Read any trailing data
+		if _, err := io.Copy(io.Discard, rc); err != nil {
+			return emptyDesc, err
+		}
+
+		for _, p := range processors {
+			if ep, ok := p.(interface {
+				Err() error
+			}); ok {
+				if err := ep.Err(); err != nil {
+					return emptyDesc, err
+				}
+			}
+		}
+		return ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Size:      rc.c,
+			Digest:    digester.Digest(),
+		}, nil
+	*/
 }
 
 type readCounter struct {

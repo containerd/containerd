@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/userns"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
@@ -54,6 +55,39 @@ func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
 	}
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
+		return err
+	})
+}
+
+// apply preunpacked stuff
+func applyPreunpacked(ctx context.Context, mounts []mount.Mount, r io.Reader, desc ocispec.Descriptor) error {
+	switch {
+	case len(mounts) == 1 && mounts[0].Type == "overlay":
+		// OverlayConvertWhiteout (mknod c 0 0) doesn't work in userns.
+		// https://github.com/containerd/containerd/issues/3762
+		if userns.RunningInUserNS() {
+			break
+		}
+		path, parents, err := getOverlayPath(mounts[0].Options)
+		if err != nil {
+			if errdefs.IsInvalidArgument(err) {
+				break
+			}
+			return err
+		}
+		opts := []archive.ApplyOpt{
+			archive.WithConvertWhiteout(archive.OverlayConvertWhiteout),
+			archive.WithDesc(desc), archive.WithMounts(mounts),
+			archive.WithUsePreunpackedLayer(),
+		}
+		if len(parents) > 0 {
+			opts = append(opts, archive.WithParents(parents))
+		}
+		_, err = archive.Apply(ctx, path, r, opts...)
+		return err
+	}
+	return mount.WithTempMount(ctx, mounts, func(root string) error {
+		_, err := archive.Apply(ctx, root, r, archive.WithDesc(desc), archive.WithMounts(mounts), archive.WithUsePreunpackedLayer())
 		return err
 	})
 }
