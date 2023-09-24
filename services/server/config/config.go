@@ -17,6 +17,7 @@
 package config
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/log"
 )
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
@@ -196,7 +198,7 @@ func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
 }
 
 // LoadConfig loads the containerd server config from the provided path
-func LoadConfig(path string, out *Config) error {
+func LoadConfig(ctx context.Context, path string, out *Config) error {
 	if out == nil {
 		return fmt.Errorf("argument out must not be nil: %w", errdefs.ErrInvalidArgument)
 	}
@@ -214,7 +216,7 @@ func LoadConfig(path string, out *Config) error {
 			continue
 		}
 
-		config, err := loadConfigFile(path)
+		config, err := loadConfigFile(ctx, path)
 		if err != nil {
 			return err
 		}
@@ -246,7 +248,7 @@ func LoadConfig(path string, out *Config) error {
 }
 
 // loadConfigFile decodes a TOML file at the given path
-func loadConfigFile(path string) (*Config, error) {
+func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	config := &Config{}
 
 	f, err := os.Open(path)
@@ -255,9 +257,40 @@ func loadConfigFile(path string) (*Config, error) {
 	}
 	defer f.Close()
 
-	// TODO: Add DisallowUnknownFields, requires better testing and bubbling errors
-	if err := toml.NewDecoder(f).Decode(config); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
+	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
+		var serr *toml.StrictMissingError
+		if errors.As(err, &serr) {
+			for _, derr := range serr.Errors {
+				row, col := derr.Position()
+				log.G(ctx).WithFields(log.Fields{
+					"file":   path,
+					"row":    row,
+					"column": col,
+					"key":    strings.Join(derr.Key(), " "),
+				}).WithError(err).Warn("Ignoring unknown key in TOML")
+			}
+
+			// Try decoding again with unknown fields
+			config = &Config{}
+			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
+			}
+			err = toml.NewDecoder(f).Decode(config)
+		}
+		if err != nil {
+			var derr *toml.DecodeError
+			if errors.As(err, &derr) {
+				row, column := derr.Position()
+				log.G(ctx).WithFields(log.Fields{
+					"file":   path,
+					"row":    row,
+					"column": column,
+				}).WithError(err).Error("Failure unmarshaling TOML")
+				return nil, fmt.Errorf("failed to unmarshal TOML at row %d column %d: %w", row, column, err)
+			}
+			return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
+		}
+
 	}
 
 	return config, nil
