@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // DefaultConfig returns default configurations of cri plugin.
@@ -53,7 +53,9 @@ func DefaultConfig() PluginConfig {
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
 `
-	tree, _ := toml.Load(defaultRuncV2Opts)
+	var m map[string]interface{}
+	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
+
 	return PluginConfig{
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:        "/opt/cni/bin",
@@ -68,7 +70,7 @@ func DefaultConfig() PluginConfig {
 			Runtimes: map[string]Runtime{
 				"runc": {
 					Type:        "io.containerd.runc.v2",
-					Options:     tree.ToMap(),
+					Options:     m,
 					SandboxMode: string(ModePodSandbox),
 				},
 			},

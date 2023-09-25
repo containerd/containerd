@@ -20,7 +20,6 @@ package config
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -28,14 +27,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
+	tomlu "github.com/pelletier/go-toml/v2/unstable"
 )
 
 // UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
@@ -323,17 +322,13 @@ type hostFileConfig struct {
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
-	tree, err := toml.LoadBytes(b)
+	orderedHosts, err := getSortedHosts(b)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse TOML: %w", err)
+		return nil, err
 	}
 
-	// HACK: we want to keep toml parsing structures private in this package, however go-toml ignores private embedded types.
-	// so we remap it to a public type within the func body, so technically it's public, but not possible to import elsewhere.
-	type HostFileConfig = hostFileConfig
-
 	c := struct {
-		HostFileConfig
+		hostFileConfig
 		// Server specifies the default server. When `host` is
 		// also specified, those hosts are tried first.
 		Server string `toml:"server"`
@@ -341,16 +336,11 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 		HostConfigs map[string]hostFileConfig `toml:"host"`
 	}{}
 
-	orderedHosts, err := getSortedHosts(tree)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
 		hosts []hostConfig
 	)
 
-	if err := tree.Unmarshal(&c); err != nil {
+	if err := toml.Unmarshal(b, &c); err != nil {
 		return nil, err
 	}
 
@@ -366,7 +356,7 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	}
 
 	// Parse root host config and append it as the last element
-	parsed, err := parseHostConfig(c.Server, baseDir, c.HostFileConfig)
+	parsed, err := parseHostConfig(c.Server, baseDir, c.hostFileConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -491,24 +481,41 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	return result, nil
 }
 
-// getSortedHosts returns the list of hosts as they defined in the file.
-func getSortedHosts(root *toml.Tree) ([]string, error) {
-	iter, ok := root.Get("host").(*toml.Tree)
-	if !ok {
-		return nil, errors.New("invalid `host` tree")
+// getSortedHosts returns the list of hosts in the order are they defined in the file.
+func getSortedHosts(b []byte) ([]string, error) {
+	var hostsInOrder []string
+
+	// Use toml unstable package for directly parsing toml
+	// See https://github.com/pelletier/go-toml/discussions/801#discussioncomment-7083586
+	p := tomlu.Parser{}
+	p.Reset(b)
+
+	var host string
+	// iterate over all top level expressions
+	for p.NextExpression() {
+		e := p.Expression()
+
+		if e.Kind != tomlu.Table {
+			continue
+		}
+
+		// Let's look at the key. It's an iterator over the multiple dotted parts of the key.
+		var parts []string
+		for it := e.Key(); it.Next(); {
+			parts = append(parts, string(it.Node().Data))
+		}
+
+		// only consider keys that look like `hosts.XXX`
+		// and skip subtables such as `hosts.XXX.header`
+		if len(parts) < 2 || parts[0] != "host" || parts[1] == host {
+			continue
+		}
+
+		host = parts[1]
+		hostsInOrder = append(hostsInOrder, host)
 	}
 
-	list := append([]string{}, iter.Keys()...)
-
-	// go-toml stores TOML sections in the map object, so no order guaranteed.
-	// We retrieve line number for each key and sort the keys by position.
-	sort.Slice(list, func(i, j int) bool {
-		h1 := iter.GetPath([]string{list[i]}).(*toml.Tree)
-		h2 := iter.GetPath([]string{list[j]}).(*toml.Tree)
-		return h1.Position().Line < h2.Position().Line
-	})
-
-	return list, nil
+	return hostsInOrder, nil
 }
 
 // makeStringSlice is a helper func to convert from []interface{} to []string.

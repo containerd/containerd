@@ -24,7 +24,7 @@ import (
 	"os"
 
 	"github.com/docker/go-units"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 )
 
 // Config represents device mapper configuration loaded from file.
@@ -55,21 +55,19 @@ type Config struct {
 
 // LoadConfig reads devmapper configuration file from disk in TOML format
 func LoadConfig(path string) (*Config, error) {
-	if _, err := os.Stat(path); err != nil {
+	f, err := os.Open(path)
+	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, os.ErrNotExist
 		}
 
 		return nil, err
+
 	}
+	defer f.Close()
 
 	config := Config{}
-	file, err := toml.LoadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open devmapepr TOML: %s: %w", path, err)
-	}
-
-	if err := file.Unmarshal(&config); err != nil {
+	if err := toml.NewDecoder(f).Decode(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal devmapper TOML: %w", err)
 	}
 

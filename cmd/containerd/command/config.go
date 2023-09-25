@@ -18,7 +18,6 @@ package command
 
 import (
 	gocontext "context"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -28,28 +27,12 @@ import (
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pelletier/go-toml"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/urfave/cli"
 )
 
-// Config is a wrapper of server config for printing out.
-type Config struct {
-	*srvconfig.Config
-	// Plugins overrides `Plugins map[string]toml.Tree` in server config.
-	Plugins map[string]interface{} `toml:"plugins"`
-}
-
-// WriteTo marshals the config to the provided writer
-func (c *Config) WriteTo(w io.Writer) (int64, error) {
-	return 0, toml.NewEncoder(w).Encode(c)
-}
-
-func outputConfig(cfg *srvconfig.Config) error {
-	config := &Config{
-		Config: cfg,
-	}
-
-	plugins, err := server.LoadPlugins(gocontext.Background(), config.Config)
+func outputConfig(config *srvconfig.Config) error {
+	plugins, err := server.LoadPlugins(gocontext.Background(), config)
 	if err != nil {
 		return err
 	}
@@ -83,13 +66,9 @@ func outputConfig(cfg *srvconfig.Config) error {
 	// when a config without a version is loaded from disk and has no version
 	// set, we assume it's a v1 config.  But when generating new configs via
 	// this command, generate the v2 config
-	config.Config.Version = 2
+	config.Version = 2
 
-	// remove overridden Plugins type to avoid duplication in output
-	config.Config.Plugins = nil
-
-	_, err = config.WriteTo(os.Stdout)
-	return err
+	return toml.NewEncoder(os.Stdout).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {
@@ -112,7 +91,7 @@ var configCommand = cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
-				if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(gocontext.Background(), context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 

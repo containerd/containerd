@@ -121,7 +121,7 @@ can be used and modified as necessary as a custom configuration.`
 		configPath := context.GlobalString("config")
 		_, err := os.Stat(configPath)
 		if !os.IsNotExist(err) || context.GlobalIsSet("config") {
-			if err := srvconfig.LoadConfig(configPath, config); err != nil {
+			if err := srvconfig.LoadConfig(ctx, configPath, config); err != nil {
 				return err
 			}
 		}

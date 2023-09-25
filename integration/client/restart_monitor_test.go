@@ -60,7 +60,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		t.Fatal(err)
 	}
 
-	if err := srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
+	if err := srvconfig.LoadConfig(context.TODO(), configTOMLFile, &configTOMLDecoded); err != nil {
 		t.Fatal(err)
 	}
 
