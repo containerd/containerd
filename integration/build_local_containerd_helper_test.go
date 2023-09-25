@@ -96,7 +96,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
-			pc, err := config.Decode(p)
+			pc, err := config.Decode(ctx, p)
 			assert.NoError(t, err)
 
 			initContext.Config = pc
