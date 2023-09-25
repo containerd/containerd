@@ -201,6 +201,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for _, r := range config.RequiredPlugins {
 		required[r] = struct{}{}
 	}
+
 	for _, p := range plugins {
 		id := p.URI()
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
@@ -218,7 +219,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
-			pc, err := config.Decode(p)
+			pc, err := config.Decode(ctx, p)
 			if err != nil {
 				return nil, err
 			}
