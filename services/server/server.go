@@ -202,6 +202,16 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		required[r] = struct{}{}
 	}
 
+	if config.Version < srvconfig.CurrentConfigVersion {
+		for _, p := range plugins {
+			if p.ConfigMigration != nil {
+				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	for _, p := range plugins {
 		id := p.URI()
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
