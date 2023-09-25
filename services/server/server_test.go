@@ -17,8 +17,10 @@
 package server
 
 import (
+	"context"
 	"testing"
 
+	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,4 +54,95 @@ func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
 		State: statePath,
 	})
 	assert.EqualError(t, err, "root must be specified")
+}
+
+func TestMigration(t *testing.T) {
+	plugin.Reset()
+	defer plugin.Reset()
+
+	version := srvconfig.CurrentConfigVersion - 1
+
+	type testConfig struct {
+		Migrated    string `toml:"migrated"`
+		NotMigrated string `toml:"notmigrated"`
+	}
+
+	plugin.Register(&plugin.Registration{
+		Type:   "io.containerd.test",
+		ID:     "t1",
+		Config: &testConfig{},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			c, ok := ic.Config.(*testConfig)
+			if !ok {
+				t.Error("expected first plugin to have configuration")
+			} else {
+				if c.Migrated != "" {
+					t.Error("expected first plugin to have empty value for migrated config")
+				}
+				if c.NotMigrated != "don't migrate me" {
+					t.Errorf("expected first plugin does not have correct value for not migrated config: %q", c.NotMigrated)
+				}
+			}
+			return nil, nil
+		},
+	})
+	plugin.Register(&plugin.Registration{
+		Type: "io.containerd.new",
+		Requires: []plugin.Type{
+			"io.containerd.test", // Ensure this test runs second
+		},
+		ID:     "t2",
+		Config: &testConfig{},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			c, ok := ic.Config.(*testConfig)
+			if !ok {
+				t.Error("expected second plugin to have configuration")
+			} else {
+				if c.Migrated != "migrate me" {
+					t.Errorf("expected second plugin does not have correct value for migrated config: %q", c.Migrated)
+				}
+				if c.NotMigrated != "" {
+					t.Error("expected second plugin to have empty value for not migrated config")
+				}
+			}
+			return nil, nil
+		},
+		ConfigMigration: func(ctx context.Context, v int, plugins map[string]interface{}) error {
+			if v != version {
+				t.Errorf("unxpected version: %d", v)
+			}
+			t1, ok := plugins["io.containerd.test.t1"]
+			if !ok {
+				t.Error("plugin not set as expected")
+				return nil
+			}
+			conf, ok := t1.(map[string]interface{})
+			if !ok {
+				t.Errorf("unexpected config value: %v", t1)
+				return nil
+			}
+			newconf := map[string]interface{}{
+				"migrated": conf["migrated"],
+			}
+			delete(conf, "migrated")
+			plugins["io.containerd.new.t2"] = newconf
+
+			return nil
+		},
+	})
+
+	config := &srvconfig.Config{}
+	config.Version = version
+	config.Plugins = map[string]interface{}{
+		"io.containerd.test.t1": map[string]interface{}{
+			"migrated":    "migrate me",
+			"notmigrated": "don't migrate me",
+		},
+	}
+
+	ctx := context.Background()
+	_, err := New(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
