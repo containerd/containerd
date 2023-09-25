@@ -17,6 +17,7 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -116,6 +117,15 @@ type Registration struct {
 	InitFn func(*InitContext) (interface{}, error)
 	// Disable the plugin from loading
 	Disable bool
+
+	// ConfigMigration allows a plugin to migrate configurations from an older
+	// version to handle plugin renames or moving of features from one plugin
+	// to another in a later version.
+	// The configuration map is keyed off the plugin name and the value
+	// is the configuration for that objects, with the structure defined
+	// for the plugin. No validation is done on the value before performing
+	// the migration.
+	ConfigMigration func(context.Context, int, map[string]interface{}) error
 }
 
 // Init the registered plugin
@@ -180,6 +190,13 @@ func Register(r *Registration) {
 	}
 
 	register.r = append(register.r, r)
+}
+
+// Reset removes all global registrations
+func Reset() {
+	register.Lock()
+	defer register.Unlock()
+	register.r = nil
 }
 
 func checkUnique(r *Registration) error {
