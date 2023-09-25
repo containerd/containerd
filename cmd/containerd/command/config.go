@@ -33,12 +33,14 @@ import (
 )
 
 func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
-	plugins, err := server.LoadPlugins(gocontext.Background(), config)
+	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
 	}
 	if len(plugins) != 0 {
-		config.Plugins = make(map[string]interface{})
+		if config.Plugins == nil {
+			config.Plugins = make(map[string]interface{})
+		}
 		for _, p := range plugins {
 			if p.Config == nil {
 				continue
@@ -69,7 +71,7 @@ func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 	// this command, generate the max configuration version
 	config.Version = srvconfig.CurrentConfigVersion
 
-	return toml.NewEncoder(os.Stdout).Encode(config)
+	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {
