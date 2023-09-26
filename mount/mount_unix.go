@@ -30,6 +30,12 @@ func UnmountRecursive(target string, flags int) error {
 	if target == "" {
 		return nil
 	}
+
+	target, err := CanonicalizePath(target)
+	if err != nil {
+		return err
+	}
+
 	mounts, err := mountinfo.GetMounts(mountinfo.PrefixFilter(target))
 	if err != nil {
 		return err
