@@ -254,7 +254,7 @@ func Config(ctx context.Context, provider content.Provider, image ocispec.Descri
 	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
-	return manifest.Config, err
+	return manifest.Config, nil
 }
 
 // Platforms returns one or more platforms supported by the image.
