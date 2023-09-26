@@ -17,6 +17,7 @@
 package config
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -177,21 +178,33 @@ type ProxyPlugin struct {
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
-func (c *Config) Decode(p *plugin.Registration) (interface{}, error) {
+func (c *Config) Decode(ctx context.Context, p *plugin.Registration) (interface{}, error) {
 	id := p.URI()
 	data, ok := c.Plugins[id]
 	if !ok {
 		return p.Config, nil
 	}
-	r, w := io.Pipe()
-	go func() {
-		err := toml.NewEncoder(w).Encode(data)
-		w.CloseWithError(err)
-	}()
 
-	// TODO: Add DisallowUnknownFields, requires better testing and bubbling errors
-	if err := toml.NewDecoder(r).Decode(p.Config); err != nil {
+	b, err := toml.Marshal(data)
+	if err != nil {
 		return nil, err
+	}
+
+	if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(p.Config); err != nil {
+		var serr *toml.StrictMissingError
+		if errors.As(err, &serr) {
+			for _, derr := range serr.Errors {
+				log.G(ctx).WithFields(log.Fields{
+					"plugin": id,
+					"key":    strings.Join(derr.Key(), " "),
+				}).WithError(err).Warn("Ignoring unknown key in TOML for plugin")
+			}
+			err = toml.Unmarshal(b, p.Config)
+		}
+		if err != nil {
+			return nil, err
+		}
+
 	}
 
 	return p.Config, nil

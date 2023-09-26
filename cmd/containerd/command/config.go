@@ -31,7 +31,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func outputConfig(config *srvconfig.Config) error {
+func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 	plugins, err := server.LoadPlugins(gocontext.Background(), config)
 	if err != nil {
 		return err
@@ -43,7 +43,7 @@ func outputConfig(config *srvconfig.Config) error {
 				continue
 			}
 
-			pc, err := config.Decode(p)
+			pc, err := config.Decode(ctx, p)
 			if err != nil {
 				return err
 			}
@@ -83,7 +83,7 @@ var configCommand = cli.Command{
 			Name:  "default",
 			Usage: "See the output of the default config",
 			Action: func(context *cli.Context) error {
-				return outputConfig(defaultConfig())
+				return outputConfig(gocontext.Background(), defaultConfig())
 			},
 		},
 		{
@@ -91,11 +91,12 @@ var configCommand = cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
-				if err := srvconfig.LoadConfig(gocontext.Background(), context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				ctx := gocontext.Background()
+				if err := srvconfig.LoadConfig(ctx, context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
-				return outputConfig(config)
+				return outputConfig(ctx, config)
 			},
 		},
 	},
