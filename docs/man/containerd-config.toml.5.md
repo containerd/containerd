@@ -110,6 +110,15 @@ documentation.
     for cache and memory bandwidth management.
     See [RDT configuration](https://github.com/intel/goresctrl/blob/main/doc/rdt.md#configuration)
     for details of the file format.
+- **[plugins."io.containerd.grpc.v1.cri".containerd]** contains options for the CRI plugin, and child nodes for CRI options:
+  - **default_runtime_name** (Default: **"runc"**) specifies the default runtime name
+- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]** one or more container runtimes, each with a unique name
+- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>]** a runtime named `<runtime>`
+- **[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]** options for the named `<runtime>`, most important:
+  -  **BinaryName** specifies the path to the actual runtime to be invoked by the shim, e.g. `"/usr/bin/runc"`
+
+
+
 
 **oom_score**
 : The out of memory (OOM) score applied to the containerd daemon process (Default: 0)
@@ -151,7 +160,9 @@ the main config.
 - **path** (Default: "") Path or name of the binary
 - **args** (Default: "[]") Args to the binary
 
-## EXAMPLE
+## EXAMPLES
+
+### Complete Configuration
 
 The following is a complete **config.toml** default configuration example:
 
@@ -199,6 +210,52 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
     blockio_config_file = ""
     rdt_config_file = ""
 ```
+
+### Multiple Runtimes
+
+The following is an example partial configuraton with two runtimes:
+
+```toml
+[plugins]
+
+  [plugins."io.containerd.grpc.v1.cri"]
+
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runc"
+
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+          privileged_without_host_devices = false
+          runtime_type = "io.containerd.runc.v2"
+
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+           BinaryName = "/usr/bin/runc"
+
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other]
+          privileged_without_host_devices = false
+          runtime_type = "io.containerd.runc.v2"
+
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other.options]
+            BinaryName = "/usr/bin/path-to-runtime"
+```
+
+The above creates two named runtime configurations - named `runc` and `other` - and sets the default runtime to `runc`.
+The above are used _solely_ for runtimes invoked via CRI. To use the non-default "other" runtime in this example,
+a spec will include the runtime handler named "other" to specify the desire to use the named runtime config.
+
+The CRI specification includes a [`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476), which will reference the named runtime.
+
+It is important to note the naming convention. Runtimes are under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes]`,
+with each runtime given a unique name, e.g. `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]`.
+In addition, each runtime can have shim-specific options under `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.<runtime>.options]`,
+for example, `[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]`.
+
+The `io.containerd.runc.v2` runtime is used to run OCI-compatible runtimes on Linux, such as runc.  In the example above, the `runtime_type`
+field specifies the shim to use (`io.containerd.runc.v2`) while the `BinaryName` field is a shim-specific option which specifies the path to the
+OCI runtime.
+
+For the example configuration named "runc", the shim will launch `/usr/bin/runc` as the OCI runtime.  For the example configuration named
+"other", the shim will launch `/usr/bin/path-to-runtime` instead.
 
 ## BUGS
 

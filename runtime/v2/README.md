@@ -1,29 +1,182 @@
 # Runtime v2
 
 Runtime v2 introduces a first class shim API for runtime authors to integrate with containerd.
-The shim API is minimal and scoped to the execution lifecycle of a container.
 
-## Binary Naming
+containerd, the daemon, does not directly launch containers. Instead, it acts as a higher-level manager
+or hub for coordinating the activities of containers and content, that lower-level
+programs, called "runtimes", actually implement to start, stop and manage containers,
+either individual containers or groups of containers, e.g. Kubernetes pods.
 
-Users specify the runtime they wish to use when creating a container.
+For example, containerd will retrieve container image config and its content as layers, use the snapshotter to lay it out on disk, set up
+the container's rootfs and config, and then launch a runtime that will create/start/stop the container.
+
+This document describes the major components of the v2 runtime integration model, how the components interact
+with containerd and the v2 runtime, and how to use and integrate different v2 runtimes.
+
+To simplify the interaction, runtime v2 introduced a first class v2 API for runtime authors to integrate with containerd,
+replacing the v1 API.
+The v2 API is minimal and scoped to the execution lifecycle of a container.
+
+This document is split into the following sections:
+
+* [architecture](#architecture) - the major components, their purposes and relationships
+* [usage](#usage) - how to invoke specific runtimes, and how to configure them
+* [authoring](#shim-authoring) - how to author a v2 runtime
+
+## Architecture
+
+### containerd-runtime communication
+
+containerd expects a runtime to implement several container control features, such as create, start and stop.
+
+The high-level flow is as follows:
+
+1. client requests from containerd to create a container
+1. containerd lays out the container's filesystem, and creates the necessary config information
+1. containerd invokes the runtime over an API to create/start/stop the container
+
+However, containerd itself does not actually directly invoke the runtime to start the container.
+Instead it expects to invoke the runtime, which will expose a socket - Unix-domain on Unix-like systems, named pipe on Windows -
+and listen for container commands via [ttRPC](https://github.com/containerd/ttrpc) over that
+socket.
+
+The runtime is expected to process those operations. How it does so is entirely within the scope of the runtime implementation.
+Two common patterns are:
+
+* a single binary for runtime that both listens on the socket and creates/starts/stops the container
+* a separate shim binary that listens on the socket, and invokes a separate runtime engine that creates/starts/stops the container
+
+The separate "shim+engine" pattern is used because it makes it easier to integrate distinct runtimes implementing a specific runtime
+engine spec, such as the [OCI runtime spec](https://github.com/opencontainers/runtime-spec).
+The ttRPC protocol can be handled via one runtime shim, while distinct runtime engine implementations can
+be used, as long as they implement the OCI runtime spec.
+
+The most commonly used runtime _engine_ is [runc](https://github.com/opencontainers/runc), which implements the
+[OCI runtime spec](https://github.com/opencontainers/runtime-spec). As this is a runtime _engine_, it is not
+invoked directly by containerd; instead, it is invoked by a shim, which listens on the socket and invokes the runtime engine.
+
+#### shim+engine Architecture
+
+##### runtime shim
+
+The runtime shim is what actually is invoked by containerd. It has minimal options on start beyond
+being provided the communications port for containerd and some configuration information.
+
+The runtime shim listens on the socket for ttRPC commands from containerd, and then invokes a separate program,
+the runtime engine, via `fork`/`exec` to run the container. For example, the `io.containerd.runc.v2` shim invokes
+an OCI compliant runtime engine such as `runc`.
+
+containerd passes options to the shim over the ttRPC connection, which may include the runtime engine binary
+to invoke. These are the `options` for the [`CreateTaskRequest`](https://github.com/containerd/containerd/blob/main/runtime/v2/README.md#container-level-shim-configuration).
+
+For example, the `io.containerd.runc.v2` shim supports including the path to the runtime engine binary.
+
+##### runtime engine
+
+The runtime engine itself is what actually starts and stops the container.
+
+For example, in the case of [runc](https://github.com/opencontainers/runc), the containerd project provides the shim
+as the executable `containerd-shim-runc-v2`. This is invoked by containerd and starts the ttRPC listener.
+
+The shim then invokes the actual `runc` binary, passing it the container configuration, and the `runc` binary
+creates/starts/stops the container typically via `libcontainer`->system apis.
+
+#### shim+engine Relationship
+
+Since each shim instance communicates with containerd as a daemon, while parenting containers via invoking independent runtimes,
+it is possible to have one shim for multiple containers and invocations. For example,
+you could have one `containerd-shim-runc-v2` communicating with one containerd, and it can
+invoke ten distinct containers.
+
+It even is possible to have one shim for multiple containers, each with its own actual runtime,
+since, as described above, the runtime binary is passed as one of the options in `CreateTaskRequest`.
+
+containerd does not know or care about whether the shim to container relationship is one-to-one,
+or one-to-many. It is entirely up to the shim to decide. For example, the `io.containerd.runc.v2` shim
+automatically groups based on the presence of
+[labels](https://github.com/containerd/containerd/blob/b30e0163ac36c1a193604e5eca031053d62019c5/runtime/v2/runc/manager/manager_linux.go#L54-L60). In practice, this means that containers launched by Kubernetes, that are part of the same Kubernetes pod, are handled by a single
+shim, grouping on the `io.kubernetes.cri.sandbox-id` label set by the CRI plugin.
+
+The flow, then, is as follows:
+
+1. containerd receives a request to create a container
+1. containerd lays out the container's filesystem, and creates the necessary [container config](https://github.com/opencontainers/image-spec/blob/main/config.md) information
+1. containerd invokes the shim, including container configuration, which uses that information to decide whether to launch a new socket listener (1:1 shim to container) or use an existing one (1:many)
+   * if existing, return the address of the existing socket and exit
+   * if new, the shim:
+	 1. creates a new process to listen on a socket for ttRPC commands from containerd
+	 1. returns the address to that socket to containerd
+	 1. exits
+1. containerd sends the shim a command to start the container
+1. The shim invokes `runc` to create/start/stop the container
+
+An excellent flow diagram is available later in this document under [Flow](#Flow).
+
+## Usage
+
+### Invoking Runtimes
+
+A runtime - single instance or shim+engine - and its options, can be selected when creating a container via one of the exposed
+containerd services (containerd client, CRI API,...), or via a client that calls into the containerd provided services.
+Examples of containerd clients include `ctr`, `nerdctl`, kubernetes, docker/moby, rancher and others.
+
 The runtime can also be changed via a container update.
 
-```bash
-> ctr run --runtime io.containerd.runc.v2
-```
+The runtime name that is passed is a string that is used to identify the runtime to containerd. In the case of separate shim+engine,
+this will be the runtime _shim_. Either way, this is the binary that containerd executes and expects to start the ttRPC listener.
+The runtime name can be either a URI-like string, or, beginning with containerd 1.6.0, the actual path to the executable.
 
-When a user specifies a runtime name, `io.containerd.runc.v2`, they will specify the name and version of the runtime.
-This will be translated by containerd into a binary name for the shim.
+1. If the runtime name is a path, use that as the actual path to the runtime to invoke.
+1. If the runtime name is URI-like, convert it to a runtime name using the below logic.
 
-`io.containerd.runc.v2` -> `containerd-shim-runc-v2`
+If the runtime name is URI-like, containerd will convert the passed runtime from the URI-like name to a binary name using the following logic:
 
-Since 1.6 release, it's also possible to specify absolute runtime path:
+1. Replaces all `.` with `-`
+1. Takes the last 2 components, e.g. `runc.v2`
+1. Prepends `containerd-shim`
 
-```bash
-> ctr run --runtime /usr/local/bin/containerd-shim-runc-v2
-```
+For example, if the runtime name is `io.containerd.runc.v2`, containerd will invoke the shim as `containerd-shim-runc-v2`. It expects to
+find the binary in its normal `PATH`.
 
 containerd keeps the `containerd-shim-*` prefix so that users can `ps aux | grep containerd-shim` to see running shims on their system.
+
+For example:
+
+```bash
+$ ctr --runtime io.containerd.runc.v2 run --rm docker.io/library/alpine:latest alpine
+```
+
+Will invoke `containerd-shim-runc-v2`.
+
+You can test this by trying another name:
+
+```bash
+$ ctr run --runtime=io.foo.bar.runc2.v2.baz --rm docker.io/library/hello-world:latest hello-world /hello
+ctr: failed to start shim: failed to resolve runtime path: runtime "io.foo.bar.runc2.v2.baz" binary not installed "containerd-shim-v2-baz": file does not exist: unknown
+```
+
+It received `io.foo.bar.runc2.v2.baz` and looked for `containerd-shim-v2-baz`.
+
+You also can override the default configured runtime for the shim, by passing it the `--runc-binary`
+option. For example"
+
+```
+ctr --runtime io.containerd.runc.v2 --runc-binary /usr/local/bin/runc-custom run --rm docker.io/library/alpine:latest alpine
+```
+
+### Configuring Runtimes
+
+You can configure one or more runtimes in containerd's `config.toml` configuration file, by modifying the
+section:
+
+```toml
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+```
+
+See [config.toml man page](../../docs/man/containerd-config.toml.5.md) for more details and an example.
+
+These "named runtimes" in the configuration file are used solely when invoked via CRI, which has a
+[`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476).
 
 ## Shim Authoring
 
