@@ -41,9 +41,7 @@ const LegacyConfigMediaType = "application/octet-stream"
 // 1. original manifest will be deleted by next gc round.
 // 2. don't cover manifest list.
 func ConvertManifest(ctx context.Context, store content.Store, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
-	if !(desc.MediaType == images.MediaTypeDockerSchema2Manifest ||
-		desc.MediaType == ocispec.MediaTypeImageManifest) {
-
+	if !images.IsManifestType(desc.MediaType) {
 		log.G(ctx).Warnf("do nothing for media type: %s", desc.MediaType)
 		return desc, nil
 	}

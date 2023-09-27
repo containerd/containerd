@@ -94,10 +94,8 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 		}
 
 		// Try manifests endpoints for manifests types
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, images.MediaTypeDockerSchema2ManifestList,
-			images.MediaTypeDockerSchema1Manifest,
-			ocispec.MediaTypeImageManifest, ocispec.MediaTypeImageIndex:
+		if images.IsManifestType(desc.MediaType) || images.IsIndexType(desc.MediaType) ||
+			desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 
 			var firstErr error
 			for _, host := range r.hosts {
