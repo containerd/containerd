@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
 	"time"
+	"unsafe"
 
+	kernel "github.com/containerd/containerd/contrib/seccomp/kernelversion"
 	"github.com/containerd/containerd/pkg/randutil"
 	"golang.org/x/sys/unix"
 )
@@ -32,7 +35,25 @@ const (
 	loopDevFormat   = "/dev/loop%d"
 
 	ebusyString = "device or resource busy"
+
+	loopConfigureIoctl = 0x4c0a
 )
+
+type LoopConfig struct {
+	Fd        uint32
+	BlockSize uint32
+	Info      unix.LoopInfo64
+	Reserved  [8]uint64
+}
+
+func ioctlConfigure(fd int, value *LoopConfig) error {
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(loopConfigureIoctl), uintptr(unsafe.Pointer(value)))
+	if err == 0 {
+		return nil
+	}
+
+	return err
+}
 
 // LoopParams parameters to control loop device setup
 type LoopParams struct {
@@ -83,6 +104,32 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 			loop.Close()
 		}
 	}()
+
+	fiveDotEight := kernel.KernelVersion{Kernel: 5, Major: 8}
+	if ok, err := kernel.GreaterEqualThan(fiveDotEight); err == nil && ok {
+		config := LoopConfig{
+			Fd: uint32(back.Fd()),
+		}
+
+		copy(config.Info.File_name[:], backingFile)
+		if param.Readonly {
+			config.Info.Flags |= unix.LO_FLAGS_READ_ONLY
+		}
+
+		if param.Autoclear {
+			config.Info.Flags |= unix.LO_FLAGS_AUTOCLEAR
+		}
+
+		if param.Direct {
+			config.Info.Flags |= unix.LO_FLAGS_DIRECT_IO
+		}
+
+		if err := ioctlConfigure(int(loop.Fd()), &config); err != nil {
+			return nil, fmt.Errorf("failed to configure loop device: %s: %w", loopDev, err)
+		}
+
+		return loop, nil
+	}
 
 	// 2. Set FD
 	if err := unix.IoctlSetInt(int(loop.Fd()), unix.LOOP_SET_FD, int(back.Fd())); err != nil {
