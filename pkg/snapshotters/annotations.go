@@ -55,8 +55,7 @@ func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler 
 			if err != nil {
 				return nil, err
 			}
-			switch desc.MediaType {
-			case ocispec.MediaTypeImageManifest, images.MediaTypeDockerSchema2Manifest:
+			if images.IsManifestType(desc.MediaType) {
 				for i := range children {
 					c := &children[i]
 					if images.IsLayerType(c.MediaType) {
