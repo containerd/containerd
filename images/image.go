@@ -147,8 +147,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 	)
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch desc.MediaType {
-		case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		if IsManifestType(desc.MediaType) {
 			p, err := content.ReadBlob(ctx, provider, desc)
 			if err != nil {
 				return nil, err
@@ -186,7 +185,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 			})
 
 			return nil, nil
-		case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		} else if IsIndexType(desc.MediaType) {
 			p, err := content.ReadBlob(ctx, provider, desc)
 			if err != nil {
 				return nil, err
@@ -266,8 +265,7 @@ func Platforms(ctx context.Context, provider content.Provider, image ocispec.Des
 			return nil, ErrSkipDesc
 		}
 
-		switch desc.MediaType {
-		case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+		if IsConfigType(desc.MediaType) {
 			imagePlatform, err := ConfigPlatform(ctx, provider, desc)
 			if err != nil {
 				return nil, err
@@ -324,8 +322,7 @@ func Check(ctx context.Context, provider content.Provider, image ocispec.Descrip
 // Children returns the immediate children of content described by the descriptor.
 func Children(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 	var descs []ocispec.Descriptor
-	switch desc.MediaType {
-	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	if IsManifestType(desc.MediaType) {
 		p, err := content.ReadBlob(ctx, provider, desc)
 		if err != nil {
 			return nil, err
@@ -344,7 +341,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 
 		descs = append(descs, manifest.Config)
 		descs = append(descs, manifest.Layers...)
-	case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	} else if IsIndexType(desc.MediaType) {
 		p, err := content.ReadBlob(ctx, provider, desc)
 		if err != nil {
 			return nil, err
@@ -360,7 +357,7 @@ func Children(ctx context.Context, provider content.Provider, desc ocispec.Descr
 		}
 
 		descs = append(descs, index.Manifests...)
-	default:
+	} else {
 		if IsLayerType(desc.MediaType) || IsKnownConfig(desc.MediaType) {
 			// childless data types.
 			return nil, nil
@@ -392,19 +389,15 @@ func validateMediaType(b []byte, mt string) error {
 	if len(doc.FSLayers) != 0 {
 		return fmt.Errorf("media-type: schema 1 not supported")
 	}
-	switch mt {
-	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-		if len(doc.Manifests) != 0 ||
-			doc.MediaType == MediaTypeDockerSchema2ManifestList ||
-			doc.MediaType == ocispec.MediaTypeImageIndex {
+	if IsManifestType(mt) {
+		if len(doc.Manifests) != 0 || IsIndexType(doc.MediaType) {
 			return fmt.Errorf("media-type: expected manifest but found index (%s)", mt)
 		}
-	case MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-		if len(doc.Config) != 0 || len(doc.Layers) != 0 ||
-			doc.MediaType == MediaTypeDockerSchema2Manifest ||
-			doc.MediaType == ocispec.MediaTypeImageManifest {
+	} else if IsIndexType(mt) {
+		if len(doc.Config) != 0 || len(doc.Layers) != 0 || IsManifestType(doc.MediaType) {
 			return fmt.Errorf("media-type: expected index but found manifest (%s)", mt)
 		}
+
 	}
 	return nil
 }
