@@ -135,8 +135,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 		return err
 	}
 
-	switch desc.MediaType {
-	case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	if images.IsManifestType(desc.MediaType) {
 		var manifest ocispec.Manifest
 		if err := json.Unmarshal(b, &manifest); err != nil {
 			return err
@@ -158,8 +157,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 			}
 			fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", subprefix, manifest.Layers[i].MediaType, manifest.Layers[i].Digest, manifest.Layers[i].Size)
 		}
-
-	case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+	} else if images.IsIndexType(desc.MediaType) {
 		var idx ocispec.Index
 		if err := json.Unmarshal(b, &idx); err != nil {
 			return err
