@@ -116,8 +116,7 @@ func TestExportDockerManifest(t *testing.T) {
 	// test single-platform export
 	var result ocispec.Descriptor
 	err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		if images.IsManifestType(desc.MediaType) {
 			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
 			if err != nil {
 				return nil, err
@@ -132,7 +131,7 @@ func TestExportDockerManifest(t *testing.T) {
 				result = desc
 			}
 			return nil, nil
-		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		} else if images.IsIndexType(desc.MediaType) {
 			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
 			if err != nil {
 				return nil, err
