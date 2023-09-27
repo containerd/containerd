@@ -255,24 +255,22 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 }
 
 func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *ProgressTracker) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
 			"size":      desc.Size,
 		}))
 
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema1Manifest:
+		if desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
-		default:
-			err := remotes.Fetch(ctx, ingester, fetcher, desc)
-			if errdefs.IsAlreadyExists(err) {
-				pt.MarkExists(desc)
-				return nil, nil
-			}
-			return nil, err
 		}
+		err := remotes.Fetch(ctx, ingester, fetcher, desc)
+		if errdefs.IsAlreadyExists(err) {
+			pt.MarkExists(desc)
+			return nil, nil
+		}
+		return nil, err
 	}
 }
 
