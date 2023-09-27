@@ -241,10 +241,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	}
 
 	var (
-		firstErr error
-		paths    [][]string
-		dgst     = refspec.Digest()
-		caps     = HostCapabilityPull
+		errorList Errors
+		paths     [][]string
+		dgst      = refspec.Digest()
+		caps      = HostCapabilityPull
 	)
 
 	if dgst != "" {
@@ -295,9 +295,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					err = fmt.Errorf("pull access denied, repository does not exist or may require authorization: %w", err)
 				}
 				// Store the error for referencing later
-				if firstErr == nil {
-					firstErr = err
-				}
+				errorList = append(errorList, err)
 				log.G(ctx).WithError(err).Info("trying next host")
 				continue // try another host
 			}
@@ -310,9 +308,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				}
 				if resp.StatusCode > 399 {
 					// Set firstErr when encountering the first non-404 status code.
-					if firstErr == nil {
-						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
-					}
+					errorList = append(errorList, remoteerrors.NewUnexpectedStatusErr(resp))
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
@@ -383,8 +379,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			}
 			// Prevent resolving to excessively large manifests
 			if size > MaxManifestSize {
-				if firstErr == nil {
-					firstErr = fmt.Errorf("rejecting %d byte manifest for %s: %w", size, ref, errdefs.ErrNotFound)
+				if len(errorList) == 0 {
+					errorList = append(errorList, fmt.Errorf("rejecting %d byte manifest for %s: %w", size, ref, errdefs.ErrNotFound))
 				}
 				continue
 			}
@@ -404,11 +400,17 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	// "firstErr" contains the first non-404 error. That is, "firstErr == nil"
 	// means that either no registries were given or each registry returned 404.
 
-	if firstErr == nil {
-		firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
+	if len(errorList) == 0 {
+		errorList = append(errorList, fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound))
 	}
 
-	return "", ocispec.Descriptor{}, firstErr
+	for _, err := range errorList {
+		if errdefs.IsNotFound(err) {
+			return "", ocispec.Descriptor{}, err
+		}
+	}
+
+	return "", ocispec.Descriptor{}, fmt.Errorf("%s: %w, detail: %s", ref, errdefs.ErrUnavailable, errorList)
 }
 
 func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
