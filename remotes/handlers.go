@@ -90,23 +90,21 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // discovered in a call to Dispatch. Use with ChildrenHandler to do a full
 // recursive fetch.
 func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
 			"size":      desc.Size,
 		}))
 
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema1Manifest:
+		if desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
-		default:
-			err := Fetch(ctx, ingester, fetcher, desc)
-			if errdefs.IsAlreadyExists(err) {
-				return nil, nil
-			}
-			return nil, err
 		}
+		err := Fetch(ctx, ingester, fetcher, desc)
+		if errdefs.IsAlreadyExists(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 }
 
@@ -316,21 +314,16 @@ func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) 
 			return children, nil
 		}
 
-		var descs []ocispec.Descriptor
-		if images.IsManifestType(desc.MediaType) {
-			if m.Match(*desc.Platform) {
-				descs = children
-			} else {
-				for _, child := range children {
-					if images.IsConfigType(child.MediaType) {
-						descs = append(descs, child)
-					}
+		if images.IsManifestType(desc.MediaType) && !m.Match(*desc.Platform) {
+			var descs []ocispec.Descriptor
+			for _, child := range children {
+				if images.IsConfigType(child.MediaType) {
+					descs = append(descs, child)
 				}
 			}
-		} else {
-			descs = children
+			return descs, nil
 		}
-		return descs, nil
+		return children, nil
 	}
 }
 
