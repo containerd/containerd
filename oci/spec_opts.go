@@ -376,26 +376,24 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 		if err != nil {
 			return err
 		}
+		if !images.IsConfigType(ic.MediaType) {
+			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
+		}
+
 		var (
 			imageConfigBytes []byte
 			ociimage         v1.Image
 			config           v1.ImageConfig
 		)
-		switch ic.MediaType {
-		case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-			var err error
-			imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
-			if err != nil {
-				return err
-			}
-
-			if err := json.Unmarshal(imageConfigBytes, &ociimage); err != nil {
-				return err
-			}
-			config = ociimage.Config
-		default:
-			return fmt.Errorf("unknown image config media type %s", ic.MediaType)
+		imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
+		if err != nil {
+			return err
 		}
+
+		if err = json.Unmarshal(imageConfigBytes, &ociimage); err != nil {
+			return err
+		}
+		config = ociimage.Config
 
 		appendOSMounts(s, ociimage.OS)
 		setProcess(s)
