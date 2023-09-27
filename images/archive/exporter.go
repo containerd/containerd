@@ -170,8 +170,7 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 	dManifests := map[digest.Digest]*exportManifest{}
 	resolvedIndex := map[digest.Digest]digest.Digest{}
 	for _, desc := range eo.manifests {
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		if images.IsManifestType(desc.MediaType) {
 			mt, ok := dManifests[desc.Digest]
 			if !ok {
 				// TODO(containerd): Skip if already added
@@ -191,7 +190,7 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 			if name != "" {
 				mt.names = append(mt.names, name)
 			}
-		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		} else if images.IsIndexType(desc.MediaType) {
 			d, ok := resolvedIndex[desc.Digest]
 			if !ok {
 				if err := desc.Digest.Validate(); err != nil {
@@ -255,7 +254,7 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 				}
 
 			}
-		default:
+		} else {
 			return fmt.Errorf("only manifests may be exported: %w", errdefs.ErrInvalidArgument)
 		}
 	}
