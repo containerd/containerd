@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	capabRemapIDs = "remap-ids"
+	capaRemapIDs     = "remap-ids"
+	capaOnlyRemapIds = "only-remap-ids"
 )
 
 // WithRemapperLabels creates the labels used by any supporting snapshotter
@@ -45,7 +46,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	for _, capab := range capabs {
-		if capab == capabRemapIDs {
+		if capab == capaRemapIDs {
 			// Snapshotter supports ID remapping, we don't need to do anything.
 			return parent, nil
 		}
@@ -70,6 +71,17 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 
 	if !needsRemap {
 		return parent, nil
+	}
+
+	capaOnlyRemap := false
+	for _, capa := range capabs {
+		if capa == capaOnlyRemapIds {
+			capaOnlyRemap = true
+		}
+	}
+
+	if capaOnlyRemap {
+		return "", fmt.Errorf("snapshotter %q doesn't support idmap mounts on this host, configure `slow_chown` to allow a slower and expensive fallback", snapshotterName)
 	}
 
 	var ctrUID, hostUID, length uint32
