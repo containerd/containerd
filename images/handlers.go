@@ -294,8 +294,8 @@ func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc
 			return children, err
 		}
 
-		switch desc.MediaType {
-		case ocispec.MediaTypeImageIndex, MediaTypeDockerSchema2ManifestList:
+		// only limit manifests from an index
+		if IsIndexType(desc.MediaType) {
 			sort.SliceStable(children, func(i, j int) bool {
 				if children[i].Platform == nil {
 					return false
@@ -314,8 +314,6 @@ func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc
 					children = children[:n]
 				}
 			}
-		default:
-			// only limit manifests from an index
 		}
 		return children, nil
 	}
