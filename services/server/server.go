@@ -202,10 +202,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		required[r] = struct{}{}
 	}
 
-	if config.Version < srvconfig.CurrentConfigVersion {
+	// Run migration for each configuration version
+	// Run each plugin migration for each version to ensure that migration logic is simple and
+	// focused on upgrading from one version at a time.
+	for v := config.Version; v < srvconfig.CurrentConfigVersion; v++ {
 		for _, p := range plugins {
 			if p.ConfigMigration != nil {
-				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+				if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
 					return nil, err
 				}
 			}
