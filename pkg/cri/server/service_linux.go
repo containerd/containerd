@@ -34,8 +34,8 @@ const networkAttachCount = 2
 // initPlatform handles linux specific initialization for the CRI service.
 func (c *criService) initPlatform() (err error) {
 	if userns.RunningInUserNS() {
-		if !(c.config.DisableCgroup && !c.apparmorEnabled() && c.config.RestrictOOMScoreAdj) {
-			log.L.Warn("Running containerd in a user namespace typically requires disable_cgroup, disable_apparmor, restrict_oom_score_adj set to be true")
+		if c.apparmorEnabled() || !c.config.RestrictOOMScoreAdj {
+			log.L.Warn("Running CRI plugin in a user namespace typically requires disable_apparmor and restrict_oom_score_adj to be true")
 		}
 	}
 
