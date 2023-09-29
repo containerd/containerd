@@ -54,7 +54,6 @@ func init() {
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
-	ready := ic.RegisterReadiness()
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
@@ -99,6 +98,8 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
 
+	// RegisterReadiness() must be called after NewCRIService(): https://github.com/containerd/containerd/issues/9163
+	ready := ic.RegisterReadiness()
 	go func() {
 		if err := s.Run(ready); err != nil {
 			log.G(ctx).WithError(err).Fatal("Failed to run CRI service")
