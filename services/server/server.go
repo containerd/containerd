@@ -103,6 +103,20 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 
 // New creates and initializes a new containerd server
 func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
+	var (
+		version    = config.Version
+		migrationT time.Duration
+	)
+	if version < srvconfig.CurrentConfigVersion {
+		// Migrate config to latest version
+		t1 := time.Now()
+		err := config.MigrateConfig(ctx)
+		if err != nil {
+			return nil, err
+		}
+		migrationT = time.Since(t1)
+	}
+
 	if err := apply(ctx, config); err != nil {
 		return nil, err
 	}
@@ -203,17 +217,24 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		required[r] = struct{}{}
 	}
 
-	// Run migration for each configuration version
-	// Run each plugin migration for each version to ensure that migration logic is simple and
-	// focused on upgrading from one version at a time.
-	for v := config.Version; v < srvconfig.CurrentConfigVersion; v++ {
-		for _, p := range plugins {
-			if p.ConfigMigration != nil {
-				if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
-					return nil, err
+	if version < srvconfig.CurrentConfigVersion {
+		t1 := time.Now()
+		// Run migration for each configuration version
+		// Run each plugin migration for each version to ensure that migration logic is simple and
+		// focused on upgrading from one version at a time.
+		for v := version; v < srvconfig.CurrentConfigVersion; v++ {
+			for _, p := range plugins {
+				if p.ConfigMigration != nil {
+					if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
+		migrationT = migrationT + time.Since(t1)
+	}
+	if migrationT > 0 {
+		log.G(ctx).WithField("t", migrationT).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", version)
 	}
 
 	for _, p := range plugins {
