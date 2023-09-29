@@ -43,6 +43,13 @@ import (
 // CurrentConfigVersion is the max config version which is supported
 const CurrentConfigVersion = 3
 
+// migrations hold the migration functions for every prior containerd config version
+var migrations = []func(context.Context, *Config) error{
+	nil,       // Version 0 is not defined, treated at version 1
+	v1Migrate, // Version 1 plugins renamed to URI for version 2
+	nil,       // Version 2 has only plugin changes to version 3
+}
+
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
 
 // Config provides containerd configuration data for the server
@@ -67,9 +74,11 @@ type Config struct {
 	Metrics MetricsConfig `toml:"metrics"`
 	// DisabledPlugins are IDs of plugins to disable. Disabled plugins won't be
 	// initialized and started.
+	// DisabledPlugins must use a fully qualified plugin URI.
 	DisabledPlugins []string `toml:"disabled_plugins"`
 	// RequiredPlugins are IDs of required plugins. Containerd exits if any
 	// required plugin doesn't exist or fails to be initialized or started.
+	// RequiredPlugins must use a fully qualified plugin URI.
 	RequiredPlugins []string `toml:"required_plugins"`
 	// Plugins provides plugin specific configuration for the initialization of a plugin
 	Plugins map[string]interface{} `toml:"plugins"`
@@ -101,41 +110,83 @@ type StreamProcessor struct {
 	Env []string `toml:"env"`
 }
 
-// GetVersion returns the config file's version
-func (c *Config) GetVersion() int {
-	if c.Version == 0 {
-		return 1
-	}
-	return c.Version
-}
-
 // ValidateVersion validates the config for a v2 file
 func (c *Config) ValidateVersion() error {
-	version := c.GetVersion()
-	if version == 1 {
-		return errors.New("containerd config version `1` is no longer supported since containerd v2.0, please switch to version `2`, " +
-			"see https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md#version-header")
-	}
-
-	if version > CurrentConfigVersion {
-		return fmt.Errorf("expected containerd config version equal to or less than `%d`, got `%d`", CurrentConfigVersion, version)
+	if c.Version > CurrentConfigVersion {
+		return fmt.Errorf("expected containerd config version equal to or less than `%d`, got `%d`", CurrentConfigVersion, c.Version)
 	}
 
 	for _, p := range c.DisabledPlugins {
-		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
+		if !strings.ContainsAny(p, ".") {
 			return fmt.Errorf("invalid disabled plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
 	for _, p := range c.RequiredPlugins {
-		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
+		if !strings.ContainsAny(p, ".") {
 			return fmt.Errorf("invalid required plugin URI %q expect io.containerd.x.vx", p)
 		}
 	}
-	for p := range c.Plugins {
-		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
-			return fmt.Errorf("invalid plugin key URI %q expect io.containerd.x.vx", p)
+
+	return nil
+}
+
+// MigrateConfig will convert the config to the latest version before using
+func (c *Config) MigrateConfig(ctx context.Context) error {
+	for c.Version < CurrentConfigVersion {
+		if m := migrations[c.Version]; m != nil {
+			if err := m(ctx, c); err != nil {
+				return err
+			}
 		}
+		c.Version++
 	}
+	return nil
+}
+
+func v1Migrate(ctx context.Context, c *Config) error {
+	plugins := make(map[string]interface{}, len(c.Plugins))
+
+	// corePlugins is the list of used plugins before v1 was deprecated
+	corePlugins := map[string]string{
+		"cri":       "io.containerd.grpc.v1.cri",
+		"cgroups":   "io.containerd.monitor.v1.cgroups",
+		"linux":     "io.containerd.runtime.v1.linux",
+		"scheduler": "io.containerd.gc.v1.scheduler",
+		"bolt":      "io.containerd.metadata.v1.bolt",
+		"task":      "io.containerd.runtime.v2.task",
+		"opt":       "io.containerd.internal.v1.opt",
+		"restart":   "io.containerd.internal.v1.restart",
+		"tracing":   "io.containerd.internal.v1.tracing",
+		"otlp":      "io.containerd.tracing.processor.v1.otlp",
+		"aufs":      "io.containerd.snapshotter.v1.aufs",
+		"btrfs":     "io.containerd.snapshotter.v1.btrfs",
+		"devmapper": "io.containerd.snapshotter.v1.devmapper",
+		"native":    "io.containerd.snapshotter.v1.native",
+		"overlayfs": "io.containerd.snapshotter.v1.overlayfs",
+		"zfs":       "io.containerd.snapshotter.v1.zfs",
+	}
+	for plugin, value := range c.Plugins {
+		if !strings.ContainsAny(plugin, ".") {
+			var ambiguous string
+			if full, ok := corePlugins[plugin]; ok {
+				plugin = full
+			} else if strings.HasSuffix(plugin, "-service") {
+				plugin = "io.containerd.service.v1." + plugin
+			} else if plugin == "windows" || plugin == "windows-lcow" {
+				// runtime, differ, and snapshotter plugins do not have configs for v1
+				ambiguous = plugin
+				plugin = "io.containerd.snapshotter.v1." + plugin
+			} else {
+				ambiguous = plugin
+				plugin = "io.containerd.grpc.v1." + plugin
+			}
+			if ambiguous != "" {
+				log.G(ctx).Warnf("Ambiguous %s plugin in v1 config, treating as %s", ambiguous, plugin)
+			}
+		}
+		plugins[plugin] = value
+	}
+	c.Plugins = plugins
 	return nil
 }
 

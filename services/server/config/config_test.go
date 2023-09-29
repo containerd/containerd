@@ -29,6 +29,12 @@ import (
 	"github.com/containerd/log/logtest"
 )
 
+func TestMigrations(t *testing.T) {
+	if len(migrations) != CurrentConfigVersion {
+		t.Fatalf("Migration missing, expected %d migrations, only %d defined", CurrentConfigVersion, len(migrations))
+	}
+}
+
 func TestMergeConfigs(t *testing.T) {
 	a := &Config{
 		Version:          2,
@@ -215,9 +221,10 @@ version = 2
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
 
-// TestDecodePluginInV1Config tests decoding non-versioned
-// config (should be parsed as V1 config).
+// TestDecodePluginInV1Config tests decoding non-versioned config
+// (should be parsed as V1 config) and migrated to latest.
 func TestDecodePluginInV1Config(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
 	data := `
 [plugins.linux]
   shim_debug = true
@@ -229,5 +236,15 @@ func TestDecodePluginInV1Config(t *testing.T) {
 
 	var out Config
 	err = LoadConfig(context.Background(), path, &out)
-	assert.ErrorContains(t, err, "config version `1` is no longer supported")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, out.Version)
+
+	err = out.MigrateConfig(ctx)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, out.Version)
+
+	pluginConfig := map[string]interface{}{}
+	_, err = out.Decode(ctx, &plugin.Registration{Type: "io.containerd.runtime.v1", ID: "linux", Config: &pluginConfig})
+	assert.NoError(t, err)
+	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
