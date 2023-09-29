@@ -384,11 +384,21 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load base OCI spec from file: %s: %w", cfg.BaseRuntimeSpec, err)
 		}
-
+		printWarning(spec)
 		specs[cfg.BaseRuntimeSpec] = spec
 	}
 
 	return specs, nil
+}
+
+// printWarning prints warning for spec. when spec field is not supported or other warnings.
+func printWarning(spec *oci.Spec) {
+	if spec == nil {
+		return
+	}
+	if spec.Process != nil && spec.Process.Capabilities != nil && len(spec.Process.Capabilities.Inheritable) > 0 {
+		log.L.Warn("Inheritable capabilities were removed from the default spec.")
+	}
 }
 
 // ValidateMode validate the given mod value,

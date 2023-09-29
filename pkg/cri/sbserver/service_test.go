@@ -17,7 +17,10 @@
 package sbserver
 
 import (
+	"bytes"
 	"encoding/json"
+
+	"io"
 	"os"
 	"testing"
 
@@ -33,6 +36,9 @@ import (
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 	"github.com/containerd/containerd/pkg/registrar"
+	"github.com/containerd/log"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 )
 
 // newTestCRIService creates a fake criService for test.
@@ -95,4 +101,48 @@ func TestValidateMode(t *testing.T) {
 
 	mode = "nonexistent"
 	assert.Error(t, ValidateMode(mode))
+}
+
+func Test_printWarning(t *testing.T) {
+	var buffer bytes.Buffer
+	logger := &logrus.Logger{
+		Out:          &buffer,
+		Formatter:    new(logrus.TextFormatter),
+		Hooks:        make(logrus.LevelHooks),
+		Level:        logrus.InfoLevel,
+		ExitFunc:     os.Exit,
+		ReportCaller: false,
+	}
+	log.L = logrus.NewEntry(logger)
+	tests := []struct {
+		name    string
+		args    *oci.Spec
+		message string
+	}{
+		{
+			name:    "args is nil,don't print warning",
+			args:    nil,
+			message: "",
+		},
+		{
+			name: "args is not nil,print warning",
+			args: &oci.Spec{
+				Process: &specs.Process{
+					Capabilities: &specs.LinuxCapabilities{
+						Inheritable: []string{"CAP_NET_RAW"},
+					},
+				},
+			},
+			message: "Inheritable capabilities were removed from the default spec.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			printWarning(tt.args)
+			readAll, _ := io.ReadAll(&buffer)
+			if tt.message != "" {
+				assert.Contains(t, string(readAll), tt.message)
+			}
+		})
+	}
 }
