@@ -120,7 +120,7 @@ github.com/containerd/fifo
 # github.com/containerd/go-cni v1.1.9
 ## explicit; go 1.19
 github.com/containerd/go-cni
-# github.com/containerd/go-runc v1.1.0
+# github.com/containerd/go-runc v1.1.0 => github.com/fuweid/go-runc v0.0.0-20231001032945-f56547a97a6e
 ## explicit; go 1.18
 github.com/containerd/go-runc
 # github.com/containerd/imgcrypt v1.1.7

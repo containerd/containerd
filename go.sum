@@ -257,8 +257,6 @@ github.com/containerd/go-runc v0.0.0-20190911050354-e029b79d8cda/go.mod h1:IV7qH
 github.com/containerd/go-runc v0.0.0-20200220073739-7016d3ce2328/go.mod h1:PpyHrqVs8FTi9vpyHwPwiNEGaACDxT/N/pLcvMSRA9g=
 github.com/containerd/go-runc v0.0.0-20201020171139-16b287bc67d0/go.mod h1:cNU0ZbCgCQVZK4lgG3P+9tn9/PaJNmoDXPpoJhDR+Ok=
 github.com/containerd/go-runc v1.0.0/go.mod h1:cNU0ZbCgCQVZK4lgG3P+9tn9/PaJNmoDXPpoJhDR+Ok=
-github.com/containerd/go-runc v1.1.0 h1:OX4f+/i2y5sUT7LhmcJH7GYrjjhHa1QI4e8yO0gGleA=
-github.com/containerd/go-runc v1.1.0/go.mod h1:xJv2hFF7GvHtTJd9JqTS2UVxMkULUYw4JN5XAUZqH5U=
 github.com/containerd/imgcrypt v1.0.1/go.mod h1:mdd8cEPW7TPgNG4FpuP3sGBiQ7Yi/zak9TYCG3juvb0=
 github.com/containerd/imgcrypt v1.0.4-0.20210301171431-0ae5c75f59ba/go.mod h1:6TNsg0ctmizkrOgXRNQjAPFWpMYRWuiB6dSF4Pfa5SA=
 github.com/containerd/imgcrypt v1.1.1-0.20210312161619-7ed62a527887/go.mod h1:5AZJNI6sLHJljKuI9IHnw1pWqo/F0nGDOuR9zgTs7ow=
@@ -407,6 +405,8 @@ github.com/fsnotify/fsnotify v1.4.9/go.mod h1:znqG4EE+3YCdAaPaxE2ZRY/06pZUdp0tY4
 github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=
 github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
 github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa/go.mod h1:KnogPXtdwXqoenmZCw6S+25EAm2MkxbG0deNDu4cbSA=
+github.com/fuweid/go-runc v0.0.0-20231001032945-f56547a97a6e h1:sZFwbEWC4bnPDjuEngHn4gQMjCax8YVnqbModD39v8g=
+github.com/fuweid/go-runc v0.0.0-20231001032945-f56547a97a6e/go.mod h1:xJv2hFF7GvHtTJd9JqTS2UVxMkULUYw4JN5XAUZqH5U=
 github.com/garyburd/redigo v0.0.0-20150301180006-535138d7bcd7/go.mod h1:NR3MbYisc3/PwhQ00EMzDiPmrwpPxAn5GI05/YaO1SY=
 github.com/getsentry/raven-go v0.2.0/go.mod h1:KungGk8q33+aIAZUIVWZDr2OfAEBsO49PX4NzFV5kcQ=
 github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680/go.mod h1:4dBDuWmgqj2HViK6kFavaiC9ZROes6MMH2rRYeMEF04=

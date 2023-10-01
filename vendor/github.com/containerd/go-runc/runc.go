@@ -126,6 +126,11 @@ type ConsoleSocket interface {
 	Path() string
 }
 
+// PidfdSocket handles the path of the socket for pidfd created by runc
+type PidfdSocket interface {
+	Path() string
+}
+
 // CreateOpts holds all the options information for calling runc with supported options
 type CreateOpts struct {
 	IO
@@ -230,6 +235,7 @@ type ExecOpts struct {
 	IO
 	PidFile       string
 	ConsoleSocket ConsoleSocket
+	PidfdSocket   PidfdSocket
 	Detach        bool
 	Started       chan<- int
 	ExtraArgs     []string
@@ -238,6 +244,9 @@ type ExecOpts struct {
 func (o *ExecOpts) args() (out []string, err error) {
 	if o.ConsoleSocket != nil {
 		out = append(out, "--console-socket", o.ConsoleSocket.Path())
+	}
+	if o.PidfdSocket != nil {
+		out = append(out, "--pidfd-socket", o.PidfdSocket.Path())
 	}
 	if o.Detach {
 		out = append(out, "--detach")

@@ -152,6 +152,20 @@ func (c *Socket) ReceiveMaster() (console.Console, error) {
 	return console.ConsoleFromFile(f)
 }
 
+// ReceivePidfd blocks until the socket receives the pidfd of the process.
+func (c *Socket) ReceivePidfd() (*os.File, error) {
+	conn, err := c.l.Accept()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	uc, ok := conn.(*net.UnixConn)
+	if !ok {
+		return nil, fmt.Errorf("received connection which was not a unix socket")
+	}
+	return recvFd(uc)
+}
+
 // Close closes the unix socket
 func (c *Socket) Close() error {
 	err := c.l.Close()

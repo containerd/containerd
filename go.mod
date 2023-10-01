@@ -140,3 +140,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+replace github.com/containerd/go-runc v1.1.0 => github.com/fuweid/go-runc v0.0.0-20231001032945-f56547a97a6e

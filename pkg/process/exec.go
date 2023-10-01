@@ -55,6 +55,7 @@ type execProcess struct {
 	stdio   stdio.Stdio
 	path    string
 	spec    specs.Process
+	pidfd   *os.File
 
 	parent    *Init
 	waitBlock chan struct{}
@@ -148,7 +149,8 @@ func (e *execProcess) kill(ctx context.Context, sig uint32, _ bool) error {
 	case !e.exited.IsZero():
 		return fmt.Errorf("process already finished: %w", errdefs.ErrNotFound)
 	default:
-		if err := unix.Kill(pid, syscall.Signal(sig)); err != nil {
+		err := unix.PidfdSendSignal(int(e.pidfd.Fd()), syscall.Signal(sig), nil, 0)
+		if err != nil {
 			return fmt.Errorf("exec kill error: %w", checkKillError(err))
 		}
 	}
@@ -182,6 +184,8 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		socket  *runc.Socket
 		pio     *processIO
 		pidFile = newExecPidFile(e.path, e.id)
+
+		pidfdSocket *runc.Socket
 	)
 	if e.stdio.Terminal {
 		if socket, err = runc.NewTempConsoleSocket(); err != nil {
@@ -194,9 +198,16 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		}
 		e.io = pio
 	}
+
+	if pidfdSocket, err = runc.NewTempPidfdSocket(); err != nil {
+		return fmt.Errorf("failed to create runc pidfd socket: %w", err)
+	}
+	defer pidfdSocket.Close()
+
 	opts := &runc.ExecOpts{
-		PidFile: pidFile.Path(),
-		Detach:  true,
+		PidFile:     pidFile.Path(),
+		Detach:      true,
+		PidfdSocket: pidfdSocket,
 	}
 	if pio != nil {
 		opts.IO = pio.IO()
@@ -228,10 +239,17 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 			return fmt.Errorf("failed to start io pipe copy: %w", err)
 		}
 	}
+
+	e.pidfd, err = pidfdSocket.ReceivePidfd()
+	if err != nil {
+		return fmt.Errorf("failed to receive pidfd: %w", err)
+	}
+
 	pid, err := pidFile.Read()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve OCI runtime exec pi: %wd", err)
 	}
+
 	e.pid.pid = pid
 	return nil
 }
