@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/urfave/cli"
 )

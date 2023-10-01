@@ -22,7 +22,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/pkg/progress"
 
 	"github.com/opencontainers/image-spec/identity"

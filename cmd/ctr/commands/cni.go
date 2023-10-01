@@ -27,7 +27,7 @@ import (
 
 func init() {
 	typeurl.Register(&NetworkMetaData{},
-		"github.com/containerd/containerd/cmd/ctr/commands", "NetworkMetaData")
+		"github.com/containerd/containerd/v2/cmd/ctr/commands", "NetworkMetaData")
 }
 
 const (

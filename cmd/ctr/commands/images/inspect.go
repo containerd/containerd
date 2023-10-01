@@ -19,7 +19,7 @@ package images
 import (
 	"os"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/pkg/display"
 	"github.com/urfave/cli"
 )
