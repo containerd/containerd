@@ -117,18 +117,18 @@ func TestContainerdImage(t *testing.T) {
 	t.Logf("the image should be marked as managed")
 	imgByRef, err := containerdClient.GetImage(ctx, testImage)
 	assert.NoError(t, err)
-	assert.Equal(t, imgByRef.Labels()["io.cri-containerd.image"], "managed")
+	assert.Equal(t, "managed", imgByRef.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image id should be created and managed")
 	imgByID, err := containerdClient.GetImage(ctx, id)
 	assert.NoError(t, err)
-	assert.Equal(t, imgByID.Labels()["io.cri-containerd.image"], "managed")
+	assert.Equal(t, "managed", imgByID.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image should be labeled")
 	img, err := containerdClient.GetImage(ctx, testImage)
 	assert.NoError(t, err)
-	assert.Equal(t, img.Labels()["foo"], "bar")
-	assert.Equal(t, img.Labels()[labels.ImageLabelKey], labels.ImageLabelValue)
+	assert.Equal(t, "bar", img.Labels()["foo"])
+	assert.Equal(t, labels.ImageLabelValue, img.Labels()[labels.ImageLabelKey])
 
 	t.Logf("the image should be pinned")
 	i, err = imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
@@ -225,7 +225,7 @@ func TestContainerdSandboxImage(t *testing.T) {
 	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
 	require.NoError(t, err)
 	t.Log("ensure correct labels are set on pause image")
-	assert.Equal(t, pauseImg.Labels()["io.cri-containerd.pinned"], "pinned")
+	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
 
 	t.Log("pause image should be seen by cri plugin")
 	pimg, err := imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})
