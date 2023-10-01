@@ -271,12 +271,12 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 			},
 		})
 
-		assert.Equal(t, errors.Unwrap(err), context.Canceled, "[%v] expected canceled error, but got (%v)", idx, err)
-		assert.Equal(t, mirrorSrv.limiter.clearHitCircuitBreaker(), true, "[%v] expected to hit circuit breaker", idx)
+		assert.Equal(t, context.Canceled, errors.Unwrap(err), "[%v] expected canceled error, but got (%v)", idx, err)
+		assert.True(t, mirrorSrv.limiter.clearHitCircuitBreaker(), "[%v] expected to hit circuit breaker", idx)
 
 		// cleanup the temp data by sync delete
 		lid, ok := leases.FromContext(dctx)
-		assert.Equal(t, ok, true)
+		assert.True(t, ok)
 		err = cli.LeasesService().Delete(ctx, leases.Lease{ID: lid}, leases.SynchronousDelete)
 		assert.NoError(t, err)
 	}

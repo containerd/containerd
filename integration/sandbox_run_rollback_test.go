@@ -67,7 +67,7 @@ func TestRunPodSandboxWithSetupCNIFailure(t *testing.T) {
 	t.Logf("Create a sandbox")
 	_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
 	require.Error(t, err)
-	require.Equal(t, true, strings.Contains(err.Error(), "you-shall-not-pass!"))
+	require.ErrorContains(t, err, "you-shall-not-pass!")
 
 	t.Logf("Retry to create sandbox with same config")
 	sb, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
@@ -95,7 +95,7 @@ func TestRunPodSandboxWithShimStartFailure(t *testing.T) {
 	t.Logf("Create a sandbox")
 	_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
 	require.Error(t, err)
-	require.Equal(t, true, strings.Contains(err.Error(), "no hard feelings"))
+	require.ErrorContains(t, err, "no hard feelings")
 }
 
 // TestRunPodSandboxWithShimDeleteFailure should keep the sandbox record if
@@ -130,16 +130,16 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 			require.Len(t, l, 1)
 
 			sb := l[0]
-			require.Equal(t, sb.State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
-			require.Equal(t, sb.Metadata.Name, sbConfig.Metadata.Name)
-			require.Equal(t, sb.Metadata.Namespace, sbConfig.Metadata.Namespace)
-			require.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
-			require.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
+			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sb.State)
+			require.Equal(t, sbConfig.Metadata.Name, sb.Metadata.Name)
+			require.Equal(t, sbConfig.Metadata.Namespace, sb.Metadata.Namespace)
+			require.Equal(t, sbConfig.Metadata.Uid, sb.Metadata.Uid)
+			require.Equal(t, sbConfig.Metadata.Attempt, sb.Metadata.Attempt)
 
 			t.Log("Check PodSandboxStatus")
 			sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
 			require.NoError(t, err)
-			require.Equal(t, sbStatus.State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
+			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
 			require.Greater(t, len(sbStatus.Network.Ip), 0)
 
 			if restart {
@@ -150,13 +150,13 @@ func TestRunPodSandboxWithShimDeleteFailure(t *testing.T) {
 				l, err = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{Id: sb.Id})
 				require.NoError(t, err)
 				require.Len(t, l, 1)
-				require.Equal(t, l[0].State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
+				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, l[0].State)
 
 				t.Log("Check PodSandboxStatus")
 				sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
 				require.NoError(t, err)
 				t.Log(sbStatus.Network)
-				require.Equal(t, sbStatus.State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
+				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
 			}
 
 			t.Log("Cleanup leaky sandbox")
@@ -206,11 +206,11 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 			require.Len(t, l, 1)
 
 			sb := l[0]
-			require.Equal(t, sb.State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
-			require.Equal(t, sb.Metadata.Name, sbConfig.Metadata.Name)
-			require.Equal(t, sb.Metadata.Namespace, sbConfig.Metadata.Namespace)
-			require.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
-			require.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
+			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sb.State)
+			require.Equal(t, sbConfig.Metadata.Name, sb.Metadata.Name)
+			require.Equal(t, sbConfig.Metadata.Namespace, sb.Metadata.Namespace)
+			require.Equal(t, sbConfig.Metadata.Uid, sb.Metadata.Uid)
+			require.Equal(t, sbConfig.Metadata.Attempt, sb.Metadata.Attempt)
 
 			if restart {
 				t.Log("Restart containerd")
@@ -220,7 +220,7 @@ func TestRunPodSandboxWithShimStartAndTeardownCNIFailure(t *testing.T) {
 				l, err = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{Id: sb.Id})
 				require.NoError(t, err)
 				require.Len(t, l, 1)
-				require.Equal(t, l[0].State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
+				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, l[0].State)
 			}
 
 			t.Log("Cleanup leaky sandbox")
@@ -287,11 +287,11 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 		require.NoError(t, err)
 	}()
 
-	assert.Equal(t, sb.State, criapiv1.PodSandboxState_SANDBOX_NOTREADY)
-	assert.Equal(t, sb.Metadata.Name, sbConfig.Metadata.Name)
-	assert.Equal(t, sb.Metadata.Namespace, sbConfig.Metadata.Namespace)
-	assert.Equal(t, sb.Metadata.Uid, sbConfig.Metadata.Uid)
-	assert.Equal(t, sb.Metadata.Attempt, sbConfig.Metadata.Attempt)
+	assert.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sb.State)
+	assert.Equal(t, sbConfig.Metadata.Name, sb.Metadata.Name)
+	assert.Equal(t, sbConfig.Metadata.Namespace, sb.Metadata.Namespace)
+	assert.Equal(t, sbConfig.Metadata.Uid, sb.Metadata.Uid)
+	assert.Equal(t, sbConfig.Metadata.Attempt, sb.Metadata.Attempt)
 
 	if os.Getenv("DISABLE_CRI_SANDBOXES") != "" {
 		// non-sbserver

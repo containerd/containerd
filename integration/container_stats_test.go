@@ -252,7 +252,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 
 		t.Logf("Verify container stats for %s", id)
 		for _, s := range stats {
-			require.Equal(t, s.GetAttributes().GetId(), id)
+			require.Equal(t, id, s.GetAttributes().GetId())
 			testStats(t, s, containerConfigMap[id])
 		}
 	}
@@ -406,9 +406,9 @@ func testStats(t *testing.T,
 	require.NotEmpty(t, s.GetAttributes().GetId())
 	require.NotEmpty(t, s.GetAttributes().GetMetadata())
 	require.NotEmpty(t, s.GetAttributes().GetAnnotations())
-	require.Equal(t, s.GetAttributes().GetLabels(), config.Labels)
-	require.Equal(t, s.GetAttributes().GetAnnotations(), config.Annotations)
-	require.Equal(t, s.GetAttributes().GetMetadata().Name, config.Metadata.Name)
+	require.Equal(t, config.Labels, s.GetAttributes().GetLabels())
+	require.Equal(t, config.Annotations, s.GetAttributes().GetAnnotations())
+	require.Equal(t, config.Metadata.Name, s.GetAttributes().GetMetadata().Name)
 	require.NotEmpty(t, s.GetAttributes().GetLabels())
 	require.NotEmpty(t, s.GetCpu().GetTimestamp())
 	require.NotEmpty(t, s.GetCpu().GetUsageCoreNanoSeconds().GetValue())
