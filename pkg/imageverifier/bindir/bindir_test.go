@@ -29,6 +29,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -136,7 +137,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
@@ -170,7 +171,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 30 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(30 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -183,7 +184,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             filepath.Join(t.TempDir(), "missing_directory"),
 			MaxVerifiers:       10,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -196,7 +197,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             t.TempDir(),
 			MaxVerifiers:       10,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -213,7 +214,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       0,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -231,7 +232,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -250,7 +251,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       2,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -268,7 +269,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       3,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -287,7 +288,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       3,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -306,7 +307,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -325,7 +326,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -344,7 +345,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -379,7 +380,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       -1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
@@ -395,7 +396,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		v := NewImageVerifier(&Config{
 			BinDir:             binDir,
 			MaxVerifiers:       1,
-			PerVerifierTimeout: 5 * time.Second,
+			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
