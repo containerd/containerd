@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/pkg/imageverifier/bindir"
+	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/containerd/plugin"
 )
 
@@ -40,6 +41,6 @@ func defaultConfig() *bindir.Config {
 	return &bindir.Config{
 		BinDir:             defaultPath,
 		MaxVerifiers:       10,
-		PerVerifierTimeout: 10 * time.Second,
+		PerVerifierTimeout: tomlext.FromStdTime(10 * time.Second),
 	}
 }

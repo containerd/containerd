@@ -17,8 +17,7 @@
 package nri
 
 import (
-	"time"
-
+	"github.com/containerd/containerd/pkg/tomlext"
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 
@@ -33,9 +32,9 @@ type Config struct {
 	// PluginConfigPath is the path to search for plugin-specific configuration.
 	PluginConfigPath string `toml:"plugin_config_path" json:"pluginConfigPath"`
 	// PluginRegistrationTimeout is the timeout for plugin registration.
-	PluginRegistrationTimeout time.Duration `toml:"plugin_registration_timeout" json:"pluginRegistrationTimeout"`
+	PluginRegistrationTimeout tomlext.Duration `toml:"plugin_registration_timeout" json:"pluginRegistrationTimeout"`
 	// PluginRequestTimeout is the timeout for a plugin to handle a request.
-	PluginRequestTimeout time.Duration `toml:"plugin_request_timeout" json:"pluginRequestTimeout"`
+	PluginRequestTimeout tomlext.Duration `toml:"plugin_request_timeout" json:"pluginRequestTimeout"`
 	// DisableConnections disables connections from externally launched plugins.
 	DisableConnections bool `toml:"disable_connections" json:"disableConnections"`
 }
@@ -48,8 +47,8 @@ func DefaultConfig() *Config {
 		PluginPath:       nri.DefaultPluginPath,
 		PluginConfigPath: nri.DefaultPluginConfigPath,
 
-		PluginRegistrationTimeout: nri.DefaultPluginRegistrationTimeout,
-		PluginRequestTimeout:      nri.DefaultPluginRequestTimeout,
+		PluginRegistrationTimeout: tomlext.FromStdTime(nri.DefaultPluginRegistrationTimeout),
+		PluginRequestTimeout:      tomlext.FromStdTime(nri.DefaultPluginRequestTimeout),
 	}
 }
 
@@ -74,9 +73,9 @@ func (c *Config) toOptions() []nri.Option {
 // ConfigureTimeouts sets timeout options for NRI.
 func (c *Config) ConfigureTimeouts() {
 	if c.PluginRegistrationTimeout != 0 {
-		nri.SetPluginRegistrationTimeout(c.PluginRegistrationTimeout)
+		nri.SetPluginRegistrationTimeout(tomlext.ToStdTime(c.PluginRegistrationTimeout))
 	}
 	if c.PluginRequestTimeout != 0 {
-		nri.SetPluginRequestTimeout(c.PluginRequestTimeout)
+		nri.SetPluginRequestTimeout(tomlext.ToStdTime(c.PluginRequestTimeout))
 	}
 }
