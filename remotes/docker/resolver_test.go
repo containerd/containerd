@@ -26,6 +26,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -327,6 +328,36 @@ func TestHostTLSFailureFallbackResolver(t *testing.T) {
 			server.Close()
 			tlsServer.Close()
 		}
+	}
+
+	runBasicTest(t, "testname", sf)
+}
+
+func TestHTTPFallbackResolver(t *testing.T) {
+	sf := func(h http.Handler) (string, ResolverOptions, func()) {
+		s := httptest.NewServer(h)
+		u, err := url.Parse(s.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		client := &http.Client{
+			Transport: HTTPFallback{http.DefaultTransport},
+		}
+		options := ResolverOptions{
+			Hosts: func(host string) ([]RegistryHost, error) {
+				return []RegistryHost{
+					{
+						Client:       client,
+						Host:         u.Host,
+						Scheme:       "https",
+						Path:         "/v2",
+						Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+					},
+				}, nil
+			},
+		}
+		return u.Host, options, s.Close
 	}
 
 	runBasicTest(t, "testname", sf)
