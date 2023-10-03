@@ -70,6 +70,7 @@ func TestNewExporter(t *testing.T) {
 			output: errdefs.ErrNotImplemented,
 		},
 	} {
+		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			t.Logf("input: %v", testcase.input)
 
