@@ -188,7 +188,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 				resp.Body.Close()
 				resp = nil
 			case http.StatusCreated:
-				mountedFrom = path.Join(p.refspec.Locator, fromRepo)
+				mountedFrom = path.Join(p.refspec.Hostname(), fromRepo)
 			}
 		}
 

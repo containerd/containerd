@@ -163,9 +163,9 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTr
 	return dockerPusher{
 		dockerBase: &dockerBase{
 			refspec: reference.Spec{
-				Locator: "sample",
+				Locator: "example.com/samplerepository:latest",
 			},
-			repository: "sample",
+			repository: "samplerepository",
 			hosts: []RegistryHost{
 				{
 					Client:       s.Client(),
@@ -176,7 +176,7 @@ func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTr
 				},
 			},
 		},
-		object:  "sample",
+		object:  "latest",
 		tracker: tracker,
 	}, reg, tracker, s.Close
 }
@@ -354,7 +354,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				ref:               fmt.Sprintf("layer2-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 				annotations: map[string]string{
-					distributionSourceLabelKey("sample"): "always-mount",
+					distributionSourceLabelKey("example.com"): "always-mount",
 				},
 			},
 			checkerFunc: func(writer *pushWriter) bool {
@@ -368,7 +368,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			},
 			wantErr: fmt.Errorf("content %v on remote: %w", digest.FromBytes(layerContent), errdefs.ErrAlreadyExists),
 			wantStatus: &PushStatus{
-				MountedFrom: "sample/always-mount",
+				MountedFrom: "example.com/always-mount",
 				Exists:      false,
 			},
 		},
@@ -383,7 +383,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				ref:               fmt.Sprintf("layer3-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 				annotations: map[string]string{
-					distributionSourceLabelKey("sample"): "never-mount",
+					distributionSourceLabelKey("example.com"): "never-mount",
 				},
 			},
 			checkerFunc: func(writer *pushWriter) bool {
