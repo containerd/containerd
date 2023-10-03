@@ -757,10 +757,10 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	// TODO: Find other way to retrieve sandbox runtime, this must belong to the Runtime part of the CRI.
 	ociRuntime, err := c.getSandboxRuntime(s, runtimeHandler)
 	if err != nil {
-		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s, err: %+v", runtimeHandler, err)
+		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s: %w", runtimeHandler, err)
 	}
 
-	snapshotter = c.RuntimeSnapshotter(context.Background(), ociRuntime)
+	snapshotter = c.RuntimeSnapshotter(ctx, ociRuntime)
 	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	return snapshotter, nil
 }

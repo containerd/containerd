@@ -19,7 +19,6 @@ package images
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"testing"
 
 	docker "github.com/distribution/reference"
@@ -383,7 +382,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 		desc              string
 		podSandboxConfig  *runtime.PodSandboxConfig
 		expectSnapshotter string
-		expectErr         error
+		expectErr         bool
 	}{
 		{
 			desc:              "should return default snapshotter for nil podSandboxConfig",
@@ -408,7 +407,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 					annotations.RuntimeHandler: "runtime-not-exists",
 				},
 			},
-			expectErr:         fmt.Errorf(`experimental: failed to get sandbox runtime for runtime-not-exists, err: no runtime for "runtime-not-exists" is configured`),
+			expectErr:         true,
 			expectSnapshotter: "",
 		},
 		{
@@ -432,7 +431,9 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			}
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
-			assert.Equal(t, tt.expectErr, err)
+			if tt.expectErr {
+				assert.Error(t, err)
+			}
 		})
 	}
 }
