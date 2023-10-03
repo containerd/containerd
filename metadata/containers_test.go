@@ -619,6 +619,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			},
 		},
 	} {
+		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			testcase.original.ID = testcase.name
 			if testcase.input.ID == "" {

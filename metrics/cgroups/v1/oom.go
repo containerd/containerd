@@ -98,6 +98,7 @@ func (o *oomCollector) Collect(ch chan<- prometheus.Metric) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range o.set {
+		t := t
 		c := atomic.LoadInt64(&t.count)
 		ch <- prometheus.MustNewConstMetric(o.desc, prometheus.CounterValue, float64(c), t.id, t.namespace)
 	}
