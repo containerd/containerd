@@ -481,6 +481,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			cause: errdefs.ErrNotFound,
 		},
 	} {
+		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			testcase.original.Name = testcase.name
 			if testcase.input.Name == "" {
