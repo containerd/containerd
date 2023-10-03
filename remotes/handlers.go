@@ -71,17 +71,17 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 		}
 	}
 
-	switch mt := desc.MediaType; {
-	case mt == images.MediaTypeDockerSchema2Manifest || mt == ocispec.MediaTypeImageManifest:
+	switch {
+	case images.IsManifestType(desc.MediaType):
 		return "manifest-" + key
-	case mt == images.MediaTypeDockerSchema2ManifestList || mt == ocispec.MediaTypeImageIndex:
+	case images.IsIndexType(desc.MediaType):
 		return "index-" + key
-	case images.IsLayerType(mt):
+	case images.IsLayerType(desc.MediaType):
 		return "layer-" + key
-	case images.IsKnownConfig(mt):
+	case images.IsKnownConfig(desc.MediaType):
 		return "config-" + key
 	default:
-		log.G(ctx).Warnf("reference for unknown type: %s", mt)
+		log.G(ctx).Warnf("reference for unknown type: %s", desc.MediaType)
 		return "unknown-" + key
 	}
 }
@@ -90,23 +90,21 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // discovered in a call to Dispatch. Use with ChildrenHandler to do a full
 // recursive fetch.
 func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
 			"size":      desc.Size,
 		}))
 
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema1Manifest:
+		if desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 			return nil, fmt.Errorf("%v not supported", desc.MediaType)
-		default:
-			err := Fetch(ctx, ingester, fetcher, desc)
-			if errdefs.IsAlreadyExists(err) {
-				return nil, nil
-			}
-			return nil, err
 		}
+		err := Fetch(ctx, ingester, fetcher, desc)
+		if errdefs.IsAlreadyExists(err) {
+			return nil, nil
+		}
+		return nil, err
 	}
 }
 
@@ -214,20 +212,18 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 	indexStack := []ocispec.Descriptor{}
 
 	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		if images.IsManifestType(desc.MediaType) {
 			m.Lock()
 			manifests = append(manifests, desc)
 			m.Unlock()
 			return nil, images.ErrStopHandler
-		case images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
+		} else if images.IsIndexType(desc.MediaType) {
 			m.Lock()
 			indexStack = append(indexStack, desc)
 			m.Unlock()
 			return nil, images.ErrStopHandler
-		default:
-			return nil, nil
 		}
+		return nil, nil
 	})
 
 	pushHandler := PushHandler(pusher, store)
@@ -318,24 +314,16 @@ func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) 
 			return children, nil
 		}
 
-		var descs []ocispec.Descriptor
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
-			if m.Match(*desc.Platform) {
-				descs = children
-			} else {
-				for _, child := range children {
-					if child.MediaType == images.MediaTypeDockerSchema2Config ||
-						child.MediaType == ocispec.MediaTypeImageConfig {
-
-						descs = append(descs, child)
-					}
+		if images.IsManifestType(desc.MediaType) && !m.Match(*desc.Platform) {
+			var descs []ocispec.Descriptor
+			for _, child := range children {
+				if images.IsConfigType(child.MediaType) {
+					descs = append(descs, child)
 				}
 			}
-		default:
-			descs = children
+			return descs, nil
 		}
-		return descs, nil
+		return children, nil
 	}
 }
 
@@ -350,10 +338,7 @@ func annotateDistributionSourceHandler(f images.HandlerFunc, provider content.In
 
 		// Distribution source is only used for config or blob but may be inherited from
 		// a manifest or manifest list
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest,
-			images.MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex:
-		default:
+		if !images.IsManifestType(desc.MediaType) && !images.IsIndexType(desc.MediaType) {
 			return children, nil
 		}
 

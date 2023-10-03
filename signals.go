@@ -57,24 +57,23 @@ func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (s
 	if err != nil {
 		return "", err
 	}
+	if !images.IsConfigType(ic.MediaType) {
+		return "", fmt.Errorf("unknown image config media type %s", ic.MediaType)
+	}
+
 	var (
 		ociimage v1.Image
 		config   v1.ImageConfig
 	)
-	switch ic.MediaType {
-	case v1.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
-		p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
-		if err != nil {
-			return "", err
-		}
-
-		if err := json.Unmarshal(p, &ociimage); err != nil {
-			return "", err
-		}
-		config = ociimage.Config
-	default:
-		return "", fmt.Errorf("unknown image config media type %s", ic.MediaType)
+	p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
+	if err != nil {
+		return "", err
 	}
+
+	if err = json.Unmarshal(p, &ociimage); err != nil {
+		return "", err
+	}
+	config = ociimage.Config
 
 	if config.StopSignal == "" {
 		return defaultSignal, nil

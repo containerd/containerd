@@ -179,8 +179,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			return children, err
 		}
 
-		switch desc.MediaType {
-		case images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+		if images.IsManifestType(desc.MediaType) {
 			var nonLayers []ocispec.Descriptor
 			var manifestLayers []ocispec.Descriptor
 			// Split layers from non-layers, layers will be handled after
@@ -203,7 +202,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			lock.Unlock()
 
 			children = nonLayers
-		case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+		} else if images.IsConfigType(desc.MediaType) {
 			lock.Lock()
 			l := layers[desc.Digest]
 			lock.Unlock()
