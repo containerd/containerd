@@ -36,6 +36,7 @@ VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 REVISION ?= $(shell git rev-parse HEAD)$(shell if ! git diff --no-ext-diff --quiet --exit-code; then echo .m; fi)
 PACKAGE=github.com/containerd/containerd
 SHIM_CGO_ENABLED ?= 0
+COMMIT=$(shell git rev-parse HEAD)
 
 ifneq "$(strip $(shell command -v $(GO) 2>/dev/null))" ""
 	GOOS ?= $(shell $(GO) env GOOS)
@@ -145,6 +146,9 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 TESTFLAGS ?= $(TESTFLAGS_RACE) $(EXTRA_TESTFLAGS)
 TESTFLAGS_PARALLEL ?= 8
 
+# Flags passed to `go test -bench` for constant run count benchmarks
+BENCHFLAGS_COUNT ?= -count=10 -benchtime=1x
+
 # Use this to replace `go test` with, for instance, `gotestsum`
 GOTEST ?= $(GO) test
 
@@ -236,9 +240,26 @@ bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/cni-bridge-fp
 
-benchmark: ## run benchmarks tests
+benchmark: ## run non-integration benchmarks tests
 	@echo "$(WHALE) $@"
-	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark -test.root
+	@$(MAKE) --no-print-directory _benchmark
+
+_benchmark:
+	@$(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH ./...
+
+benchmark-integration-client: ## run client integration benchmarks tests
+	@echo "$(WHALE) $@"
+	@$(MAKE) --no-print-directory _benchmark-integration-client
+
+_benchmark-integration-client:
+	@cd "${ROOTDIR}/integration/client" && $(GO) test ${TESTFLAGS} -bench . -run NEVERMATCH -test.root
+
+benchmark-integration-benchmark: ## run non-averaged integration benchmarks tests
+	@echo "$(WHALE) $@"
+	@$(MAKE) --no-print-directory _benchmark-integration-benchmark
+
+_benchmark-integration-benchmark:
+	@cd "${ROOTDIR}/integration/benchmark" && $(GO) test ${TESTFLAGS} ${BENCHFLAGS_COUNT} -bench . -run NEVERMATCH -test.root
 
 FORCE:
 
