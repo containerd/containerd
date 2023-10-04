@@ -416,3 +416,10 @@ func (is *simpleImageStore) Delete(ctx context.Context, name string, opts ...ima
 
 	return nil
 }
+
+func (is *simpleImageStore) Count(ctx context.Context) (int64, error) {
+	is.l.Lock()
+	defer is.l.Unlock()
+
+	return int64(len(is.images)), nil
+}

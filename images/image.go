@@ -83,6 +83,8 @@ type Store interface {
 	Update(ctx context.Context, image Image, fieldpaths ...string) (Image, error)
 
 	Delete(ctx context.Context, name string, opts ...DeleteOpt) error
+
+	Count(ctx context.Context) (int64, error)
 }
 
 // TODO(stevvooe): Many of these functions make strong platform assumptions,

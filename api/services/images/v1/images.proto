@@ -54,6 +54,9 @@ service Images {
 
 	// Delete deletes the image by name.
 	rpc Delete(DeleteImageRequest) returns (google.protobuf.Empty);
+
+	// Count the number of images.
+	rpc Count(google.protobuf.Empty) returns (CountImagesResponse);
 }
 
 message Image {
@@ -140,4 +143,8 @@ message DeleteImageRequest {
 	//
 	// Default is false
 	bool sync = 2;
+}
+
+message CountImagesResponse {
+	int64 count = 1;
 }
