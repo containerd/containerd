@@ -1,0 +1,37 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.6"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The seventh patch release for containerd 1.7 contains various fixes and updates.
+
+### Notable Updates
+
+* **Require plugins to succeed after registering readiness** ([#9165](https://github.com/containerd/containerd/pull/9165))
+* **Handle unexpected shim kill events** ([#9132](https://github.com/containerd/containerd/pull/9132))
+* **Build binaries with Go 1.21.1** ([#9167](https://github.com/containerd/containerd/pull/9167))
+* **cri: Stop recommending disable_cgroup** ([#9168](https://github.com/containerd/containerd/pull/9168))
+* **remotes/docker: Fix MountedFrom prefixed with target repository** ([#9193](https://github.com/containerd/containerd/pull/9193))
+* **remotes: always try to establish tls connection when tls configured** ([#9188](https://github.com/containerd/containerd/pull/9188))
+* **NRI: Add support for rlimits** ([#48](https://github.com/containerd/nri/pull/48))
+
+See the changelog for complete list of changes"""
