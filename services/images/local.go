@@ -176,7 +176,14 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
 	log.G(ctx).WithField("name", req.Name).Debugf("delete image")
 
-	if err := l.store.Delete(ctx, req.Name); err != nil {
+	var opts []images.DeleteOpt
+	if req.Target != nil {
+		desc := descFromProto(req.Target)
+		opts = append(opts, images.DeleteTarget(&desc))
+	}
+
+	// Sync option handled here after event is published
+	if err := l.store.Delete(ctx, req.Name, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 

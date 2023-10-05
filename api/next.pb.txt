@@ -4253,6 +4253,19 @@ file {
       type: TYPE_BOOL
       json_name: "sync"
     }
+    field {
+      name: "target"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Descriptor"
+      oneof_index: 0
+      json_name: "target"
+      proto3_optional: true
+    }
+    oneof_decl {
+      name: "_target"
+    }
   }
   service {
     name: "Images"

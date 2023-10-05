@@ -58,6 +58,7 @@ type Image struct {
 // DeleteOptions provide options on image delete
 type DeleteOptions struct {
 	Synchronous bool
+	Target      *ocispec.Descriptor
 }
 
 // DeleteOpt allows configuring a delete operation
@@ -68,6 +69,16 @@ type DeleteOpt func(context.Context, *DeleteOptions) error
 func SynchronousDelete() DeleteOpt {
 	return func(ctx context.Context, o *DeleteOptions) error {
 		o.Synchronous = true
+		return nil
+	}
+}
+
+// DeleteTarget is used to specify the target value an image is expected
+// to have when deleting. If the image has a different target, then
+// NotFound is returned.
+func DeleteTarget(target *ocispec.Descriptor) DeleteOpt {
+	return func(ctx context.Context, o *DeleteOptions) error {
+		o.Target = target
 		return nil
 	}
 }

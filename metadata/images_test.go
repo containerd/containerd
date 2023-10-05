@@ -154,10 +154,11 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 		name       string
 		original   images.Image
 		createerr  error
-		input      images.Image
+		input      images.Image // Input target size determines target digest, base image uses 10
 		fieldpaths []string
 		expected   images.Image
 		cause      error
+		deleteerr  error
 	}{
 		{
 			name:     "Touch",
@@ -239,7 +240,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"boo": "boo",
 				},
 				Target: ocispec.Descriptor{
-					Size:      20,                                 // ignored
+					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
 						"not": "bar",
@@ -272,7 +273,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"boo": "boo",
 				},
 				Target: ocispec.Descriptor{
-					Size:      20,                                 // ignored
+					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
 						"foo": "boo",
@@ -303,7 +304,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"baz": "bunk",
 				},
 				Target: ocispec.Descriptor{
-					Size:      20,                                 // ignored
+					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
 						"foo": "bar",
@@ -335,7 +336,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"baz": "bunk",
 				},
 				Target: ocispec.Descriptor{
-					Size:      20,                                 // ignored
+					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
 						"foo": "baz",
@@ -360,7 +361,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			},
 		},
 		{
-			name:     "ReplaceTarget", // target must be updated as a unit
+			name:     "ReplaceTargetTypeAndAnnotations", // target must be updated as a unit
 			original: imageBase(),
 			input: images.Image{
 				Target: ocispec.Descriptor{
@@ -385,6 +386,57 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name:     "ReplaceTargetFieldpath", // target must be updated as a unit
+			original: imageBase(),
+			input: images.Image{
+				Target: ocispec.Descriptor{
+					Size:      20,
+					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
+				},
+			},
+			fieldpaths: []string{"target"},
+			expected: images.Image{
+				Labels: map[string]string{ // Labels not updated
+					"foo": "bar",
+					"baz": "boo",
+				},
+				Target: ocispec.Descriptor{
+					Size:      20,
+					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
+				},
+			},
+			deleteerr: errdefs.ErrNotFound,
+		},
+		{
+			name:     "ReplaceTarget", // target must be updated as a unit
+			original: imageBase(),
+			input: images.Image{
+				Target: ocispec.Descriptor{
+					Size:      20,
+					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
+				},
+			},
+			expected: images.Image{
+				Target: ocispec.Descriptor{
+					Size:      20,
+					MediaType: "application/vnd.oci.blab+replaced",
+					Annotations: map[string]string{
+						"fox": "dog",
+					},
+				},
+			},
+			deleteerr: errdefs.ErrNotFound,
 		},
 		{
 			name:     "EmptySize",
@@ -487,11 +539,9 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			}
 			testcase.expected.Name = testcase.name
 
-			if testcase.original.Target.Digest == "" {
-				testcase.original.Target.Digest = digest.FromString(testcase.name)
-				testcase.input.Target.Digest = testcase.original.Target.Digest
-				testcase.expected.Target.Digest = testcase.original.Target.Digest
-			}
+			testcase.original.Target.Digest = digest.FromString(fmt.Sprintf("%s-%d", testcase.name, testcase.original.Target.Size))
+			testcase.input.Target.Digest = digest.FromString(fmt.Sprintf("%s-%d", testcase.name, testcase.input.Target.Size))
+			testcase.expected.Target.Digest = testcase.input.Target.Digest
 
 			// Create
 			now := time.Now()
@@ -539,6 +589,22 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			}
 
 			checkImagesEqual(t, &result, &testcase.expected, "get after failed to get expected result")
+
+			if testcase.original.Target.Digest != testcase.expected.Target.Digest {
+				t.Log("Delete should fail")
+			}
+			// Delete
+			err = store.Delete(ctx, testcase.original.Name, images.DeleteTarget(&testcase.original.Target))
+			if err != nil {
+				if testcase.deleteerr == nil {
+					t.Fatal(err)
+				}
+				if !errors.Is(err, testcase.deleteerr) {
+					t.Fatal("unexpected error", err, ", expected", testcase.deleteerr)
+				}
+			} else if testcase.deleteerr != nil {
+				t.Fatal("no error on deleted, expected", testcase.deleteerr)
+			}
 		})
 	}
 }
