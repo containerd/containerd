@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -32,12 +33,14 @@ import (
 )
 
 func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
-	plugins, err := server.LoadPlugins(gocontext.Background(), config)
+	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
 	}
 	if len(plugins) != 0 {
-		config.Plugins = make(map[string]interface{})
+		if config.Plugins == nil {
+			config.Plugins = make(map[string]interface{})
+		}
 		for _, p := range plugins {
 			if p.Config == nil {
 				continue
@@ -65,10 +68,10 @@ func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 	// for the time being, keep the defaultConfig's version set at 1 so that
 	// when a config without a version is loaded from disk and has no version
 	// set, we assume it's a v1 config.  But when generating new configs via
-	// this command, generate the v2 config
-	config.Version = 2
+	// this command, generate the max configuration version
+	config.Version = srvconfig.CurrentConfigVersion
 
-	return toml.NewEncoder(os.Stdout).Encode(config)
+	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {
@@ -99,16 +102,38 @@ var configCommand = cli.Command{
 				return outputConfig(ctx, config)
 			},
 		},
+		{
+			Name:  "migrate",
+			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
+			Action: func(context *cli.Context) error {
+				config := defaultConfig()
+				ctx := gocontext.Background()
+				if err := srvconfig.LoadConfig(ctx, context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+
+				if config.Version < srvconfig.CurrentConfigVersion {
+					plugins := plugin.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+					for _, p := range plugins {
+						if p.ConfigMigration != nil {
+							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+								return err
+							}
+						}
+					}
+				}
+
+				config.Version = srvconfig.CurrentConfigVersion
+
+				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+			},
+		},
 	},
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		// see: https://github.com/containerd/containerd/blob/5c6ea7fdc1247939edaddb1eba62a94527418687/RELEASES.md#daemon-configuration
-		// this version MUST remain set to 1 until either there exists a means to
-		// override / configure the default at the containerd cli .. or when
-		// version 1 is no longer supported
-		Version: 1,
+		Version: srvconfig.CurrentConfigVersion,
 		Root:    defaults.DefaultRootDir,
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{

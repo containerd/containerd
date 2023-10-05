@@ -14,6 +14,12 @@
    limitations under the License.
 */
 
+// config is the global configuration for containerd
+//
+// Version History
+// 1: Deprecated and removed in containerd 2.0
+// 2: Uses fully qualified plugin names
+// 3: Added support for migration and warning on unknown fields
 package config
 
 import (
@@ -33,6 +39,9 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/log"
 )
+
+// CurrentConfigVersion is the max config version which is supported
+const CurrentConfigVersion = 3
 
 // NOTE: Any new map fields added also need to be handled in mergeConfig.
 
@@ -100,17 +109,18 @@ func (c *Config) GetVersion() int {
 	return c.Version
 }
 
-// ValidateV2 validates the config for a v2 file
-func (c *Config) ValidateV2() error {
-	switch version := c.GetVersion(); version {
-	case 1:
+// ValidateVersion validates the config for a v2 file
+func (c *Config) ValidateVersion() error {
+	version := c.GetVersion()
+	if version == 1 {
 		return errors.New("containerd config version `1` is no longer supported since containerd v2.0, please switch to version `2`, " +
 			"see https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md#version-header")
-	case 2:
-		// NOP
-	default:
-		return fmt.Errorf("expected containerd config version `2`, got `%d`", version)
 	}
+
+	if version > CurrentConfigVersion {
+		return fmt.Errorf("expected containerd config version equal to or less than `%d`, got `%d`", CurrentConfigVersion, version)
+	}
+
 	for _, p := range c.DisabledPlugins {
 		if !strings.HasPrefix(p, "io.containerd.") || len(strings.SplitN(p, ".", 4)) < 4 {
 			return fmt.Errorf("invalid disabled plugin URI %q expect io.containerd.x.vx", p)
@@ -253,7 +263,7 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 		out.Imports = append(out.Imports, path)
 	}
 
-	err := out.ValidateV2()
+	err := out.ValidateVersion()
 	if err != nil {
 		return fmt.Errorf("failed to load TOML from %s: %w", path, err)
 	}
