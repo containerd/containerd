@@ -102,9 +102,9 @@ func testCompressDecompress(t testing.TB, size int, compression Compression) Dec
 }
 
 func TestCompressDecompressGzip(t *testing.T) {
-	oldUnpigzPath := unpigzPath
-	unpigzPath = ""
-	defer func() { unpigzPath = oldUnpigzPath }()
+	oldUnpigzPath := gzipPath
+	gzipPath = ""
+	defer func() { gzipPath = oldUnpigzPath }()
 
 	decompressor := testCompressDecompress(t, 1024*1024, Gzip)
 	wrapper := decompressor.(*readCloserWrapper)
@@ -148,7 +148,7 @@ func TestDetectPigz(t *testing.T) {
 
 	t.Setenv("PATH", tempPath)
 
-	if pigzPath := detectPigz(); pigzPath == "" {
+	if pigzPath := detectCommand("unpigz", disablePigzEnv); pigzPath == "" {
 		t.Fatal("failed to detect pigz path")
 	} else if pigzPath != fullPath {
 		t.Fatalf("wrong pigz found: %s != %s", pigzPath, fullPath)
@@ -156,7 +156,7 @@ func TestDetectPigz(t *testing.T) {
 
 	t.Setenv(disablePigzEnv, "1")
 
-	if pigzPath := detectPigz(); pigzPath != "" {
+	if pigzPath := detectCommand("unpigz", disablePigzEnv); pigzPath != "" {
 		t.Fatalf("disable via %s doesn't work", disablePigzEnv)
 	}
 }
