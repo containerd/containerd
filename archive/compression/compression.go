@@ -303,25 +303,22 @@ func cmdStream(cmd *exec.Cmd, in io.Reader) (io.ReadCloser, error) {
 }
 
 func detectCommand(path, disableEnvName string) string {
+	// Check if this command is disabled via the env variable
+	value := os.Getenv(disableEnvName)
+	if value != "" {
+		disable, err := strconv.ParseBool(value)
+		if err != nil {
+			log.L.WithError(err).Warnf("could not parse %s: %s", disableEnvName, value)
+		}
+
+		if disable {
+			return ""
+		}
+	}
+
 	path, err := exec.LookPath(path)
 	if err != nil {
 		log.L.WithError(err).Debugf("%s not found", path)
-		return ""
-	}
-
-	// Check if this command is disabled via the env variable
-	value := os.Getenv(disableEnvName)
-	if value == "" {
-		return path
-	}
-
-	disable, err := strconv.ParseBool(value)
-	if err != nil {
-		log.L.WithError(err).Warnf("could not parse %s: %s", disableEnvName, value)
-		return path
-	}
-
-	if disable {
 		return ""
 	}
 
