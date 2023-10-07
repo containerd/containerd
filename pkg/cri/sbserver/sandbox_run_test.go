@@ -145,7 +145,7 @@ func TestSelectPodIP(t *testing.T) {
 		},
 		{
 			desc:                  "ipv6 should be picked even if ipv4 comes first",
-			ips:                   []string{"2001:db8:85a3::8a2e:370:7334", "192.168.17.43"},
+			ips:                   []string{"192.168.17.43", "2001:db8:85a3::8a2e:370:7334"},
 			expectedIP:            "2001:db8:85a3::8a2e:370:7334",
 			expectedAdditionalIPs: []string{"192.168.17.43"},
 			pref:                  "ipv6",
