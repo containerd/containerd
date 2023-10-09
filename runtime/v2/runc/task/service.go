@@ -137,11 +137,14 @@ type containerProcess struct {
 // that its exit can be handled efficiently. If the process has already exited,
 // it handles the exit immediately. handleStarted should be called after the
 // event announcing the start of the process has been published.
+// Note that handleStarted needs to be aware of whether s.mu is already held
+// when it is called. If s.mu has been held, we don't need to lock it when
+// calling handleProcessExit.
 //
 // The returned cleanup closure releases resources used to handle early exits.
 // It must be called before the caller of preStart returns, otherwise severe
 // memory leaks will occur.
-func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Container, process.Process), cleanup func()) {
+func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Container, process.Process, bool), cleanup func()) {
 	exits := make(map[int][]runcC.Exit)
 
 	s.lifecycleMu.Lock()
@@ -165,7 +168,7 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		}
 	}
 
-	handleStarted = func(c *runc.Container, p process.Process) {
+	handleStarted = func(c *runc.Container, p process.Process, muLocked bool) {
 		var pid int
 		if p != nil {
 			pid = p.Pid()
@@ -180,7 +183,13 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		} else if exited {
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
-				s.handleProcessExit(ee, c, p)
+				if muLocked {
+					s.handleProcessExit(ee, c, p)
+				} else {
+					s.mu.Lock()
+					s.handleProcessExit(ee, c, p)
+					s.mu.Unlock()
+				}
 			}
 		} else {
 			s.running[pid] = append(s.running[pid], containerProcess{
@@ -235,7 +244,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	// could happen would also cause the container.Pid() call above to
 	// nil-deference panic.
 	proc, _ := container.Process("")
-	handleStarted(container, proc)
+	handleStarted(container, proc, true)
 
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(container.Pid()),
@@ -262,7 +271,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	defer cleanup()
 	p, err := container.Start(ctx, r)
 	if err != nil {
-		handleStarted(container, p)
+		handleStarted(container, p, false)
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -302,7 +311,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			Pid:         uint32(p.Pid()),
 		})
 	}
-	handleStarted(container, p)
+	handleStarted(container, p, false)
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
 	}, nil
@@ -462,7 +471,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 	if err != nil {
 		return nil, err
 	}
-	pids, err := s.getContainerPids(ctx, r.ID)
+	pids, err := s.getContainerPids(ctx, container)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -631,7 +640,9 @@ func (s *service) processExits() {
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
+			s.mu.Lock()
 			s.handleProcessExit(e, cp.Container, cp.Process)
+			s.mu.Unlock()
 		}
 	}
 }
@@ -640,10 +651,8 @@ func (s *service) send(evt interface{}) {
 	s.events <- evt
 }
 
+// s.mu must be locked when calling handleProcessExit
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if ip, ok := p.(*process.Init); ok {
 		// Ensure all children are killed
 		if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
@@ -664,16 +673,12 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 	})
 }
 
-func (s *service) getContainerPids(ctx context.Context, id string) ([]uint32, error) {
-	container, err := s.getContainer(id)
-	if err != nil {
-		return nil, err
-	}
+func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
 	p, err := container.Process("")
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	ps, err := p.(*process.Init).Runtime().Ps(ctx, id)
+	ps, err := p.(*process.Init).Runtime().Ps(ctx, container.ID)
 	if err != nil {
 		return nil, err
 	}
