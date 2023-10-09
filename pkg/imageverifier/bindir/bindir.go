@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/pkg/imageverifier"
+	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -37,9 +38,9 @@ import (
 const outputLimitBytes = 1 << 15 // 32 KiB
 
 type Config struct {
-	BinDir             string        `toml:"bin_dir"`
-	MaxVerifiers       int           `toml:"max_verifiers"`
-	PerVerifierTimeout time.Duration `toml:"per_verifier_timeout"`
+	BinDir             string           `toml:"bin_dir"`
+	MaxVerifiers       int              `toml:"max_verifiers"`
+	PerVerifierTimeout tomlext.Duration `toml:"per_verifier_timeout"`
 }
 
 type ImageVerifier struct {
@@ -110,7 +111,7 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 }
 
 func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, v.config.PerVerifierTimeout)
+	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 
 	binPath := filepath.Join(v.config.BinDir, bin)
