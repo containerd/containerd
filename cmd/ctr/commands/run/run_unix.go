@@ -327,6 +327,10 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			opts = append(opts, oci.WithCPUCFS(quota, period))
 		}
 
+		if burst := context.Uint64("cpu-burst"); burst != 0 {
+			opts = append(opts, oci.WithCPUBurst(burst))
+		}
+
 		joinNs := context.StringSlice("with-ns")
 		for _, ns := range joinNs {
 			nsType, nsPath, ok := strings.Cut(ns, ":")

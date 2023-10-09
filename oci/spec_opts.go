@@ -1535,6 +1535,15 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
 	}
 }
 
+// WithCPUBurst sets the container's cpu burst
+func WithCPUBurst(burst uint64) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setCPU(s)
+		s.Linux.Resources.CPU.Burst = &burst
+		return nil
+	}
+}
+
 // WithCPURT sets the container's realtime scheduling (RT) runtime and period.
 func WithCPURT(runtime int64, period uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
