@@ -16,4 +16,6 @@
 
 package builtins
 
-import _ "github.com/containerd/zfs/plugin"
+// Temporarily removed while plugin package is moved, to be added back
+// before 2.0.
+//import _ "github.com/containerd/zfs/plugin"
