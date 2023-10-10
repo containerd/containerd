@@ -21,7 +21,6 @@ require (
 	github.com/containerd/nri v0.5.0
 	github.com/containerd/ttrpc v1.2.2
 	github.com/containerd/typeurl/v2 v2.1.1
-	github.com/containerd/zfs v1.2.0
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.3.0
 	github.com/coreos/go-systemd/v22 v22.5.0
@@ -103,7 +102,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
-	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
