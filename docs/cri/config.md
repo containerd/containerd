@@ -471,17 +471,23 @@ version = 2
 ## Registry Configuration
 
 Here is a simple example for a default registry hosts configuration. Set
-`config_path = "/etc/containerd/certs.d"` in your config.toml for containerd.
+`config_path = "/etc/containerd/hosts.d"` in your config.toml for containerd.
 Make a directory tree at the config path that includes `docker.io` as a directory
 representing the host namespace to be configured. Then add a `hosts.toml` file
 in the `docker.io` to configure the host namespace. It should look like this:
 ```
-$ tree /etc/containerd/certs.d
-/etc/containerd/certs.d
-└── docker.io
-    └── hosts.toml
 
-$ cat /etc/containerd/certs.d/docker.io/hosts.toml
+$ tree /etc/containerd
+/etc/containerd/
+├── hosts.d
+│   └── ca.pem
+└── hosts.d
+    ├── 192.168.12.34:5000
+    │   └── hosts.toml
+    └── docker.io
+        └── hosts.toml
+
+$ cat /etc/containerd/hosts.d/docker.io/hosts.toml
 server = "https://docker.io"
 
 [host."https://registry-1.docker.io"]
@@ -491,11 +497,11 @@ server = "https://docker.io"
 To specify a custom certificate:
 
 ```
-$ cat /etc/containerd/certs.d/192.168.12.34:5000/hosts.toml
+$ cat /etc/containerd/hosts.d/192.168.12.34:5000/hosts.toml
 server = "https://192.168.12.34:5000"
 
 [host."https://192.168.12.34:5000"]
-  ca = "/path/to/ca.crt"
+  ca = "/etc/containerd/hosts.d/ca.pem"
 ```
 
 See [`docs/hosts.md`](https://github.com/containerd/containerd/blob/main/docs/hosts.md) for the further information.
