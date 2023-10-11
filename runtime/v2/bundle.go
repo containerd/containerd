@@ -26,11 +26,10 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
-
-const configFilename = "config.json"
 
 // LoadBundle loads an existing bundle from disk
 func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
@@ -107,9 +106,10 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	}
 	if spec := spec.GetValue(); spec != nil {
 		// write the spec to the bundle
-		err = os.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
+		specPath := filepath.Join(b.Path, oci.ConfigFilename)
+		err = os.WriteFile(specPath, spec, 0666)
 		if err != nil {
-			return nil, fmt.Errorf("failed to write %s", configFilename)
+			return nil, fmt.Errorf("failed to write bundle spec: %w", err)
 		}
 	}
 	return b, nil
