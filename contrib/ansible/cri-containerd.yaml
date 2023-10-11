@@ -32,13 +32,13 @@
         value: 1
 
     - name: "Check kubelet args in kubelet config (Ubuntu)"
-      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf || true
       register: check_args
       when: ansible_distribution == "Ubuntu"
 
     - name: "Add runtime args in kubelet conf (Ubuntu)"
       lineinfile:
-        dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+        dest: "/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf"
         line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
       when: ansible_distribution == "Ubuntu" and check_args.stdout == ""
