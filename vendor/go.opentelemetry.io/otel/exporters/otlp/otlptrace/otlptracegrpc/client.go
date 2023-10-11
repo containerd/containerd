@@ -26,9 +26,11 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"go.opentelemetry.io/otel/exporters/otlp/internal/retry"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
@@ -128,13 +130,16 @@ var errAlreadyStopped = errors.New("the client is already stopped")
 // If the client has already stopped, an error will be returned describing
 // this.
 func (c *client) Stop(ctx context.Context) error {
+	// Make sure to return context error if the context is done when calling this method.
+	err := ctx.Err()
+
 	// Acquire the c.tscMu lock within the ctx lifetime.
 	acquired := make(chan struct{})
 	go func() {
 		c.tscMu.Lock()
 		close(acquired)
 	}()
-	var err error
+
 	select {
 	case <-ctx.Done():
 		// The Stop timeout is reached. Kill any remaining exports to force
@@ -196,9 +201,17 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 	defer cancel()
 
 	return c.requestFunc(ctx, func(iCtx context.Context) error {
-		_, err := c.tsc.Export(iCtx, &coltracepb.ExportTraceServiceRequest{
+		resp, err := c.tsc.Export(iCtx, &coltracepb.ExportTraceServiceRequest{
 			ResourceSpans: protoSpans,
 		})
+		if resp != nil && resp.PartialSuccess != nil {
+			msg := resp.PartialSuccess.GetErrorMessage()
+			n := resp.PartialSuccess.GetRejectedSpans()
+			if n != 0 || msg != "" {
+				err := internal.TracePartialSuccessError(n, msg)
+				otel.Handle(err)
+			}
+		}
 		// nil is converted to OK.
 		if status.Code(err) == codes.OK {
 			// Success.
@@ -246,7 +259,6 @@ func (c *client) exportContext(parent context.Context) (context.Context, context
 // retryable returns if err identifies a request that can be retried and a
 // duration to wait for if an explicit throttle time is included in err.
 func retryable(err error) (bool, time.Duration) {
-	//func retryable(err error) (bool, time.Duration) {
 	s := status.Convert(err)
 	switch s.Code() {
 	case codes.Canceled,
@@ -265,11 +277,22 @@ func retryable(err error) (bool, time.Duration) {
 
 // throttleDelay returns a duration to wait for if an explicit throttle time
 // is included in the response status.
-func throttleDelay(status *status.Status) time.Duration {
-	for _, detail := range status.Details() {
+func throttleDelay(s *status.Status) time.Duration {
+	for _, detail := range s.Details() {
 		if t, ok := detail.(*errdetails.RetryInfo); ok {
 			return t.RetryDelay.AsDuration()
 		}
 	}
 	return 0
+}
+
+// MarshalLog is the marshaling function used by the logging system to represent this Client.
+func (c *client) MarshalLog() interface{} {
+	return struct {
+		Type     string
+		Endpoint string
+	}{
+		Type:     "otlphttpgrpc",
+		Endpoint: c.endpoint,
+	}
 }
