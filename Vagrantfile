@@ -200,6 +200,19 @@ EOF
       SHELL
   end
 
+  config.vm.provision "install-failpoint-binaries", type: "shell",  run: "once" do |sh|
+      sh.upload_path = "/tmp/vagrant-install-failpoint-binaries"
+      sh.inline = <<~SHELL
+        #!/usr/bin/env bash
+        source /etc/environment
+        source /etc/profile.d/sh.local
+        set -eux -o pipefail
+        ${GOPATH}/src/github.com/containerd/containerd/script/setup/install-failpoint-binaries
+        chcon -v -t container_runtime_exec_t $(type -ap containerd-shim-runc-fp-v1)
+        containerd-shim-runc-fp-v1 -v
+      SHELL
+  end
+
   # SELinux is Enforcing by default.
   # To set SELinux as Disabled on a VM that has already been provisioned:
   #   SELINUX=Disabled vagrant up --provision-with=selinux
