@@ -245,7 +245,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2019, windows-2022]
-        disable_cri_sandboxes: ["", "legacyCRI"]
 
     defaults:
       run:
@@ -337,7 +336,6 @@ jobs:
       - name: Integration 1
         env:
           CGO_ENABLED: 1
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
           EXTRA_TESTFLAGS: "-timeout=20m"
@@ -355,7 +353,6 @@ jobs:
           TESTFLAGS_PARALLEL: 1
           EXTRA_TESTFLAGS: "-short"
           CGO_ENABLED: 1
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: mingw32-make.exe integration
@@ -368,14 +365,12 @@ jobs:
 
       - name: CRI Integration Test
         env:
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
         run: |
           make cri-integration
 
       - name: cri-tools critest
         env:
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
         shell: powershell
         run: |
@@ -411,7 +406,6 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc, crun]
-        DISABLE_CRI_SANDBOXES: ["", "legacyCRI"]
 
     env:
       GOTEST: gotestsum --
@@ -466,7 +460,6 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-serial-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-serial-gotest.json
         run: |
@@ -485,7 +478,6 @@ jobs:
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
           RUNC_FLAVOR: ${{ matrix.runc }}
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
           GOTESTSUM_JSONFILE: ${{github.workspace}}/test-integration-parallel-gotest.json
         run: |
@@ -502,14 +494,12 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
-          DISABLE_CRI_SANDBOXES: ${{ matrix.disable_cri_sandboxes }}
         run: |
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
