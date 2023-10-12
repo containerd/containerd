@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer"
 	tplugins "github.com/containerd/containerd/pkg/transfer/plugins"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/log"
@@ -37,7 +38,7 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "transfer",
 		Requires: []plugin.Type{

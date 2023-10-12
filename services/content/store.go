@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	digest "github.com/opencontainers/go-digest"
@@ -36,7 +37,7 @@ type store struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.ServicePlugin,
 		ID:   services.ContentService,
 		Requires: []plugin.Type{

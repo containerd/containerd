@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl/v2"
@@ -49,7 +50,7 @@ type differ interface {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.ServicePlugin,
 		ID:   services.DiffService,
 		Requires: []plugin.Type{

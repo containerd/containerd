@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/log"
@@ -42,7 +43,7 @@ import (
 const exporterPlugin = "otlp"
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		ID:     exporterPlugin,
 		Type:   plugins.TracingProcessorPlugin,
 		Config: &OTLPConfig{},
@@ -55,7 +56,7 @@ func init() {
 			return trace.NewBatchSpanProcessor(exp), nil
 		},
 	})
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		ID:   "tracing",
 		Type: plugins.InternalPlugin,
 		Requires: []plugin.Type{

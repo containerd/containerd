@@ -25,6 +25,7 @@ import (
 	v2 "github.com/containerd/containerd/metrics/cgroups/v2"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
@@ -36,7 +37,7 @@ type Config struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type:   plugins.TaskMonitorPlugin,
 		ID:     "cgroups",
 		InitFn: New,

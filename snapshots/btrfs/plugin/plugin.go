@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/btrfs"
 )
@@ -36,7 +37,7 @@ type Config struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		ID:     "btrfs",
 		Type:   plugins.SnapshotPlugin,
 		Config: &Config{},
@@ -48,7 +49,7 @@ func init() {
 				return nil, errors.New("invalid btrfs configuration")
 			}
 
-			root := ic.Root
+			root := ic.Properties[plugins.PropertyRootDir]
 			if len(config.RootPath) != 0 {
 				root = config.RootPath
 			}

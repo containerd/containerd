@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
@@ -245,13 +246,14 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		initContext := plugin.NewContext(
 			ctx,
-			p,
 			initialized,
-			config.Root,
-			config.State,
+			map[string]string{
+				plugins.PropertyRootDir:      filepath.Join(config.Root, id),
+				plugins.PropertyStateDir:     filepath.Join(config.State, id),
+				plugins.PropertyGRPCAddress:  config.GRPC.Address,
+				plugins.PropertyTTRPCAddress: config.TTRPC.Address,
+			},
 		)
-		initContext.Address = config.GRPC.Address
-		initContext.TTRPCAddress = config.TTRPC.Address
 		initContext.RegisterReadiness = func() func() {
 			atomic.StoreInt32(&mustSucceed, 1)
 			return s.RegisterReadiness()
@@ -259,7 +261,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
-			pc, err := config.Decode(ctx, p)
+			pc, err := config.Decode(ctx, id, p.Config)
 			if err != nil {
 				return nil, err
 			}
@@ -426,7 +428,7 @@ func (s *Server) Wait() {
 
 // LoadPlugins loads all plugins into containerd and generates an ordered graph
 // of all plugins.
-func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Registration, error) {
+func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
 	path := config.PluginDir
 	if path == "" {
@@ -436,12 +438,13 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		return nil, err
 	}
 	// load additional plugins that don't automatically register themselves
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.ContentPlugin,
 		ID:   "content",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Exports["root"] = ic.Root
-			return local.NewStore(ic.Root)
+			root := ic.Properties[plugins.PropertyRootDir]
+			ic.Meta.Exports["root"] = root
+			return local.NewStore(root)
 		},
 	})
 
@@ -486,7 +489,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			p = platforms.DefaultSpec()
 		}
 
-		plugin.Register(&plugin.Registration{
+		registry.Register(&plugin.Registration{
 			Type: t,
 			ID:   name,
 			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -504,7 +507,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 
 	filter := srvconfig.V2DisabledFilter
 	// return the ordered graph for plugins
-	return plugin.Graph(filter(config.DisabledPlugins)), nil
+	return registry.Graph(filter(config.DisabledPlugins)), nil
 }
 
 type proxyClients struct {

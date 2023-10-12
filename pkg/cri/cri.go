@@ -27,6 +27,7 @@ import (
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -39,7 +40,7 @@ import (
 // Register CRI service plugin
 func init() {
 	config := criconfig.DefaultConfig()
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type:   plugins.GRPCPlugin,
 		ID:     "cri",
 		Config: &config,
@@ -63,10 +64,10 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 
 	c := criconfig.Config{
 		PluginConfig:       *pluginConfig,
-		ContainerdRootDir:  filepath.Dir(ic.Root),
-		ContainerdEndpoint: ic.Address,
-		RootDir:            ic.Root,
-		StateDir:           ic.State,
+		ContainerdRootDir:  filepath.Dir(ic.Properties[plugins.PropertyRootDir]),
+		ContainerdEndpoint: ic.Properties[plugins.PropertyGRPCAddress],
+		RootDir:            ic.Properties[plugins.PropertyRootDir],
+		StateDir:           ic.Properties[plugins.PropertyStateDir],
 	}
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 

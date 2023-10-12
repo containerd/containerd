@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/stretchr/testify/assert"
 )
@@ -57,8 +58,8 @@ func TestCreateTopLevelDirectoriesWithEmptyRootPath(t *testing.T) {
 }
 
 func TestMigration(t *testing.T) {
-	plugin.Reset()
-	defer plugin.Reset()
+	registry.Reset()
+	defer registry.Reset()
 
 	version := srvconfig.CurrentConfigVersion - 1
 
@@ -67,7 +68,7 @@ func TestMigration(t *testing.T) {
 		NotMigrated string `toml:"notmigrated"`
 	}
 
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type:   "io.containerd.test",
 		ID:     "t1",
 		Config: &testConfig{},
@@ -86,7 +87,7 @@ func TestMigration(t *testing.T) {
 			return nil, nil
 		},
 	})
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: "io.containerd.new",
 		Requires: []plugin.Type{
 			"io.containerd.test", // Ensure this test runs second

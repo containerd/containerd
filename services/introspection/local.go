@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
@@ -39,7 +40,7 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type:     plugins.ServicePlugin,
 		ID:       services.IntrospectionService,
 		Requires: []plugin.Type{},
@@ -47,7 +48,7 @@ func init() {
 			// this service fetches all plugins through the plugin set of the plugin context
 			return &Local{
 				plugins: ic.Plugins(),
-				root:    ic.Root,
+				root:    ic.Properties[plugins.PropertyRootDir],
 			}, nil
 		},
 	})
