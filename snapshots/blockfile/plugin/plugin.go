@@ -67,6 +67,7 @@ func init() {
 				opts = append(opts, blockfile.WithMountOptions(config.MountOptions))
 			}
 
+			ic.Meta.Exports[plugin.SnapshotterRootDir] = root
 			return blockfile.NewSnapshotter(root, opts...)
 		},
 	})
