@@ -255,13 +255,13 @@ func SupportsIDMappedMounts() (bool, error) {
 	uidmap := fmt.Sprintf("%d:%d:%d", uidMap.ContainerID, uidMap.HostID, uidMap.Size)
 	gidmap := fmt.Sprintf("%d:%d:%d", gidMap.ContainerID, gidMap.HostID, gidMap.Size)
 
-	usernsFd, childProcCleanUp, err := mount.GetUsernsFD(uidmap, gidmap)
+	usernsFd, err := mount.GetUsernsFD(uidmap, gidmap)
 	if err != nil {
 		return false, err
 	}
-	defer childProcCleanUp()
+	defer usernsFd.Close()
 
-	if err = mount.IDMapMount(lowerDir, lowerDir, usernsFd); err != nil {
+	if err = mount.IDMapMount(lowerDir, lowerDir, int(usernsFd.Fd())); err != nil {
 		return false, fmt.Errorf("failed to remap lowerdir %s: %w", lowerDir, err)
 	}
 	defer func() {
