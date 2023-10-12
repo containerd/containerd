@@ -351,9 +351,26 @@ We will do our best to not break compatibility in the tool in _patch_ releases.
 The daemon's configuration file, commonly located in `/etc/containerd/config.toml`
 is versioned and backwards compatible.  The `version` field in the config
 file specifies the config's version.  If no version number is specified inside
-the config file then it is assumed to be a version 1 config and parsed as such.
-Please use `version = 2` to enable version 2 config as version 1 has been
-deprecated.
+the config file then it is assumed to be a version `1` config and parsed as such.
+The latest version is `version = 2`. The `main` branch is being prepared to support
+the next config version `3`. The configuration is automatically migrated to the
+latest version on each startup, leaving the configuration file unchanged. To avoid
+the migration and optimize the daemon startup time, use `containerd config migrate`
+to output the configuration as the latest version. Version `1` is no longer deprecated
+and is supported by migration, however, it is recommended to use at least version `2`.
+
+Migrating a configuration to the latest version will limit the prior versions
+of containerd in which the configuration can be used. It is suggested not to
+migrate your configuration file until you are confident you do not need to
+quickly rollback your containerd version. Use the table of configuration
+versions to containerd releases to know the minimum version of containerd for
+each configuration version.
+
+| Configuration Version | Minimum containerd version |
+|-----------------------|----------------------------|
+| 1                     | v1.0.0                     |
+| 2                     | v1.3.0                     |
+| 3                     | v2.0.0                     |
 
 ### Not Covered
 
@@ -383,7 +400,6 @@ The deprecated features are shown in the following table:
 |----------------------------------------------------------------------------------|---------------------|----------------------------|------------------------------------------|
 | Runtime V1 API and implementation (`io.containerd.runtime.v1.linux`)             | containerd v1.4     | containerd v2.0 ✅         | Use `io.containerd.runc.v2`              |
 | Runc V1 implementation of Runtime V2 (`io.containerd.runc.v1`)                   | containerd v1.4     | containerd v2.0 ✅         | Use `io.containerd.runc.v2`              |
-| config.toml `version = 1`                                                        | containerd v1.5     | containerd v2.0 ✅         | Use config.toml `version = 2`            |
 | Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0 ✅         | Use `overlayfs` snapshotter              |
 | Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0 ✅         | Use `containerd.io/restart.loguri` label |
 | `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0 ✅         | Use `containerd-*.tar.gz` bundles        |
