@@ -96,24 +96,6 @@ func (r *Registration) URI() string {
 	return r.Type.String() + "." + r.ID
 }
 
-// Load loads all plugins at the provided path into containerd.
-//
-// Load is currently only implemented on non-static, non-gccgo builds for amd64
-// and arm64, and plugins must be built with the exact same version of Go as
-// containerd itself.
-func Load(path string) (err error) {
-	defer func() {
-		if v := recover(); v != nil {
-			rerr, ok := v.(error)
-			if !ok {
-				rerr = fmt.Errorf("%s", v)
-			}
-			err = rerr
-		}
-	}()
-	return loadPlugins(path)
-}
-
 // DisableFilter filters out disabled plugins
 type DisableFilter func(r *Registration) bool
 

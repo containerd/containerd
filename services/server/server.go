@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/dynamic"
 	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	srvconfig "github.com/containerd/containerd/services/server/config"
@@ -434,7 +435,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	if err := plugin.Load(path); err != nil {
+	if err := dynamic.Load(path); err != nil {
 		return nil, err
 	}
 	// load additional plugins that don't automatically register themselves

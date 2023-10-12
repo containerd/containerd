@@ -1,5 +1,3 @@
-//go:build (!amd64 && !arm64) || static_build || gccgo
-
 /*
    Copyright The containerd Authors.
 
@@ -16,13 +14,24 @@
    limitations under the License.
 */
 
-package plugin
+package dynamic
 
-// loadPlugins is not supported;
+import "fmt"
+
+// Load loads all plugins at the provided path into containerd.
 //
-// - with gccgo: gccgo has no plugin support golang/go#36403
-// - on static builds; https://github.com/containerd/containerd/commit/0d682e24a1ba8e93e5e54a73d64f7d256f87492f
-// - on architectures other than amd64 and arm64 (other architectures need to be tested)
-func loadPlugins(path string) error {
-	return nil
+// Load is currently only implemented on non-static, non-gccgo builds for amd64
+// and arm64, and plugins must be built with the exact same version of Go as
+// containerd itself.
+func Load(path string) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			rerr, ok := v.(error)
+			if !ok {
+				rerr = fmt.Errorf("%s", v)
+			}
+			err = rerr
+		}
+	}()
+	return loadPlugins(path)
 }
