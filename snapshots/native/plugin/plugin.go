@@ -50,6 +50,7 @@ func init() {
 				root = config.RootPath
 			}
 
+			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return native.NewSnapshotter(root)
 		},
 	})

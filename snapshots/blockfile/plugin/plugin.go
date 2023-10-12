@@ -74,6 +74,7 @@ func init() {
 			}
 			opts = append(opts, blockfile.WithRecreateScratch(config.RecreateScratch))
 
+			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return blockfile.NewSnapshotter(root, opts...)
 		},
 	})
