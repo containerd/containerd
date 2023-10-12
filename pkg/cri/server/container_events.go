@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -16,31 +14,20 @@
    limitations under the License.
 */
 
-package fuzz
+package server
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
-
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
+func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
+	// TODO (https://github.com/containerd/containerd/issues/7318):
+	// replace with a real implementation that broadcasts containerEventsChan
+	// to all subscribers.
+	for event := range c.containerEventsChan {
+		if err := s.Send(&event); err != nil {
+			return err
+		}
 	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+	return nil
 }

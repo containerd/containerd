@@ -24,8 +24,8 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	server "github.com/containerd/containerd/pkg/cri/sbserver"
-	"github.com/containerd/containerd/pkg/cri/sbserver/images"
+	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/pkg/cri/server/images"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )

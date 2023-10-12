@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -16,31 +14,29 @@
    limitations under the License.
 */
 
-package fuzz
+package server
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"context"
+	"fmt"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
+func (c *criService) PodSandboxStats(
+	ctx context.Context,
+	r *runtime.PodSandboxStatsRequest,
+) (*runtime.PodSandboxStatsResponse, error) {
 
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return 0
-	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("an error occurred when trying to find sandbox %s: %w", r.GetPodSandboxId(), err)
 	}
 
-	return fuzzCRI(f, c)
+	podSandboxStats, err := c.podSandboxStats(ctx, sandbox)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode pod sandbox metrics %s: %w", r.GetPodSandboxId(), err)
+	}
+
+	return &runtime.PodSandboxStatsResponse{Stats: podSandboxStats}, nil
 }
