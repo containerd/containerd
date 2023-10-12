@@ -1,4 +1,4 @@
-//go:build gofuzz
+//go:build !windows && !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,31 +16,21 @@
    limitations under the License.
 */
 
-package fuzz
+package server
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/snapshots"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
+func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
+	return []oci.SpecOpts{}, nil
+}
 
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
-	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+// snapshotterOpts returns snapshotter options for the rootfs snapshot
+func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+	return []snapshots.Opt{}, nil
 }

@@ -16,31 +16,18 @@
    limitations under the License.
 */
 
-package fuzz
+package server
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"fmt"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
+func SandboxStore(cs CRIService) (*sandbox.Store, error) {
+	s, ok := cs.(*criService)
+	if !ok {
+		return nil, fmt.Errorf("%+v is not sbserver.criService", cs)
 	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+	return s.sandboxStore, nil
 }

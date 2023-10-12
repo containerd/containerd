@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/nri"
-	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/cri/server"
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -84,7 +84,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := sbserver.NewCRIService(c, client, getNRIAPI(ic))
+	s, err := server.NewCRIService(c, client, getNRIAPI(ic))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}

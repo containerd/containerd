@@ -1,4 +1,4 @@
-//go:build gofuzz
+//go:build !windows && !linux
 
 /*
    Copyright The containerd Authors.
@@ -16,31 +16,19 @@
    limitations under the License.
 */
 
-package fuzz
+package server
 
 import (
-	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"context"
+	"fmt"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/errdefs"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func FuzzCRISandboxServer(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	f := fuzz.NewConsumer(data)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
-	}
-	defer client.Close()
-
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	return fuzzCRI(f, c)
+func (c *criService) podSandboxStats(
+	ctx context.Context,
+	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
+	return nil, fmt.Errorf("pod sandbox stats not implemented: %w", errdefs.ErrNotImplemented)
 }
