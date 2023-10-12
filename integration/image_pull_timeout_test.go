@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	criserver "github.com/containerd/containerd/pkg/cri/server"
+	criserver "github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/log"
 	"github.com/containerd/log/logtest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

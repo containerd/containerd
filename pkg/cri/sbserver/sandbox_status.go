@@ -23,6 +23,8 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/go-cni"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -100,6 +102,26 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	}
 
 	return sandbox.IP, sandbox.AdditionalIPs, nil
+}
+
+// SandboxInfo is extra information for sandbox.
+// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
+type SandboxInfo struct {
+	Pid         uint32 `json:"pid"`
+	Status      string `json:"processStatus"`
+	NetNSClosed bool   `json:"netNamespaceClosed"`
+	Image       string `json:"image"`
+	SnapshotKey string `json:"snapshotKey"`
+	Snapshotter string `json:"snapshotter"`
+	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
+	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
+	// in https://github.com/containerd/cri/issues/1064).
+	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
+	RuntimeType    string                    `json:"runtimeType"`
+	RuntimeOptions interface{}               `json:"runtimeOptions"`
+	Config         *runtime.PodSandboxConfig `json:"config"`
+	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
+	CNIResult      *cni.Result               `json:"cniResult"`
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
