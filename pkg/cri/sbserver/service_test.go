@@ -27,10 +27,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	servertesting "github.com/containerd/containerd/pkg/cri/server/testing"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	servertesting "github.com/containerd/containerd/pkg/cri/testing"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 	"github.com/containerd/containerd/pkg/registrar"
 )

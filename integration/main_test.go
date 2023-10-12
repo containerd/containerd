@@ -41,7 +41,7 @@ import (
 	dialer "github.com/containerd/containerd/integration/remote/util"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/server"
+	server "github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/log"
 	"github.com/opencontainers/selinux/go-selinux"

@@ -21,11 +21,10 @@ package sbserver
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
 
-func SandboxStore(cs server.CRIService) (*sandbox.Store, error) {
+func SandboxStore(cs CRIService) (*sandbox.Store, error) {
 	s, ok := cs.(*criService)
 	if !ok {
 		return nil, fmt.Errorf("%+v is not sbserver.criService", cs)

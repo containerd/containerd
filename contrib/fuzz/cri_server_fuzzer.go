@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/server"
+	server "github.com/containerd/containerd/pkg/cri/sbserver"
 )
 
 func FuzzCRIServer(data []byte) int {

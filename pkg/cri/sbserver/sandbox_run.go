@@ -32,9 +32,9 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/pkg/cri/bandwidth"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
-	"github.com/containerd/containerd/pkg/cri/server/bandwidth"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
