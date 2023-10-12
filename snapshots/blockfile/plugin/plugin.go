@@ -21,6 +21,7 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/blockfile"
 )
 
@@ -45,7 +46,7 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
+		Type:   plugins.SnapshotPlugin,
 		ID:     "blockfile",
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,13 +47,13 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.DiffPlugin,
+		Type: plugins.DiffPlugin,
 		ID:   "windows",
 		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
+			plugins.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			md, err := ic.Get(plugin.MetadataPlugin)
+			md, err := ic.Get(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}

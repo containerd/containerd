@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"google.golang.org/grpc"
@@ -30,13 +31,13 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+		Type: plugins.GRPCPlugin,
 		ID:   "leases",
 		Requires: []plugin.Type{
-			plugin.LeasePlugin,
+			plugins.LeasePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			i, err := ic.GetByID(plugin.LeasePlugin, "manager")
+			i, err := ic.GetByID(plugins.LeasePlugin, "manager")
 			if err != nil {
 				return nil, err
 			}

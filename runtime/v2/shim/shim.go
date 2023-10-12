@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/version"
@@ -284,7 +285,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	}
 
 	plugin.Register(&plugin.Registration{
-		Type: plugin.InternalPlugin,
+		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return sd, nil
@@ -293,7 +294,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 
 	// Register event plugin
 	plugin.Register(&plugin.Registration{
-		Type: plugin.EventPlugin,
+		Type: plugins.EventPlugin,
 		ID:   "publisher",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return publisher, nil

@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/remote"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
 	"github.com/urfave/cli"
@@ -167,7 +167,7 @@ func main() {
 		cli.StringFlag{
 			Name:  "runtime",
 			Usage: "Set the runtime to stress test",
-			Value: plugin.RuntimeRuncV2,
+			Value: plugins.RuntimeRuncV2,
 		},
 		cli.StringFlag{
 			Name:  "snapshotter",

@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/btrfs"
 )
 
@@ -37,7 +38,7 @@ type Config struct {
 func init() {
 	plugin.Register(&plugin.Registration{
 		ID:     "btrfs",
-		Type:   plugin.SnapshotPlugin,
+		Type:   plugins.SnapshotPlugin,
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}

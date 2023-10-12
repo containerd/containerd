@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
@@ -127,7 +128,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 		timeout.Set(key, d)
 	}
-	plugins, err := LoadPlugins(ctx, config)
+	loaded, err := LoadPlugins(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +224,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		// Run each plugin migration for each version to ensure that migration logic is simple and
 		// focused on upgrading from one version at a time.
 		for v := version; v < srvconfig.CurrentConfigVersion; v++ {
-			for _, p := range plugins {
+			for _, p := range loaded {
 				if p.ConfigMigration != nil {
 					if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
 						return nil, err
@@ -237,7 +238,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		log.G(ctx).WithField("t", migrationT).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", version)
 	}
 
-	for _, p := range plugins {
+	for _, p := range loaded {
 		id := p.URI()
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
 		var mustSucceed int32
@@ -436,7 +437,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 	}
 	// load additional plugins that don't automatically register themselves
 	plugin.Register(&plugin.Registration{
-		Type: plugin.ContentPlugin,
+		Type: plugins.ContentPlugin,
 		ID:   "content",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Exports["root"] = ic.Root
@@ -456,20 +457,20 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		)
 
 		switch pp.Type {
-		case string(plugin.SnapshotPlugin), "snapshot":
-			t = plugin.SnapshotPlugin
+		case string(plugins.SnapshotPlugin), "snapshot":
+			t = plugins.SnapshotPlugin
 			ssname := name
 			f = func(conn *grpc.ClientConn) interface{} {
 				return ssproxy.NewSnapshotter(ssapi.NewSnapshotsClient(conn), ssname)
 			}
 
-		case string(plugin.ContentPlugin), "content":
-			t = plugin.ContentPlugin
+		case string(plugins.ContentPlugin), "content":
+			t = plugins.ContentPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
 				return csproxy.NewContentStore(csapi.NewContentClient(conn))
 			}
-		case string(plugin.DiffPlugin), "diff":
-			t = plugin.DiffPlugin
+		case string(plugins.DiffPlugin), "diff":
+			t = plugins.DiffPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
 				return diffproxy.NewDiffApplier(diffapi.NewDiffClient(conn))
 			}

@@ -22,7 +22,7 @@ import (
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/systemd"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -30,7 +30,7 @@ import (
 func newFakeRuntimeConfig(runcV2, systemdCgroup bool) criconfig.Runtime {
 	r := criconfig.Runtime{Type: "default", Options: map[string]interface{}{}}
 	if runcV2 {
-		r.Type = plugin.RuntimeRuncV2
+		r.Type = plugins.RuntimeRuncV2
 		if systemdCgroup {
 			r.Options["SystemdCgroup"] = true
 		}

@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf/types"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
@@ -119,7 +119,7 @@ systemd_cgroup = true
   no_pivot = true
   default_runtime_name = "default"
 [containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
+  runtime_type = "` + plugins.RuntimeRuncV2 + `"
 `
 	nonNilOpts := `
 systemd_cgroup = true
@@ -134,7 +134,7 @@ systemd_cgroup = true
   Root = "/runc"
   NoNewKeyring = true
 [containerd.runtimes.runcv2]
-  runtime_type = "` + plugin.RuntimeRuncV2 + `"
+  runtime_type = "` + plugins.RuntimeRuncV2 + `"
 [containerd.runtimes.runcv2.options]
   BinaryName = "runc"
   Root = "/runcv2"

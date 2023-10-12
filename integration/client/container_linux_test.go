@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
 
@@ -1028,7 +1028,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 		ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime(plugin.RuntimeRuncV2, &options.Options{BinaryName: "no-runc"}),
+		WithRuntime(plugins.RuntimeRuncV2, &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)

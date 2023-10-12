@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
@@ -34,13 +35,13 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+		Type: plugins.GRPCPlugin,
 		ID:   "events",
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
+			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
+			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
 			if err != nil {
 				return nil, err
 			}

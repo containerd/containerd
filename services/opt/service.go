@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 )
 
 // Config for the opt manager
@@ -32,7 +33,7 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.InternalPlugin,
+		Type: plugins.InternalPlugin,
 		ID:   "opt",
 		Config: &Config{
 			Path: defaultPath,

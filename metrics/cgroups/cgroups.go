@@ -25,6 +25,7 @@ import (
 	v2 "github.com/containerd/containerd/metrics/cgroups/v2"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime"
 	metrics "github.com/docker/go-metrics"
 )
@@ -36,11 +37,11 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.TaskMonitorPlugin,
+		Type:   plugins.TaskMonitorPlugin,
 		ID:     "cgroups",
 		InitFn: New,
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
+			plugins.EventPlugin,
 		},
 		Config: &Config{},
 	})
@@ -58,7 +59,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		err error
 	)
 
-	ep, err := ic.Get(plugin.EventPlugin)
+	ep, err := ic.Get(plugins.EventPlugin)
 	if err != nil {
 		return nil, err
 	}
