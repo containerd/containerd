@@ -18,8 +18,6 @@ Documentation=https://containerd.io
 After=network.target local-fs.target
 
 [Service]
-#uncomment to fallback to legacy CRI plugin implementation with podsandbox support.
-#Environment="DISABLE_CRI_SANDBOXES=1"
 ExecStartPre=-/sbin/modprobe overlay
 ExecStart=/usr/local/bin/containerd
 

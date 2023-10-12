@@ -272,7 +272,6 @@ EOF
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
         'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
         'GITHUB_WORKSPACE': '',
-        'DISABLE_CRI_SANDBOXES': ENV['DISABLE_CRI_SANDBOXES'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
