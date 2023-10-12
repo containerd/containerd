@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/log"
 
@@ -49,7 +48,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// If the sandbox is still running, not ready, or in an unknown state, forcibly stop it.
 	// Even if it's in a NotReady state, this will close its network namespace, if open.
 	// This can happen if the task process associated with the Pod died or it was killed.
-	log.L.Infof("Forcibly stopping sandbox %q", id)
+	log.G(ctx).Infof("Forcibly stopping sandbox %q", id)
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
 	}
@@ -80,25 +79,18 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		}
 	}
 
-	// Cleanup the sandbox root directories.
-	sandboxRootDir := c.getSandboxRootDir(id)
-	if err := ensureRemoveAll(ctx, sandboxRootDir); err != nil {
-		return nil, fmt.Errorf("failed to remove sandbox root directory %q: %w",
-			sandboxRootDir, err)
-	}
-	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
-	if err := ensureRemoveAll(ctx, volatileSandboxRootDir); err != nil {
-		return nil, fmt.Errorf("failed to remove volatile sandbox root directory %q: %w",
-			volatileSandboxRootDir, err)
+	// Use sandbox controller to delete sandbox
+	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
 
-	// Delete sandbox container.
-	if err := sandbox.Container.Delete(ctx, containerd.WithSnapshotCleanup); err != nil {
-		if !errdefs.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to delete sandbox container %q: %w", id, err)
-		}
-		log.G(ctx).Tracef("Remove called for sandbox container %q that does not exist", id)
+	if err := controller.Shutdown(ctx, id); err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 	}
+
+	// Send CONTAINER_DELETED event with ContainerId equal to SandboxId.
+	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	err = c.nri.RemovePodSandbox(ctx, &sandbox)
 	if err != nil {
@@ -112,11 +104,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	// 3) On-going operations which have held the reference will not be affected.
 	c.sandboxStore.Delete(id)
 
+	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
+		return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
+	}
+
 	// Release the sandbox name reserved for the sandbox.
 	c.sandboxNameIndex.ReleaseByKey(id)
-
-	// Send CONTAINER_DELETED event with both ContainerId and SandboxId equal to SandboxId.
-	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
 	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
 

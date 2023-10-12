@@ -19,12 +19,11 @@ package cri
 import (
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/nri"
-	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/cri/server"
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
@@ -34,7 +33,6 @@ import (
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/server"
 )
 
 // Register CRI service plugin
@@ -86,14 +84,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	var s server.CRIService
-	if os.Getenv("DISABLE_CRI_SANDBOXES") == "" {
-		log.G(ctx).Info("using CRI Sandbox server - use DISABLE_CRI_SANDBOXES=1 to fallback to legacy CRI")
-		s, err = sbserver.NewCRIService(c, client, getNRIAPI(ic))
-	} else {
-		log.G(ctx).Info("using legacy CRI server")
-		s, err = server.NewCRIService(c, client, getNRIAPI(ic))
-	}
+	s, err := server.NewCRIService(c, client, getNRIAPI(ic))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}

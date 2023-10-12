@@ -34,7 +34,6 @@ func TestSetContainerStarting(t *testing.T) {
 		status    containerstore.Status
 		expectErr bool
 	}{
-
 		{
 			desc: "should not return error when container is in created state",
 			status: containerstore.Status{

@@ -20,13 +20,17 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/containerd/cgroups/v3"
+	"github.com/moby/sys/mountinfo"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/mount"
@@ -35,110 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/seutil"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	"github.com/moby/sys/mountinfo"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	"golang.org/x/sys/unix"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
-
-const (
-	// defaultSandboxOOMAdj is default omm adj for sandbox container. (kubernetes#47938).
-	defaultSandboxOOMAdj = -998
-	// defaultShmSize is the default size of the sandbox shm.
-	defaultShmSize = int64(1024 * 1024 * 64)
-	// relativeRootfsPath is the rootfs path relative to bundle path.
-	relativeRootfsPath = "rootfs"
-	// devShm is the default path of /dev/shm.
-	devShm = "/dev/shm"
-	// etcHosts is the default path of /etc/hosts file.
-	etcHosts = "/etc/hosts"
-	// etcHostname is the default path of /etc/hostname file.
-	etcHostname = "/etc/hostname"
-	// resolvConfPath is the abs path of resolv.conf on host or container.
-	resolvConfPath = "/etc/resolv.conf"
-	// hostnameEnv is the key for HOSTNAME env.
-	hostnameEnv = "HOSTNAME"
-)
-
-// getCgroupsPath generates container cgroups path.
-func getCgroupsPath(cgroupsParent, id string) string {
-	base := path.Base(cgroupsParent)
-	if strings.HasSuffix(base, ".slice") {
-		// For a.slice/b.slice/c.slice, base is c.slice.
-		// runc systemd cgroup path format is "slice:prefix:name".
-		return strings.Join([]string{base, "cri-containerd", id}, ":")
-	}
-	return filepath.Join(cgroupsParent, id)
-}
-
-// getSandboxHostname returns the hostname file path inside the sandbox root directory.
-func (c *criService) getSandboxHostname(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "hostname")
-}
-
-// getSandboxHosts returns the hosts file path inside the sandbox root directory.
-func (c *criService) getSandboxHosts(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "hosts")
-}
-
-// getResolvPath returns resolv.conf filepath for specified sandbox.
-func (c *criService) getResolvPath(id string) string {
-	return filepath.Join(c.getSandboxRootDir(id), "resolv.conf")
-}
-
-// getSandboxDevShm returns the shm file path inside the sandbox root directory.
-func (c *criService) getSandboxDevShm(id string) string {
-	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
-}
-
-func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {
-	var labels []string
-
-	if selinuxOptions == nil {
-		return nil, nil
-	}
-	if err := checkSelinuxLevel(selinuxOptions.Level); err != nil {
-		return nil, err
-	}
-	if selinuxOptions.User != "" {
-		labels = append(labels, "user:"+selinuxOptions.User)
-	}
-	if selinuxOptions.Role != "" {
-		labels = append(labels, "role:"+selinuxOptions.Role)
-	}
-	if selinuxOptions.Type != "" {
-		labels = append(labels, "type:"+selinuxOptions.Type)
-	}
-	if selinuxOptions.Level != "" {
-		labels = append(labels, "level:"+selinuxOptions.Level)
-	}
-
-	return labels, nil
-}
-
-func initLabelsFromOpt(selinuxOpts *runtime.SELinuxOption) (string, string, error) {
-	labels, err := toLabel(selinuxOpts)
-	if err != nil {
-		return "", "", err
-	}
-	return label.InitLabels(labels)
-}
-
-func checkSelinuxLevel(level string) error {
-	if len(level) == 0 {
-		return nil
-	}
-
-	matched, err := regexp.MatchString(`^s\d(-s\d)??(:c\d{1,4}(\.c\d{1,4})?(,c\d{1,4}(\.c\d{1,4})?)*)?$`, level)
-	if err != nil {
-		return fmt.Errorf("the format of 'level' %q is not correct: %w", level, err)
-	}
-	if !matched {
-		return fmt.Errorf("the format of 'level' %q is not correct", level)
-	}
-	return nil
-}
 
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
 // if apparmor_parser is installed, and if we are not running docker-in-docker.
@@ -283,130 +184,10 @@ func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
 	return nil
 }
 
-func parseUsernsIDMap(runtimeIDMap []*runtime.IDMapping) ([]specs.LinuxIDMapping, error) {
-	var m []specs.LinuxIDMapping
-
-	if len(runtimeIDMap) == 0 {
-		return m, nil
-	}
-
-	if len(runtimeIDMap) > 1 {
-		// We only accept 1 line, because containerd.WithRemappedSnapshot() only supports that.
-		return m, fmt.Errorf("only one mapping line supported, got %v mapping lines", len(runtimeIDMap))
-	}
-
-	// We know len is 1 now.
-	if runtimeIDMap[0] == nil {
-		return m, nil
-	}
-	uidMap := *runtimeIDMap[0]
-
-	if uidMap.Length < 1 {
-		return m, fmt.Errorf("invalid mapping length: %v", uidMap.Length)
-	}
-
-	m = []specs.LinuxIDMapping{
-		{
-			ContainerID: uidMap.ContainerId,
-			HostID:      uidMap.HostId,
-			Size:        uidMap.Length,
-		},
-	}
-
-	return m, nil
-}
-
-func parseUsernsIDs(userns *runtime.UserNamespace) (uids, gids []specs.LinuxIDMapping, retErr error) {
-	if userns == nil {
-		// If userns is not set, the kubelet doesn't support this option
-		// and we should just fallback to no userns. This is completely
-		// valid.
-		return nil, nil, nil
-	}
-
-	uids, err := parseUsernsIDMap(userns.GetUids())
-	if err != nil {
-		return nil, nil, fmt.Errorf("UID mapping: %w", err)
-	}
-
-	gids, err = parseUsernsIDMap(userns.GetGids())
-	if err != nil {
-		return nil, nil, fmt.Errorf("GID mapping: %w", err)
-	}
-
-	switch mode := userns.GetMode(); mode {
-	case runtime.NamespaceMode_NODE:
-		if len(uids) != 0 || len(gids) != 0 {
-			return nil, nil, fmt.Errorf("can't use user namespace mode %q with mappings. Got %v UID mappings and %v GID mappings", mode, len(uids), len(gids))
-		}
-	case runtime.NamespaceMode_POD:
-		// This is valid, we will handle it in WithPodNamespaces().
-		if len(uids) == 0 || len(gids) == 0 {
-			return nil, nil, fmt.Errorf("can't use user namespace mode %q without UID and GID mappings", mode)
-		}
-	default:
-		return nil, nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
-	}
-
-	return uids, gids, nil
-}
-
-// sameUsernsConfig checks if the userns configs are the same. If the mappings
-// on each config are the same but in different order, it returns false.
-// XXX: If the runtime.UserNamespace struct changes, we should update this
-// function accordingly.
-func sameUsernsConfig(a, b *runtime.UserNamespace) bool {
-	// If both are nil, they are the same.
-	if a == nil && b == nil {
-		return true
-	}
-	// If only one is nil, they are different.
-	if a == nil || b == nil {
-		return false
-	}
-	// At this point, a is not nil nor b.
-
-	if a.GetMode() != b.GetMode() {
-		return false
-	}
-
-	aUids, aGids, err := parseUsernsIDs(a)
-	if err != nil {
-		return false
-	}
-	bUids, bGids, err := parseUsernsIDs(b)
-	if err != nil {
-		return false
-	}
-
-	if !sameMapping(aUids, bUids) {
-		return false
-	}
-	if !sameMapping(aGids, bGids) {
-		return false
-	}
-	return true
-}
-
-// sameMapping checks if the mappings are the same. If the mappings are the same
-// but in different order, it returns false.
-func sameMapping(a, b []specs.LinuxIDMapping) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for x := range a {
-		if a[x].ContainerID != b[x].ContainerID {
-			return false
-		}
-		if a[x].HostID != b[x].HostID {
-			return false
-		}
-		if a[x].Size != b[x].Size {
-			return false
-		}
-	}
-	return true
+// getCgroupsMode returns cgropu mode.
+// TODO: add build constraints to cgroups package and remove this helper
+func isUnifiedCgroupsMode() bool {
+	return cgroups.Mode() == cgroups.Unified
 }
 
 func snapshotterRemapOpts(nsOpts *runtime.NamespaceOption) ([]snapshots.Opt, error) {

@@ -24,8 +24,8 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/pkg/cri/server/images"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 )
@@ -191,7 +191,7 @@ func sandboxStore(cs server.CRIService) (*sandboxstore.Store, error) {
 
 	ss, err = server.SandboxStore(cs)
 	if err != nil {
-		ss, err = sbserver.SandboxStore(cs)
+		ss, err = server.SandboxStore(cs)
 		if err != nil {
 			return nil, err
 		}
@@ -535,6 +535,6 @@ func FuzzParseAuth(data []byte) int {
 	if err != nil {
 		return 0
 	}
-	_, _, _ = server.ParseAuth(auth, host)
+	_, _, _ = images.ParseAuth(auth, host)
 	return 1
 }

@@ -31,15 +31,12 @@ import (
 	"testing"
 	"time"
 
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
-	"github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/pkg/cri/server/podsandbox"
 	"github.com/containerd/containerd/pkg/failpoint"
-	"github.com/containerd/typeurl/v2"
 )
 
 const (
@@ -293,40 +290,12 @@ func TestRunPodSandboxAndTeardownCNISlow(t *testing.T) {
 	assert.Equal(t, sbConfig.Metadata.Uid, sb.Metadata.Uid)
 	assert.Equal(t, sbConfig.Metadata.Attempt, sb.Metadata.Attempt)
 
-	if os.Getenv("DISABLE_CRI_SANDBOXES") != "" {
-		// non-sbserver
-		t.Log("Get sandbox info (non-sbserver)")
-		_, info, err := SandboxInfo(sb.Id)
-		require.NoError(t, err)
-		require.False(t, info.NetNSClosed)
-		var netNS string
-		for _, n := range info.RuntimeSpec.Linux.Namespaces {
-			if n.Type == runtimespec.NetworkNamespace {
-				netNS = n.Path
-			}
-		}
-		assert.NotEmpty(t, netNS, "network namespace should be set")
+	t.Log("Get sandbox info (sbserver)")
+	_, info, err := sbserverSandboxInfo(sb.Id)
+	require.NoError(t, err)
+	require.False(t, info.NetNSClosed)
 
-		t.Log("Get sandbox container")
-		c, err := GetContainer(sb.Id)
-		require.NoError(t, err)
-		md, ok := c.Extensions["io.cri-containerd.sandbox.metadata"]
-		require.True(t, ok, "sandbox metadata should exist in extension")
-		i, err := typeurl.UnmarshalAny(md)
-		require.NoError(t, err)
-		require.IsType(t, &sandbox.Metadata{}, i)
-		metadata, ok := i.(*sandbox.Metadata)
-		require.True(t, ok)
-		assert.Equal(t, netNS, metadata.NetNSPath, "network namespace path should be the same in runtime spec and sandbox metadata")
-	} else {
-		// sbserver
-		t.Log("Get sandbox info (sbserver)")
-		_, info, err := sbserverSandboxInfo(sb.Id)
-		require.NoError(t, err)
-		require.False(t, info.NetNSClosed)
-
-		assert.NotEmpty(t, info.Metadata.NetNSPath, "network namespace should be set")
-	}
+	assert.NotEmpty(t, info.Metadata.NetNSPath, "network namespace should be set")
 }
 
 // sbserverSandboxInfo gets sandbox info.

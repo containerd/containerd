@@ -17,8 +17,7 @@
 package server
 
 import (
-	metrics "github.com/docker/go-metrics"
-	prom "github.com/prometheus/client_golang/prometheus"
+	"github.com/docker/go-metrics"
 )
 
 var (
@@ -40,21 +39,11 @@ var (
 	networkPluginOperations        metrics.LabeledCounter
 	networkPluginOperationsErrors  metrics.LabeledCounter
 	networkPluginOperationsLatency metrics.LabeledTimer
-
-	imagePulls           metrics.LabeledCounter
-	inProgressImagePulls metrics.Gauge
-	// image size in MB / image pull duration in seconds
-	imagePullThroughput prom.Histogram
 )
 
 func init() {
-	const (
-		namespace = "containerd"
-		subsystem = "cri"
-	)
-
 	// these CRI metrics record latencies for successful operations around a sandbox and container's lifecycle.
-	ns := metrics.NewNamespace(namespace, subsystem, nil)
+	ns := metrics.NewNamespace("containerd", "cri_sandboxed", nil)
 
 	sandboxListTimer = ns.NewTimer("sandbox_list", "time to list sandboxes")
 	sandboxCreateNetworkTimer = ns.NewTimer("sandbox_create_network", "time to create the network for a sandbox")
@@ -75,19 +64,6 @@ func init() {
 	networkPluginOperationsErrors = ns.NewLabeledCounter("network_plugin_operations_errors_total", "cumulative number of network plugin operations by operation type", "operation_type")
 	networkPluginOperationsLatency = ns.NewLabeledTimer("network_plugin_operations_duration_seconds", "latency in seconds of network plugin operations. Broken down by operation type", "operation_type")
 
-	imagePulls = ns.NewLabeledCounter("image_pulls", "succeeded and failed counters", "status")
-	inProgressImagePulls = ns.NewGauge("in_progress_image_pulls", "in progress pulls", metrics.Total)
-	imagePullThroughput = prom.NewHistogram(
-		prom.HistogramOpts{
-			Namespace: namespace,
-			Subsystem: subsystem,
-			Name:      "image_pulling_throughput",
-			Help:      "image pull throughput",
-			Buckets:   prom.DefBuckets,
-		},
-	)
-
-	ns.Add(imagePullThroughput)
 	metrics.Register(ns)
 }
 

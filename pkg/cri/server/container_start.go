@@ -149,6 +149,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			}
 		}
 	}()
+
 	err = c.nri.StartContainer(ctx, &sandbox, &cntr)
 	if err != nil {
 		log.G(ctx).WithError(err).Errorf("NRI container start failed")

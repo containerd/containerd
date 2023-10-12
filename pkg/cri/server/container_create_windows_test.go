@@ -22,26 +22,11 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	"github.com/containerd/containerd/pkg/cri/config"
 )
-
-func getSandboxConfig() *runtime.PodSandboxConfig {
-	return &runtime.PodSandboxConfig{
-		Metadata: &runtime.PodSandboxMetadata{
-			Name:      "test-sandbox-name",
-			Uid:       "test-sandbox-uid",
-			Namespace: "test-sandbox-ns",
-			Attempt:   2,
-		},
-		Windows:     &runtime.WindowsPodSandboxConfig{},
-		Hostname:    "test-hostname",
-		Annotations: map[string]string{"c": "d"},
-	}
-}
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,
 	*imagespec.ImageConfig, func(*testing.T, string, string, uint32, *runtimespec.Spec)) {
@@ -91,7 +76,17 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 			},
 		},
 	}
-	sandboxConfig := getSandboxConfig()
+	sandboxConfig := &runtime.PodSandboxConfig{
+		Metadata: &runtime.PodSandboxMetadata{
+			Name:      "test-sandbox-name",
+			Uid:       "test-sandbox-uid",
+			Namespace: "test-sandbox-ns",
+			Attempt:   2,
+		},
+		Windows:     &runtime.WindowsPodSandboxConfig{},
+		Hostname:    "test-hostname",
+		Annotations: map[string]string{"c": "d"},
+	}
 	imageConfig := &imagespec.ImageConfig{
 		Env:        []string{"ik1=iv1", "ik2=iv2", "ik3=iv3=iv3bis", "ik4=iv4=iv4bis=boop"},
 		Entrypoint: []string{"/entrypoint"},
@@ -156,7 +151,7 @@ func TestContainerWindowsNetworkNamespace(t *testing.T) {
 	c := newTestCRIService()
 
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -178,7 +173,7 @@ func TestMountCleanPath(t *testing.T) {
 		ContainerPath: "c:/test/container-path",
 		HostPath:      "c:/test/host-path",
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -198,7 +193,7 @@ func TestMountNamedPipe(t *testing.T) {
 		ContainerPath: `\\.\pipe\foo`,
 		HostPath:      `\\.\pipe\foo`,
 	})
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -250,120 +245,12 @@ func TestHostProcessRequirements(t *testing.T) {
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{
 				HostProcess: test.sandboxHostProcess,
 			}
-			_, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestEntrypointAndCmdForArgsEscaped(t *testing.T) {
-	testID := "test-id"
-	testSandboxID := "sandbox-id"
-	testContainerName := "container-name"
-	testPid := uint32(1234)
-	nsPath := "test-ns"
-	c := newTestCRIService()
-
-	for _, test := range []struct {
-		name                string
-		imgEntrypoint       []string
-		imgCmd              []string
-		command             []string
-		args                []string
-		expectedArgs        []string
-		expectedCommandLine string
-		ArgsEscaped         bool
-	}{
-		// override image entrypoint and cmd in shell form with container args and verify expected runtime spec
-		{
-			name:                "TestShellFormImgEntrypointCmdWithCtrArgs",
-			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
-			imgCmd:              []string{`cmd -args "hello world"`},
-			command:             nil,
-			args:                []string{`cmd -args "additional args"`},
-			expectedArgs:        nil,
-			expectedCommandLine: `"C:\My Folder\MyProcess.exe" -arg1 "test value" "cmd -args \"additional args\""`,
-			ArgsEscaped:         true,
-		},
-		// check image entrypoint and cmd in shell form without overriding with container command and args and verify expected runtime spec
-		{
-			name:                "TestShellFormImgEntrypointCmdWithoutCtrArgs",
-			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
-			imgCmd:              []string{`cmd -args "hello world"`},
-			command:             nil,
-			args:                nil,
-			expectedArgs:        nil,
-			expectedCommandLine: `"C:\My Folder\MyProcess.exe" -arg1 "test value" "cmd -args \"hello world\""`,
-			ArgsEscaped:         true,
-		},
-		// override image entrypoint and cmd by container command and args in shell form and verify expected runtime spec
-		{
-			name:                "TestShellFormImgEntrypointCmdWithCtrEntrypointAndArgs",
-			imgEntrypoint:       []string{`"C:\My Folder\MyProcess.exe" -arg1 "test value"`},
-			imgCmd:              []string{`cmd -args "hello world"`},
-			command:             []string{`C:\My Folder\MyProcess.exe`, "-arg1", "additional test value"},
-			args:                []string{"cmd", "-args", "additional args"},
-			expectedArgs:        nil,
-			expectedCommandLine: `"C:\My Folder\MyProcess.exe" -arg1 "additional test value" cmd -args "additional args"`,
-			ArgsEscaped:         true,
-		},
-		// override image cmd by container args in exec form and verify expected runtime spec
-		{
-			name:                "TestExecFormImgEntrypointCmdWithCtrArgs",
-			imgEntrypoint:       []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value"},
-			imgCmd:              []string{"cmd", "-args", "hello world"},
-			command:             nil,
-			args:                []string{"additional", "args"},
-			expectedArgs:        []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value", "additional", "args"},
-			expectedCommandLine: "",
-			ArgsEscaped:         false,
-		},
-		// check image entrypoint and cmd in exec form without overriding with container command and args and verify expected runtime spec
-		{
-			name:                "TestExecFormImgEntrypointCmdWithoutCtrArgs",
-			imgEntrypoint:       []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value"},
-			imgCmd:              []string{"cmd", "-args", "hello world"},
-			command:             nil,
-			args:                nil,
-			expectedArgs:        []string{`C:\My Folder\MyProcess.exe`, "-arg1", "test value", "cmd", "-args", "hello world"},
-			expectedCommandLine: "",
-			ArgsEscaped:         false,
-		},
-	} {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			imageConfig := &imagespec.ImageConfig{
-				Entrypoint:  test.imgEntrypoint,
-				Cmd:         test.imgCmd,
-				ArgsEscaped: test.ArgsEscaped,
-			}
-			sandboxConfig := getSandboxConfig()
-			containerConfig := &runtime.ContainerConfig{
-				Metadata: &runtime.ContainerMetadata{
-					Name:    "test-name",
-					Attempt: 1,
-				},
-				Image: &runtime.ImageSpec{
-					Image: testImageName,
-				},
-				Command: test.command,
-				Args:    test.args,
-				Windows: &runtime.WindowsContainerConfig{},
-			}
-			runtimeSpec, err := c.containerSpec(testID, testSandboxID, testPid, nsPath, testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
-			assert.NoError(t, err)
-			assert.NotNil(t, runtimeSpec)
-
-			// check the runtime spec for expected commandline and args
-			actualCommandLine := runtimeSpec.Process.CommandLine
-			actualArgs := runtimeSpec.Process.Args
-
-			require.Equal(t, actualArgs, test.expectedArgs)
-			require.Equal(t, actualCommandLine, test.expectedCommandLine)
 		})
 	}
 }

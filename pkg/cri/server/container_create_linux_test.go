@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,6 +31,7 @@ import (
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -255,7 +255,7 @@ func TestContainerCapabilities(t *testing.T) {
 			c.allCaps = allCaps
 
 			containerConfig.Linux.SecurityContext.Capabilities = test.capability
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 
 			if selinux.GetEnabled() {
@@ -290,7 +290,7 @@ func TestContainerSpecTty(t *testing.T) {
 	c := newTestCRIService()
 	for _, tty := range []bool{true, false} {
 		containerConfig.Tty = tty
-		spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, tty, spec.Process.Terminal)
@@ -317,7 +317,7 @@ func TestContainerSpecDefaultPath(t *testing.T) {
 			imageConfig.Env = append(imageConfig.Env, pathenv)
 			expected = pathenv
 		}
-		spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Contains(t, spec.Process.Env, expected)
@@ -334,7 +334,7 @@ func TestContainerSpecReadonlyRootfs(t *testing.T) {
 	c := newTestCRIService()
 	for _, readonly := range []bool{true, false} {
 		containerConfig.Linux.SecurityContext.ReadonlyRootfs = readonly
-		spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+		spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 		require.NoError(t, err)
 		specCheck(t, testID, testSandboxID, testPid, spec)
 		assert.Equal(t, readonly, spec.Root.Readonly)
@@ -367,23 +367,16 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 			HostPath:      "test-sys-extra",
 			Readonly:      false,
 		},
-		{
-			ContainerPath: "/dev",
-			HostPath:      "test-dev-extra",
-			Readonly:      false,
-		},
 	}
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, extraMounts, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, extraMounts, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
-	var mounts, sysMounts, devMounts []runtimespec.Mount
+	var mounts, sysMounts []runtimespec.Mount
 	for _, m := range spec.Mounts {
 		if strings.HasPrefix(m.Destination, "test-container-path") {
 			mounts = append(mounts, m)
 		} else if m.Destination == "/sys" {
 			sysMounts = append(sysMounts, m)
-		} else if strings.HasPrefix(m.Destination, "/dev") {
-			devMounts = append(devMounts, m)
 		}
 	}
 	t.Logf("CRI mount should override extra mount")
@@ -395,11 +388,6 @@ func TestContainerSpecWithExtraMounts(t *testing.T) {
 	require.Len(t, sysMounts, 1)
 	assert.Equal(t, "test-sys-extra", sysMounts[0].Source)
 	assert.Contains(t, sysMounts[0].Options, "rw")
-
-	t.Logf("Dev mount should override all default dev mounts")
-	require.Len(t, devMounts, 1)
-	assert.Equal(t, "test-dev-extra", devMounts[0].Source)
-	assert.Contains(t, devMounts[0].Options, "rw")
 }
 
 func TestContainerAndSandboxPrivileged(t *testing.T) {
@@ -447,238 +435,12 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				Privileged: test.sandboxPrivileged,
 			}
-			_, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			_, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestContainerMounts(t *testing.T) {
-	const testSandboxID = "test-id"
-	idmap := []*runtime.IDMapping{
-		{
-			ContainerId: 0,
-			HostId:      100,
-			Length:      1,
-		},
-	}
-
-	for _, test := range []struct {
-		desc            string
-		statFn          func(string) (os.FileInfo, error)
-		criMounts       []*runtime.Mount
-		securityContext *runtime.LinuxContainerSecurityContext
-		expectedMounts  []*runtime.Mount
-	}{
-		{
-			desc: "should setup ro mount when rootfs is read-only",
-			securityContext: &runtime.LinuxContainerSecurityContext{
-				ReadonlyRootfs: true,
-			},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hostname",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:       true,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       true,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       true,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/dev/shm",
-					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-			},
-		},
-		{
-			desc:            "should setup rw mount when rootfs is read-write",
-			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hostname",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/dev/shm",
-					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-			},
-		},
-		{
-			desc: "should setup uidMappings/gidMappings when userns is used",
-			securityContext: &runtime.LinuxContainerSecurityContext{
-				NamespaceOptions: &runtime.NamespaceOption{
-					UsernsOptions: &runtime.UserNamespace{
-						Mode: runtime.NamespaceMode_POD,
-						Uids: idmap,
-						Gids: idmap,
-					},
-				},
-			},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hostname",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-					UidMappings:    idmap,
-					GidMappings:    idmap,
-				},
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-					UidMappings:    idmap,
-					GidMappings:    idmap,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-					UidMappings:    idmap,
-					GidMappings:    idmap,
-				},
-				{
-					ContainerPath:  "/dev/shm",
-					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-			},
-		},
-		{
-			desc: "should use host /dev/shm when host ipc is set",
-			securityContext: &runtime.LinuxContainerSecurityContext{
-				NamespaceOptions: &runtime.NamespaceOption{Ipc: runtime.NamespaceMode_NODE},
-			},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hostname",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath: "/dev/shm",
-					HostPath:      "/dev/shm",
-					Readonly:      false,
-				},
-			},
-		},
-		{
-			desc: "should skip container mounts if already mounted by CRI",
-			criMounts: []*runtime.Mount{
-				{
-					ContainerPath: "/etc/hostname",
-					HostPath:      "/test-etc-hostname",
-				},
-				{
-					ContainerPath: "/etc/hosts",
-					HostPath:      "/test-etc-host",
-				},
-				{
-					ContainerPath: resolvConfPath,
-					HostPath:      "test-resolv-conf",
-				},
-				{
-					ContainerPath: "/dev/shm",
-					HostPath:      "test-dev-shm",
-				},
-			},
-			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts:  nil,
-		},
-		{
-			desc: "should skip hostname mount if the old sandbox doesn't have hostname file",
-			statFn: func(path string) (os.FileInfo, error) {
-				assert.Equal(t, filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"), path)
-				return nil, errors.New("random error")
-			},
-			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/dev/shm",
-					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-			},
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			config := &runtime.ContainerConfig{
-				Metadata: &runtime.ContainerMetadata{
-					Name:    "test-name",
-					Attempt: 1,
-				},
-				Mounts: test.criMounts,
-				Linux: &runtime.LinuxContainerConfig{
-					SecurityContext: test.securityContext,
-				},
-			}
-			c := newTestCRIService()
-			c.os.(*ostesting.FakeOS).StatFn = test.statFn
-			mounts := c.containerMounts(testSandboxID, config)
-			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
 }
@@ -714,7 +476,7 @@ func TestPrivilegedBindMount(t *testing.T) {
 			containerConfig.Linux.SecurityContext.Privileged = test.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
 
-			spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 
 			assert.NoError(t, err)
 			if test.expectedSysFSRO {
@@ -886,7 +648,7 @@ func TestPidNamespace(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 			assert.Contains(t, spec.Linux.Namespaces, test.expected)
 		})
@@ -916,6 +678,7 @@ func TestUserNamespace(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
+
 	for _, test := range []struct {
 		desc          string
 		userNS        *runtime.UserNamespace
@@ -1060,7 +823,7 @@ func TestUserNamespace(t *testing.T) {
 				sandboxUserns = test.sandboxUserNS
 			}
 			sandboxConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: sandboxUserns}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 
 			if test.err {
 				require.Error(t, err)
@@ -1090,7 +853,7 @@ func TestNoDefaultRunMount(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	assert.NoError(t, err)
 	for _, mount := range spec.Mounts {
 		assert.NotEqual(t, "/run", mount.Destination)
@@ -1194,7 +957,8 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 			},
 		},
 		{
-			desc: "sp should not set seccomp when seccomp is not specified"},
+			desc: "sp should not set seccomp when seccomp is not specified",
+		},
 		{
 			desc:     "sp should set default seccomp when seccomp is runtime/default",
 			specOpts: seccomp.WithDefaultProfile(),
@@ -1518,7 +1282,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				Privileged: test.privileged,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 			if !test.privileged { // specCheck presumes an unprivileged container
 				specCheck(t, testID, testSandboxID, testPid, spec)
@@ -1571,7 +1335,7 @@ func TestHostname(t *testing.T) {
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
 				NamespaceOptions: &runtime.NamespaceOption{Network: test.networkNs},
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 			specCheck(t, testID, testSandboxID, testPid, spec)
 			assert.Contains(t, spec.Process.Env, test.expectedEnv)
@@ -1584,7 +1348,7 @@ func TestDisableCgroup(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 	c.config.DisableCgroup = true
-	spec, err := c.containerSpec("test-id", "sandbox-id", 1234, "", "container-name", testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, "test-id", "sandbox-id", 1234, "", "container-name", testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 
 	t.Log("resource limit should not be set")
@@ -1654,7 +1418,6 @@ func TestGenerateUserString(t *testing.T) {
 		},
 	}
 	for _, tc := range testcases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			r, err := generateUserString(tc.u, tc.uid, tc.gid)
 			if tc.expectedError {
@@ -1740,11 +1503,11 @@ additional-group-for-root:x:22222:root
 			containerConfig.Linux.SecurityContext = test.securityContext
 			imageConfig.User = test.imageConfigUser
 
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 
 			spec.Root.Path = tempRootDir // simulating /etc/{passwd, group}
-			opts, err := c.containerSpecOpts(containerConfig, imageConfig)
+			opts, err := c.platformSpecOpts(platforms.DefaultSpec(), containerConfig, imageConfig)
 			require.NoError(t, err)
 			oci.ApplyOpts(ctx, nil, testContainer, spec, opts...)
 
@@ -1816,7 +1579,7 @@ func TestNonRootUserAndDevices(t *testing.T) {
 				},
 			}
 
-			spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, config.Runtime{})
 			assert.NoError(t, err)
 
 			assert.Equal(t, test.expectedDeviceUID, *spec.Linux.Devices[0].UID)
@@ -1890,7 +1653,7 @@ func TestPrivilegedDevices(t *testing.T) {
 				PrivilegedWithoutHostDevices:                  test.privilegedWithoutHostDevices,
 				PrivilegedWithoutHostDevicesAllDevicesAllowed: test.privilegedWithoutHostDevicesAllDevicesAllowed,
 			}
-			spec, err := c.containerSpec(t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, t.Name(), testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 
 			hostDevicesRaw, err := oci.HostDevices()
@@ -1944,7 +1707,7 @@ func TestBaseOCISpec(t *testing.T) {
 	testPid := uint32(1234)
 	containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	assert.NoError(t, err)
 
 	specCheck(t, testID, testSandboxID, testPid, spec)
@@ -2275,9 +2038,8 @@ containerEdits:
 			},
 		},
 	} {
-		test := test
 		t.Run(test.description, func(t *testing.T) {
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			require.NoError(t, err)
 
 			specCheck(t, testID, testSandboxID, testPid, spec)
@@ -2307,144 +2069,6 @@ containerEdits:
 						assert.Contains(t, spec.Linux.Devices, expectedDev)
 					}
 				}
-			}
-		})
-	}
-}
-
-// TestLinuxVolumeMounts tests the linux-specific parts of VolumeMounts.
-func TestLinuxVolumeMounts(t *testing.T) {
-	testContainerRootDir := "test-container-root"
-	idmap := []*runtime.IDMapping{
-		{
-			ContainerId: 0,
-			HostId:      100,
-			Length:      1,
-		},
-	}
-
-	for _, test := range []struct {
-		desc              string
-		criMounts         []*runtime.Mount
-		imageVolumes      map[string]struct{}
-		usernsEnabled     bool
-		expectedMountDest []string
-		expectedMappings  []*runtime.IDMapping
-	}{
-		{
-			desc:          "should skip image volumes if already mounted by CRI",
-			usernsEnabled: true,
-			criMounts: []*runtime.Mount{
-				{
-					ContainerPath: "/test-volume-1",
-					HostPath:      "/test-hostpath-1",
-				},
-			},
-			imageVolumes: map[string]struct{}{
-				"/test-volume-1": {},
-				"/test-volume-2": {},
-			},
-			expectedMountDest: []string{
-				"/test-volume-2",
-			},
-			expectedMappings: idmap,
-		},
-		{
-			desc:          "should include mappings for image volumes",
-			usernsEnabled: true,
-			imageVolumes: map[string]struct{}{
-				"/test-volume-1/": {},
-				"/test-volume-2/": {},
-			},
-			expectedMountDest: []string{
-				"/test-volume-2/",
-				"/test-volume-2/",
-			},
-			expectedMappings: idmap,
-		},
-		{
-			desc: "should convert rel imageVolume paths to abs paths",
-			imageVolumes: map[string]struct{}{
-				"test-volume-1/":       {},
-				"./test-volume-2/":     {},
-				"../../test-volume-3/": {},
-			},
-			expectedMountDest: []string{
-				"/test-volume-1",
-				"/test-volume-2",
-				"/test-volume-3",
-			},
-		},
-		{
-			desc:          "should convert rel imageVolume paths to abs paths and add userns mappings",
-			usernsEnabled: true,
-			imageVolumes: map[string]struct{}{
-				"test-volume-1/":       {},
-				"./test-volume-2/":     {},
-				"../../test-volume-3/": {},
-			},
-			expectedMountDest: []string{
-				"/test-volume-1",
-				"/test-volume-2",
-				"/test-volume-3",
-			},
-			expectedMappings: idmap,
-		},
-		{
-			desc: "doesn't include mappings for image volumes if userns is disabled",
-			imageVolumes: map[string]struct{}{
-				"/test-volume-1/": {},
-				"/test-volume-2/": {},
-			},
-			expectedMountDest: []string{
-				"/test-volume-2/",
-				"/test-volume-2/",
-			},
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			config := &imagespec.ImageConfig{
-				Volumes: test.imageVolumes,
-			}
-			containerConfig := &runtime.ContainerConfig{
-				Mounts: test.criMounts,
-			}
-
-			if test.usernsEnabled {
-				containerConfig.Linux = &runtime.LinuxContainerConfig{
-					SecurityContext: &runtime.LinuxContainerSecurityContext{
-						NamespaceOptions: &runtime.NamespaceOption{
-							UsernsOptions: &runtime.UserNamespace{
-								Mode: runtime.NamespaceMode_POD,
-								Uids: idmap,
-								Gids: idmap,
-							},
-						},
-					},
-				}
-			}
-
-			c := newTestCRIService()
-			got := c.volumeMounts(testContainerRootDir, containerConfig, config)
-			assert.Len(t, got, len(test.expectedMountDest))
-			for _, dest := range test.expectedMountDest {
-				found := false
-				for _, m := range got {
-					if m.ContainerPath != dest {
-						continue
-					}
-					found = true
-					assert.Equal(t,
-						filepath.Dir(m.HostPath),
-						filepath.Join(testContainerRootDir, "volumes"))
-
-					if test.expectedMappings != nil {
-						assert.Equal(t, test.expectedMappings, m.UidMappings)
-						assert.Equal(t, test.expectedMappings, m.GidMappings)
-					}
-				}
-				assert.True(t, found)
 			}
 		})
 	}

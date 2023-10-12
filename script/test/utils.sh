@@ -222,10 +222,6 @@ run_containerd() {
   CMD=""
   if [ -n "${sudo}" ]; then
     CMD+="${sudo} "
-    # sudo strips environment variables, so add DISABLE_CRI_SANDBOXES back if present
-    if [ -n  "${DISABLE_CRI_SANDBOXES}" ]; then
-      CMD+="DISABLE_CRI_SANDBOXES='${DISABLE_CRI_SANDBOXES}' "
-    fi
   fi
   CMD+="${PWD}/bin/containerd"
 

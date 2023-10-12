@@ -77,7 +77,6 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		log.G(ctx).Infof("Network plugin is ready, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
-
 	netStart := time.Now()
 	err = netPlugin.Status()
 	networkPluginOperations.WithValues(networkStatusOp).Inc()

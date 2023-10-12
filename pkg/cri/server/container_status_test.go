@@ -18,9 +18,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -242,8 +245,9 @@ func TestContainerStatus(t *testing.T) {
 				assert.NoError(t, c.containerStore.Add(container))
 			}
 			if test.imageExist {
-				c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{*image})
+				imageStore, err := imagestore.NewFakeStore([]imagestore.Image{*image})
 				assert.NoError(t, err)
+				c.imageService = &fakeImageService{imageStore: imageStore}
 			}
 			resp, err := c.ContainerStatus(context.Background(), &runtime.ContainerStatusRequest{ContainerId: container.ID})
 			if test.expectErr {
@@ -259,6 +263,27 @@ func TestContainerStatus(t *testing.T) {
 			assert.Equal(t, expected, resp.GetStatus())
 		})
 	}
+}
+
+type fakeImageService struct {
+	runtime.ImageServiceServer
+	imageStore *imagestore.Store
+}
+
+func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
+	return ""
+}
+
+func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { return nil }
+
+func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
+
+func (s *fakeImageService) GetSnapshot(key string) (snapshotstore.Snapshot, error) {
+	return snapshotstore.Snapshot{}, errors.New("not implemented")
+}
+
+func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+	return imagestore.Image{}, errors.New("not implemented")
 }
 
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {

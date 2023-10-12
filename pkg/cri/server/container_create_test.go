@@ -18,9 +18,14 @@ package server
 
 import (
 	"context"
+	"errors"
+	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"testing"
+
+	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	"github.com/containerd/containerd/platforms"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -33,6 +38,8 @@ import (
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/opts"
 )
+
+var currentPlatform = platforms.DefaultSpec()
 
 func checkMount(t *testing.T, mounts []runtimespec.Mount, src, dest, typ string,
 	contains, notcontains []string) {
@@ -63,7 +70,7 @@ func TestGeneralContainerSpec(t *testing.T) {
 	c := newTestCRIService()
 	testSandboxID := "sandbox-id"
 	testContainerName := "container-name"
-	spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
+	spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 	specCheck(t, testID, testSandboxID, testPid, spec)
 }
@@ -139,7 +146,7 @@ func TestPodAnnotationPassthroughContainerSpec(t *testing.T) {
 			ociRuntime := config.Runtime{
 				PodAnnotations: test.podAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -224,11 +231,22 @@ func TestContainerSpecCommand(t *testing.T) {
 
 func TestVolumeMounts(t *testing.T) {
 	testContainerRootDir := "test-container-root"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
+
 	for _, test := range []struct {
 		desc              string
+		platform          platforms.Platform
 		criMounts         []*runtime.Mount
+		usernsEnabled     bool
 		imageVolumes      map[string]struct{}
 		expectedMountDest []string
+		expectedMappings  []*runtime.IDMapping
 	}{
 		{
 			desc: "should setup rw mount for image volumes",
@@ -273,6 +291,65 @@ func TestVolumeMounts(t *testing.T) {
 				"/test-volume-2/",
 			},
 		},
+		{
+			desc:     "should make relative paths absolute on Linux",
+			platform: platforms.Platform{OS: "linux"},
+			imageVolumes: map[string]struct{}{
+				"./test-volume-1":     {},
+				"C:/test-volume-2":    {},
+				"../../test-volume-3": {},
+				"/abs/test-volume-4":  {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/C:/test-volume-2",
+				"/test-volume-3",
+				"/abs/test-volume-4",
+			},
+		},
+		{
+			desc:          "should include mappings for image volumes on Linux",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+			expectedMappings: idmap,
+		},
+		{
+			desc:          "should NOT include mappings for image volumes on Linux if !userns",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: false,
+			imageVolumes: map[string]struct{}{
+				"/test-volume-1/": {},
+				"/test-volume-2/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-2/",
+				"/test-volume-2/",
+			},
+		},
+		{
+			desc:          "should convert rel imageVolume paths to abs paths and add userns mappings",
+			platform:      platforms.Platform{OS: "linux"},
+			usernsEnabled: true,
+			imageVolumes: map[string]struct{}{
+				"test-volume-1/":       {},
+				"C:/test-volume-2/":    {},
+				"../../test-volume-3/": {},
+			},
+			expectedMountDest: []string{
+				"/test-volume-1",
+				"/C:/test-volume-2",
+				"/test-volume-3",
+			},
+			expectedMappings: idmap,
+		},
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
@@ -280,19 +357,38 @@ func TestVolumeMounts(t *testing.T) {
 				Volumes: test.imageVolumes,
 			}
 			containerConfig := &runtime.ContainerConfig{Mounts: test.criMounts}
+			if test.usernsEnabled {
+				containerConfig.Linux = &runtime.LinuxContainerConfig{
+					SecurityContext: &runtime.LinuxContainerSecurityContext{
+						NamespaceOptions: &runtime.NamespaceOption{
+							UsernsOptions: &runtime.UserNamespace{
+								Mode: runtime.NamespaceMode_POD,
+								Uids: idmap,
+								Gids: idmap,
+							},
+						},
+					},
+				}
+			}
+
 			c := newTestCRIService()
-			got := c.volumeMounts(testContainerRootDir, containerConfig, config)
+			got := c.volumeMounts(test.platform, testContainerRootDir, containerConfig, config)
 			assert.Len(t, got, len(test.expectedMountDest))
 			for _, dest := range test.expectedMountDest {
 				found := false
 				for _, m := range got {
-					if m.ContainerPath == dest {
-						found = true
-						assert.Equal(t,
-							filepath.Dir(m.HostPath),
-							filepath.Join(testContainerRootDir, "volumes"))
-						break
+					if m.ContainerPath != dest {
+						continue
 					}
+					found = true
+					assert.Equal(t,
+						filepath.Dir(m.HostPath),
+						filepath.Join(testContainerRootDir, "volumes"))
+					if test.expectedMappings != nil {
+						assert.Equal(t, test.expectedMappings, m.UidMappings)
+						assert.Equal(t, test.expectedMappings, m.GidMappings)
+					}
+					break
 				}
 				assert.True(t, found)
 			}
@@ -415,7 +511,7 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 				PodAnnotations:       test.podAnnotations,
 				ContainerAnnotations: test.containerAnnotations,
 			}
-			spec, err := c.containerSpec(testID, testSandboxID, testPid, "", testContainerName, testImageName,
+			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName,
 				containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 			assert.NoError(t, err)
 			assert.NotNil(t, spec)
@@ -438,6 +534,7 @@ func TestBaseRuntimeSpec(t *testing.T) {
 
 	out, err := c.runtimeSpec(
 		"id1",
+		platforms.DefaultSpec(),
 		"/etc/containerd/cri-base.json",
 		oci.WithHostname("new-host"),
 		oci.WithDomainname("new-domain"),
@@ -455,38 +552,228 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }
 
-func TestRuntimeSnapshotter(t *testing.T) {
-	defaultRuntime := config.Runtime{
-		Snapshotter: "",
-	}
-
-	fooRuntime := config.Runtime{
-		Snapshotter: "devmapper",
+func TestLinuxContainerMounts(t *testing.T) {
+	const testSandboxID = "test-id"
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
 	}
 
 	for _, test := range []struct {
-		desc              string
-		runtime           config.Runtime
-		expectSnapshotter string
+		desc            string
+		statFn          func(string) (os.FileInfo, error)
+		criMounts       []*runtime.Mount
+		securityContext *runtime.LinuxContainerSecurityContext
+		expectedMounts  []*runtime.Mount
 	}{
 		{
-			desc:              "should return default snapshotter when runtime.Snapshotter is not set",
-			runtime:           defaultRuntime,
-			expectSnapshotter: config.DefaultConfig().Snapshotter,
+			desc: "should setup ro mount when rootfs is read-only",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				ReadonlyRootfs: true,
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       true,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       true,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       true,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
 		},
 		{
-			desc:              "should return overridden snapshotter when runtime.Snapshotter is set",
-			runtime:           fooRuntime,
-			expectSnapshotter: "devmapper",
+			desc:            "should setup rw mount when rootfs is read-write",
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
+		},
+		{
+			desc: "should setup uidMappings/gidMappings when userns is used",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{
+					UsernsOptions: &runtime.UserNamespace{
+						Mode: runtime.NamespaceMode_POD,
+						Uids: idmap,
+						Gids: idmap,
+					},
+				},
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+					UidMappings:    idmap,
+					GidMappings:    idmap,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
+		},
+		{
+			desc: "should use host /dev/shm when host ipc is set",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				NamespaceOptions: &runtime.NamespaceOption{Ipc: runtime.NamespaceMode_NODE},
+			},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hostname",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      "/dev/shm",
+					Readonly:      false,
+				},
+			},
+		},
+		{
+			desc: "should skip container mounts if already mounted by CRI",
+			criMounts: []*runtime.Mount{
+				{
+					ContainerPath: "/etc/hostname",
+					HostPath:      "/test-etc-hostname",
+				},
+				{
+					ContainerPath: "/etc/hosts",
+					HostPath:      "/test-etc-host",
+				},
+				{
+					ContainerPath: resolvConfPath,
+					HostPath:      "test-resolv-conf",
+				},
+				{
+					ContainerPath: "/dev/shm",
+					HostPath:      "test-dev-shm",
+				},
+			},
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts:  nil,
+		},
+		{
+			desc: "should skip hostname mount if the old sandbox doesn't have hostname file",
+			statFn: func(path string) (os.FileInfo, error) {
+				assert.Equal(t, filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"), path)
+				return nil, errors.New("random error")
+			},
+			securityContext: &runtime.LinuxContainerSecurityContext{},
+			expectedMounts: []*runtime.Mount{
+				{
+					ContainerPath:  "/etc/hosts",
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  resolvConfPath,
+					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+				{
+					ContainerPath:  "/dev/shm",
+					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
+					Readonly:       false,
+					SelinuxRelabel: true,
+				},
+			},
 		},
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			cri := newTestCRIService()
-			cri.config = config.Config{
-				PluginConfig: config.DefaultConfig(),
+			config := &runtime.ContainerConfig{
+				Metadata: &runtime.ContainerMetadata{
+					Name:    "test-name",
+					Attempt: 1,
+				},
+				Mounts: test.criMounts,
+				Linux: &runtime.LinuxContainerConfig{
+					SecurityContext: test.securityContext,
+				},
 			}
-			assert.Equal(t, test.expectSnapshotter, cri.runtimeSnapshotter(context.Background(), test.runtime))
+			c := newTestCRIService()
+			c.os.(*ostesting.FakeOS).StatFn = test.statFn
+			mounts := c.linuxContainerMounts(testSandboxID, config)
+			assert.Equal(t, test.expectedMounts, mounts, test.desc)
 		})
 	}
 }

@@ -38,6 +38,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		}
 		return nil
 	}
+
 	for _, test := range []struct {
 		desc      string
 		spec      *runtimespec.Spec

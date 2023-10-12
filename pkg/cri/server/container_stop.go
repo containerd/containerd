@@ -89,7 +89,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 		}
 		// Don't return for unknown state, some cleanup needs to be done.
 		if state == runtime.ContainerState_CONTAINER_UNKNOWN {
-			return c.cleanupUnknownContainer(ctx, id, container, sandboxID)
+			return cleanupUnknownContainer(ctx, id, container, sandboxID, c)
 		}
 		return nil
 	}
@@ -104,7 +104,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to wait for task for %q: %w", id, err)
 			}
-			return c.cleanupUnknownContainer(ctx, id, container, sandboxID)
+			return cleanupUnknownContainer(ctx, id, container, sandboxID, c)
 		}
 
 		exitCtx, exitCancel := context.WithCancel(context.Background())
@@ -133,7 +133,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// default SIGTERM is still better than returning error and leaving
 			// the container unstoppable. (See issue #990)
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.imageStore.Get(container.ImageRef)
+			image, err := c.GetImage(container.ImageRef)
 			if err != nil {
 				if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get image %q: %w", container.ImageRef, err)
@@ -207,7 +207,7 @@ func (c *criService) waitContainerStop(ctx context.Context, container containers
 }
 
 // cleanupUnknownContainer cleanup stopped container in unknown state.
-func (c *criService) cleanupUnknownContainer(ctx context.Context, id string, cntr containerstore.Container, sandboxID string) error {
+func cleanupUnknownContainer(ctx context.Context, id string, cntr containerstore.Container, sandboxID string, c *criService) error {
 	// Reuse handleContainerExit to do the cleanup.
 	return handleContainerExit(ctx, &eventtypes.TaskExit{
 		ContainerID: id,

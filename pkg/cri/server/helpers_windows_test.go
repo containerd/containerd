@@ -50,6 +50,15 @@ func TestWindowsHostNetwork(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "when no host process return false",
+			c: &runtime.PodSandboxConfig{
+				Windows: &runtime.WindowsPodSandboxConfig{
+					SecurityContext: &runtime.WindowsSandboxSecurityContext{},
+				},
+			},
+			expected: false,
+		},
 	}
 
 	for _, tt := range tests {

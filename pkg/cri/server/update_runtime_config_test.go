@@ -28,7 +28,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	servertesting "github.com/containerd/containerd/pkg/cri/server/testing"
+	servertesting "github.com/containerd/containerd/pkg/cri/testing"
 )
 
 func TestUpdateRuntimeConfig(t *testing.T) {

@@ -25,7 +25,6 @@ const (
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
 	testSandboxImage = "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113798" // #nosec G101
-	testImageFSPath  = "/test/image/fs/path"
 )
 
 var testConfig = criconfig.Config{

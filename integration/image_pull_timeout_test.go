@@ -459,6 +459,7 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 			},
 			Registry:                 registryCfg,
 			ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
+			StatsCollectPeriod:       10,
 		},
 		ContainerdRootDir: containerdRootDir,
 		RootDir:           filepath.Join(criWorkDir, "root"),

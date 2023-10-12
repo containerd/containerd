@@ -19,14 +19,14 @@ package server
 import (
 	"fmt"
 
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 )
 
 // windowsNetworkAttachCount is the minimum number of networks the PodSandbox
 // attaches to
 const windowsNetworkAttachCount = 1
 
-// initPlatform handles Windows specific initialization for the CRI service.
+// initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
 	pluginDirs := map[string]string{
 		defaultNetworkPlugin: c.config.NetworkPluginConfDir,

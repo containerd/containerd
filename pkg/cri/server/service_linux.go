@@ -20,11 +20,12 @@ import (
 	"fmt"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	"github.com/opencontainers/selinux/go-selinux"
+
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/userns"
-	cni "github.com/containerd/go-cni"
+	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
-	"github.com/opencontainers/selinux/go-selinux"
 )
 
 // networkAttachCount is the minimum number of networks the PodSandbox
@@ -92,7 +93,7 @@ func (c *criService) initPlatform() (err error) {
 		reg := cdi.GetRegistry()
 		err = reg.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
 		if err != nil {
-			return fmt.Errorf("failed to configure CDI registry: %w", err)
+			return fmt.Errorf("failed to configure CDI registry")
 		}
 	}
 

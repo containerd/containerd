@@ -28,6 +28,9 @@ import (
 	containerdio "github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
+	criconfig "github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/pkg/cri/server/podsandbox"
+	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -38,7 +41,6 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/pkg/netns"
 )
 
 // NOTE: The recovery logic has following assumption: when the cri plugin is down:
@@ -58,13 +60,27 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list sandbox containers: %w", err)
 	}
 
+	podSandboxController, ok := c.sandboxControllers[criconfig.ModePodSandbox]
+	if !ok {
+		log.G(ctx).Fatal("unable to restore pod sandboxes, no controller found")
+	}
+
+	podSandboxLoader, ok := podSandboxController.(podSandboxRecover)
+	if !ok {
+		log.G(ctx).Fatal("pod sandbox controller doesn't support recovery")
+	}
+
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for _, sandbox := range sandboxes {
 		sandbox := sandbox
 		eg.Go(func() error {
-			sb, err := c.loadSandbox(ctx2, sandbox)
+			sb, err := podSandboxLoader.RecoverContainer(ctx2, sandbox)
 			if err != nil {
-				log.G(ctx2).WithError(err).Errorf("Failed to load sandbox %q", sandbox.ID())
+				log.G(ctx2).
+					WithError(err).
+					WithField("sandbox", sandbox.ID()).
+					Error("Failed to load sandbox")
+
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded sandbox %+v", sb)
@@ -81,6 +97,57 @@ func (c *criService) recover(ctx context.Context) error {
 		return err
 	}
 
+	// Recover sandboxes in the new SandboxStore
+	storedSandboxes, err := c.client.SandboxStore().List(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list sandboxes from API: %w", err)
+	}
+	for _, sbx := range storedSandboxes {
+		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
+			continue
+		}
+
+		metadata := sandboxstore.Metadata{}
+		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		if err != nil {
+			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
+		}
+
+		var (
+			state      = sandboxstore.StateUnknown
+			controller = c.sandboxControllers[criconfig.ModeShim]
+		)
+
+		status, err := controller.Status(ctx, sbx.ID, false)
+		if err != nil {
+			log.G(ctx).
+				WithError(err).
+				WithField("sandbox", sbx.ID).
+				Error("failed to recover sandbox state")
+
+			if errdefs.IsNotFound(err) {
+				state = sandboxstore.StateNotReady
+			}
+		} else {
+			if code, ok := runtime.PodSandboxState_value[status.State]; ok {
+				if code == int32(runtime.PodSandboxState_SANDBOX_READY) {
+					state = sandboxstore.StateReady
+				} else if code == int32(runtime.PodSandboxState_SANDBOX_NOTREADY) {
+					state = sandboxstore.StateNotReady
+				}
+			}
+		}
+
+		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
+
+		// Load network namespace.
+		sb.NetNS = getNetNS(&metadata)
+
+		if err := c.sandboxStore.Add(sb); err != nil {
+			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
+		}
+	}
+
 	// Recover all containers.
 	containers, err := c.client.Containers(ctx, filterLabel(containerKindLabel, containerKindContainer))
 	if err != nil {
@@ -92,7 +159,11 @@ func (c *criService) recover(ctx context.Context) error {
 		eg.Go(func() error {
 			cntr, err := c.loadContainer(ctx2, container)
 			if err != nil {
-				log.G(ctx2).WithError(err).Errorf("Failed to load container %q", container.ID())
+				log.G(ctx2).
+					WithError(err).
+					WithField("container", container.ID()).
+					Error("Failed to load container")
+
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
@@ -339,103 +410,18 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	return containerstore.NewContainer(*meta, opts...)
 }
 
-// loadSandbox loads sandbox from containerd.
-func (c *criService) loadSandbox(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
-	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
-	defer cancel()
-	var sandbox sandboxstore.Sandbox
-	// Load sandbox metadata.
-	exts, err := cntr.Extensions(ctx)
-	if err != nil {
-		return sandbox, fmt.Errorf("failed to get sandbox container extensions: %w", err)
-	}
-	ext, ok := exts[sandboxMetadataExtension]
-	if !ok {
-		return sandbox, fmt.Errorf("metadata extension %q not found", sandboxMetadataExtension)
-	}
-	data, err := typeurl.UnmarshalAny(ext)
-	if err != nil {
-		return sandbox, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
-	}
-	meta := data.(*sandboxstore.Metadata)
+// podSandboxRecover is an additional interface implemented by podsandbox/ controller to handle
+// Pod sandbox containers recovery.
+type podSandboxRecover interface {
+	RecoverContainer(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error)
+}
 
-	s, err := func() (sandboxstore.Status, error) {
-		status := unknownSandboxStatus()
-		// Load sandbox created timestamp.
-		info, err := cntr.Info(ctx)
-		if err != nil {
-			return status, fmt.Errorf("failed to get sandbox container info: %w", err)
-		}
-		status.CreatedAt = info.CreatedAt
-
-		// Load sandbox state.
-		t, err := cntr.Task(ctx, nil)
-		if err != nil && !errdefs.IsNotFound(err) {
-			return status, fmt.Errorf("failed to load task: %w", err)
-		}
-		var taskStatus containerd.Status
-		var notFound bool
-		if errdefs.IsNotFound(err) {
-			// Task is not found.
-			notFound = true
-		} else {
-			// Task is found. Get task status.
-			taskStatus, err = t.Status(ctx)
-			if err != nil {
-				// It's still possible that task is deleted during this window.
-				if !errdefs.IsNotFound(err) {
-					return status, fmt.Errorf("failed to get task status: %w", err)
-				}
-				notFound = true
-			}
-		}
-		if notFound {
-			// Task does not exist, set sandbox state as NOTREADY.
-			status.State = sandboxstore.StateNotReady
-		} else {
-			if taskStatus.Status == containerd.Running {
-				// Wait for the task for sandbox monitor.
-				// wait is a long running background request, no timeout needed.
-				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
-				if err != nil {
-					if !errdefs.IsNotFound(err) {
-						return status, fmt.Errorf("failed to wait for task: %w", err)
-					}
-					status.State = sandboxstore.StateNotReady
-				} else {
-					// Task is running, set sandbox state as READY.
-					status.State = sandboxstore.StateReady
-					status.Pid = t.Pid()
-					c.eventMonitor.startSandboxExitMonitor(context.Background(), meta.ID, status.Pid, exitCh)
-				}
-			} else {
-				// Task is not running. Delete the task and set sandbox state as NOTREADY.
-				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-					return status, fmt.Errorf("failed to delete task: %w", err)
-				}
-				status.State = sandboxstore.StateNotReady
-			}
-		}
-		return status, nil
-	}()
-	if err != nil {
-		log.G(ctx).WithError(err).Errorf("Failed to load sandbox status for %q", cntr.ID())
-	}
-
-	sandbox = sandboxstore.NewSandbox(*meta, s)
-	sandbox.Container = cntr
-
+func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 	// Don't need to load netns for host network sandbox.
 	if hostNetwork(meta.Config) {
-		return sandbox, nil
+		return nil
 	}
-	// Load network namespace.
-	sandbox.NetNS = netns.LoadNetNS(meta.NetNSPath)
-
-	// It doesn't matter whether task is running or not. If it is running, sandbox
-	// status will be `READY`; if it is not running, sandbox status will be `NOT_READY`,
-	// kubelet will stop the sandbox which will properly cleanup everything.
-	return sandbox, nil
+	return netns.LoadNetNS(meta.NetNSPath)
 }
 
 // loadImages loads images from containerd.
@@ -466,7 +452,7 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
 				// TODO(random-liu): Consider whether we should try unpack here.
 			}
-			if err := c.updateImage(ctx, i.Name()); err != nil {
+			if err := c.UpdateImage(ctx, i.Name()); err != nil {
 				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
 				return
 			}

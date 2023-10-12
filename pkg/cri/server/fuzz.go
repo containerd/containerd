@@ -27,7 +27,7 @@ import (
 func SandboxStore(cs CRIService) (*sandbox.Store, error) {
 	s, ok := cs.(*criService)
 	if !ok {
-		return nil, fmt.Errorf("%+v is not server.criService", cs)
+		return nil, fmt.Errorf("%+v is not sbserver.criService", cs)
 	}
 	return s.sandboxStore, nil
 }
