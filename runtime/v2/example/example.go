@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
@@ -31,18 +32,18 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.TTRPCPlugin,
+		Type: plugins.TTRPCPlugin,
 		ID:   "task",
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.InternalPlugin,
+			plugins.EventPlugin,
+			plugins.InternalPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			pp, err := ic.GetByID(plugin.EventPlugin, "publisher")
+			pp, err := ic.GetByID(plugins.EventPlugin, "publisher")
 			if err != nil {
 				return nil, err
 			}
-			ss, err := ic.GetByID(plugin.InternalPlugin, "shutdown")
+			ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
 			if err != nil {
 				return nil, err
 			}

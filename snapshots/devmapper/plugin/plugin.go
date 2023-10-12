@@ -24,12 +24,13 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/devmapper"
 )
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
+		Type:   plugins.SnapshotPlugin,
 		ID:     "devmapper",
 		Config: &devmapper.Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

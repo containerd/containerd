@@ -36,7 +36,7 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/pkg/cri/streaming"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
@@ -350,7 +350,7 @@ func (c *criService) register(s *grpc.Server) error {
 // imageFSPath returns containerd image filesystem path.
 // Note that if containerd changes directory layout, we also needs to change this.
 func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, plugin.SnapshotPlugin.String()+"."+snapshotter)
+	return filepath.Join(rootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {

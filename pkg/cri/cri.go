@@ -27,6 +27,7 @@ import (
 	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
@@ -39,13 +40,13 @@ import (
 func init() {
 	config := criconfig.DefaultConfig()
 	plugin.Register(&plugin.Registration{
-		Type:   plugin.GRPCPlugin,
+		Type:   plugins.GRPCPlugin,
 		ID:     "cri",
 		Config: &config,
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.ServicePlugin,
-			plugin.NRIApiPlugin,
+			plugins.EventPlugin,
+			plugins.ServicePlugin,
+			plugins.NRIApiPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -125,7 +126,7 @@ func setGLogLevel() error {
 // Get the NRI plugin, and set up our NRI API for it.
 func getNRIAPI(ic *plugin.InitContext) *nri.API {
 	const (
-		pluginType = plugin.NRIApiPlugin
+		pluginType = plugins.NRIApiPlugin
 		pluginName = "nri"
 	)
 

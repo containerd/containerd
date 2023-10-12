@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/pkg/shutdown"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
@@ -34,13 +35,13 @@ import (
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.TTRPCPlugin,
+		Type: plugins.TTRPCPlugin,
 		ID:   "pause",
 		Requires: []plugin.Type{
-			plugin.InternalPlugin,
+			plugins.InternalPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ss, err := ic.GetByID(plugin.InternalPlugin, "shutdown")
+			ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
 			if err != nil {
 				return nil, err
 			}

@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/log"
@@ -42,13 +43,13 @@ func init() {
 	}
 
 	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+		Type: plugins.GRPCPlugin,
 		ID:   "streaming",
 		Requires: []plugin.Type{
-			plugin.StreamingPlugin,
+			plugins.StreamingPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			i, err := ic.GetByID(plugin.StreamingPlugin, "manager")
+			i, err := ic.GetByID(plugins.StreamingPlugin, "manager")
 			if err != nil {
 				return nil, err
 			}

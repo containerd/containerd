@@ -32,24 +32,39 @@ func mockPluginFilter(*Registration) bool {
 	return false
 }
 
-var tasksServiceRequires = []Type{
-	RuntimePlugin,
-	RuntimePluginV2,
-	MetadataPlugin,
-	TaskMonitorPlugin,
-}
-
 // TestContainerdPlugin tests the logic of Graph, use the containerd's plugin
 func TestContainerdPlugin(t *testing.T) {
 	registerClear()
+	// Plugin types commonly used by containerd
+	const (
+		InternalPlugin         Type = "io.containerd.internal.v1"
+		RuntimePlugin          Type = "io.containerd.runtime.v1"
+		RuntimePluginV2        Type = "io.containerd.runtime.v2"
+		ServicePlugin          Type = "io.containerd.service.v1"
+		GRPCPlugin             Type = "io.containerd.grpc.v1"
+		SnapshotPlugin         Type = "io.containerd.snapshotter.v1"
+		TaskMonitorPlugin      Type = "io.containerd.monitor.v1"
+		DiffPlugin             Type = "io.containerd.differ.v1"
+		MetadataPlugin         Type = "io.containerd.metadata.v1"
+		ContentPlugin          Type = "io.containerd.content.v1"
+		GCPlugin               Type = "io.containerd.gc.v1"
+		LeasePlugin            Type = "io.containerd.lease.v1"
+		TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
+	)
+
 	Register(&Registration{
 		Type: TaskMonitorPlugin,
 		ID:   "cgroups",
 	})
 	Register(&Registration{
-		Type:     ServicePlugin,
-		ID:       services.TasksService,
-		Requires: tasksServiceRequires,
+		Type: ServicePlugin,
+		ID:   services.TasksService,
+		Requires: []Type{
+			RuntimePlugin,
+			RuntimePluginV2,
+			MetadataPlugin,
+			TaskMonitorPlugin,
+		},
 	})
 	Register(&Registration{
 		Type: ServicePlugin,

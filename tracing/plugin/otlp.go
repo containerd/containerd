@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
@@ -43,7 +44,7 @@ const exporterPlugin = "otlp"
 func init() {
 	plugin.Register(&plugin.Registration{
 		ID:     exporterPlugin,
-		Type:   plugin.TracingProcessorPlugin,
+		Type:   plugins.TracingProcessorPlugin,
 		Config: &OTLPConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			cfg := ic.Config.(*OTLPConfig)
@@ -55,13 +56,18 @@ func init() {
 		},
 	})
 	plugin.Register(&plugin.Registration{
-		ID:       "tracing",
-		Type:     plugin.InternalPlugin,
-		Requires: []plugin.Type{plugin.TracingProcessorPlugin},
-		Config:   &TraceConfig{ServiceName: "containerd", TraceSamplingRatio: 1.0},
+		ID:   "tracing",
+		Type: plugins.InternalPlugin,
+		Requires: []plugin.Type{
+			plugins.TracingProcessorPlugin,
+		},
+		Config: &TraceConfig{
+			ServiceName:        "containerd",
+			TraceSamplingRatio: 1.0,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			//get TracingProcessorPlugin which is a dependency
-			plugins, err := ic.GetByType(plugin.TracingProcessorPlugin)
+			plugins, err := ic.GetByType(plugins.TracingProcessorPlugin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
 			}

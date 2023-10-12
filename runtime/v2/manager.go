@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
@@ -51,11 +52,11 @@ type Config struct {
 
 func init() {
 	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimePluginV2,
+		Type: plugins.RuntimePluginV2,
 		ID:   "task",
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.MetadataPlugin,
+			plugins.EventPlugin,
+			plugins.MetadataPlugin,
 		},
 		Config: &Config{
 			Platforms: defaultPlatforms(),
@@ -69,11 +70,11 @@ func init() {
 
 			ic.Meta.Platforms = supportedPlatforms
 
-			m, err := ic.Get(plugin.MetadataPlugin)
+			m, err := ic.Get(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.GetByID(plugin.EventPlugin, "exchange")
+			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
 			if err != nil {
 				return nil, err
 			}
@@ -104,10 +105,10 @@ func init() {
 	// use the following workaround.
 	// This expected to be removed in 1.7.
 	plugin.Register(&plugin.Registration{
-		Type: plugin.RuntimePluginV2,
+		Type: plugins.RuntimePluginV2,
 		ID:   "shim",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			taskManagerI, err := ic.GetByID(plugin.RuntimePluginV2, "task")
+			taskManagerI, err := ic.GetByID(plugins.RuntimePluginV2, "task")
 			if err != nil {
 				return nil, err
 			}
@@ -176,7 +177,7 @@ type ShimManager struct {
 
 // ID of the shim manager
 func (m *ShimManager) ID() string {
-	return plugin.RuntimePluginV2.String() + ".shim"
+	return plugins.RuntimePluginV2.String() + ".shim"
 }
 
 // Start launches a new shim instance
@@ -400,7 +401,7 @@ func NewTaskManager(shims *ShimManager) *TaskManager {
 
 // ID of the task manager
 func (m *TaskManager) ID() string {
-	return plugin.RuntimePluginV2.String() + ".task"
+	return plugins.RuntimePluginV2.String() + ".task"
 }
 
 // Create launches new shim instance and creates new task

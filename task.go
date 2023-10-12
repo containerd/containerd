@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/rootfs"
@@ -309,7 +309,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	switch status.Status {
 	case Stopped, Unknown, "":
 	case Created:
-		if t.client.runtime == plugin.RuntimePlugin.String()+".windows" {
+		if t.client.runtime == plugins.RuntimePlugin.String()+".windows" {
 			// On windows Created is akin to Stopped
 			break
 		}
@@ -326,7 +326,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		// io.Wait locks for restored tasks on Windows unless we call
 		// io.Close first (https://github.com/containerd/containerd/issues/5621)
 		// in other cases, preserve the contract and let IO finish before closing
-		if t.client.runtime == plugin.RuntimePlugin.String()+".windows" {
+		if t.client.runtime == plugins.RuntimePlugin.String()+".windows" {
 			t.io.Close()
 		}
 		// io.Cancel is used to cancel the io goroutine while it is in
@@ -690,7 +690,7 @@ func isCheckpointPathExist(runtime string, v interface{}) bool {
 	}
 
 	switch runtime {
-	case plugin.RuntimeRuncV2:
+	case plugins.RuntimeRuncV2:
 		if opts, ok := v.(*options.CheckpointOptions); ok && opts.ImagePath != "" {
 			return true
 		}

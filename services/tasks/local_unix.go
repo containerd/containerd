@@ -20,12 +20,13 @@ package tasks
 
 import (
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 )
 
 var tasksServiceRequires = []plugin.Type{
-	plugin.EventPlugin,
-	plugin.RuntimePlugin,
-	plugin.RuntimePluginV2,
-	plugin.MetadataPlugin,
-	plugin.TaskMonitorPlugin,
+	plugins.EventPlugin,
+	plugins.RuntimePlugin,
+	plugins.RuntimePluginV2,
+	plugins.MetadataPlugin,
+	plugins.TaskMonitorPlugin,
 }
