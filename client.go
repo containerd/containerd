@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -185,7 +184,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 	c := &Client{
 		defaultns: copts.defaultns,
 		conn:      conn,
-		runtime:   plugins.RuntimePlugin.String() + "." + runtime.GOOS,
+		runtime:   defaults.DefaultRuntime,
 	}
 
 	if copts.defaultPlatform != nil {
