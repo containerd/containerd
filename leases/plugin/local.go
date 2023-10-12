@@ -23,11 +23,12 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.LeasePlugin,
 		ID:   "manager",
 		Requires: []plugin.Type{

@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
@@ -46,7 +47,7 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.DiffPlugin,
 		ID:   "windows",
 		Requires: []plugin.Type{

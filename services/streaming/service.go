@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
@@ -42,7 +43,7 @@ func init() {
 		panic(err)
 	}
 
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "streaming",
 		Requires: []plugin.Type{

@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
@@ -48,7 +49,7 @@ const (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.DiffPlugin,
 		ID:   "windows-lcow",
 		Requires: []plugin.Type{

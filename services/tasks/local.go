@@ -19,6 +19,7 @@ package tasks
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -41,6 +42,7 @@ import (
 	"github.com/containerd/containerd/pkg/rdt"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
@@ -75,7 +77,7 @@ type Config struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type:     plugins.ServicePlugin,
 		ID:       services.TasksService,
 		Requires: tasksServiceRequires,
@@ -106,7 +108,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 
 	monitor, err := ic.Get(plugins.TaskMonitorPlugin)
 	if err != nil {
-		if !errdefs.IsNotFound(err) {
+		if !errors.Is(err, plugin.ErrPluginNotFound) {
 			return nil, err
 		}
 		monitor = runtime.NewNoopMonitor()

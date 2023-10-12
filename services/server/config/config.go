@@ -239,11 +239,10 @@ type ProxyPlugin struct {
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
-func (c *Config) Decode(ctx context.Context, p *plugin.Registration) (interface{}, error) {
-	id := p.URI()
+func (c *Config) Decode(ctx context.Context, id string, config interface{}) (interface{}, error) {
 	data, ok := c.Plugins[id]
 	if !ok {
-		return p.Config, nil
+		return config, nil
 	}
 
 	b, err := toml.Marshal(data)
@@ -251,7 +250,7 @@ func (c *Config) Decode(ctx context.Context, p *plugin.Registration) (interface{
 		return nil, err
 	}
 
-	if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(p.Config); err != nil {
+	if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(config); err != nil {
 		var serr *toml.StrictMissingError
 		if errors.As(err, &serr) {
 			for _, derr := range serr.Errors {
@@ -260,7 +259,7 @@ func (c *Config) Decode(ctx context.Context, p *plugin.Registration) (interface{
 					"key":    strings.Join(derr.Key(), " "),
 				}).WithError(err).Warn("Ignoring unknown key in TOML for plugin")
 			}
-			err = toml.Unmarshal(b, p.Config)
+			err = toml.Unmarshal(b, config)
 		}
 		if err != nil {
 			return nil, err
@@ -268,7 +267,7 @@ func (c *Config) Decode(ctx context.Context, p *plugin.Registration) (interface{
 
 	}
 
-	return p.Config, nil
+	return config, nil
 }
 
 // LoadConfig loads the containerd server config from the provided path

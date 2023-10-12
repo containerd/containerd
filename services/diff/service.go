@@ -22,13 +22,14 @@ import (
 
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "diff",
 		Requires: []plugin.Type{

@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/pkg/failpoint"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime/v2/runc/task"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -39,7 +40,7 @@ const (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.TTRPCPlugin,
 		ID:   "task",
 		Requires: []plugin.Type{

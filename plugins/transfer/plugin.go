@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 
@@ -40,7 +41,7 @@ import (
 
 // Register local transfer service plugin
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.TransferPlugin,
 		ID:   "local",
 		Requires: []plugin.Type{

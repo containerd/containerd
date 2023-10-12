@@ -21,13 +21,14 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/content/contentserver"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "content",
 		Requires: []plugin.Type{

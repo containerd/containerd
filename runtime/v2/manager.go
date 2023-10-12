@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
@@ -51,7 +52,7 @@ type Config struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.RuntimePluginV2,
 		ID:   "task",
 		Requires: []plugin.Type{
@@ -83,10 +84,10 @@ func init() {
 			events := ep.(*exchange.Exchange)
 
 			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
-				Root:         ic.Root,
-				State:        ic.State,
-				Address:      ic.Address,
-				TTRPCAddress: ic.TTRPCAddress,
+				Root:         ic.Properties[plugins.PropertyRootDir],
+				State:        ic.Properties[plugins.PropertyStateDir],
+				Address:      ic.Properties[plugins.PropertyGRPCAddress],
+				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
 				Events:       events,
 				Store:        cs,
 				SchedCore:    config.SchedCore,
@@ -104,7 +105,7 @@ func init() {
 	// However, due to time limits and to avoid migration steps in 1.6 release,
 	// use the following workaround.
 	// This expected to be removed in 1.7.
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.RuntimePluginV2,
 		ID:   "shim",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

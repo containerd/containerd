@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	ctrdsrv "github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/log/logtest"
@@ -54,7 +55,7 @@ import (
 
 var (
 	loadPluginOnce   sync.Once
-	loadedPlugins    []*plugin.Registration
+	loadedPlugins    []plugin.Registration
 	loadedPluginsErr error
 )
 
@@ -88,15 +89,16 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 	for _, p := range loadedPlugins {
 		initContext := plugin.NewContext(
 			ctx,
-			p,
 			initialized,
-			config.Root,
-			config.State,
+			map[string]string{
+				plugins.PropertyRootDir:  filepath.Join(config.Root, p.URI()),
+				plugins.PropertyStateDir: filepath.Join(config.State, p.URI()),
+			},
 		)
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
-			pc, err := config.Decode(ctx, p)
+			pc, err := config.Decode(ctx, p.URI(), p.Config)
 			assert.NoError(t, err)
 
 			initContext.Config = pc

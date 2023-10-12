@@ -14,25 +14,37 @@
    limitations under the License.
 */
 
-package plugin
+package registry
 
 import (
-	"github.com/containerd/containerd/pkg/nri"
+	"sync"
+
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
 )
 
-func init() {
-	registry.Register(&plugin.Registration{
-		Type:   plugins.NRIApiPlugin,
-		ID:     "nri",
-		Config: nri.DefaultConfig(),
-		InitFn: initFunc,
-	})
+var register = struct {
+	sync.RWMutex
+	r plugin.Registry
+}{}
+
+// Register allows plugins to register
+func Register(r *plugin.Registration) {
+	register.Lock()
+	defer register.Unlock()
+	register.r = register.r.Register(r)
 }
 
-func initFunc(ic *plugin.InitContext) (interface{}, error) {
-	l, err := nri.New(ic.Config.(*nri.Config))
-	return l, err
+// Reset removes all global registrations
+func Reset() {
+	register.Lock()
+	defer register.Unlock()
+	register.r = nil
+}
+
+// Graph returns an ordered list of registered plugins for initialization.
+// Plugins in disableList specified by id will be disabled.
+func Graph(filter plugin.DisableFilter) []plugin.Registration {
+	register.RLock()
+	defer register.RUnlock()
+	return register.r.Graph(filter)
 }

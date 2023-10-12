@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 )
@@ -97,7 +98,7 @@ func (d duration) MarshalText() (text []byte, err error) {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
+	registry.Register(&plugin.Registration{
 		Type: plugins.GCPlugin,
 		ID:   "scheduler",
 		Requires: []plugin.Type{
