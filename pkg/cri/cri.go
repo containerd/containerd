@@ -55,6 +55,7 @@ func init() {
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
 			plugin.WarningPlugin,
+			plugin.SnapshotPlugin,
 		},
 		InitFn: initCRIService,
 	})
