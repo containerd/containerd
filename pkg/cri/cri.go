@@ -47,6 +47,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 			plugins.ServicePlugin,
+			plugins.SnapshotPlugin,
 			plugins.NRIApiPlugin,
 		},
 		InitFn: initCRIService,
