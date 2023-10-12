@@ -25,9 +25,8 @@ import (
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/oci"
 )
-
-const configFilename = "config.json"
 
 // LoadBundle loads an existing bundle from disk
 func LoadBundle(ctx context.Context, root, id string) (*Bundle, error) {
@@ -101,7 +100,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec []byte) (b *Bun
 		return nil, err
 	}
 	// write the spec to the bundle
-	err = os.WriteFile(filepath.Join(b.Path, configFilename), spec, 0666)
+	err = os.WriteFile(filepath.Join(b.Path, oci.ConfigFilename), spec, 0666)
 	return b, err
 }
 
