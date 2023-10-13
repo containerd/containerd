@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/api/events"
-	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
+	taskAPI "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
@@ -58,7 +58,7 @@ var (
 )
 
 // NewTaskService creates a new instance of a task service
-func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TaskService, error) {
+func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TTRPCTaskService, error) {
 	var (
 		ep  oom.Watcher
 		err error
@@ -252,7 +252,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 }
 
 func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
-	taskAPI.RegisterTaskService(server, s)
+	taskAPI.RegisterTTRPCTaskService(server, s)
 	return nil
 }
 
