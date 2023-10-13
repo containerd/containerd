@@ -405,7 +405,7 @@ The deprecated features are shown in the following table:
 | `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0 ✅         | Use `containerd-*.tar.gz` bundles        |
 | Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images               |
 | CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅         | Use CRI `v1`                             |
-| Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.1            | Disabled by default in 2.0 in favor of core sandboxed CRI plugin (use `DISABLE_CRI_SANDBOXES=1` to fallback to prior CRI podsandbox implementation) |
+| Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅         |                                          |
 
 
 ### Deprecated config properties
