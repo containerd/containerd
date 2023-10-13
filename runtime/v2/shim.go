@@ -33,7 +33,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/runtime/task/v2"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -375,11 +375,12 @@ var _ runtime.Task = &shimTask{}
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
 type shimTask struct {
 	ShimInstance
-	task task.TaskService
+	task TaskServiceClient
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
-	taskClient, err := NewTaskClient(shim.Client())
+	// TODO: Fix version
+	taskClient, err := NewTaskClient(shim.Client(), 0)
 	if err != nil {
 		return nil, err
 	}
