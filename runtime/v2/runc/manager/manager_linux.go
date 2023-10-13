@@ -153,9 +153,6 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 			return params, fmt.Errorf("create new shim socket: %w", err)
 		}
 		if shim.CanConnect(address) {
-			if err := shim.WriteAddress("address", address); err != nil {
-				return params, fmt.Errorf("write existing socket for shim: %w", err)
-			}
 			params.Address = address
 			return params, nil
 		}
@@ -172,11 +169,6 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 			_ = shim.RemoveSocket(address)
 		}
 	}()
-
-	// make sure that reexec shim-v2 binary use the value if need
-	if err := shim.WriteAddress("address", address); err != nil {
-		return params, err
-	}
 
 	f, err := socket.File()
 	if err != nil {

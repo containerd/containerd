@@ -205,14 +205,13 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 			return nil, err
 		}
 
-		address, err := shimbinary.ReadAddress(filepath.Join(m.state, process.Namespace(), opts.SandboxID, "address"))
+		params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), opts.SandboxID, "bootstrap.json"))
 		if err != nil {
-			return nil, fmt.Errorf("failed to get socket address for sandbox %q: %w", opts.SandboxID, err)
+			return nil, err
 		}
 
-		// Use sandbox's socket address to handle task requests for this container.
-		if err := shimbinary.WriteAddress(filepath.Join(bundle.Path, "address"), address); err != nil {
-			return nil, err
+		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
+			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
 		}
 
 		shim, err := loadShim(ctx, bundle, func() {})
@@ -282,6 +281,40 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	return shim, nil
+}
+
+// restoreBootstrapParams reads bootstrap.json to restore shim configuration.
+// If its an old shim, this will perform migration - read address file and write default bootstrap
+// configuration (version = 2, protocol = ttrpc, and address).
+func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, error) {
+	filePath := filepath.Join(bundlePath, "bootstrap.json")
+	params, err := readBootstrapParams(filePath)
+	if err == nil {
+		return params, nil
+	}
+
+	if !os.IsNotExist(err) {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("failed to read bootstrap.json for bundle %s: %w", bundlePath, err)
+	}
+
+	// File not found, likely its an older shim. Try migrate.
+
+	address, err := shimbinary.ReadAddress(filepath.Join(bundlePath, "address"))
+	if err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
+	}
+
+	params = shimbinary.BootstrapParams{
+		Version:  2,
+		Address:  address,
+		Protocol: "ttrpc",
+	}
+
+	if err := writeBootstrapParams(filePath, params); err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate: failed to write bootstrap.json file: %w", err)
+	}
+
+	return params, nil
 }
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
