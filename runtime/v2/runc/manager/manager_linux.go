@@ -120,7 +120,7 @@ func (m manager) Name() string {
 
 func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shim.BootstrapParams, retErr error) {
 	var params shim.BootstrapParams
-	params.Version = 2
+	params.Version = 3
 	params.Protocol = "ttrpc"
 
 	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
