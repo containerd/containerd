@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	taskapi "github.com/containerd/containerd/api/runtime/task/v2"
+	taskapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/failpoint"
 	"github.com/containerd/containerd/pkg/shutdown"
@@ -79,11 +79,11 @@ var (
 
 type taskServiceWithFp struct {
 	fps   map[string]*failpoint.Failpoint
-	local taskapi.TaskService
+	local taskapi.TTRPCTaskService
 }
 
 func (s *taskServiceWithFp) RegisterTTRPC(server *ttrpc.Server) error {
-	taskapi.RegisterTaskService(server, s.local)
+	taskapi.RegisterTTRPCTaskService(server, s.local)
 	return nil
 }
 

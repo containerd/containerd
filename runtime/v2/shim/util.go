@@ -138,24 +138,6 @@ func WritePidFile(path string, pid int) error {
 	return f.Close()
 }
 
-// WriteAddress writes a address file atomically
-func WriteAddress(path, address string) error {
-	path, err := filepath.Abs(path)
-	if err != nil {
-		return err
-	}
-	f, err := atomicfile.New(path, 0o666)
-	if err != nil {
-		return err
-	}
-	_, err = f.Write([]byte(address))
-	if err != nil {
-		f.Cancel()
-		return err
-	}
-	return f.Close()
-}
-
 // ErrNoAddress is returned when the address file has no content
 var ErrNoAddress = errors.New("no shim address")
 

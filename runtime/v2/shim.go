@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/pkg/atomicfile"
 	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -59,20 +60,7 @@ func init() {
 	timeout.Set(shutdownTimeout, 3*time.Second)
 }
 
-func loadAddress(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
 func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstance, retErr error) {
-	address, err := loadAddress(filepath.Join(bundle.Path, "address"))
-	if err != nil {
-		return nil, err
-	}
-
 	shimCtx, cancelShimLog := context.WithCancel(ctx)
 	defer func() {
 		if retErr != nil {
@@ -108,9 +96,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		f.Close()
 	}
 
-	params, err := parseStartResponse(ctx, address)
+	params, err := restoreBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
 	conn, err := makeConnection(ctx, params, onCloseWithShimLog)
@@ -125,8 +113,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	}()
 
 	shim := &shim{
-		bundle: bundle,
-		client: conn,
+		bundle:  bundle,
+		client:  conn,
+		version: params.Version,
 	}
 
 	return shim, nil
@@ -199,7 +188,7 @@ type ShimInstance interface {
 	Version() int
 }
 
-func parseStartResponse(ctx context.Context, response []byte) (client.BootstrapParams, error) {
+func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	var params client.BootstrapParams
 
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
@@ -214,6 +203,45 @@ func parseStartResponse(ctx context.Context, response []byte) (client.BootstrapP
 	}
 
 	return params, nil
+}
+
+// writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
+func writeBootstrapParams(path string, params client.BootstrapParams) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	f, err := atomicfile.New(path, 0o666)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(&params)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(data)
+	if err != nil {
+		f.Cancel()
+		return err
+	}
+
+	return f.Close()
+}
+
+func readBootstrapParams(path string) (client.BootstrapParams, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return client.BootstrapParams{}, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return client.BootstrapParams{}, err
+	}
+
+	return parseStartResponse(data)
 }
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.

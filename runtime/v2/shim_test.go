@@ -17,12 +17,14 @@
 package v2
 
 import (
-	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/containerd/containerd/errdefs"
 	client "github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseStartResponse(t *testing.T) {
@@ -36,7 +38,7 @@ func TestParseStartResponse(t *testing.T) {
 			Name:     "v2 shim",
 			Response: "/somedirectory/somesocket",
 			Expected: client.BootstrapParams{
-				Version:  0,
+				Version:  2,
 				Address:  "/somedirectory/somesocket",
 				Protocol: "ttrpc",
 			},
@@ -63,20 +65,20 @@ func TestParseStartResponse(t *testing.T) {
 			Name:     "invalid shim v2 response",
 			Response: `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
 			Expected: client.BootstrapParams{
-				Version:  0,
+				Version:  2,
 				Address:  `{"address":"/somedirectory/somesocket","protocol":"ttrpc"}`,
 				Protocol: "ttrpc",
 			},
 		},
 		{
 			Name:     "later unsupported shim",
-			Response: `{"Version": 3,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`,
+			Response: `{"Version": 4,"Address":"/somedirectory/somesocket","Protocol":"ttrpc"}`,
 			Expected: client.BootstrapParams{},
 			Err:      errdefs.ErrNotImplemented,
 		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			params, err := parseStartResponse(context.Background(), []byte(tc.Response))
+			params, err := parseStartResponse([]byte(tc.Response))
 			if err != nil {
 				if !errors.Is(err, tc.Err) {
 					t.Errorf("unexpected error: %v", err)
@@ -96,5 +98,27 @@ func TestParseStartResponse(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestRestoreBootstrapParams(t *testing.T) {
+	bundlePath := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(bundlePath, "address"), []byte("unix://123"), 0o666)
+	require.NoError(t, err)
+
+	restored, err := restoreBootstrapParams(bundlePath)
+	require.NoError(t, err)
+
+	expected := client.BootstrapParams{
+		Version:  2,
+		Address:  "unix://123",
+		Protocol: "ttrpc",
+	}
+
+	require.EqualValues(t, expected, restored)
+
+	loaded, err := readBootstrapParams(filepath.Join(bundlePath, "bootstrap.json"))
+
+	require.NoError(t, err)
+	require.EqualValues(t, expected, loaded)
 }

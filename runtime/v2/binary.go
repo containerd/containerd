@@ -129,7 +129,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		return nil, err
 	}
 
-	params, err := parseStartResponse(ctx, response)
+	params, err := parseStartResponse(response)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +137,11 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	conn, err := makeConnection(ctx, params, onCloseWithShimLog)
 	if err != nil {
 		return nil, err
+	}
+
+	// Save bootstrap configuration (so containerd can restore shims after restart).
+	if err := writeBootstrapParams(filepath.Join(b.bundle.Path, "bootstrap.json"), params); err != nil {
+		return nil, fmt.Errorf("failed to write bootstrap.json: %w", err)
 	}
 
 	return &shim{
