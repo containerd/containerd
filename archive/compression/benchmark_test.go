@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,19 +50,30 @@ func BenchmarkDecompression(b *testing.B) {
 		zstd := testCompress(b, data, Zstd)
 
 		b.Run(fmt.Sprintf("size=%dMiB", sizeInMiB), func(b *testing.B) {
-			b.Run("gzip", func(b *testing.B) {
-				testDecompress(b, gz)
-			})
+			original := gzipPath
+			defer func() {
+				gzipPath = original
+			}()
+
 			b.Run("zstd", func(b *testing.B) {
 				testDecompress(b, zstd)
 			})
-			if unpigzPath != "" {
-				original := unpigzPath
-				unpigzPath = ""
-				b.Run("gzipPureGo", func(b *testing.B) {
+
+			gzipPath = ""
+			b.Run("gzipPureGo", func(b *testing.B) {
+				testDecompress(b, gz)
+			})
+			gzipPath, err = exec.LookPath("igzip")
+			if err == nil {
+				b.Run("igzip", func(b *testing.B) {
 					testDecompress(b, gz)
 				})
-				unpigzPath = original
+			}
+			gzipPath, err = exec.LookPath("unpigz")
+			if err == nil {
+				b.Run("unpigz", func(b *testing.B) {
+					testDecompress(b, gz)
+				})
 			}
 		})
 	}

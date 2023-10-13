@@ -47,11 +47,14 @@ const (
 	Zstd
 )
 
-const disablePigzEnv = "CONTAINERD_DISABLE_PIGZ"
+const (
+	disablePigzEnv  = "CONTAINERD_DISABLE_PIGZ"
+	disableIgzipEnv = "CONTAINERD_DISABLE_IGZIP"
+)
 
 var (
-	initPigz   sync.Once
-	unpigzPath string
+	initGzip sync.Once
+	gzipPath string
 )
 
 var (
@@ -259,17 +262,20 @@ func (compression *Compression) Extension() string {
 }
 
 func gzipDecompress(ctx context.Context, buf io.Reader) (io.ReadCloser, error) {
-	initPigz.Do(func() {
-		if unpigzPath = detectPigz(); unpigzPath != "" {
-			log.L.Debug("using pigz for decompression")
+	initGzip.Do(func() {
+		if gzipPath = detectCommand("igzip", disableIgzipEnv); gzipPath != "" {
+			log.L.Debug("using igzip for decompression")
+			return
+		}
+		if gzipPath = detectCommand("unpigz", disablePigzEnv); gzipPath != "" {
+			log.L.Debug("using unpigz for decompression")
 		}
 	})
 
-	if unpigzPath == "" {
+	if gzipPath == "" {
 		return gzip.NewReader(buf)
 	}
-
-	return cmdStream(exec.CommandContext(ctx, unpigzPath, "-d", "-c"), buf)
+	return cmdStream(exec.CommandContext(ctx, gzipPath, "-d", "-c"), buf)
 }
 
 func cmdStream(cmd *exec.Cmd, in io.Reader) (io.ReadCloser, error) {
@@ -296,26 +302,23 @@ func cmdStream(cmd *exec.Cmd, in io.Reader) (io.ReadCloser, error) {
 	return reader, nil
 }
 
-func detectPigz() string {
-	path, err := exec.LookPath("unpigz")
+func detectCommand(path, disableEnvName string) string {
+	// Check if this command is disabled via the env variable
+	value := os.Getenv(disableEnvName)
+	if value != "" {
+		disable, err := strconv.ParseBool(value)
+		if err != nil {
+			log.L.WithError(err).Warnf("could not parse %s: %s", disableEnvName, value)
+		}
+
+		if disable {
+			return ""
+		}
+	}
+
+	path, err := exec.LookPath(path)
 	if err != nil {
-		log.L.WithError(err).Debug("unpigz not found, falling back to go gzip")
-		return ""
-	}
-
-	// Check if pigz disabled via CONTAINERD_DISABLE_PIGZ env variable
-	value := os.Getenv(disablePigzEnv)
-	if value == "" {
-		return path
-	}
-
-	disable, err := strconv.ParseBool(value)
-	if err != nil {
-		log.L.WithError(err).Warnf("could not parse %s: %s", disablePigzEnv, value)
-		return path
-	}
-
-	if disable {
+		log.L.WithError(err).Debugf("%s not found", path)
 		return ""
 	}
 
