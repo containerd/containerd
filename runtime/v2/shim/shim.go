@@ -379,7 +379,7 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	}
 
 	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
-		if err != shutdown.ErrShutdown {
+		if !errors.Is(err, shutdown.ErrShutdown) {
 			return err
 		}
 	}
@@ -391,10 +391,10 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	}
 
 	select {
-	case <-publisher.Done():
+	case <-sd.Done():
 		return nil
 	case <-time.After(5 * time.Second):
-		return errors.New("publisher not closed")
+		return errors.New("shim shutdown timeout")
 	}
 }
 
