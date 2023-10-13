@@ -177,6 +177,9 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	})
 }
 
+// CurrentShimVersion is the latest shim version supported by containerd (e.g. TaskService v3).
+const CurrentShimVersion = 3
+
 // ShimInstance represents running shim process managed by ShimManager.
 type ShimInstance interface {
 	io.Closer
@@ -192,6 +195,8 @@ type ShimInstance interface {
 	Client() any
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
+	// Version returns shim's features compatibility version.
+	Version() int
 }
 
 func parseStartResponse(ctx context.Context, response []byte) (client.BootstrapParams, error) {
@@ -201,9 +206,10 @@ func parseStartResponse(ctx context.Context, response []byte) (client.BootstrapP
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
 		params.Protocol = "ttrpc"
+		params.Version = 2
 	}
 
-	if params.Version > 2 {
+	if params.Version > CurrentShimVersion {
 		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
@@ -303,8 +309,9 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 }
 
 type shim struct {
-	bundle *Bundle
-	client any
+	bundle  *Bundle
+	client  any
+	version int
 }
 
 var _ ShimInstance = (*shim)(nil)
@@ -312,6 +319,10 @@ var _ ShimInstance = (*shim)(nil)
 // ID of the shim/task
 func (s *shim) ID() string {
 	return s.bundle.ID
+}
+
+func (s *shim) Version() int {
+	return s.version
 }
 
 func (s *shim) Namespace() string {
@@ -379,8 +390,7 @@ type shimTask struct {
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
-	// TODO: Fix version
-	taskClient, err := NewTaskClient(shim.Client(), 0)
+	taskClient, err := NewTaskClient(shim.Client(), shim.Version())
 	if err != nil {
 		return nil, err
 	}
