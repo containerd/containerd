@@ -38,6 +38,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
@@ -46,12 +48,12 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.SnapshotPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.SnapshotPlugin,
 		ID:   "windows",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
-			return NewSnapshotter(ic.Root)
+			return NewSnapshotter(ic.Properties[plugins.PropertyRootDir])
 		},
 	})
 }

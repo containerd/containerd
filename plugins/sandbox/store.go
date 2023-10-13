@@ -19,17 +19,19 @@ package sandbox
 import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.SandboxStorePlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.SandboxStorePlugin,
 		ID:   "local",
 		Requires: []plugin.Type{
-			plugin.MetadataPlugin,
+			plugins.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
+			m, err := ic.Get(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}

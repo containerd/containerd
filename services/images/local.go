@@ -28,6 +28,8 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/log"
@@ -37,25 +39,25 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.ServicePlugin,
 		ID:   services.ImagesService,
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.MetadataPlugin,
-			plugin.GCPlugin,
+			plugins.EventPlugin,
+			plugins.MetadataPlugin,
+			plugins.GCPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugin.MetadataPlugin)
+			m, err := ic.Get(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			g, err := ic.Get(plugin.GCPlugin)
+			g, err := ic.Get(plugins.GCPlugin)
 			if err != nil {
 				return nil, err
 			}
 
-			ep, err := ic.Get(plugin.EventPlugin)
+			ep, err := ic.Get(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}

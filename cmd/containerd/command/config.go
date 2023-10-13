@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,7 +46,7 @@ func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 				continue
 			}
 
-			pc, err := config.Decode(ctx, p)
+			pc, err := config.Decode(ctx, p.URI(), p.Config)
 			if err != nil {
 				return err
 			}
@@ -113,7 +113,7 @@ var configCommand = cli.Command{
 				}
 
 				if config.Version < srvconfig.CurrentConfigVersion {
-					plugins := plugin.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
 					for _, p := range plugins {
 						if p.ConfigMigration != nil {
 							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {

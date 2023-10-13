@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 )
 
 var (
@@ -34,6 +33,10 @@ var (
 	// this allows the plugin loader differentiate between a plugin which is configured
 	// not to load and one that fails to load.
 	ErrSkipPlugin = errors.New("skip plugin")
+	// ErrPluginInitialized is used when a plugin is already initialized
+	ErrPluginInitialized = errors.New("plugin: already initialized")
+	// ErrPluginNotFound is used when a plugin is looked up but not found
+	ErrPluginNotFound = errors.New("plugin: not found")
 
 	// ErrInvalidRequires will be thrown if the requirements for a plugin are
 	// defined in an invalid manner.
@@ -50,56 +53,6 @@ type Type string
 
 func (t Type) String() string { return string(t) }
 
-const (
-	// InternalPlugin implements an internal plugin to containerd
-	InternalPlugin Type = "io.containerd.internal.v1"
-	// RuntimePlugin implements a runtime
-	RuntimePlugin Type = "io.containerd.runtime.v1"
-	// RuntimePluginV2 implements a runtime v2
-	RuntimePluginV2 Type = "io.containerd.runtime.v2"
-	// ServicePlugin implements a internal service
-	ServicePlugin Type = "io.containerd.service.v1"
-	// GRPCPlugin implements a grpc service
-	GRPCPlugin Type = "io.containerd.grpc.v1"
-	// TTRPCPlugin implements a ttrpc shim service
-	TTRPCPlugin Type = "io.containerd.ttrpc.v1"
-	// SnapshotPlugin implements a snapshotter
-	SnapshotPlugin Type = "io.containerd.snapshotter.v1"
-	// TaskMonitorPlugin implements a task monitor
-	TaskMonitorPlugin Type = "io.containerd.monitor.v1"
-	// DiffPlugin implements a differ
-	DiffPlugin Type = "io.containerd.differ.v1"
-	// MetadataPlugin implements a metadata store
-	MetadataPlugin Type = "io.containerd.metadata.v1"
-	// ContentPlugin implements a content store
-	ContentPlugin Type = "io.containerd.content.v1"
-	// GCPlugin implements garbage collection policy
-	GCPlugin Type = "io.containerd.gc.v1"
-	// EventPlugin implements event handling
-	EventPlugin Type = "io.containerd.event.v1"
-	// LeasePlugin implements lease manager
-	LeasePlugin Type = "io.containerd.lease.v1"
-	// StreamingPlugin implements a stream manager
-	StreamingPlugin Type = "io.containerd.streaming.v1"
-	// TracingProcessorPlugin implements a open telemetry span processor
-	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
-	// NRIApiPlugin implements the NRI adaptation interface for containerd.
-	NRIApiPlugin Type = "io.containerd.nri.v1"
-	// TransferPlugin implements a transfer service
-	TransferPlugin Type = "io.containerd.transfer.v1"
-	// SandboxStorePlugin implements a sandbox store
-	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
-	// SandboxControllerPlugin implements a sandbox controller
-	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
-	// ImageVerifierPlugin implements an image verifier service
-	ImageVerifierPlugin Type = "io.containerd.image-verifier.v1"
-)
-
-const (
-	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
-	RuntimeRuncV2 = "io.containerd.runc.v2"
-)
-
 // Registration contains information for registering a plugin
 type Registration struct {
 	// Type of the plugin
@@ -115,8 +68,6 @@ type Registration struct {
 	// context are passed in. The init function may modify the registration to
 	// add exports, capabilities and platform support declarations.
 	InitFn func(*InitContext) (interface{}, error)
-	// Disable the plugin from loading
-	Disable bool
 
 	// ConfigMigration allows a plugin to migrate configurations from an older
 	// version to handle plugin renames or moving of features from one plugin
@@ -129,12 +80,12 @@ type Registration struct {
 }
 
 // Init the registered plugin
-func (r *Registration) Init(ic *InitContext) *Plugin {
+func (r Registration) Init(ic *InitContext) *Plugin {
 	p, err := r.InitFn(ic)
 	return &Plugin{
 		Registration: r,
 		Config:       ic.Config,
-		Meta:         ic.Meta,
+		Meta:         *ic.Meta,
 		instance:     p,
 		err:          err,
 	}
@@ -145,41 +96,64 @@ func (r *Registration) URI() string {
 	return r.Type.String() + "." + r.ID
 }
 
-var register = struct {
-	sync.RWMutex
-	r []*Registration
-}{}
+// DisableFilter filters out disabled plugins
+type DisableFilter func(r *Registration) bool
 
-// Load loads all plugins at the provided path into containerd.
-//
-// Load is currently only implemented on non-static, non-gccgo builds for amd64
-// and arm64, and plugins must be built with the exact same version of Go as
-// containerd itself.
-func Load(path string) (err error) {
-	defer func() {
-		if v := recover(); v != nil {
-			rerr, ok := v.(error)
-			if !ok {
-				rerr = fmt.Errorf("%s", v)
-			}
-			err = rerr
+// Registry is list of registrations which can be registered to and
+// produce a filtered and ordered output.
+// The Registry itself is immutable and the list will be copied
+// and appeneded to a new registry when new items are registered.
+type Registry []*Registration
+
+// Graph computes the ordered list of registrations based on their dependencies,
+// filtering out any plugins which match the provided filter.
+func (registry Registry) Graph(filter DisableFilter) []Registration {
+	disabled := map[*Registration]bool{}
+	for _, r := range registry {
+		if filter(r) {
+			disabled[r] = true
 		}
-	}()
-	return loadPlugins(path)
+	}
+
+	ordered := make([]Registration, 0, len(registry)-len(disabled))
+	added := map[*Registration]bool{}
+	for _, r := range registry {
+		if disabled[r] {
+			continue
+		}
+		children(r, registry, added, disabled, &ordered)
+		if !added[r] {
+			ordered = append(ordered, *r)
+			added[r] = true
+		}
+	}
+	return ordered
 }
 
-// Register allows plugins to register
-func Register(r *Registration) {
-	register.Lock()
-	defer register.Unlock()
+func children(reg *Registration, registry []*Registration, added, disabled map[*Registration]bool, ordered *[]Registration) {
+	for _, t := range reg.Requires {
+		for _, r := range registry {
+			if !disabled[r] && r.URI() != reg.URI() && (t == "*" || r.Type == t) {
+				children(r, registry, added, disabled, ordered)
+				if !added[r] {
+					*ordered = append(*ordered, *r)
+					added[r] = true
+				}
+			}
+		}
+	}
+}
 
+// Register adds the registration to a Registry and returns the
+// updated Registry, panicking if registration could not succeed.
+func (registry Registry) Register(r *Registration) Registry {
 	if r.Type == "" {
 		panic(ErrNoType)
 	}
 	if r.ID == "" {
 		panic(ErrNoPluginID)
 	}
-	if err := checkUnique(r); err != nil {
+	if err := checkUnique(registry, r); err != nil {
 		panic(err)
 	}
 
@@ -189,66 +163,14 @@ func Register(r *Registration) {
 		}
 	}
 
-	register.r = append(register.r, r)
+	return append(registry, r)
 }
 
-// Reset removes all global registrations
-func Reset() {
-	register.Lock()
-	defer register.Unlock()
-	register.r = nil
-}
-
-func checkUnique(r *Registration) error {
-	for _, registered := range register.r {
+func checkUnique(registry Registry, r *Registration) error {
+	for _, registered := range registry {
 		if r.URI() == registered.URI() {
 			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
 		}
 	}
 	return nil
-}
-
-// DisableFilter filters out disabled plugins
-type DisableFilter func(r *Registration) bool
-
-// Graph returns an ordered list of registered plugins for initialization.
-// Plugins in disableList specified by id will be disabled.
-func Graph(filter DisableFilter) (ordered []*Registration) {
-	register.RLock()
-	defer register.RUnlock()
-
-	for _, r := range register.r {
-		if filter(r) {
-			r.Disable = true
-		}
-	}
-
-	added := map[*Registration]bool{}
-	for _, r := range register.r {
-		if r.Disable {
-			continue
-		}
-		children(r, added, &ordered)
-		if !added[r] {
-			ordered = append(ordered, r)
-			added[r] = true
-		}
-	}
-	return ordered
-}
-
-func children(reg *Registration, added map[*Registration]bool, ordered *[]*Registration) {
-	for _, t := range reg.Requires {
-		for _, r := range register.r {
-			if !r.Disable &&
-				r.URI() != reg.URI() &&
-				(t == "*" || r.Type == t) {
-				children(r, added, ordered)
-				if !added[r] {
-					*ordered = append(*ordered, r)
-					added[r] = true
-				}
-			}
-		}
-	}
 }

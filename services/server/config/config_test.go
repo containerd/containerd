@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/log/logtest"
 )
 
@@ -201,7 +200,7 @@ func TestDecodePlugin(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
 	data := `
 version = 2
-[plugins."io.containerd.runtime.v1.linux"]
+[plugins."io.containerd.runtime.v2.task"]
   shim_debug = true
 `
 
@@ -216,7 +215,7 @@ version = 2
 	assert.NoError(t, err)
 
 	pluginConfig := map[string]interface{}{}
-	_, err = out.Decode(ctx, &plugin.Registration{Type: "io.containerd.runtime.v1", ID: "linux", Config: &pluginConfig})
+	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }
@@ -226,7 +225,7 @@ version = 2
 func TestDecodePluginInV1Config(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
 	data := `
-[plugins.linux]
+[plugins.task]
   shim_debug = true
 `
 
@@ -244,7 +243,7 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	assert.Equal(t, 3, out.Version)
 
 	pluginConfig := map[string]interface{}{}
-	_, err = out.Decode(ctx, &plugin.Registration{Type: "io.containerd.runtime.v1", ID: "linux", Config: &pluginConfig})
+	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
 }

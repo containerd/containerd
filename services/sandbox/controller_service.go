@@ -27,26 +27,28 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/log"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
-			plugin.SandboxControllerPlugin,
-			plugin.EventPlugin,
+			plugins.SandboxControllerPlugin,
+			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sc, err := ic.GetByID(plugin.SandboxControllerPlugin, "local")
+			sc, err := ic.GetByID(plugins.SandboxControllerPlugin, "local")
 			if err != nil {
 				return nil, err
 			}
 
-			ep, err := ic.Get(plugin.EventPlugin)
+			ep, err := ic.Get(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}

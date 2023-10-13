@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	gogotypes "github.com/containerd/containerd/protobuf/types"
 	_ "github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
@@ -172,7 +172,7 @@ func TestContainerStart(t *testing.T) {
 }
 
 func readShimPath(taskID string) (string, error) {
-	runtime := plugin.RuntimePluginV2.String() + ".task"
+	runtime := plugins.RuntimePluginV2.String() + ".task"
 	shimBinaryNamePath := filepath.Join(defaultState, runtime, testNamespace, taskID, "shim-binary-path")
 
 	shimPath, err := os.ReadFile(shimBinaryNamePath)

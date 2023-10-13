@@ -41,7 +41,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/log"
 )
@@ -289,7 +289,7 @@ func generateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) interface{} {
 	switch t {
-	case plugin.RuntimeRuncV2:
+	case plugins.RuntimeRuncV2:
 		return &runcoptions.Options{}
 	case runtimeRunhcsV1:
 		return &runhcsoptions.Options{}

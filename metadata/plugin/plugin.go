@@ -28,6 +28,8 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
 
@@ -81,27 +83,28 @@ func (bc *BoltConfig) Validate() error {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.MetadataPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.MetadataPlugin,
 		ID:   "bolt",
 		Requires: []plugin.Type{
-			plugin.ContentPlugin,
-			plugin.EventPlugin,
-			plugin.SnapshotPlugin,
+			plugins.ContentPlugin,
+			plugins.EventPlugin,
+			plugins.SnapshotPlugin,
 		},
 		Config: &BoltConfig{
 			ContentSharingPolicy: SharingPolicyShared,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			if err := os.MkdirAll(ic.Root, 0711); err != nil {
+			root := ic.Properties[plugins.PropertyRootDir]
+			if err := os.MkdirAll(root, 0711); err != nil {
 				return nil, err
 			}
-			cs, err := ic.Get(plugin.ContentPlugin)
+			cs, err := ic.Get(plugins.ContentPlugin)
 			if err != nil {
 				return nil, err
 			}
 
-			snapshottersRaw, err := ic.GetByType(plugin.SnapshotPlugin)
+			snapshottersRaw, err := ic.GetByType(plugins.SnapshotPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -119,7 +122,7 @@ func init() {
 				snapshotters[name] = sn.(snapshots.Snapshotter)
 			}
 
-			ep, err := ic.Get(plugin.EventPlugin)
+			ep, err := ic.Get(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -140,7 +143,7 @@ func init() {
 				}
 			}
 
-			path := filepath.Join(ic.Root, "meta.db")
+			path := filepath.Join(root, "meta.db")
 			ic.Meta.Exports["path"] = path
 
 			options := *bolt.DefaultOptions

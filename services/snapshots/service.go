@@ -24,6 +24,8 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
@@ -32,11 +34,11 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.GRPCPlugin,
 		ID:   "snapshots",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugins.ServicePlugin,
 		},
 		InitFn: newService,
 	})
@@ -50,11 +52,11 @@ type service struct {
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
-	plugins, err := ic.GetByType(plugin.ServicePlugin)
+	sps, err := ic.GetByType(plugins.ServicePlugin)
 	if err != nil {
 		return nil, err
 	}
-	p, ok := plugins[services.SnapshotsService]
+	p, ok := sps[services.SnapshotsService]
 	if !ok {
 		return nil, errors.New("snapshots service not found")
 	}

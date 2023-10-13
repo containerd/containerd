@@ -21,19 +21,21 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/content/contentserver"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.GRPCPlugin,
 		ID:   "content",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugins, err := ic.GetByType(plugin.ServicePlugin)
+			plugins, err := ic.GetByType(plugins.ServicePlugin)
 			if err != nil {
 				return nil, err
 			}

@@ -21,6 +21,8 @@ import (
 
 	api "github.com/containerd/containerd/api/services/version/v1"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	ctrdversion "github.com/containerd/containerd/version"
 	"google.golang.org/grpc"
@@ -29,8 +31,8 @@ import (
 var _ api.VersionServer = &service{}
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type:   plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type:   plugins.GRPCPlugin,
 		ID:     "version",
 		InitFn: initFunc,
 	})

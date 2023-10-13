@@ -21,6 +21,8 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/native"
 )
 
@@ -31,8 +33,8 @@ type Config struct {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
+	registry.Register(&plugin.Registration{
+		Type:   plugins.SnapshotPlugin,
 		ID:     "native",
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -43,7 +45,7 @@ func init() {
 				return nil, errors.New("invalid native configuration")
 			}
 
-			root := ic.Root
+			root := ic.Properties[plugins.PropertyRootDir]
 			if len(config.RootPath) != 0 {
 				root = config.RootPath
 			}

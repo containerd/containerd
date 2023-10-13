@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/sandbox"
 	srv "github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/introspection"
@@ -183,16 +184,16 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 	return func(c *clientOpts) error {
 		var opts []ServicesOpt
 		for t, fn := range map[plugin.Type]func(interface{}) ServicesOpt{
-			plugin.EventPlugin: func(i interface{}) ServicesOpt {
+			plugins.EventPlugin: func(i interface{}) ServicesOpt {
 				return WithEventService(i.(EventService))
 			},
-			plugin.LeasePlugin: func(i interface{}) ServicesOpt {
+			plugins.LeasePlugin: func(i interface{}) ServicesOpt {
 				return WithLeasesService(i.(leases.Manager))
 			},
-			plugin.SandboxStorePlugin: func(i interface{}) ServicesOpt {
+			plugins.SandboxStorePlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxStore(i.(sandbox.Store))
 			},
-			plugin.SandboxControllerPlugin: func(i interface{}) ServicesOpt {
+			plugins.SandboxControllerPlugin: func(i interface{}) ServicesOpt {
 				return WithSandboxController(i.(sandbox.Controller))
 			},
 		} {
@@ -203,7 +204,7 @@ func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
 			opts = append(opts, fn(i))
 		}
 
-		plugins, err := ic.GetByType(plugin.ServicePlugin)
+		plugins, err := ic.GetByType(plugins.ServicePlugin)
 		if err != nil {
 			return fmt.Errorf("failed to get service plugin: %w", err)
 		}

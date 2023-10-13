@@ -29,6 +29,8 @@ import (
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 
 	// Load packages with type registrations
@@ -39,30 +41,30 @@ import (
 
 // Register local transfer service plugin
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.TransferPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.TransferPlugin,
 		ID:   "local",
 		Requires: []plugin.Type{
-			plugin.LeasePlugin,
-			plugin.MetadataPlugin,
-			plugin.DiffPlugin,
-			plugin.ImageVerifierPlugin,
+			plugins.LeasePlugin,
+			plugins.MetadataPlugin,
+			plugins.DiffPlugin,
+			plugins.ImageVerifierPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			config := ic.Config.(*transferConfig)
-			m, err := ic.Get(plugin.MetadataPlugin)
+			m, err := ic.Get(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
 			ms := m.(*metadata.DB)
-			l, err := ic.Get(plugin.LeasePlugin)
+			l, err := ic.Get(plugins.LeasePlugin)
 			if err != nil {
 				return nil, err
 			}
 
 			vfs := make(map[string]imageverifier.ImageVerifier)
-			vps, err := ic.GetByType(plugin.ImageVerifierPlugin)
+			vps, err := ic.GetByType(plugins.ImageVerifierPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -82,7 +84,7 @@ func init() {
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
 				if err != nil {
-					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugin.TransferPlugin, uc.Platform)
+					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugins.TransferPlugin, uc.Platform)
 				}
 
 				sn := ms.Snapshotter(uc.Snapshotter)
@@ -90,7 +92,7 @@ func init() {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
 
-				diffPlugins, err := ic.GetByType(plugin.DiffPlugin)
+				diffPlugins, err := ic.GetByType(plugins.DiffPlugin)
 				if err != nil {
 					return nil, fmt.Errorf("error loading diff plugins: %w", err)
 				}

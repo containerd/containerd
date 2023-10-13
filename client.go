@@ -21,7 +21,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -52,7 +51,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
@@ -185,7 +184,7 @@ func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
 	c := &Client{
 		defaultns: copts.defaultns,
 		conn:      conn,
-		runtime:   plugin.RuntimePlugin.String() + "." + runtime.GOOS,
+		runtime:   defaults.DefaultRuntime,
 	}
 
 	if copts.defaultPlatform != nil {
@@ -826,7 +825,7 @@ func (c *Client) getSnapshotter(ctx context.Context, name string) (snapshots.Sna
 // GetSnapshotterSupportedPlatforms returns a platform matchers which represents the
 // supported platforms for the given snapshotters
 func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshotterName string) (platforms.MatchComparer, error) {
-	filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotterName)}
+	filters := []string{fmt.Sprintf("type==%s, id==%s", plugins.SnapshotPlugin, snapshotterName)}
 	in := c.IntrospectionService()
 
 	resp, err := in.Plugins(ctx, filters)
@@ -857,7 +856,7 @@ func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
 
 // GetSnapshotterCapabilities returns the capabilities of a snapshotter.
 func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName string) ([]string, error) {
-	filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotterName)}
+	filters := []string{fmt.Sprintf("type==%s, id==%s", plugins.SnapshotPlugin, snapshotterName)}
 	in := c.IntrospectionService()
 
 	resp, err := in.Plugins(ctx, filters)

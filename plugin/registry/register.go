@@ -1,5 +1,3 @@
-//go:build darwin
-
 /*
    Copyright The containerd Authors.
 
@@ -16,15 +14,37 @@
    limitations under the License.
 */
 
-package tasks
+package registry
 
 import (
+	"sync"
+
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugins"
 )
 
-var tasksServiceRequires = []plugin.Type{
-	plugins.RuntimePluginV2,
-	plugins.MetadataPlugin,
-	plugins.TaskMonitorPlugin,
+var register = struct {
+	sync.RWMutex
+	r plugin.Registry
+}{}
+
+// Register allows plugins to register
+func Register(r *plugin.Registration) {
+	register.Lock()
+	defer register.Unlock()
+	register.r = register.r.Register(r)
+}
+
+// Reset removes all global registrations
+func Reset() {
+	register.Lock()
+	defer register.Unlock()
+	register.r = nil
+}
+
+// Graph returns an ordered list of registered plugins for initialization.
+// Plugins in disableList specified by id will be disabled.
+func Graph(filter plugin.DisableFilter) []plugin.Registration {
+	register.RLock()
+	defer register.RUnlock()
+	return register.r.Graph(filter)
 }

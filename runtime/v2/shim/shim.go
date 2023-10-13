@@ -34,6 +34,8 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/version"
@@ -283,8 +285,8 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		}
 	}
 
-	plugin.Register(&plugin.Registration{
-		Type: plugin.InternalPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.InternalPlugin,
 		ID:   "shutdown",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return sd, nil
@@ -292,8 +294,8 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	})
 
 	// Register event plugin
-	plugin.Register(&plugin.Registration{
-		Type: plugin.EventPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.EventPlugin,
 		ID:   "publisher",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return publisher, nil
@@ -306,24 +308,24 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 
 		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
 	)
-	plugins := plugin.Graph(func(*plugin.Registration) bool { return false })
-	for _, p := range plugins {
+
+	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
 		id := p.URI()
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
 
 		initContext := plugin.NewContext(
 			ctx,
-			p,
 			initialized,
-			// NOTE: Root is empty since the shim does not support persistent storage,
-			// shim plugins should make use state directory for writing files to disk.
-			// The state directory will be destroyed when the shim if cleaned up or
-			// on reboot
-			"",
-			bundlePath,
+			map[string]string{
+				// NOTE: Root is empty since the shim does not support persistent storage,
+				// shim plugins should make use state directory for writing files to disk.
+				// The state directory will be destroyed when the shim if cleaned up or
+				// on reboot
+				plugins.PropertyStateDir:     filepath.Join(bundlePath, p.URI()),
+				plugins.PropertyGRPCAddress:  addressFlag,
+				plugins.PropertyTTRPCAddress: ttrpcAddress,
+			},
 		)
-		initContext.Address = addressFlag
-		initContext.TTRPCAddress = ttrpcAddress
 
 		// load the plugin specific configuration if it is provided
 		// TODO: Read configuration passed into shim, or from state directory?

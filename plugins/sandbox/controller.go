@@ -29,6 +29,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
 	"github.com/containerd/containerd/sandbox"
@@ -38,26 +40,26 @@ import (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.SandboxControllerPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.SandboxControllerPlugin,
 		ID:   "local",
 		Requires: []plugin.Type{
-			plugin.RuntimePluginV2,
-			plugin.EventPlugin,
-			plugin.SandboxStorePlugin,
+			plugins.RuntimePluginV2,
+			plugins.EventPlugin,
+			plugins.SandboxStorePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimPlugin, err := ic.GetByID(plugin.RuntimePluginV2, "shim")
+			shimPlugin, err := ic.GetByID(plugins.RuntimePluginV2, "shim")
 			if err != nil {
 				return nil, err
 			}
 
-			exchangePlugin, err := ic.GetByID(plugin.EventPlugin, "exchange")
+			exchangePlugin, err := ic.GetByID(plugins.EventPlugin, "exchange")
 			if err != nil {
 				return nil, err
 			}
 
-			sbPlugin, err := ic.GetByID(plugin.SandboxStorePlugin, "local")
+			sbPlugin, err := ic.GetByID(plugins.SandboxStorePlugin, "local")
 			if err != nil {
 				return nil, err
 			}

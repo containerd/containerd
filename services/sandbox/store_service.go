@@ -25,19 +25,21 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/log"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.GRPCPlugin,
 		ID:   "sandboxes",
 		Requires: []plugin.Type{
-			plugin.SandboxStorePlugin,
+			plugins.SandboxStorePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sp, err := ic.GetByID(plugin.SandboxStorePlugin, "local")
+			sp, err := ic.GetByID(plugins.SandboxStorePlugin, "local")
 			if err != nil {
 				return nil, err
 			}

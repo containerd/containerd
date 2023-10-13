@@ -22,227 +22,201 @@ import (
 	"github.com/containerd/containerd/services"
 )
 
-func registerClear() {
-	register.Lock()
-	defer register.Unlock()
-	register.r = nil
-}
-
 func mockPluginFilter(*Registration) bool {
 	return false
 }
 
-var tasksServiceRequires = []Type{
-	RuntimePlugin,
-	RuntimePluginV2,
-	MetadataPlugin,
-	TaskMonitorPlugin,
-}
-
 // TestContainerdPlugin tests the logic of Graph, use the containerd's plugin
 func TestContainerdPlugin(t *testing.T) {
-	registerClear()
-	Register(&Registration{
+	// Plugin types commonly used by containerd
+	const (
+		InternalPlugin         Type = "io.containerd.internal.v1"
+		RuntimePlugin          Type = "io.containerd.runtime.v1"
+		RuntimePluginV2        Type = "io.containerd.runtime.v2"
+		ServicePlugin          Type = "io.containerd.service.v1"
+		GRPCPlugin             Type = "io.containerd.grpc.v1"
+		SnapshotPlugin         Type = "io.containerd.snapshotter.v1"
+		TaskMonitorPlugin      Type = "io.containerd.monitor.v1"
+		DiffPlugin             Type = "io.containerd.differ.v1"
+		MetadataPlugin         Type = "io.containerd.metadata.v1"
+		ContentPlugin          Type = "io.containerd.content.v1"
+		GCPlugin               Type = "io.containerd.gc.v1"
+		LeasePlugin            Type = "io.containerd.lease.v1"
+		TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
+	)
+
+	var register Registry
+	register = register.Register(&Registration{
 		Type: TaskMonitorPlugin,
 		ID:   "cgroups",
-	})
-	Register(&Registration{
-		Type:     ServicePlugin,
-		ID:       services.TasksService,
-		Requires: tasksServiceRequires,
-	})
-	Register(&Registration{
+	}).Register(&Registration{
+		Type: ServicePlugin,
+		ID:   services.TasksService,
+		Requires: []Type{
+			RuntimePlugin,
+			RuntimePluginV2,
+			MetadataPlugin,
+			TaskMonitorPlugin,
+		},
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.IntrospectionService,
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.NamespacesService,
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "namespaces",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "content",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "containers",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.ContainersService,
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "events",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "leases",
 		Requires: []Type{
 			LeasePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: LeasePlugin,
 		ID:   "manager",
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "diff",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.DiffService,
 		Requires: []Type{
 			DiffPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.SnapshotsService,
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "snapshots",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "version",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "images",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GCPlugin,
 		ID:   "scheduler",
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: RuntimePluginV2,
 		ID:   "task",
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "tasks",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type:     GRPCPlugin,
 		ID:       "introspection",
 		Requires: []Type{"*"},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.ContentService,
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "healthcheck",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: InternalPlugin,
 		ID:   "opt",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "cri",
 		Requires: []Type{
 			ServicePlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: RuntimePlugin,
 		ID:   "linux",
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: InternalPlugin,
 		Requires: []Type{
 			ServicePlugin,
 		},
 		ID: "restart",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: DiffPlugin,
 		ID:   "walking",
 		Requires: []Type{
 			MetadataPlugin,
 		},
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: SnapshotPlugin,
 		ID:   "native",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: SnapshotPlugin,
 		ID:   "overlayfs",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: ContentPlugin,
 		ID:   "content",
-	})
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: MetadataPlugin,
 		ID:   "bolt",
 		Requires: []Type{
 			ContentPlugin,
 			SnapshotPlugin,
 		},
-	})
-
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: TracingProcessorPlugin,
 		ID:   "otlp",
-	})
-
-	Register(&Registration{
+	}).Register(&Registration{
 		Type: InternalPlugin,
 		ID:   "tracing",
 		Requires: []Type{
@@ -250,7 +224,7 @@ func TestContainerdPlugin(t *testing.T) {
 		},
 	})
 
-	ordered := Graph(mockPluginFilter)
+	ordered := register.Graph(mockPluginFilter)
 	expectedURI := []string{
 		"io.containerd.monitor.v1.cgroups",
 		"io.containerd.content.v1.content",
@@ -290,7 +264,7 @@ func TestContainerdPlugin(t *testing.T) {
 	cmpOrdered(t, ordered, expectedURI)
 }
 
-func cmpOrdered(t *testing.T, ordered []*Registration, expectedURI []string) {
+func cmpOrdered(t *testing.T, ordered []Registration, expectedURI []string) {
 	if len(ordered) != len(expectedURI) {
 		t.Fatalf("ordered compare failed, %d != %d", len(ordered), len(expectedURI))
 	}
@@ -306,6 +280,7 @@ func TestPluginGraph(t *testing.T) {
 	for _, testcase := range []struct {
 		input       []*Registration
 		expectedURI []string
+		filter      DisableFilter
 	}{
 		// test requires *
 		{
@@ -380,21 +355,27 @@ func TestPluginGraph(t *testing.T) {
 					ID:   "content",
 				},
 				{
-					Type:    "disable",
-					ID:      "disable",
-					Disable: true,
+					Type: "disable",
+					ID:   "disable",
 				},
 			},
 			expectedURI: []string{
 				"content.content",
 			},
+			filter: func(r *Registration) bool {
+				return r.Type == "disable"
+			},
 		},
 	} {
-		registerClear()
+		var register Registry
 		for _, in := range testcase.input {
-			Register(in)
+			register = register.Register(in)
 		}
-		ordered := Graph(mockPluginFilter)
+		var filter DisableFilter = mockPluginFilter
+		if testcase.filter != nil {
+			filter = testcase.filter
+		}
+		ordered := register.Graph(filter)
 		cmpOrdered(t, ordered, testcase.expectedURI)
 	}
 }

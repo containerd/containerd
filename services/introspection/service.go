@@ -22,22 +22,24 @@ import (
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type:     plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type:     plugins.GRPCPlugin,
 		ID:       "introspection",
-		Requires: []plugin.Type{plugin.ServicePlugin},
+		Requires: []plugin.Type{plugins.ServicePlugin},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugins, err := ic.GetByType(plugin.ServicePlugin)
+			sps, err := ic.GetByType(plugins.ServicePlugin)
 			if err != nil {
 				return nil, err
 			}
-			p, ok := plugins[services.IntrospectionService]
+			p, ok := sps[services.IntrospectionService]
 			if !ok {
 				return nil, errors.New("introspection service not found")
 			}
@@ -51,7 +53,7 @@ func init() {
 			if !ok {
 				return nil, errors.New("could not create a local client for introspection service")
 			}
-			localClient.UpdateLocal(ic.Root)
+			localClient.UpdateLocal(ic.Properties[plugins.PropertyRootDir])
 
 			return &server{
 				local: localClient,

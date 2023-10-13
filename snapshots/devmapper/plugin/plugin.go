@@ -24,12 +24,14 @@ import (
 
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/snapshots/devmapper"
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type:   plugin.SnapshotPlugin,
+	registry.Register(&plugin.Registration{
+		Type:   plugins.SnapshotPlugin,
 		ID:     "devmapper",
 		Config: &devmapper.Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -45,7 +47,7 @@ func init() {
 			}
 
 			if config.RootPath == "" {
-				config.RootPath = ic.Root
+				config.RootPath = ic.Properties[plugins.PropertyRootDir]
 			}
 
 			return devmapper.NewSnapshotter(ic.Context, config)

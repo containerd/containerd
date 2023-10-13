@@ -22,6 +22,8 @@ import (
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"google.golang.org/grpc"
@@ -32,18 +34,18 @@ var (
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.GRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.GRPCPlugin,
 		ID:   "tasks",
 		Requires: []plugin.Type{
-			plugin.ServicePlugin,
+			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugins, err := ic.GetByType(plugin.ServicePlugin)
+			sps, err := ic.GetByType(plugins.ServicePlugin)
 			if err != nil {
 				return nil, err
 			}
-			p, ok := plugins[services.TasksService]
+			p, ok := sps[services.TasksService]
 			if !ok {
 				return nil, errors.New("tasks service not found")
 			}

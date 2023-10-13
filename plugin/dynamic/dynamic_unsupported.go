@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build (!amd64 && !arm64) || static_build || gccgo
 
 /*
    Copyright The containerd Authors.
@@ -16,15 +16,13 @@
    limitations under the License.
 */
 
-package tasks
+package dynamic
 
-import (
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugins"
-)
-
-var tasksServiceRequires = []plugin.Type{
-	plugins.RuntimePluginV2,
-	plugins.MetadataPlugin,
-	plugins.TaskMonitorPlugin,
+// loadPlugins is not supported;
+//
+// - with gccgo: gccgo has no plugin support golang/go#36403
+// - on static builds; https://github.com/containerd/containerd/commit/0d682e24a1ba8e93e5e54a73d64f7d256f87492f
+// - on architectures other than amd64 and arm64 (other architectures need to be tested)
+func loadPlugins(path string) error {
+	return nil
 }

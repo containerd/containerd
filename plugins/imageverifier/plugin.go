@@ -22,12 +22,14 @@ import (
 	"github.com/containerd/containerd/pkg/imageverifier/bindir"
 	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 )
 
 // Register default image verifier service plugin
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type:   plugin.ImageVerifierPlugin,
+	registry.Register(&plugin.Registration{
+		Type:   plugins.ImageVerifierPlugin,
 		ID:     "bindir",
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {

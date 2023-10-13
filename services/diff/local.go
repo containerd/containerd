@@ -26,6 +26,8 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -48,15 +50,15 @@ type differ interface {
 }
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.ServicePlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.ServicePlugin,
 		ID:   services.DiffService,
 		Requires: []plugin.Type{
-			plugin.DiffPlugin,
+			plugins.DiffPlugin,
 		},
 		Config: defaultDifferConfig,
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			differs, err := ic.GetByType(plugin.DiffPlugin)
+			differs, err := ic.GetByType(plugins.DiffPlugin)
 			if err != nil {
 				return nil, err
 			}
