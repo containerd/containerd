@@ -101,9 +101,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
 
 	defer func() {
@@ -246,11 +246,12 @@ func readBootstrapParams(path string) (client.BootstrapParams, error) {
 
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
-	}).Debug("shim bootstrap parameters")
+		"version":  params.Version,
+	}).Infof("connecting to shim %s", id)
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
