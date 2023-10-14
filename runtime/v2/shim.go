@@ -96,7 +96,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		f.Close()
 	}
 
-	params, err := restoreBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"))
+	params, err := restoreBootstrapParams(bundle.Path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}

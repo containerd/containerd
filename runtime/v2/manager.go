@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -205,7 +206,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 			return nil, err
 		}
 
-		params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), opts.SandboxID, "bootstrap.json"))
+		params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), opts.SandboxID))
 		if err != nil {
 			return nil, err
 		}
@@ -288,13 +289,12 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 // configuration (version = 2, protocol = ttrpc, and address).
 func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, error) {
 	filePath := filepath.Join(bundlePath, "bootstrap.json")
-	params, err := readBootstrapParams(filePath)
-	if err == nil {
-		return params, nil
-	}
 
-	if !os.IsNotExist(err) {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("failed to read bootstrap.json for bundle %s: %w", bundlePath, err)
+	// Read bootstrap.json if exists
+	if _, err := os.Stat(filePath); err == nil {
+		return readBootstrapParams(filePath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("failed to stat %s: %w", filePath, err)
 	}
 
 	// File not found, likely its an older shim. Try migrate.
@@ -304,7 +304,7 @@ func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, erro
 		return shimbinary.BootstrapParams{}, fmt.Errorf("unable to migrate shim: failed to get socket address for bundle %s: %w", bundlePath, err)
 	}
 
-	params = shimbinary.BootstrapParams{
+	params := shimbinary.BootstrapParams{
 		Version:  2,
 		Address:  address,
 		Protocol: "ttrpc",
