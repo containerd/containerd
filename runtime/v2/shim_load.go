@@ -150,6 +150,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			m.shims.Delete(ctx, id)
 		})
 		if err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to load shim %q", id)
 			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 			continue
 		}
