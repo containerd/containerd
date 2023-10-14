@@ -32,6 +32,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	csapi "github.com/containerd/containerd/api/services/content/v1"
@@ -220,6 +221,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			reqID = p.ID
 		}
 		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
+		var mustSucceed int32
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -231,7 +233,10 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		initContext.Events = events
 		initContext.Address = config.GRPC.Address
 		initContext.TTRPCAddress = config.TTRPC.Address
-		initContext.RegisterReadiness = s.RegisterReadiness
+		initContext.RegisterReadiness = func() func() {
+			atomic.StoreInt32(&mustSucceed, 1)
+			return s.RegisterReadiness()
+		}
 
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
@@ -255,6 +260,10 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			}
 			if _, ok := required[reqID]; ok {
 				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
+			}
+			// If readiness was registered during initialization, the plugin cannot fail
+			if atomic.LoadInt32(&mustSucceed) != 0 {
+				return nil, fmt.Errorf("plugin failed after registering readiness %s: %w", id, err)
 			}
 			continue
 		}
