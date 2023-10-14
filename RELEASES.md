@@ -406,6 +406,7 @@ The deprecated features are shown in the following table:
 | Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+json`) | containerd v1.7     | containerd v2.0            | Use Schema 2 or OCI images               |
 | CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅         | Use CRI `v1`                             |
 | Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅         |                                          |
+| Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1            | Use external plugins (proxy or binary)   |
 
 
 ### Deprecated config properties
