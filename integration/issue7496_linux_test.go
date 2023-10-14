@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	apitask "github.com/containerd/containerd/api/runtime/task/v2"
+	apitask "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime/v2/shim"
@@ -111,7 +111,7 @@ func TestIssue7496(t *testing.T) {
 // example, umount overlayfs rootfs which doesn't with volatile.
 //
 // REF: https://man7.org/linux/man-pages/man1/strace.1.html
-func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TaskService, delayInSec int) chan struct{} {
+func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskService, delayInSec int) chan struct{} {
 	pid := shimPid(ctx, t, shimCli)
 
 	doneCh := make(chan struct{})
@@ -153,7 +153,7 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.Tas
 	return doneCh
 }
 
-func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TaskService {
+func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TTRPCTaskService {
 	addr, err := shim.SocketAddress(ctx, containerdEndpoint, id)
 	require.NoError(t, err)
 	addr = strings.TrimPrefix(addr, "unix://")
@@ -162,10 +162,10 @@ func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TaskSer
 	require.NoError(t, err)
 
 	client := ttrpc.NewClient(conn)
-	return apitask.NewTaskClient(client)
+	return apitask.NewTTRPCTaskClient(client)
 }
 
-func shimPid(ctx context.Context, t *testing.T, shimCli apitask.TaskService) uint32 {
+func shimPid(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskService) uint32 {
 	resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
 	require.NoError(t, err)
 	return resp.GetShimPid()
