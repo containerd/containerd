@@ -32,21 +32,30 @@ func TestImageFsInfo(t *testing.T) {
 	c := newTestCRIService()
 	snapshots := []snapshotstore.Snapshot{
 		{
-			Key:       "key1",
+			Key: snapshotstore.Key{
+				Key:         "key1",
+				Snapshotter: "snapshotter1",
+			},
 			Kind:      snapshot.KindActive,
 			Size:      10,
 			Inodes:    100,
 			Timestamp: 234567,
 		},
 		{
-			Key:       "key2",
+			Key: snapshotstore.Key{
+				Key:         "key2",
+				Snapshotter: "snapshotter1",
+			},
 			Kind:      snapshot.KindCommitted,
 			Size:      20,
 			Inodes:    200,
 			Timestamp: 123456,
 		},
 		{
-			Key:       "key3",
+			Key: snapshotstore.Key{
+				Key:         "key3",
+				Snapshotter: "snapshotter1",
+			},
 			Kind:      snapshot.KindView,
 			Size:      0,
 			Inodes:    0,

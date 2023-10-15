@@ -27,23 +27,35 @@ import (
 )
 
 func TestSnapshotStore(t *testing.T) {
-	snapshots := map[string]Snapshot{
-		"key1": {
-			Key:       "key1",
+	key1 := Key{
+		Key:         "key1",
+		Snapshotter: "snapshotter1",
+	}
+	key2 := Key{
+		Key:         "key2",
+		Snapshotter: "snapshotter1",
+	}
+	key3 := Key{
+		Key:         "key1",
+		Snapshotter: "snapshotter2",
+	}
+	snapshots := map[Key]Snapshot{
+		key1: {
+			Key:       key1,
 			Kind:      snapshot.KindActive,
 			Size:      10,
 			Inodes:    100,
 			Timestamp: time.Now().UnixNano(),
 		},
-		"key2": {
-			Key:       "key2",
+		key2: {
+			Key:       key2,
 			Kind:      snapshot.KindCommitted,
 			Size:      20,
 			Inodes:    200,
 			Timestamp: time.Now().UnixNano(),
 		},
-		"key3": {
-			Key:       "key3",
+		key3: {
+			Key:       key3,
 			Kind:      snapshot.KindView,
 			Size:      0,
 			Inodes:    0,
@@ -70,7 +82,19 @@ func TestSnapshotStore(t *testing.T) {
 	sns := s.List()
 	assert.Len(sns, 3)
 
-	testKey := "key2"
+	invalidKey := Key{
+		Key:         "key2",
+		Snapshotter: "snapshotter2",
+	}
+	t.Logf("should not delete snapshot with invalid key")
+	s.Delete(invalidKey)
+	sns = s.List()
+	assert.Len(sns, 3)
+
+	testKey := Key{
+		Key:         "key2",
+		Snapshotter: "snapshotter1",
+	}
 
 	t.Logf("should be able to delete snapshot")
 	s.Delete(testKey)

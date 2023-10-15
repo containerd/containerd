@@ -77,7 +77,7 @@ type imageService interface {
 	UpdateImage(ctx context.Context, r string) error
 
 	GetImage(id string) (imagestore.Image, error)
-	GetSnapshot(key string) (snapshotstore.Snapshot, error)
+	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
 	LocalResolve(refOrID string) (imagestore.Image, error)
 }
