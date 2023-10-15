@@ -392,7 +392,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 
 func sandboxPod(id string, timestamp time.Time, cachedCPU uint64) sandboxstore.Sandbox {
 	return sandboxstore.Sandbox{
-		Metadata: sandboxstore.Metadata{ID: id}, Stats: &stats.ContainerStats{
+		Metadata: sandboxstore.Metadata{ID: id, RuntimeHandler: "runc"},
+		Stats: &stats.ContainerStats{
 			Timestamp:            timestamp,
 			UsageCoreNanoSeconds: cachedCPU,
 		}}

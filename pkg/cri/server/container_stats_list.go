@@ -81,11 +81,21 @@ func (c *criService) getMetricsHandler(ctx context.Context, sandboxID string) (m
 		return nil, err
 	}
 
+	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get runtimeHandler %q: %w", sandbox.RuntimeHandler, err)
+	}
+	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
+
 	switch p.OS {
 	case "windows":
-		return c.windowsContainerMetrics, nil
+		return func(meta containerstore.Metadata, stats *types.Metric) (*runtime.ContainerStats, error) {
+			return c.windowsContainerMetrics(meta, stats, snapshotter)
+		}, nil
 	case "linux":
-		return c.linuxContainerMetrics, nil
+		return func(meta containerstore.Metadata, stats *types.Metric) (*runtime.ContainerStats, error) {
+			return c.linuxContainerMetrics(meta, stats, snapshotter)
+		}, nil
 	default:
 		return nil, fmt.Errorf("container metrics for platform %+v: %w", p, errdefs.ErrNotImplemented)
 	}
@@ -267,10 +277,11 @@ func matchLabelSelector(selector, labels map[string]string) bool {
 func (c *criService) windowsContainerMetrics(
 	meta containerstore.Metadata,
 	stats *types.Metric,
+	snapshotter string,
 ) (*runtime.ContainerStats, error) {
 	var cs runtime.ContainerStats
 	var usedBytes, inodesUsed uint64
-	sn, err := c.GetSnapshot(meta.ID)
+	sn, err := c.GetSnapshot(meta.ID, snapshotter)
 	// If snapshotstore doesn't have cached snapshot information
 	// set WritableLayer usage to zero
 	if err == nil {
@@ -322,10 +333,11 @@ func (c *criService) windowsContainerMetrics(
 func (c *criService) linuxContainerMetrics(
 	meta containerstore.Metadata,
 	stats *types.Metric,
+	snapshotter string,
 ) (*runtime.ContainerStats, error) {
 	var cs runtime.ContainerStats
 	var usedBytes, inodesUsed uint64
-	sn, err := c.GetSnapshot(meta.ID)
+	sn, err := c.GetSnapshot(meta.ID, snapshotter)
 	// If snapshotstore doesn't have cached snapshot information
 	// set WritableLayer usage to zero
 	if err == nil {

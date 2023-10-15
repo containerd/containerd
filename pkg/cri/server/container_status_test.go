@@ -278,7 +278,7 @@ func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { re
 
 func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
 
-func (s *fakeImageService) GetSnapshot(key string) (snapshotstore.Snapshot, error) {
+func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 

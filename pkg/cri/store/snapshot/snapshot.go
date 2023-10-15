@@ -23,10 +23,17 @@ import (
 	snapshot "github.com/containerd/containerd/snapshots"
 )
 
+type Key struct {
+	// Key is the key of the snapshot
+	Key string
+	// Snapshotter is the name of the snapshotter managing the snapshot
+	Snapshotter string
+}
+
 // Snapshot contains the information about the snapshot.
 type Snapshot struct {
 	// Key is the key of the snapshot
-	Key string
+	Key Key
 	// Kind is the kind of the snapshot (active, committed, view)
 	Kind snapshot.Kind
 	// Size is the size of the snapshot in bytes.
@@ -41,12 +48,12 @@ type Snapshot struct {
 // Store stores all snapshots.
 type Store struct {
 	lock      sync.RWMutex
-	snapshots map[string]Snapshot
+	snapshots map[Key]Snapshot
 }
 
 // NewStore creates a snapshot store.
 func NewStore() *Store {
-	return &Store{snapshots: make(map[string]Snapshot)}
+	return &Store{snapshots: make(map[Key]Snapshot)}
 }
 
 // Add a snapshot into the store.
@@ -58,7 +65,7 @@ func (s *Store) Add(snapshot Snapshot) {
 
 // Get returns the snapshot with specified key. Returns errdefs.ErrNotFound if the
 // snapshot doesn't exist.
-func (s *Store) Get(key string) (Snapshot, error) {
+func (s *Store) Get(key Key) (Snapshot, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	if sn, ok := s.snapshots[key]; ok {
@@ -79,7 +86,7 @@ func (s *Store) List() []Snapshot {
 }
 
 // Delete deletes the snapshot with specified key.
-func (s *Store) Delete(key string) {
+func (s *Store) Delete(key Key) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	delete(s.snapshots, key)
