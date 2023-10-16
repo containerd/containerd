@@ -65,7 +65,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.3.0
 	golang.org/x/net v0.13.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.10.0
+	golang.org/x/sys v0.13.0
 	google.golang.org/grpc v1.50.1
 	google.golang.org/protobuf v1.28.1
 	gotest.tools/v3 v3.5.0
