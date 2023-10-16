@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
@@ -189,7 +189,7 @@ func stateName(v interface{}) string {
 	panic(fmt.Errorf("invalid state %v", v))
 }
 
-func readConfig(path string) (spec *specs.Spec, err error) {
+func readConfig(path string) (spec *runtimespec.Spec, err error) {
 	cfg := filepath.Join(path, configFile)
 	f, err := os.Open(cfg)
 	if err != nil {

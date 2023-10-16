@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
@@ -199,7 +199,7 @@ func (p *Init) validateRuncFeatures(ctx context.Context, bundle string) error {
 	return nil
 }
 
-func (p *Init) validateIDMapMounts(ctx context.Context, spec *specs.Spec) error {
+func (p *Init) validateIDMapMounts(ctx context.Context, spec *runtimespec.Spec) error {
 	var used bool
 	for _, m := range spec.Mounts {
 		if m.UIDMappings != nil || m.GIDMappings != nil {
@@ -448,7 +448,7 @@ func (p *Init) Exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 // exec returns a new exec'd process
 func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (Process, error) {
 	// process exec request
-	var spec specs.Process
+	var spec runtimespec.Process
 	if err := json.Unmarshal(r.Spec.Value, &spec); err != nil {
 		return nil, err
 	}
@@ -517,7 +517,7 @@ func (p *Init) Update(ctx context.Context, r *google_protobuf.Any) error {
 }
 
 func (p *Init) update(ctx context.Context, r *google_protobuf.Any) error {
-	var resources specs.LinuxResources
+	var resources runtimespec.LinuxResources
 	if err := json.Unmarshal(r.Value, &resources); err != nil {
 		return err
 	}

@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // LoadBundle loads an existing bundle from disk
@@ -75,7 +75,7 @@ func NewBundle(ctx context.Context, root, state, id string, spec typeurl.Any) (b
 	if err := os.Mkdir(b.Path, 0700); err != nil {
 		return nil, err
 	}
-	if typeurl.Is(spec, &specs.Spec{}) {
+	if typeurl.Is(spec, &runtimespec.Spec{}) {
 		if err := prepareBundleDirectoryPermissions(b.Path, spec.GetValue()); err != nil {
 			return nil, err
 		}

@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestWithCPUCount(t *testing.T) {
@@ -131,9 +131,9 @@ func TestWithProcessArgsOverwritesWithImage(t *testing.T) {
 	}
 
 	s := Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Windows: &specs.Windows{},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Windows: &runtimespec.Windows{},
 	}
 
 	args := []string{"cmd.exe", "echo", "should be set"}
@@ -174,9 +174,9 @@ func TestWithProcessArgsOverwritesWithImageArgsEscaped(t *testing.T) {
 	}
 
 	s := Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Windows: &specs.Windows{},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Windows: &runtimespec.Windows{},
 	}
 
 	args := []string{"cmd.exe", "echo", "should be set"}
@@ -216,9 +216,9 @@ func TestWithImageOverwritesWithProcessArgs(t *testing.T) {
 	}
 
 	s := Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Windows: &specs.Windows{},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Windows: &runtimespec.Windows{},
 	}
 
 	opts := []SpecOpts{
@@ -259,9 +259,9 @@ func TestWithImageArgsEscapedOverwritesWithProcessArgs(t *testing.T) {
 	}
 
 	s := Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Windows: &specs.Windows{},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Windows: &runtimespec.Windows{},
 	}
 
 	opts := []SpecOpts{
@@ -369,9 +369,9 @@ func TestWithImageConfigArgsWindows(t *testing.T) {
 			}
 
 			s := Spec{
-				Version: specs.Version,
-				Root:    &specs.Root{},
-				Windows: &specs.Windows{},
+				Version: runtimespec.Version,
+				Root:    &runtimespec.Root{},
+				Windows: &runtimespec.Windows{},
 			}
 
 			opts := []SpecOpts{
@@ -498,9 +498,9 @@ func TestWithImageConfigArgsEscapedWindows(t *testing.T) {
 			}
 
 			s := Spec{
-				Version: specs.Version,
-				Root:    &specs.Root{},
-				Windows: &specs.Windows{},
+				Version: runtimespec.Version,
+				Root:    &runtimespec.Root{},
+				Windows: &runtimespec.Windows{},
 			}
 
 			opts := []SpecOpts{
@@ -529,7 +529,7 @@ func TestWithImageConfigArgsEscapedWindows(t *testing.T) {
 func TestWindowsDefaultPathEnv(t *testing.T) {
 	t.Parallel()
 	s := Spec{}
-	s.Process = &specs.Process{
+	s.Process = &runtimespec.Process{
 		Env: []string{},
 	}
 

@@ -20,15 +20,15 @@ import (
 	"strconv"
 
 	"github.com/containerd/typeurl/v2"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func init() {
 	const prefix = "types.containerd.io"
 	// register TypeUrls for commonly marshaled external types
-	major := strconv.Itoa(specs.VersionMajor)
-	typeurl.Register(&specs.Spec{}, prefix, "opencontainers/runtime-spec", major, "Spec")
-	typeurl.Register(&specs.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
-	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
-	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
+	major := strconv.Itoa(runtimespec.VersionMajor)
+	typeurl.Register(&runtimespec.Spec{}, prefix, "opencontainers/runtime-spec", major, "Spec")
+	typeurl.Register(&runtimespec.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
+	typeurl.Register(&runtimespec.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
+	typeurl.Register(&runtimespec.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
 }

@@ -20,7 +20,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // ensureRemoveAll is a wrapper for os.RemoveAll on Windows.
@@ -28,6 +28,6 @@ func ensureRemoveAll(_ context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
 	return nil
 }

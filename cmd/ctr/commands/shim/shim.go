@@ -36,7 +36,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
 
@@ -177,7 +177,7 @@ var execCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		url, err := typeurl.TypeURL(specs.Process{})
+		url, err := typeurl.TypeURL(runtimespec.Process{})
 		if err != nil {
 			return err
 		}

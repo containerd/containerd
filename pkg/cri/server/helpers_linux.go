@@ -28,7 +28,7 @@ import (
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/moby/sys/mountinfo"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -172,7 +172,7 @@ func isVMBasedRuntime(runtimeType string) bool {
 	return false
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
 	if !isVMBasedRuntime(runtimeType) {
 		return nil
 	}

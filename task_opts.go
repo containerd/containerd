@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // NewTaskOpts allows the caller to set options on a new task
@@ -190,14 +190,14 @@ func WithKillExecID(execID string) KillOpts {
 }
 
 // WithResources sets the provided resources for task updates. Resources must be
-// either a *specs.LinuxResources or a *specs.WindowsResources
+// either a *runtimespec.LinuxResources or a *runtimespec.WindowsResources
 func WithResources(resources interface{}) UpdateTaskOpts {
 	return func(ctx context.Context, client *Client, r *UpdateTaskInfo) error {
 		switch resources.(type) {
-		case *specs.LinuxResources:
-		case *specs.WindowsResources:
+		case *runtimespec.LinuxResources:
+		case *runtimespec.WindowsResources:
 		default:
-			return errors.New("WithResources requires a *specs.LinuxResources or *specs.WindowsResources")
+			return errors.New("WithResources requires a *runtimespec.LinuxResources or *runtimespec.WindowsResources")
 		}
 
 		r.Resources = resources

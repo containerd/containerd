@@ -26,7 +26,7 @@ import (
 	"text/template"
 
 	"github.com/containerd/containerd/oci"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
 
@@ -63,7 +63,7 @@ var ociHook = cli.Command{
 // the overhead of unmarshaling.
 type hookSpec struct {
 	// Root configures the container's root filesystem.
-	Root *specs.Root `json:"root,omitempty"`
+	Root *runtimespec.Root `json:"root,omitempty"`
 }
 
 func loadSpec(path string) (*hookSpec, error) {
@@ -79,15 +79,15 @@ func loadSpec(path string) (*hookSpec, error) {
 	return &s, nil
 }
 
-func loadHookState(r io.Reader) (*specs.State, error) {
-	var s specs.State
+func loadHookState(r io.Reader) (*runtimespec.State, error) {
+	var s runtimespec.State
 	if err := json.NewDecoder(r).Decode(&s); err != nil {
 		return nil, err
 	}
 	return &s, nil
 }
 
-func newTemplateContext(state *specs.State, spec *hookSpec) *templateContext {
+func newTemplateContext(state *runtimespec.State, spec *hookSpec) *templateContext {
 	t := &templateContext{
 		state: state,
 		root:  spec.Root.Path,
@@ -104,7 +104,7 @@ func newTemplateContext(state *specs.State, spec *hookSpec) *templateContext {
 }
 
 type templateContext struct {
-	state *specs.State
+	state *runtimespec.State
 	root  string
 	funcs template.FuncMap
 }

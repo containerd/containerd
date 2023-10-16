@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type execProcess struct {
@@ -54,7 +54,7 @@ type execProcess struct {
 	stdin   io.Closer
 	stdio   stdio.Stdio
 	path    string
-	spec    specs.Process
+	spec    runtimespec.Process
 
 	parent    *Init
 	waitBlock chan struct{}

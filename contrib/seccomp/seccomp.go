@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithProfile receives the name of a file stored on disk comprising a json
@@ -36,8 +36,8 @@ import (
 //
 //go:noinline
 func WithProfile(profile string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		s.Linux.Seccomp = &specs.LinuxSeccomp{}
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
+		s.Linux.Seccomp = &runtimespec.LinuxSeccomp{}
 		f, err := os.ReadFile(profile)
 		if err != nil {
 			return fmt.Errorf("cannot load seccomp profile %q: %v", profile, err)
@@ -57,7 +57,7 @@ func WithProfile(profile string) oci.SpecOpts {
 //
 //go:noinline
 func WithDefaultProfile() oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		s.Linux.Seccomp = DefaultProfile(s)
 		return nil
 	}

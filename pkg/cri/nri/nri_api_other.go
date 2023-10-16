@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/constants"
@@ -93,7 +93,7 @@ func (*API) RemoveContainer(context.Context, *sstore.Sandbox, *cstore.Container)
 	return nil
 }
 
-func (*API) UndoCreateContainer(context.Context, *sstore.Sandbox, string, *specs.Spec) {
+func (*API) UndoCreateContainer(context.Context, *sstore.Sandbox, string, *runtimespec.Spec) {
 }
 
 func (*API) WithContainerAdjustment() containerd.NewContainerOpts {

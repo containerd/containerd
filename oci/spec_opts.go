@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/moby/sys/user"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -60,28 +60,28 @@ func Compose(opts ...SpecOpts) SpecOpts {
 // setProcess sets Process to empty if unset
 func setProcess(s *Spec) {
 	if s.Process == nil {
-		s.Process = &specs.Process{}
+		s.Process = &runtimespec.Process{}
 	}
 }
 
 // setRoot sets Root to empty if unset
 func setRoot(s *Spec) {
 	if s.Root == nil {
-		s.Root = &specs.Root{}
+		s.Root = &runtimespec.Root{}
 	}
 }
 
 // setLinux sets Linux to empty if unset
 func setLinux(s *Spec) {
 	if s.Linux == nil {
-		s.Linux = &specs.Linux{}
+		s.Linux = &runtimespec.Linux{}
 	}
 }
 
 func setResources(s *Spec) {
 	if s.Linux != nil {
 		if s.Linux.Resources == nil {
-			s.Linux.Resources = &specs.LinuxResources{}
+			s.Linux.Resources = &runtimespec.LinuxResources{}
 		}
 	}
 }
@@ -90,7 +90,7 @@ func setResources(s *Spec) {
 func setResourcesWindows(s *Spec) {
 	if s.Windows != nil {
 		if s.Windows.Resources == nil {
-			s.Windows.Resources = &specs.WindowsResources{}
+			s.Windows.Resources = &runtimespec.WindowsResources{}
 		}
 	}
 }
@@ -100,7 +100,7 @@ func setCPU(s *Spec) {
 	setResources(s)
 	if s.Linux != nil {
 		if s.Linux.Resources.CPU == nil {
-			s.Linux.Resources.CPU = &specs.LinuxCPU{}
+			s.Linux.Resources.CPU = &runtimespec.LinuxCPU{}
 		}
 	}
 }
@@ -110,7 +110,7 @@ func setCPUWindows(s *Spec) {
 	setResourcesWindows(s)
 	if s.Windows != nil {
 		if s.Windows.Resources.CPU == nil {
-			s.Windows.Resources.CPU = &specs.WindowsCPUResources{}
+			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
 		}
 	}
 }
@@ -119,7 +119,7 @@ func setCPUWindows(s *Spec) {
 func setCapabilities(s *Spec) {
 	setProcess(s)
 	if s.Process.Capabilities == nil {
-		s.Process.Capabilities = &specs.LinuxCapabilities{}
+		s.Process.Capabilities = &runtimespec.LinuxCapabilities{}
 	}
 }
 
@@ -159,7 +159,7 @@ func WithSpecFromBytes(p []byte) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		*s = Spec{} // make sure spec is cleared.
 		if err := json.Unmarshal(p, s); err != nil {
-			return fmt.Errorf("decoding spec config file failed, current supported OCI runtime-spec : v%s: %w", specs.Version, err)
+			return fmt.Errorf("decoding spec config file failed, current supported OCI runtime-spec : v%s: %w", runtimespec.Version, err)
 		}
 		return nil
 	}
@@ -264,7 +264,7 @@ func WithTTYSize(width, height int) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setProcess(s)
 		if s.Process.ConsoleSize == nil {
-			s.Process.ConsoleSize = &specs.Box{}
+			s.Process.ConsoleSize = &runtimespec.Box{}
 		}
 		s.Process.ConsoleSize.Width = uint(width)
 		s.Process.ConsoleSize.Height = uint(height)
@@ -289,7 +289,7 @@ func WithDomainname(name string) SpecOpts {
 }
 
 // WithMounts appends mounts
-func WithMounts(mounts []specs.Mount) SpecOpts {
+func WithMounts(mounts []runtimespec.Mount) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		s.Mounts = append(s.Mounts, mounts...)
 		return nil
@@ -300,7 +300,7 @@ func WithMounts(mounts []specs.Mount) SpecOpts {
 func WithoutMounts(dests ...string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		var (
-			mounts  []specs.Mount
+			mounts  []runtimespec.Mount
 			current = s.Mounts
 		)
 	mLoop:
@@ -319,7 +319,7 @@ func WithoutMounts(dests ...string) SpecOpts {
 }
 
 // WithHostNamespace allows a task to run inside the host's linux namespace
-func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
+func WithHostNamespace(ns runtimespec.LinuxNamespaceType) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
@@ -334,7 +334,7 @@ func WithHostNamespace(ns specs.LinuxNamespaceType) SpecOpts {
 
 // WithLinuxNamespace uses the passed in namespace for the spec. If a namespace of the same type already exists in the
 // spec, the existing namespace is replaced by the one provided.
-func WithLinuxNamespace(ns specs.LinuxNamespace) SpecOpts {
+func WithLinuxNamespace(ns runtimespec.LinuxNamespace) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		for i, n := range s.Linux.Namespaces {
@@ -470,7 +470,7 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 			}
 
 			s.Process.Cwd = config.WorkingDir
-			s.Process.User = specs.User{
+			s.Process.User = runtimespec.User{
 				Username: config.User,
 			}
 		} else {
@@ -490,7 +490,7 @@ func WithRootFSPath(path string) SpecOpts {
 	}
 }
 
-// WithRootFSReadonly sets specs.Root.Readonly to true
+// WithRootFSReadonly sets runtimespec.Root.Readonly to true
 func WithRootFSReadonly() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setRoot(s)
@@ -508,7 +508,7 @@ func WithNoNewPrivileges(_ context.Context, _ Client, _ *containers.Container, s
 
 // WithHostHostsFile bind-mounts the host's /etc/hosts into the container as readonly
 func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	s.Mounts = append(s.Mounts, specs.Mount{
+	s.Mounts = append(s.Mounts, runtimespec.Mount{
 		Destination: "/etc/hosts",
 		Type:        "bind",
 		Source:      "/etc/hosts",
@@ -519,7 +519,7 @@ func WithHostHostsFile(_ context.Context, _ Client, _ *containers.Container, s *
 
 // WithHostResolvconf bind-mounts the host's /etc/resolv.conf into the container as readonly
 func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	s.Mounts = append(s.Mounts, specs.Mount{
+	s.Mounts = append(s.Mounts, runtimespec.Mount{
 		Destination: "/etc/resolv.conf",
 		Type:        "bind",
 		Source:      "/etc/resolv.conf",
@@ -530,7 +530,7 @@ func WithHostResolvconf(_ context.Context, _ Client, _ *containers.Container, s 
 
 // WithHostLocaltime bind-mounts the host's /etc/localtime into the container as readonly
 func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
-	s.Mounts = append(s.Mounts, specs.Mount{
+	s.Mounts = append(s.Mounts, runtimespec.Mount{
 		Destination: "/etc/localtime",
 		Type:        "bind",
 		Source:      "/etc/localtime",
@@ -541,19 +541,19 @@ func WithHostLocaltime(_ context.Context, _ Client, _ *containers.Container, s *
 
 // WithUserNamespace sets the uid and gid mappings for the task
 // this can be called multiple times to add more mappings to the generated spec
-func WithUserNamespace(uidMap, gidMap []specs.LinuxIDMapping) SpecOpts {
+func WithUserNamespace(uidMap, gidMap []runtimespec.LinuxIDMapping) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		var hasUserns bool
 		setLinux(s)
 		for _, ns := range s.Linux.Namespaces {
-			if ns.Type == specs.UserNamespace {
+			if ns.Type == runtimespec.UserNamespace {
 				hasUserns = true
 				break
 			}
 		}
 		if !hasUserns {
-			s.Linux.Namespaces = append(s.Linux.Namespaces, specs.LinuxNamespace{
-				Type: specs.UserNamespace,
+			s.Linux.Namespaces = append(s.Linux.Namespaces, runtimespec.LinuxNamespace{
+				Type: runtimespec.UserNamespace,
 			})
 		}
 		s.Linux.UIDMappings = append(s.Linux.UIDMappings, uidMap...)
@@ -1182,7 +1182,7 @@ func WithSeccompUnconfined(_ context.Context, _ Client, _ *containers.Container,
 func WithParentCgroupDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setLinux(s)
 	if s.Linux.Resources == nil {
-		s.Linux.Resources = &specs.LinuxResources{}
+		s.Linux.Resources = &runtimespec.LinuxResources{}
 	}
 	s.Linux.Resources.Devices = nil
 	return nil
@@ -1192,9 +1192,9 @@ func WithParentCgroupDevices(_ context.Context, _ Client, _ *containers.Containe
 func WithAllDevicesAllowed(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setLinux(s)
 	if s.Linux.Resources == nil {
-		s.Linux.Resources = &specs.LinuxResources{}
+		s.Linux.Resources = &runtimespec.LinuxResources{}
 	}
-	s.Linux.Resources.Devices = []specs.LinuxDeviceCgroup{
+	s.Linux.Resources.Devices = []runtimespec.LinuxDeviceCgroup{
 		{
 			Allow:  true,
 			Access: rwm,
@@ -1208,12 +1208,12 @@ func WithAllDevicesAllowed(_ context.Context, _ Client, _ *containers.Container,
 func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	setLinux(s)
 	if s.Linux.Resources == nil {
-		s.Linux.Resources = &specs.LinuxResources{}
+		s.Linux.Resources = &runtimespec.LinuxResources{}
 	}
 	intptr := func(i int64) *int64 {
 		return &i
 	}
-	s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, []specs.LinuxDeviceCgroup{
+	s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, []runtimespec.LinuxDeviceCgroup{
 		{
 			// "/dev/null",
 			Type:   "c",
@@ -1304,10 +1304,10 @@ var WithPrivileged = Compose(
 // WithWindowsHyperV sets the Windows.HyperV section for HyperV isolation of containers.
 func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 	if s.Windows == nil {
-		s.Windows = &specs.Windows{}
+		s.Windows = &runtimespec.Windows{}
 	}
 	if s.Windows.HyperV == nil {
-		s.Windows.HyperV = &specs.WindowsHyperV{}
+		s.Windows.HyperV = &runtimespec.WindowsHyperV{}
 	}
 	return nil
 }
@@ -1320,20 +1320,20 @@ func WithMemoryLimit(limit uint64) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Linux != nil {
 			if s.Linux.Resources == nil {
-				s.Linux.Resources = &specs.LinuxResources{}
+				s.Linux.Resources = &runtimespec.LinuxResources{}
 			}
 			if s.Linux.Resources.Memory == nil {
-				s.Linux.Resources.Memory = &specs.LinuxMemory{}
+				s.Linux.Resources.Memory = &runtimespec.LinuxMemory{}
 			}
 			l := int64(limit)
 			s.Linux.Resources.Memory.Limit = &l
 		}
 		if s.Windows != nil {
 			if s.Windows.Resources == nil {
-				s.Windows.Resources = &specs.WindowsResources{}
+				s.Windows.Resources = &runtimespec.WindowsResources{}
 			}
 			if s.Windows.Resources.Memory == nil {
-				s.Windows.Resources.Memory = &specs.WindowsMemoryResources{}
+				s.Windows.Resources.Memory = &runtimespec.WindowsMemoryResources{}
 			}
 			s.Windows.Resources.Memory.Limit = &limit
 		}
@@ -1356,7 +1356,7 @@ func WithAnnotations(annotations map[string]string) SpecOpts {
 }
 
 // WithLinuxDevices adds the provided linux devices to the spec
-func WithLinuxDevices(devices []specs.LinuxDevice) SpecOpts {
+func WithLinuxDevices(devices []runtimespec.LinuxDevice) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		setLinux(s)
 		s.Linux.Devices = append(s.Linux.Devices, devices...)
@@ -1393,7 +1393,7 @@ func withLinuxDevice(path, permissions string, followSymlinks bool) SpecOpts {
 
 		s.Linux.Devices = append(s.Linux.Devices, *dev)
 
-		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
+		s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, runtimespec.LinuxDeviceCgroup{
 			Type:   dev.Type,
 			Allow:  true,
 			Major:  &dev.Major,
@@ -1458,9 +1458,9 @@ func WithWindowsDevice(idType, id string) SpecOpts {
 			return errors.New("missing idType")
 		}
 		if s.Windows == nil {
-			s.Windows = &specs.Windows{}
+			s.Windows = &runtimespec.Windows{}
 		}
-		s.Windows.Devices = append(s.Windows.Devices, specs.WindowsDevice{IDType: idType, ID: id})
+		s.Windows.Devices = append(s.Windows.Devices, runtimespec.WindowsDevice{IDType: idType, ID: id})
 		return nil
 	}
 }
@@ -1470,7 +1470,7 @@ func WithMemorySwap(swap int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		setResources(s)
 		if s.Linux.Resources.Memory == nil {
-			s.Linux.Resources.Memory = &specs.LinuxMemory{}
+			s.Linux.Resources.Memory = &runtimespec.LinuxMemory{}
 		}
 		s.Linux.Resources.Memory.Swap = &swap
 		return nil
@@ -1482,7 +1482,7 @@ func WithPidsLimit(limit int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		setResources(s)
 		if s.Linux.Resources.Pids == nil {
-			s.Linux.Resources.Pids = &specs.LinuxPids{}
+			s.Linux.Resources.Pids = &runtimespec.LinuxPids{}
 		}
 		s.Linux.Resources.Pids.Limit = limit
 		return nil
@@ -1490,7 +1490,7 @@ func WithPidsLimit(limit int64) SpecOpts {
 }
 
 // WithBlockIO sets the container's blkio parameters
-func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
+func WithBlockIO(blockio *runtimespec.LinuxBlockIO) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
 		setResources(s)
 		s.Linux.Resources.BlockIO = blockio
@@ -1562,7 +1562,7 @@ func WithoutRunMount(ctx context.Context, client Client, c *containers.Container
 // WithRdt sets the container's RDT parameters
 func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
-		s.Linux.IntelRdt = &specs.LinuxIntelRdt{
+		s.Linux.IntelRdt = &runtimespec.LinuxIntelRdt{
 			ClosID:        closID,
 			L3CacheSchema: l3CacheSchema,
 			MemBwSchema:   memBwSchema,
@@ -1605,7 +1605,7 @@ func WithWindowsCPUMaximum(max uint16) SpecOpts {
 func WithWindowsIgnoreFlushesDuringBoot() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Windows == nil {
-			s.Windows = &specs.Windows{}
+			s.Windows = &runtimespec.Windows{}
 		}
 		s.Windows.IgnoreFlushesDuringBoot = true
 		return nil
@@ -1616,10 +1616,10 @@ func WithWindowsIgnoreFlushesDuringBoot() SpecOpts {
 func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Windows == nil {
-			s.Windows = &specs.Windows{}
+			s.Windows = &runtimespec.Windows{}
 		}
 		if s.Windows.Network == nil {
-			s.Windows.Network = &specs.WindowsNetwork{}
+			s.Windows.Network = &runtimespec.WindowsNetwork{}
 		}
 
 		s.Windows.Network.AllowUnqualifiedDNSQuery = true
@@ -1631,10 +1631,10 @@ func WithWindowNetworksAllowUnqualifiedDNSQuery() SpecOpts {
 func WithWindowsNetworkNamespace(ns string) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
 		if s.Windows == nil {
-			s.Windows = &specs.Windows{}
+			s.Windows = &runtimespec.Windows{}
 		}
 		if s.Windows.Network == nil {
-			s.Windows.Network = &specs.WindowsNetwork{}
+			s.Windows.Network = &runtimespec.WindowsNetwork{}
 		}
 		s.Windows.Network.NetworkNamespace = ns
 		return nil

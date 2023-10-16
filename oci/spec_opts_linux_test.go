@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -75,11 +75,11 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		t.Run(fmt.Sprintf("user %d", testCase.userID), func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
-				Version: specs.Version,
-				Root: &specs.Root{
+				Version: runtimespec.Version,
+				Root: &runtimespec.Root{
 					Path: td,
 				},
-				Linux: &specs.Linux{},
+				Linux: &runtimespec.Linux{},
 			}
 			err := WithUserID(testCase.userID)(context.Background(), nil, &c, &s)
 			assert.NoError(t, err)
@@ -135,11 +135,11 @@ guest:x:405:100:guest:/dev/null:/sbin/nologin
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
-				Version: specs.Version,
-				Root: &specs.Root{
+				Version: runtimespec.Version,
+				Root: &runtimespec.Root{
 					Path: td,
 				},
-				Linux: &specs.Linux{},
+				Linux: &runtimespec.Linux{},
 			}
 			err := WithUsername(testCase.user)(context.Background(), nil, &c, &s)
 			if err != nil {
@@ -205,8 +205,8 @@ sys:x:3:root,bin,adm
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
-				Version: specs.Version,
-				Root: &specs.Root{
+				Version: runtimespec.Version,
+				Root: &runtimespec.Root{
 					Path: td,
 				},
 			}
@@ -220,7 +220,7 @@ sys:x:3:root,bin,adm
 // withAllKnownCaps sets all known capabilities.
 // This function differs from the exported function
 // by also setting inheritable capabilities.
-func withAllKnownCaps(s *specs.Spec) error {
+func withAllKnownCaps(s *runtimespec.Spec) error {
 	caps := cap.Known()
 	if err := WithCapabilities(caps)(context.Background(), nil, nil, s); err != nil {
 		return err
@@ -232,7 +232,7 @@ func withAllKnownCaps(s *specs.Spec) error {
 func TestSetCaps(t *testing.T) {
 	t.Parallel()
 
-	var s specs.Spec
+	var s runtimespec.Spec
 
 	// Add base set of capabilities
 	if err := WithCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
@@ -305,7 +305,7 @@ func TestSetCaps(t *testing.T) {
 func TestAddCaps(t *testing.T) {
 	t.Parallel()
 
-	var s specs.Spec
+	var s runtimespec.Spec
 
 	if err := WithAddedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
 		t.Fatal(err)
@@ -327,7 +327,7 @@ func TestAddCaps(t *testing.T) {
 func TestDropCaps(t *testing.T) {
 	t.Parallel()
 
-	var s specs.Spec
+	var s runtimespec.Spec
 
 	if err := withAllKnownCaps(&s); err != nil {
 		t.Fatal(err)
@@ -609,12 +609,12 @@ daemon:x:2:root,bin,daemon
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
-				Version: specs.Version,
-				Root: &specs.Root{
+				Version: runtimespec.Version,
+				Root: &runtimespec.Root{
 					Path: td,
 				},
-				Process: &specs.Process{
-					User: specs.User{
+				Process: &runtimespec.Process{
+					User: runtimespec.User{
 						AdditionalGids: testCase.additionalGIDs,
 					},
 				},
@@ -646,13 +646,13 @@ func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 		followSymlinks bool
 
 		expectError          bool
-		expectedLinuxDevices []specs.LinuxDevice
+		expectedLinuxDevices []runtimespec.LinuxDevice
 	}{
 		{
 			name:        "regularDeviceresolvesPath",
 			path:        zero,
 			expectError: false,
-			expectedLinuxDevices: []specs.LinuxDevice{{
+			expectedLinuxDevices: []runtimespec.LinuxDevice{{
 				Path: zero,
 				Type: "c",
 			}},
@@ -661,7 +661,7 @@ func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 			name:        "symlinkedDeviceResolvesPath",
 			path:        symZero,
 			expectError: false,
-			expectedLinuxDevices: []specs.LinuxDevice{{
+			expectedLinuxDevices: []runtimespec.LinuxDevice{{
 				Path: zero,
 				Type: "c",
 			}},
@@ -676,9 +676,9 @@ func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := Spec{
-				Version: specs.Version,
-				Root:    &specs.Root{},
-				Linux:   &specs.Linux{},
+				Version: runtimespec.Version,
+				Root:    &runtimespec.Root{},
+				Linux:   &runtimespec.Linux{},
 			}
 
 			opts := []SpecOpts{

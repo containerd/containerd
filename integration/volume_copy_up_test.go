@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/integration/images"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -243,7 +243,7 @@ func getContainerBindVolumes(t *testing.T, containerID string) (map[string]strin
 
 	mounts := struct {
 		RuntimeSpec struct {
-			Mounts []specs.Mount `json:"mounts"`
+			Mounts []runtimespec.Mount `json:"mounts"`
 		} `json:"runtimeSpec"`
 	}{}
 

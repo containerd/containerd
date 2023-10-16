@@ -21,7 +21,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/windows"
 
 	"github.com/containerd/containerd/containers"
@@ -52,7 +52,7 @@ func WithHostDevices(_ context.Context, _ Client, _ *containers.Container, s *Sp
 	return nil
 }
 
-func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+func DeviceFromPath(path string) (*runtimespec.LinuxDevice, error) {
 	return nil, errors.New("device from path not supported on Windows")
 }
 

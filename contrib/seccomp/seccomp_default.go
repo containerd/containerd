@@ -24,37 +24,37 @@ import (
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func arches() []specs.Arch {
+func arches() []runtimespec.Arch {
 	switch runtime.GOARCH {
 	case "amd64":
-		return []specs.Arch{specs.ArchX86_64, specs.ArchX86, specs.ArchX32}
+		return []runtimespec.Arch{runtimespec.ArchX86_64, runtimespec.ArchX86, runtimespec.ArchX32}
 	case "arm64":
-		return []specs.Arch{specs.ArchARM, specs.ArchAARCH64}
+		return []runtimespec.Arch{runtimespec.ArchARM, runtimespec.ArchAARCH64}
 	case "mips64":
-		return []specs.Arch{specs.ArchMIPS, specs.ArchMIPS64, specs.ArchMIPS64N32}
+		return []runtimespec.Arch{runtimespec.ArchMIPS, runtimespec.ArchMIPS64, runtimespec.ArchMIPS64N32}
 	case "mips64n32":
-		return []specs.Arch{specs.ArchMIPS, specs.ArchMIPS64, specs.ArchMIPS64N32}
+		return []runtimespec.Arch{runtimespec.ArchMIPS, runtimespec.ArchMIPS64, runtimespec.ArchMIPS64N32}
 	case "mipsel64":
-		return []specs.Arch{specs.ArchMIPSEL, specs.ArchMIPSEL64, specs.ArchMIPSEL64N32}
+		return []runtimespec.Arch{runtimespec.ArchMIPSEL, runtimespec.ArchMIPSEL64, runtimespec.ArchMIPSEL64N32}
 	case "mipsel64n32":
-		return []specs.Arch{specs.ArchMIPSEL, specs.ArchMIPSEL64, specs.ArchMIPSEL64N32}
+		return []runtimespec.Arch{runtimespec.ArchMIPSEL, runtimespec.ArchMIPSEL64, runtimespec.ArchMIPSEL64N32}
 	case "s390x":
-		return []specs.Arch{specs.ArchS390, specs.ArchS390X}
+		return []runtimespec.Arch{runtimespec.ArchS390, runtimespec.ArchS390X}
 	case "riscv64":
 		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
-		return []specs.Arch{specs.ArchRISCV64}
+		return []runtimespec.Arch{runtimespec.ArchRISCV64}
 	default:
-		return []specs.Arch{}
+		return []runtimespec.Arch{}
 	}
 }
 
 // DefaultProfile defines the allowed syscalls for the default seccomp profile.
-func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
+func DefaultProfile(sp *runtimespec.Spec) *runtimespec.LinuxSeccomp {
 	nosys := uint(unix.ENOSYS)
-	syscalls := []specs.LinuxSyscall{
+	syscalls := []runtimespec.LinuxSyscall{
 		{
 			Names: []string{
 				"accept",
@@ -407,79 +407,79 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"write",
 				"writev",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		},
 		{
 			Names:  []string{"socket"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: unix.AF_VSOCK,
-					Op:    specs.OpNotEqual,
+					Op:    runtimespec.OpNotEqual,
 				},
 			},
 		},
 		{
 			Names:  []string{"personality"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0x0,
-					Op:    specs.OpEqualTo,
+					Op:    runtimespec.OpEqualTo,
 				},
 			},
 		},
 		{
 			Names:  []string{"personality"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0x0008,
-					Op:    specs.OpEqualTo,
+					Op:    runtimespec.OpEqualTo,
 				},
 			},
 		},
 		{
 			Names:  []string{"personality"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0x20000,
-					Op:    specs.OpEqualTo,
+					Op:    runtimespec.OpEqualTo,
 				},
 			},
 		},
 		{
 			Names:  []string{"personality"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0x20008,
-					Op:    specs.OpEqualTo,
+					Op:    runtimespec.OpEqualTo,
 				},
 			},
 		},
 		{
 			Names:  []string{"personality"},
-			Action: specs.ActAllow,
-			Args: []specs.LinuxSeccompArg{
+			Action: runtimespec.ActAllow,
+			Args: []runtimespec.LinuxSeccompArg{
 				{
 					Index: 0,
 					Value: 0xffffffff,
-					Op:    specs.OpEqualTo,
+					Op:    runtimespec.OpEqualTo,
 				},
 			},
 		},
 	}
 
-	s := &specs.LinuxSeccomp{
-		DefaultAction: specs.ActErrno,
+	s := &runtimespec.LinuxSeccomp{
+		DefaultAction: runtimespec.ActErrno,
 		Architectures: arches(),
 		Syscalls:      syscalls,
 	}
@@ -488,14 +488,14 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	if ok, err := kernelversion.GreaterEqualThan(
 		kernelversion.KernelVersion{Kernel: 4, Major: 8}); err == nil {
 		if ok {
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"process_vm_readv",
 					"process_vm_writev",
 					"ptrace",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		}
 	}
@@ -503,16 +503,16 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	// include by arch
 	switch runtime.GOARCH {
 	case "ppc64le":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"sync_file_range2",
 				"swapcontext",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	case "arm", "arm64":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"arm_fadvise64_64",
 				"arm_sync_file_range",
@@ -521,43 +521,43 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"cacheflush",
 				"set_tls",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	case "amd64":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"arch_prctl",
 				"modify_ldt",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	case "386":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"modify_ldt",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	case "s390", "s390x":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"s390_pci_mmio_read",
 				"s390_pci_mmio_write",
 				"s390_runtime_instr",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	case "riscv64":
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"riscv_flush_icache",
 			},
-			Action: specs.ActAllow,
-			Args:   []specs.LinuxSeccompArg{},
+			Action: runtimespec.ActAllow,
+			Args:   []runtimespec.LinuxSeccompArg{},
 		})
 	}
 
@@ -565,14 +565,14 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	for _, c := range sp.Process.Capabilities.Bounding {
 		switch c {
 		case "CAP_DAC_READ_SEARCH":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"open_by_handle_at"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_ADMIN":
 			admin = true
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"bpf",
 					"clone",
@@ -598,39 +598,39 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"umount2",
 					"unshare",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_BOOT":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"reboot"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_CHROOT":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"chroot"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_MODULE":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"delete_module",
 					"init_module",
 					"finit_module",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_PACCT":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"acct"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_PTRACE":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"kcmp",
 					"pidfd_getfd",
@@ -639,62 +639,62 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"process_vm_writev",
 					"ptrace",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_RAWIO":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"iopl",
 					"ioperm",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_TIME":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"settimeofday",
 					"stime",
 					"clock_settime",
 					"clock_settime64",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_TTY_CONFIG":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"vhangup"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYS_NICE":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"get_mempolicy",
 					"mbind",
 					"set_mempolicy",
 				},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_SYSLOG":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"syslog"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_BPF":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"bpf"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		case "CAP_PERFMON":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names:  []string{"perf_event_open"},
-				Action: specs.ActAllow,
-				Args:   []specs.LinuxSeccompArg{},
+				Action: runtimespec.ActAllow,
+				Args:   []runtimespec.LinuxSeccompArg{},
 			})
 		}
 	}
@@ -702,43 +702,43 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 	if !admin {
 		switch runtime.GOARCH {
 		case "s390", "s390x":
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"clone",
 				},
-				Action: specs.ActAllow,
-				Args: []specs.LinuxSeccompArg{
+				Action: runtimespec.ActAllow,
+				Args: []runtimespec.LinuxSeccompArg{
 					{
 						Index:    1,
 						Value:    unix.CLONE_NEWNS | unix.CLONE_NEWUTS | unix.CLONE_NEWIPC | unix.CLONE_NEWUSER | unix.CLONE_NEWPID | unix.CLONE_NEWNET | unix.CLONE_NEWCGROUP,
 						ValueTwo: 0,
-						Op:       specs.OpMaskedEqual,
+						Op:       runtimespec.OpMaskedEqual,
 					},
 				},
 			})
 		default:
-			s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+			s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 				Names: []string{
 					"clone",
 				},
-				Action: specs.ActAllow,
-				Args: []specs.LinuxSeccompArg{
+				Action: runtimespec.ActAllow,
+				Args: []runtimespec.LinuxSeccompArg{
 					{
 						Index:    0,
 						Value:    unix.CLONE_NEWNS | unix.CLONE_NEWUTS | unix.CLONE_NEWIPC | unix.CLONE_NEWUSER | unix.CLONE_NEWPID | unix.CLONE_NEWNET | unix.CLONE_NEWCGROUP,
 						ValueTwo: 0,
-						Op:       specs.OpMaskedEqual,
+						Op:       runtimespec.OpMaskedEqual,
 					},
 				},
 			})
 		}
 		// clone3 is explicitly requested to give ENOSYS instead of the default EPERM, when CAP_SYS_ADMIN is unset
 		// https://github.com/moby/moby/pull/42681
-		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
+		s.Syscalls = append(s.Syscalls, runtimespec.LinuxSyscall{
 			Names: []string{
 				"clone3",
 			},
-			Action:   specs.ActErrno,
+			Action:   runtimespec.ActErrno,
 			ErrnoRet: &nosys,
 		})
 	}

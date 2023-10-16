@@ -17,11 +17,11 @@
 package oci
 
 import (
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func defaultMounts() []specs.Mount {
-	return []specs.Mount{
+func defaultMounts() []runtimespec.Mount {
+	return []runtimespec.Mount{
 		{
 			Destination: "/dev",
 			Type:        "devfs",
@@ -46,7 +46,7 @@ func appendOSMounts(s *Spec, os string) {
 	/* The nosuid noexec options are for consistency with Linux mounts: on FreeBSD it is
 	   by default impossible to execute anything from these filesystems.
 	*/
-	var mounts = []specs.Mount{
+	var mounts = []runtimespec.Mount{
 		{
 			Destination: "/proc",
 			Type:        "linprocfs",

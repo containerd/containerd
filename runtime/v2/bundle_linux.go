@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // prepareBundleDirectoryPermissions prepares the permissions of the bundle
@@ -41,16 +41,16 @@ func prepareBundleDirectoryPermissions(path string, spec []byte) error {
 	return os.Chmod(path, 0710)
 }
 
-// ociSpecUserNS is a subset of specs.Spec used to reduce garbage during
+// ociSpecUserNS is a subset of runtimespec.Spec used to reduce garbage during
 // unmarshal.
 type ociSpecUserNS struct {
 	Linux *linuxSpecUserNS
 }
 
-// linuxSpecUserNS is a subset of specs.Linux used to reduce garbage during
+// linuxSpecUserNS is a subset of runtimespec.Linux used to reduce garbage during
 // unmarshal.
 type linuxSpecUserNS struct {
-	GIDMappings []specs.LinuxIDMapping
+	GIDMappings []runtimespec.LinuxIDMapping
 }
 
 // remappedGID reads the remapped GID 0 from the OCI spec, if it exists. If

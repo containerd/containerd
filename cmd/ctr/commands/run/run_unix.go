@@ -43,7 +43,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
 	"github.com/intel/goresctrl/pkg/blockio"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )
 
@@ -184,7 +184,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 					return nil, err
 				}
 				opts = append(opts,
-					oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}))
+					oci.WithUserNamespace([]runtimespec.LinuxIDMapping{uidMap}, []runtimespec.LinuxIDMapping{gidMap}))
 				// use snapshotter opts or the remapped snapshot support to shift the filesystem
 				// currently the snapshotters known to support the labels are:
 				// fuse-overlayfs - https://github.com/containerd/fuse-overlayfs-snapshotter
@@ -241,7 +241,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, fmt.Errorf("get hostname: %w", err)
 			}
 			opts = append(opts,
-				oci.WithHostNamespace(specs.NetworkNamespace),
+				oci.WithHostNamespace(runtimespec.NetworkNamespace),
 				oci.WithHostHostsFile,
 				oci.WithHostResolvconf,
 				oci.WithEnv([]string{fmt.Sprintf("HOSTNAME=%s", hostname)}),
@@ -340,8 +340,8 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			if !validNamespace(nsType) {
 				return nil, errors.New("the Linux namespace type specified in --with-ns is not valid: " + nsType)
 			}
-			opts = append(opts, oci.WithLinuxNamespace(specs.LinuxNamespace{
-				Type: specs.LinuxNamespaceType(nsType),
+			opts = append(opts, oci.WithLinuxNamespace(runtimespec.LinuxNamespace{
+				Type: runtimespec.LinuxNamespaceType(nsType),
 				Path: nsPath,
 			}))
 		}
@@ -378,7 +378,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				if s.Linux != nil {
 					s.Linux.RootfsPropagation = rootfsPropagation
 				} else {
-					s.Linux = &specs.Linux{
+					s.Linux = &runtimespec.Linux{
 						RootfsPropagation: rootfsPropagation,
 					}
 				}
@@ -420,7 +420,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	cOpts = append(cOpts, containerd.WithRuntime(context.String("runtime"), runtimeOpts))
 
 	opts = append(opts, oci.WithAnnotations(commands.LabelArgs(context.StringSlice("label"))))
-	var s specs.Spec
+	var s runtimespec.Spec
 	spec = containerd.WithSpec(&s, opts...)
 
 	cOpts = append(cOpts, spec)
@@ -469,25 +469,25 @@ func getRuntimeOptions(context *cli.Context) (interface{}, error) {
 	return nil, nil
 }
 
-func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
+func parseIDMapping(mapping string) (runtimespec.LinuxIDMapping, error) {
 	// We expect 3 parts, but limit to 4 to allow detection of invalid values.
 	parts := strings.SplitN(mapping, ":", 4)
 	if len(parts) != 3 {
-		return specs.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
+		return runtimespec.LinuxIDMapping{}, errors.New("user namespace mappings require the format `container-id:host-id:size`")
 	}
 	cID, err := strconv.ParseUint(parts[0], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, fmt.Errorf("invalid container id for user namespace remapping: %w", err)
+		return runtimespec.LinuxIDMapping{}, fmt.Errorf("invalid container id for user namespace remapping: %w", err)
 	}
 	hID, err := strconv.ParseUint(parts[1], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, fmt.Errorf("invalid host id for user namespace remapping: %w", err)
+		return runtimespec.LinuxIDMapping{}, fmt.Errorf("invalid host id for user namespace remapping: %w", err)
 	}
 	size, err := strconv.ParseUint(parts[2], 0, 32)
 	if err != nil {
-		return specs.LinuxIDMapping{}, fmt.Errorf("invalid size for user namespace remapping: %w", err)
+		return runtimespec.LinuxIDMapping{}, fmt.Errorf("invalid size for user namespace remapping: %w", err)
 	}
-	return specs.LinuxIDMapping{
+	return runtimespec.LinuxIDMapping{
 		ContainerID: uint32(cID),
 		HostID:      uint32(hID),
 		Size:        uint32(size),
@@ -495,15 +495,15 @@ func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
 }
 
 func validNamespace(ns string) bool {
-	linuxNs := specs.LinuxNamespaceType(ns)
+	linuxNs := runtimespec.LinuxNamespaceType(ns)
 	switch linuxNs {
-	case specs.PIDNamespace,
-		specs.NetworkNamespace,
-		specs.UTSNamespace,
-		specs.MountNamespace,
-		specs.UserNamespace,
-		specs.IPCNamespace,
-		specs.CgroupNamespace:
+	case runtimespec.PIDNamespace,
+		runtimespec.NetworkNamespace,
+		runtimespec.UTSNamespace,
+		runtimespec.MountNamespace,
+		runtimespec.UserNamespace,
+		runtimespec.IPCNamespace,
+		runtimespec.CgroupNamespace:
 		return true
 	default:
 		return false

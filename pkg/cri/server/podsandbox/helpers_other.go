@@ -22,7 +22,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // ensureRemoveAll wraps `os.RemoveAll` to check for specific errors that can
@@ -33,6 +33,6 @@ func ensureRemoveAll(ctx context.Context, dir string) error {
 	return os.RemoveAll(dir)
 }
 
-func modifyProcessLabel(runtimeType string, spec *specs.Spec) error {
+func modifyProcessLabel(runtimeType string, spec *runtimespec.Spec) error {
 	return nil
 }

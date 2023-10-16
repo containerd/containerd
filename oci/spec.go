@@ -25,7 +25,7 @@ import (
 
 	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/containers"
@@ -46,7 +46,7 @@ var (
 
 // Spec is a type alias to the OCI runtime spec to allow third part SpecOpts
 // to be created without the "issues" with go vendoring and package imports
-type Spec = specs.Spec
+type Spec = runtimespec.Spec
 
 const ConfigFilename = "config.json"
 
@@ -96,7 +96,7 @@ func generateDefaultSpecWithPlatform(ctx context.Context, platform, id string, s
 		err = populateDefaultUnixSpec(ctx, s, id)
 		if err == nil && runtime.GOOS == "windows" {
 			// To run LCOW we have a Linux and Windows section. Add an empty one now.
-			s.Windows = &specs.Windows{}
+			s.Windows = &runtimespec.Windows{}
 		}
 	}
 
@@ -134,22 +134,22 @@ func defaultUnixCaps() []string {
 	}
 }
 
-func defaultUnixNamespaces() []specs.LinuxNamespace {
-	return []specs.LinuxNamespace{
+func defaultUnixNamespaces() []runtimespec.LinuxNamespace {
+	return []runtimespec.LinuxNamespace{
 		{
-			Type: specs.PIDNamespace,
+			Type: runtimespec.PIDNamespace,
 		},
 		{
-			Type: specs.IPCNamespace,
+			Type: runtimespec.IPCNamespace,
 		},
 		{
-			Type: specs.UTSNamespace,
+			Type: runtimespec.UTSNamespace,
 		},
 		{
-			Type: specs.MountNamespace,
+			Type: runtimespec.MountNamespace,
 		},
 		{
-			Type: specs.NetworkNamespace,
+			Type: runtimespec.NetworkNamespace,
 		},
 	}
 }
@@ -161,23 +161,23 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 	}
 
 	*s = Spec{
-		Version: specs.Version,
-		Root: &specs.Root{
+		Version: runtimespec.Version,
+		Root: &runtimespec.Root{
 			Path: defaultRootfsPath,
 		},
-		Process: &specs.Process{
+		Process: &runtimespec.Process{
 			Cwd:             "/",
 			NoNewPrivileges: true,
-			User: specs.User{
+			User: runtimespec.User{
 				UID: 0,
 				GID: 0,
 			},
-			Capabilities: &specs.LinuxCapabilities{
+			Capabilities: &runtimespec.LinuxCapabilities{
 				Bounding:  defaultUnixCaps(),
 				Permitted: defaultUnixCaps(),
 				Effective: defaultUnixCaps(),
 			},
-			Rlimits: []specs.POSIXRlimit{
+			Rlimits: []runtimespec.POSIXRlimit{
 				{
 					Type: "RLIMIT_NOFILE",
 					Hard: uint64(1024),
@@ -185,7 +185,7 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 				},
 			},
 		},
-		Linux: &specs.Linux{
+		Linux: &runtimespec.Linux{
 			MaskedPaths: []string{
 				"/proc/acpi",
 				"/proc/asound",
@@ -206,8 +206,8 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 				"/proc/sysrq-trigger",
 			},
 			CgroupsPath: filepath.Join("/", ns, id),
-			Resources: &specs.LinuxResources{
-				Devices: []specs.LinuxDeviceCgroup{
+			Resources: &runtimespec.LinuxResources{
+				Devices: []runtimespec.LinuxDeviceCgroup{
 					{
 						Allow:  false,
 						Access: rwm,
@@ -223,21 +223,21 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 
 func populateDefaultWindowsSpec(ctx context.Context, s *Spec, id string) error {
 	*s = Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Process: &specs.Process{
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Process: &runtimespec.Process{
 			Cwd: `C:\`,
 		},
-		Windows: &specs.Windows{},
+		Windows: &runtimespec.Windows{},
 	}
 	return nil
 }
 
 func populateDefaultDarwinSpec(s *Spec) error {
 	*s = Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Process: &specs.Process{Cwd: "/"},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Process: &runtimespec.Process{Cwd: "/"},
 	}
 	return nil
 }

@@ -23,13 +23,13 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/namespaces"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestWithDefaultPathEnv(t *testing.T) {
 	t.Parallel()
 	s := Spec{}
-	s.Process = &specs.Process{
+	s.Process = &runtimespec.Process{
 		Env: []string{},
 	}
 	var (

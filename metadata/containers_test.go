@@ -34,20 +34,20 @@ import (
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 )
 
 func init() {
-	typeurl.Register(&specs.Spec{}, "types.containerd.io/opencontainers/runtime-spec", "v1", "Spec")
+	typeurl.Register(&runtimespec.Spec{}, "types.containerd.io/opencontainers/runtime-spec", "v1", "Spec")
 }
 
 func TestContainersList(t *testing.T) {
 	ctx, db := testEnv(t)
 	store := NewContainerStore(NewDB(db, nil, nil))
-	spec := &specs.Spec{}
+	spec := &runtimespec.Spec{}
 	encoded, err := protobuf.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
@@ -175,7 +175,7 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 	var (
 		ctx, db = testEnv(t)
 		store   = NewContainerStore(NewDB(db, nil, nil))
-		spec    = &specs.Spec{}
+		spec    = &runtimespec.Spec{}
 	)
 
 	encoded, err := protobuf.MarshalAnyToProto(spec)

@@ -25,13 +25,13 @@ import (
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const newLine = "\n"
 
 func withExitStatus(es int) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		s.Process.Args = []string{"sh", "-c", fmt.Sprintf("exit %d", es)}
 		return nil
 	}
@@ -49,11 +49,11 @@ func withTrue() oci.SpecOpts {
 	return oci.WithProcessArgs("true")
 }
 
-func withExecExitStatus(s *specs.Process, es int) {
+func withExecExitStatus(s *runtimespec.Process, es int) {
 	s.Args = []string{"sh", "-c", fmt.Sprintf("exit %d", es)}
 }
 
-func withExecArgs(s *specs.Process, args ...string) {
+func withExecArgs(s *runtimespec.Process, args ...string) {
 	s.Args = args
 }
 

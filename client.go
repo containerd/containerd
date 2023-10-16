@@ -62,7 +62,7 @@ import (
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -73,11 +73,11 @@ import (
 func init() {
 	const prefix = "types.containerd.io"
 	// register TypeUrls for commonly marshaled external types
-	major := strconv.Itoa(specs.VersionMajor)
-	typeurl.Register(&specs.Spec{}, prefix, "opencontainers/runtime-spec", major, "Spec")
-	typeurl.Register(&specs.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
-	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
-	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
+	major := strconv.Itoa(runtimespec.VersionMajor)
+	typeurl.Register(&runtimespec.Spec{}, prefix, "opencontainers/runtime-spec", major, "Spec")
+	typeurl.Register(&runtimespec.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
+	typeurl.Register(&runtimespec.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
+	typeurl.Register(&runtimespec.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
 }
 
 // New returns a new containerd client that is connected to the containerd
