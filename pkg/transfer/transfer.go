@@ -20,7 +20,7 @@ import (
 	"context"
 	"io"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -31,7 +31,7 @@ type Transferrer interface {
 }
 
 type ImageResolver interface {
-	Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error)
+	Resolve(ctx context.Context) (name string, desc imagespec.Descriptor, err error)
 }
 
 type ImageFetcher interface {
@@ -41,15 +41,15 @@ type ImageFetcher interface {
 }
 
 type ImagePusher interface {
-	Pusher(context.Context, ocispec.Descriptor) (Pusher, error)
+	Pusher(context.Context, imagespec.Descriptor) (Pusher, error)
 }
 
 type Fetcher interface {
-	Fetch(context.Context, ocispec.Descriptor) (io.ReadCloser, error)
+	Fetch(context.Context, imagespec.Descriptor) (io.ReadCloser, error)
 }
 
 type Pusher interface {
-	Push(context.Context, ocispec.Descriptor) (content.Writer, error)
+	Push(context.Context, imagespec.Descriptor) (content.Writer, error)
 }
 
 // ImageFilterer is used to filter out child objects of an image
@@ -61,7 +61,7 @@ type ImageFilterer interface {
 // the provided descriptor. The descriptor may be any type of manifest
 // including an index with multiple image references.
 type ImageStorer interface {
-	Store(context.Context, ocispec.Descriptor, images.Store) ([]images.Image, error)
+	Store(context.Context, imagespec.Descriptor, images.Store) ([]images.Image, error)
 }
 
 // ImageGetter is type which returns an image from an image store
@@ -82,7 +82,7 @@ type ImageExporter interface {
 
 // ImageImporter imports an image into a content store
 type ImageImporter interface {
-	Import(context.Context, content.Store) (ocispec.Descriptor, error)
+	Import(context.Context, content.Store) (imagespec.Descriptor, error)
 }
 
 // ImageImportStreamer returns an import streamer based on OCI or
@@ -104,7 +104,7 @@ type ImageUnpacker interface {
 // the unpack Platform, if snapshotter is not specified the platform default will
 // be used.
 type UnpackConfiguration struct {
-	Platform    ocispec.Platform
+	Platform    imagespec.Platform
 	Snapshotter string
 }
 

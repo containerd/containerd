@@ -27,14 +27,14 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/labels"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var _ converter.ConvertFunc = LayerConvertFunc
 
 // LayerConvertFunc converts tar.gz layers into uncompressed tar layers.
 // Media type is changed, e.g., "application/vnd.oci.image.layer.v1.tar+gzip" -> "application/vnd.oci.image.layer.v1.tar"
-func LayerConvertFunc(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func LayerConvertFunc(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	if !images.IsLayerType(desc.MediaType) || IsUncompressedType(desc.MediaType) {
 		// No conversion. No need to return an error here.
 		return nil, nil
@@ -98,8 +98,8 @@ func IsUncompressedType(mt string) bool {
 	case
 		images.MediaTypeDockerSchema2Layer,
 		images.MediaTypeDockerSchema2LayerForeign,
-		ocispec.MediaTypeImageLayer,
-		ocispec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // deprecated
+		imagespec.MediaTypeImageLayer,
+		imagespec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // deprecated
 		return true
 	default:
 		return false
@@ -112,10 +112,10 @@ func convertMediaType(mt string) string {
 		return images.MediaTypeDockerSchema2Layer
 	case images.MediaTypeDockerSchema2LayerForeignGzip:
 		return images.MediaTypeDockerSchema2LayerForeign
-	case ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayerZstd:
-		return ocispec.MediaTypeImageLayer
-	case ocispec.MediaTypeImageLayerNonDistributableGzip, ocispec.MediaTypeImageLayerNonDistributableZstd: //nolint:staticcheck // deprecated
-		return ocispec.MediaTypeImageLayerNonDistributable //nolint:staticcheck // deprecated
+	case imagespec.MediaTypeImageLayerGzip, imagespec.MediaTypeImageLayerZstd:
+		return imagespec.MediaTypeImageLayer
+	case imagespec.MediaTypeImageLayerNonDistributableGzip, imagespec.MediaTypeImageLayerNonDistributableZstd: //nolint:staticcheck // deprecated
+		return imagespec.MediaTypeImageLayerNonDistributable //nolint:staticcheck // deprecated
 	default:
 		return mt
 	}

@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGetter, p transfer.ImagePusher, tops *transfer.Config) error {
@@ -144,7 +144,7 @@ func newProgressPusher(pusher remotes.Pusher, progress *ProgressTracker) *progre
 }
 
 func (p *progressPusher) WrapHandler(h images.Handler) images.Handler {
-	return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+	return images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) (subdescs []imagespec.Descriptor, err error) {
 		p.progress.Add(desc)
 		subdescs, err = h.Handle(ctx, desc)
 		p.progress.AddChildren(desc, subdescs)
@@ -152,7 +152,7 @@ func (p *progressPusher) WrapHandler(h images.Handler) images.Handler {
 	})
 }
 
-func (p *progressPusher) Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error) {
+func (p *progressPusher) Push(ctx context.Context, d imagespec.Descriptor) (content.Writer, error) {
 	ref := remotes.MakeRefKey(ctx, d)
 	p.status.add(ref, d)
 	cw, err := p.Pusher.Push(ctx, d)
@@ -187,7 +187,7 @@ func (ps *pushStatus) update(ref string, delta int) {
 	ps.l.Unlock()
 }
 
-func (ps *pushStatus) add(ref string, d ocispec.Descriptor) {
+func (ps *pushStatus) add(ref string, d imagespec.Descriptor) {
 	status := content.Status{
 		Ref:       ref,
 		Offset:    0,
@@ -202,7 +202,7 @@ func (ps *pushStatus) add(ref string, d ocispec.Descriptor) {
 	}
 	ps.l.Unlock()
 }
-func (ps *pushStatus) markComplete(ref string, d ocispec.Descriptor) {
+func (ps *pushStatus) markComplete(ref string, d imagespec.Descriptor) {
 	ps.l.Lock()
 	_, ok := ps.statuses[ref]
 	if ok {
@@ -238,7 +238,7 @@ func (p *progressPusher) Check(ctx context.Context, dgst digest.Digest) (bool, e
 type progressWriter struct {
 	content.Writer
 	ref      string
-	desc     ocispec.Descriptor
+	desc     imagespec.Descriptor
 	status   *pushStatus
 	progress *ProgressTracker
 }

@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/images/imagetest"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log/logtest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestUsageCalculation(t *testing.T) {
@@ -60,13 +60,13 @@ func TestUsageCalculation(t *testing.T) {
 			name: "manifestlimit",
 			target: func(tc imagetest.ContentStore) imagetest.Content {
 				return tc.Index(
-					imagetest.AddPlatform(imagetest.SimpleManifest(5)(tc), ocispec.Platform{Architecture: "amd64", OS: "linux"}),
-					imagetest.AddPlatform(imagetest.SimpleManifest(10)(tc), ocispec.Platform{Architecture: "arm64", OS: "linux"}),
+					imagetest.AddPlatform(imagetest.SimpleManifest(5)(tc), imagespec.Platform{Architecture: "amd64", OS: "linux"}),
+					imagetest.AddPlatform(imagetest.SimpleManifest(10)(tc), imagespec.Platform{Architecture: "arm64", OS: "linux"}),
 				)
 			},
 			expected: func(t imagetest.Content) int64 { return imagetest.SizeOfManifest(imagetest.LimitChildren(t, 1)) },
 			opts: []Opt{
-				WithManifestLimit(platforms.Only(ocispec.Platform{Architecture: "amd64", OS: "linux"}), 1),
+				WithManifestLimit(platforms.Only(imagespec.Platform{Architecture: "amd64", OS: "linux"}), 1),
 				WithManifestUsage(),
 			},
 		},

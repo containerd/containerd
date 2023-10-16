@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -108,7 +108,7 @@ func (r *OCIRegistry) Image() string {
 	return r.reference
 }
 
-func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.Descriptor, err error) {
+func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc imagespec.Descriptor, err error) {
 	return r.resolver.Resolve(ctx, r.reference)
 }
 
@@ -116,7 +116,7 @@ func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher
 	return r.resolver.Fetcher(ctx, ref)
 }
 
-func (r *OCIRegistry) Pusher(ctx context.Context, desc ocispec.Descriptor) (transfer.Pusher, error) {
+func (r *OCIRegistry) Pusher(ctx context.Context, desc imagespec.Descriptor) (transfer.Pusher, error) {
 	var ref = r.reference
 	// Annotate ref with digest to push only push tag for single digest
 	if !strings.Contains(ref, "@") {

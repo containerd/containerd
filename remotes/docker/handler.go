@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // AppendDistributionSourceLabel updates the label of blob with distribution source.
@@ -43,7 +43,7 @@ func AppendDistributionSourceLabel(manager content.Manager, ref string) (images.
 	}
 
 	source, repo := u.Hostname(), strings.TrimPrefix(u.Path, "/")
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		info, err := manager.Info(ctx, desc.Digest)
 		if err != nil {
 			return nil, err

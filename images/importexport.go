@@ -21,17 +21,17 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/content"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Importer is the interface for image importer.
 type Importer interface {
 	// Import imports an image from a tar stream.
-	Import(ctx context.Context, store content.Store, reader io.Reader) (ocispec.Descriptor, error)
+	Import(ctx context.Context, store content.Store, reader io.Reader) (imagespec.Descriptor, error)
 }
 
 // Exporter is the interface for image exporter.
 type Exporter interface {
 	// Export exports an image to a tar stream.
-	Export(ctx context.Context, store content.Provider, desc ocispec.Descriptor, writer io.Writer) error
+	Export(ctx context.Context, store content.Provider, desc imagespec.Descriptor, writer io.Writer) error
 }

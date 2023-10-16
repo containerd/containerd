@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
 	"github.com/urfave/cli"
 )
@@ -162,14 +162,14 @@ func streamProcessors() map[string]srvconfig.StreamProcessor {
 	return map[string]srvconfig.StreamProcessor{
 		basename + ".tar.gzip": {
 			Accepts: []string{images.MediaTypeImageLayerGzipEncrypted},
-			Returns: ocispec.MediaTypeImageLayerGzip,
+			Returns: imagespec.MediaTypeImageLayerGzip,
 			Path:    ctdDecoder,
 			Args:    ctdDecoderArgs,
 			Env:     ctdDecoderEnv,
 		},
 		basename + ".tar": {
 			Accepts: []string{images.MediaTypeImageLayerEncrypted},
-			Returns: ocispec.MediaTypeImageLayer,
+			Returns: imagespec.MediaTypeImageLayer,
 			Path:    ctdDecoder,
 			Args:    ctdDecoderArgs,
 			Env:     ctdDecoderEnv,

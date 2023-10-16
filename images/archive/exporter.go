@@ -30,12 +30,12 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
-	ocispecs "github.com/opencontainers/image-spec/specs-go"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type exportOptions struct {
-	manifests          []ocispec.Descriptor
+	manifests          []imagespec.Descriptor
 	platform           platforms.MatchComparer
 	allPlatforms       bool
 	skipDockerManifest bool
@@ -106,7 +106,7 @@ func WithImages(imgs []images.Image) ExportOpt {
 // exported archive, creating an index record for each name.
 // When no names are provided, it is up to caller to put name annotation to
 // on the manifest descriptor if needed.
-func WithManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
+func WithManifest(manifest imagespec.Descriptor, names ...string) ExportOpt {
 	return func(ctx context.Context, o *exportOptions) error {
 		if len(names) == 0 {
 			o.manifests = append(o.manifests, manifest)
@@ -122,7 +122,7 @@ func WithManifest(manifest ocispec.Descriptor, names ...string) ExportOpt {
 }
 
 // BlobFilter returns false if the blob should not be included in the archive.
-type BlobFilter func(ocispec.Descriptor) bool
+type BlobFilter func(imagespec.Descriptor) bool
 
 // WithBlobFilter specifies BlobFilter.
 func WithBlobFilter(f BlobFilter) ExportOpt {
@@ -134,7 +134,7 @@ func WithBlobFilter(f BlobFilter) ExportOpt {
 
 // WithSkipNonDistributableBlobs excludes non-distributable blobs such as Windows base layers.
 func WithSkipNonDistributableBlobs() ExportOpt {
-	f := func(desc ocispec.Descriptor) bool {
+	f := func(desc imagespec.Descriptor) bool {
 		return !images.IsNonDistributable(desc.MediaType)
 	}
 	return WithBlobFilter(f)
@@ -147,7 +147,7 @@ func addNameAnnotation(name string, base map[string]string) map[string]string {
 	}
 
 	annotations[images.AnnotationImageName] = name
-	annotations[ocispec.AnnotationRefName] = ociReferenceName(name)
+	annotations[imagespec.AnnotationRefName] = ociReferenceName(name)
 
 	return annotations
 }
@@ -203,12 +203,12 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 					return err
 				}
 
-				var index ocispec.Index
+				var index imagespec.Index
 				if err := json.Unmarshal(p, &index); err != nil {
 					return err
 				}
 
-				var manifests []ocispec.Descriptor
+				var manifests []imagespec.Descriptor
 				for _, m := range index.Manifests {
 					if eo.platform != nil {
 						if m.Platform == nil || eo.platform.Match(*m.Platform) {
@@ -280,9 +280,9 @@ func Export(ctx context.Context, store content.Provider, writer io.Writer, opts 
 	return writeTar(ctx, tw, records)
 }
 
-func getRecords(ctx context.Context, store content.Provider, desc ocispec.Descriptor, algorithms map[string]struct{}, brOpts *blobRecordOptions) ([]tarRecord, error) {
+func getRecords(ctx context.Context, store content.Provider, desc imagespec.Descriptor, algorithms map[string]struct{}, brOpts *blobRecordOptions) ([]tarRecord, error) {
 	var records []tarRecord
-	exportHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	exportHandler := func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		if err := desc.Digest.Validate(); err != nil {
 			return nil, err
 		}
@@ -316,7 +316,7 @@ type blobRecordOptions struct {
 	blobFilter BlobFilter
 }
 
-func blobRecord(cs content.Provider, desc ocispec.Descriptor, opts *blobRecordOptions) tarRecord {
+func blobRecord(cs content.Provider, desc imagespec.Descriptor, opts *blobRecordOptions) tarRecord {
 	if opts != nil && opts.blobFilter != nil && !opts.blobFilter(desc) {
 		return tarRecord{}
 	}
@@ -362,9 +362,9 @@ func directoryRecord(name string, mode int64) tarRecord {
 
 func ociLayoutFile(version string) tarRecord {
 	if version == "" {
-		version = ocispec.ImageLayoutVersion
+		version = imagespec.ImageLayoutVersion
 	}
-	layout := ocispec.ImageLayout{
+	layout := imagespec.ImageLayout{
 		Version: version,
 	}
 
@@ -375,7 +375,7 @@ func ociLayoutFile(version string) tarRecord {
 
 	return tarRecord{
 		Header: &tar.Header{
-			Name:     ocispec.ImageLayoutFile,
+			Name:     imagespec.ImageLayoutFile,
 			Mode:     0444,
 			Size:     int64(len(b)),
 			Typeflag: tar.TypeReg,
@@ -388,9 +388,9 @@ func ociLayoutFile(version string) tarRecord {
 
 }
 
-func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
-	index := ocispec.Index{
-		Versioned: ocispecs.Versioned{
+func ociIndexRecord(manifests []imagespec.Descriptor) tarRecord {
+	index := imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 		Manifests: manifests,
@@ -416,7 +416,7 @@ func ociIndexRecord(manifests []ocispec.Descriptor) tarRecord {
 }
 
 type exportManifest struct {
-	manifest ocispec.Descriptor
+	manifest imagespec.Descriptor
 	names    []string
 }
 
@@ -434,7 +434,7 @@ func manifestsRecord(ctx context.Context, store content.Provider, manifests map[
 			return tarRecord{}, err
 		}
 
-		var manifest ocispec.Manifest
+		var manifest imagespec.Manifest
 		if err := json.Unmarshal(p, &manifest); err != nil {
 			return tarRecord{}, err
 		}

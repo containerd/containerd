@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/epoch"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -326,7 +326,7 @@ func validateImage(image *images.Image) error {
 	return validateTarget(&image.Target)
 }
 
-func validateTarget(target *ocispec.Descriptor) error {
+func validateTarget(target *imagespec.Descriptor) error {
 	// NOTE(stevvooe): Only validate fields we actually store.
 
 	if err := target.Digest.Validate(); err != nil {

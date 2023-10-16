@@ -41,7 +41,7 @@ import (
 	criserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/log"
 	"github.com/containerd/log/logtest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -149,7 +149,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 		]
 	}
 	`
-	var index ocispec.Index
+	var index imagespec.Index
 	assert.NoError(t, json.Unmarshal([]byte(imageIndexJSON), &index))
 
 	var manifestWriters = []io.Closer{}

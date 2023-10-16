@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	protobuftypes "github.com/containerd/containerd/protobuf/types"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type proxyContentStore struct {
@@ -91,7 +91,7 @@ func (pcs *proxyContentStore) Delete(ctx context.Context, dgst digest.Digest) er
 }
 
 // ReaderAt ignores MediaType.
-func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
+func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc imagespec.Descriptor) (content.ReaderAt, error) {
 	i, err := pcs.Info(ctx, desc.Digest)
 	if err != nil {
 		return nil, err

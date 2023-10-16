@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -498,7 +498,7 @@ type namespacedWriter struct {
 
 	bref    string
 	started time.Time
-	desc    ocispec.Descriptor
+	desc    imagespec.Descriptor
 }
 
 func (nw *namespacedWriter) Close() error {
@@ -540,7 +540,7 @@ func (nw *namespacedWriter) Truncate(size int64) error {
 	return nw.createAndCopy(nw.ctx, desc)
 }
 
-func (nw *namespacedWriter) createAndCopy(ctx context.Context, desc ocispec.Descriptor) error {
+func (nw *namespacedWriter) createAndCopy(ctx context.Context, desc imagespec.Descriptor) error {
 	nwDescWithoutDigest := desc
 	nwDescWithoutDigest.Digest = ""
 	w, err := nw.provider.Writer(ctx, content.WithRef(nw.bref), content.WithDescriptor(nwDescWithoutDigest))
@@ -684,7 +684,7 @@ func (nw *namespacedWriter) Status() (st content.Status, err error) {
 	return
 }
 
-func (cs *contentStore) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
+func (cs *contentStore) ReaderAt(ctx context.Context, desc imagespec.Descriptor) (content.ReaderAt, error) {
 	if err := cs.checkAccess(ctx, desc.Digest); err != nil {
 		return nil, err
 	}

@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func imagesToProto(images []images.Image) []*imagesapi.Image {
@@ -56,8 +56,8 @@ func imageFromProto(imagepb *imagesapi.Image) images.Image {
 	}
 }
 
-func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
-	return ocispec.Descriptor{
+func descFromProto(desc *types.Descriptor) imagespec.Descriptor {
+	return imagespec.Descriptor{
 		MediaType:   desc.MediaType,
 		Size:        desc.Size,
 		Digest:      digest.Digest(desc.Digest),
@@ -65,7 +65,7 @@ func descFromProto(desc *types.Descriptor) ocispec.Descriptor {
 	}
 }
 
-func descToProto(desc *ocispec.Descriptor) *types.Descriptor {
+func descToProto(desc *imagespec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   desc.MediaType,
 		Size:        desc.Size,

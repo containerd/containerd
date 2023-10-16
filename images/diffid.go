@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -30,14 +30,14 @@ import (
 )
 
 // GetDiffID gets the diff ID of the layer blob descriptor.
-func GetDiffID(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (digest.Digest, error) {
+func GetDiffID(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (digest.Digest, error) {
 	switch desc.MediaType {
 	case
 		// If the layer is already uncompressed, we can just return its digest
 		MediaTypeDockerSchema2Layer,
-		ocispec.MediaTypeImageLayer,
+		imagespec.MediaTypeImageLayer,
 		MediaTypeDockerSchema2LayerForeign,
-		ocispec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // deprecated
+		imagespec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // deprecated
 		return desc.Digest, nil
 	}
 	info, err := cs.Info(ctx, desc.Digest)

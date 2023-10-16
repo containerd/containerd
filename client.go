@@ -61,7 +61,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	snproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
@@ -375,7 +375,7 @@ type RemoteContext struct {
 
 	// ChildLabelMap sets the labels used to reference child objects in the content
 	// store. By default, all GC reference labels will be set for all fetched content.
-	ChildLabelMap func(ocispec.Descriptor) []string
+	ChildLabelMap func(imagespec.Descriptor) []string
 }
 
 func defaultRemoteContext() *RemoteContext {
@@ -425,7 +425,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 }
 
 // Push uploads the provided content to a remote resource
-func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, opts ...RemoteOpt) error {
+func (c *Client) Push(ctx context.Context, ref string, desc imagespec.Descriptor, opts ...RemoteOpt) error {
 	pushCtx := defaultRemoteContext()
 	for _, o := range opts {
 		if err := o(c, pushCtx); err != nil {
@@ -525,20 +525,20 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 	return ctr, nil
 }
 
-func writeIndex(ctx context.Context, index *ocispec.Index, client *Client, ref string) (d ocispec.Descriptor, err error) {
+func writeIndex(ctx context.Context, index *imagespec.Index, client *Client, ref string) (d imagespec.Descriptor, err error) {
 	labels := map[string]string{}
 	for i, m := range index.Manifests {
 		labels[fmt.Sprintf("containerd.io/gc.ref.content.%d", i)] = m.Digest.String()
 	}
 	data, err := json.Marshal(index)
 	if err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
-	return writeContent(ctx, client.ContentStore(), ocispec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
+	return writeContent(ctx, client.ContentStore(), imagespec.MediaTypeImageIndex, ref, bytes.NewReader(data), content.WithLabels(labels))
 }
 
-func decodeIndex(ctx context.Context, store content.Provider, desc ocispec.Descriptor) (*ocispec.Index, error) {
-	var index ocispec.Index
+func decodeIndex(ctx context.Context, store content.Provider, desc imagespec.Descriptor) (*imagespec.Index, error) {
+	var index imagespec.Index
 	p, err := content.ReadBlob(ctx, store, desc)
 	if err != nil {
 		return nil, err
@@ -842,10 +842,10 @@ func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshott
 	return platforms.Any(snPlatforms...), nil
 }
 
-func toPlatforms(pt []*apitypes.Platform) []ocispec.Platform {
-	platforms := make([]ocispec.Platform, len(pt))
+func toPlatforms(pt []*apitypes.Platform) []imagespec.Platform {
+	platforms := make([]imagespec.Platform, len(pt))
 	for i, p := range pt {
-		platforms[i] = ocispec.Platform{
+		platforms[i] = imagespec.Platform{
 			Architecture: p.Architecture,
 			OS:           p.OS,
 			Variant:      p.Variant,

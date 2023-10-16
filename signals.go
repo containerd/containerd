@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/moby/sys/signal"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // StopSignalLabel is a well-known containerd label for storing the stop
@@ -62,8 +62,8 @@ func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (s
 	}
 
 	var (
-		ociimage v1.Image
-		config   v1.ImageConfig
+		ociimage imagespec.Image
+		config   imagespec.ImageConfig
 	)
 	p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
 	if err != nil {

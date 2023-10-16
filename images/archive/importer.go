@@ -35,8 +35,8 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type importOpts struct {
@@ -62,24 +62,24 @@ func WithImportCompression() ImportOpt {
 //   - normalizes Docker references and adds as OCI ref name
 //     e.g. alpine:latest -> docker.io/library/alpine:latest
 //   - existing OCI reference names are untouched
-func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opts ...ImportOpt) (ocispec.Descriptor, error) {
+func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opts ...ImportOpt) (imagespec.Descriptor, error) {
 	var (
 		tr = tar.NewReader(reader)
 
-		ociLayout ocispec.ImageLayout
+		ociLayout imagespec.ImageLayout
 		mfsts     []struct {
 			Config   string
 			RepoTags []string
 			Layers   []string
 		}
 		symlinks = make(map[string]string)
-		blobs    = make(map[string]ocispec.Descriptor)
+		blobs    = make(map[string]imagespec.Descriptor)
 		iopts    importOpts
 	)
 
 	for _, o := range opts {
 		if err := o(&iopts); err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 	}
 
@@ -89,7 +89,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 			break
 		}
 		if err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 		if hdr.Typeflag == tar.TypeSymlink {
 			symlinks[hdr.Name] = path.Join(path.Dir(hdr.Name), hdr.Linkname)
@@ -104,21 +104,21 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 		}
 
 		hdrName := path.Clean(hdr.Name)
-		if hdrName == ocispec.ImageLayoutFile {
+		if hdrName == imagespec.ImageLayoutFile {
 			if err = onUntarJSON(tr, &ociLayout); err != nil {
-				return ocispec.Descriptor{}, fmt.Errorf("untar oci layout %q: %w", hdr.Name, err)
+				return imagespec.Descriptor{}, fmt.Errorf("untar oci layout %q: %w", hdr.Name, err)
 			}
 		} else if hdrName == "manifest.json" {
 			if err = onUntarJSON(tr, &mfsts); err != nil {
-				return ocispec.Descriptor{}, fmt.Errorf("untar manifest %q: %w", hdr.Name, err)
+				return imagespec.Descriptor{}, fmt.Errorf("untar manifest %q: %w", hdr.Name, err)
 			}
 		} else {
 			dgst, err := onUntarBlob(ctx, tr, store, hdr.Size, "tar-"+hdrName)
 			if err != nil {
-				return ocispec.Descriptor{}, fmt.Errorf("failed to ingest %q: %w", hdr.Name, err)
+				return imagespec.Descriptor{}, fmt.Errorf("failed to ingest %q: %w", hdr.Name, err)
 			}
 
-			blobs[hdrName] = ocispec.Descriptor{
+			blobs[hdrName] = imagespec.Descriptor{
 				Digest: dgst,
 				Size:   hdr.Size,
 			}
@@ -129,53 +129,53 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 	// When not provided, the layout of the tar will be interpreted
 	// as Docker v1.1 or v1.2.
 	if ociLayout.Version != "" {
-		if ociLayout.Version != ocispec.ImageLayoutVersion {
-			return ocispec.Descriptor{}, fmt.Errorf("unsupported OCI version %s", ociLayout.Version)
+		if ociLayout.Version != imagespec.ImageLayoutVersion {
+			return imagespec.Descriptor{}, fmt.Errorf("unsupported OCI version %s", ociLayout.Version)
 		}
 
 		idx, ok := blobs["index.json"]
 		if !ok {
-			return ocispec.Descriptor{}, fmt.Errorf("missing index.json in OCI layout %s", ocispec.ImageLayoutVersion)
+			return imagespec.Descriptor{}, fmt.Errorf("missing index.json in OCI layout %s", imagespec.ImageLayoutVersion)
 		}
 
-		idx.MediaType = ocispec.MediaTypeImageIndex
+		idx.MediaType = imagespec.MediaTypeImageIndex
 		return idx, nil
 	}
 
 	if mfsts == nil {
-		return ocispec.Descriptor{}, errors.New("unrecognized image format")
+		return imagespec.Descriptor{}, errors.New("unrecognized image format")
 	}
 
 	for name, linkname := range symlinks {
 		desc, ok := blobs[linkname]
 		if !ok {
-			return ocispec.Descriptor{}, fmt.Errorf("no target for symlink layer from %q to %q", name, linkname)
+			return imagespec.Descriptor{}, fmt.Errorf("no target for symlink layer from %q to %q", name, linkname)
 		}
 		blobs[name] = desc
 	}
 
-	idx := ocispec.Index{
-		Versioned: specs.Versioned{
+	idx := imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 	}
 	for _, mfst := range mfsts {
 		config, ok := blobs[mfst.Config]
 		if !ok {
-			return ocispec.Descriptor{}, fmt.Errorf("image config %q not found", mfst.Config)
+			return imagespec.Descriptor{}, fmt.Errorf("image config %q not found", mfst.Config)
 		}
 		config.MediaType = images.MediaTypeDockerSchema2Config
 
 		layers, err := resolveLayers(ctx, store, mfst.Layers, blobs, iopts.compress)
 		if err != nil {
-			return ocispec.Descriptor{}, fmt.Errorf("failed to resolve layers: %w", err)
+			return imagespec.Descriptor{}, fmt.Errorf("failed to resolve layers: %w", err)
 		}
 
 		manifest := struct {
-			SchemaVersion int                  `json:"schemaVersion"`
-			MediaType     string               `json:"mediaType"`
-			Config        ocispec.Descriptor   `json:"config"`
-			Layers        []ocispec.Descriptor `json:"layers"`
+			SchemaVersion int                    `json:"schemaVersion"`
+			MediaType     string                 `json:"mediaType"`
+			Config        imagespec.Descriptor   `json:"config"`
+			Layers        []imagespec.Descriptor `json:"layers"`
 		}{
 			SchemaVersion: 2,
 			MediaType:     images.MediaTypeDockerSchema2Manifest,
@@ -185,12 +185,12 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 
 		desc, err := writeManifest(ctx, store, manifest, manifest.MediaType)
 		if err != nil {
-			return ocispec.Descriptor{}, fmt.Errorf("write docker manifest: %w", err)
+			return imagespec.Descriptor{}, fmt.Errorf("write docker manifest: %w", err)
 		}
 
 		imgPlatforms, err := images.Platforms(ctx, store, desc)
 		if err != nil {
-			return ocispec.Descriptor{}, fmt.Errorf("unable to resolve platform: %w", err)
+			return imagespec.Descriptor{}, fmt.Errorf("unable to resolve platform: %w", err)
 		}
 		if len(imgPlatforms) > 0 {
 			// Only one platform can be resolved from non-index manifest,
@@ -218,12 +218,12 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 
 				normalized, err := normalizeReference(ref)
 				if err != nil {
-					return ocispec.Descriptor{}, err
+					return imagespec.Descriptor{}, err
 				}
 
 				mfstdesc.Annotations = map[string]string{
-					images.AnnotationImageName: normalized,
-					ocispec.AnnotationRefName:  ociReferenceName(normalized),
+					images.AnnotationImageName:  normalized,
+					imagespec.AnnotationRefName: ociReferenceName(normalized),
 				}
 
 				idx.Manifests = append(idx.Manifests, mfstdesc)
@@ -231,7 +231,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 		}
 	}
 
-	return writeManifest(ctx, store, idx, ocispec.MediaTypeImageIndex)
+	return writeManifest(ctx, store, idx, imagespec.MediaTypeImageIndex)
 }
 
 const (
@@ -247,16 +247,16 @@ func onUntarJSON(r io.Reader, j interface{}) error {
 func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, size int64, ref string) (digest.Digest, error) {
 	dgstr := digest.Canonical.Digester()
 
-	if err := content.WriteBlob(ctx, store, ref, io.TeeReader(r, dgstr.Hash()), ocispec.Descriptor{Size: size}); err != nil {
+	if err := content.WriteBlob(ctx, store, ref, io.TeeReader(r, dgstr.Hash()), imagespec.Descriptor{Size: size}); err != nil {
 		return "", err
 	}
 
 	return dgstr.Digest(), nil
 }
 
-func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]ocispec.Descriptor, compress bool) ([]ocispec.Descriptor, error) {
-	layers := make([]ocispec.Descriptor, len(layerFiles))
-	descs := map[digest.Digest]*ocispec.Descriptor{}
+func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]imagespec.Descriptor, compress bool) ([]imagespec.Descriptor, error) {
+	layers := make([]imagespec.Descriptor, len(layerFiles))
+	descs := map[digest.Digest]*imagespec.Descriptor{}
 	filters := []string{}
 	for i, f := range layerFiles {
 		desc, ok := blobs[f]
@@ -330,10 +330,10 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 	return layers, nil
 }
 
-func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string, opts ...content.Opt) (desc ocispec.Descriptor, err error) {
+func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string, opts ...content.Opt) (desc imagespec.Descriptor, err error) {
 	w, err := content.OpenWriter(ctx, cs, content.WithRef(ref))
 	if err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("failed to open writer: %w", err)
+		return imagespec.Descriptor{}, fmt.Errorf("failed to open writer: %w", err)
 	}
 
 	defer func() {
@@ -343,24 +343,24 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 		}
 	}()
 	if err := w.Truncate(0); err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("failed to truncate writer: %w", err)
+		return imagespec.Descriptor{}, fmt.Errorf("failed to truncate writer: %w", err)
 	}
 
 	cw, err := compression.CompressStream(w, compression.Gzip)
 	if err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 
 	if _, err := io.Copy(cw, r); err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 	if err := cw.Close(); err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 
 	cst, err := w.Status()
 	if err != nil {
-		return ocispec.Descriptor{}, fmt.Errorf("failed to get writer status: %w", err)
+		return imagespec.Descriptor{}, fmt.Errorf("failed to get writer status: %w", err)
 	}
 
 	desc.Digest = w.Digest()
@@ -368,32 +368,32 @@ func compressBlob(ctx context.Context, cs content.Store, r io.Reader, ref string
 
 	if err := w.Commit(ctx, desc.Size, desc.Digest, opts...); err != nil {
 		if !errdefs.IsAlreadyExists(err) {
-			return ocispec.Descriptor{}, fmt.Errorf("failed to commit: %w", err)
+			return imagespec.Descriptor{}, fmt.Errorf("failed to commit: %w", err)
 		}
 	}
 
 	return desc, nil
 }
 
-func writeManifest(ctx context.Context, cs content.Ingester, manifest interface{}, mediaType string) (ocispec.Descriptor, error) {
+func writeManifest(ctx context.Context, cs content.Ingester, manifest interface{}, mediaType string) (imagespec.Descriptor, error) {
 	manifestBytes, err := json.Marshal(manifest)
 	if err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 
-	desc := ocispec.Descriptor{
+	desc := imagespec.Descriptor{
 		MediaType: mediaType,
 		Digest:    digest.FromBytes(manifestBytes),
 		Size:      int64(len(manifestBytes)),
 	}
 	if err := content.WriteBlob(ctx, cs, "manifest-"+desc.Digest.String(), bytes.NewReader(manifestBytes), desc); err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 
 	return desc, nil
 }
 
-func detectLayerMediaType(ctx context.Context, store content.Store, desc ocispec.Descriptor) (string, error) {
+func detectLayerMediaType(ctx context.Context, store content.Store, desc imagespec.Descriptor) (string, error) {
 	var mediaType string
 	// need to parse existing blob to use the proper media type
 	bytes := make([]byte, 10)

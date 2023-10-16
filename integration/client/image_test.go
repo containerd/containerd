@@ -29,7 +29,7 @@ import (
 	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImageIsUnpacked(t *testing.T) {
@@ -111,7 +111,7 @@ func TestImagePullWithDistSourceLabel(t *testing.T) {
 	// only check the target platform
 	childrenHandler := images.LimitManifests(images.ChildrenHandler(cs), pMatcher, 1)
 
-	checkLabelHandler := func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	checkLabelHandler := func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := childrenHandler(ctx, desc)
 		if err != nil {
 			return nil, err

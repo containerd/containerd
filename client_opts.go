@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/snapshots"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/grpc"
 )
@@ -190,7 +190,7 @@ func WithPullLabels(labels map[string]string) RemoteOpt {
 // to overwrite the default GC labels or filter which labels get set
 // for content.
 // The default is `images.ChildGCLabels`.
-func WithChildLabelMap(fn func(ocispec.Descriptor) []string) RemoteOpt {
+func WithChildLabelMap(fn func(imagespec.Descriptor) []string) RemoteOpt {
 	return func(_ *Client, c *RemoteContext) error {
 		c.ChildLabelMap = fn
 		return nil

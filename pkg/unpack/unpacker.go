@@ -42,7 +42,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -161,9 +161,9 @@ func NewUnpacker(ctx context.Context, cs content.Store, opts ...UnpackerOpt) (*U
 func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 	var (
 		lock   sync.Mutex
-		layers = map[digest.Digest][]ocispec.Descriptor{}
+		layers = map[digest.Digest][]imagespec.Descriptor{}
 	)
-	return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		ctx, span := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "UnpackHandler"))
 		defer span.End()
 		span.SetAttributes(
@@ -180,8 +180,8 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		}
 
 		if images.IsManifestType(desc.MediaType) {
-			var nonLayers []ocispec.Descriptor
-			var manifestLayers []ocispec.Descriptor
+			var nonLayers []imagespec.Descriptor
+			var manifestLayers []imagespec.Descriptor
 			// Split layers from non-layers, layers will be handled after
 			// the config
 			for i, child := range children {
@@ -229,8 +229,8 @@ func (u *Unpacker) Wait() (Result, error) {
 
 func (u *Unpacker) unpack(
 	h images.Handler,
-	config ocispec.Descriptor,
-	layers []ocispec.Descriptor,
+	config imagespec.Descriptor,
+	layers []imagespec.Descriptor,
 ) error {
 	ctx := u.ctx
 	ctx, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpack"))
@@ -240,7 +240,7 @@ func (u *Unpacker) unpack(
 		return err
 	}
 
-	var i ocispec.Image
+	var i imagespec.Image
 	if err := json.Unmarshal(p, &i); err != nil {
 		return fmt.Errorf("unmarshal image config: %w", err)
 	}
@@ -283,7 +283,7 @@ func (u *Unpacker) unpack(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	doUnpackFn := func(i int, desc ocispec.Descriptor) error {
+	doUnpackFn := func(i int, desc imagespec.Descriptor) error {
 		parent := identity.ChainID(chain)
 		chain = append(chain, diffIDs[i])
 		chainID := identity.ChainID(chain).String()
@@ -443,7 +443,7 @@ func (u *Unpacker) unpack(
 	return nil
 }
 
-func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
+func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []imagespec.Descriptor, done []chan struct{}) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for i, desc := range layers {
 		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
@@ -508,7 +508,7 @@ func (u *Unpacker) lockSnChainID(ctx context.Context, chainID, snapshotter strin
 	}, nil
 }
 
-func (u *Unpacker) lockBlobDescriptor(ctx context.Context, desc ocispec.Descriptor) (func(), error) {
+func (u *Unpacker) lockBlobDescriptor(ctx context.Context, desc imagespec.Descriptor) (func(), error) {
 	key := u.makeBlobDescriptorKey(desc)
 
 	if err := u.duplicationSuppressor.Lock(ctx, key); err != nil {
@@ -523,7 +523,7 @@ func (u *Unpacker) makeChainIDKeyWithSnapshotter(chainID, snapshotter string) st
 	return fmt.Sprintf("sn://%s/%v", snapshotter, chainID)
 }
 
-func (u *Unpacker) makeBlobDescriptorKey(desc ocispec.Descriptor) string {
+func (u *Unpacker) makeBlobDescriptorKey(desc imagespec.Descriptor) string {
 	return fmt.Sprintf("blob://%v", desc.Digest)
 }
 

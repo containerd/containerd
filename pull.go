@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/containerd/containerd/tracing"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -192,7 +192,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 		isConvertible         bool
 		originalSchema1Digest string
-		converterFunc         func(context.Context, ocispec.Descriptor) (ocispec.Descriptor, error)
+		converterFunc         func(context.Context, imagespec.Descriptor) (imagespec.Descriptor, error)
 		limiter               *semaphore.Weighted
 	)
 
@@ -203,7 +203,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 		isConvertible = true
 
-		converterFunc = func(ctx context.Context, _ ocispec.Descriptor) (ocispec.Descriptor, error) {
+		converterFunc = func(ctx context.Context, _ imagespec.Descriptor) (imagespec.Descriptor, error) {
 			return schema1Converter.Convert(ctx)
 		}
 
@@ -228,12 +228,12 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 		// set isConvertible to true if there is application/octet-stream media type
 		convertibleHandler := images.HandlerFunc(
-			func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			func(_ context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 				if desc.MediaType == docker.LegacyConfigMediaType {
 					isConvertible = true
 				}
 
-				return []ocispec.Descriptor{}, nil
+				return []imagespec.Descriptor{}, nil
 			},
 		)
 
@@ -251,7 +251,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 		handler = images.Handlers(handlers...)
 
-		converterFunc = func(ctx context.Context, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
+		converterFunc = func(ctx context.Context, desc imagespec.Descriptor) (imagespec.Descriptor, error) {
 			return docker.ConvertManifest(ctx, store, desc)
 		}
 	}

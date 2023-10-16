@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -119,8 +119,8 @@ func TestWithWindowNetworksAllowUnqualifiedDNSQuery(t *testing.T) {
 func TestWithProcessArgsOverwritesWithImage(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Entrypoint:  []string{"powershell.exe", "-Command", "Write-Host Hello"},
 			Cmd:         []string{"cmd.exe", "/S", "/C", "echo Hello"},
 			ArgsEscaped: false,
@@ -162,8 +162,8 @@ func TestWithProcessArgsOverwritesWithImage(t *testing.T) {
 func TestWithProcessArgsOverwritesWithImageArgsEscaped(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Entrypoint:  []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
 			Cmd:         []string{`cmd.exe /S /C "C:\test path\test.exe"`},
 			ArgsEscaped: true,
@@ -205,8 +205,8 @@ func TestWithProcessArgsOverwritesWithImageArgsEscaped(t *testing.T) {
 func TestWithImageOverwritesWithProcessArgs(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Entrypoint: []string{"powershell.exe", "-Command"},
 			Cmd:        []string{"Write-Host", "echo Hello"},
 		},
@@ -247,8 +247,8 @@ func TestWithImageOverwritesWithProcessArgs(t *testing.T) {
 func TestWithImageArgsEscapedOverwritesWithProcessArgs(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Entrypoint:  []string{`powershell.exe -Command "C:\My Data\MyExe.exe" -arg1 "-arg2 value2"`},
 			Cmd:         []string{`cmd.exe /S /C "C:\test path\test.exe"`},
 			ArgsEscaped: true,
@@ -358,8 +358,8 @@ func TestWithImageConfigArgsWindows(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			img, err := newFakeImage(ocispec.Image{
-				Config: ocispec.ImageConfig{
+			img, err := newFakeImage(imagespec.Image{
+				Config: imagespec.ImageConfig{
 					Entrypoint: tc.entrypoint,
 					Cmd:        tc.cmd,
 				},
@@ -486,8 +486,8 @@ func TestWithImageConfigArgsEscapedWindows(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			img, err := newFakeImage(ocispec.Image{
-				Config: ocispec.ImageConfig{
+			img, err := newFakeImage(imagespec.Image{
+				Config: imagespec.ImageConfig{
 					Entrypoint:  tc.entrypoint,
 					Cmd:         tc.cmd,
 					ArgsEscaped: true,

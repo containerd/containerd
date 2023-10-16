@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/api/types"
@@ -243,9 +243,9 @@ func populateDefaultDarwinSpec(s *Spec) error {
 }
 
 // DescriptorFromProto converts containerds protobuf [types.Descriptor]
-// to the OCI image specs [ocispec.Descriptor].
-func DescriptorFromProto(d *types.Descriptor) ocispec.Descriptor {
-	return ocispec.Descriptor{
+// to the OCI image specs [imagespec.Descriptor].
+func DescriptorFromProto(d *types.Descriptor) imagespec.Descriptor {
+	return imagespec.Descriptor{
 		MediaType:   d.MediaType,
 		Digest:      digest.Digest(d.Digest),
 		Size:        d.Size,
@@ -253,9 +253,9 @@ func DescriptorFromProto(d *types.Descriptor) ocispec.Descriptor {
 	}
 }
 
-// DescriptorToProto converts the OCI image specs [ocispec.Descriptor]
+// DescriptorToProto converts the OCI image specs [imagespec.Descriptor]
 // to containerds protobuf [types.Descriptor].
-func DescriptorToProto(d ocispec.Descriptor) *types.Descriptor {
+func DescriptorToProto(d imagespec.Descriptor) *types.Descriptor {
 	return &types.Descriptor{
 		MediaType:   d.MediaType,
 		Digest:      d.Digest.String(),

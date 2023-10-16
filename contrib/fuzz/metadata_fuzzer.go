@@ -23,7 +23,7 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/containerd/containerd/containers"
@@ -412,7 +412,7 @@ func FuzzContentStore(data []byte) int {
 			}
 			_ = cs.Abort(ctx, ref)
 		case "Commit":
-			desc := ocispec.Descriptor{}
+			desc := imagespec.Descriptor{}
 			err = f.GenerateStruct(&desc)
 			if err != nil {
 				return 0

@@ -40,7 +40,7 @@ import (
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (
@@ -61,7 +61,7 @@ func init() {
 				return nil, err
 			}
 
-			ic.Meta.Platforms = append(ic.Meta.Platforms, ocispec.Platform{
+			ic.Meta.Platforms = append(ic.Meta.Platforms, imagespec.Platform{
 				OS:           "linux",
 				Architecture: runtime.GOARCH,
 			})
@@ -83,7 +83,7 @@ type windowsLcowDiff struct {
 	store content.Store
 }
 
-var emptyDesc = ocispec.Descriptor{}
+var emptyDesc = imagespec.Descriptor{}
 
 // NewWindowsLcowDiff is the Windows LCOW container layer implementation
 // for comparing and applying Linux filesystem layers on Windows
@@ -96,7 +96,7 @@ func NewWindowsLcowDiff(store content.Store) (CompareApplier, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+func (s windowsLcowDiff) Apply(ctx context.Context, desc imagespec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d imagespec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -132,7 +132,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
 			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
-		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+		if processor.MediaType() == imagespec.MediaTypeImageLayer {
 			break
 		}
 	}
@@ -176,8 +176,8 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 		return emptyDesc, fmt.Errorf("failed GrantVmGroupAccess on layer vhd: %v: %w", layerPath, err)
 	}
 
-	return ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayer,
+	return imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageLayer,
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
@@ -185,7 +185,7 @@ func (s windowsLcowDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mou
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s windowsLcowDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s windowsLcowDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d imagespec.Descriptor, err error) {
 	return emptyDesc, fmt.Errorf("windowsLcowDiff does not implement Compare method: %w", errdefs.ErrNotImplemented)
 }
 

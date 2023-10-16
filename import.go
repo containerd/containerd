@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type importOpts struct {
@@ -159,7 +159,7 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 		platformMatcher = iopts.platformMatcher
 	}
 
-	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var handler images.HandlerFunc = func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		// Only save images at top level
 		if desc.Digest != index.Digest {
 			return images.Children(ctx, cs, desc)
@@ -230,7 +230,7 @@ func imageName(annotations map[string]string, ociCleanup func(string) string) st
 	if name != "" {
 		return name
 	}
-	name = annotations[ocispec.AnnotationRefName]
+	name = annotations[imagespec.AnnotationRefName]
 	if name != "" {
 		if ociCleanup != nil {
 			name = ociCleanup(name)

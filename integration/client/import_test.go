@@ -45,8 +45,8 @@ import (
 	"github.com/containerd/containerd/platforms"
 
 	digest "github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TestExportAndImport exports testImage as a tar stream,
@@ -178,7 +178,7 @@ func TestImport(t *testing.T) {
 
 	provider := client.ContentStore()
 
-	checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
+	checkManifest := func(ctx context.Context, t *testing.T, d imagespec.Descriptor, expManifest *imagespec.Manifest) {
 		m, err := images.Manifest(ctx, provider, d, nil)
 		if err != nil {
 			t.Fatalf("unable to read target blob: %+v", err)
@@ -362,7 +362,7 @@ func checkImages(t *testing.T, target digest.Digest, actual []images.Image, name
 			t.Fatalf("image(%d) unexpected name %q, expected %q", i, actual[i].Name, n)
 		}
 
-		if actual[i].Target.MediaType != ocispec.MediaTypeImageManifest &&
+		if actual[i].Target.MediaType != imagespec.MediaTypeImageManifest &&
 			actual[i].Target.MediaType != images.MediaTypeDockerSchema2Manifest {
 			t.Fatalf("image(%d) unexpected media type: %s", i, actual[i].Target.MediaType)
 		}
@@ -388,8 +388,8 @@ func createContent(size int64, seed int64) ([]byte, digest.Digest) {
 }
 
 func createConfig(osName, archName, author string) ([]byte, digest.Digest) {
-	image := ocispec.Image{
-		Platform: ocispec.Platform{
+	image := imagespec.Image{
+		Platform: imagespec.Platform{
 			OS:           osName,
 			Architecture: archName,
 		},
@@ -400,27 +400,27 @@ func createConfig(osName, archName, author string) ([]byte, digest.Digest) {
 	return b, digest.FromBytes(b)
 }
 
-func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest, *ocispec.Manifest) {
-	manifest := ocispec.Manifest{
-		Versioned: specs.Versioned{
+func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest, *imagespec.Manifest) {
+	manifest := imagespec.Manifest{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
-		Config: ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageConfig,
+		Config: imagespec.Descriptor{
+			MediaType: imagespec.MediaTypeImageConfig,
 			Digest:    digest.FromBytes(config),
 			Size:      int64(len(config)),
 			Annotations: map[string]string{
-				"ocispec": "manifest.config.descriptor",
+				"imagespec": "manifest.config.descriptor",
 			},
 		},
 	}
 	for _, l := range layers {
-		manifest.Layers = append(manifest.Layers, ocispec.Descriptor{
-			MediaType: ocispec.MediaTypeImageLayer,
+		manifest.Layers = append(manifest.Layers, imagespec.Descriptor{
+			MediaType: imagespec.MediaTypeImageLayer,
 			Digest:    digest.FromBytes(l),
 			Size:      int64(len(l)),
 			Annotations: map[string]string{
-				"ocispec": "manifest.layers.descriptor",
+				"imagespec": "manifest.layers.descriptor",
 			},
 		})
 	}
@@ -431,13 +431,13 @@ func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest, *oci
 }
 
 func createIndex(manifest []byte, tags ...string) []byte {
-	idx := ocispec.Index{
-		Versioned: specs.Versioned{
+	idx := imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 	}
-	d := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageManifest,
+	d := imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageManifest,
 		Digest:    digest.FromBytes(manifest),
 		Size:      int64(len(manifest)),
 	}
@@ -448,7 +448,7 @@ func createIndex(manifest []byte, tags ...string) []byte {
 		for _, t := range tags {
 			dt := d
 			dt.Annotations = map[string]string{
-				ocispec.AnnotationRefName: t,
+				imagespec.AnnotationRefName: t,
 			}
 			idx.Manifests = append(idx.Manifests, dt)
 		}
@@ -610,16 +610,16 @@ func (ip *imagesProgress) getImages() []string {
 
 }
 
-func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string]ocispec.Descriptor, tw []tartest.WriterToTar) {
-	descs = map[string]ocispec.Descriptor{}
-	idx := ocispec.Index{
-		Versioned: specs.Versioned{
+func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string]imagespec.Descriptor, tw []tartest.WriterToTar) {
+	descs = map[string]imagespec.Descriptor{}
+	idx := imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 	}
 
 	if len(imageNames) > 1 {
-		var lastManifest ocispec.Descriptor
+		var lastManifest imagespec.Descriptor
 
 		for _, image := range imageNames[1:] {
 			if image != "" && image[len(image)-1] == '@' {
@@ -640,17 +640,17 @@ func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string
 			annotations := map[string]string{}
 			if image != "" {
 				if parts := strings.SplitN(image, " ", 2); len(parts) == 2 {
-					annotations[ocispec.AnnotationRefName] = parts[1]
+					annotations[imagespec.AnnotationRefName] = parts[1]
 					image = strings.Join(parts, ":")
 				} else {
 					annotations[images.AnnotationImageName] = image
 				}
 			}
 
-			md := ocispec.Descriptor{
+			md := imagespec.Descriptor{
 				Digest:      m,
 				Size:        int64(len(mb)),
-				MediaType:   ocispec.MediaTypeImageManifest,
+				MediaType:   imagespec.MediaTypeImageManifest,
 				Annotations: annotations,
 			}
 
@@ -666,10 +666,10 @@ func createImages(tc tartest.TarContext, imageNames ...string) (descs map[string
 	}
 
 	ib, _ := json.Marshal(idx)
-	id := ocispec.Descriptor{
+	id := imagespec.Descriptor{
 		Digest:    digest.FromBytes(ib),
 		Size:      int64(len(ib)),
-		MediaType: ocispec.MediaTypeImageIndex,
+		MediaType: imagespec.MediaTypeImageIndex,
 	}
 	tw = append(tw, tc.File("index.json", ib, 0644))
 

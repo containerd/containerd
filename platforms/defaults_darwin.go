@@ -21,12 +21,12 @@ package platforms
 import (
 	"runtime"
 
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // DefaultSpec returns the current platform's default platform specification.
-func DefaultSpec() specs.Platform {
-	return specs.Platform{
+func DefaultSpec() imagespec.Platform {
+	return imagespec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		// The Variant field will be empty if arch != ARM.
@@ -36,7 +36,7 @@ func DefaultSpec() specs.Platform {
 
 // Default returns the default matcher for the platform.
 func Default() MatchComparer {
-	return Ordered(DefaultSpec(), specs.Platform{
+	return Ordered(DefaultSpec(), imagespec.Platform{
 		// darwin runtime also supports Linux binary via runu/LKL
 		OS:           "linux",
 		Architecture: runtime.GOARCH,

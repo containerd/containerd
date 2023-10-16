@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
 	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -162,7 +162,7 @@ command. As part of this process, we do the following:
 
 		// TODO: Show unpack status
 
-		var p []ocispec.Platform
+		var p []imagespec.Platform
 		if context.Bool("all-platforms") {
 			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
 			if err != nil {

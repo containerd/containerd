@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Image describes an image used by containers
@@ -43,7 +43,7 @@ type Image interface {
 	// Name of the image
 	Name() string
 	// Target descriptor for the image content
-	Target() ocispec.Descriptor
+	Target() imagespec.Descriptor
 	// Labels of the image
 	Labels() map[string]string
 	// Unpack unpacks the image's content into a snapshot
@@ -55,7 +55,7 @@ type Image interface {
 	// Usage returns a usage calculation for the image.
 	Usage(context.Context, ...UsageOpt) (int64, error)
 	// Config descriptor for the image.
-	Config(ctx context.Context) (ocispec.Descriptor, error)
+	Config(ctx context.Context) (imagespec.Descriptor, error)
 	// IsUnpacked returns whether an image is unpacked.
 	IsUnpacked(context.Context, string) (bool, error)
 	// ContentStore provides a content store which contains image blob data
@@ -65,7 +65,7 @@ type Image interface {
 	// Platform returns the platform match comparer. Can be nil.
 	Platform() platforms.MatchComparer
 	// Spec returns the OCI image spec for a given image.
-	Spec(ctx context.Context) (ocispec.Image, error)
+	Spec(ctx context.Context) (imagespec.Image, error)
 }
 
 type usageOptions struct {
@@ -149,7 +149,7 @@ func (i *image) Name() string {
 	return i.i.Name
 }
 
-func (i *image) Target() ocispec.Descriptor {
+func (i *image) Target() imagespec.Descriptor {
 	return i.i.Target
 }
 
@@ -199,7 +199,7 @@ func (i *image) Usage(ctx context.Context, opts ...UsageOpt) (int64, error) {
 	return usage.CalculateImageUsage(ctx, i.i, i.client.ContentStore(), usageOpts...)
 }
 
-func (i *image) Config(ctx context.Context) (ocispec.Descriptor, error) {
+func (i *image) Config(ctx context.Context) (imagespec.Descriptor, error) {
 	provider := i.client.ContentStore()
 	return i.i.Config(ctx, provider, i.platform)
 }
@@ -225,8 +225,8 @@ func (i *image) IsUnpacked(ctx context.Context, snapshotterName string) (bool, e
 	return true, nil
 }
 
-func (i *image) Spec(ctx context.Context) (ocispec.Image, error) {
-	var ociImage ocispec.Image
+func (i *image) Spec(ctx context.Context) (imagespec.Image, error) {
+	var ociImage imagespec.Image
 
 	desc, err := i.Config(ctx)
 	if err != nil {
@@ -365,23 +365,23 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	return err
 }
 
-func (i *image) getManifest(ctx context.Context, platform platforms.MatchComparer) (ocispec.Manifest, error) {
+func (i *image) getManifest(ctx context.Context, platform platforms.MatchComparer) (imagespec.Manifest, error) {
 	cs := i.ContentStore()
 	manifest, err := images.Manifest(ctx, cs, i.i.Target, platform)
 	if err != nil {
-		return ocispec.Manifest{}, err
+		return imagespec.Manifest{}, err
 	}
 	return manifest, nil
 }
 
-func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]rootfs.Layer, error) {
+func (i *image) getLayers(ctx context.Context, manifest imagespec.Manifest) ([]rootfs.Layer, error) {
 	diffIDs, err := i.RootFS(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve rootfs: %w", err)
 	}
 
 	// parse out the image layers from oci artifact layers
-	imageLayers := []ocispec.Descriptor{}
+	imageLayers := []imagespec.Descriptor{}
 	for _, ociLayer := range manifest.Layers {
 		if images.IsLayerType(ociLayer.MediaType) {
 			imageLayers = append(imageLayers, ociLayer)
@@ -392,9 +392,9 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	}
 	layers := make([]rootfs.Layer, len(diffIDs))
 	for i := range diffIDs {
-		layers[i].Diff = ocispec.Descriptor{
+		layers[i].Diff = imagespec.Descriptor{
 			// TODO: derive media type from compressed type
-			MediaType: ocispec.MediaTypeImageLayer,
+			MediaType: imagespec.MediaTypeImageLayer,
 			Digest:    diffIDs[i],
 		}
 		layers[i].Blob = imageLayers[i]
@@ -402,7 +402,7 @@ func (i *image) getLayers(ctx context.Context, manifest ocispec.Manifest) ([]roo
 	return layers, nil
 }
 
-func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest ocispec.Manifest) error {
+func (i *image) checkSnapshotterSupport(ctx context.Context, snapshotterName string, manifest imagespec.Manifest) error {
 	snapshotterPlatformMatcher, err := i.client.GetSnapshotterSupportedPlatforms(ctx, snapshotterName)
 	if err != nil {
 		return err

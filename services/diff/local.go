@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
 )
 
@@ -96,7 +96,7 @@ var _ diffapi.DiffClient = &local{}
 
 func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.CallOption) (*diffapi.ApplyResponse, error) {
 	var (
-		ocidesc ocispec.Descriptor
+		ocidesc imagespec.Descriptor
 		err     error
 		desc    = oci.DescriptorFromProto(er.Diff)
 		mounts  = mount.FromProto(er.Mounts)
@@ -130,7 +130,7 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 
 func (l *local) Diff(ctx context.Context, dr *diffapi.DiffRequest, _ ...grpc.CallOption) (*diffapi.DiffResponse, error) {
 	var (
-		ocidesc ocispec.Descriptor
+		ocidesc imagespec.Descriptor
 		err     error
 		aMounts = mount.FromProto(dr.Left)
 		bMounts = mount.FromProto(dr.Right)

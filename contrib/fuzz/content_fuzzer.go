@@ -27,7 +27,7 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
@@ -73,7 +73,7 @@ func generateBlobs(f *fuzz.ConsumeFuzzer) (map[digest.Digest][]byte, error) {
 // checkwrite is a wrapper around content.WriteBlob()
 func checkWrite(ctx context.Context, cs content.Store, dgst digest.Digest, p []byte) (digest.Digest, error) {
 	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p),
-		ocispec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
+		imagespec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
 		return dgst, err
 	}
 	return dgst, nil
@@ -138,7 +138,7 @@ func FuzzCSWalk(data []byte) int {
 
 func FuzzArchiveExport(data []byte) int {
 	f := fuzz.NewConsumer(data)
-	manifest := ocispec.Descriptor{}
+	manifest := imagespec.Descriptor{}
 	err := f.GenerateStruct(&manifest)
 	if err != nil {
 		return 0

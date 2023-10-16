@@ -28,13 +28,13 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/images"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Content represents a piece of image content in the content store along with
 // its relevant children and size.
 type Content struct {
-	Descriptor ocispec.Descriptor
+	Descriptor imagespec.Descriptor
 	Labels     map[string]string
 	Size       Size
 	Children   []Content
@@ -69,12 +69,12 @@ func NewContentStore(ctx context.Context, t *testing.T) ContentStore {
 // Index creates an index with the provided manifests and stores it
 // in the content store.
 func (tc ContentStore) Index(manifests ...Content) Content {
-	var index ocispec.Index
+	var index imagespec.Index
 	for _, m := range manifests {
 		index.Manifests = append(index.Manifests, m.Descriptor)
 	}
 
-	idx := tc.JSONObject(ocispec.MediaTypeImageIndex, index)
+	idx := tc.JSONObject(imagespec.MediaTypeImageIndex, index)
 	idx.Children = manifests
 	return idx
 
@@ -83,12 +83,12 @@ func (tc ContentStore) Index(manifests ...Content) Content {
 // Manifest creates a manifest with the given config and layers then
 // stores it in the content store.
 func (tc ContentStore) Manifest(config Content, layers ...Content) Content {
-	var manifest ocispec.Manifest
+	var manifest imagespec.Manifest
 	manifest.Config = config.Descriptor
 	for _, l := range layers {
 		manifest.Layers = append(manifest.Layers, l.Descriptor)
 	}
-	m := tc.JSONObject(ocispec.MediaTypeImageManifest, manifest)
+	m := tc.JSONObject(imagespec.MediaTypeImageManifest, manifest)
 	m.Children = append(m.Children, config)
 	m.Children = append(m.Children, layers...)
 	return m
@@ -99,7 +99,7 @@ func (tc ContentStore) Manifest(config Content, layers ...Content) Content {
 func (tc ContentStore) Blob(mediaType string, data []byte) Content {
 	tc.t.Helper()
 
-	descriptor := ocispec.Descriptor{
+	descriptor := imagespec.Descriptor{
 		MediaType: mediaType,
 		Digest:    digest.SHA256.FromBytes(data),
 		Size:      int64(len(data)),
@@ -166,7 +166,7 @@ func (tc ContentStore) Walk(c Content, fn func(context.Context, *Content, conten
 }
 
 // AddPlatform alters the content desciptor by setting the platform
-func AddPlatform(c Content, p ocispec.Platform) Content {
+func AddPlatform(c Content, p imagespec.Platform) Content {
 	c.Descriptor.Platform = &p
 	return c
 }
@@ -189,12 +189,12 @@ type ContentCreator func(ContentStore) Content
 // The layer produced is not a valid compressed tar, do not unpack it.
 func SimpleManifest(layerSize int) ContentCreator {
 	return func(tc ContentStore) Content {
-		config := ocispec.ImageConfig{
+		config := imagespec.ImageConfig{
 			Env: []string{"random"}, // TODO: Make random string
 		}
 		return tc.Manifest(
-			tc.JSONObject(ocispec.MediaTypeImageConfig, config),
-			tc.RandomBlob(ocispec.MediaTypeImageLayerGzip, layerSize))
+			tc.JSONObject(imagespec.MediaTypeImageConfig, config),
+			tc.RandomBlob(imagespec.MediaTypeImageLayerGzip, layerSize))
 	}
 }
 

@@ -31,7 +31,7 @@ import (
 	"testing"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -60,17 +60,17 @@ func (b blob) Size() int64 {
 }
 
 type fakeImage struct {
-	config ocispec.Descriptor
+	config imagespec.Descriptor
 	blobs  map[string]blob
 }
 
-func newFakeImage(config ocispec.Image) (Image, error) {
+func newFakeImage(config imagespec.Image) (Image, error) {
 	configBlob, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
-	configDescriptor := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageConfig,
+	configDescriptor := imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageConfig,
 		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
 	}
 
@@ -82,7 +82,7 @@ func newFakeImage(config ocispec.Image) (Image, error) {
 	}, nil
 }
 
-func (i fakeImage) Config(ctx context.Context) (ocispec.Descriptor, error) {
+func (i fakeImage) Config(ctx context.Context) (imagespec.Descriptor, error) {
 	return i.config, nil
 }
 
@@ -90,7 +90,7 @@ func (i fakeImage) ContentStore() content.Store {
 	return i
 }
 
-func (i fakeImage) ReaderAt(ctx context.Context, dec ocispec.Descriptor) (content.ReaderAt, error) {
+func (i fakeImage) ReaderAt(ctx context.Context, dec imagespec.Descriptor) (content.ReaderAt, error) {
 	blob, found := i.blobs[dec.Digest.String()]
 	if !found {
 		return nil, errdefs.ErrNotFound
@@ -503,8 +503,8 @@ func TestWithUserNamespace(t *testing.T) {
 func TestWithImageConfigArgs(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Env:        []string{"z=bar", "y=baz"},
 			Entrypoint: []string{"create", "--namespace=test"},
 			Cmd:        []string{"", "--debug"},

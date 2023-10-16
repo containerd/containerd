@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 	"github.com/moby/sys/user"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -375,8 +375,8 @@ func WithImageConfigArgs(image Image, args []string) SpecOpts {
 
 		var (
 			imageConfigBytes []byte
-			ociimage         v1.Image
-			config           v1.ImageConfig
+			ociimage         imagespec.Image
+			config           imagespec.ImageConfig
 		)
 		imageConfigBytes, err = content.ReadBlob(ctx, image.ContentStore(), ic)
 		if err != nil {

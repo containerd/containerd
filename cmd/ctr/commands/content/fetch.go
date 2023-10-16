@@ -36,7 +36,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 )
 
@@ -182,7 +182,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		close(progress)
 	}()
 
-	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	h := images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
 			ongoing.Add(desc)
 		}
@@ -348,7 +348,7 @@ outer:
 type Jobs struct {
 	name     string
 	added    map[digest.Digest]struct{}
-	descs    []ocispec.Descriptor
+	descs    []imagespec.Descriptor
 	mu       sync.Mutex
 	resolved bool
 }
@@ -362,7 +362,7 @@ func NewJobs(name string) *Jobs {
 }
 
 // Add adds a descriptor to be tracked
-func (j *Jobs) Add(desc ocispec.Descriptor) {
+func (j *Jobs) Add(desc imagespec.Descriptor) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.resolved = true
@@ -375,11 +375,11 @@ func (j *Jobs) Add(desc ocispec.Descriptor) {
 }
 
 // Jobs returns a list of all tracked descriptors
-func (j *Jobs) Jobs() []ocispec.Descriptor {
+func (j *Jobs) Jobs() []imagespec.Descriptor {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 
-	var descs []ocispec.Descriptor
+	var descs []imagespec.Descriptor
 	return append(descs, j.descs...)
 }
 

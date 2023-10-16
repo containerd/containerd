@@ -19,13 +19,13 @@ package platforms
 import (
 	"fmt"
 
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/windows"
 )
 
 // NewMatcher returns a Windows matcher that will match on osVersionPrefix if
 // the platform is Windows otherwise use the default matcher
-func newDefaultMatcher(platform specs.Platform) Matcher {
+func newDefaultMatcher(platform imagespec.Platform) Matcher {
 	prefix := prefix(platform.OSVersion)
 	return windowsmatcher{
 		Platform:        platform,

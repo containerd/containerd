@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type service struct {
@@ -46,7 +46,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 	}
 
 	var (
-		ocidesc ocispec.Descriptor
+		ocidesc imagespec.Descriptor
 		err     error
 		desc    = oci.DescriptorFromProto(er.Diff)
 		mounts  = mount.FromProto(er.Mounts)
@@ -76,7 +76,7 @@ func (s *service) Diff(ctx context.Context, dr *diffapi.DiffRequest) (*diffapi.D
 		return nil, errdefs.ToGRPC(errdefs.ErrNotImplemented)
 	}
 	var (
-		ocidesc ocispec.Descriptor
+		ocidesc imagespec.Descriptor
 		err     error
 		aMounts = mount.FromProto(dr.Left)
 		bMounts = mount.FromProto(dr.Right)

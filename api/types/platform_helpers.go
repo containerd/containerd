@@ -16,11 +16,11 @@
 
 package types
 
-import oci "github.com/opencontainers/image-spec/specs-go/v1"
+import imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 // OCIPlatformToProto converts from a slice of OCI [specs.Platform] to a
 // slice of the protobuf definition [Platform].
-func OCIPlatformToProto(platforms []oci.Platform) []*Platform {
+func OCIPlatformToProto(platforms []imagespec.Platform) []*Platform {
 	ap := make([]*Platform, len(platforms))
 	for i := range platforms {
 		ap[i] = &Platform{
@@ -34,10 +34,10 @@ func OCIPlatformToProto(platforms []oci.Platform) []*Platform {
 
 // OCIPlatformFromProto converts a slice of the protobuf definition [Platform]
 // to a slice of OCI [specs.Platform].
-func OCIPlatformFromProto(platforms []*Platform) []oci.Platform {
-	op := make([]oci.Platform, len(platforms))
+func OCIPlatformFromProto(platforms []*Platform) []imagespec.Platform {
+	op := make([]imagespec.Platform, len(platforms))
 	for i := range platforms {
-		op[i] = oci.Platform{
+		op[i] = imagespec.Platform{
 			OS:           platforms[i].OS,
 			Architecture: platforms[i].Architecture,
 			Variant:      platforms[i].Variant,

@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/errdefs"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // mediatype definitions for image components handled in containerd.
@@ -55,8 +55,8 @@ const (
 
 	// Encrypted media types
 
-	MediaTypeImageLayerEncrypted     = ocispec.MediaTypeImageLayer + "+encrypted"
-	MediaTypeImageLayerGzipEncrypted = ocispec.MediaTypeImageLayerGzip + "+encrypted"
+	MediaTypeImageLayerEncrypted     = imagespec.MediaTypeImageLayer + "+encrypted"
+	MediaTypeImageLayerGzipEncrypted = imagespec.MediaTypeImageLayerGzip + "+encrypted"
 )
 
 // DiffCompression returns the compression as defined by the layer diff media
@@ -81,7 +81,7 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 			return "", nil
 		}
 		return "gzip", nil
-	case ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // Non-distributable layers are deprecated
+	case imagespec.MediaTypeImageLayer, imagespec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // Non-distributable layers are deprecated
 		if len(ext) > 0 {
 			switch ext[len(ext)-1] {
 			case "gzip":
@@ -147,7 +147,7 @@ func IsDockerType(mt string) bool {
 // No support for schema1 manifest.
 func IsManifestType(mt string) bool {
 	switch mt {
-	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	case MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest:
 		return true
 	default:
 		return false
@@ -157,7 +157,7 @@ func IsManifestType(mt string) bool {
 // IsIndexType returns true if the media type is an OCI-compatible index.
 func IsIndexType(mt string) bool {
 	switch mt {
-	case ocispec.MediaTypeImageIndex, MediaTypeDockerSchema2ManifestList:
+	case imagespec.MediaTypeImageIndex, MediaTypeDockerSchema2ManifestList:
 		return true
 	default:
 		return false
@@ -168,7 +168,7 @@ func IsIndexType(mt string) bool {
 // No support for containerd checkpoint configs.
 func IsConfigType(mt string) bool {
 	switch mt {
-	case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
+	case MediaTypeDockerSchema2Config, imagespec.MediaTypeImageConfig:
 		return true
 	default:
 		return false
@@ -179,7 +179,7 @@ func IsConfigType(mt string) bool {
 // including containerd checkpoint configs
 func IsKnownConfig(mt string) bool {
 	switch mt {
-	case MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig,
+	case MediaTypeDockerSchema2Config, imagespec.MediaTypeImageConfig,
 		MediaTypeContainerd1Checkpoint, MediaTypeContainerd1CheckpointConfig:
 		return true
 	}
@@ -187,14 +187,14 @@ func IsKnownConfig(mt string) bool {
 }
 
 // ChildGCLabels returns the label for a given descriptor to reference it
-func ChildGCLabels(desc ocispec.Descriptor) []string {
+func ChildGCLabels(desc imagespec.Descriptor) []string {
 	mt := desc.MediaType
 	if IsKnownConfig(mt) {
 		return []string{"containerd.io/gc.ref.content.config"}
 	}
 
 	switch mt {
-	case MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest:
+	case MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest:
 		return []string{"containerd.io/gc.ref.content.m."}
 	}
 
@@ -207,7 +207,7 @@ func ChildGCLabels(desc ocispec.Descriptor) []string {
 
 // ChildGCLabelsFilterLayers returns the labels for a given descriptor to
 // reference it, skipping layer media types
-func ChildGCLabelsFilterLayers(desc ocispec.Descriptor) []string {
+func ChildGCLabelsFilterLayers(desc imagespec.Descriptor) []string {
 	if IsLayerType(desc.MediaType) {
 		return nil
 	}

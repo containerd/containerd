@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Config is used to hold parameters needed for a diff operation
@@ -60,7 +60,7 @@ type Comparer interface {
 	// a ref which can be used to track the content creation of the diff.
 	// The media type which is used to determine the format of the created
 	// content can also be provided as an option.
-	Compare(ctx context.Context, lower, upper []mount.Mount, opts ...Opt) (ocispec.Descriptor, error)
+	Compare(ctx context.Context, lower, upper []mount.Mount, opts ...Opt) (imagespec.Descriptor, error)
 }
 
 // ApplyConfig is used to hold parameters needed for a apply operation
@@ -70,7 +70,7 @@ type ApplyConfig struct {
 }
 
 // ApplyOpt is used to configure an Apply operation
-type ApplyOpt func(context.Context, ocispec.Descriptor, *ApplyConfig) error
+type ApplyOpt func(context.Context, imagespec.Descriptor, *ApplyConfig) error
 
 // Applier allows applying diffs between mounts
 type Applier interface {
@@ -79,7 +79,7 @@ type Applier interface {
 	// implementation and content descriptor. For example, in the common
 	// case the descriptor is a file system difference in tar format,
 	// that tar would be applied on top of the mounts.
-	Apply(ctx context.Context, desc ocispec.Descriptor, mount []mount.Mount, opts ...ApplyOpt) (ocispec.Descriptor, error)
+	Apply(ctx context.Context, desc imagespec.Descriptor, mount []mount.Mount, opts ...ApplyOpt) (imagespec.Descriptor, error)
 }
 
 // WithCompressor sets the function to be used to compress the diff stream.
@@ -119,7 +119,7 @@ func WithLabels(labels map[string]string) Opt {
 
 // WithPayloads sets the apply processor payloads to the config
 func WithPayloads(payloads map[string]typeurl.Any) ApplyOpt {
-	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
+	return func(_ context.Context, _ imagespec.Descriptor, c *ApplyConfig) error {
 		c.ProcessorPayloads = payloads
 		return nil
 	}

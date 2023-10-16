@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -44,11 +44,11 @@ type diffRemote struct {
 	client diffapi.DiffClient
 }
 
-func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (ocispec.Descriptor, error) {
+func (r *diffRemote) Apply(ctx context.Context, desc imagespec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (imagespec.Descriptor, error) {
 	var config diff.ApplyConfig
 	for _, opt := range opts {
 		if err := opt(ctx, desc, &config); err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 	}
 
@@ -64,16 +64,16 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 	}
 	resp, err := r.client.Apply(ctx, req)
 	if err != nil {
-		return ocispec.Descriptor{}, errdefs.FromGRPC(err)
+		return imagespec.Descriptor{}, errdefs.FromGRPC(err)
 	}
 	return oci.DescriptorFromProto(resp.Applied), nil
 }
 
-func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (ocispec.Descriptor, error) {
+func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...diff.Opt) (imagespec.Descriptor, error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 	}
 	if tm := epoch.FromContext(ctx); tm != nil && config.SourceDateEpoch == nil {
@@ -93,7 +93,7 @@ func (r *diffRemote) Compare(ctx context.Context, a, b []mount.Mount, opts ...di
 	}
 	resp, err := r.client.Diff(ctx, req)
 	if err != nil {
-		return ocispec.Descriptor{}, errdefs.FromGRPC(err)
+		return imagespec.Descriptor{}, errdefs.FromGRPC(err)
 	}
 	return oci.DescriptorFromProto(resp.Diff), nil
 }

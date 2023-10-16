@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/images/converter/uncompress"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -80,6 +80,6 @@ func TestConvert(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, l := range mani.Layers {
-		assert.Equal(t, ocispec.MediaTypeImageLayer, l.MediaType)
+		assert.Equal(t, imagespec.MediaTypeImageLayer, l.MediaType)
 	}
 }

@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -48,14 +48,14 @@ var (
 
 // Handler handles image manifests
 type Handler interface {
-	Handle(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error)
+	Handle(ctx context.Context, desc imagespec.Descriptor) (subdescs []imagespec.Descriptor, err error)
 }
 
 // HandlerFunc function implementing the Handler interface
-type HandlerFunc func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error)
+type HandlerFunc func(ctx context.Context, desc imagespec.Descriptor) (subdescs []imagespec.Descriptor, err error)
 
 // Handle image manifests
-func (fn HandlerFunc) Handle(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+func (fn HandlerFunc) Handle(ctx context.Context, desc imagespec.Descriptor) (subdescs []imagespec.Descriptor, err error) {
 	return fn(ctx, desc)
 }
 
@@ -63,8 +63,8 @@ func (fn HandlerFunc) Handle(ctx context.Context, desc ocispec.Descriptor) (subd
 //
 // A handler may return `ErrStopHandler` to stop calling additional handlers
 func Handlers(handlers ...Handler) HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
-		var children []ocispec.Descriptor
+	return func(ctx context.Context, desc imagespec.Descriptor) (subdescs []imagespec.Descriptor, err error) {
+		var children []imagespec.Descriptor
 		for _, handler := range handlers {
 			ch, err := handler.Handle(ctx, desc)
 			if err != nil {
@@ -86,7 +86,7 @@ func Handlers(handlers ...Handler) HandlerFunc {
 //
 // This differs from dispatch in that each sibling resource is considered
 // synchronously.
-func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) error {
+func Walk(ctx context.Context, handler Handler, descs ...imagespec.Descriptor) error {
 	for _, desc := range descs {
 
 		children, err := handler.Handle(ctx, desc)
@@ -110,9 +110,9 @@ func Walk(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) err
 // some children are still found by Walking the descriptors (for example, not all of
 // them have been filtered out by one of the handlers). If there are no children,
 // then an ErrEmptyWalk error is returned.
-func WalkNotEmpty(ctx context.Context, handler Handler, descs ...ocispec.Descriptor) error {
+func WalkNotEmpty(ctx context.Context, handler Handler, descs ...imagespec.Descriptor) error {
 	isEmpty := true
-	var notEmptyHandler HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var notEmptyHandler HandlerFunc = func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := handler.Handle(ctx, desc)
 		if err != nil {
 			return children, err
@@ -151,7 +151,7 @@ func WalkNotEmpty(ctx context.Context, handler Handler, descs ...ocispec.Descrip
 // with other handlers.
 //
 // If any handler returns an error, the dispatch session will be canceled.
-func Dispatch(ctx context.Context, handler Handler, limiter *semaphore.Weighted, descs ...ocispec.Descriptor) error {
+func Dispatch(ctx context.Context, handler Handler, limiter *semaphore.Weighted, descs ...imagespec.Descriptor) error {
 	eg, ctx2 := errgroup.WithContext(ctx)
 	for _, desc := range descs {
 		desc := desc
@@ -195,7 +195,7 @@ func Dispatch(ctx context.Context, handler Handler, limiter *semaphore.Weighted,
 // One can also replace this with another implementation to allow descending of
 // arbitrary types.
 func ChildrenHandler(provider content.Provider) HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		return Children(ctx, provider, desc)
 	}
 }
@@ -213,11 +213,11 @@ func SetChildrenLabels(manager content.Manager, f HandlerFunc) HandlerFunc {
 // The label map allows the caller to control the labels per child descriptor.
 // For returned labels, the index of the child will be appended to the end
 // except for the first index when the returned label does not end with '.'.
-func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(ocispec.Descriptor) []string) HandlerFunc {
+func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap func(imagespec.Descriptor) []string) HandlerFunc {
 	if labelMap == nil {
 		labelMap = ChildGCLabels
 	}
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
 			return children, err
@@ -259,13 +259,13 @@ func SetChildrenMappedLabels(manager content.Manager, f HandlerFunc, labelMap fu
 // FilterPlatforms is a handler wrapper which limits the descriptors returned
 // based on matching the specified platform matcher.
 func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
 			return children, err
 		}
 
-		var descs []ocispec.Descriptor
+		var descs []imagespec.Descriptor
 
 		if m == nil {
 			descs = children
@@ -288,7 +288,7 @@ func FilterPlatforms(f HandlerFunc, m platforms.Matcher) HandlerFunc {
 // A limit of 0 or less is considered no limit.
 // A not found error is returned if no manifest is matched.
 func LimitManifests(f HandlerFunc, m platforms.MatchComparer, n int) HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
 			return children, err

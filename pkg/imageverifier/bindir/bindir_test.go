@@ -31,7 +31,7 @@ import (
 
 	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -140,7 +140,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{
 			Digest:      "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
 			MediaType:   "application/vnd.docker.distribution.manifest.list.v2+json",
 			Size:        2048,
@@ -174,7 +174,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(30 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK, "expected OK, got not OK with reason: %v", j.Reason)
 		assert.Less(t, len(j.Reason), len(bins)*(outputLimitBytes+1024), "reason is: %v", j.Reason) // 1024 leaves margin for the formatting around the reason.
@@ -187,7 +187,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
@@ -200,7 +200,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
@@ -217,7 +217,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Empty(t, j.Reason)
@@ -235,7 +235,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
@@ -254,7 +254,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.NotEmpty(t, j.Reason)
@@ -272,7 +272,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier-0%[1]v => Reason A, verifier-1%[1]v => Reason B, verifier-2%[1]v => Reason C", exeIfWindows()), j.Reason)
@@ -291,7 +291,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.False(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier verifier-2%[1]v rejected image (exit code 1): Reason D", exeIfWindows()), j.Reason)
@@ -310,7 +310,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.True(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier-0%[1]v => Reason A, verifier-1%[1]v => Reason B, verifier-2%[1]v => Reason C", exeIfWindows()), j.Reason)
@@ -329,7 +329,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.NoError(t, err)
 		assert.False(t, j.OK)
 		assert.Equal(t, fmt.Sprintf("verifier verifier-2%[1]v rejected image (exit code 1): Reason D", exeIfWindows()), j.Reason)
@@ -348,7 +348,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		if runtime.GOOS == "windows" {
 			assert.NoError(t, err)
 			assert.False(t, j.OK)
@@ -383,7 +383,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{})
 		assert.Error(t, err)
 		assert.Nil(t, j)
 	})
@@ -399,7 +399,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 			PerVerifierTimeout: tomlext.FromStdTime(5 * time.Second),
 		})
 
-		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{
+		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", imagespec.Descriptor{
 			Digest:    "sha256:98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4",
 			MediaType: "application/vnd.docker.distribution.manifest.list.v2+json",
 			Size:      2048,

@@ -27,7 +27,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TreeFormat is used to format tree based output using 4 values.
@@ -113,12 +113,12 @@ func (p *ImageTreePrinter) PrintImageTree(ctx context.Context, img images.Image,
 }
 
 // PrintManifestTree prints a manifest and all its sub elements
-func (p *ImageTreePrinter) PrintManifestTree(ctx context.Context, desc ocispec.Descriptor, store ContentReader) error {
+func (p *ImageTreePrinter) PrintManifestTree(ctx context.Context, desc imagespec.Descriptor, store ContentReader) error {
 	// start displaying tree from the root descriptor perspective, which is a single child view
 	return p.printManifestTree(ctx, desc, store, p.format.LastDrop, p.format.Spacer)
 }
 
-func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.Descriptor, store ContentReader, prefix, childprefix string) error {
+func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc imagespec.Descriptor, store ContentReader, prefix, childprefix string) error {
 	subprefix := childprefix + p.format.MiddleDrop
 	subchild := childprefix + p.format.SkipLine
 	fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", prefix, desc.MediaType, desc.Digest, desc.Size)
@@ -136,7 +136,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	}
 
 	if images.IsManifestType(desc.MediaType) {
-		var manifest ocispec.Manifest
+		var manifest imagespec.Manifest
 		if err := json.Unmarshal(b, &manifest); err != nil {
 			return err
 		}
@@ -158,7 +158,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 			fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", subprefix, manifest.Layers[i].MediaType, manifest.Layers[i].Digest, manifest.Layers[i].Size)
 		}
 	} else if images.IsIndexType(desc.MediaType) {
-		var idx ocispec.Index
+		var idx imagespec.Index
 		if err := json.Unmarshal(b, &idx); err != nil {
 			return err
 		}
@@ -177,7 +177,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	return nil
 }
 
-func (p *ImageTreePrinter) showContent(ctx context.Context, store ContentReader, desc ocispec.Descriptor, prefix string) error {
+func (p *ImageTreePrinter) showContent(ctx context.Context, store ContentReader, desc imagespec.Descriptor, prefix string) error {
 	if p.verbose {
 		info, err := store.Info(ctx, desc.Digest)
 		if err != nil {

@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/pkg/imageverifier"
 	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const outputLimitBytes = 1 << 15 // 32 KiB
@@ -55,7 +55,7 @@ func NewImageVerifier(c *Config) *ImageVerifier {
 	}
 }
 
-func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*imageverifier.Judgement, error) {
+func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc imagespec.Descriptor) (*imageverifier.Judgement, error) {
 	// os.ReadDir sorts entries by name.
 	entries, err := os.ReadDir(v.config.BinDir)
 	if err != nil {
@@ -110,7 +110,7 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 	}, nil
 }
 
-func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc ocispec.Descriptor) (exitCode int, reason string, err error) {
+func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName string, desc imagespec.Descriptor) (exitCode int, reason string, err error) {
 	ctx, cancel := context.WithTimeout(ctx, tomlext.ToStdTime(v.config.PerVerifierTimeout))
 	defer cancel()
 
@@ -118,7 +118,7 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 	args := []string{
 		"-name", imageName,
 		"-digest", desc.Digest.String(),
-		"-stdin-media-type", ocispec.MediaTypeDescriptor,
+		"-stdin-media-type", imagespec.MediaTypeDescriptor,
 	}
 
 	cmd := exec.CommandContext(ctx, binPath, args...)

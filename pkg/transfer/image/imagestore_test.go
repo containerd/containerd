@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestStore(t *testing.T) {
@@ -202,7 +202,7 @@ func TestStore(t *testing.T) {
 		for _, a := range testCase.Annotations {
 			name := testCase.Name + "_" + a
 			dgst := digest.Canonical.FromString(name)
-			desc := ocispec.Descriptor{
+			desc := imagespec.Descriptor{
 				Digest:      dgst,
 				Annotations: map[string]string{},
 			}
@@ -219,7 +219,7 @@ func TestStore(t *testing.T) {
 				desc.Annotations[images.AnnotationImageName] = testCase.ImageName
 			case "OCI":
 				desc.Annotations["io.containerd.import.ref-source"] = "annotation"
-				desc.Annotations[ocispec.AnnotationRefName] = testCase.ImageName
+				desc.Annotations[imagespec.AnnotationRefName] = testCase.ImageName
 			case "Annotation":
 				desc.Annotations["io.containerd.import.ref-source"] = "annotation"
 			}

@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/images"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestContextCustomKeyPrefix(t *testing.T) {
@@ -38,7 +38,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 
 	// makes sure that even though we've supplied some custom handling, the built-in still works
 	t.Run("normal supported case", func(t *testing.T) {
-		desc := ocispec.Descriptor{MediaType: ocispec.MediaTypeImageLayer}
+		desc := imagespec.Descriptor{MediaType: imagespec.MediaTypeImageLayer}
 		expected := "layer-"
 
 		actual := MakeRefKey(ctx, desc)
@@ -48,7 +48,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 	})
 
 	t.Run("unknown media type", func(t *testing.T) {
-		desc := ocispec.Descriptor{MediaType: "we.dont.know.what.this.is"}
+		desc := imagespec.Descriptor{MediaType: "we.dont.know.what.this.is"}
 		expected := "unknown-"
 
 		actual := MakeRefKey(ctx, desc)
@@ -58,7 +58,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 	})
 
 	t.Run("overwrite supported media type", func(t *testing.T) {
-		desc := ocispec.Descriptor{MediaType: images.MediaTypeDockerSchema2Layer}
+		desc := imagespec.Descriptor{MediaType: images.MediaTypeDockerSchema2Layer}
 		expected := "bananas-"
 
 		actual := MakeRefKey(ctx, desc)
@@ -68,7 +68,7 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 	})
 
 	t.Run("custom media type", func(t *testing.T) {
-		desc := ocispec.Descriptor{MediaType: cmt}
+		desc := imagespec.Descriptor{MediaType: cmt}
 		expected := "apples-"
 
 		actual := MakeRefKey(ctx, desc)
@@ -82,16 +82,16 @@ func TestContextCustomKeyPrefix(t *testing.T) {
 func TestSkipNonDistributableBlobs(t *testing.T) {
 	ctx := context.Background()
 
-	out, err := SkipNonDistributableBlobs(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		return []ocispec.Descriptor{
+	out, err := SkipNonDistributableBlobs(images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+		return []imagespec.Descriptor{
 			{MediaType: images.MediaTypeDockerSchema2Layer, Digest: "test:1"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeign, Digest: "test:2"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeignGzip, Digest: "test:3"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
 		}, nil
-	}))(ctx, ocispec.Descriptor{MediaType: images.MediaTypeDockerSchema2Manifest})
+	}))(ctx, imagespec.Descriptor{MediaType: images.MediaTypeDockerSchema2Manifest})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,24 +137,24 @@ func TestSkipNonDistributableBlobs(t *testing.T) {
 		return dgst
 	}
 
-	configDigest := write(ocispec.ImageConfig{}, "config")
+	configDigest := write(imagespec.ImageConfig{}, "config")
 
-	manifest := ocispec.Manifest{
-		Config:    ocispec.Descriptor{Digest: configDigest, MediaType: ocispec.MediaTypeImageConfig},
-		MediaType: ocispec.MediaTypeImageManifest,
-		Layers: []ocispec.Descriptor{
+	manifest := imagespec.Manifest{
+		Config:    imagespec.Descriptor{Digest: configDigest, MediaType: imagespec.MediaTypeImageConfig},
+		MediaType: imagespec.MediaTypeImageManifest,
+		Layers: []imagespec.Descriptor{
 			{MediaType: images.MediaTypeDockerSchema2Layer, Digest: "test:1"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeign, Digest: "test:2"},
 			{MediaType: images.MediaTypeDockerSchema2LayerForeignGzip, Digest: "test:3"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
-			{MediaType: ocispec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributable, Digest: "test:4"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributableGzip, Digest: "test:5"},
+			{MediaType: imagespec.MediaTypeImageLayerNonDistributableZstd, Digest: "test:6"},
 		},
 	}
 
 	manifestDigest := write(manifest, "manifest")
 
-	out, err = SkipNonDistributableBlobs(images.ChildrenHandler(cs))(ctx, ocispec.Descriptor{MediaType: manifest.MediaType, Digest: manifestDigest})
+	out, err = SkipNonDistributableBlobs(images.ChildrenHandler(cs))(ctx, imagespec.Descriptor{MediaType: manifest.MediaType, Digest: manifestDigest})
 	if err != nil {
 		t.Fatal(err)
 	}

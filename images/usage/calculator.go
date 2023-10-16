@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"golang.org/x/sync/semaphore"
 )
@@ -100,7 +100,7 @@ func CalculateImageUsage(ctx context.Context, i images.Image, provider ContentPr
 		mustExist = true
 	}
 
-	var wh images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var wh images.HandlerFunc = func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		var usage int64
 		children, err := handler(ctx, desc)
 		if err != nil {

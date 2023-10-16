@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -56,10 +56,10 @@ func WithMediaTypeKeyPrefix(ctx context.Context, mediaType, prefix string) conte
 // MakeRefKey returns a unique reference for the descriptor. This reference can be
 // used to lookup ongoing processes related to the descriptor. This function
 // may look to the context to namespace the reference appropriately.
-func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
+func MakeRefKey(ctx context.Context, desc imagespec.Descriptor) string {
 	key := desc.Digest.String()
 	if desc.Annotations != nil {
-		if name, ok := desc.Annotations[ocispec.AnnotationRefName]; ok {
+		if name, ok := desc.Annotations[imagespec.AnnotationRefName]; ok {
 			key = fmt.Sprintf("%s@%s", name, desc.Digest.String())
 		}
 	}
@@ -90,7 +90,7 @@ func MakeRefKey(ctx context.Context, desc ocispec.Descriptor) string {
 // discovered in a call to Dispatch. Use with ChildrenHandler to do a full
 // recursive fetch.
 func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
@@ -109,7 +109,7 @@ func FetchHandler(ingester content.Ingester, fetcher Fetcher) images.HandlerFunc
 }
 
 // Fetch fetches the given digest into the provided ingester
-func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc ocispec.Descriptor) error {
+func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc imagespec.Descriptor) error {
 	log.G(ctx).Debug("fetch")
 
 	cw, err := content.OpenWriter(ctx, ingester, content.WithRef(MakeRefKey(ctx, desc)), content.WithDescriptor(desc))
@@ -154,7 +154,7 @@ func Fetch(ctx context.Context, ingester content.Ingester, fetcher Fetcher, desc
 // PushHandler returns a handler that will push all content from the provider
 // using a writer from the pusher.
 func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,
@@ -166,7 +166,7 @@ func PushHandler(pusher Pusher, provider content.Provider) images.HandlerFunc {
 	}
 }
 
-func push(ctx context.Context, provider content.Provider, pusher Pusher, desc ocispec.Descriptor) error {
+func push(ctx context.Context, provider content.Provider, pusher Pusher, desc imagespec.Descriptor) error {
 	log.G(ctx).Debug("push")
 
 	var (
@@ -205,13 +205,13 @@ func push(ctx context.Context, provider content.Provider, pusher Pusher, desc oc
 // If the passed in content.Provider is also a content.InfoProvider (such as
 // content.Manager) then this will also annotate the distribution sources using
 // labels prefixed with "containerd.io/distribution.source".
-func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
+func PushContent(ctx context.Context, pusher Pusher, desc imagespec.Descriptor, store content.Provider, limiter *semaphore.Weighted, platform platforms.MatchComparer, wrapper func(h images.Handler) images.Handler) error {
 
 	var m sync.Mutex
-	manifests := []ocispec.Descriptor{}
-	indexStack := []ocispec.Descriptor{}
+	manifests := []imagespec.Descriptor{}
+	indexStack := []imagespec.Descriptor{}
 
-	filterHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	filterHandler := images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		if images.IsManifestType(desc.MediaType) {
 			m.Lock()
 			manifests = append(manifests, desc)
@@ -274,7 +274,7 @@ func PushContent(ctx context.Context, pusher Pusher, desc ocispec.Descriptor, st
 //   - application/vnd.oci.image.layer.nondistributable
 //   - application/vnd.docker.image.rootfs.foreign
 func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		if images.IsNonDistributable(desc.MediaType) {
 			log.G(ctx).WithField("digest", desc.Digest).WithField("mediatype", desc.MediaType).Debug("Skipping non-distributable blob")
 			return nil, images.ErrSkipDesc
@@ -288,7 +288,7 @@ func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
 			return nil, nil
 		}
 
-		out := make([]ocispec.Descriptor, 0, len(children))
+		out := make([]imagespec.Descriptor, 0, len(children))
 		for _, child := range children {
 			if !images.IsNonDistributable(child.MediaType) {
 				out = append(out, child)
@@ -303,7 +303,7 @@ func SkipNonDistributableBlobs(f images.HandlerFunc) images.HandlerFunc {
 // FilterManifestByPlatformHandler allows Handler to handle non-target
 // platform's manifest and configuration data.
 func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
 			return nil, err
@@ -315,7 +315,7 @@ func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) 
 		}
 
 		if images.IsManifestType(desc.MediaType) && !m.Match(*desc.Platform) {
-			var descs []ocispec.Descriptor
+			var descs []imagespec.Descriptor
 			for _, child := range children {
 				if images.IsConfigType(child.MediaType) {
 					descs = append(descs, child)
@@ -330,7 +330,7 @@ func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) 
 // annotateDistributionSourceHandler add distribution source label into
 // annotation of config or blob descriptor.
 func annotateDistributionSourceHandler(f images.HandlerFunc, provider content.InfoProvider) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		children, err := f(ctx, desc)
 		if err != nil {
 			return nil, err

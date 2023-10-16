@@ -22,7 +22,7 @@ import (
 	"os"
 	"time"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd"
@@ -129,7 +129,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				opts = append(opts, image.WithNamedPrefix(prefix, overwrite))
 			}
 
-			var platSpec ocispec.Platform
+			var platSpec imagespec.Platform
 			// Only when all-platforms not specified, we will check platform value
 			// Implicitly if the platforms is empty, it means all-platforms
 			if !context.Bool("all-platforms") {
@@ -153,7 +153,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 					opts = append(opts, image.WithUnpack(platSpec, snapshotter))
 				} else {
 					// Empty spec means all platforms
-					var emptySpec ocispec.Platform
+					var emptySpec imagespec.Platform
 					opts = append(opts, image.WithUnpack(emptySpec, snapshotter))
 				}
 			}

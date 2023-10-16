@@ -22,7 +22,7 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Resolver provides remotes based on a locator.
@@ -38,7 +38,7 @@ type Resolver interface {
 	// While the name may differ from ref, it should itself be a valid ref.
 	//
 	// If the resolution fails, an error will be returned.
-	Resolve(ctx context.Context, ref string) (name string, desc ocispec.Descriptor, err error)
+	Resolve(ctx context.Context, ref string) (name string, desc imagespec.Descriptor, err error)
 
 	// Fetcher returns a new fetcher for the provided reference.
 	// All content fetched from the returned fetcher will be
@@ -55,7 +55,7 @@ type Resolver interface {
 // A fetcher implementation may implement the FetcherByDigest interface too.
 type Fetcher interface {
 	// Fetch the resource identified by the descriptor.
-	Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
+	Fetch(ctx context.Context, desc imagespec.Descriptor) (io.ReadCloser, error)
 }
 
 // FetcherByDigest fetches content by the digest.
@@ -65,31 +65,31 @@ type FetcherByDigest interface {
 	// FetcherByDigest usually returns an incomplete descriptor.
 	// Typically, the media type is always set to "application/octet-stream",
 	// and the annotations are unset.
-	FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...FetchByDigestOpts) (io.ReadCloser, ocispec.Descriptor, error)
+	FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...FetchByDigestOpts) (io.ReadCloser, imagespec.Descriptor, error)
 }
 
 // Pusher pushes content
 type Pusher interface {
 	// Push returns a content writer for the given resource identified
 	// by the descriptor.
-	Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error)
+	Push(ctx context.Context, d imagespec.Descriptor) (content.Writer, error)
 }
 
 // FetcherFunc allows package users to implement a Fetcher with just a
 // function.
-type FetcherFunc func(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error)
+type FetcherFunc func(ctx context.Context, desc imagespec.Descriptor) (io.ReadCloser, error)
 
 // Fetch content
-func (fn FetcherFunc) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
+func (fn FetcherFunc) Fetch(ctx context.Context, desc imagespec.Descriptor) (io.ReadCloser, error) {
 	return fn(ctx, desc)
 }
 
 // PusherFunc allows package users to implement a Pusher with just a
 // function.
-type PusherFunc func(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error)
+type PusherFunc func(ctx context.Context, desc imagespec.Descriptor) (content.Writer, error)
 
 // Push content
-func (fn PusherFunc) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
+func (fn PusherFunc) Push(ctx context.Context, desc imagespec.Descriptor) (content.Writer, error) {
 	return fn(ctx, desc)
 }
 

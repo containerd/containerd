@@ -35,14 +35,14 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type walkingDiff struct {
 	store content.Store
 }
 
-var emptyDesc = ocispec.Descriptor{}
+var emptyDesc = imagespec.Descriptor{}
 
 // NewWalkingDiff is a generic implementation of diff.Comparer.  The diff is
 // calculated by mounting both the upper and lower mount sets and walking the
@@ -58,7 +58,7 @@ func NewWalkingDiff(store content.Store) diff.Comparer {
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d imagespec.Descriptor, err error) {
 	var config diff.Config
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
@@ -82,19 +82,19 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 		isCompressed = true
 	} else {
 		if config.MediaType == "" {
-			config.MediaType = ocispec.MediaTypeImageLayerGzip
+			config.MediaType = imagespec.MediaTypeImageLayerGzip
 		}
 
 		switch config.MediaType {
-		case ocispec.MediaTypeImageLayer:
-		case ocispec.MediaTypeImageLayerGzip:
+		case imagespec.MediaTypeImageLayer:
+		case imagespec.MediaTypeImageLayerGzip:
 			isCompressed = true
 		default:
 			return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
 		}
 	}
 
-	var ocidesc ocispec.Descriptor
+	var ocidesc imagespec.Descriptor
 	if err := mount.WithTempMount(ctx, lower, func(lowerRoot string) error {
 		return mount.WithReadonlyTempMount(ctx, upper, func(upperRoot string) error {
 			var newReference bool
@@ -105,7 +105,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 
 			cw, err := s.store.Writer(ctx,
 				content.WithRef(config.Reference),
-				content.WithDescriptor(ocispec.Descriptor{
+				content.WithDescriptor(imagespec.Descriptor{
 					MediaType: config.MediaType, // most contentstore implementations just ignore this
 				}))
 			if err != nil {
@@ -189,7 +189,7 @@ func (s *walkingDiff) Compare(ctx context.Context, lower, upper []mount.Mount, o
 				}
 			}
 
-			ocidesc = ocispec.Descriptor{
+			ocidesc = imagespec.Descriptor{
 				MediaType: config.MediaType,
 				Size:      info.Size,
 				Digest:    info.Digest,

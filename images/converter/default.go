@@ -29,13 +29,13 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 )
 
 // ConvertFunc returns a converted content descriptor.
 // When the content was not converted, ConvertFunc returns nil.
-type ConvertFunc func(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error)
+type ConvertFunc func(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error)
 
 // DefaultIndexConvertFunc is the default convert func used by Convert.
 func DefaultIndexConvertFunc(layerConvertFunc ConvertFunc, docker2oci bool, platformMC platforms.MatchComparer) ConvertFunc {
@@ -50,7 +50,7 @@ func DefaultIndexConvertFunc(layerConvertFunc ConvertFunc, docker2oci bool, plat
 
 // ConvertHookFunc is a callback function called during conversion of a blob.
 // orgDesc is the target descriptor to convert. newDesc is passed if conversion happens.
-type ConvertHookFunc func(ctx context.Context, cs content.Store, orgDesc ocispec.Descriptor, newDesc *ocispec.Descriptor) (*ocispec.Descriptor, error)
+type ConvertHookFunc func(ctx context.Context, cs content.Store, orgDesc imagespec.Descriptor, newDesc *imagespec.Descriptor) (*imagespec.Descriptor, error)
 
 // ConvertHooks is a configuration for hook callbacks called during blob conversion.
 type ConvertHooks struct {
@@ -82,9 +82,9 @@ type defaultConverter struct {
 // convert dispatches desc.MediaType and calls c.convert{Layer,Manifest,Index,Config}.
 //
 // Also converts media type if c.docker2oci is set.
-func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	var (
-		newDesc *ocispec.Descriptor
+		newDesc *imagespec.Descriptor
 		err     error
 	)
 	if images.IsLayerType(desc.MediaType) {
@@ -127,7 +127,7 @@ func (c *defaultConverter) convert(ctx context.Context, cs content.Store, desc o
 	return newDesc, nil
 }
 
-func copyDesc(desc ocispec.Descriptor) *ocispec.Descriptor {
+func copyDesc(desc imagespec.Descriptor) *imagespec.Descriptor {
 	descCopy := desc
 	return &descCopy
 }
@@ -135,7 +135,7 @@ func copyDesc(desc ocispec.Descriptor) *ocispec.Descriptor {
 // convertLayer converts image layers if c.layerConvertFunc is set.
 //
 // c.layerConvertFunc can be nil, e.g., for converting Docker media types to OCI ones.
-func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	if c.layerConvertFunc != nil {
 		return c.layerConvertFunc(ctx, cs, desc)
 	}
@@ -146,9 +146,9 @@ func (c *defaultConverter) convertLayer(ctx context.Context, cs content.Store, d
 //
 // - converts `.mediaType` if the target format is OCI
 // - records diff ID changes in c.diffIDMap
-func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	var (
-		manifest ocispec.Manifest
+		manifest imagespec.Manifest
 		modified bool
 	)
 	labels, err := readJSON(ctx, cs, &manifest, desc)
@@ -227,9 +227,9 @@ func (c *defaultConverter) convertManifest(ctx context.Context, cs content.Store
 //
 // - converts `.mediaType` if the target format is OCI
 // - clears manifest entries that do not match c.platformMC
-func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	var (
-		index    ocispec.Index
+		index    imagespec.Index
 		modified bool
 	)
 	labels, err := readJSON(ctx, cs, &index, desc)
@@ -244,7 +244,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 		modified = true
 	}
 
-	newManifests := make([]ocispec.Descriptor, len(index.Manifests))
+	newManifests := make([]imagespec.Descriptor, len(index.Manifests))
 	newManifestsToBeRemoved := make(map[int]struct{}) // slice index
 	var mu sync.Mutex
 	eg, ctx2 := errgroup.WithContext(ctx)
@@ -283,7 +283,7 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 		return nil, err
 	}
 	if modified {
-		var newManifestsClean []ocispec.Descriptor
+		var newManifestsClean []imagespec.Descriptor
 		for i, m := range newManifests {
 			if _, ok := newManifestsToBeRemoved[i]; !ok {
 				newManifestsClean = append(newManifestsClean, m)
@@ -300,10 +300,10 @@ func (c *defaultConverter) convertIndex(ctx context.Context, cs content.Store, d
 // - updates `.rootfs.diff_ids` using c.diffIDMap .
 //
 // - clears legacy `.config.Image` and `.container_config.Image` fields if `.rootfs.diff_ids` was updated.
-func (c *defaultConverter) convertConfig(ctx context.Context, cs content.Store, desc ocispec.Descriptor) (*ocispec.Descriptor, error) {
+func (c *defaultConverter) convertConfig(ctx context.Context, cs content.Store, desc imagespec.Descriptor) (*imagespec.Descriptor, error) {
 	var (
 		cfg      DualConfig
-		cfgAsOCI ocispec.Image // read only, used for parsing cfg
+		cfgAsOCI imagespec.Image // read only, used for parsing cfg
 		modified bool
 	)
 
@@ -382,7 +382,7 @@ func clearDockerV1DummyID(cfg DualConfig) (bool, error) {
 // Unmarshalled as map[string]*json.RawMessage to retain unknown fields on remarshalling.
 type DualConfig map[string]*json.RawMessage
 
-func readJSON(ctx context.Context, cs content.Store, x interface{}, desc ocispec.Descriptor) (map[string]string, error) {
+func readJSON(ctx context.Context, cs content.Store, x interface{}, desc imagespec.Descriptor) (map[string]string, error) {
 	info, err := cs.Info(ctx, desc.Digest)
 	if err != nil {
 		return nil, err
@@ -398,7 +398,7 @@ func readJSON(ctx context.Context, cs content.Store, x interface{}, desc ocispec
 	return labels, nil
 }
 
-func writeJSON(ctx context.Context, cs content.Store, x interface{}, oldDesc ocispec.Descriptor, labels map[string]string) (*ocispec.Descriptor, error) {
+func writeJSON(ctx context.Context, cs content.Store, x interface{}, oldDesc imagespec.Descriptor, labels map[string]string) (*imagespec.Descriptor, error) {
 	b, err := json.Marshal(x)
 	if err != nil {
 		return nil, err
@@ -426,19 +426,19 @@ func writeJSON(ctx context.Context, cs content.Store, x interface{}, oldDesc oci
 func ConvertDockerMediaTypeToOCI(mt string) string {
 	switch mt {
 	case images.MediaTypeDockerSchema2ManifestList:
-		return ocispec.MediaTypeImageIndex
+		return imagespec.MediaTypeImageIndex
 	case images.MediaTypeDockerSchema2Manifest:
-		return ocispec.MediaTypeImageManifest
+		return imagespec.MediaTypeImageManifest
 	case images.MediaTypeDockerSchema2LayerGzip:
-		return ocispec.MediaTypeImageLayerGzip
+		return imagespec.MediaTypeImageLayerGzip
 	case images.MediaTypeDockerSchema2LayerForeignGzip:
-		return ocispec.MediaTypeImageLayerNonDistributableGzip //nolint:staticcheck // deprecated
+		return imagespec.MediaTypeImageLayerNonDistributableGzip //nolint:staticcheck // deprecated
 	case images.MediaTypeDockerSchema2Layer:
-		return ocispec.MediaTypeImageLayer
+		return imagespec.MediaTypeImageLayer
 	case images.MediaTypeDockerSchema2LayerForeign:
-		return ocispec.MediaTypeImageLayerNonDistributable //nolint:staticcheck // deprecated
+		return imagespec.MediaTypeImageLayerNonDistributable //nolint:staticcheck // deprecated
 	case images.MediaTypeDockerSchema2Config:
-		return ocispec.MediaTypeImageConfig
+		return imagespec.MediaTypeImageConfig
 	default:
 		return mt
 	}

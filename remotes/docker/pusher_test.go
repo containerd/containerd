@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -111,8 +111,8 @@ func TestPusherErrReset(t *testing.T) {
 
 	ct := []byte("manifest-content")
 
-	desc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageManifest,
+	desc := imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageManifest,
 		Digest:    digest.FromBytes(ct),
 		Size:      int64(len(ct)),
 	}
@@ -134,8 +134,8 @@ func TestPusherErrReset(t *testing.T) {
 }
 
 func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent []byte) error {
-	desc := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayerGzip,
+	desc := imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageLayerGzip,
 		Digest:    digest.FromBytes(layerContent),
 		Size:      int64(len(layerContent)),
 	}
@@ -312,7 +312,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			dockerBaseObject: baseObject,
 			args: args{
 				content:           manifestContent,
-				mediatype:         ocispec.MediaTypeImageManifest,
+				mediatype:         imagespec.MediaTypeImageManifest,
 				ref:               fmt.Sprintf("manifest-%s", manifestContentDigest.String()),
 				unavailableOnFail: false,
 			},
@@ -333,7 +333,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			dockerBaseObject: baseObject,
 			args: args{
 				content:           manifestContent,
-				mediatype:         ocispec.MediaTypeImageManifest,
+				mediatype:         imagespec.MediaTypeImageManifest,
 				ref:               fmt.Sprintf("manifest-%s", manifestContentDigest.String()),
 				unavailableOnFail: false,
 			},
@@ -350,7 +350,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			// dockerBaseObject:
 			args: args{
 				content:           layerContent,
-				mediatype:         ocispec.MediaTypeImageLayer,
+				mediatype:         imagespec.MediaTypeImageLayer,
 				ref:               fmt.Sprintf("layer2-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 				annotations: map[string]string{
@@ -379,7 +379,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			// dockerBaseObject:
 			args: args{
 				content:           layerContent,
-				mediatype:         ocispec.MediaTypeImageLayer,
+				mediatype:         imagespec.MediaTypeImageLayer,
 				ref:               fmt.Sprintf("layer3-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 				annotations: map[string]string{
@@ -408,7 +408,7 @@ func Test_dockerPusher_push(t *testing.T) {
 			// dockerBaseObject:
 			args: args{
 				content:           layerContent,
-				mediatype:         ocispec.MediaTypeImageLayer,
+				mediatype:         imagespec.MediaTypeImageLayer,
 				ref:               fmt.Sprintf("layer-%s", layerContentDigest.String()),
 				unavailableOnFail: false,
 			},
@@ -431,7 +431,7 @@ func Test_dockerPusher_push(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			desc := ocispec.Descriptor{
+			desc := imagespec.Descriptor{
 				MediaType:   test.args.mediatype,
 				Digest:      digest.FromBytes(test.args.content),
 				Size:        int64(len(test.args.content)),

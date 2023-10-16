@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // NOTE: The following labels contain "cri" prefix but they are not specific to CRI and
@@ -50,7 +50,7 @@ const (
 // used mainly by remote snapshotters for querying image contents from the remote location.
 func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler {
 	return func(f images.Handler) images.Handler {
-		return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		return images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 			children, err := f.Handle(ctx, desc)
 			if err != nil {
 				return nil, err
@@ -77,7 +77,7 @@ func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler 
 // getLayers returns comma-separated digests based on the passed list of
 // descriptors. The returned list contains as many digests as possible as well
 // as meets the label validation.
-func getLayers(ctx context.Context, key string, descs []ocispec.Descriptor, validate func(k, v string) error) (layers string) {
+func getLayers(ctx context.Context, key string, descs []imagespec.Descriptor, validate func(k, v string) error) (layers string) {
 	for _, l := range descs {
 		if images.IsLayerType(l.MediaType) {
 			item := l.Digest.String()

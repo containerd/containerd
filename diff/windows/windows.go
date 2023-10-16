@@ -43,7 +43,7 @@ import (
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -78,7 +78,7 @@ type windowsDiff struct {
 	store content.Store
 }
 
-var emptyDesc = ocispec.Descriptor{}
+var emptyDesc = imagespec.Descriptor{}
 
 // NewWindowsDiff is the Windows container layer implementation
 // for comparing and applying filesystem layers
@@ -91,7 +91,7 @@ func NewWindowsDiff(store content.Store) (CompareApplier, error) {
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+func (s windowsDiff) Apply(ctx context.Context, desc imagespec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d imagespec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -122,7 +122,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
 			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
-		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+		if processor.MediaType() == imagespec.MediaTypeImageLayer {
 			break
 		}
 	}
@@ -161,8 +161,8 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 		return emptyDesc, err
 	}
 
-	return ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayer,
+	return imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageLayer,
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
@@ -170,7 +170,7 @@ func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 
 // Compare creates a diff between the given mounts and uploads the result
 // to the content store.
-func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
+func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d imagespec.Descriptor, err error) {
 	t1 := time.Now()
 
 	var config diff.Config
@@ -189,13 +189,13 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 	}
 
 	if config.MediaType == "" {
-		config.MediaType = ocispec.MediaTypeImageLayerGzip
+		config.MediaType = imagespec.MediaTypeImageLayerGzip
 	}
 
 	var isCompressed bool
 	switch config.MediaType {
-	case ocispec.MediaTypeImageLayer:
-	case ocispec.MediaTypeImageLayerGzip:
+	case imagespec.MediaTypeImageLayer:
+	case imagespec.MediaTypeImageLayerGzip:
 		isCompressed = true
 	default:
 		return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
@@ -207,7 +207,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		config.Reference = uniqueRef()
 	}
 
-	cw, err := s.store.Writer(ctx, content.WithRef(config.Reference), content.WithDescriptor(ocispec.Descriptor{
+	cw, err := s.store.Writer(ctx, content.WithRef(config.Reference), content.WithDescriptor(imagespec.Descriptor{
 		MediaType: config.MediaType,
 	}))
 
@@ -290,7 +290,7 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		}
 	}
 
-	desc := ocispec.Descriptor{
+	desc := imagespec.Descriptor{
 		MediaType: config.MediaType,
 		Size:      info.Size,
 		Digest:    info.Digest,

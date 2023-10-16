@@ -37,8 +37,8 @@ import (
 	"github.com/containerd/containerd/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
 	digest "github.com/opencontainers/go-digest"
-	specs "github.com/opencontainers/image-spec/specs-go"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestHTTPResolver(t *testing.T) {
@@ -239,7 +239,7 @@ func TestBadTokenResolver(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+	h := newContent(imagespec.MediaTypeImageManifest, []byte("not anything parse-able"))
 
 	base, ro, close := withTokenServer(th, creds)(logHandler{t, h})
 	defer close()
@@ -262,7 +262,7 @@ func TestMissingBasicAuthResolver(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+	h := newContent(imagespec.MediaTypeImageManifest, []byte("not anything parse-able"))
 
 	base, ro, close := withBasicAuthServer(creds)(logHandler{t, h})
 	defer close()
@@ -288,7 +288,7 @@ func TestWrongBasicAuthResolver(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	h := newContent(ocispec.MediaTypeImageManifest, []byte("not anything parse-able"))
+	h := newContent(imagespec.MediaTypeImageManifest, []byte("not anything parse-able"))
 
 	base, ro, close := withBasicAuthServer(creds)(logHandler{t, h})
 	defer close()
@@ -437,10 +437,10 @@ func TestResolveProxy(t *testing.T) {
 	)
 
 	m := newManifest(
-		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
-		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+		newContent(imagespec.MediaTypeImageConfig, []byte("1")),
+		newContent(imagespec.MediaTypeImageLayerGzip, []byte("2")),
 	)
-	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	mc := newContent(imagespec.MediaTypeImageManifest, m.OCIManifest())
 	m.RegisterHandler(r, name)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
@@ -499,10 +499,10 @@ func TestResolveProxyFallback(t *testing.T) {
 	)
 
 	m := newManifest(
-		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
-		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+		newContent(imagespec.MediaTypeImageConfig, []byte("1")),
+		newContent(imagespec.MediaTypeImageLayerGzip, []byte("2")),
 	)
-	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	mc := newContent(imagespec.MediaTypeImageManifest, m.OCIManifest())
 	m.RegisterHandler(r, name)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
@@ -695,10 +695,10 @@ func runBasicTest(t *testing.T, name string, sf func(h http.Handler) (string, Re
 	)
 
 	m := newManifest(
-		newContent(ocispec.MediaTypeImageConfig, []byte("1")),
-		newContent(ocispec.MediaTypeImageLayerGzip, []byte("2")),
+		newContent(imagespec.MediaTypeImageConfig, []byte("1")),
+		newContent(imagespec.MediaTypeImageLayerGzip, []byte("2")),
 	)
-	mc := newContent(ocispec.MediaTypeImageManifest, m.OCIManifest())
+	mc := newContent(imagespec.MediaTypeImageManifest, m.OCIManifest())
 	m.RegisterHandler(r, name)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, tag), mc)
 	r.Handle(fmt.Sprintf("/v2/%s/manifests/%s", name, mc.Digest()), mc)
@@ -756,7 +756,7 @@ func runNotFoundTest(t *testing.T, name string, sf func(h http.Handler) (string,
 	}
 }
 
-func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) error {
+func testFetch(ctx context.Context, f remotes.Fetcher, desc imagespec.Descriptor) error {
 	r, err := f.Fetch(ctx, desc)
 	if err != nil {
 		return err
@@ -792,7 +792,7 @@ func testFetch(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) 
 	return nil
 }
 
-func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+func testocimanifest(ctx context.Context, f remotes.Fetcher, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 	r, err := f.Fetch(ctx, desc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch %s: %w", desc.Digest, err)
@@ -805,12 +805,12 @@ func testocimanifest(ctx context.Context, f remotes.Fetcher, desc ocispec.Descri
 		return nil, fmt.Errorf("digest mismatch: %s != %s", dgst, desc.Digest)
 	}
 
-	var manifest ocispec.Manifest
+	var manifest imagespec.Manifest
 	if err := json.Unmarshal(p, &manifest); err != nil {
 		return nil, err
 	}
 
-	var descs []ocispec.Descriptor
+	var descs []imagespec.Descriptor
 
 	descs = append(descs, manifest.Config)
 	descs = append(descs, manifest.Layers...)
@@ -830,8 +830,8 @@ func newContent(mediaType string, b []byte) testContent {
 	}
 }
 
-func (tc testContent) Descriptor() ocispec.Descriptor {
-	return ocispec.Descriptor{
+func (tc testContent) Descriptor() imagespec.Descriptor {
+	return imagespec.Descriptor{
 		MediaType: tc.mediaType,
 		Digest:    digest.FromBytes(tc.content),
 		Size:      int64(len(tc.content)),
@@ -863,12 +863,12 @@ func newManifest(config testContent, refs ...testContent) testManifest {
 }
 
 func (m testManifest) OCIManifest() []byte {
-	manifest := ocispec.Manifest{
-		Versioned: specs.Versioned{
+	manifest := imagespec.Manifest{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 1,
 		},
 		Config: m.config.Descriptor(),
-		Layers: make([]ocispec.Descriptor, len(m.references)),
+		Layers: make([]imagespec.Descriptor, len(m.references)),
 	}
 	for i, c := range m.references {
 		manifest.Layers[i] = c.Descriptor()

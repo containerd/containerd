@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // NewFileSystemApplier returns an applier which simply mounts
@@ -42,12 +42,12 @@ type fsApplier struct {
 	store content.Provider
 }
 
-var emptyDesc = ocispec.Descriptor{}
+var emptyDesc = imagespec.Descriptor{}
 
 // Apply applies the content associated with the provided digests onto the
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
-func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+func (s *fsApplier) Apply(ctx context.Context, desc imagespec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d imagespec.Descriptor, err error) {
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -81,7 +81,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 			return emptyDesc, fmt.Errorf("failed to get stream processor for %s: %w", desc.MediaType, err)
 		}
 		processors = append(processors, processor)
-		if processor.MediaType() == ocispec.MediaTypeImageLayer {
+		if processor.MediaType() == imagespec.MediaTypeImageLayer {
 			break
 		}
 	}
@@ -110,8 +110,8 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 			}
 		}
 	}
-	return ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageLayer,
+	return imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageLayer,
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil

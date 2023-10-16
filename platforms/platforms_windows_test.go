@@ -19,7 +19,7 @@ package platforms
 import (
 	"testing"
 
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,13 +28,13 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestFallbackOnOSVersion(t *testing.T) {
-	p := specs.Platform{
+	p := imagespec.Platform{
 		OS:           "windows",
 		Architecture: "amd64",
 		OSVersion:    "99.99.99.99",
 	}
 
-	other := specs.Platform{OS: p.OS, Architecture: p.Architecture}
+	other := imagespec.Platform{OS: p.OS, Architecture: p.Architecture}
 
 	m := NewMatcher(p)
 	require.True(t, m.Match(other))

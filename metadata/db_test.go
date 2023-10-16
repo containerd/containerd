@@ -42,7 +42,7 @@ import (
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
@@ -604,7 +604,7 @@ func create(obj object, tx *bolt.Tx, db *DB, cs content.Store, sn snapshots.Snap
 		expected := digest.FromBytes(v.data)
 		w, err := cs.Writer(ctx,
 			content.WithRef("test-ref"),
-			content.WithDescriptor(ocispec.Descriptor{Size: int64(len(v.data)), Digest: expected}))
+			content.WithDescriptor(imagespec.Descriptor{Size: int64(len(v.data)), Digest: expected}))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create writer: %w", err)
 		}
@@ -718,7 +718,7 @@ func image(n string, d digest.Digest, l ...string) object {
 	return object{
 		data: testImage{
 			name: n,
-			target: ocispec.Descriptor{
+			target: imagespec.Descriptor{
 				MediaType: "irrelevant",
 				Digest:    d,
 				Size:      256,
@@ -775,7 +775,7 @@ type testSnapshot struct {
 
 type testImage struct {
 	name   string
-	target ocispec.Descriptor
+	target imagespec.Descriptor
 }
 
 type testContainer struct {

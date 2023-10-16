@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -329,7 +329,7 @@ func checkBlobPath(t *testing.T, cs content.Store, dgst digest.Digest) string {
 
 func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Digest, p []byte) digest.Digest {
 	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p),
-		ocispec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
+		imagespec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -348,7 +348,7 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 	total := int64(len(contentB))
 	setupIncompleteWrite(ctx, t, cs, ref, total)
 
-	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
+	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(imagespec.Descriptor{Size: total}))
 	assert.NoError(t, err)
 
 	assert.Nil(t, writer.Truncate(0))
@@ -362,7 +362,7 @@ func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
 }
 
 func setupIncompleteWrite(ctx context.Context, t *testing.T, cs content.Store, ref string, total int64) {
-	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(ocispec.Descriptor{Size: total}))
+	writer, err := cs.Writer(ctx, content.WithRef(ref), content.WithDescriptor(imagespec.Descriptor{Size: total}))
 	assert.NoError(t, err)
 
 	_, err = writer.Write([]byte("bad data"))

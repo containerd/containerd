@@ -31,14 +31,14 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type dockerFetcher struct {
 	*dockerBase
 }
 
-func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
+func (r dockerFetcher) Fetch(ctx context.Context, desc imagespec.Descriptor) (io.ReadCloser, error) {
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", desc.Digest))
 
 	hosts := r.filterHosts(HostCapabilityPull)
@@ -180,8 +180,8 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, medi
 	return getReq, headResp.ContentLength, nil
 }
 
-func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...remotes.FetchByDigestOpts) (io.ReadCloser, ocispec.Descriptor, error) {
-	var desc ocispec.Descriptor
+func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, opts ...remotes.FetchByDigestOpts) (io.ReadCloser, imagespec.Descriptor, error) {
+	var desc imagespec.Descriptor
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("digest", dgst))
 	var config remotes.FetchByDigestConfig
 	for _, o := range opts {
@@ -248,7 +248,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		return nil, desc, err
 	}
 
-	desc = ocispec.Descriptor{
+	desc = imagespec.Descriptor{
 		MediaType: "application/octet-stream",
 		Digest:    dgst,
 		Size:      sz,

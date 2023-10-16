@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TestExport exports testImage as a tar stream
@@ -114,15 +114,15 @@ func TestExportDockerManifest(t *testing.T) {
 	dstFile.Seek(0, 0)
 
 	// test single-platform export
-	var result ocispec.Descriptor
-	err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var result imagespec.Descriptor
+	err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		if images.IsManifestType(desc.MediaType) {
 			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
 			if err != nil {
 				return nil, err
 			}
 
-			var manifest ocispec.Manifest
+			var manifest imagespec.Manifest
 			if err := json.Unmarshal(p, &manifest); err != nil {
 				return nil, err
 			}
@@ -137,7 +137,7 @@ func TestExportDockerManifest(t *testing.T) {
 				return nil, err
 			}
 
-			var idx ocispec.Index
+			var idx imagespec.Index
 			if err := json.Unmarshal(p, &idx); err != nil {
 				return nil, err
 			}

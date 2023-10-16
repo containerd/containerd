@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // maxResets is the no.of times the Copy() method can tolerate a reset of the body
@@ -58,7 +58,7 @@ func NewReader(ra ReaderAt) io.Reader {
 // ReadBlob retrieves the entire contents of the blob from the provider.
 //
 // Avoid using this for large blobs, such as layers.
-func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) ([]byte, error) {
+func ReadBlob(ctx context.Context, provider Provider, desc imagespec.Descriptor) ([]byte, error) {
 	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
 		return desc.Data, nil
 	}
@@ -89,7 +89,7 @@ func ReadBlob(ctx context.Context, provider Provider, desc ocispec.Descriptor) (
 // This is useful when the digest and size are known beforehand.
 //
 // Copy is buffered, so no need to wrap reader in buffered io.
-func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc ocispec.Descriptor, opts ...Opt) error {
+func WriteBlob(ctx context.Context, cs Ingester, ref string, r io.Reader, desc imagespec.Descriptor, opts ...Opt) error {
 	cw, err := OpenWriter(ctx, cs, WithRef(ref), WithDescriptor(desc))
 	if err != nil {
 		if !errdefs.IsAlreadyExists(err) {

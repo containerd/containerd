@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ProgressTracker struct {
@@ -36,7 +36,7 @@ type ProgressTracker struct {
 	added         chan jobUpdate
 	waitC         chan struct{}
 
-	parents map[digest.Digest][]ocispec.Descriptor
+	parents map[digest.Digest][]imagespec.Descriptor
 	parentL sync.Mutex
 }
 
@@ -53,13 +53,13 @@ type jobStatus struct {
 	name     string
 	parents  []string
 	progress int64
-	desc     ocispec.Descriptor
+	desc     imagespec.Descriptor
 }
 
 type jobUpdate struct {
-	desc   ocispec.Descriptor
+	desc   imagespec.Descriptor
 	exists bool
-	//children []ocispec.Descriptor
+	//children []imagespec.Descriptor
 }
 
 type ActiveJobs interface {
@@ -78,7 +78,7 @@ func NewProgressTracker(root, transferState string) *ProgressTracker {
 		transferState: transferState,
 		added:         make(chan jobUpdate, 1),
 		waitC:         make(chan struct{}),
-		parents:       map[digest.Digest][]ocispec.Descriptor{},
+		parents:       map[digest.Digest][]imagespec.Descriptor{},
 	}
 }
 
@@ -189,7 +189,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 }
 
 // Add adds a descriptor to be tracked
-func (j *ProgressTracker) Add(desc ocispec.Descriptor) {
+func (j *ProgressTracker) Add(desc imagespec.Descriptor) {
 	if j == nil {
 		return
 	}
@@ -198,7 +198,7 @@ func (j *ProgressTracker) Add(desc ocispec.Descriptor) {
 	}
 }
 
-func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
+func (j *ProgressTracker) MarkExists(desc imagespec.Descriptor) {
 	if j == nil {
 		return
 	}
@@ -210,7 +210,7 @@ func (j *ProgressTracker) MarkExists(desc ocispec.Descriptor) {
 }
 
 // AddChildren adds hierarchy information
-func (j *ProgressTracker) AddChildren(desc ocispec.Descriptor, children []ocispec.Descriptor) {
+func (j *ProgressTracker) AddChildren(desc imagespec.Descriptor, children []imagespec.Descriptor) {
 	if j == nil || len(children) == 0 {
 		return
 	}

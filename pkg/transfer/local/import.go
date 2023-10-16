@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -50,7 +50,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	}
 
 	var (
-		descriptors []ocispec.Descriptor
+		descriptors []imagespec.Descriptor
 		handler     images.Handler
 		unpacker    *unpack.Unpacker
 	)
@@ -58,7 +58,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	// If save index, add index
 	descriptors = append(descriptors, index)
 
-	var handlerFunc images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	var handlerFunc images.HandlerFunc = func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		// Only save images at top level
 		if desc.Digest != index.Digest {
 			return images.Children(ctx, ts.content, desc)
@@ -69,7 +69,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 			return nil, err
 		}
 
-		var idx ocispec.Index
+		var idx imagespec.Index
 		if err := json.Unmarshal(p, &idx); err != nil {
 			return nil, err
 		}
