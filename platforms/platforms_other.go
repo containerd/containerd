@@ -18,12 +18,8 @@
 
 package platforms
 
-import (
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-)
-
 // NewMatcher returns the default Matcher for containerd
-func newDefaultMatcher(platform imagespec.Platform) Matcher {
+func newDefaultMatcher(platform Platform) Matcher {
 	return &matcher{
 		Platform: Normalize(platform),
 	}

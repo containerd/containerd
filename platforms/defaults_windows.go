@@ -28,9 +28,9 @@ import (
 )
 
 // DefaultSpec returns the current platform's default platform specification.
-func DefaultSpec() imagespec.Platform {
+func DefaultSpec() Platform {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
-	return imagespec.Platform{
+	return Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
@@ -40,14 +40,14 @@ func DefaultSpec() imagespec.Platform {
 }
 
 type windowsmatcher struct {
-	imagespec.Platform
+	Platform
 	osVersionPrefix string
 	defaultMatcher  Matcher
 }
 
 // Match matches platform with the same windows major, minor
 // and build version.
-func (m windowsmatcher) Match(p imagespec.Platform) bool {
+func (m windowsmatcher) Match(p Platform) bool {
 	match := m.defaultMatcher.Match(p)
 
 	if match && m.OS == "windows" {
@@ -84,7 +84,7 @@ func GetOsVersion(osVersionPrefix string) osversion.OSVersion {
 // Less sorts matched platforms in front of other platforms.
 // For matched platforms, it puts platforms with larger revision
 // number in front.
-func (m windowsmatcher) Less(p1, p2 imagespec.Platform) bool {
+func (m windowsmatcher) Less(p1, p2 Platform) bool {
 	m1, m2 := m.Match(p1), m.Match(p2)
 	if m1 && m2 {
 		r1, r2 := revision(p1.OSVersion), revision(p2.OSVersion)

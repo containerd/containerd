@@ -129,7 +129,7 @@ type Platform = imagespec.Platform
 
 // Matcher matches platforms specifications, provided by an image or runtime.
 type Matcher interface {
-	Match(platform imagespec.Platform) bool
+	Match(platform Platform) bool
 }
 
 // NewMatcher returns a simple matcher based on the provided platform
@@ -140,15 +140,15 @@ type Matcher interface {
 // functionality.
 //
 // Applications should opt to use `Match` over directly parsing specifiers.
-func NewMatcher(platform imagespec.Platform) Matcher {
+func NewMatcher(platform Platform) Matcher {
 	return newDefaultMatcher(platform)
 }
 
 type matcher struct {
-	imagespec.Platform
+	Platform
 }
 
-func (m *matcher) Match(platform imagespec.Platform) bool {
+func (m *matcher) Match(platform Platform) bool {
 	normalized := Normalize(platform)
 	return m.OS == normalized.OS &&
 		m.Architecture == normalized.Architecture &&
@@ -160,8 +160,8 @@ func (m *matcher) String() string {
 }
 
 // ParseAll parses a list of platform specifiers into a list of platform.
-func ParseAll(specifiers []string) ([]imagespec.Platform, error) {
-	platforms := make([]imagespec.Platform, len(specifiers))
+func ParseAll(specifiers []string) ([]Platform, error) {
+	platforms := make([]Platform, len(specifiers))
 	for i, s := range specifiers {
 		p, err := Parse(s)
 		if err != nil {
@@ -180,21 +180,21 @@ func ParseAll(specifiers []string) ([]imagespec.Platform, error) {
 // value will be matched against the known set of operating systems, then fall
 // back to the known set of architectures. The missing component will be
 // inferred based on the local environment.
-func Parse(specifier string) (imagespec.Platform, error) {
+func Parse(specifier string) (Platform, error) {
 	if strings.Contains(specifier, "*") {
 		// TODO(stevvooe): need to work out exact wildcard handling
-		return imagespec.Platform{}, fmt.Errorf("%q: wildcards not yet supported: %w", specifier, errInvalidArgument)
+		return Platform{}, fmt.Errorf("%q: wildcards not yet supported: %w", specifier, errInvalidArgument)
 	}
 
 	parts := strings.Split(specifier, "/")
 
 	for _, part := range parts {
 		if !specifierRe.MatchString(part) {
-			return imagespec.Platform{}, fmt.Errorf("%q is an invalid component of %q: platform specifier component must match %q: %w", part, specifier, specifierRe.String(), errInvalidArgument)
+			return Platform{}, fmt.Errorf("%q is an invalid component of %q: platform specifier component must match %q: %w", part, specifier, specifierRe.String(), errInvalidArgument)
 		}
 	}
 
-	var p imagespec.Platform
+	var p Platform
 	switch len(parts) {
 	case 1:
 		// in this case, we will test that the value might be an OS, then look
@@ -226,7 +226,7 @@ func Parse(specifier string) (imagespec.Platform, error) {
 			return p, nil
 		}
 
-		return imagespec.Platform{}, fmt.Errorf("%q: unknown operating system or architecture: %w", specifier, errInvalidArgument)
+		return Platform{}, fmt.Errorf("%q: unknown operating system or architecture: %w", specifier, errInvalidArgument)
 	case 2:
 		// In this case, we treat as a regular os/arch pair. We don't care
 		// about whether or not we know of the platform.
@@ -256,12 +256,12 @@ func Parse(specifier string) (imagespec.Platform, error) {
 		return p, nil
 	}
 
-	return imagespec.Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errInvalidArgument)
+	return Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errInvalidArgument)
 }
 
 // MustParse is like Parses but panics if the specifier cannot be parsed.
 // Simplifies initialization of global variables.
-func MustParse(specifier string) imagespec.Platform {
+func MustParse(specifier string) Platform {
 	p, err := Parse(specifier)
 	if err != nil {
 		panic("platform: Parse(" + strconv.Quote(specifier) + "): " + err.Error())
@@ -270,7 +270,7 @@ func MustParse(specifier string) imagespec.Platform {
 }
 
 // Format returns a string specifier from the provided platform specification.
-func Format(platform imagespec.Platform) string {
+func Format(platform Platform) string {
 	if platform.OS == "" {
 		return "unknown"
 	}
@@ -282,7 +282,7 @@ func Format(platform imagespec.Platform) string {
 //
 // For example, if "Aarch64" is encountered, we change it to "arm64" or if
 // "x86_64" is encountered, it becomes "amd64".
-func Normalize(platform imagespec.Platform) imagespec.Platform {
+func Normalize(platform Platform) Platform {
 	platform.OS = normalizeOS(platform.OS)
 	platform.Architecture, platform.Variant = normalizeArch(platform.Architecture, platform.Variant)
 

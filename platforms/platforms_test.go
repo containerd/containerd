@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
-
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestParseSelector(t *testing.T) {
@@ -39,8 +37,8 @@ func TestParseSelector(t *testing.T) {
 	for _, testcase := range []struct {
 		skip      bool
 		input     string
-		expected  imagespec.Platform
-		matches   []imagespec.Platform
+		expected  Platform
+		matches   []Platform
 		formatted string
 	}{
 		// While wildcards are a valid use case for platform selection,
@@ -50,7 +48,7 @@ func TestParseSelector(t *testing.T) {
 		{
 			skip:  true,
 			input: "*",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "*",
 				Architecture: "*",
 			},
@@ -59,7 +57,7 @@ func TestParseSelector(t *testing.T) {
 		{
 			skip:  true,
 			input: "linux/*",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "*",
 			},
@@ -68,11 +66,11 @@ func TestParseSelector(t *testing.T) {
 		{
 			skip:  true,
 			input: "*/arm64",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "*",
 				Architecture: "arm64",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "*",
 					Architecture: "aarch64",
@@ -92,11 +90,11 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux/arm64",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "arm64",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "linux",
 					Architecture: "aarch64",
@@ -116,12 +114,12 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux/arm64/v8",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "arm64",
 				Variant:      "v8",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "linux",
 					Architecture: "aarch64",
@@ -143,11 +141,11 @@ func TestParseSelector(t *testing.T) {
 			// but we leave the variant blank. This will represent the vast
 			// majority of arm images.
 			input: "linux/arm",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "arm",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "linux",
 					Architecture: "arm",
@@ -167,12 +165,12 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux/arm/v6",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "arm",
 				Variant:      "v6",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "linux",
 					Architecture: "armel",
@@ -182,12 +180,12 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux/arm/v7",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "arm",
 				Variant:      "v7",
 			},
-			matches: []imagespec.Platform{
+			matches: []Platform{
 				{
 					OS:           "linux",
 					Architecture: "arm",
@@ -201,7 +199,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "arm",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
@@ -209,7 +207,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "armel",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "arm",
 				Variant:      "v6",
@@ -218,7 +216,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "armhf",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "arm",
 			},
@@ -226,7 +224,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "Aarch64",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "arm64",
 			},
@@ -234,7 +232,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "x86_64",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "amd64",
 			},
@@ -242,7 +240,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "Linux/x86_64",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "amd64",
 			},
@@ -250,7 +248,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "i386",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "386",
 			},
@@ -258,7 +256,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: defaultArch,
 				Variant:      defaultVariant,
@@ -267,7 +265,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "s390x",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           defaultOS,
 				Architecture: "s390x",
 			},
@@ -275,7 +273,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "linux/s390x",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "linux",
 				Architecture: "s390x",
 			},
@@ -283,7 +281,7 @@ func TestParseSelector(t *testing.T) {
 		},
 		{
 			input: "macOS",
-			expected: imagespec.Platform{
+			expected: Platform{
 				OS:           "darwin",
 				Architecture: defaultArch,
 				Variant:      defaultVariant,

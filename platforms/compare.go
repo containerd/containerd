@@ -19,8 +19,6 @@ package platforms
 import (
 	"strconv"
 	"strings"
-
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // MatchComparer is able to match and compare platforms to
@@ -28,19 +26,19 @@ import (
 type MatchComparer interface {
 	Matcher
 
-	Less(imagespec.Platform, imagespec.Platform) bool
+	Less(Platform, Platform) bool
 }
 
-// platformVector returns an (ordered) vector of appropriate imagespec.Platform
+// platformVector returns an (ordered) vector of appropriate Platform
 // objects to try matching for the given platform object (see platforms.Only).
-func platformVector(platform imagespec.Platform) []imagespec.Platform {
-	vector := []imagespec.Platform{platform}
+func platformVector(platform Platform) []Platform {
+	vector := []Platform{platform}
 
 	switch platform.Architecture {
 	case "amd64":
 		if amd64Version, err := strconv.Atoi(strings.TrimPrefix(platform.Variant, "v")); err == nil && amd64Version > 1 {
 			for amd64Version--; amd64Version >= 1; amd64Version-- {
-				vector = append(vector, imagespec.Platform{
+				vector = append(vector, Platform{
 					Architecture: platform.Architecture,
 					OS:           platform.OS,
 					OSVersion:    platform.OSVersion,
@@ -49,7 +47,7 @@ func platformVector(platform imagespec.Platform) []imagespec.Platform {
 				})
 			}
 		}
-		vector = append(vector, imagespec.Platform{
+		vector = append(vector, Platform{
 			Architecture: "386",
 			OS:           platform.OS,
 			OSVersion:    platform.OSVersion,
@@ -58,7 +56,7 @@ func platformVector(platform imagespec.Platform) []imagespec.Platform {
 	case "arm":
 		if armVersion, err := strconv.Atoi(strings.TrimPrefix(platform.Variant, "v")); err == nil && armVersion > 5 {
 			for armVersion--; armVersion >= 5; armVersion-- {
-				vector = append(vector, imagespec.Platform{
+				vector = append(vector, Platform{
 					Architecture: platform.Architecture,
 					OS:           platform.OS,
 					OSVersion:    platform.OSVersion,
@@ -72,7 +70,7 @@ func platformVector(platform imagespec.Platform) []imagespec.Platform {
 		if variant == "" {
 			variant = "v8"
 		}
-		vector = append(vector, platformVector(imagespec.Platform{
+		vector = append(vector, platformVector(Platform{
 			Architecture: "arm",
 			OS:           platform.OS,
 			OSVersion:    platform.OSVersion,
@@ -91,7 +89,7 @@ func platformVector(platform imagespec.Platform) []imagespec.Platform {
 // For arm/v7, will also match arm/v6 and arm/v5
 // For arm/v6, will also match arm/v5
 // For amd64, will also match 386
-func Only(platform imagespec.Platform) MatchComparer {
+func Only(platform Platform) MatchComparer {
 	return Ordered(platformVector(Normalize(platform))...)
 }
 
@@ -103,13 +101,13 @@ func Only(platform imagespec.Platform) MatchComparer {
 //
 // OnlyStrict matches non-canonical forms.
 // So, "arm64" matches "arm/64/v8".
-func OnlyStrict(platform imagespec.Platform) MatchComparer {
+func OnlyStrict(platform Platform) MatchComparer {
 	return Ordered(Normalize(platform))
 }
 
 // Ordered returns a platform MatchComparer which matches any of the platforms
 // but orders them in order they are provided.
-func Ordered(platforms ...imagespec.Platform) MatchComparer {
+func Ordered(platforms ...Platform) MatchComparer {
 	matchers := make([]Matcher, len(platforms))
 	for i := range platforms {
 		matchers[i] = NewMatcher(platforms[i])
@@ -121,7 +119,7 @@ func Ordered(platforms ...imagespec.Platform) MatchComparer {
 
 // Any returns a platform MatchComparer which matches any of the platforms
 // with no preference for ordering.
-func Any(platforms ...imagespec.Platform) MatchComparer {
+func Any(platforms ...Platform) MatchComparer {
 	matchers := make([]Matcher, len(platforms))
 	for i := range platforms {
 		matchers[i] = NewMatcher(platforms[i])
@@ -139,7 +137,7 @@ type orderedPlatformComparer struct {
 	matchers []Matcher
 }
 
-func (c orderedPlatformComparer) Match(platform imagespec.Platform) bool {
+func (c orderedPlatformComparer) Match(platform Platform) bool {
 	for _, m := range c.matchers {
 		if m.Match(platform) {
 			return true
@@ -148,7 +146,7 @@ func (c orderedPlatformComparer) Match(platform imagespec.Platform) bool {
 	return false
 }
 
-func (c orderedPlatformComparer) Less(p1 imagespec.Platform, p2 imagespec.Platform) bool {
+func (c orderedPlatformComparer) Less(p1 Platform, p2 Platform) bool {
 	for _, m := range c.matchers {
 		p1m := m.Match(p1)
 		p2m := m.Match(p2)
@@ -166,7 +164,7 @@ type anyPlatformComparer struct {
 	matchers []Matcher
 }
 
-func (c anyPlatformComparer) Match(platform imagespec.Platform) bool {
+func (c anyPlatformComparer) Match(platform Platform) bool {
 	for _, m := range c.matchers {
 		if m.Match(platform) {
 			return true
@@ -175,7 +173,7 @@ func (c anyPlatformComparer) Match(platform imagespec.Platform) bool {
 	return false
 }
 
-func (c anyPlatformComparer) Less(p1, p2 imagespec.Platform) bool {
+func (c anyPlatformComparer) Less(p1, p2 Platform) bool {
 	var p1m, p2m bool
 	for _, m := range c.matchers {
 		if !p1m && m.Match(p1) {
@@ -194,10 +192,10 @@ func (c anyPlatformComparer) Less(p1, p2 imagespec.Platform) bool {
 
 type allPlatformComparer struct{}
 
-func (allPlatformComparer) Match(imagespec.Platform) bool {
+func (allPlatformComparer) Match(Platform) bool {
 	return true
 }
 
-func (allPlatformComparer) Less(imagespec.Platform, imagespec.Platform) bool {
+func (allPlatformComparer) Less(Platform, Platform) bool {
 	return false
 }

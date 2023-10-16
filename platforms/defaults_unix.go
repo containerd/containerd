@@ -25,8 +25,8 @@ import (
 )
 
 // DefaultSpec returns the current platform's default platform specification.
-func DefaultSpec() imagespec.Platform {
-	return imagespec.Platform{
+func DefaultSpec() Platform {
+	return Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		// The Variant field will be empty if arch != ARM.

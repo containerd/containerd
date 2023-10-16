@@ -22,12 +22,10 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
-
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestDefault(t *testing.T) {
-	expected := imagespec.Platform{
+	expected := Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		Variant:      cpuVariant(),

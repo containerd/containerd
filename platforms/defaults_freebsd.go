@@ -23,8 +23,8 @@ import (
 )
 
 // DefaultSpec returns the current platform's default platform specification.
-func DefaultSpec() imagespec.Platform {
-	return imagespec.Platform{
+func DefaultSpec() Platform {
+	return Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
 		// The Variant field will be empty if arch != ARM.
@@ -34,7 +34,7 @@ func DefaultSpec() imagespec.Platform {
 
 // Default returns the default matcher for the platform.
 func Default() MatchComparer {
-	return Ordered(DefaultSpec(), imagespec.Platform{
+	return Ordered(DefaultSpec(), Platform{
 		OS:           "linux",
 		Architecture: runtime.GOARCH,
 		// The Variant field will be empty if arch != ARM.

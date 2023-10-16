@@ -28,13 +28,13 @@ func TestNormalize(t *testing.T) {
 }
 
 func TestFallbackOnOSVersion(t *testing.T) {
-	p := imagespec.Platform{
+	p := Platform{
 		OS:           "windows",
 		Architecture: "amd64",
 		OSVersion:    "99.99.99.99",
 	}
 
-	other := imagespec.Platform{OS: p.OS, Architecture: p.Architecture}
+	other := Platform{OS: p.OS, Architecture: p.Architecture}
 
 	m := NewMatcher(p)
 	require.True(t, m.Match(other))
