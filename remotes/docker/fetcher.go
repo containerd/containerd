@@ -18,7 +18,6 @@ package docker
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -289,11 +288,13 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
 		}
-		var registryErr Errors
-		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
-			return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
-		}
-		return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
+
+		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
+		// var registryErr Errors
+		// if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
+		// 	return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
+		// }
+		// return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
 	}
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package docker
+package errors
 
 import (
 	"encoding/json"
@@ -158,7 +158,7 @@ type ErrorDescriptor struct {
 	// Code is the error code that this descriptor describes.
 	Code ErrorCode
 
-	// Value provides a unique, string key, often captilized with
+	// Value provides a unique, string key, often capitalized with
 	// underscores, to identify the error code. This value is used as the
 	// keyed value when serializing api errors.
 	Value string

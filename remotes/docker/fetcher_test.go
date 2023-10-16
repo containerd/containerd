@@ -26,8 +26,10 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 
+	remoteserrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -129,10 +131,12 @@ func TestDockerFetcherOpen(t *testing.T) {
 		{
 			name:         "should return status and error.message if it exists if the registry request fails",
 			mockedStatus: 500,
-			mockedErr: Errors{Error{
-				Code:    ErrorCodeUnknown,
-				Message: "Test Error",
-			}},
+			mockedErr: remoteserrors.Errors{
+				remoteserrors.Error{
+					Code:    remoteserrors.ErrorCodeUnknown,
+					Message: "Test Error",
+				},
+			},
 			want:                   nil,
 			wantErr:                true,
 			wantServerMessageError: true,
@@ -200,14 +204,22 @@ func TestDockerFetcherOpen(t *testing.T) {
 			if tt.wantErr {
 				var expectedError error
 				if tt.wantServerMessageError {
-					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
+					var msgs []string
+					var errs = tt.mockedErr.(remoteserrors.Errors)
+					for _, err := range errs {
+						e, ok := err.(remoteserrors.Error)
+						if ok {
+							msgs = append(msgs, e.Message)
+						} else {
+							msgs = append(msgs, e.Error())
+						}
+					}
+					expectedError = fmt.Errorf("unexpected status code(%d) from %s request to %v/ns: %s", tt.mockedStatus, req.method, s.URL, strings.Join(msgs, ","))
 				} else if tt.wantPlainError {
-					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
+					expectedError = fmt.Errorf("unexpected status code(%d) from %s request to %s/ns: %s", tt.mockedStatus, req.method, s.URL, "")
 				}
 				assert.Equal(t, expectedError.Error(), err.Error())
-
 			}
-
 		})
 	}
 }
