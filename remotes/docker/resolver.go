@@ -28,6 +28,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/reference"
@@ -37,8 +40,6 @@ import (
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -163,8 +164,8 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		resolveHeader.Set("Accept", strings.Join([]string{
 			images.MediaTypeDockerSchema2Manifest,
 			images.MediaTypeDockerSchema2ManifestList,
-			ocispec.MediaTypeImageManifest,
-			ocispec.MediaTypeImageIndex, "*/*",
+			imagespec.MediaTypeImageManifest,
+			imagespec.MediaTypeImageIndex, "*/*",
 		}, ", "))
 	} else {
 		resolveHeader["Accept"] = options.Headers["Accept"]
@@ -231,14 +232,14 @@ func (r *countingReader) Read(p []byte) (int, error) {
 
 var _ remotes.Resolver = &dockerResolver{}
 
-func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
+func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, imagespec.Descriptor, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {
-		return "", ocispec.Descriptor{}, err
+		return "", imagespec.Descriptor{}, err
 	}
 	refspec := base.refspec
 	if refspec.Object == "" {
-		return "", ocispec.Descriptor{}, reference.ErrObjectRequired
+		return "", imagespec.Descriptor{}, reference.ErrObjectRequired
 	}
 
 	var (
@@ -251,7 +252,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		if err := dgst.Validate(); err != nil {
 			// need to fail here, since we can't actually resolve the invalid
 			// digest.
-			return "", ocispec.Descriptor{}, err
+			return "", imagespec.Descriptor{}, err
 		}
 
 		// turns out, we have a valid digest, make a url.
@@ -267,12 +268,12 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 	hosts := base.filterHosts(caps)
 	if len(hosts) == 0 {
-		return "", ocispec.Descriptor{}, fmt.Errorf("no resolve hosts: %w", errdefs.ErrNotFound)
+		return "", imagespec.Descriptor{}, fmt.Errorf("no resolve hosts: %w", errdefs.ErrNotFound)
 	}
 
 	ctx, err = ContextWithRepositoryScope(ctx, refspec, false)
 	if err != nil {
-		return "", ocispec.Descriptor{}, err
+		return "", imagespec.Descriptor{}, err
 	}
 
 	var (
@@ -288,7 +289,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 			req := base.request(host, http.MethodHead, u...)
 			if err := req.addNamespace(base.refspec.Hostname()); err != nil {
-				return "", ocispec.Descriptor{}, err
+				return "", imagespec.Descriptor{}, err
 			}
 
 			for key, value := range r.resolveHeader {
@@ -327,7 +328,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					log.G(ctx).Infof("trying next host - response was %s", resp.Status)
 					continue // try another host
 				}
-				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
+				return "", imagespec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
 			}
 			size := resp.ContentLength
 			contentType := getManifestMediaType(resp)
@@ -343,7 +344,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 				if dgstHeader != "" && size != -1 {
 					if err := dgstHeader.Validate(); err != nil {
-						return "", ocispec.Descriptor{}, fmt.Errorf("%q in header not a valid digest: %w", dgstHeader, err)
+						return "", imagespec.Descriptor{}, fmt.Errorf("%q in header not a valid digest: %w", dgstHeader, err)
 					}
 					dgst = dgstHeader
 				}
@@ -353,7 +354,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 				req = base.request(host, http.MethodGet, u...)
 				if err := req.addNamespace(base.refspec.Hostname()); err != nil {
-					return "", ocispec.Descriptor{}, err
+					return "", imagespec.Descriptor{}, err
 				}
 
 				for key, value := range r.resolveHeader {
@@ -362,7 +363,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 
 				resp, err := req.doWithRetries(ctx, nil)
 				if err != nil {
-					return "", ocispec.Descriptor{}, err
+					return "", imagespec.Descriptor{}, err
 				}
 
 				bodyReader := countingReader{reader: resp.Body}
@@ -389,7 +390,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					return err
 				}()
 				if err != nil {
-					return "", ocispec.Descriptor{}, err
+					return "", imagespec.Descriptor{}, err
 				}
 				size = bodyReader.bytesRead
 			}
@@ -402,7 +403,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 				continue
 			}
 
-			desc := ocispec.Descriptor{
+			desc := imagespec.Descriptor{
 				Digest:    dgst,
 				MediaType: contentType,
 				Size:      size,
@@ -419,7 +420,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
 	}
 
-	return "", ocispec.Descriptor{}, firstErr
+	return "", imagespec.Descriptor{}, firstErr
 }
 
 func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {

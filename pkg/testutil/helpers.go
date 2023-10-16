@@ -24,8 +24,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/containerd/containerd/mount"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/mount"
 )
 
 const umountflags int = 0

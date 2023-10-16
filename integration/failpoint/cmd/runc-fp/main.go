@@ -25,8 +25,9 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/containerd/containerd/oci"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/oci"
 )
 
 const (

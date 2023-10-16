@@ -25,13 +25,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/typeurl/v2"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"

@@ -23,9 +23,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/containerd/continuity/testutil"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/continuity/testutil"
 )
 
 func TestLongestCommonPrefix(t *testing.T) {

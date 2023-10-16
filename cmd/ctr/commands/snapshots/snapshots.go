@@ -28,6 +28,10 @@ import (
 	"text/tabwriter"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -36,9 +40,6 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
 )
 
 // Command is the cli command for managing snapshots
@@ -100,7 +101,7 @@ var diffCommand = cli.Command{
 		cli.StringFlag{
 			Name:  "media-type",
 			Usage: "Media type to use for creating diff",
-			Value: ocispec.MediaTypeImageLayerGzip,
+			Value: imagespec.MediaTypeImageLayerGzip,
 		},
 		cli.StringFlag{
 			Name:  "ref",
@@ -131,7 +132,7 @@ var diffCommand = cli.Command{
 		}
 		defer done(ctx)
 
-		var desc ocispec.Descriptor
+		var desc imagespec.Descriptor
 		labels := commands.LabelArgs(context.StringSlice("label"))
 		snapshotter := client.SnapshotService(context.GlobalString("snapshotter"))
 
@@ -151,8 +152,8 @@ var diffCommand = cli.Command{
 				return err
 			}
 		} else {
-			desc, err = withMounts(ctx, idA, snapshotter, func(a []mount.Mount) (ocispec.Descriptor, error) {
-				return withMounts(ctx, idB, snapshotter, func(b []mount.Mount) (ocispec.Descriptor, error) {
+			desc, err = withMounts(ctx, idA, snapshotter, func(a []mount.Mount) (imagespec.Descriptor, error) {
+				return withMounts(ctx, idB, snapshotter, func(b []mount.Mount) (imagespec.Descriptor, error) {
 					return client.DiffService().Compare(ctx, a, b, opts...)
 				})
 			})
@@ -172,22 +173,22 @@ var diffCommand = cli.Command{
 	},
 }
 
-func withMounts(ctx gocontext.Context, id string, sn snapshots.Snapshotter, f func(mounts []mount.Mount) (ocispec.Descriptor, error)) (ocispec.Descriptor, error) {
+func withMounts(ctx gocontext.Context, id string, sn snapshots.Snapshotter, f func(mounts []mount.Mount) (imagespec.Descriptor, error)) (imagespec.Descriptor, error) {
 	var mounts []mount.Mount
 	info, err := sn.Stat(ctx, id)
 	if err != nil {
-		return ocispec.Descriptor{}, err
+		return imagespec.Descriptor{}, err
 	}
 	if info.Kind == snapshots.KindActive {
 		mounts, err = sn.Mounts(ctx, id)
 		if err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 	} else {
 		key := fmt.Sprintf("%s-view-key", id)
 		mounts, err = sn.View(ctx, key, id)
 		if err != nil {
-			return ocispec.Descriptor{}, err
+			return imagespec.Descriptor{}, err
 		}
 		defer sn.Remove(ctx, key)
 	}

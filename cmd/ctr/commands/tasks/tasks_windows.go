@@ -22,11 +22,12 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
 )
 
 var platformStartFlags = []cli.Flag{}

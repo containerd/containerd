@@ -20,11 +20,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/images/converter/uncompress"
 	"github.com/containerd/containerd/platforms"
-	"github.com/urfave/cli"
 )
 
 var convertCommand = cli.Command{

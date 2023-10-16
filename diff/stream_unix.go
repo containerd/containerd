@@ -27,10 +27,11 @@ import (
 	"os"
 	"sync"
 
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/typeurl/v2"
-	exec "golang.org/x/sys/execabs"
 )
 
 // NewBinaryProcessor returns a binary processor for use with processing content streams

@@ -25,11 +25,12 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/content/local"
 	imageArchive "github.com/containerd/containerd/images/archive"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // FuzzApply implements a fuzzer that applies
@@ -93,7 +94,7 @@ func FuzzImportIndex(data []byte) int {
 			}
 			hdrName := path.Clean(hdr.Name)
 			switch hdrName {
-			case ocispec.ImageLayoutFile, "manifest.json":
+			case imagespec.ImageLayoutFile, "manifest.json":
 				hasLayoutOrManifest = true
 			}
 		}

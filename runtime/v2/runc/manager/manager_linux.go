@@ -26,6 +26,9 @@ import (
 	"syscall"
 	"time"
 
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -39,8 +42,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/shim"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/log"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 // NewShimManager returns an implementation of the shim manager

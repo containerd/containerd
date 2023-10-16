@@ -20,8 +20,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 func TestValidLabels(t *testing.T) {

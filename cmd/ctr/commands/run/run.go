@@ -23,10 +23,11 @@ import (
 	"fmt"
 	"strings"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/console"
 	gocni "github.com/containerd/go-cni"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
@@ -40,8 +41,8 @@ import (
 )
 
 func withMounts(context *cli.Context) oci.SpecOpts {
-	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
-		mounts := make([]specs.Mount, 0)
+	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *runtimespec.Spec) error {
+		mounts := make([]runtimespec.Mount, 0)
 		dests := make([]string, 0)
 		for _, mount := range context.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
@@ -56,8 +57,8 @@ func withMounts(context *cli.Context) oci.SpecOpts {
 }
 
 // parseMountFlag parses a mount string in the form "type=foo,source=/path,destination=/target,options=rbind:rw"
-func parseMountFlag(m string) (specs.Mount, error) {
-	mount := specs.Mount{}
+func parseMountFlag(m string) (runtimespec.Mount, error) {
+	mount := runtimespec.Mount{}
 	r := csv.NewReader(strings.NewReader(m))
 
 	fields, err := r.Read()

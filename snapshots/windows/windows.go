@@ -34,6 +34,8 @@ import (
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
@@ -44,7 +46,6 @@ import (
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -52,7 +53,7 @@ func init() {
 		Type: plugins.SnapshotPlugin,
 		ID:   "windows",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			ic.Meta.Platforms = []ocispec.Platform{platforms.DefaultSpec()}
+			ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 			return NewSnapshotter(ic.Properties[plugins.PropertyRootDir])
 		},
 	})

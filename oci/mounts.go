@@ -19,11 +19,11 @@
 package oci
 
 import (
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
-func defaultMounts() []specs.Mount {
-	return []specs.Mount{
+func defaultMounts() []runtimespec.Mount {
+	return []runtimespec.Mount{
 		{
 			Destination: "/proc",
 			Type:        "proc",

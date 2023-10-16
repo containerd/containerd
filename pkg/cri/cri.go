@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"k8s.io/klog/v2"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/server"
@@ -30,8 +33,6 @@ import (
 	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"k8s.io/klog/v2"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"

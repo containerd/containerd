@@ -25,16 +25,17 @@ import (
 	"strings"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/images"
 	criopts "github.com/containerd/containerd/pkg/cri/opts"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func checkMemoryLimit(t *testing.T, spec *runtimespec.Spec, memLimit int64) {

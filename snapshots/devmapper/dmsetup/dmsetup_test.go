@@ -23,11 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/testutil"
 )
 
 const (

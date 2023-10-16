@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	tasks "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/diff"
@@ -32,8 +35,6 @@ import (
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (

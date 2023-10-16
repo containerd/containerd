@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
+
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
@@ -30,7 +32,6 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	"google.golang.org/grpc"
 )
 
 func init() {

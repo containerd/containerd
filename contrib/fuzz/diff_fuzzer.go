@@ -21,11 +21,12 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/diff/apply"
 	"github.com/containerd/containerd/diff/walking"
 	"github.com/containerd/containerd/mount"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func FuzzDiffApply(data []byte) int {
@@ -44,7 +45,7 @@ func FuzzDiffApply(data []byte) int {
 		}
 		mounts = append(mounts, m)
 	}
-	desc := ocispec.Descriptor{}
+	desc := imagespec.Descriptor{}
 	err = f.GenerateStruct(&desc)
 	if err != nil {
 		return 0

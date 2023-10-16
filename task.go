@@ -26,6 +26,11 @@ import (
 	"syscall"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cio"
@@ -41,10 +46,6 @@ import (
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/typeurl/v2"
-	digest "github.com/opencontainers/go-digest"
-	is "github.com/opencontainers/image-spec/specs-go"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // UnknownExitStatus is returned when containerd is unable to
@@ -159,7 +160,7 @@ type Task interface {
 	// Resume the execution of the task
 	Resume(context.Context) error
 	// Exec creates a new process inside the task
-	Exec(context.Context, string, *specs.Process, cio.Creator) (Process, error)
+	Exec(context.Context, string, *runtimespec.Process, cio.Creator) (Process, error)
 	// Pids returns a list of system specific process ids inside the task
 	Pids(context.Context) ([]ProcessInfo, error)
 	// Checkpoint serializes the runtime and memory information of a task into an
@@ -349,7 +350,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 	return &ExitStatus{code: r.ExitStatus, exitedAt: protobuf.FromTimestamp(r.ExitedAt)}, nil
 }
 
-func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreate cio.Creator) (_ Process, err error) {
+func (t *task) Exec(ctx context.Context, id string, spec *runtimespec.Process, ioCreate cio.Creator) (_ Process, err error) {
 	if id == "" {
 		return nil, fmt.Errorf("exec id must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
@@ -483,8 +484,8 @@ func (t *task) Checkpoint(ctx context.Context, opts ...CheckpointTaskOpts) (Imag
 		defer t.Resume(ctx)
 	}
 
-	index := v1.Index{
-		Versioned: is.Versioned{
+	index := imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 		Annotations: make(map[string]string),
@@ -610,7 +611,7 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 	return response.Metrics[0], nil
 }
 
-func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
+func (t *task) checkpointTask(ctx context.Context, index *imagespec.Index, request *tasks.CheckpointTaskRequest) error {
 	response, err := t.client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -618,11 +619,11 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	// NOTE: response.Descriptors can be an empty slice if checkpoint image is jumped
 	// add the checkpoint descriptors to the index
 	for _, d := range response.Descriptors {
-		index.Manifests = append(index.Manifests, v1.Descriptor{
+		index.Manifests = append(index.Manifests, imagespec.Descriptor{
 			MediaType: d.MediaType,
 			Size:      d.Size,
 			Digest:    digest.Digest(d.Digest),
-			Platform: &v1.Platform{
+			Platform: &imagespec.Platform{
 				OS:           goruntime.GOOS,
 				Architecture: goruntime.GOARCH,
 			},
@@ -632,7 +633,7 @@ func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tas
 	return nil
 }
 
-func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapshotterName string, id string) error {
+func (t *task) checkpointRWSnapshot(ctx context.Context, index *imagespec.Index, snapshotterName string, id string) error {
 	opts := []diff.Opt{
 		diff.WithReference(fmt.Sprintf("checkpoint-rw-%s", id)),
 	}
@@ -640,7 +641,7 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapsh
 	if err != nil {
 		return err
 	}
-	rw.Platform = &v1.Platform{
+	rw.Platform = &imagespec.Platform{
 		OS:           goruntime.GOOS,
 		Architecture: goruntime.GOARCH,
 	}
@@ -648,7 +649,7 @@ func (t *task) checkpointRWSnapshot(ctx context.Context, index *v1.Index, snapsh
 	return nil
 }
 
-func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image string) error {
+func (t *task) checkpointImage(ctx context.Context, index *imagespec.Index, image string) error {
 	if image == "" {
 		return fmt.Errorf("cannot checkpoint image with empty name")
 	}
@@ -660,7 +661,7 @@ func (t *task) checkpointImage(ctx context.Context, index *v1.Index, image strin
 	return nil
 }
 
-func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d v1.Descriptor, err error) {
+func writeContent(ctx context.Context, store content.Ingester, mediaType, ref string, r io.Reader, opts ...content.Opt) (d imagespec.Descriptor, err error) {
 	writer, err := store.Writer(ctx, content.WithRef(ref))
 	if err != nil {
 		return d, err
@@ -676,7 +677,7 @@ func writeContent(ctx context.Context, store content.Ingester, mediaType, ref st
 			return d, err
 		}
 	}
-	return v1.Descriptor{
+	return imagespec.Descriptor{
 		MediaType: mediaType,
 		Digest:    writer.Digest(),
 		Size:      size,

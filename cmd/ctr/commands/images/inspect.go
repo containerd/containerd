@@ -19,9 +19,10 @@ package images
 import (
 	"os"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/pkg/display"
-	"github.com/urfave/cli"
 )
 
 var inspectCommand = cli.Command{

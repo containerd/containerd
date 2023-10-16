@@ -24,14 +24,15 @@ import (
 	"fmt"
 	"os"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithProfile sets the provided apparmor profile to the spec
 func WithProfile(profile string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		s.Process.ApparmorProfile = profile
 		return nil
 	}
@@ -45,7 +46,7 @@ func WithProfile(profile string) oci.SpecOpts {
 //
 //go:noinline
 func WithDefaultProfile(name string) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if err := LoadDefaultProfile(name); err != nil {
 			return err
 		}

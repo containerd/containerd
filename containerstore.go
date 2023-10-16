@@ -21,14 +21,15 @@ import (
 	"errors"
 	"io"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/typeurl/v2"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type remoteContainers struct {

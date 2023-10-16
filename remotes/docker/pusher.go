@@ -28,14 +28,15 @@ import (
 	"sync"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/remotes"
 	remoteserrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type dockerPusher struct {
@@ -63,11 +64,11 @@ func (p dockerPusher) Writer(ctx context.Context, opts ...content.WriterOpt) (co
 	return p.push(ctx, wOpts.Desc, wOpts.Ref, true)
 }
 
-func (p dockerPusher) Push(ctx context.Context, desc ocispec.Descriptor) (content.Writer, error) {
+func (p dockerPusher) Push(ctx context.Context, desc imagespec.Descriptor) (content.Writer, error) {
 	return p.push(ctx, desc, remotes.MakeRefKey(ctx, desc), false)
 }
 
-func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref string, unavailableOnFail bool) (content.Writer, error) {
+func (p dockerPusher) push(ctx context.Context, desc imagespec.Descriptor, ref string, unavailableOnFail bool) (content.Writer, error) {
 	if l, ok := p.tracker.(StatusTrackLocker); ok {
 		l.Lock(ref)
 		defer l.Unlock(ref)

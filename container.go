@@ -24,6 +24,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/selinux/go-selinux/label"
+
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	tasktypes "github.com/containerd/containerd/api/types/task"
@@ -36,9 +40,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl/v2"
-	ver "github.com/opencontainers/image-spec/specs-go"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/selinux/go-selinux/label"
 )
 
 const (
@@ -326,8 +327,8 @@ func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) err
 }
 
 func (c *container) Checkpoint(ctx context.Context, ref string, opts ...CheckpointOpts) (Image, error) {
-	index := &ocispec.Index{
-		Versioned: ver.Versioned{
+	index := &imagespec.Index{
+		Versioned: imagespecs.Versioned{
 			SchemaVersion: 2,
 		},
 		Annotations: make(map[string]string),

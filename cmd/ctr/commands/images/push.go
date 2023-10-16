@@ -26,6 +26,11 @@ import (
 	"text/tabwriter"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
@@ -38,10 +43,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
-	"golang.org/x/sync/errgroup"
 )
 
 var pushCommand = cli.Command{
@@ -63,7 +64,7 @@ var pushCommand = cli.Command{
 	}, cli.StringFlag{
 		Name:  "manifest-type",
 		Usage: "Media type of manifest digest",
-		Value: ocispec.MediaTypeImageManifest,
+		Value: imagespec.MediaTypeImageManifest,
 	}, cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "Push content from a specific platform",
@@ -83,7 +84,7 @@ var pushCommand = cli.Command{
 			ref   = context.Args().First()
 			local = context.Args().Get(1)
 			debug = context.GlobalBool("debug")
-			desc  ocispec.Descriptor
+			desc  imagespec.Descriptor
 		)
 		if ref == "" {
 			return errors.New("please provide a remote image reference to push")
@@ -170,7 +171,7 @@ var pushCommand = cli.Command{
 
 			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
 
-			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 				if !context.Bool("allow-non-distributable-blobs") && images.IsNonDistributable(desc.MediaType) {
 					return nil, nil
 				}

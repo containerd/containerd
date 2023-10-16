@@ -22,9 +22,10 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/fsnotify/fsnotify"
+
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
-	"github.com/fsnotify/fsnotify"
 )
 
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change

@@ -20,6 +20,8 @@ import (
 	"context"
 	"os"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/cgroups/v3"
 	cgroup1 "github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -27,7 +29,6 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // apply sets config settings on the server process
@@ -53,7 +54,7 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 				if err != cgroup1.ErrCgroupDeleted {
 					return err
 				}
-				if cg, err = cgroup1.New(cgroup1.StaticPath(config.Cgroup.Path), &specs.LinuxResources{}); err != nil {
+				if cg, err = cgroup1.New(cgroup1.StaticPath(config.Cgroup.Path), &runtimespec.LinuxResources{}); err != nil {
 					return err
 				}
 			}

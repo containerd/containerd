@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/ttrpc"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 )

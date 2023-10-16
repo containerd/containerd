@@ -24,8 +24,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/fifo"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/fifo"
 )
 
 var bufPool = sync.Pool{

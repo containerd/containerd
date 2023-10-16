@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"strings"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	exec "golang.org/x/sys/execabs"
 )
 
 // NvidiaCLI is the path to the Nvidia helper binary
@@ -66,7 +67,7 @@ func AllCaps() []Capability {
 
 // WithGPUs adds NVIDIA gpu support to a container
 func WithGPUs(opts ...Opts) oci.SpecOpts {
-	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		c := &config{}
 		for _, o := range opts {
 			if err := o(c); err != nil {
@@ -85,9 +86,9 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 			return err
 		}
 		if s.Hooks == nil {
-			s.Hooks = &specs.Hooks{}
+			s.Hooks = &runtimespec.Hooks{}
 		}
-		s.Hooks.Prestart = append(s.Hooks.Prestart, specs.Hook{
+		s.Hooks.Prestart = append(s.Hooks.Prestart, runtimespec.Hook{
 			Path: c.OCIHookPath,
 			Args: append([]string{
 				"containerd",

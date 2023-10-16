@@ -42,7 +42,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
@@ -70,8 +70,8 @@ func TestTaskUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	limit := int64(32 * 1024 * 1024)
-	memory := func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
-		s.Linux.Resources.Memory = &specs.LinuxMemory{
+	memory := func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
+		s.Linux.Resources.Memory = &runtimespec.LinuxMemory{
 			Limit: &limit,
 		}
 		return nil
@@ -129,8 +129,8 @@ func TestTaskUpdate(t *testing.T) {
 		}
 	}
 	limit = 64 * 1024 * 1024
-	if err := task.Update(ctx, WithResources(&specs.LinuxResources{
-		Memory: &specs.LinuxMemory{
+	if err := task.Update(ctx, WithResources(&runtimespec.LinuxResources{
+		Memory: &runtimespec.LinuxMemory{
 			Limit: &limit,
 		},
 	})); err != nil {
@@ -201,7 +201,7 @@ func TestShimInCgroup(t *testing.T) {
 		}
 		defer cg2.Delete()
 	} else {
-		cg, err = cgroup1.New(cgroup1.StaticPath(path), &specs.LinuxResources{})
+		cg, err = cgroup1.New(cgroup1.StaticPath(path), &runtimespec.LinuxResources{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -891,7 +891,7 @@ func TestContainerKillAll(t *testing.T) {
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image),
 			withProcessArgs("sh", "-c", "top"),
-			oci.WithHostNamespace(specs.PIDNamespace),
+			oci.WithHostNamespace(runtimespec.PIDNamespace),
 		),
 	)
 	if err != nil {
@@ -1047,7 +1047,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 }
 
 func TestContainerKillInitPidHost(t *testing.T) {
-	initContainerAndCheckChildrenDieOnKill(t, oci.WithHostNamespace(specs.PIDNamespace))
+	initContainerAndCheckChildrenDieOnKill(t, oci.WithHostNamespace(runtimespec.PIDNamespace))
 }
 
 func TestUserNamespaces(t *testing.T) {
@@ -1090,13 +1090,13 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 
 	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
 		withExitStatus(7),
-		oci.WithUserNamespace([]specs.LinuxIDMapping{
+		oci.WithUserNamespace([]runtimespec.LinuxIDMapping{
 			{
 				ContainerID: 0,
 				HostID:      1000,
 				Size:        10000,
 			},
-		}, []specs.LinuxIDMapping{
+		}, []runtimespec.LinuxIDMapping{
 			{
 				ContainerID: 0,
 				HostID:      2000,
@@ -1344,7 +1344,7 @@ func TestShimOOMScore(t *testing.T) {
 		}
 		defer cg2.Delete()
 	} else {
-		cg, err = cgroup1.New(cgroup1.StaticPath(path), &specs.LinuxResources{})
+		cg, err = cgroup1.New(cgroup1.StaticPath(path), &runtimespec.LinuxResources{})
 		if err != nil {
 			t.Fatal(err)
 		}

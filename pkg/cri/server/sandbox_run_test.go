@@ -21,9 +21,10 @@ import (
 	"net"
 	"testing"
 
-	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/go-cni"
 )
 
 func TestToCNIPortMappings(t *testing.T) {

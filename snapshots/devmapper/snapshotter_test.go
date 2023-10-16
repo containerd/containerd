@@ -26,8 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/continuity/fs/fstest"
 
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"

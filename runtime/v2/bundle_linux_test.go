@@ -26,13 +26,14 @@ import (
 	"syscall"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewBundle(t *testing.T) {
@@ -54,8 +55,8 @@ func TestNewBundle(t *testing.T) {
 			id := fmt.Sprintf("new-bundle-%d", i)
 			spec := oci.Spec{}
 			if tc.userns {
-				spec.Linux = &specs.Linux{
-					GIDMappings: []specs.LinuxIDMapping{{ContainerID: 0, HostID: usernsGID}},
+				spec.Linux = &runtimespec.Linux{
+					GIDMappings: []runtimespec.LinuxIDMapping{{ContainerID: 0, HostID: usernsGID}},
 				}
 			}
 			specAny, err := typeurl.MarshalAny(&spec)
@@ -96,22 +97,22 @@ func TestRemappedGID(t *testing.T) {
 	}, {
 		// empty Linux section
 		spec: oci.Spec{
-			Linux: &specs.Linux{},
+			Linux: &runtimespec.Linux{},
 		},
 		gid: 0,
 	}, {
 		// empty ID mappings
 		spec: oci.Spec{
-			Linux: &specs.Linux{
-				GIDMappings: make([]specs.LinuxIDMapping, 0),
+			Linux: &runtimespec.Linux{
+				GIDMappings: make([]runtimespec.LinuxIDMapping, 0),
 			},
 		},
 		gid: 0,
 	}, {
 		// valid ID mapping
 		spec: oci.Spec{
-			Linux: &specs.Linux{
-				GIDMappings: []specs.LinuxIDMapping{{
+			Linux: &runtimespec.Linux{
+				GIDMappings: []runtimespec.LinuxIDMapping{{
 					ContainerID: 0,
 					HostID:      1000,
 				}},
@@ -121,8 +122,8 @@ func TestRemappedGID(t *testing.T) {
 	}, {
 		// missing ID mapping
 		spec: oci.Spec{
-			Linux: &specs.Linux{
-				GIDMappings: []specs.LinuxIDMapping{{
+			Linux: &runtimespec.Linux{
+				GIDMappings: []runtimespec.LinuxIDMapping{{
 					ContainerID: 100,
 					HostID:      1000,
 				}},

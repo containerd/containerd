@@ -21,8 +21,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/containerd/typeurl/v2"
 )
 
 // isNil returns true if the given parameter is nil or typed nil.

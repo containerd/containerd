@@ -22,6 +22,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -31,8 +34,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/image-spec/identity"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // DeleteOpts allows the caller to set options for the deletion of a container
@@ -125,8 +126,8 @@ func WithImageConfigLabels(image Image) NewContainerOpts {
 		}
 
 		var (
-			ociimage v1.Image
-			config   v1.ImageConfig
+			ociimage imagespec.Image
+			config   imagespec.ImageConfig
 		)
 		p, err := content.ReadBlob(ctx, image.ContentStore(), ic)
 		if err != nil {

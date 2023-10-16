@@ -24,6 +24,8 @@ import (
 	"time"
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/services/tasks/v1"
@@ -33,7 +35,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )

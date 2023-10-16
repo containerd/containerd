@@ -19,6 +19,8 @@ package containerd
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -26,7 +28,6 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type remoteImages struct {

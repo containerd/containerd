@@ -23,10 +23,11 @@ import (
 	"sync"
 	"time"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/log"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type criWorker struct {

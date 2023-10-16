@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/pkg/randutil"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/pkg/randutil"
 )
 
 const (

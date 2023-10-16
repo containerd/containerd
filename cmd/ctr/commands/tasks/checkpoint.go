@@ -20,10 +20,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/urfave/cli"
 )
 
 var checkpointCommand = cli.Command{

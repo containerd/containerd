@@ -27,6 +27,9 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/cri/instrument"
@@ -40,8 +43,6 @@ import (
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
-	"google.golang.org/grpc"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 

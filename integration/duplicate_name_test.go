@@ -19,8 +19,9 @@ package integration
 import (
 	"testing"
 
-	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/integration/images"
 )
 
 func TestDuplicateName(t *testing.T) {

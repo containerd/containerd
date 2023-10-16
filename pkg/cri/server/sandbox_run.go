@@ -26,9 +26,10 @@ import (
 	"strings"
 	"time"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/go-cni"
 	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/annotations"

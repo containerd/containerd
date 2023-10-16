@@ -30,6 +30,10 @@ import (
 	"testing"
 	"time"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/cio"
@@ -47,9 +51,6 @@ import (
 	"github.com/containerd/go-runc"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 func empty() cio.Creator {
@@ -1710,9 +1711,9 @@ func TestContainerHook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hook := func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
+	hook := func(_ context.Context, _ oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		if s.Hooks == nil {
-			s.Hooks = &specs.Hooks{}
+			s.Hooks = &runtimespec.Hooks{}
 		}
 		path, err := exec.LookPath("containerd")
 		if err != nil {
@@ -1722,7 +1723,7 @@ func TestContainerHook(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		s.Hooks.Prestart = []specs.Hook{
+		s.Hooks.Prestart = []runtimespec.Hook{
 			{
 				Path: path,
 				Args: []string{

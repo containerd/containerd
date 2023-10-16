@@ -22,9 +22,10 @@ import (
 	goruntime "runtime"
 	"time"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"

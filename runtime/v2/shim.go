@@ -27,10 +27,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/containerd/ttrpc"
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/runtime/task/v2"

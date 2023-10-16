@@ -25,9 +25,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 type copySource struct {

@@ -23,14 +23,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Layer represents the descriptors for a layer diff. These descriptions
@@ -38,8 +39,8 @@ import (
 // used to transport that tar. The blob descriptor may or may not describe
 // a compressed object.
 type Layer struct {
-	Diff ocispec.Descriptor
-	Blob ocispec.Descriptor
+	Diff imagespec.Descriptor
+	Blob imagespec.Descriptor
 }
 
 // ApplyLayers applies all the layers using the given snapshotter and applier.
@@ -115,7 +116,7 @@ func applyLayers(ctx context.Context, layers []Layer, chain []digest.Digest, sn 
 		parent  = identity.ChainID(chain[:len(chain)-1])
 		chainID = identity.ChainID(chain)
 		layer   = layers[len(layers)-1]
-		diff    ocispec.Descriptor
+		diff    imagespec.Descriptor
 		key     string
 		mounts  []mount.Mount
 		err     error

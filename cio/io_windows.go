@@ -22,6 +22,7 @@ import (
 	"io"
 
 	winio "github.com/Microsoft/go-winio"
+
 	"github.com/containerd/log"
 )
 

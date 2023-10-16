@@ -26,8 +26,9 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/sys"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/sys"
 )
 
 // TODO: Support multiple mappings in future

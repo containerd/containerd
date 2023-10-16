@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -40,7 +40,7 @@ func TestWithDevices(t *testing.T) {
 		isLCOW  bool
 
 		expectError            bool
-		expectedWindowsDevices []specs.WindowsDevice
+		expectedWindowsDevices []runtimespec.WindowsDevice
 	}{
 		{
 			name: "empty",
@@ -73,7 +73,7 @@ func TestWithDevices(t *testing.T) {
 			devices: []*runtime.Device{{HostPath: "class/5B45201D-F2F2-4F3B-85BB-30FF1F953599"}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
 		},
 		// Docker _only_ accepts `class` ID Type, so anything else should fail.
 		// See https://github.com/moby/moby/blob/v20.10.13/daemon/oci_windows.go#L283-L294
@@ -91,21 +91,21 @@ func TestWithDevices(t *testing.T) {
 			isLCOW:  true,
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: `PCIP\VEN_8086&DEV_43A2&SUBSYS_72708086&REV_00\3&11583659&0&F5`, IDType: "gpu"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: `PCIP\VEN_8086&DEV_43A2&SUBSYS_72708086&REV_00\3&11583659&0&F5`, IDType: "gpu"}},
 		},
 		{
 			name:    "hostPath_hcsshim_wcow_location_path",
 			devices: []*runtime.Device{{HostPath: "vpci-location-path://PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0001)"}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0001)", IDType: "vpci-location-path"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0001)", IDType: "vpci-location-path"}},
 		},
 		{
 			name:    "hostPath_hcsshim_wcow_class_guid",
 			devices: []*runtime.Device{{HostPath: "class://5B45201D-F2F2-4F3B-85BB-30FF1F953599"}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
 		},
 		{
 			name: "hostPath_hcsshim_wcow_gpu_hyper-v",
@@ -113,7 +113,7 @@ func TestWithDevices(t *testing.T) {
 			devices: []*runtime.Device{{HostPath: `vpci://PCIP\VEN_8086&DEV_43A2&SUBSYS_72708086&REV_00\3&11583659&0&F5`}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: `PCIP\VEN_8086&DEV_43A2&SUBSYS_72708086&REV_00\3&11583659&0&F5`, IDType: "vpci"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: `PCIP\VEN_8086&DEV_43A2&SUBSYS_72708086&REV_00\3&11583659&0&F5`, IDType: "vpci"}},
 		},
 		// Example from https://github.com/microsoft/hcsshim/blob/v0.9.2/test/cri-containerd/container_test.go
 		// According to https://github.com/jterry75/cri/blob/f8e83e63cc027d0e9c0c984f9db3cba58d3672d4/pkg/server/container_create_windows.go#L625-L649
@@ -145,14 +145,14 @@ func TestWithDevices(t *testing.T) {
 			devices: []*runtime.Device{{HostPath: "gpu://"}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "", IDType: "gpu"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "", IDType: "gpu"}},
 		},
 		{
 			name:    "hostPath_dockerstyle_with_slashes_in_id",
 			devices: []*runtime.Device{{HostPath: "class/slashed/id"}},
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "slashed/id", IDType: "class"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "slashed/id", IDType: "class"}},
 		},
 		{
 			name:    "hostPath_docker_style_non-class_idtypewith_slashes_in_id",
@@ -167,7 +167,7 @@ func TestWithDevices(t *testing.T) {
 				{HostPath: "vpci-location-path://PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0002)"}},
 
 			expectError: false,
-			expectedWindowsDevices: []specs.WindowsDevice{
+			expectedWindowsDevices: []runtimespec.WindowsDevice{
 				{ID: "PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0001)", IDType: "vpci-location-path"},
 				{ID: "PCIROOT(0)#PCI(0100)#PCI(0000)#PCI(0000)#PCI(0002)", IDType: "vpci-location-path"},
 			},

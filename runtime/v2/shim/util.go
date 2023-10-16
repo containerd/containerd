@@ -28,9 +28,10 @@ import (
 	"strings"
 	"time"
 
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
-	exec "golang.org/x/sys/execabs"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"

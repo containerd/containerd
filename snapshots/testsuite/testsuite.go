@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
@@ -36,7 +38,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/containerd/log/logtest"
-	"github.com/stretchr/testify/assert"
 )
 
 // SnapshotterFunc is used in SnapshotterSuite

@@ -22,10 +22,11 @@ import (
 	"io"
 	"os"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -141,7 +142,7 @@ type stdProcessor struct {
 }
 
 func (c *stdProcessor) MediaType() string {
-	return ocispec.MediaTypeImageLayer
+	return imagespec.MediaTypeImageLayer
 }
 
 func (c *stdProcessor) Read(p []byte) (int, error) {
@@ -157,7 +158,7 @@ type compressedProcessor struct {
 }
 
 func (c *compressedProcessor) MediaType() string {
-	return ocispec.MediaTypeImageLayer
+	return imagespec.MediaTypeImageLayer
 }
 
 func (c *compressedProcessor) Read(p []byte) (int, error) {

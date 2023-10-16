@@ -21,7 +21,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
@@ -139,9 +139,9 @@ func TestWithLinuxNamespace(t *testing.T) {
 	t.Parallel()
 
 	ctx := namespaces.WithNamespace(context.Background(), "testing")
-	replacedNS := specs.LinuxNamespace{Type: specs.NetworkNamespace, Path: "/var/run/netns/test"}
+	replacedNS := runtimespec.LinuxNamespace{Type: runtimespec.NetworkNamespace, Path: "/var/run/netns/test"}
 
-	var s *specs.Spec
+	var s *runtimespec.Spec
 	var err error
 	if runtime.GOOS != "windows" {
 		s, err = GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, WithLinuxNamespace(replacedNS))
@@ -173,7 +173,7 @@ func TestWithCapabilities(t *testing.T) {
 	opts := []SpecOpts{
 		WithCapabilities([]string{"CAP_SYS_ADMIN"}),
 	}
-	var s *specs.Spec
+	var s *runtimespec.Spec
 	var err error
 	if runtime.GOOS != "windows" {
 		s, err = GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, opts...)
@@ -261,12 +261,12 @@ func TestWithPrivileged(t *testing.T) {
 
 	opts := []SpecOpts{
 		WithCapabilities(nil),
-		WithMounts([]specs.Mount{
+		WithMounts([]runtimespec.Mount{
 			{Type: "cgroup", Destination: "/sys/fs/cgroup", Options: []string{"ro"}},
 		}),
 		WithPrivileged,
 	}
-	var s *specs.Spec
+	var s *runtimespec.Spec
 	var err error
 	if runtime.GOOS != "windows" {
 		s, err = GenerateSpec(ctx, nil, &containers.Container{ID: t.Name()}, opts...)

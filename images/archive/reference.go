@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containerd/containerd/reference"
 	distref "github.com/distribution/reference"
 	"github.com/opencontainers/go-digest"
+
+	"github.com/containerd/containerd/reference"
 )
 
 // FilterRefPrefix restricts references to having the given image

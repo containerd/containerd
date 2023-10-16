@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,15 +31,15 @@ func TestValidateMediaType(t *testing.T) {
 		index bool
 	}{
 		{MediaTypeDockerSchema2Manifest, false},
-		{ocispec.MediaTypeImageManifest, false},
+		{imagespec.MediaTypeImageManifest, false},
 		{MediaTypeDockerSchema2ManifestList, true},
-		{ocispec.MediaTypeImageIndex, true},
+		{imagespec.MediaTypeImageIndex, true},
 	}
 	for _, tc := range docTests {
 		t.Run("manifest-"+tc.mt, func(t *testing.T) {
-			manifest := ocispec.Manifest{
-				Config: ocispec.Descriptor{Size: 1},
-				Layers: []ocispec.Descriptor{{Size: 2}},
+			manifest := imagespec.Manifest{
+				Config: imagespec.Descriptor{Size: 1},
+				Layers: []imagespec.Descriptor{{Size: 2}},
 			}
 			b, err := json.Marshal(manifest)
 			require.NoError(t, err, "failed to marshal manifest")
@@ -52,8 +52,8 @@ func TestValidateMediaType(t *testing.T) {
 			}
 		})
 		t.Run("index-"+tc.mt, func(t *testing.T) {
-			index := ocispec.Index{
-				Manifests: []ocispec.Descriptor{{Size: 1}},
+			index := imagespec.Index{
+				Manifests: []imagespec.Descriptor{{Size: 1}},
 			}
 			b, err := json.Marshal(index)
 			require.NoError(t, err, "failed to marshal index")
@@ -73,20 +73,20 @@ func TestValidateMediaType(t *testing.T) {
 		invalid []string
 	}{{
 		MediaTypeDockerSchema2Manifest,
-		[]string{MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest},
-		[]string{MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex},
+		[]string{MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest},
+		[]string{MediaTypeDockerSchema2ManifestList, imagespec.MediaTypeImageIndex},
 	}, {
-		ocispec.MediaTypeImageManifest,
-		[]string{MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest},
-		[]string{MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex},
+		imagespec.MediaTypeImageManifest,
+		[]string{MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest},
+		[]string{MediaTypeDockerSchema2ManifestList, imagespec.MediaTypeImageIndex},
 	}, {
 		MediaTypeDockerSchema2ManifestList,
-		[]string{MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex},
-		[]string{MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest},
+		[]string{MediaTypeDockerSchema2ManifestList, imagespec.MediaTypeImageIndex},
+		[]string{MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest},
 	}, {
-		ocispec.MediaTypeImageIndex,
-		[]string{MediaTypeDockerSchema2ManifestList, ocispec.MediaTypeImageIndex},
-		[]string{MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest},
+		imagespec.MediaTypeImageIndex,
+		[]string{MediaTypeDockerSchema2ManifestList, imagespec.MediaTypeImageIndex},
+		[]string{MediaTypeDockerSchema2Manifest, imagespec.MediaTypeImageManifest},
 	}}
 	for _, tc := range mtTests {
 		for _, v := range tc.valid {

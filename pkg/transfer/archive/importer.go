@@ -20,8 +20,9 @@ import (
 	"context"
 	"io"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
@@ -59,7 +60,7 @@ func (iis *ImageImportStream) ImportStream(context.Context) (io.Reader, string, 
 	return iis.stream, iis.mediaType, nil
 }
 
-func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (ocispec.Descriptor, error) {
+func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (imagespec.Descriptor, error) {
 	var opts []archive.ImportOpt
 	if iis.forceCompress {
 		opts = append(opts, archive.WithImportCompression())

@@ -22,10 +22,11 @@ import (
 	"context"
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/namespaces"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestWithImageConfigNoEnv(t *testing.T) {
@@ -41,10 +42,10 @@ func TestWithImageConfigNoEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	// test hack: we don't want to test the WithAdditionalGIDs portion of the image config code
-	s.Windows = &specs.Windows{}
+	s.Windows = &runtimespec.Windows{}
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Entrypoint: []string{"create", "--namespace=test"},
 			Cmd:        []string{"", "--debug"},
 		},

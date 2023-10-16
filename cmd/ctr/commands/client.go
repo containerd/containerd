@@ -19,11 +19,12 @@ package commands
 import (
 	gocontext "context"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
 )
 
 // AppContext returns the context for a command. Should only be called once per

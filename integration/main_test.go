@@ -33,6 +33,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
@@ -44,13 +52,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/server"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/log"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (

@@ -33,11 +33,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/imgcrypt"
+	"github.com/containerd/imgcrypt/images/encryption"
+
+	distribution "github.com/distribution/reference"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
@@ -50,7 +53,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/log"
-	distribution "github.com/distribution/reference"
 )
 
 // For image management:

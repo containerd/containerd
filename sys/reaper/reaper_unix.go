@@ -26,9 +26,10 @@ import (
 	"syscall"
 	"time"
 
-	runc "github.com/containerd/go-runc"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
+
+	runc "github.com/containerd/go-runc"
 )
 
 // ErrNoSuchProcess is returned when the process no longer exists

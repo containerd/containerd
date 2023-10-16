@@ -31,8 +31,8 @@ import (
 	"testing"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -60,17 +60,17 @@ func (b blob) Size() int64 {
 }
 
 type fakeImage struct {
-	config ocispec.Descriptor
+	config imagespec.Descriptor
 	blobs  map[string]blob
 }
 
-func newFakeImage(config ocispec.Image) (Image, error) {
+func newFakeImage(config imagespec.Image) (Image, error) {
 	configBlob, err := json.Marshal(config)
 	if err != nil {
 		return nil, err
 	}
-	configDescriptor := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageConfig,
+	configDescriptor := imagespec.Descriptor{
+		MediaType: imagespec.MediaTypeImageConfig,
 		Digest:    digest.NewDigestFromBytes(digest.SHA256, configBlob),
 	}
 
@@ -82,7 +82,7 @@ func newFakeImage(config ocispec.Image) (Image, error) {
 	}, nil
 }
 
-func (i fakeImage) Config(ctx context.Context) (ocispec.Descriptor, error) {
+func (i fakeImage) Config(ctx context.Context) (imagespec.Descriptor, error) {
 	return i.config, nil
 }
 
@@ -90,7 +90,7 @@ func (i fakeImage) ContentStore() content.Store {
 	return i
 }
 
-func (i fakeImage) ReaderAt(ctx context.Context, dec ocispec.Descriptor) (content.ReaderAt, error) {
+func (i fakeImage) ReaderAt(ctx context.Context, dec imagespec.Descriptor) (content.ReaderAt, error) {
 	blob, found := i.blobs[dec.Digest.String()]
 	if !found {
 		return nil, errdefs.ErrNotFound
@@ -211,7 +211,7 @@ func TestWithEnv(t *testing.T) {
 	t.Parallel()
 
 	s := Spec{}
-	s.Process = &specs.Process{
+	s.Process = &runtimespec.Process{
 		Env: []string{"DEFAULT=test"},
 	}
 
@@ -245,7 +245,7 @@ func TestWithMounts(t *testing.T) {
 	t.Parallel()
 
 	s := Spec{
-		Mounts: []specs.Mount{
+		Mounts: []runtimespec.Mount{
 			{
 				Source:      "default-source",
 				Destination: "default-dest",
@@ -253,7 +253,7 @@ func TestWithMounts(t *testing.T) {
 		},
 	}
 
-	WithMounts([]specs.Mount{
+	WithMounts([]runtimespec.Mount{
 		{
 			Source:      "new-source",
 			Destination: "new-dest",
@@ -463,13 +463,13 @@ func TestWithUserNamespace(t *testing.T) {
 	s := Spec{}
 
 	opts := []SpecOpts{
-		WithUserNamespace([]specs.LinuxIDMapping{
+		WithUserNamespace([]runtimespec.LinuxIDMapping{
 			{
 				ContainerID: 1,
 				HostID:      2,
 				Size:        10000,
 			},
-		}, []specs.LinuxIDMapping{
+		}, []runtimespec.LinuxIDMapping{
 			{
 				ContainerID: 2,
 				HostID:      3,
@@ -484,12 +484,12 @@ func TestWithUserNamespace(t *testing.T) {
 		}
 	}
 
-	expectedUIDMapping := specs.LinuxIDMapping{
+	expectedUIDMapping := runtimespec.LinuxIDMapping{
 		ContainerID: 1,
 		HostID:      2,
 		Size:        10000,
 	}
-	expectedGIDMapping := specs.LinuxIDMapping{
+	expectedGIDMapping := runtimespec.LinuxIDMapping{
 		ContainerID: 2,
 		HostID:      3,
 		Size:        20000,
@@ -503,8 +503,8 @@ func TestWithUserNamespace(t *testing.T) {
 func TestWithImageConfigArgs(t *testing.T) {
 	t.Parallel()
 
-	img, err := newFakeImage(ocispec.Image{
-		Config: ocispec.ImageConfig{
+	img, err := newFakeImage(imagespec.Image{
+		Config: imagespec.ImageConfig{
 			Env:        []string{"z=bar", "y=baz"},
 			Entrypoint: []string{"create", "--namespace=test"},
 			Cmd:        []string{"", "--debug"},
@@ -515,9 +515,9 @@ func TestWithImageConfigArgs(t *testing.T) {
 	}
 
 	s := Spec{
-		Version: specs.Version,
-		Root:    &specs.Root{},
-		Windows: &specs.Windows{},
+		Version: runtimespec.Version,
+		Root:    &runtimespec.Root{},
+		Windows: &runtimespec.Windows{},
 	}
 
 	opts := []SpecOpts{
@@ -548,7 +548,7 @@ func TestDevShmSize(t *testing.T) {
 
 	ss := []Spec{
 		{
-			Mounts: []specs.Mount{
+			Mounts: []runtimespec.Mount{
 				{
 					Destination: "/dev/shm",
 					Type:        "tmpfs",
@@ -558,7 +558,7 @@ func TestDevShmSize(t *testing.T) {
 			},
 		},
 		{
-			Mounts: []specs.Mount{
+			Mounts: []runtimespec.Mount{
 				{
 					Destination: "/test/shm",
 					Type:        "tmpfs",
@@ -568,7 +568,7 @@ func TestDevShmSize(t *testing.T) {
 			},
 		},
 		{
-			Mounts: []specs.Mount{
+			Mounts: []runtimespec.Mount{
 				{
 					Destination: "/test/shm",
 					Type:        "tmpfs",
@@ -613,7 +613,7 @@ func TestDevShmSize(t *testing.T) {
 	}
 }
 
-func getDevShmMount(s *Spec) *specs.Mount {
+func getDevShmMount(s *Spec) *runtimespec.Mount {
 	for _, m := range s.Mounts {
 		if filepath.Clean(m.Destination) == "/dev/shm" && m.Source == "shm" && m.Type == "tmpfs" {
 			return &m
@@ -655,7 +655,7 @@ func TestWithoutMounts(t *testing.T) {
 		return s
 	}
 	opts := []SpecOpts{
-		WithMounts([]specs.Mount{
+		WithMounts([]runtimespec.Mount{
 			{
 				Destination: x("/dst1"),
 				Source:      x("/src1"),
@@ -670,7 +670,7 @@ func TestWithoutMounts(t *testing.T) {
 			},
 		}),
 		WithoutMounts(x("/dst2"), x("/dst3")),
-		WithMounts([]specs.Mount{
+		WithMounts([]runtimespec.Mount{
 			{
 				Destination: x("/dst4"),
 				Source:      x("/src4"),
@@ -678,7 +678,7 @@ func TestWithoutMounts(t *testing.T) {
 		}),
 	}
 
-	expected := []specs.Mount{
+	expected := []runtimespec.Mount{
 		{
 			Destination: x("/dst1"),
 			Source:      x("/src1"),
@@ -707,7 +707,7 @@ func TestWithWindowsDevice(t *testing.T) {
 		id     string
 
 		expectError            bool
-		expectedWindowsDevices []specs.WindowsDevice
+		expectedWindowsDevices []runtimespec.WindowsDevice
 	}{
 		{
 			name:        "empty_idType_and_id",
@@ -727,7 +727,7 @@ func TestWithWindowsDevice(t *testing.T) {
 			id:     "",
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "", IDType: "class"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "", IDType: "class"}},
 		},
 		{
 			name:   "idType_and_id",
@@ -735,16 +735,16 @@ func TestWithWindowsDevice(t *testing.T) {
 			id:     "5B45201D-F2F2-4F3B-85BB-30FF1F953599",
 
 			expectError:            false,
-			expectedWindowsDevices: []specs.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
+			expectedWindowsDevices: []runtimespec.WindowsDevice{{ID: "5B45201D-F2F2-4F3B-85BB-30FF1F953599", IDType: "class"}},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			spec := Spec{
-				Version: specs.Version,
-				Root:    &specs.Root{},
-				Windows: &specs.Windows{},
+				Version: runtimespec.Version,
+				Root:    &runtimespec.Root{},
+				Windows: &runtimespec.Windows{},
 			}
 
 			opts := []SpecOpts{

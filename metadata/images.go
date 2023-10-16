@@ -25,6 +25,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
@@ -32,9 +36,6 @@ import (
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/epoch"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	bolt "go.etcd.io/bbolt"
 )
 
 type imageStore struct {
@@ -326,7 +327,7 @@ func validateImage(image *images.Image) error {
 	return validateTarget(&image.Target)
 }
 
-func validateTarget(target *ocispec.Descriptor) error {
+func validateTarget(target *imagespec.Descriptor) error {
 	// NOTE(stevvooe): Only validate fields we actually store.
 
 	if err := target.Digest.Validate(); err != nil {

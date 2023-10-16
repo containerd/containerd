@@ -21,10 +21,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/go-cni"
 
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"

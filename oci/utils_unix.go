@@ -24,9 +24,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/pkg/userns"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 // ErrNotADevice denotes that a file is not a valid linux device.
@@ -40,11 +41,11 @@ var (
 )
 
 // HostDevices returns all devices that can be found under /dev directory.
-func HostDevices() ([]specs.LinuxDevice, error) {
+func HostDevices() ([]runtimespec.LinuxDevice, error) {
 	return getDevices("/dev", "")
 }
 
-func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
+func getDevices(path, containerPath string) ([]runtimespec.LinuxDevice, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return nil, fmt.Errorf("error stating device path: %w", err)
@@ -58,14 +59,14 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 		if containerPath != "" {
 			dev.Path = containerPath
 		}
-		return []specs.LinuxDevice{*dev}, nil
+		return []runtimespec.LinuxDevice{*dev}, nil
 	}
 
 	files, err := osReadDir(path)
 	if err != nil {
 		return nil, err
 	}
-	var out []specs.LinuxDevice
+	var out []runtimespec.LinuxDevice
 	for _, f := range files {
 		switch {
 		case f.IsDir():
@@ -134,7 +135,7 @@ const (
 
 // DeviceFromPath takes the path to a device to look up the information about a
 // linux device and returns that information as a LinuxDevice struct.
-func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
+func DeviceFromPath(path string) (*runtimespec.LinuxDevice, error) {
 	if overrideDeviceFromPath != nil {
 		if err := overrideDeviceFromPath(path); err != nil {
 			return nil, err
@@ -168,7 +169,7 @@ func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 		return nil, ErrNotADevice
 	}
 	fm := os.FileMode(mode &^ unix.S_IFMT)
-	return &specs.LinuxDevice{
+	return &runtimespec.LinuxDevice{
 		Type:     devType,
 		Path:     path,
 		Major:    int64(major),

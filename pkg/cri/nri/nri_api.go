@@ -20,10 +20,11 @@ import (
 	"context"
 	"time"
 
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 type CRIImplementation interface {

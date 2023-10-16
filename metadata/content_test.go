@@ -25,6 +25,10 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/content/local"
 	"github.com/containerd/containerd/content/testsuite"
@@ -32,9 +36,6 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	bolt "go.etcd.io/bbolt"
 )
 
 func createContentStore(ctx context.Context, root string, opts ...DBOpt) (context.Context, content.Store, func() error, error) {
@@ -107,7 +108,7 @@ func TestContentLeased(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := content.WriteBlob(lctx, cs, "test-1", bytes.NewReader(blob),
-		ocispec.Descriptor{Size: int64(len(blob)), Digest: expected}); err != nil {
+		imagespec.Descriptor{Size: int64(len(blob)), Digest: expected}); err != nil {
 		t.Fatal(err)
 	}
 	if err := checkContentLeased(lctx, db, expected); err != nil {
@@ -126,7 +127,7 @@ func TestContentLeased(t *testing.T) {
 
 	if _, err := cs.Writer(lctx,
 		content.WithRef("test-2"),
-		content.WithDescriptor(ocispec.Descriptor{Size: int64(len(blob)), Digest: expected})); err == nil {
+		content.WithDescriptor(imagespec.Descriptor{Size: int64(len(blob)), Digest: expected})); err == nil {
 		t.Fatal("expected already exist error")
 	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
@@ -154,7 +155,7 @@ func TestIngestLeased(t *testing.T) {
 
 	w, err := cs.Writer(lctx,
 		content.WithRef("test-1"),
-		content.WithDescriptor(ocispec.Descriptor{Size: int64(len(blob)), Digest: expected}))
+		content.WithDescriptor(imagespec.Descriptor{Size: int64(len(blob)), Digest: expected}))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,12 +23,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/tracing"
-	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -38,6 +32,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/log"
 )
 
 const exporterPlugin = "otlp"

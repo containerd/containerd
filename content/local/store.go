@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/log"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var bufPool = sync.Pool{
@@ -122,7 +122,7 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo, labels map[string]strin
 }
 
 // ReaderAt returns an io.ReaderAt for the blob.
-func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
+func (s *store) ReaderAt(ctx context.Context, desc imagespec.Descriptor) (content.ReaderAt, error) {
 	p, err := s.blobPath(desc.Digest)
 	if err != nil {
 		return nil, fmt.Errorf("calculating blob path for ReaderAt: %w", err)

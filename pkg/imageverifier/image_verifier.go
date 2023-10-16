@@ -19,11 +19,11 @@ package imageverifier
 import (
 	"context"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type ImageVerifier interface {
-	VerifyImage(ctx context.Context, name string, desc ocispec.Descriptor) (*Judgement, error)
+	VerifyImage(ctx context.Context, name string, desc imagespec.Descriptor) (*Judgement, error)
 }
 
 type Judgement struct {

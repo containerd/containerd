@@ -21,10 +21,11 @@ import (
 
 	"github.com/urfave/cli"
 
+	"github.com/distribution/reference"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/distribution/reference"
 )
 
 var tagCommand = cli.Command{

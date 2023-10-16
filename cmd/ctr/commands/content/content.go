@@ -26,16 +26,17 @@ import (
 	"text/tabwriter"
 	"time"
 
+	units "github.com/docker/go-units"
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/log"
-	units "github.com/docker/go-units"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
-	exec "golang.org/x/sys/execabs"
 )
 
 var (
@@ -75,7 +76,7 @@ var (
 			}
 			defer cancel()
 			cs := client.ContentStore()
-			ra, err := cs.ReaderAt(ctx, ocispec.Descriptor{Digest: dgst})
+			ra, err := cs.ReaderAt(ctx, imagespec.Descriptor{Digest: dgst})
 			if err != nil {
 				return err
 			}
@@ -126,7 +127,7 @@ var (
 			// TODO(stevvooe): Allow ingest to be reentrant. Currently, we expect
 			// all data to be written in a single invocation. Allow multiple writes
 			// to the same transaction key followed by a commit.
-			return content.WriteBlob(ctx, cs, ref, os.Stdin, ocispec.Descriptor{Size: expectedSize, Digest: expectedDigest})
+			return content.WriteBlob(ctx, cs, ref, os.Stdin, imagespec.Descriptor{Size: expectedSize, Digest: expectedDigest})
 		},
 	}
 
@@ -325,7 +326,7 @@ var (
 			}
 			defer cancel()
 			cs := client.ContentStore()
-			ra, err := cs.ReaderAt(ctx, ocispec.Descriptor{Digest: dgst})
+			ra, err := cs.ReaderAt(ctx, imagespec.Descriptor{Digest: dgst})
 			if err != nil {
 				return err
 			}
@@ -546,7 +547,7 @@ var (
 			if err != nil {
 				return err
 			}
-			desc := ocispec.Descriptor{
+			desc := imagespec.Descriptor{
 				MediaType: media,
 				Digest:    dgst,
 				Size:      info.Size,

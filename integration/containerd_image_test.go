@@ -25,14 +25,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/cri/labels"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Test to test the CRI plugin should see image pulled into containerd directly.

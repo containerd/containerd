@@ -22,8 +22,9 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
+
+	"github.com/containerd/log"
 )
 
 var imageListFile = flag.String("image-list", "", "The TOML file containing the non-default images to be used in tests.")

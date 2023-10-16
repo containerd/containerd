@@ -19,9 +19,10 @@ package oci
 import (
 	"context"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/cap"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithHostDevices adds all the hosts device nodes to the container's spec
@@ -48,7 +49,7 @@ func WithDevices(devicePath, containerPath, permissions string) SpecOpts {
 		}
 		for i := range devs {
 			s.Linux.Devices = append(s.Linux.Devices, devs[i])
-			s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, specs.LinuxDeviceCgroup{
+			s.Linux.Resources.Devices = append(s.Linux.Resources.Devices, runtimespec.LinuxDeviceCgroup{
 				Allow:  true,
 				Type:   devs[i].Type,
 				Major:  &devs[i].Major,

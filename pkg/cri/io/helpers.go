@@ -24,8 +24,9 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/containerd/containerd/cio"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/cio"
 )
 
 // AttachOptions specifies how to attach to a container.

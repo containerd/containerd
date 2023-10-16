@@ -22,9 +22,10 @@ import (
 	"net"
 	"os"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 )
 
 func setupSignals(config Config) (chan os.Signal, error) {

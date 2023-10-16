@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImagesList(t *testing.T) {
@@ -44,7 +45,7 @@ func TestImagesList(t *testing.T) {
 				"even":      fmt.Sprint(i%2 == 0),
 				"odd":       fmt.Sprint(i%2 != 0),
 			},
-			Target: ocispec.Descriptor{
+			Target: imagespec.Descriptor{
 				Size:      10,
 				MediaType: "application/vnd.containerd.test",
 				Digest:    digest.FromString(id),
@@ -168,7 +169,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -181,7 +182,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -197,7 +198,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{},
+				Target: imagespec.Descriptor{},
 			},
 			createerr: errdefs.ErrInvalidArgument,
 		},
@@ -209,7 +210,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -222,7 +223,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -239,7 +240,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
@@ -254,7 +255,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -272,7 +273,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
@@ -286,7 +287,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"for": "bar",
 					"boo": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -303,7 +304,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "baz",
 					"baz": "bunk",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
@@ -317,7 +318,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "baz",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -335,7 +336,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "baz",
 					"baz": "bunk",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+ignored", // make sure other stuff is ignored
 					Annotations: map[string]string{
@@ -350,7 +351,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -364,7 +365,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			name:     "ReplaceTargetTypeAndAnnotations", // target must be updated as a unit
 			original: imageBase(),
 			input: images.Image{
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -378,7 +379,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -391,7 +392,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			name:     "ReplaceTargetFieldpath", // target must be updated as a unit
 			original: imageBase(),
 			input: images.Image{
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      20,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -405,7 +406,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      20,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -419,7 +420,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 			name:     "ReplaceTarget", // target must be updated as a unit
 			original: imageBase(),
 			input: images.Image{
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      20,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -428,7 +429,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 				},
 			},
 			expected: images.Image{
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      20,
 					MediaType: "application/vnd.oci.blab+replaced",
 					Annotations: map[string]string{
@@ -446,7 +447,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      0,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -463,7 +464,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
 						"foo": "bar",
@@ -480,7 +481,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size: 10,
 				},
 			},
@@ -493,7 +494,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size: 10,
 				},
 			},
@@ -506,7 +507,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -520,7 +521,7 @@ func TestImagesCreateUpdateDelete(t *testing.T) {
 					"foo": "bar",
 					"baz": "boo",
 				},
-				Target: ocispec.Descriptor{
+				Target: imagespec.Descriptor{
 					Size:      10,
 					MediaType: "application/vnd.oci.blab",
 					Annotations: map[string]string{
@@ -615,7 +616,7 @@ func imageBase() images.Image {
 			"foo": "bar",
 			"baz": "boo",
 		},
-		Target: ocispec.Descriptor{
+		Target: imagespec.Descriptor{
 			Size:      10,
 			MediaType: "application/vnd.oci.blab",
 			Annotations: map[string]string{

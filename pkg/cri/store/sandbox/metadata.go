@@ -20,8 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	cni "github.com/containerd/go-cni"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	cni "github.com/containerd/go-cni"
 )
 
 // NOTE(random-liu):

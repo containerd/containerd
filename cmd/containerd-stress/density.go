@@ -29,12 +29,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
 )
 
 var densityCommand = cli.Command{

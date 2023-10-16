@@ -39,10 +39,11 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/containerd/containerd/mount"
 	cnins "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/moby/sys/symlink"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/mount"
 )
 
 // Some of the following functions are migrated from

@@ -26,6 +26,8 @@ import (
 	"syscall"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
@@ -33,7 +35,6 @@ import (
 	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/containerd/snapshots/testsuite"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func newSnapshotterWithOpts(opts ...Opt) testsuite.SnapshotterFunc {
@@ -219,12 +220,12 @@ func testOverlayRemappedBind(t *testing.T, newSnapshotter testsuite.SnapshotterF
 	contID := uint32(0)
 	length := uint32(65536)
 
-	uidMap := specs.LinuxIDMapping{
+	uidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,
 	}
-	gidMap := specs.LinuxIDMapping{
+	gidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,
@@ -324,12 +325,12 @@ func testOverlayRemappedActive(t *testing.T, newSnapshotter testsuite.Snapshotte
 	contID := uint32(0)
 	length := uint32(65536)
 
-	uidMap := specs.LinuxIDMapping{
+	uidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,
 	}
-	gidMap := specs.LinuxIDMapping{
+	gidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,

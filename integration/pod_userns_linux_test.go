@@ -28,13 +28,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/integration/images"
-	runc "github.com/containerd/go-runc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/integration/images"
+	runc "github.com/containerd/go-runc"
 )
 
 const (

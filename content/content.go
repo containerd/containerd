@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Store combines the methods of content-oriented interfaces into a set that
@@ -57,7 +57,7 @@ type Provider interface {
 	// ReaderAt only requires desc.Digest to be set.
 	// Other fields in the descriptor may be used internally for resolving
 	// the location of the actual data.
-	ReaderAt(ctx context.Context, desc ocispec.Descriptor) (ReaderAt, error)
+	ReaderAt(ctx context.Context, desc imagespec.Descriptor) (ReaderAt, error)
 }
 
 // Ingester writes content
@@ -173,7 +173,7 @@ func WithLabels(labels map[string]string) Opt {
 // WriterOpts is internally used by WriterOpt.
 type WriterOpts struct {
 	Ref  string
-	Desc ocispec.Descriptor
+	Desc imagespec.Descriptor
 }
 
 // WriterOpt is used for passing options to Ingester.Writer.
@@ -185,7 +185,7 @@ type WriterOpt func(*WriterOpts) error
 // Write does not require any field of desc to be set.
 // If the data size is unknown, desc.Size should be set to 0.
 // Some implementations may also accept negative values as "unknown".
-func WithDescriptor(desc ocispec.Descriptor) WriterOpt {
+func WithDescriptor(desc imagespec.Descriptor) WriterOpt {
 	return func(opts *WriterOpts) error {
 		opts.Desc = desc
 		return nil

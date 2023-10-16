@@ -20,6 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -29,8 +32,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -128,13 +129,13 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	}
 
 	checkNeedsFix := images.HandlerFunc(
-		func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		func(_ context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 			// set to true if there is application/octet-stream media type
 			if desc.MediaType == docker.LegacyConfigMediaType {
 				hasMediaTypeBug1622 = true
 			}
 
-			return []ocispec.Descriptor{}, nil
+			return []imagespec.Descriptor{}, nil
 		},
 	)
 
@@ -152,15 +153,15 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 	if tops.Progress != nil {
 		baseHandlers = append(baseHandlers, images.HandlerFunc(
-			func(_ context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+			func(_ context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 				progressTracker.Add(desc)
 
-				return []ocispec.Descriptor{}, nil
+				return []imagespec.Descriptor{}, nil
 			},
 		))
 
 		baseChildrenHandler := childrenHandler
-		childrenHandler = images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) (children []ocispec.Descriptor, err error) {
+		childrenHandler = images.HandlerFunc(func(ctx context.Context, desc imagespec.Descriptor) (children []imagespec.Descriptor, err error) {
 			children, err = baseChildrenHandler(ctx, desc)
 			if err != nil {
 				return
@@ -255,7 +256,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 }
 
 func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *ProgressTracker) images.HandlerFunc {
-	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+	return func(ctx context.Context, desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
 		ctx = log.WithLogger(ctx, log.G(ctx).WithFields(log.Fields{
 			"digest":    desc.Digest,
 			"mediatype": desc.MediaType,

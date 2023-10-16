@@ -20,8 +20,9 @@ import (
 	"context"
 	"fmt"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/typeurl/v2"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
@@ -44,9 +45,9 @@ func init() {
 type Store struct {
 	imageName     string
 	imageLabels   map[string]string
-	platforms     []ocispec.Platform
+	platforms     []imagespec.Platform
 	allMetadata   bool
-	labelMap      func(ocispec.Descriptor) []string
+	labelMap      func(imagespec.Descriptor) []string
 	manifestLimit int
 
 	// extraReferences are used to store or lookup multiple references
@@ -96,7 +97,7 @@ func WithImageLabels(labels map[string]string) StoreOpt {
 }
 
 // WithPlatforms specifies which platforms to fetch content for
-func WithPlatforms(p ...ocispec.Platform) StoreOpt {
+func WithPlatforms(p ...imagespec.Platform) StoreOpt {
 	return func(s *Store) {
 		s.platforms = append(s.platforms, p...)
 	}
@@ -162,7 +163,7 @@ func WithExtraReference(name string) StoreOpt {
 }
 
 // WithUnpack specifies a platform to unpack for and an optional snapshotter to use
-func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
+func WithUnpack(p imagespec.Platform, snapshotter string) StoreOpt {
 	return func(s *Store) {
 		s.unpacks = append(s.unpacks, transfer.UnpackConfiguration{
 			Platform:    p,
@@ -212,7 +213,7 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 	return h
 }
 
-func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) ([]images.Image, error) {
+func (is *Store) Store(ctx context.Context, desc imagespec.Descriptor, store images.Store) ([]images.Image, error) {
 	var imgs []images.Image
 
 	// If import ref type, store references from annotation or prefix
@@ -456,7 +457,7 @@ func imageName(annotations map[string]string, cleanup func(string) string) strin
 		}
 		return name
 	}
-	name = annotations[ocispec.AnnotationRefName]
+	name = annotations[imagespec.AnnotationRefName]
 	if name != "" {
 		if cleanup != nil {
 			name = cleanup(name)

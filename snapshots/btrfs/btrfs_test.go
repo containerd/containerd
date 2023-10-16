@@ -29,14 +29,15 @@ import (
 	"testing"
 	"time"
 
+	exec "golang.org/x/sys/execabs"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
-	exec "golang.org/x/sys/execabs"
-	"golang.org/x/sys/unix"
 )
 
 func boltSnapshotter(t *testing.T) func(context.Context, string) (snapshots.Snapshotter, func() error, error) {

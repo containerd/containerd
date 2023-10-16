@@ -28,9 +28,10 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/log"
 )
 
 type (

@@ -19,8 +19,9 @@
 package command
 
 import (
-	"github.com/containerd/containerd/services/server"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/services/server"
 )
 
 // serviceFlags returns an array of flags for configuring containerd to run

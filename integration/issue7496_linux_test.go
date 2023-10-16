@@ -28,14 +28,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+
 	apitask "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 // TestIssue7496 is used to reproduce https://github.com/containerd/containerd/issues/7496

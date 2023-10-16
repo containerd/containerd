@@ -19,6 +19,8 @@ package containers
 import (
 	"errors"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
@@ -26,7 +28,6 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
 )
 
 var restoreCommand = cli.Command{

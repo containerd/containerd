@@ -22,9 +22,10 @@ import (
 	"context"
 	"path/filepath"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/log"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // ShouldKillAllOnExit reads the bundle's OCI spec and returns true if
@@ -38,7 +39,7 @@ func ShouldKillAllOnExit(ctx context.Context, bundlePath string) bool {
 
 	if spec.Linux != nil {
 		for _, ns := range spec.Linux.Namespaces {
-			if ns.Type == specs.PIDNamespace && ns.Path == "" {
+			if ns.Type == runtimespec.PIDNamespace && ns.Path == "" {
 				return false
 			}
 		}

@@ -22,10 +22,11 @@ import (
 	"syscall"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestIDMappedOverlay(t *testing.T) {
@@ -58,12 +59,12 @@ func TestIDMappedOverlay(t *testing.T) {
 	contID := uint32(0)
 	length := uint32(65536)
 
-	uidMap := specs.LinuxIDMapping{
+	uidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,
 	}
-	gidMap := specs.LinuxIDMapping{
+	gidMap := runtimespec.LinuxIDMapping{
 		ContainerID: contID,
 		HostID:      hostID,
 		Size:        length,
@@ -75,7 +76,7 @@ func TestIDMappedOverlay(t *testing.T) {
 		containerd.WithSnapshotter(snapshotter),
 		containerd.WithNewSnapshot(id, image, containerd.WithRemapperLabels(uidMap.ContainerID, uidMap.HostID, gidMap.ContainerID, gidMap.HostID, length)),
 		containerd.WithNewSpec(oci.WithImageConfig(image),
-			oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}),
+			oci.WithUserNamespace([]runtimespec.LinuxIDMapping{uidMap}, []runtimespec.LinuxIDMapping{gidMap}),
 			longCommand))
 	if err != nil {
 		t.Fatal(err)
