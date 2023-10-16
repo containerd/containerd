@@ -20,6 +20,11 @@ import (
 	"context"
 	"strings"
 
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -31,10 +36,6 @@ import (
 	"github.com/containerd/containerd/plugins"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func init() {

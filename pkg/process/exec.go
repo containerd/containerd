@@ -30,12 +30,13 @@ import (
 
 	"golang.org/x/sys/unix"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 type execProcess struct {

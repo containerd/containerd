@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/urfave/cli"
+	"google.golang.org/grpc/grpclog"
+
 	"github.com/containerd/containerd/cmd/ctr/commands/containers"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/cmd/ctr/commands/events"
@@ -40,8 +43,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
-	"google.golang.org/grpc/grpclog"
 )
 
 var extraCmds = []cli.Command{}

@@ -23,10 +23,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/containerd/console"
-	gocni "github.com/containerd/go-cni"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/console"
+	gocni "github.com/containerd/go-cni"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"

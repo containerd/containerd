@@ -22,10 +22,11 @@ import (
 	"io"
 	"strconv"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const newLine = "\r\n"

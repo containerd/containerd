@@ -29,11 +29,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/containerd/containerd/pkg/tomlext"
-	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/pkg/tomlext"
+	"github.com/containerd/log"
 )
 
 // buildGoVerifiers uses the local Go toolchain to build each of the standalone

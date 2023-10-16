@@ -25,6 +25,9 @@ import (
 	"io"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
@@ -34,8 +37,6 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type walkingDiff struct {

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"sync"
 
+	docker "github.com/distribution/reference"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
@@ -29,7 +31,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/labels"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/platforms"
-	docker "github.com/distribution/reference"
 
 	"github.com/opencontainers/go-digest"
 	imagedigest "github.com/opencontainers/go-digest"

@@ -23,13 +23,14 @@ import (
 	"strings"
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	imagelist "github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/platforms"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestImageIsUnpacked(t *testing.T) {

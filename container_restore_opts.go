@@ -21,13 +21,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/protobuf/proto"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (

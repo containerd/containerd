@@ -19,13 +19,14 @@ package proxy
 import (
 	"context"
 
+	"google.golang.org/protobuf/types/known/anypb"
+
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sandbox"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 // remoteSandboxController is a low level GRPC client for containerd's sandbox controller service

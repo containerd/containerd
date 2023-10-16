@@ -26,11 +26,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/cgroups/v3"
 	"github.com/moby/sys/mountinfo"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/cgroups/v3"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/mount"

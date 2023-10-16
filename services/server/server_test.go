@@ -20,10 +20,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/plugin/registry"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/stretchr/testify/assert"
 )
 
 const testPath = "/tmp/path/for/testing"

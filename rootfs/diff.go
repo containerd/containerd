@@ -20,11 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/snapshots"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // CreateDiff creates a layer diff for the given snapshot identifier from the

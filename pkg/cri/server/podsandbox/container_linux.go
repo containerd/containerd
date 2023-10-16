@@ -24,9 +24,10 @@ import (
 	"strconv"
 	"strings"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/contrib/seccomp"
 	"github.com/containerd/containerd/oci"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (

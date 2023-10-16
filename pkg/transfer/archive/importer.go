@@ -20,8 +20,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/typeurl/v2"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"

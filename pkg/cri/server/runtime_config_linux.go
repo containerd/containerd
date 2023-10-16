@@ -20,10 +20,11 @@ import (
 	"context"
 	"sort"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/pkg/systemd"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/log"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) getLinuxRuntimeConfig(ctx context.Context) *runtime.LinuxRuntimeConfiguration {

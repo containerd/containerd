@@ -22,8 +22,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/namespaces"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
+	"github.com/containerd/containerd/namespaces"
 )
 
 func TestWithDefaultPathEnv(t *testing.T) {

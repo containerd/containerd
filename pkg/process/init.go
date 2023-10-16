@@ -31,6 +31,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"golang.org/x/sys/unix"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/stdio"
@@ -38,8 +41,6 @@ import (
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"golang.org/x/sys/unix"
 )
 
 // Init represents an initial process for a container

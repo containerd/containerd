@@ -24,6 +24,8 @@ import (
 	"github.com/Microsoft/hcsshim"
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	"github.com/Microsoft/hcsshim/hcn"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
@@ -33,7 +35,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) podSandboxStats(

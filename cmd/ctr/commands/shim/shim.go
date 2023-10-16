@@ -27,6 +27,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -36,8 +39,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 )
 
 var fifoFlags = []cli.Flag{

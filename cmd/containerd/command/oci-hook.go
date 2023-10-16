@@ -25,9 +25,10 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/containerd/containerd/oci"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/oci"
 )
 
 var ociHook = cli.Command{

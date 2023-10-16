@@ -17,8 +17,9 @@
 package protobuf
 
 import (
-	"github.com/containerd/typeurl/v2"
 	"google.golang.org/protobuf/types/known/anypb"
+
+	"github.com/containerd/typeurl/v2"
 )
 
 // FromAny converts typeurl.Any to github.com/containerd/containerd/protobuf/types.Any.

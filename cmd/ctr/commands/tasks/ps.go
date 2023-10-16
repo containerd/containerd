@@ -22,9 +22,10 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli"
 )
 
 var psCommand = cli.Command{

@@ -28,6 +28,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
@@ -40,11 +46,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 const (

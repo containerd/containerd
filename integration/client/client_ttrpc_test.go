@@ -21,13 +21,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/ttrpcutil"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/ttrpc"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestClientTTRPC_New(t *testing.T) {

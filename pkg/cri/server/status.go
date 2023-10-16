@@ -22,8 +22,9 @@ import (
 	"fmt"
 	goruntime "runtime"
 
-	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/log"
 )
 
 // networkNotReadyReason is the reason reported when network is not ready.

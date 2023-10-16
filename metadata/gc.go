@@ -24,10 +24,11 @@ import (
 	"strings"
 	"time"
 
+	bolt "go.etcd.io/bbolt"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/log"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (

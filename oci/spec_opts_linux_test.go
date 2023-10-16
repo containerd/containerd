@@ -23,14 +23,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/pkg/cap"
-	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/continuity/fs/fstest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/pkg/cap"
+	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/continuity/fs/fstest"
 )
 
 //nolint:gosec

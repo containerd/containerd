@@ -30,6 +30,9 @@ import (
 
 	"github.com/Microsoft/go-winio/pkg/security"
 	"github.com/Microsoft/hcsshim/ext4/tar2ext4"
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
@@ -39,8 +42,6 @@ import (
 	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const (

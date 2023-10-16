@@ -19,6 +19,8 @@ package proxy
 import (
 	"context"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
@@ -27,7 +29,6 @@ import (
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

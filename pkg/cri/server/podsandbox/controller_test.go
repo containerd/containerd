@@ -21,11 +21,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
-	"github.com/stretchr/testify/assert"
 )
 
 const (

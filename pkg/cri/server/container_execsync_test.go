@@ -24,10 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	cioutil "github.com/containerd/containerd/pkg/ioutil"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCWWrite(t *testing.T) {

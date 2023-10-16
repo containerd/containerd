@@ -19,11 +19,12 @@ package metadata
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf/types"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl/v2"
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestSandboxCreate(t *testing.T) {

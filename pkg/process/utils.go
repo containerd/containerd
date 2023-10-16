@@ -30,10 +30,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	runc "github.com/containerd/go-runc"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/errdefs"
+	runc "github.com/containerd/go-runc"
 )
 
 const (

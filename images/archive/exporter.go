@@ -25,13 +25,14 @@ import (
 	"path"
 	"sort"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/platforms"
-	digest "github.com/opencontainers/go-digest"
-	imagespecs "github.com/opencontainers/image-spec/specs-go"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type exportOptions struct {

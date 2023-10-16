@@ -20,11 +20,12 @@ import (
 	"context"
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/imagetest"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log/logtest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestUsageCalculation(t *testing.T) {

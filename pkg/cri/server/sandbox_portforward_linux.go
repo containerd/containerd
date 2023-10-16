@@ -23,8 +23,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
+
+	"github.com/containerd/log"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the

@@ -21,6 +21,8 @@ package v1
 import (
 	"context"
 
+	"github.com/docker/go-metrics"
+
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/errdefs"
@@ -28,7 +30,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/log"
-	"github.com/docker/go-metrics"
 )
 
 // NewTaskMonitor returns a new cgroups monitor

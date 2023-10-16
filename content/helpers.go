@@ -24,11 +24,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // maxResets is the no.of times the Copy() method can tolerate a reset of the body

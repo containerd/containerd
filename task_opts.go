@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"syscall"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // NewTaskOpts allows the caller to set options on a new task

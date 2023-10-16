@@ -24,8 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/pkg/randutil"
 )
 
 func TestBasic(t *testing.T) {

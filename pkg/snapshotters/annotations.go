@@ -19,10 +19,11 @@ package snapshotters
 import (
 	"context"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/log"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // NOTE: The following labels contain "cri" prefix but they are not specific to CRI and

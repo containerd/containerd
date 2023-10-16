@@ -27,8 +27,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/fifo"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/fifo"
 )
 
 func openShimLog(ctx context.Context, bundle *Bundle, _ func(string, time.Duration) (net.Conn, error)) (io.ReadCloser, error) {

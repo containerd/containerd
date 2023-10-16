@@ -21,9 +21,10 @@ package opts
 import (
 	"context"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func isHugetlbControllerPresent() bool {

@@ -21,9 +21,10 @@ import (
 	"io"
 	"time"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/typeurl/v2"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Config is used to hold parameters needed for a diff operation

@@ -25,6 +25,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
@@ -33,11 +39,6 @@ import (
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
-	"github.com/google/go-cmp/cmp"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	bolt "go.etcd.io/bbolt"
 )
 
 func init() {

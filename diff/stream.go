@@ -22,10 +22,11 @@ import (
 	"io"
 	"os"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/typeurl/v2"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (

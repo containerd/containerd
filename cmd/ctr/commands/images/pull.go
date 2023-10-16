@@ -24,6 +24,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opencontainers/image-spec/identity"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
@@ -34,9 +38,6 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
-	"github.com/opencontainers/image-spec/identity"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
 )
 
 var pullCommand = cli.Command{

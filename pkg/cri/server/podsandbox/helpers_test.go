@@ -22,11 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/oci"
 )
 
 func TestGetRepoDigestAndTag(t *testing.T) {

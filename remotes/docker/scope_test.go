@@ -20,8 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/reference"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/reference"
 )
 
 func TestRepositoryScope(t *testing.T) {

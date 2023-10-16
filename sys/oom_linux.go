@@ -22,8 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/pkg/userns"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 const (

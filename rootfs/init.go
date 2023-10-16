@@ -22,10 +22,11 @@ import (
 	"fmt"
 	"os"
 
+	digest "github.com/opencontainers/go-digest"
+
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
 )
 
 var (

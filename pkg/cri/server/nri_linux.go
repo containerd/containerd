@@ -22,8 +22,9 @@ import (
 	"context"
 	"time"
 
-	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cstore.Container, req *cri.UpdateContainerResourcesRequest, status cstore.Status) (cstore.Status, error) {

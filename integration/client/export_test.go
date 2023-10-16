@@ -24,12 +24,13 @@ import (
 	"os"
 	"testing"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/platforms"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TestExport exports testImage as a tar stream

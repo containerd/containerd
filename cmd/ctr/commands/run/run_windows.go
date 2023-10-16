@@ -22,6 +22,9 @@ import (
 	"strings"
 
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
@@ -29,8 +32,6 @@ import (
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 )
 
 var platformRunFlags = []cli.Flag{

@@ -17,8 +17,9 @@
 package os
 
 import (
-	"github.com/containerd/containerd/mount"
 	"golang.org/x/sys/unix"
+
+	"github.com/containerd/containerd/mount"
 )
 
 // Mount will call unix.Mount to mount the file.

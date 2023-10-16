@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"io"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/converter"
 	"github.com/containerd/containerd/labels"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var _ converter.ConvertFunc = LayerConvertFunc

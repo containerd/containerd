@@ -21,9 +21,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+
+	"github.com/containerd/containerd/errdefs"
 )
 
 // TestNewExporter runs tests with different combinations of configuration for NewExporter function

@@ -27,8 +27,9 @@ import (
 
 	"github.com/Microsoft/go-winio/pkg/bindfilter"
 	"github.com/Microsoft/hcsshim"
-	"github.com/containerd/log"
 	"golang.org/x/sys/windows"
+
+	"github.com/containerd/log"
 )
 
 const sourceStreamName = "containerd.io-source"

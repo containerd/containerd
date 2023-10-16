@@ -23,10 +23,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/pkg/userns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/containerd/pkg/userns"
 )
 
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {

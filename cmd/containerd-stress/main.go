@@ -28,13 +28,14 @@ import (
 	"syscall"
 	"time"
 
+	metrics "github.com/docker/go-metrics"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/remote"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/log"
-	metrics "github.com/docker/go-metrics"
-	"github.com/urfave/cli"
 )
 
 var (

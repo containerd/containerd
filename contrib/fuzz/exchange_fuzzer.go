@@ -19,6 +19,7 @@ import (
 	"context"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"

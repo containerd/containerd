@@ -23,10 +23,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
 	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
 )
 
 func TestStore(t *testing.T) {

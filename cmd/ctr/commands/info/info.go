@@ -17,10 +17,11 @@
 package info
 
 import (
+	"github.com/urfave/cli"
+
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/urfave/cli"
 )
 
 type Info struct {

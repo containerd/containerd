@@ -21,15 +21,16 @@ import (
 	"os"
 	"path/filepath"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/urfave/cli"
+
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin/registry"
 	"github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pelletier/go-toml/v2"
-	"github.com/urfave/cli"
 )
 
 func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {

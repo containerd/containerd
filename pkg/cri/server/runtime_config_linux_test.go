@@ -20,11 +20,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/systemd"
 	"github.com/containerd/containerd/plugins"
-	"github.com/stretchr/testify/assert"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func newFakeRuntimeConfig(runcV2, systemdCgroup bool) criconfig.Runtime {

@@ -20,12 +20,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf/types"
 )
 
 func TestCreateDelete(t *testing.T) {

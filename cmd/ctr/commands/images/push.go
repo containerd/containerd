@@ -26,6 +26,11 @@ import (
 	"text/tabwriter"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/cmd/ctr/commands/content"
@@ -38,10 +43,6 @@ import (
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
-	"golang.org/x/sync/errgroup"
 )
 
 var pushCommand = cli.Command{

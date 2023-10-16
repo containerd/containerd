@@ -19,9 +19,10 @@ package oci
 import (
 	"context"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/pkg/cap"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // WithHostDevices adds all the hosts device nodes to the container's spec

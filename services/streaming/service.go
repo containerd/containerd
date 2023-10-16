@@ -20,6 +20,8 @@ import (
 	"errors"
 	"io"
 
+	"google.golang.org/grpc"
+
 	api "github.com/containerd/containerd/api/services/streaming/v1"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/streaming"
@@ -30,7 +32,6 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"google.golang.org/grpc"
 )
 
 var emptyResponse typeurl.Any

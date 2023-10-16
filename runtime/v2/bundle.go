@@ -23,12 +23,13 @@ import (
 	"path/filepath"
 	"runtime"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/identifiers"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // LoadBundle loads an existing bundle from disk

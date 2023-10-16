@@ -23,6 +23,9 @@ import (
 	"sync"
 	"time"
 
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/utils/clock"
+
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	apitasks "github.com/containerd/containerd/api/services/tasks/v1"
@@ -36,8 +39,6 @@ import (
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/utils/clock"
 )
 
 const (

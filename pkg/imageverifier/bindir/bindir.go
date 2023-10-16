@@ -29,10 +29,11 @@ import (
 	"strings"
 	"time"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/pkg/imageverifier"
 	"github.com/containerd/containerd/pkg/tomlext"
 	"github.com/containerd/log"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const outputLimitBytes = 1 << 15 // 32 KiB

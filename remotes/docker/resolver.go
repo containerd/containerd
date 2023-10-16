@@ -28,6 +28,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/reference"
@@ -37,8 +40,6 @@ import (
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (

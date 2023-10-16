@@ -32,6 +32,11 @@ import (
 	"sync"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/errdefs"
@@ -39,10 +44,6 @@ import (
 	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	imagespecs "github.com/opencontainers/image-spec/specs-go"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/sync/errgroup"
 )
 
 const (

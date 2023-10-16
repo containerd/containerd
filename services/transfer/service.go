@@ -19,6 +19,11 @@ package transfer
 import (
 	"context"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	transferTypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/errdefs"
@@ -31,10 +36,6 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func init() {

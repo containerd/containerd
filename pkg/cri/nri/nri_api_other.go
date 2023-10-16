@@ -21,12 +21,13 @@ package nri
 import (
 	"context"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	cstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/nri"

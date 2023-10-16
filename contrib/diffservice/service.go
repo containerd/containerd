@@ -19,13 +19,14 @@ package diffservice
 import (
 	"context"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/typeurl/v2"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type service struct {

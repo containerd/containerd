@@ -19,8 +19,9 @@ package sandbox
 import (
 	"testing"
 
-	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/typeurl/v2"
 )
 
 func TestAddExtension(t *testing.T) {

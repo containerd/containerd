@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/identifiers"
@@ -30,7 +32,6 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	api "github.com/containerd/containerd/sandbox"
 	"github.com/containerd/typeurl/v2"
-	"go.etcd.io/bbolt"
 )
 
 type sandboxStore struct {

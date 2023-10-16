@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	docker "github.com/distribution/reference"
+	imagedigest "github.com/opencontainers/go-digest"
+
 	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -28,8 +31,6 @@ import (
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/log"
-	docker "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 )
 
 type CRIImageService struct {

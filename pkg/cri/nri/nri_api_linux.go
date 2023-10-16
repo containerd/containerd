@@ -21,6 +21,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-tools/generate"
+	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -32,9 +36,6 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/runtime-tools/generate"
-	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/nri/pkg/api"

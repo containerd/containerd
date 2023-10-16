@@ -22,10 +22,11 @@ import (
 	"syscall"
 	"testing"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 func TestIDMappedOverlay(t *testing.T) {

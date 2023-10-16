@@ -29,6 +29,10 @@ import (
 	"strings"
 
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
+	"github.com/moby/sys/user"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
@@ -37,9 +41,6 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
-	"github.com/moby/sys/user"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec

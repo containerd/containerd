@@ -25,10 +25,11 @@ import (
 
 	// containerd/pkg/testutil has circular dependency on this mount pkg.
 	// so we use continuity/testutil instead.
-	"github.com/containerd/continuity/testutil"
-	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/stretchr/testify/assert"
 	exec "golang.org/x/sys/execabs"
+
+	"github.com/containerd/continuity/testutil"
+	"github.com/containerd/continuity/testutil/loopback"
 )
 
 func checkLookup(t *testing.T, fsType, mntPoint, dir string) {

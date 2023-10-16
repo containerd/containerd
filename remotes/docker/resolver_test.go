@@ -32,13 +32,14 @@ import (
 	"testing"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+	imagespecs "github.com/opencontainers/image-spec/specs-go"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/containerd/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
-	digest "github.com/opencontainers/go-digest"
-	imagespecs "github.com/opencontainers/image-spec/specs-go"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestHTTPResolver(t *testing.T) {

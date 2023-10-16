@@ -31,12 +31,13 @@ import (
 	"syscall"
 	"time"
 
+	exec "golang.org/x/sys/execabs"
+
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"
-	exec "golang.org/x/sys/execabs"
 )
 
 const binaryIOProcTermTimeout = 12 * time.Second // Give logger process solid 10 seconds for cleanup

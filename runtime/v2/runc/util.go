@@ -22,9 +22,10 @@ import (
 	"context"
 	"path/filepath"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/log"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // ShouldKillAllOnExit reads the bundle's OCI spec and returns true if

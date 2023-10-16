@@ -28,8 +28,9 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/fifo"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/fifo"
 )
 
 func TestOpenFifos(t *testing.T) {

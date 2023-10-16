@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/docker/go-metrics"
+	"github.com/prometheus/client_golang/prometheus"
+
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
 	cmetrics "github.com/containerd/containerd/metrics"
 	"github.com/containerd/containerd/metrics/cgroups/common"
@@ -31,8 +34,6 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"github.com/docker/go-metrics"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Trigger will be called when an event happens and provides the cgroup

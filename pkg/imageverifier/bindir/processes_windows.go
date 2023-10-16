@@ -24,8 +24,9 @@ import (
 	"os/exec"
 	"unsafe"
 
-	"github.com/containerd/log"
 	"golang.org/x/sys/windows"
+
+	"github.com/containerd/log"
 )
 
 type process struct {

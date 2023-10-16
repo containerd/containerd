@@ -25,9 +25,10 @@ import (
 	"os"
 	"strings"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TreeFormat is used to format tree based output using 4 values.

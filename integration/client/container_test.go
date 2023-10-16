@@ -30,6 +30,10 @@ import (
 	"testing"
 	"time"
 
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	apievents "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/cio"
@@ -47,9 +51,6 @@ import (
 	"github.com/containerd/go-runc"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 func empty() cio.Creator {

@@ -27,6 +27,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/urfave/cli"
+	"google.golang.org/grpc/grpclog"
+
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/errdefs"
 	_ "github.com/containerd/containerd/metrics" // import containerd build info
@@ -36,8 +39,6 @@ import (
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
-	"google.golang.org/grpc/grpclog"
 )
 
 const usage = `

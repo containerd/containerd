@@ -23,6 +23,9 @@ import (
 	"path/filepath"
 	"time"
 
+	docker "github.com/distribution/reference"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
 	clabels "github.com/containerd/containerd/labels"
@@ -31,8 +34,6 @@ import (
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/log"
-	docker "github.com/distribution/reference"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	imagedigest "github.com/opencontainers/go-digest"
 )

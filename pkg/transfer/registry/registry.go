@@ -25,6 +25,8 @@ import (
 	"strings"
 	"sync"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
@@ -34,7 +36,6 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {

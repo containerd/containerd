@@ -30,6 +30,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	exec "golang.org/x/sys/execabs"
+
 	. "github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/oci"
@@ -37,8 +40,6 @@ import (
 	"github.com/containerd/containerd/runtime/restart"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/typeurl/v2"
-	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 //nolint:unused // Ignore on non-Linux
