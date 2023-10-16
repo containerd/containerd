@@ -87,8 +87,8 @@ type criService struct {
 	imageService
 	// config contains all configurations.
 	config criconfig.Config
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
+	// imageFSPaths contains path to image filesystem for snapshotters.
+	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// sandboxStore stores all resources associated with sandboxes.
@@ -139,11 +139,21 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
 	}
 
-	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
-	log.L.Infof("Get image filesystem path %q", imageFSPath)
+	imageFSPaths := map[string]string{}
+	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
+		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
+		snapshotter := ociRuntime.Snapshotter
+		if snapshotter != "" {
+			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
+			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+		}
+	}
+	snapshotter := config.ContainerdConfig.Snapshotter
+	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
+	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
 
 	// TODO: expose this as a separate containerd plugin.
-	imageService, err := images.NewService(config, imageFSPath, client)
+	imageService, err := images.NewService(config, imageFSPaths, client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
 	}
@@ -152,7 +162,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		imageService:       imageService,
 		config:             config,
 		client:             client,
-		imageFSPath:        imageFSPath,
+		imageFSPaths:       imageFSPaths,
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),

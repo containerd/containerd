@@ -34,7 +34,7 @@ func TestImageFsInfo(t *testing.T) {
 		{
 			Key: snapshotstore.Key{
 				Key:         "key1",
-				Snapshotter: "snapshotter1",
+				Snapshotter: "overlayfs",
 			},
 			Kind:      snapshot.KindActive,
 			Size:      10,
@@ -44,7 +44,7 @@ func TestImageFsInfo(t *testing.T) {
 		{
 			Key: snapshotstore.Key{
 				Key:         "key2",
-				Snapshotter: "snapshotter1",
+				Snapshotter: "overlayfs",
 			},
 			Kind:      snapshot.KindCommitted,
 			Size:      20,
@@ -54,7 +54,7 @@ func TestImageFsInfo(t *testing.T) {
 		{
 			Key: snapshotstore.Key{
 				Key:         "key3",
-				Snapshotter: "snapshotter1",
+				Snapshotter: "overlayfs",
 			},
 			Kind:      snapshot.KindView,
 			Size:      0,
@@ -74,6 +74,7 @@ func TestImageFsInfo(t *testing.T) {
 	resp, err := c.ImageFsInfo(context.Background(), &runtime.ImageFsInfoRequest{})
 	require.NoError(t, err)
 	stats := resp.GetImageFilesystems()
-	assert.Len(t, stats, 1)
-	assert.Equal(t, expected, stats[0])
+	// stats[0] is for default snapshotter, stats[1] is for `overlayfs`
+	assert.Len(t, stats, 2)
+	assert.Equal(t, expected, stats[1])
 }

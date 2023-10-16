@@ -291,7 +291,7 @@ func (c *criService) windowsContainerMetrics(
 	cs.WritableLayer = &runtime.FilesystemUsage{
 		Timestamp: sn.Timestamp,
 		FsId: &runtime.FilesystemIdentifier{
-			Mountpoint: c.imageFSPath,
+			Mountpoint: c.imageFSPaths[snapshotter],
 		},
 		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
@@ -347,7 +347,7 @@ func (c *criService) linuxContainerMetrics(
 	cs.WritableLayer = &runtime.FilesystemUsage{
 		Timestamp: sn.Timestamp,
 		FsId: &runtime.FilesystemIdentifier{
-			Mountpoint: c.imageFSPath,
+			Mountpoint: c.imageFSPaths[snapshotter],
 		},
 		UsedBytes:  &runtime.UInt64Value{Value: usedBytes},
 		InodesUsed: &runtime.UInt64Value{Value: inodesUsed},
