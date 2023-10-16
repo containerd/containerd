@@ -173,7 +173,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		containerStats.WritableLayer = &runtime.WindowsFilesystemUsage{
 			Timestamp: sn.Timestamp,
 			FsId: &runtime.FilesystemIdentifier{
-				Mountpoint: c.imageFSPath,
+				Mountpoint: c.imageFSPaths[snapshotter],
 			},
 			UsedBytes: &runtime.UInt64Value{Value: usedBytes},
 		}

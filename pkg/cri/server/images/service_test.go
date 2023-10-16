@@ -42,7 +42,7 @@ const (
 func newTestCRIService() *CRIImageService {
 	return &CRIImageService{
 		config:        testConfig,
-		imageFSPath:   testImageFSPath,
+		imageFSPaths:  map[string]string{"overlayfs": testImageFSPath},
 		imageStore:    imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore: snapshotstore.NewStore(),
 	}

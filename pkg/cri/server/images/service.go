@@ -39,8 +39,8 @@ type CRIImageService struct {
 	config criconfig.Config
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
+	// imageFSPaths contains path to image filesystem for snapshotters.
+	imageFSPaths map[string]string
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -51,12 +51,12 @@ type CRIImageService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
-func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.Config, imageFSPaths map[string]string, client *containerd.Client) (*CRIImageService, error) {
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
 		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
-		imageFSPath:                 imageFSPath,
+		imageFSPaths:                imageFSPaths,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
