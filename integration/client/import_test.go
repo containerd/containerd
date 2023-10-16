@@ -477,7 +477,7 @@ func TestTransferImport(t *testing.T) {
 		// [0]: Index name or ""
 		// [1:]: Additional images and manifest to import
 		//  Images ending with @ will have digest appended and use the digest of the previously imported image
-		//  A space can be used to seperate a repo name and tag, only the tag will be set in the imported image
+		//  A space can be used to separate a repo name and tag, only the tag will be set in the imported image
 		Images []string
 		Opts   []image.StoreOpt
 	}{
