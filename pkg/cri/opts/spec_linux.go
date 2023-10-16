@@ -18,6 +18,7 @@ package opts
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -174,4 +175,38 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 
 		return oci.WithCDIDevices(devices...)(ctx, client, c, s)
 	}
+}
+
+func GenerateCDIDevicesOpts(containerMounts []*runtime.Mount) []*runtime.CDIDevice {
+	// OCI Spec default Mounts
+	defaultSpecMounts := []string{"/proc", "/run", "/dev", "/dev/pts", "/dev/shm", "/dev/mqueue", "/sys"}
+
+	// Default Mount skip.
+	isDefaultSpecMount := func(defaultMnts []string, m *runtime.Mount) bool {
+		for _, mntPath := range defaultMnts {
+			if filepath.Clean(m.ContainerPath) == filepath.Clean(mntPath) {
+				return true
+			}
+		}
+		return false
+	}
+
+	CDIDevices := []*runtime.CDIDevice{}
+	for _, mount := range containerMounts {
+		// Filter the default Mounts
+		if isDefaultSpecMount(defaultSpecMounts, mount) {
+			continue
+		}
+
+		// Encoded Mount host path
+		encodedHostPath := base64.URLEncoding.EncodeToString([]byte(mount.GetHostPath()))
+		mntName := "kata.direct.volume/direct-volume=" + encodedHostPath
+		cdiDevice := runtime.CDIDevice{
+			Name: mntName,
+		}
+
+		CDIDevices = append(CDIDevices, &cdiDevice)
+	}
+
+	return CDIDevices
 }

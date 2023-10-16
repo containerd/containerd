@@ -106,7 +106,10 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
 	if c.config.EnableCDI {
-		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, config.CDIDevices))
+		CDIDevices := config.CDIDevices
+		devices := customopts.GenerateCDIDevicesOpts(config.GetMounts())
+		CDIDevices = append(CDIDevices, devices...)
+		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, CDIDevices))
 	}
 	return specOpts, nil
 }
