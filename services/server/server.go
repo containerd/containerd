@@ -431,10 +431,11 @@ func (s *Server) Wait() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
-	path := config.PluginDir
+	path := config.PluginDir //nolint: staticcheck
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
+	log.G(ctx).Warning("`go_plugin` is deprecated, please use `external plugins` instead")
 	if err := dynamic.Load(path); err != nil {
 		return nil, err
 	}
