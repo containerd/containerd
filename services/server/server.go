@@ -35,6 +35,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/ttrpc"
+	metrics "github.com/docker/go-metrics"
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
+
 	csapi "github.com/containerd/containerd/api/services/content/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/content"
@@ -49,19 +60,10 @@ import (
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/snapshots"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
-	"github.com/containerd/ttrpc"
-	metrics "github.com/docker/go-metrics"
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
-	bolt "go.etcd.io/bbolt"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -306,7 +308,31 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			return nil, err
 		}
 	}
+
+	recordConfigDeprecations(ctx, config, initialized)
 	return s, nil
+}
+
+// recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
+func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
+	// record any detected deprecations without blocking server startup
+	plugin, err := set.GetByID(plugin.WarningPlugin, plugin.DeprecationsPlugin)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	instance, err := plugin.Instance()
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	warn, ok := instance.(warning.Service)
+	if !ok {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations, unexpected plugin type")
+		return
+	}
+
+	_ = warn // TODO(samuelkarp): placeholder for future use
 }
 
 // Server is the containerd main daemon
