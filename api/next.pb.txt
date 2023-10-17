@@ -2401,6 +2401,7 @@ file {
   dependency: "google/rpc/status.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "gogoproto/gogo.proto"
+  dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "Plugin"
     field {
@@ -2514,6 +2515,53 @@ file {
         65004: "UUID"
       }
       json_name: "uuid"
+    }
+    field {
+      name: "pid"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pid"
+    }
+    field {
+      name: "pidns"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT64
+      json_name: "pidns"
+    }
+    field {
+      name: "deprecations"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.services.introspection.v1.DeprecationWarning"
+      json_name: "deprecations"
+    }
+  }
+  message_type {
+    name: "DeprecationWarning"
+    field {
+      name: "id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
+    field {
+      name: "message"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "message"
+    }
+    field {
+      name: "last_occurrence"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "lastOccurrence"
     }
   }
   service {
