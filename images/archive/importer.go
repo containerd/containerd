@@ -133,7 +133,7 @@ func ImportIndex(ctx context.Context, store content.Store, reader io.Reader, opt
 			return ocispec.Descriptor{}, fmt.Errorf("unsupported OCI version %s", ociLayout.Version)
 		}
 
-		idx, ok := blobs["index.json"]
+		idx, ok := blobs[ocispec.ImageIndexFile]
 		if !ok {
 			return ocispec.Descriptor{}, fmt.Errorf("missing index.json in OCI layout %s", ocispec.ImageLayoutVersion)
 		}
