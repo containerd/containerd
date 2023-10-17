@@ -127,6 +127,19 @@ func (ps *Set) Get(t Type) (interface{}, error) {
 	return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
 }
 
+// GetByID returns the plugin of the given type and ID
+func (ps *Set) GetByID(t Type, id string) (*Plugin, error) {
+	typSet, ok := ps.byTypeAndID[t]
+	if !ok || len(typSet) == 0 {
+		return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
+	}
+	p, ok := typSet[id]
+	if !ok {
+		return nil, fmt.Errorf("no plugins registered for %s %q: %w", t, id, ErrPluginNotFound)
+	}
+	return p, nil
+}
+
 // GetAll returns all initialized plugins
 func (ps *Set) GetAll() []*Plugin {
 	return ps.ordered
