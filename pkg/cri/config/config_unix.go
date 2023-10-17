@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/pelletier/go-toml/v2"
+	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.

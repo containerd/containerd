@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/streaming"
+	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 // DefaultConfig returns default configurations of cri plugin.
