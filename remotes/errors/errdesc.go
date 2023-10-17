@@ -91,7 +91,6 @@ var (
 	})
 )
 
-var nextCode = 1000
 var registerLock sync.Mutex
 
 // Register will make the passed-in error known to the environment and
@@ -100,7 +99,7 @@ func Register(group string, descriptor ErrorDescriptor) ErrorCode {
 	registerLock.Lock()
 	defer registerLock.Unlock()
 
-	descriptor.Code = ErrorCode(nextCode)
+	descriptor.Code = ErrorCode(descriptor.Value)
 
 	if _, ok := idToDescriptors[descriptor.Value]; ok {
 		panic(fmt.Sprintf("ErrorValue %q is already registered", descriptor.Value))
@@ -113,7 +112,6 @@ func Register(group string, descriptor ErrorDescriptor) ErrorCode {
 	errorCodeToDescriptors[descriptor.Code] = descriptor
 	idToDescriptors[descriptor.Value] = descriptor
 
-	nextCode++
 	return descriptor.Code
 }
 

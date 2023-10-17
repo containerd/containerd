@@ -30,9 +30,9 @@ type ErrorCoder interface {
 
 // ErrorCode represents the error type. The errors are serialized via strings
 // and the integer format may change and should *never* be exported.
-type ErrorCode int
+type ErrorCode string
 
-var _ error = ErrorCode(0)
+var _ error = ErrorCode("")
 
 // ErrorCode just returns itself
 func (ec ErrorCode) ErrorCode() ErrorCode {
@@ -230,7 +230,6 @@ func (errs Errors) MarshalJSON() ([]byte, error) {
 			err = daErr
 		default:
 			err = ErrorCodeUnknown.WithDetail(daErr)
-
 		}
 
 		// If the Error struct was setup and they forgot to set the
@@ -254,7 +253,7 @@ func (errs Errors) MarshalJSON() ([]byte, error) {
 // Error or ErrorCode
 func (errs *Errors) UnmarshalJSON(data []byte) error {
 	var tmpErrs struct {
-		Errors []Error
+		Errors []Error `json:"errors,omitempty"`
 	}
 
 	if err := json.Unmarshal(data, &tmpErrs); err != nil {

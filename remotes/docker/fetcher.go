@@ -290,11 +290,6 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 
 		return nil, remoteserrors.NewUnexpectedStatusErr(resp)
-		// var registryErr Errors
-		// if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
-		// 	return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
-		// }
-		// return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
 	}
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")
