@@ -211,12 +211,13 @@ func writeBootstrapParams(path string, params client.BootstrapParams) error {
 	if err != nil {
 		return err
 	}
-	f, err := atomicfile.New(path, 0o666)
+
+	data, err := json.Marshal(&params)
 	if err != nil {
 		return err
 	}
 
-	data, err := json.Marshal(&params)
+	f, err := atomicfile.New(path, 0o666)
 	if err != nil {
 		return err
 	}
