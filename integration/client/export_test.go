@@ -171,10 +171,10 @@ func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 			t.Error(err)
 			continue
 		}
-		if h.Name == "oci-layout" {
+		if h.Name == ocispec.ImageLayoutFile {
 			foundOCILayout = true
 		}
-		if h.Name == "index.json" {
+		if h.Name == ocispec.ImageIndexFile {
 			foundIndexJSON = true
 		}
 		if h.Name == "manifest.json" {
