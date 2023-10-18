@@ -17,6 +17,7 @@
 package content
 
 import (
+	gocontext "context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	units "github.com/docker/go-units"
@@ -235,7 +237,7 @@ var (
 		},
 	}
 
-	listReferencesCommand = cli.Command{
+	listReferencesCommand = &cli.Command{
 		Name:        "references",
 		Usage:       "List references to the given content",
 		ArgsUsage:   "<digest>",
@@ -247,44 +249,152 @@ var (
 				return err
 			}
 			defer cancel()
-			cs := client.ContentStore()
 
 			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
 			defer tw.Flush()
-			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE\tLABELS")
+
+			fmt.Fprintln(tw, "TYPE\tID")
+
+			// Images
+			imgStore := client.ImageService()
 
 			dgst, err := digest.Parse(object)
 			if err != nil {
 				return err
 			}
-			labelGCContentRef := "containerd.io/gc.ref.content"
+
+			digestField := "target.digest"
+			filter := fmt.Sprintf("%s==%s", digestField, dgst)
+
+			imgs, err := imgStore.List(ctx, filter)
+			if err != nil {
+				return err
+			}
+
+			imgNames := make([]string, 0)
+			for _, m := range imgs {
+				imgNames = append(imgNames, m.Name)
+			}
+
+			// Content
+			cs := client.ContentStore()
+
+			ids := make([]string, 0)
+
 			walkFn := func(info content.Info) error {
 				var isRef = false
-				var labelStrings []string
-				for k, v := range info.Labels {
-					if strings.HasPrefix(k, labelGCContentRef) && v == string(dgst) {
+				for _, v := range info.Labels {
+					if v == string(dgst) {
 						isRef = true
+						break
 					}
-					labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
 				}
 				if isRef {
-					sort.Strings(labelStrings)
-					labels := strings.Join(labelStrings, ",")
-					if labels == "" {
-						labels = "-"
-					}
-
-					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
-						info.Digest,
-						units.HumanSize(float64(info.Size)),
-						units.HumanDuration(time.Since(info.CreatedAt)),
-						labels)
+					ids = append(ids, string(info.Digest))
 				}
 				return nil
 			}
 
 			args := make([]string, 0)
-			return cs.Walk(ctx, walkFn, args...)
+			err = cs.Walk(ctx, walkFn, args...)
+			if err != nil {
+				return err
+			}
+
+			// Lease
+			leaseRefs := make([]string, 0)
+			contentKey := "content"
+			lm := client.LeasesService()
+
+			leases, err := lm.List(ctx)
+			if err != nil {
+				return err
+			}
+
+			for _, lease := range leases {
+				resources, err := lm.ListResources(ctx, lease)
+				if err != nil {
+					return err
+				}
+
+				for _, r := range resources {
+					if r.Type != contentKey {
+						continue
+					}
+
+					if r.ID == string(dgst) {
+						leaseRefs = append(leaseRefs, lease.ID)
+					}
+				}
+			}
+
+			// Snapshots
+			snapshotterRefs := make([]string, 0)
+			snapshotSvc := client.SnapshotService(context.String("snapshotter"))
+			snapWalkFn := func(_ gocontext.Context, info snapshots.Info) error {
+				isRef := false
+				for _, v := range info.Labels {
+					if v == string(dgst) {
+						isRef = true
+						break
+					}
+				}
+				if isRef {
+					snapshotterRefs = append(snapshotterRefs, info.Name)
+				}
+				return nil
+			}
+
+			args = make([]string, 0)
+			err = snapshotSvc.Walk(ctx, snapWalkFn, args...)
+			if err != nil {
+				return err
+			}
+
+			// Sandbox
+			ss := client.SandboxStore()
+			sandboxRefs := make([]string, 0)
+
+			sandboxes, err := ss.List(ctx)
+			if err != nil {
+				return err
+			}
+
+			for _, sbox := range sandboxes {
+				for _, v := range sbox.Labels {
+					if v == string(dgst) {
+						sandboxRefs = append(sandboxRefs, sbox.ID)
+						break
+					}
+				}
+			}
+
+			// Container
+			containerSvc := client.ContainerService()
+			containerRefs := make([]string, 0)
+
+			containerList, err := containerSvc.List(ctx)
+			if err != nil {
+				return err
+			}
+
+			for _, container := range containerList {
+				for _, v := range container.Labels {
+					if v == string(dgst) {
+						containerRefs = append(containerRefs, container.ID)
+						break
+					}
+				}
+			}
+
+			fmt.Fprintf(tw, "%s\t%s\n", "Containers", strings.Join(containerRefs, ", "))
+			fmt.Fprintf(tw, "%s\t%s\n", "Content", strings.Join(ids, ", "))
+			fmt.Fprintf(tw, "%s\t%s\n", "Images", strings.Join(imgNames, ", "))
+			fmt.Fprintf(tw, "%s\t%s\n", "Leases", strings.Join(leaseRefs, ", "))
+			fmt.Fprintf(tw, "%s\t%s\n", "Sandboxes", strings.Join(sandboxRefs, ", "))
+			fmt.Fprintf(tw, "%s\t%s\n", "Snapshots", strings.Join(snapshotterRefs, ", "))
+
+			return nil
 		},
 	}
 
