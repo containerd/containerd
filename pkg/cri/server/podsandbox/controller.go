@@ -34,9 +34,25 @@ import (
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
 )
+
+func init() {
+	registry.Register(&plugin.Registration{
+		Type:     plugins.SandboxControllerPlugin,
+		ID:       "podsandbox",
+		Requires: []plugin.Type{},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			// register the global controller to containerd plugin manager,
+			// the global controller will be initialized when cri plugin is initializing
+			return &Controller{}, nil
+		},
+	})
+}
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.
 // TODO: this will be removed in subsequent iterations.
@@ -72,7 +88,7 @@ type Controller struct {
 	store *Store
 }
 
-func New(
+func (c *Controller) Init(
 	config criconfig.Config,
 	client *containerd.Client,
 	sandboxStore *sandboxstore.Store,
@@ -80,17 +96,15 @@ func New(
 	cri CRIService,
 	imageService ImageService,
 	baseOCISpecs map[string]*oci.Spec,
-) *Controller {
-	return &Controller{
-		config:       config,
-		client:       client,
-		imageService: imageService,
-		sandboxStore: sandboxStore,
-		os:           os,
-		cri:          cri,
-		baseOCISpecs: baseOCISpecs,
-		store:        NewStore(),
-	}
+) {
+	c.cri = cri
+	c.client = client
+	c.config = config
+	c.sandboxStore = sandboxStore
+	c.os = os
+	c.baseOCISpecs = baseOCISpecs
+	c.store = NewStore()
+	c.imageService = imageService
 }
 
 var _ sandbox.Controller = (*Controller)(nil)

@@ -103,6 +103,7 @@ message ControllerCreateRequest {
 	google.protobuf.Any options = 3;
 	string netns_path = 4;
 	map<string, string> annotations = 5;
+	string sandboxer = 10;
 }
 
 message ControllerCreateResponse {
@@ -111,6 +112,7 @@ message ControllerCreateResponse {
 
 message ControllerStartRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerStartResponse {
@@ -122,6 +124,7 @@ message ControllerStartResponse {
 
 message ControllerPlatformRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerPlatformResponse {
@@ -131,12 +134,14 @@ message ControllerPlatformResponse {
 message ControllerStopRequest {
 	string sandbox_id = 1;
 	uint32 timeout_secs = 2;
+	string sandboxer = 10;
 }
 
 message ControllerStopResponse {}
 
 message ControllerWaitRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerWaitResponse {
@@ -147,6 +152,7 @@ message ControllerWaitResponse {
 message ControllerStatusRequest {
 	string sandbox_id = 1;
 	bool verbose = 2;
+	string sandboxer = 10;
 }
 
 message ControllerStatusResponse {
@@ -161,12 +167,14 @@ message ControllerStatusResponse {
 
 message ControllerShutdownRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerShutdownResponse {}
 
 message ControllerMetricsRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerMetricsResponse {

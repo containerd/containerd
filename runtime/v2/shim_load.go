@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/cleanup"
+	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/log"
 )
 
@@ -141,7 +142,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 				ttrpcAddress: m.containerdTTRPCAddress,
 				schedCore:    m.schedCore,
 			})
-		instance, err := loadShim(ctx, bundle, func() {
+		shim, err := loadShimTask(ctx, bundle, func() {
 			log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 			cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
@@ -151,10 +152,6 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		if err != nil {
 			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 			continue
-		}
-		shim, err := newShimTask(instance)
-		if err != nil {
-			return err
 		}
 
 		// There are 3 possibilities for the loaded shim here:
@@ -178,6 +175,26 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
+	shim, err := loadShim(ctx, bundle, onClose)
+	if err != nil {
+		return nil, err
+	}
+	// Check connectivity, TaskService is the only required service, so create a temp one to check connection.
+	s, err := newShimTask(shim)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
+	defer cancel()
+
+	if _, err := s.PID(ctx); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (m *ShimManager) cleanupWorkDirs(ctx context.Context) error {

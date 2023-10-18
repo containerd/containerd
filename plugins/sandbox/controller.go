@@ -42,7 +42,7 @@ import (
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.SandboxControllerPlugin,
-		ID:   "local",
+		ID:   "shim",
 		Requires: []plugin.Type{
 			plugins.RuntimePluginV2,
 			plugins.EventPlugin,
@@ -59,20 +59,13 @@ func init() {
 				return nil, err
 			}
 
-			sbPlugin, err := ic.GetByID(plugins.SandboxStorePlugin, "local")
-			if err != nil {
-				return nil, err
-			}
-
 			var (
 				shims     = shimPlugin.(*v2.ShimManager)
 				publisher = exchangePlugin.(*exchange.Exchange)
-				store     = sbPlugin.(sandbox.Store)
 			)
 
 			return &controllerLocal{
 				shims:     shims,
-				store:     store,
 				publisher: publisher,
 			}, nil
 		},
@@ -81,7 +74,6 @@ func init() {
 
 type controllerLocal struct {
 	shims     *v2.ShimManager
-	store     sandbox.Store
 	publisher events.Publisher
 }
 
@@ -106,19 +98,15 @@ func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc
 	}
 }
 
-func (c *controllerLocal) Create(ctx context.Context, sandboxID string, opts ...sandbox.CreateOpt) error {
+func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
 	var coptions sandbox.CreateOptions
+	sandboxID := info.ID
 	for _, opt := range opts {
 		opt(&coptions)
 	}
 
 	if _, err := c.shims.Get(ctx, sandboxID); err == nil {
 		return fmt.Errorf("sandbox %s already running: %w", sandboxID, errdefs.ErrAlreadyExists)
-	}
-
-	info, err := c.store.Get(ctx, sandboxID)
-	if err != nil {
-		return fmt.Errorf("failed to query sandbox metadata from store: %w", err)
 	}
 
 	shim, err := c.shims.Start(ctx, sandboxID, runtime.CreateOpts{

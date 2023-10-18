@@ -4974,6 +4974,13 @@ file {
       type_name: ".containerd.types.Sandbox.ExtensionsEntry"
       json_name: "extensions"
     }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
     nested_type {
       name: "Runtime"
       field {
@@ -5194,6 +5201,13 @@ file {
       type_name: ".containerd.services.sandbox.v1.ControllerCreateRequest.AnnotationsEntry"
       json_name: "annotations"
     }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
     nested_type {
       name: "AnnotationsEntry"
       field {
@@ -5233,6 +5247,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
     }
   }
   message_type {
@@ -5297,6 +5318,13 @@ file {
       type: TYPE_STRING
       json_name: "sandboxId"
     }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
   }
   message_type {
     name: "ControllerPlatformResponse"
@@ -5325,6 +5353,13 @@ file {
       type: TYPE_UINT32
       json_name: "timeoutSecs"
     }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
   }
   message_type {
     name: "ControllerStopResponse"
@@ -5337,6 +5372,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
     }
   }
   message_type {
@@ -5372,6 +5414,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_BOOL
       json_name: "verbose"
+    }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
     }
   }
   message_type {
@@ -5459,6 +5508,13 @@ file {
       type: TYPE_STRING
       json_name: "sandboxId"
     }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
   }
   message_type {
     name: "ControllerShutdownResponse"
@@ -5471,6 +5527,13 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
     }
   }
   message_type {

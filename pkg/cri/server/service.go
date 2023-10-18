@@ -98,9 +98,6 @@ type criService struct {
 	sandboxNameIndex *registrar.Registrar
 	// containerStore stores all resources associated with containers.
 	containerStore *containerstore.Store
-	// sandboxControllers contains different sandbox controller type,
-	// every controller controls sandbox lifecycle (and hides implementation details behind).
-	sandboxControllers map[criconfig.SandboxControllerMode]sandbox.Controller
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
@@ -169,7 +166,6 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
-		sandboxControllers: make(map[criconfig.SandboxControllerMode]sandbox.Controller),
 	}
 
 	// TODO: figure out a proper channel size.
@@ -210,9 +206,8 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, err
 	}
 
-	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
-	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, imageService, c.baseOCISpecs)
-	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
+	podSandboxController := c.client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
+	podSandboxController.Init(config, client, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
 
 	c.nri = nri
 
@@ -355,6 +350,17 @@ func (c *criService) register(s *grpc.Server) error {
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
 	return nil
+}
+
+// getSandboxController returns the sandbox controller configuration for sandbox.
+// If absent in legacy case, it will return the default controller.
+func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error) {
+	ociRuntime, err := c.getSandboxRuntime(config, runtimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+
+	return c.client.SandboxController(ociRuntime.Sandboxer), nil
 }
 
 // imageFSPath returns containerd image filesystem path.

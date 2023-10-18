@@ -40,13 +40,13 @@ func NewSandboxController(client api.ControllerClient) sandbox.Controller {
 	return &remoteSandboxController{client: client}
 }
 
-func (s *remoteSandboxController) Create(ctx context.Context, sandboxID string, opts ...sandbox.CreateOpt) error {
+func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
 	var options sandbox.CreateOptions
 	for _, opt := range opts {
 		opt(&options)
 	}
 	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
-		SandboxID: sandboxID,
+		SandboxID: sandboxInfo.ID,
 		Rootfs:    mount.ToProto(options.Rootfs),
 		Options: &anypb.Any{
 			TypeUrl: options.Options.GetTypeUrl(),
