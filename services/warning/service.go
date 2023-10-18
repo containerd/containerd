@@ -52,16 +52,6 @@ type Warning struct {
 
 var _ Service = (*service)(nil)
 
-func init() {
-	registry.Register(&plugin.Registration{
-		Type: plugins.InternalPlugin,
-		ID:   "warning",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return &service{warnings: make(map[deprecation.Warning]time.Time)}, nil
-		},
-	})
-}
-
 type service struct {
 	warnings map[deprecation.Warning]time.Time
 	m        sync.RWMutex
