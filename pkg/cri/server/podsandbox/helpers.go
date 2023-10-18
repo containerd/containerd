@@ -28,6 +28,7 @@ import (
 	clabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/log"
@@ -43,14 +44,6 @@ const (
 	// directory of the sandbox, all files created for the sandbox will be
 	// placed under this directory.
 	sandboxesDir = "sandboxes"
-	// criContainerdPrefix is common prefix for cri-containerd
-	criContainerdPrefix = "io.cri-containerd"
-	// containerKindLabel is a label key indicating container is sandbox container or application container
-	containerKindLabel = criContainerdPrefix + ".kind"
-	// containerKindSandbox is a label value indicating container is sandbox container
-	containerKindSandbox = "sandbox"
-	// sandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
-	sandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 	// MetadataKey is the key used for storing metadata in the sandbox extensions
 	MetadataKey = "metadata"
 )
@@ -117,7 +110,7 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	for k, v := range configLabels {
 		labels[k] = v
 	}
-	labels[containerKindLabel] = containerType
+	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
 }
 

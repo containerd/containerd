@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -133,7 +134,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to generate sandbox container spec options: %w", err)
 	}
 
-	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
+	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindSandbox)
 
 	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
 	extraSOpts, err := sandboxSnapshotterOpts(config)
@@ -147,7 +148,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
-		containerd.WithContainerExtension(sandboxMetadataExtension, &metadata),
+		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
 		containerd.WithRuntime(ociRuntime.Type, sandboxInfo.Runtime.Options),
 	}
 

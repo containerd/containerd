@@ -35,4 +35,6 @@ const (
 	ContainerKindContainer = "container"
 	// ContainerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
 	ContainerMetadataExtension = criContainerdPrefix + ".container.metadata"
+	// SandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
+	SandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 )
