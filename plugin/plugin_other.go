@@ -19,7 +19,7 @@
 
 package plugin
 
-func loadPlugins(path string) error {
+func loadPlugins(path string) (int, error) {
 	// plugins not supported until 1.8
-	return nil
+	return 0, nil
 }
