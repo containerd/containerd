@@ -64,6 +64,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.14.0
 	go.opentelemetry.io/otel/sdk v1.14.0
 	go.opentelemetry.io/otel/trace v1.14.0
+	golang.org/x/mod v0.12.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.13.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230726155614-23370e0ffb3e
@@ -114,7 +115,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.14.0 // indirect
 	go.opentelemetry.io/otel/metric v0.37.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.19.0 // indirect
-	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/oauth2 v0.10.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
