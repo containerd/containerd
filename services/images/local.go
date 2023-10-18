@@ -19,6 +19,10 @@ package images
 import (
 	"context"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
 	"github.com/containerd/containerd/errdefs"
@@ -27,13 +31,12 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/pkg/epoch"
 	"github.com/containerd/containerd/plugin"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/containerd/containerd/services/warning"
 )
 
 func init() {
@@ -43,6 +46,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.MetadataPlugin,
 			plugin.GCPlugin,
+			plugin.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.Get(plugin.MetadataPlugin)
@@ -53,11 +57,16 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			w, err := ic.Get(plugin.WarningPlugin)
+			if err != nil {
+				return nil, err
+			}
 
 			return &local{
 				store:     metadata.NewImageStore(m.(*metadata.DB)),
 				publisher: ic.Events,
 				gc:        g.(gcScheduler),
+				warnings:  w.(warning.Service),
 			}, nil
 		},
 	})
@@ -71,6 +80,7 @@ type local struct {
 	store     images.Store
 	gc        gcScheduler
 	publisher events.Publisher
+	warnings  warning.Service
 }
 
 var _ imagesapi.ImagesClient = &local{}
@@ -126,6 +136,7 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 		return nil, err
 	}
 
+	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 
 }
@@ -164,6 +175,7 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 		return nil, err
 	}
 
+	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 }
 
@@ -187,4 +199,16 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 	}
 
 	return &ptypes.Empty{}, nil
+}
+
+func (l *local) emitSchema1DeprecationWarning(ctx context.Context, image *images.Image) {
+	if image == nil {
+		return
+	}
+	dgst, ok := image.Labels[images.ConvertedDockerSchema1LabelKey]
+	if !ok {
+		return
+	}
+	log.G(ctx).WithField("name", image.Name).WithField("schema1digest", dgst).Warn("conversion from schema 1 images is deprecated")
+	l.warnings.Emit(ctx, deprecation.PullSchema1Image)
 }
