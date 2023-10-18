@@ -55,6 +55,7 @@ import (
 	"github.com/containerd/containerd/defaults"
 	"github.com/containerd/containerd/diff"
 	diffproxy "github.com/containerd/containerd/diff/proxy"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/platforms"
@@ -356,7 +357,9 @@ func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set
 		return
 	}
 
-	_ = warn // TODO(samuelkarp): placeholder for future use
+	if config.PluginDir != "" { //nolint:staticcheck
+		warn.Emit(ctx, deprecation.GoPluginLibrary)
+	}
 }
 
 // Server is the containerd main daemon
@@ -459,13 +462,15 @@ func (s *Server) Wait() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
-	path := config.PluginDir // nolint: staticcheck
+	path := config.PluginDir //nolint:staticcheck
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	log.G(ctx).Warning("`go_plugin` is deprecated, please use `external plugins` instead")
-	if err := dynamic.Load(path); err != nil {
+	if count, err := dynamic.Load(path); err != nil {
 		return nil, err
+	} else if count > 0 || config.PluginDir != "" { //nolint:staticcheck
+		config.PluginDir = path //nolint:staticcheck
+		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
 	}
 	// load additional plugins that don't automatically register themselves
 	registry.Register(&plugin.Registration{

@@ -23,6 +23,6 @@ package dynamic
 // - with gccgo: gccgo has no plugin support golang/go#36403
 // - on static builds; https://github.com/containerd/containerd/commit/0d682e24a1ba8e93e5e54a73d64f7d256f87492f
 // - on architectures other than amd64 and arm64 (other architectures need to be tested)
-func loadPlugins(path string) error {
-	return nil
+func loadPlugins(path string) (int, error) {
+	return 0, nil
 }
