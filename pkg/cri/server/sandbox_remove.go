@@ -105,7 +105,10 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	c.sandboxStore.Delete(id)
 
 	if err := c.client.SandboxStore().Delete(ctx, id); err != nil {
-		return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to remove sandbox metadata from store: %w", err)
+		}
+		log.G(ctx).WithError(err).Warnf("failed to delete sandbox metadata from store: %q maybe recovered from v1.x release", id)
 	}
 
 	// Release the sandbox name reserved for the sandbox.
