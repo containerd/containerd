@@ -46,4 +46,5 @@ import (
 	_ "github.com/containerd/containerd/services/tasks"
 	_ "github.com/containerd/containerd/services/transfer"
 	_ "github.com/containerd/containerd/services/version"
+	_ "github.com/containerd/containerd/services/warning"
 )
