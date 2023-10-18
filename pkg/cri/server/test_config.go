@@ -40,6 +40,7 @@ var testConfig = criconfig.Config{
 				"runc": {
 					Type:        "runc",
 					Snapshotter: "overlayfs",
+					Sandboxer:   "shim",
 				},
 			},
 		},
