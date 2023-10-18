@@ -28,6 +28,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/log"
@@ -55,9 +56,9 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	if err != nil {
 		return sandbox, fmt.Errorf("failed to get sandbox container extensions: %w", err)
 	}
-	ext, ok := exts[sandboxMetadataExtension]
+	ext, ok := exts[crilabels.SandboxMetadataExtension]
 	if !ok {
-		return sandbox, fmt.Errorf("metadata extension %q not found", sandboxMetadataExtension)
+		return sandbox, fmt.Errorf("metadata extension %q not found", crilabels.SandboxMetadataExtension)
 	}
 	data, err := typeurl.UnmarshalAny(ext)
 	if err != nil {
