@@ -146,7 +146,7 @@ var register = struct {
 }{}
 
 // Load loads all plugins at the provided path into containerd
-func Load(path string) (err error) {
+func Load(path string) (count int, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			rerr, ok := v.(error)
