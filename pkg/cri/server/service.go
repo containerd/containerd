@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -139,20 +140,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
 	}
 
-	imageFSPath := imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
-	log.L.Infof("Get image filesystem path %q", imageFSPath)
-
-	// TODO: expose this as a separate containerd plugin.
-	imageService, err := images.NewService(config, imageFSPath, client)
-	if err != nil {
-		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
-	}
-
 	c := &criService{
-		imageService:       imageService,
 		config:             config,
 		client:             client,
-		imageFSPath:        imageFSPath,
 		os:                 osinterface.RealOS{},
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
@@ -164,6 +154,23 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 
 	// TODO: figure out a proper channel size.
 	c.containerEventsChan = make(chan runtime.ContainerEventResponse, 1000)
+
+	if client.SnapshotService(c.config.ContainerdConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
+	}
+
+	c.imageFSPath = imageFSPath(
+		config.ContainerdRootDir,
+		config.ContainerdConfig.Snapshotter,
+		client,
+	)
+	log.L.Infof("Get image filesystem path %q", c.imageFSPath)
+
+	// TODO: expose this as a separate containerd plugin.
+	c.imageService, err = images.NewService(config, c.imageFSPath, client)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create CRI image service: %w", err)
+	}
 
 	if err := c.initPlatform(); err != nil {
 		return nil, fmt.Errorf("initialize platform: %w", err)
@@ -201,7 +208,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	}
 
 	// Load all sandbox controllers(pod sandbox controller and remote shim controller)
-	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, imageService, c.baseOCISpecs)
+	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
 	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
 
 	c.nri = nri
@@ -349,8 +356,40 @@ func (c *criService) register(s *grpc.Server) error {
 
 // imageFSPath returns containerd image filesystem path.
 // Note that if containerd changes directory layout, we also needs to change this.
-func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
+func imageFSPath(rootDir, snapshotter string, client *containerd.Client) string {
+	introspection := func() (string, error) {
+		filters := []string{fmt.Sprintf("type==%s, id==%s", plugins.SnapshotPlugin, snapshotter)}
+		in := client.IntrospectionService()
+
+		resp, err := in.Plugins(context.Background(), filters)
+		if err != nil {
+			return "", err
+		}
+
+		if len(resp.Plugins) <= 0 {
+			return "", fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotter)
+		}
+
+		sn := resp.Plugins[0]
+		if root, ok := sn.Exports[plugins.SnapshotterRootDir]; ok {
+			return root, nil
+		}
+		return "", errors.New("snapshotter does not export root path")
+	}
+
+	var imageFSPath string
+	path, err := introspection()
+	if err != nil {
+		log.L.WithError(err).WithField("snapshotter", snapshotter).Warn("snapshotter doesn't export root path")
+		imageFSPath = filepath.Join(
+			rootDir,
+			plugins.SnapshotPlugin.String()+"."+snapshotter,
+		)
+	} else {
+		imageFSPath = path
+	}
+
+	return imageFSPath
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {

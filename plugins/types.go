@@ -82,3 +82,7 @@ const (
 	// PropertyGRPCAddress is the ttrpc address used for client connections to containerd
 	PropertyTTRPCAddress = "io.containerd.plugin.ttrpc.address"
 )
+
+const (
+	SnapshotterRootDir = "root"
+)

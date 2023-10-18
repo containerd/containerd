@@ -54,7 +54,7 @@ func init() {
 				root = config.RootPath
 			}
 
-			ic.Meta.Exports = map[string]string{"root": root}
+			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return btrfs.NewSnapshotter(root)
 		},
 	})
