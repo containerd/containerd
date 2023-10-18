@@ -65,11 +65,15 @@ const (
 	SandboxControllerPlugin plugin.Type = "io.containerd.sandbox.controller.v1"
 	// ImageVerifierPlugin implements an image verifier service
 	ImageVerifierPlugin plugin.Type = "io.containerd.image-verifier.v1"
+	// WarningPlugin implements a warning service
+	WarningPlugin plugin.Type = "io.containerd.warning.v1"
 )
 
 const (
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
 	RuntimeRuncV2 = "io.containerd.runc.v2"
+
+	DeprecationsPlugin = "deprecations"
 )
 
 const (
