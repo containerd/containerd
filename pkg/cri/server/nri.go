@@ -18,6 +18,7 @@ package server
 
 import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	cstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
@@ -39,5 +40,5 @@ func (i *criImplementation) ContainerStore() *cstore.Store {
 }
 
 func (i *criImplementation) ContainerMetadataExtensionKey() string {
-	return containerMetadataExtension
+	return crilabels.ContainerMetadataExtension
 }

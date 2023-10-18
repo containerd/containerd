@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	containerdimages "github.com/containerd/containerd/v2/images"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/platforms"
@@ -55,7 +56,7 @@ import (
 // recover recovers system state from containerd and status checkpoint.
 func (c *criService) recover(ctx context.Context) error {
 	// Recover all sandboxes.
-	sandboxes, err := c.client.Containers(ctx, filterLabel(containerKindLabel, containerKindSandbox))
+	sandboxes, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindSandbox))
 	if err != nil {
 		return fmt.Errorf("failed to list sandbox containers: %w", err)
 	}
@@ -146,7 +147,7 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 
 	// Recover all containers.
-	containers, err := c.client.Containers(ctx, filterLabel(containerKindLabel, containerKindContainer))
+	containers, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindContainer))
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -248,9 +249,9 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	if err != nil {
 		return container, fmt.Errorf("failed to get container extensions: %w", err)
 	}
-	ext, ok := exts[containerMetadataExtension]
+	ext, ok := exts[crilabels.ContainerMetadataExtension]
 	if !ok {
-		return container, fmt.Errorf("metadata extension %q not found", containerMetadataExtension)
+		return container, fmt.Errorf("metadata extension %q not found", crilabels.ContainerMetadataExtension)
 	}
 	data, err := typeurl.UnmarshalAny(ext)
 	if err != nil {

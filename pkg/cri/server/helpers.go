@@ -38,6 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	clabels "github.com/containerd/containerd/v2/labels"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
@@ -70,18 +71,6 @@ const (
 	containersDir = "containers"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
-
-	// criContainerdPrefix is common prefix for cri-containerd
-	criContainerdPrefix = "io.cri-containerd"
-	// containerKindLabel is a label key indicating container is sandbox container or application container
-	containerKindLabel = criContainerdPrefix + ".kind"
-	// containerKindSandbox is a label value indicating container is sandbox container
-	containerKindSandbox = "sandbox"
-	// containerKindContainer is a label value indicating container is application container
-	containerKindContainer = "container"
-
-	// containerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
-	containerMetadataExtension = criContainerdPrefix + ".container.metadata"
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
@@ -257,7 +246,7 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	for k, v := range configLabels {
 		labels[k] = v
 	}
-	labels[containerKindLabel] = containerType
+	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
 }
 
