@@ -30,6 +30,7 @@ import (
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/pkg/cri/store/stats"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -120,6 +121,12 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		return nil, nil, fmt.Errorf("failed to find container metric for pod with id %s", sandbox.ID)
 	}
 
+	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get runtimeHandler %q: %w", sandbox.RuntimeHandler, err)
+	}
+	snapshotter := c.RuntimeSnapshotter(ctrdutil.NamespacedContext(), ociRuntime)
+
 	podRuntimeStats, err := c.convertToCRIStats(podMetric)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to covert container metrics for sandbox with id %s: %w", sandbox.ID, err)
@@ -159,14 +166,14 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		// If snapshotstore doesn't have cached snapshot information
 		// set WritableLayer usage to zero
 		var usedBytes uint64
-		sn, err := c.GetSnapshot(cntr.ID)
+		sn, err := c.GetSnapshot(cntr.ID, snapshotter)
 		if err == nil {
 			usedBytes = sn.Size
 		}
 		containerStats.WritableLayer = &runtime.WindowsFilesystemUsage{
 			Timestamp: sn.Timestamp,
 			FsId: &runtime.FilesystemIdentifier{
-				Mountpoint: c.imageFSPath,
+				Mountpoint: c.imageFSPaths[snapshotter],
 			},
 			UsedBytes: &runtime.UInt64Value{Value: usedBytes},
 		}

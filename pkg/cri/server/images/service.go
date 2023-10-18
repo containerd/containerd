@@ -25,8 +25,10 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
+	snapshot "github.com/containerd/containerd/snapshots"
 	"github.com/containerd/log"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -37,8 +39,8 @@ type CRIImageService struct {
 	config criconfig.Config
 	// client is an instance of the containerd client
 	client *containerd.Client
-	// imageFSPath is the path to image filesystem.
-	imageFSPath string
+	// imageFSPaths contains path to image filesystem for snapshotters.
+	imageFSPaths map[string]string
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -49,25 +51,42 @@ type CRIImageService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
-func NewService(config criconfig.Config, imageFSPath string, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.Config, imageFSPaths map[string]string, client *containerd.Client) (*CRIImageService, error) {
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
 		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
-		imageFSPath:                 imageFSPath,
+		imageFSPaths:                imageFSPaths,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
 
-	if client.SnapshotService(svc.config.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", svc.config.ContainerdConfig.Snapshotter)
+	snapshotters := map[string]snapshot.Snapshotter{}
+	ctx := ctrdutil.NamespacedContext()
+
+	// Add runtime specific snapshotters
+	for _, runtime := range config.ContainerdConfig.Runtimes {
+		snapshotterName := svc.RuntimeSnapshotter(ctx, runtime)
+		if snapshotter := svc.client.SnapshotService(snapshotterName); snapshotter != nil {
+			snapshotters[snapshotterName] = snapshotter
+		} else {
+			return nil, fmt.Errorf("failed to find snapshotter %q", snapshotterName)
+		}
+	}
+
+	// Add default snapshotter
+	snapshotterName := svc.config.ContainerdConfig.Snapshotter
+	if snapshotter := svc.client.SnapshotService(snapshotterName); snapshotter != nil {
+		snapshotters[snapshotterName] = snapshotter
+	} else {
+		return nil, fmt.Errorf("failed to find snapshotter %q", snapshotterName)
 	}
 
 	// Start snapshot stats syncer, it doesn't need to be stopped.
 	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,
-		svc.client.SnapshotService(svc.config.ContainerdConfig.Snapshotter),
+		snapshotters,
 		time.Duration(svc.config.StatsCollectPeriod)*time.Second,
 	)
 	snapshotsSyncer.start()
@@ -122,6 +141,10 @@ func (c *CRIImageService) GetImage(id string) (imagestore.Image, error) {
 }
 
 // GetSnapshot returns the snapshot with specified key.
-func (c *CRIImageService) GetSnapshot(key string) (snapshotstore.Snapshot, error) {
-	return c.snapshotStore.Get(key)
+func (c *CRIImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
+	snapshotKey := snapshotstore.Key{
+		Key:         key,
+		Snapshotter: snapshotter,
+	}
+	return c.snapshotStore.Get(snapshotKey)
 }

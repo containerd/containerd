@@ -33,18 +33,18 @@ import (
 // TODO(random-liu): Benchmark with high workload. We may need a statsSyncer instead if
 // benchmark result shows that container cpu/memory stats also need to be cached.
 type snapshotsSyncer struct {
-	store       *snapshotstore.Store
-	snapshotter snapshot.Snapshotter
-	syncPeriod  time.Duration
+	store        *snapshotstore.Store
+	snapshotters map[string]snapshot.Snapshotter
+	syncPeriod   time.Duration
 }
 
 // newSnapshotsSyncer creates a snapshot syncer.
-func newSnapshotsSyncer(store *snapshotstore.Store, snapshotter snapshot.Snapshotter,
+func newSnapshotsSyncer(store *snapshotstore.Store, snapshotters map[string]snapshot.Snapshotter,
 	period time.Duration) *snapshotsSyncer {
 	return &snapshotsSyncer{
-		store:       store,
-		snapshotter: snapshotter,
-		syncPeriod:  period,
+		store:        store,
+		snapshotters: snapshotters,
+		syncPeriod:   period,
 	}
 }
 
@@ -70,44 +70,55 @@ func (s *snapshotsSyncer) start() {
 func (s *snapshotsSyncer) sync() error {
 	ctx := ctrdutil.NamespacedContext()
 	start := time.Now().UnixNano()
-	var snapshots []snapshot.Info
-	// Do not call `Usage` directly in collect function, because
-	// `Usage` takes time, we don't want `Walk` to hold read lock
-	// of snapshot metadata store for too long time.
-	// TODO(random-liu): Set timeout for the following 2 contexts.
-	if err := s.snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
-		snapshots = append(snapshots, info)
-		return nil
-	}); err != nil {
-		return fmt.Errorf("walk all snapshots failed: %w", err)
-	}
-	for _, info := range snapshots {
-		sn, err := s.store.Get(info.Name)
-		if err == nil {
-			// Only update timestamp for non-active snapshot.
-			if sn.Kind == info.Kind && sn.Kind != snapshot.KindActive {
-				sn.Timestamp = time.Now().UnixNano()
-				s.store.Add(sn)
+
+	for key, snapshotter := range s.snapshotters {
+		var snapshots []snapshot.Info
+		// Do not call `Usage` directly in collect function, because
+		// `Usage` takes time, we don't want `Walk` to hold read lock
+		// of snapshot metadata store for too long time.
+		// TODO(random-liu): Set timeout for the following 2 contexts.
+		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshot.Info) error {
+			snapshots = append(snapshots, info)
+			return nil
+		}); err != nil {
+			return fmt.Errorf("walk all snapshots for %q failed: %w", key, err)
+		}
+		for _, info := range snapshots {
+			snapshotKey := snapshotstore.Key{
+				Key:         info.Name,
+				Snapshotter: key,
+			}
+			sn, err := s.store.Get(snapshotKey)
+			if err == nil {
+				// Only update timestamp for non-active snapshot.
+				if sn.Kind == info.Kind && sn.Kind != snapshot.KindActive {
+					sn.Timestamp = time.Now().UnixNano()
+					s.store.Add(sn)
+					continue
+				}
+			}
+			// Get newest stats if the snapshot is new or active.
+			sn = snapshotstore.Snapshot{
+				Key: snapshotstore.Key{
+					Key:         info.Name,
+					Snapshotter: key,
+				},
+				Kind:      info.Kind,
+				Timestamp: time.Now().UnixNano(),
+			}
+			usage, err := snapshotter.Usage(ctx, info.Name)
+			if err != nil {
+				if !errdefs.IsNotFound(err) {
+					log.L.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
+				}
 				continue
 			}
+			sn.Size = uint64(usage.Size)
+			sn.Inodes = uint64(usage.Inodes)
+			s.store.Add(sn)
 		}
-		// Get newest stats if the snapshot is new or active.
-		sn = snapshotstore.Snapshot{
-			Key:       info.Name,
-			Kind:      info.Kind,
-			Timestamp: time.Now().UnixNano(),
-		}
-		usage, err := s.snapshotter.Usage(ctx, info.Name)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				log.L.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
-			}
-			continue
-		}
-		sn.Size = uint64(usage.Size)
-		sn.Inodes = uint64(usage.Inodes)
-		s.store.Add(sn)
 	}
+
 	for _, sn := range s.store.List() {
 		if sn.Timestamp >= start {
 			continue

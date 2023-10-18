@@ -33,5 +33,15 @@ var testConfig = criconfig.Config{
 	PluginConfig: criconfig.PluginConfig{
 		SandboxImage:                     testSandboxImage,
 		TolerateMissingHugetlbController: true,
+		ContainerdConfig: criconfig.ContainerdConfig{
+			Snapshotter:        "overlayfs",
+			DefaultRuntimeName: "runc",
+			Runtimes: map[string]criconfig.Runtime{
+				"runc": {
+					Type:        "runc",
+					Snapshotter: "overlayfs",
+				},
+			},
+		},
 	},
 }
