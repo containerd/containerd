@@ -16,6 +16,7 @@
 #   limitations under the License.
 
 # Vagrantfile for Fedora and EL
+#
 Vagrant.configure("2") do |config|
   config.vm.box = ENV["BOX"] ? ENV["BOX"].split("@")[0] : "fedora/38-cloud-base"
   # BOX_VERSION is deprecated. Use "BOX=<BOX>@<BOX_VERSION>".
