@@ -1,0 +1,35 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.7"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The eighth patch release for containerd 1.7 contains various fixes and updates.
+
+### Notable Updates
+
+* **Fix ambiguous TLS fallback** ([#9299](https://github.com/containerd/containerd/pull/9299))
+* **Update Go to 1.20.10** ([#9265](https://github.com/containerd/containerd/pull/9265))
+* **Add a new image label on converted schema 1 images** ([#9252](https://github.com/containerd/containerd/pull/9252))
+* **Fix handling for missing basic auth credentials** ([#9235](https://github.com/containerd/containerd/pull/9235))
+* **Fix potential deadlock in create handler for containerd-shim-runc-v2** ([#9209](https://github.com/containerd/containerd/pull/9209))
+
+See the changelog for complete list of changes"""
