@@ -35,13 +35,13 @@ import (
 	"github.com/containerd/containerd/pkg/cri/server/podsandbox"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
-	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/plugins"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubelet/pkg/cri/streaming"
 
 	"github.com/containerd/containerd/pkg/cri/store/label"
 

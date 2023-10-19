@@ -63,9 +63,6 @@ github.com/Microsoft/hcsshim/pkg/ociwclayer
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/blang/semver/v4 v4.0.0
-## explicit; go 1.14
-github.com/blang/semver/v4
 # github.com/cenkalti/backoff/v4 v4.2.1
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
@@ -370,13 +367,12 @@ github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v1.16.0
 ## explicit; go 1.17
 github.com/prometheus/client_golang/prometheus
-github.com/prometheus/client_golang/prometheus/collectors
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
-# github.com/prometheus/client_model v0.3.0
-## explicit; go 1.9
+# github.com/prometheus/client_model v0.4.0
+## explicit; go 1.18
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.42.0
+# github.com/prometheus/common v0.44.0
 ## explicit; go 1.18
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
@@ -392,9 +388,6 @@ github.com/russross/blackfriday/v2
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/spf13/pflag v1.0.5
-## explicit; go 1.12
-github.com/spf13/pflag
 # github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
 ## explicit
 github.com/stefanberger/go-pkcs11uri
@@ -542,7 +535,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.0.0-20220210224613-90d013bbcef8
+# golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
 # golang.org/x/tools v0.11.0
@@ -679,7 +672,7 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
-# gopkg.in/square/go-jose.v2 v2.5.1
+# gopkg.in/square/go-jose.v2 v2.6.0
 ## explicit
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
@@ -690,22 +683,15 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.26.4
-## explicit; go 1.19
-k8s.io/api/authentication/v1
+# k8s.io/api v0.28.2
+## explicit; go 1.20
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.26.4
-## explicit; go 1.19
+# k8s.io/apimachinery v0.28.2
+## explicit; go 1.20
 k8s.io/apimachinery/pkg/api/errors
-k8s.io/apimachinery/pkg/api/meta
 k8s.io/apimachinery/pkg/api/resource
-k8s.io/apimachinery/pkg/api/validation/path
-k8s.io/apimachinery/pkg/apis/meta/internalversion
-k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
-k8s.io/apimachinery/pkg/apis/meta/v1/validation
-k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/conversion
 k8s.io/apimachinery/pkg/conversion/queryparams
 k8s.io/apimachinery/pkg/fields
@@ -720,10 +706,12 @@ k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
+k8s.io/apimachinery/pkg/util/dump
 k8s.io/apimachinery/pkg/util/errors
 k8s.io/apimachinery/pkg/util/framer
 k8s.io/apimachinery/pkg/util/httpstream
 k8s.io/apimachinery/pkg/util/httpstream/spdy
+k8s.io/apimachinery/pkg/util/httpstream/wsstream
 k8s.io/apimachinery/pkg/util/intstr
 k8s.io/apimachinery/pkg/util/json
 k8s.io/apimachinery/pkg/util/naming
@@ -739,22 +727,11 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.26.2
-## explicit; go 1.19
-k8s.io/apiserver/pkg/apis/audit
-k8s.io/apiserver/pkg/apis/audit/v1
-k8s.io/apiserver/pkg/audit
-k8s.io/apiserver/pkg/authentication/user
-k8s.io/apiserver/pkg/authorization/authorizer
-k8s.io/apiserver/pkg/endpoints/metrics
-k8s.io/apiserver/pkg/endpoints/request
+# k8s.io/apiserver v0.28.2
+## explicit; go 1.20
 k8s.io/apiserver/pkg/endpoints/responsewriter
-k8s.io/apiserver/pkg/features
-k8s.io/apiserver/pkg/server/httplog
-k8s.io/apiserver/pkg/util/feature
-k8s.io/apiserver/pkg/util/wsstream
-# k8s.io/client-go v0.26.4
-## explicit; go 1.19
+# k8s.io/client-go v0.28.2
+## explicit; go 1.20
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/install
 k8s.io/client-go/pkg/apis/clientauthentication/v1
@@ -774,19 +751,13 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.26.2
-## explicit; go 1.19
-k8s.io/component-base/featuregate
+# k8s.io/component-base v0.28.2
+## explicit; go 1.20
 k8s.io/component-base/logs/logreduction
-k8s.io/component-base/metrics
-k8s.io/component-base/metrics/legacyregistry
-k8s.io/component-base/metrics/prometheus/feature
-k8s.io/component-base/metrics/prometheusextension
-k8s.io/component-base/version
-# k8s.io/cri-api v0.28.0-beta.0
+# k8s.io/cri-api v0.28.2
 ## explicit; go 1.20
 k8s.io/cri-api/pkg/apis/runtime/v1
-# k8s.io/klog/v2 v2.90.1
+# k8s.io/klog/v2 v2.100.1
 ## explicit; go 1.13
 k8s.io/klog/v2
 k8s.io/klog/v2/internal/buffer
@@ -794,7 +765,12 @@ k8s.io/klog/v2/internal/clock
 k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
-# k8s.io/utils v0.0.0-20230220204549-a5ecb0141aa5
+# k8s.io/kubelet v0.28.2
+## explicit; go 1.20
+k8s.io/kubelet/pkg/cri/streaming
+k8s.io/kubelet/pkg/cri/streaming/portforward
+k8s.io/kubelet/pkg/cri/streaming/remotecommand
+# k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
 ## explicit; go 1.18
 k8s.io/utils/clock
 k8s.io/utils/clock/testing
@@ -803,7 +779,7 @@ k8s.io/utils/integer
 k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/net
 k8s.io/utils/strings/slices
-# sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2
+# sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
