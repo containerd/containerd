@@ -92,6 +92,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(ic),
+		containerd.WithSandboxersService(ic),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)

@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -43,13 +44,25 @@ import (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type:     plugins.SandboxControllerPlugin,
-		ID:       "podsandbox",
-		Requires: []plugin.Type{},
+		Type: plugins.SandboxControllerPlugin,
+		ID:   "podsandbox",
+		Requires: []plugin.Type{
+			plugins.EventPlugin,
+			plugins.ServicePlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			// register the global controller to containerd plugin manager,
-			// the global controller will be initialized when cri plugin is initializing
-			return &Controller{}, nil
+			c := Controller{}
+			client, err := containerd.New(
+				"",
+				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
+				containerd.WithDefaultPlatform(platforms.Default()),
+				containerd.WithInMemoryServices(ic),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+			}
+			c.client = client
+			return &c, nil
 		},
 	})
 }
@@ -90,7 +103,6 @@ type Controller struct {
 
 func (c *Controller) Init(
 	config criconfig.Config,
-	client *containerd.Client,
 	sandboxStore *sandboxstore.Store,
 	os osinterface.OS,
 	cri CRIService,
@@ -98,7 +110,6 @@ func (c *Controller) Init(
 	baseOCISpecs map[string]*oci.Spec,
 ) {
 	c.cri = cri
-	c.client = client
 	c.config = config
 	c.sandboxStore = sandboxStore
 	c.os = os

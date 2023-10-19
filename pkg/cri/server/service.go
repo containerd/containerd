@@ -218,7 +218,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	}
 
 	// Initialize pod sandbox controller
-	sbControllers[string(criconfig.ModePodSandbox)].(*podsandbox.Controller).Init(config, client, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
+	sbControllers[string(criconfig.ModePodSandbox)].(*podsandbox.Controller).Init(config, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
 
 	c.nri = nri
 

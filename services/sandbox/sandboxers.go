@@ -26,7 +26,7 @@ import (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.ServicePlugin,
+		Type: plugins.SandboxesServicePlugin,
 		ID:   services.SandboxControllersService,
 		Requires: []plugin.Type{
 			plugins.SandboxControllerPlugin,
