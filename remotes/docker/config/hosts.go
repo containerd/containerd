@@ -168,7 +168,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			// Allow setting for each host as well
 			explicitTLS := explicitTLS
 
-			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
+			if host.caCerts != nil || host.clientPairs != nil || (host.skipVerify != nil && !*host.skipVerify) {
 				explicitTLS = true
 				tr := defaultTransport.Clone()
 				tlsConfig := tr.TLSClientConfig
