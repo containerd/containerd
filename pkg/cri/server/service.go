@@ -125,6 +125,8 @@ type criService struct {
 	containerEventsChan chan runtime.ContainerEventResponse
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
+	// sbcontrollers are the configured sandbox controllers
+	sbControllers map[string]sandbox.Controller
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -136,6 +138,11 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
 	}
 
+	// TODO(dmcgowan): Get the full list directly from configured plugins
+	sbControllers := map[string]sandbox.Controller{
+		string(criconfig.ModePodSandbox): client.SandboxController(string(criconfig.ModePodSandbox)),
+		string(criconfig.ModeShim):       client.SandboxController(string(criconfig.ModeShim)),
+	}
 	imageFSPaths := map[string]string{}
 	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
 		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
@@ -143,6 +150,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		if snapshotter != "" {
 			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+		}
+		if _, ok := sbControllers[ociRuntime.Sandboxer]; !ok {
+			sbControllers[ociRuntime.Sandboxer] = client.SandboxController(ociRuntime.Sandboxer)
 		}
 	}
 	snapshotter := config.ContainerdConfig.Snapshotter
@@ -166,6 +176,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
+		sbControllers:      sbControllers,
 	}
 
 	// TODO: figure out a proper channel size.
@@ -206,8 +217,8 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, err
 	}
 
-	podSandboxController := c.client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
-	podSandboxController.Init(config, client, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
+	// Initialize pod sandbox controller
+	sbControllers[string(criconfig.ModePodSandbox)].(*podsandbox.Controller).Init(config, client, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
 
 	c.nri = nri
 
@@ -360,7 +371,12 @@ func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runt
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 
-	return c.client.SandboxController(ociRuntime.Sandboxer), nil
+	controller, ok := c.sbControllers[ociRuntime.Sandboxer]
+	if !ok {
+		return nil, fmt.Errorf("no sandbox controller %s for runtime %s", ociRuntime.Sandboxer, runtimeHandler)
+	}
+
+	return controller, nil
 }
 
 // imageFSPath returns containerd image filesystem path.
