@@ -218,9 +218,6 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 			srv.SnapshotsService: func(s interface{}) ServicesOpt {
 				return WithSnapshotters(s.(map[string]snapshots.Snapshotter))
 			},
-			srv.SandboxControllersService: func(s interface{}) ServicesOpt {
-				return WithSandboxers(s.(map[string]sandbox.Controller))
-			},
 			srv.ContainersService: func(s interface{}) ServicesOpt {
 				return WithContainerClient(s.(containersapi.ContainersClient))
 			},
@@ -248,6 +245,19 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 		for _, o := range opts {
 			o(c.services)
 		}
+		return nil
+	}
+}
+
+func WithSandboxersService(ic *plugin.InitContext) ClientOpt {
+	return func(c *clientOpts) error {
+		sandboxesPlugin, err := ic.GetByID(plugins.SandboxesServicePlugin, srv.SandboxControllersService)
+		if err != nil {
+			return err
+		}
+
+		sbs := sandboxesPlugin.(map[string]sandbox.Controller)
+		c.services.sandboxers = sbs
 		return nil
 	}
 }

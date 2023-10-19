@@ -42,11 +42,11 @@ func init() {
 		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
-			plugins.ServicePlugin,
+			plugins.SandboxesServicePlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			i, err := ic.GetByID(plugins.ServicePlugin, services.SandboxControllersService)
+			i, err := ic.GetByID(plugins.SandboxesServicePlugin, services.SandboxControllersService)
 			if err != nil {
 				return nil, err
 			}
