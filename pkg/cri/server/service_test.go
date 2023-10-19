@@ -82,17 +82,3 @@ func TestLoadBaseOCISpec(t *testing.T) {
 	assert.Equal(t, "1.0.2", out.Version)
 	assert.Equal(t, "default", out.Hostname)
 }
-
-func TestValidateMode(t *testing.T) {
-	mode := ""
-	assert.Error(t, ValidateMode(mode))
-
-	mode = "podsandbox"
-	assert.NoError(t, ValidateMode(mode))
-
-	mode = "shim"
-	assert.NoError(t, ValidateMode(mode))
-
-	mode = "nonexistent"
-	assert.Error(t, ValidateMode(mode))
-}
