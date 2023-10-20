@@ -31,6 +31,10 @@ import (
 	"github.com/containerd/typeurl/v2"
 )
 
+type TransferService interface {
+	transfer.Transferrer
+}
+
 func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
@@ -38,7 +42,11 @@ func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}
 	}
 	defer done(ctx)
 
-	return proxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator()).Transfer(ctx, src, dest, opts...)
+	return c.TransferService().Transfer(ctx, src, dest, opts...)
+}
+
+func (c *Client) NewProxyTransferrer() transfer.Transferrer {
+	return proxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator())
 }
 
 func (c *Client) streamCreator() streaming.StreamCreator {

@@ -729,6 +729,16 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
 }
 
+// TransferService returns the underlying transfer service client
+func (c *Client) TransferService() TransferService {
+	if c.transferService != nil {
+		return c.transferService
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return c.NewProxyTransferrer()
+}
+
 // VersionService returns the underlying VersionClient
 func (c *Client) VersionService() versionservice.VersionClient {
 	c.connMu.Lock()
