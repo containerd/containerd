@@ -121,7 +121,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		return nil, nil, fmt.Errorf("failed to find container metric for pod with id %s", sandbox.ID)
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get runtimeHandler %q: %w", sandbox.RuntimeHandler, err)
 	}
