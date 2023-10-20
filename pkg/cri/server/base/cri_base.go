@@ -67,6 +67,7 @@ func init() {
 				return nil
 			}
 			conf := c.(map[string]interface{})
+			migrateConfig(conf)
 			plugins["io.containerd.internal.v1.cri"] = conf
 			return nil
 		},
@@ -174,4 +175,23 @@ func setGLogLevel() error {
 		// glog doesn't support other filters. Defaults to v=0.
 	}
 	return nil
+}
+
+func migrateConfig(conf map[string]interface{}) {
+	containerdConf, ok := conf["containerd"]
+	if !ok {
+		return
+	}
+	runtimesConf, ok := containerdConf.(map[string]interface{})["runtimes"]
+	if !ok {
+		return
+	}
+	for _, v := range runtimesConf.(map[string]interface{}) {
+		runtimeConf := v.(map[string]interface{})
+		if sandboxMode, ok := runtimeConf["sandbox_mode"]; ok {
+			if _, ok := runtimeConf["sandboxer"]; !ok {
+				runtimeConf["sandboxer"] = sandboxMode
+			}
+		}
+	}
 }
