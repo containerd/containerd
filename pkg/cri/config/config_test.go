@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
@@ -228,6 +229,53 @@ func TestValidateConfig(t *testing.T) {
 				assert.ElementsMatch(t, test.warnings, w)
 			} else {
 				assert.Len(t, w, 0)
+			}
+		})
+	}
+}
+
+func TestHostAccessingSandbox(t *testing.T) {
+	privilegedContext := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: true,
+			},
+		},
+	}
+	nonPrivilegedContext := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: false,
+			},
+		},
+	}
+	hostNamespace := &runtime.PodSandboxConfig{
+		Linux: &runtime.LinuxPodSandboxConfig{
+			SecurityContext: &runtime.LinuxSandboxSecurityContext{
+				Privileged: false,
+				NamespaceOptions: &runtime.NamespaceOption{
+					Network: runtime.NamespaceMode_NODE,
+					Pid:     runtime.NamespaceMode_NODE,
+					Ipc:     runtime.NamespaceMode_NODE,
+				},
+			},
+		},
+	}
+	tests := []struct {
+		name   string
+		config *runtime.PodSandboxConfig
+		want   bool
+	}{
+		{"Security Context is nil", nil, false},
+		{"Security Context is privileged", privilegedContext, false},
+		{"Security Context is not privileged", nonPrivilegedContext, false},
+		{"Security Context namespace host access", hostNamespace, true},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hostAccessingSandbox(tt.config); got != tt.want {
+				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)
 			}
 		})
 	}

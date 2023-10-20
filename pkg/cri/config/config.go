@@ -24,7 +24,9 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
@@ -453,4 +455,56 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		return warnings, err
 	}
 	return warnings, nil
+}
+
+func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (Runtime, error) {
+	if untrustedWorkload(podSandboxConfig) {
+		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
+		if runtimeHandler != "" && runtimeHandler != RuntimeUntrusted {
+			return Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
+		}
+
+		//  If the untrusted workload is requesting access to the host/node, this request will fail.
+		//
+		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
+		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
+		// is a supported option, granting the workload to access the entire guest VM instead of host.
+		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
+		if hostAccessingSandbox(podSandboxConfig) {
+			return Runtime{}, errors.New("untrusted workload with host access is not allowed")
+		}
+
+		runtimeHandler = RuntimeUntrusted
+	}
+
+	if runtimeHandler == "" {
+		runtimeHandler = config.DefaultRuntimeName
+	}
+
+	r, ok := config.Runtimes[runtimeHandler]
+	if !ok {
+		return Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
+	}
+	return r, nil
+
+}
+
+// untrustedWorkload returns true if the sandbox contains untrusted workload.
+func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
+	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
+}
+
+// hostAccessingSandbox returns true if the sandbox configuration
+// requires additional host access for the sandbox.
+func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
+	securityContext := config.GetLinux().GetSecurityContext()
+
+	namespaceOptions := securityContext.GetNamespaceOptions()
+	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
+		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
+		return true
+	}
+
+	return false
 }

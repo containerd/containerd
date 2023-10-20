@@ -26,16 +26,16 @@ import (
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
-	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
+	"github.com/containerd/containerd/v2/protobuf"
 )
 
 // ListContainerStats returns stats of all running containers.
@@ -68,7 +68,7 @@ func (c *criService) getMetricsHandler(ctx context.Context, sandboxID string) (m
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", sandboxID, err)
 	}
-	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}
@@ -81,7 +81,7 @@ func (c *criService) getMetricsHandler(ctx context.Context, sandboxID string) (m
 		return nil, err
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runtimeHandler %q: %w", sandbox.RuntimeHandler, err)
 	}
