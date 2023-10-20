@@ -18,6 +18,7 @@ package shim
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -29,7 +30,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	shimapi "github.com/containerd/containerd/api/runtime/task/v2"
+	shimapi "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
@@ -76,7 +77,7 @@ type StopStatus struct {
 // Manager is the interface which manages the shim process
 type Manager interface {
 	Name() string
-	Start(ctx context.Context, id string, opts StartOpts) (string, error)
+	Start(ctx context.Context, id string, opts StartOpts) (BootstrapParams, error)
 	Stop(ctx context.Context, id string) (StopStatus, error)
 }
 
@@ -268,13 +269,20 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 			Debug:        debugFlag,
 		}
 
-		address, err := manager.Start(ctx, id, opts)
+		params, err := manager.Start(ctx, id, opts)
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stdout.WriteString(address); err != nil {
+
+		data, err := json.Marshal(&params)
+		if err != nil {
+			return fmt.Errorf("failed to marshal bootstrap params to json: %w", err)
+		}
+
+		if _, err := os.Stdout.Write(data); err != nil {
 			return err
 		}
+
 		return nil
 	}
 

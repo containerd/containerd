@@ -118,15 +118,19 @@ func (m manager) Name() string {
 	return m.name
 }
 
-func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ string, retErr error) {
+func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shim.BootstrapParams, retErr error) {
+	var params shim.BootstrapParams
+	params.Version = 3
+	params.Protocol = "ttrpc"
+
 	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
 	if err != nil {
-		return "", err
+		return params, err
 	}
 	grouping := id
 	spec, err := readSpec()
 	if err != nil {
-		return "", err
+		return params, err
 	}
 	for _, group := range groupLabels {
 		if groupID, ok := spec.Annotations[group]; ok {
@@ -136,7 +140,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 	}
 	address, err := shim.SocketAddress(ctx, opts.Address, grouping)
 	if err != nil {
-		return "", err
+		return params, err
 	}
 
 	socket, err := shim.NewSocket(address)
@@ -146,19 +150,17 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 		// grouping functionality where the new process should be run with the same
 		// shim as an existing container
 		if !shim.SocketEaddrinuse(err) {
-			return "", fmt.Errorf("create new shim socket: %w", err)
+			return params, fmt.Errorf("create new shim socket: %w", err)
 		}
 		if shim.CanConnect(address) {
-			if err := shim.WriteAddress("address", address); err != nil {
-				return "", fmt.Errorf("write existing socket for shim: %w", err)
-			}
-			return address, nil
+			params.Address = address
+			return params, nil
 		}
 		if err := shim.RemoveSocket(address); err != nil {
-			return "", fmt.Errorf("remove pre-existing socket: %w", err)
+			return params, fmt.Errorf("remove pre-existing socket: %w", err)
 		}
 		if socket, err = shim.NewSocket(address); err != nil {
-			return "", fmt.Errorf("try create new shim socket 2x: %w", err)
+			return params, fmt.Errorf("try create new shim socket 2x: %w", err)
 		}
 	}
 	defer func() {
@@ -168,14 +170,9 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 		}
 	}()
 
-	// make sure that reexec shim-v2 binary use the value if need
-	if err := shim.WriteAddress("address", address); err != nil {
-		return "", err
-	}
-
 	f, err := socket.File()
 	if err != nil {
-		return "", err
+		return params, err
 	}
 
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
@@ -183,13 +180,13 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 	goruntime.LockOSThread()
 	if os.Getenv("SCHED_CORE") != "" {
 		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return "", fmt.Errorf("enable sched core support: %w", err)
+			return params, fmt.Errorf("enable sched core support: %w", err)
 		}
 	}
 
 	if err := cmd.Start(); err != nil {
 		f.Close()
-		return "", err
+		return params, err
 	}
 
 	goruntime.UnlockOSThread()
@@ -207,27 +204,29 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ str
 			if cgroups.Mode() == cgroups.Unified {
 				cg, err := cgroupsv2.Load(opts.ShimCgroup)
 				if err != nil {
-					return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
+					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 				}
 				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
+					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 				}
 			} else {
 				cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
 				if err != nil {
-					return "", fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
+					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
 				}
 				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return "", fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
+					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
 				}
 			}
 		}
 	}
 
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
-		return "", fmt.Errorf("failed to adjust OOM score for shim: %w", err)
+		return params, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
-	return address, nil
+
+	params.Address = address
+	return params, nil
 }
 
 func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {

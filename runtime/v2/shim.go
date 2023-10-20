@@ -27,13 +27,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/pkg/atomicfile"
 	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
 	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/api/runtime/task/v2"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
@@ -59,20 +60,7 @@ func init() {
 	timeout.Set(shutdownTimeout, 3*time.Second)
 }
 
-func loadAddress(path string) ([]byte, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
 func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstance, retErr error) {
-	address, err := loadAddress(filepath.Join(bundle.Path, "address"))
-	if err != nil {
-		return nil, err
-	}
-
 	shimCtx, cancelShimLog := context.WithCancel(ctx)
 	defer func() {
 		if retErr != nil {
@@ -108,14 +96,14 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		f.Close()
 	}
 
-	params, err := parseStartResponse(ctx, address)
+	params, err := restoreBootstrapParams(bundle.Path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
-	conn, err := makeConnection(ctx, params, onCloseWithShimLog)
+	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to make connection: %w", err)
 	}
 
 	defer func() {
@@ -125,8 +113,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	}()
 
 	shim := &shim{
-		bundle: bundle,
-		client: conn,
+		bundle:  bundle,
+		client:  conn,
+		version: params.Version,
 	}
 
 	return shim, nil
@@ -177,6 +166,9 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	})
 }
 
+// CurrentShimVersion is the latest shim version supported by containerd (e.g. TaskService v3).
+const CurrentShimVersion = 3
+
 // ShimInstance represents running shim process managed by ShimManager.
 type ShimInstance interface {
 	io.Closer
@@ -192,31 +184,75 @@ type ShimInstance interface {
 	Client() any
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
+	// Version returns shim's features compatibility version.
+	Version() int
 }
 
-func parseStartResponse(ctx context.Context, response []byte) (client.BootstrapParams, error) {
+func parseStartResponse(response []byte) (client.BootstrapParams, error) {
 	var params client.BootstrapParams
 
 	if err := json.Unmarshal(response, &params); err != nil || params.Version < 2 {
 		// Use TTRPC for legacy shims
 		params.Address = string(response)
 		params.Protocol = "ttrpc"
+		params.Version = 2
 	}
 
-	if params.Version > 2 {
+	if params.Version > CurrentShimVersion {
 		return client.BootstrapParams{}, fmt.Errorf("unsupported shim version (%d): %w", params.Version, errdefs.ErrNotImplemented)
 	}
 
 	return params, nil
 }
 
+// writeBootstrapParams writes shim's bootstrap configuration (e.g. how to connect, version, etc).
+func writeBootstrapParams(path string, params client.BootstrapParams) error {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(&params)
+	if err != nil {
+		return err
+	}
+
+	f, err := atomicfile.New(path, 0o666)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(data)
+	if err != nil {
+		f.Cancel()
+		return err
+	}
+
+	return f.Close()
+}
+
+func readBootstrapParams(path string) (client.BootstrapParams, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return client.BootstrapParams{}, err
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return client.BootstrapParams{}, err
+	}
+
+	return parseStartResponse(data)
+}
+
 // makeConnection creates a new TTRPC or GRPC connection object from address.
 // address can be either a socket path for TTRPC or JSON serialized BootstrapParams.
-func makeConnection(ctx context.Context, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
+func makeConnection(ctx context.Context, id string, params client.BootstrapParams, onClose func()) (_ io.Closer, retErr error) {
 	log.G(ctx).WithFields(log.Fields{
 		"address":  params.Address,
 		"protocol": params.Protocol,
-	}).Debug("shim bootstrap parameters")
+		"version":  params.Version,
+	}).Infof("connecting to shim %s", id)
 
 	switch strings.ToLower(params.Protocol) {
 	case "ttrpc":
@@ -303,8 +339,9 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 }
 
 type shim struct {
-	bundle *Bundle
-	client any
+	bundle  *Bundle
+	client  any
+	version int
 }
 
 var _ ShimInstance = (*shim)(nil)
@@ -312,6 +349,10 @@ var _ ShimInstance = (*shim)(nil)
 // ID of the shim/task
 func (s *shim) ID() string {
 	return s.bundle.ID
+}
+
+func (s *shim) Version() int {
+	return s.version
 }
 
 func (s *shim) Namespace() string {
@@ -375,11 +416,11 @@ var _ runtime.Task = &shimTask{}
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
 type shimTask struct {
 	ShimInstance
-	task task.TaskService
+	task TaskServiceClient
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
-	taskClient, err := NewTaskClient(shim.Client())
+	taskClient, err := NewTaskClient(shim.Client(), shim.Version())
 	if err != nil {
 		return nil, err
 	}
