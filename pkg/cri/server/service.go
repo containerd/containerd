@@ -138,11 +138,6 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
 	}
 
-	// TODO(dmcgowan): Get the full list directly from configured plugins
-	sbControllers := map[string]sandbox.Controller{
-		string(criconfig.ModePodSandbox): client.SandboxController(string(criconfig.ModePodSandbox)),
-		string(criconfig.ModeShim):       client.SandboxController(string(criconfig.ModeShim)),
-	}
 	imageFSPaths := map[string]string{}
 	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
 		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
@@ -151,10 +146,8 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
 		}
-		if _, ok := sbControllers[ociRuntime.Sandboxer]; !ok {
-			sbControllers[ociRuntime.Sandboxer] = client.SandboxController(ociRuntime.Sandboxer)
-		}
 	}
+
 	snapshotter := config.ContainerdConfig.Snapshotter
 	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
 	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
@@ -217,8 +210,9 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		return nil, err
 	}
 
+	podSandboxController := client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
 	// Initialize pod sandbox controller
-	sbControllers[string(criconfig.ModePodSandbox)].(*podsandbox.Controller).Init(config, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
+	podSandboxController.Init(config, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
 
 	c.nri = nri
 
