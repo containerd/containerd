@@ -422,16 +422,3 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 
 	return specs, nil
 }
-
-// ValidateMode validate the given mod value,
-// returns err if mod is empty or unknown
-func ValidateMode(modeStr string) error {
-	switch modeStr {
-	case string(criconfig.ModePodSandbox), string(criconfig.ModeShim):
-		return nil
-	case "":
-		return fmt.Errorf("empty sandbox controller mode")
-	default:
-		return fmt.Errorf("unknown sandbox controller mode: %s", modeStr)
-	}
-}
