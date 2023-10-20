@@ -93,26 +93,23 @@ func (m *Mount) mount(target string) (err error) {
 	var (
 		chdir     string
 		recalcOpt bool
-		usernsFd  int
+		usernsFd  *os.File
 		options   = m.Options
 	)
 	opt := parseMountOptions(options)
 	// The only remapping of both GID and UID is supported
 	if opt.uidmap != "" && opt.gidmap != "" {
-		var (
-			childProcCleanUp func()
-		)
-		if usernsFd, childProcCleanUp, err = GetUsernsFD(opt.uidmap, opt.gidmap); err != nil {
+		if usernsFd, err = GetUsernsFD(opt.uidmap, opt.gidmap); err != nil {
 			return err
 		}
-		defer childProcCleanUp()
+		defer usernsFd.Close()
 
 		// overlay expects lowerdir's to be remapped instead
 		if m.Type == "overlay" {
 			var (
 				userNsCleanUp func()
 			)
-			options, userNsCleanUp, err = prepareIDMappedOverlay(usernsFd, options)
+			options, userNsCleanUp, err = prepareIDMappedOverlay(int(usernsFd.Fd()), options)
 			defer userNsCleanUp()
 
 			if err != nil {
@@ -196,7 +193,7 @@ func (m *Mount) mount(target string) (err error) {
 
 	// remap non-overlay mount point
 	if opt.uidmap != "" && opt.gidmap != "" && m.Type != "overlay" {
-		if err := IDMapMount(target, target, usernsFd); err != nil {
+		if err := IDMapMount(target, target, int(usernsFd.Fd())); err != nil {
 			return err
 		}
 	}

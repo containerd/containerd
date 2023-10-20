@@ -19,15 +19,15 @@ package mount
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/sys"
-	"github.com/sirupsen/logrus"
 )
 
 // TODO: Support multiple mappings in future
@@ -36,21 +36,26 @@ func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("user namespace mappings require the format `container-id:host-id:size`")
 	}
+
 	cID, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return nil, fmt.Errorf("invalid container id for user namespace remapping, %w", err)
 	}
+
 	hID, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("invalid host id for user namespace remapping, %w", err)
 	}
+
 	size, err := strconv.Atoi(parts[2])
 	if err != nil {
 		return nil, fmt.Errorf("invalid size for user namespace remapping, %w", err)
 	}
-	if cID != 0 || hID < 0 || size < 0 {
-		return nil, fmt.Errorf("invalid mapping %s, all IDs and size must be positive integers (container ID of 0 is only supported)", mapping)
+
+	if cID < 0 || hID < 0 || size < 0 {
+		return nil, fmt.Errorf("invalid mapping %s, all IDs and size must be positive integers", mapping)
 	}
+
 	return []syscall.SysProcIDMap{
 		{
 			ContainerID: cID,
@@ -87,80 +92,121 @@ func IDMapMount(source, target string, usernsFd int) (err error) {
 	return nil
 }
 
-// GetUsernsFD forks the current process and creates a user namespace using the specified
-// mappings.
-//
-// It returns:
-//  1. The file descriptor of the /proc/[pid]/ns/user of the newly
-//     created mapping.
-//  2. "Clean up" function that should be called once user namespace
-//     file descriptor is no longer needed.
-//  3. Usual error.
-func GetUsernsFD(uidmap, gidmap string) (_ int, _ func(), err error) {
-	var (
-		usernsFile       *os.File
-		pipeMap          [2]int
-		pid              uintptr
-		errno            syscall.Errno
-		uidMaps, gidMaps []syscall.SysProcIDMap
-	)
-
-	if uidMaps, err = parseIDMapping(uidmap); err != nil {
-		return -1, nil, err
-	}
-	if gidMaps, err = parseIDMapping(gidmap); err != nil {
-		return -1, nil, err
+// GetUsernsFD forks the current process and creates a user namespace using
+// the specified mappings.
+func GetUsernsFD(uidmap, gidmap string) (_usernsFD *os.File, _ error) {
+	uidMaps, err := parseIDMapping(uidmap)
+	if err != nil {
+		return nil, err
 	}
 
-	syscall.ForkLock.Lock()
-	if err = syscall.Pipe2(pipeMap[:], syscall.O_CLOEXEC); err != nil {
-		syscall.ForkLock.Unlock()
-		return -1, nil, err
+	gidMaps, err := parseIDMapping(gidmap)
+	if err != nil {
+		return nil, err
 	}
+	return getUsernsFD(uidMaps, gidMaps)
+}
 
-	pid, errno = sys.ForkUserns(pipeMap)
-	syscall.ForkLock.Unlock()
+func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_usernsFD *os.File, retErr error) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	pid, pidfd, errno := sys.ForkUserns()
 	if errno != 0 {
-		syscall.Close(pipeMap[0])
-		syscall.Close(pipeMap[1])
-		return -1, nil, errno
+		return nil, errno
 	}
 
-	syscall.Close(pipeMap[0])
+	pidFD := os.NewFile(pidfd, "pidfd")
+	defer func() {
+		unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
 
-	writeMappings := func(fname string, idmap []syscall.SysProcIDMap) error {
+		pidfdWaitid(pidFD)
+
+		pidFD.Close()
+	}()
+
+	// NOTE:
+	//
+	// The usernsFD will hold the userns reference in kernel. Even if the
+	// child process is reaped, the usernsFD is still valid.
+	usernsFD, err := os.Open(fmt.Sprintf("/proc/%d/ns/user", pid))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get userns file descriptor for /proc/%d/user/ns: %w", pid, err)
+	}
+	defer func() {
+		if retErr != nil {
+			usernsFD.Close()
+		}
+	}()
+
+	uidmapFile, err := os.OpenFile(fmt.Sprintf("/proc/%d/%s", pid, "uid_map"), os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open /proc/%d/uid_map: %w", pid, err)
+	}
+	defer uidmapFile.Close()
+
+	gidmapFile, err := os.OpenFile(fmt.Sprintf("/proc/%d/%s", pid, "gid_map"), os.O_WRONLY, 0600)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open /proc/%d/gid_map: %w", pid, err)
+	}
+	defer gidmapFile.Close()
+
+	testHookKillChildBeforePidfdSendSignal(pid, pidFD)
+
+	// Ensure the child process is still alive. If the err is ESRCH, we
+	// should return error because we can't guarantee the usernsFD and
+	// u[g]idmapFile are valid. It's safe to return error and retry.
+	if err := unix.PidfdSendSignal(int(pidFD.Fd()), 0, nil, 0); err != nil {
+		return nil, fmt.Errorf("failed to ensure child process is alive: %w", err)
+	}
+
+	testHookKillChildAfterPidfdSendSignal(pid, pidFD)
+
+	// NOTE:
+	//
+	// The u[g]id_map file descriptor is still valid if the child process
+	// is reaped.
+	writeMappings := func(f *os.File, idmap []syscall.SysProcIDMap) error {
 		mappings := ""
 		for _, m := range idmap {
-			mappings = fmt.Sprintf("%d %d %d\n", m.ContainerID, m.HostID, m.Size)
+			mappings = fmt.Sprintf("%s%d %d %d\n", mappings, m.ContainerID, m.HostID, m.Size)
 		}
-		return os.WriteFile(fmt.Sprintf("/proc/%d/%s", pid, fname), []byte(mappings), 0600)
-	}
 
-	cleanUpChild := func() {
-		sync := sys.ProcSyncExit
-		if _, _, errno := syscall.Syscall6(syscall.SYS_WRITE, uintptr(pipeMap[1]), uintptr(unsafe.Pointer(&sync)), unsafe.Sizeof(sync), 0, 0, 0); errno != 0 {
-			logrus.WithError(errno).Warnf("failed to sync with child (ProcSyncExit)")
+		_, err := f.Write([]byte(mappings))
+		if err1 := f.Close(); err1 != nil && err == nil {
+			err = err1
 		}
-		syscall.Close(pipeMap[1])
-
-		if _, err := unix.Wait4(int(pid), nil, 0, nil); err != nil {
-			logrus.WithError(err).Warnf("failed to wait for child process; the SIGHLD might be received by shim reaper")
-		}
-	}
-	defer cleanUpChild()
-
-	if err := writeMappings("uid_map", uidMaps); err != nil {
-		return -1, nil, err
-	}
-	if err := writeMappings("gid_map", gidMaps); err != nil {
-		return -1, nil, err
+		return err
 	}
 
-	if usernsFile, err = os.Open(fmt.Sprintf("/proc/%d/ns/user", pid)); err != nil {
-		return -1, nil, fmt.Errorf("failed to get user ns file descriptor for - /proc/%d/user/ns: %w", pid, err)
+	if err := writeMappings(uidmapFile, uidMaps); err != nil {
+		return nil, fmt.Errorf("failed to write uid_map: %w", err)
 	}
 
-	return int(usernsFile.Fd()), func() {
-		usernsFile.Close()
-	}, nil
+	if err := writeMappings(gidmapFile, gidMaps); err != nil {
+		return nil, fmt.Errorf("failed to write gid_map: %w", err)
+	}
+	return usernsFD, nil
 }
+
+func pidfdWaitid(pidFD *os.File) error {
+	// https://elixir.bootlin.com/linux/v5.4.258/source/include/uapi/linux/wait.h#L20
+	const PPidFD = 3
+
+	var e syscall.Errno
+	for {
+		_, _, e = syscall.Syscall6(syscall.SYS_WAITID, PPidFD, pidFD.Fd(), 0, syscall.WEXITED, 0, 0)
+		if e != syscall.EINTR {
+			break
+		}
+	}
+	return e
+}
+
+var (
+	testHookLock sync.Mutex
+
+	testHookKillChildBeforePidfdSendSignal = func(_pid uintptr, _pidFD *os.File) {}
+
+	testHookKillChildAfterPidfdSendSignal = func(_pid uintptr, _pidFD *os.File) {}
+)
