@@ -27,30 +27,29 @@ import (
 	"sync"
 	"sync/atomic"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/pkg/cri/instrument"
-	"github.com/containerd/containerd/v2/pkg/cri/nri"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
-	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
-	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
-	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"google.golang.org/grpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
-	"github.com/containerd/containerd/v2/pkg/cri/store/label"
-
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/instrument"
+	"github.com/containerd/containerd/v2/pkg/cri/nri"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/registrar"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/sandbox"
 )
 
 // defaultNetworkPlugin is used for the default CNI configuration
@@ -66,6 +65,10 @@ type CRIService interface {
 	Run(ready func()) error
 
 	Register(*grpc.Server) error
+}
+
+type sandboxService interface {
+	SandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error)
 }
 
 // imageService specifies dependencies to image service.
@@ -125,8 +128,8 @@ type criService struct {
 	containerEventsChan chan runtime.ContainerEventResponse
 	// nri is used to hook NRI into CRI request processing.
 	nri *nri.API
-	// sbcontrollers are the configured sandbox controllers
-	sbControllers map[string]sandbox.Controller
+	// sandboxService is the sandbox related service for CRI
+	sandboxService sandboxService
 }
 
 // NewCRIService returns a new instance of CRIService
@@ -169,7 +172,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
-		sbControllers:      sbControllers,
+		sandboxService:     newCriSandboxService(&config, client),
 	}
 
 	// TODO: figure out a proper channel size.
@@ -355,22 +358,6 @@ func (c *criService) register(s *grpc.Server) error {
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
 	return nil
-}
-
-// getSandboxController returns the sandbox controller configuration for sandbox.
-// If absent in legacy case, it will return the default controller.
-func (c *criService) getSandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error) {
-	ociRuntime, err := c.getSandboxRuntime(config, runtimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-
-	controller, ok := c.sbControllers[ociRuntime.Sandboxer]
-	if !ok {
-		return nil, fmt.Errorf("no sandbox controller %s for runtime %s", ociRuntime.Sandboxer, runtimeHandler)
-	}
-
-	return controller, nil
 }
 
 // imageFSPath returns containerd image filesystem path.

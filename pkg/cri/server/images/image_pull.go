@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -33,6 +32,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/log"
+	distribution "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -47,8 +48,6 @@ import (
 	"github.com/containerd/containerd/v2/remotes/docker"
 	"github.com/containerd/containerd/v2/remotes/docker/config"
 	"github.com/containerd/containerd/v2/tracing"
-	"github.com/containerd/log"
-	distribution "github.com/distribution/reference"
 )
 
 // For image management:
@@ -755,7 +754,7 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	// TODO: Find other way to retrieve sandbox runtime, this must belong to the Runtime part of the CRI.
-	ociRuntime, err := c.getSandboxRuntime(s, runtimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(s, runtimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s: %w", runtimeHandler, err)
 	}
@@ -763,56 +762,4 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	snapshotter = c.RuntimeSnapshotter(ctx, ociRuntime)
 	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	return snapshotter, nil
-}
-
-// TODO: copy-pasted from the runtime service implementation. This should not be in image service.
-func (c *CRIImageService) getSandboxRuntime(config *runtime.PodSandboxConfig, runtimeHandler string) (criconfig.Runtime, error) {
-	if untrustedWorkload(config) {
-		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
-		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
-			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
-		}
-
-		//  If the untrusted workload is requesting access to the host/node, this request will fail.
-		//
-		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
-		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
-		// is a supported option, granting the workload to access the entire guest VM instead of host.
-		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
-		if hostAccessingSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
-		}
-
-		runtimeHandler = criconfig.RuntimeUntrusted
-	}
-
-	if runtimeHandler == "" {
-		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
-	}
-
-	handler, ok := c.config.ContainerdConfig.Runtimes[runtimeHandler]
-	if !ok {
-		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
-	}
-	return handler, nil
-}
-
-// untrustedWorkload returns true if the sandbox contains untrusted workload.
-func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
-	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
-}
-
-// hostAccessingSandbox returns true if the sandbox configuration
-// requires additional host access for the sandbox.
-func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
-	securityContext := config.GetLinux().GetSecurityContext()
-
-	namespaceOptions := securityContext.GetNamespaceOptions()
-	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
-		return true
-	}
-
-	return false
 }

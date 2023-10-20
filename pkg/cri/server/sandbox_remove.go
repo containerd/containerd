@@ -80,7 +80,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	}
 
 	// Use sandbox controller to delete sandbox
-	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}

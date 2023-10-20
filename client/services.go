@@ -239,7 +239,7 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 	}
 }
 
-func WithSandboxers(ic *plugin.InitContext) Opt {
+func WithInMemorySandboxControllers(ic *plugin.InitContext) Opt {
 	return func(c *clientOpts) error {
 		sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 		if err != nil {
