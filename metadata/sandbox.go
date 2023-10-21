@@ -239,6 +239,9 @@ func (s *sandboxStore) Delete(ctx context.Context, id string) error {
 		}
 
 		if err := buckets.DeleteBucket([]byte(id)); err != nil {
+			if err == bbolt.ErrBucketNotFound {
+				err = errdefs.ErrNotFound
+			}
 			return fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 		}
 
