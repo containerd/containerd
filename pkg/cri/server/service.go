@@ -410,6 +410,9 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 			return nil, fmt.Errorf("failed to load base OCI spec from file: %s: %w", cfg.BaseRuntimeSpec, err)
 		}
 
+		if spec.Process != nil && spec.Process.Capabilities != nil && len(spec.Process.Capabilities.Inheritable) > 0 {
+			logrus.WithField("base_runtime_spec", cfg.BaseRuntimeSpec).Warn("Provided base runtime spec includes inheritable capabilities, which may be unsafe. See CVE-2023-24769 for more details.")
+		}
 		specs[cfg.BaseRuntimeSpec] = spec
 	}
 
