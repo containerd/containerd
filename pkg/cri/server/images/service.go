@@ -30,6 +30,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
@@ -42,18 +43,33 @@ import (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.GRPCPlugin,
+		Type: plugins.CRIImagePlugin,
 		ID:   "cri-image-service",
+		Requires: []plugin.Type{
+			plugins.LeasePlugin,
+			plugins.EventPlugin,
+			plugins.SandboxStorePlugin,
+			plugins.InternalPlugin,
+			plugins.ServicePlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			// Get base CRI dependencies.
-			criPlugin, err := ic.GetByID(plugins.GRPCPlugin, "cri")
+			criPlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
 			}
-
 			cri := criPlugin.(*base.CRIBase)
 
-			service, err := NewService(cri.Config, cri.Client)
+			client, err := containerd.New(
+				"",
+				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
+				containerd.WithDefaultPlatform(platforms.Default()),
+				containerd.WithInMemoryServices(ic),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
+			}
+			service, err := NewService(cri.Config, client)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create image service: %w", err)
 			}

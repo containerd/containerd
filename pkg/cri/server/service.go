@@ -18,12 +18,9 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -38,6 +35,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
@@ -47,7 +45,6 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/registrar"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/sandbox"
 )
 
@@ -134,15 +131,17 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(criBase *base.CRIBase, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
+	config := criBase.Config
 	c := &criService{
 		imageService:       imageService,
 		config:             config,
 		client:             client,
 		imageFSPaths:       imageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
+		baseOCISpecs:       criBase.BaseOCISpecs,
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
@@ -183,15 +182,8 @@ func NewCRIService(config criconfig.Config, imageService imageService, client *c
 		}
 	}
 
-	// Preload base OCI specs
-	c.baseOCISpecs, err = loadBaseOCISpecs(&config)
-	if err != nil {
-		return nil, err
-	}
-
 	podSandboxController := client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
-	// Initialize pod sandbox controller
-	podSandboxController.Init(config, c.sandboxStore, c.os, c, c.imageService, c.baseOCISpecs)
+	podSandboxController.Init(c.sandboxStore, c)
 
 	c.nri = nri
 
@@ -334,51 +326,4 @@ func (c *criService) register(s *grpc.Server) error {
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
 	return nil
-}
-
-// imageFSPath returns containerd image filesystem path.
-// Note that if containerd changes directory layout, we also needs to change this.
-func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
-}
-
-func loadOCISpec(filename string) (*oci.Spec, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open base OCI spec: %s: %w", filename, err)
-	}
-	defer file.Close()
-
-	spec := oci.Spec{}
-	if err := json.NewDecoder(file).Decode(&spec); err != nil {
-		return nil, fmt.Errorf("failed to parse base OCI spec file: %w", err)
-	}
-
-	return &spec, nil
-}
-
-func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
-	specs := map[string]*oci.Spec{}
-	for _, cfg := range config.Runtimes {
-		if cfg.BaseRuntimeSpec == "" {
-			continue
-		}
-
-		// Don't load same file twice
-		if _, ok := specs[cfg.BaseRuntimeSpec]; ok {
-			continue
-		}
-
-		spec, err := loadOCISpec(cfg.BaseRuntimeSpec)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load base OCI spec from file: %s: %w", cfg.BaseRuntimeSpec, err)
-		}
-
-		if spec.Process != nil && spec.Process.Capabilities != nil && len(spec.Process.Capabilities.Inheritable) > 0 {
-			log.L.WithField("base_runtime_spec", cfg.BaseRuntimeSpec).Warn("Provided base runtime spec includes inheritable capabilities, which may be unsafe. See CVE-2022-24769 for more details.")
-		}
-		specs[cfg.BaseRuntimeSpec] = spec
-	}
-
-	return specs, nil
 }
