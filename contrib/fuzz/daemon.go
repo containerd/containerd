@@ -19,29 +19,83 @@
 package fuzz
 
 import (
+	"context"
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/cmd/containerd/command"
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/services/server"
+	"github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/sys"
+	"github.com/containerd/log"
+)
+
+const (
+	defaultRoot    = "/var/lib/containerd"
+	defaultState   = "/tmp/containerd"
+	defaultAddress = "/tmp/containerd/containerd.sock"
 )
 
 var (
 	initDaemon sync.Once
 )
 
-func startDaemonForFuzzing(arguments []string) {
-	app := command.App()
-	_ = app.Run(arguments)
-}
-
 func startDaemon() {
-	args := []string{"--log-level", "debug"}
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	errC := make(chan error, 1)
+
 	go func() {
-		// This is similar to invoking the
-		// containerd binary.
-		// See contrib/fuzz/oss_fuzz_build.sh
-		// for more info.
-		startDaemonForFuzzing(args)
+		defer close(errC)
+
+		srvconfig := &config.Config{
+			Version: config.CurrentConfigVersion,
+			Root:    defaultRoot,
+			State:   defaultState,
+			Debug: config.Debug{
+				Level: "debug",
+			},
+			GRPC: config.GRPCConfig{
+				Address:        defaultAddress,
+				MaxRecvMsgSize: defaults.DefaultMaxRecvMsgSize,
+				MaxSendMsgSize: defaults.DefaultMaxSendMsgSize,
+			},
+			DisabledPlugins: []string{},
+			RequiredPlugins: []string{},
+		}
+
+		server, err := server.New(ctx, srvconfig)
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		l, err := sys.GetLocalListener(srvconfig.GRPC.Address, srvconfig.GRPC.UID, srvconfig.GRPC.GID)
+		if err != nil {
+			errC <- err
+			return
+		}
+
+		go func() {
+			defer l.Close()
+			if err := server.ServeGRPC(l); err != nil {
+				log.G(ctx).WithError(err).WithField("address", srvconfig.GRPC.Address).Fatal("serve failure")
+			}
+		}()
+
+		server.Wait()
 	}()
-	time.Sleep(time.Second * 4)
+
+	var err error
+	select {
+	case err = <-errC:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
+
+	if err != nil {
+		panic(err)
+	}
 }
