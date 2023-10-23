@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -39,7 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	sb "github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/log"
 )
 
 func init() {
@@ -255,7 +255,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	ctrl, err := controller.Start(ctx, id)
 	if err != nil {
-		sandbox.Container, _ = c.client.LoadContainer(ctx, id)
 		var cerr podsandbox.CleanupErr
 		if errors.As(err, &cerr) {
 			cleanupErr = fmt.Errorf("failed to cleanup sandbox: %w", cerr)
@@ -422,7 +421,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	//
 	// TaskOOM from containerd may come before sandbox is added to store,
 	// but we don't care about sandbox TaskOOM right now, so it is fine.
-	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, ctrl.Pid, exitCh)
+	c.eventMonitor.startSandboxExitMonitor(context.Background(), id, exitCh)
 
 	// Send CONTAINER_STARTED event with ContainerId equal to SandboxId.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)

@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -62,16 +63,11 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			retErr = errors.Join(retErr, CleanupErr{cleanupErr})
 		}
 	}()
-
-	sandboxInfo, err := c.client.SandboxStore().Get(ctx, id)
-	if err != nil {
-		return cin, fmt.Errorf("unable to find sandbox with id %q: %w", id, err)
+	podSandbox := c.store.Get(id)
+	if podSandbox == nil {
+		return cin, fmt.Errorf("unable to find pod sandbox with id %q: %w", id, errdefs.ErrNotFound)
 	}
-
-	var metadata sandboxstore.Metadata
-	if err := sandboxInfo.GetExtension(MetadataKey, &metadata); err != nil {
-		return cin, fmt.Errorf("failed to get sandbox %q metadata: %w", id, err)
-	}
+	metadata := podSandbox.Metadata
 
 	var (
 		config = metadata.Config
@@ -147,13 +143,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
 		containerd.WithContainerExtension(crilabels.SandboxMetadataExtension, &metadata),
-		containerd.WithRuntime(ociRuntime.Type, sandboxInfo.Runtime.Options),
+		containerd.WithRuntime(ociRuntime.Type, podSandbox.Runtime.Options),
 	}
 
 	container, err := c.client.NewContainer(ctx, id, opts...)
 	if err != nil {
 		return cin, fmt.Errorf("failed to create containerd container: %w", err)
 	}
+	podSandbox.Container = container
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
 			deferCtx, deferCancel := ctrdutil.DeferContext()
@@ -161,6 +158,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			if cleanupErr = container.Delete(deferCtx, containerd.WithSnapshotCleanup); cleanupErr != nil {
 				log.G(ctx).WithError(cleanupErr).Errorf("Failed to delete containerd container %q", id)
 			}
+			podSandbox.Container = nil
 		}
 	}()
 
@@ -213,6 +211,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
+	podSandbox.CreatedAt = info.CreatedAt
 
 	// Create sandbox task in containerd.
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).", id, metadata.Name)
@@ -238,13 +237,13 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			}
 		}
 	}()
+	podSandbox.Pid = task.Pid()
 
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
 	if err != nil {
 		return cin, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 	}
-	c.store.Save(id, exitCh)
 
 	nric, err := nri.New()
 	if err != nil {
@@ -263,18 +262,30 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err := task.Start(ctx); err != nil {
 		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
+	podSandbox.State = sandboxstore.StateReady
 
 	cin.SandboxID = id
 	cin.Pid = task.Pid()
 	cin.CreatedAt = info.CreatedAt
 	cin.Labels = labels
 
+	go func() {
+		code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh)
+		podSandbox.Exit(*containerd.NewExitStatus(code, exitTime, err))
+	}()
+
 	return
 }
 
-func (c *Controller) Create(ctx context.Context, _info sandbox.Sandbox, _ ...sandbox.CreateOpt) error {
-	// Not used by pod-sandbox implementation as there is no need to split pause containers logic.
-	return nil
+func (c *Controller) Create(_ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
+	metadata := sandboxstore.Metadata{}
+	if err := info.GetExtension(MetadataKey, &metadata); err != nil {
+		return fmt.Errorf("failed to get sandbox %q metadata: %w", info.ID, err)
+	}
+	podSandbox := types.NewPodSandbox(info.ID, sandboxstore.Status{State: sandboxstore.StateUnknown})
+	podSandbox.Metadata = metadata
+	podSandbox.Runtime = info.Runtime
+	return c.store.Save(podSandbox)
 }
 
 func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *runtime.PodSandboxConfig) (*imagestore.Image, error) {

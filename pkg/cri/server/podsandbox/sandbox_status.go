@@ -21,57 +21,32 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/containerd/typeurl/v2"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/errdefs"
-	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	"github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/go-cni"
-	"github.com/containerd/typeurl/v2"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-// SandboxInfo is extra information for sandbox.
-// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
-type SandboxInfo struct {
-	Pid         uint32 `json:"pid"`
-	Status      string `json:"processStatus"`
-	NetNSClosed bool   `json:"netNamespaceClosed"`
-	Image       string `json:"image"`
-	SnapshotKey string `json:"snapshotKey"`
-	Snapshotter string `json:"snapshotter"`
-	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
-	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
-	// in https://github.com/containerd/cri/issues/1064).
-	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
-	RuntimeType    string                    `json:"runtimeType"`
-	RuntimeOptions interface{}               `json:"runtimeOptions"`
-	Config         *runtime.PodSandboxConfig `json:"config"`
-	// Note: RuntimeSpec may not be populated if the sandbox has not been fully created.
-	RuntimeSpec *runtimespec.Spec      `json:"runtimeSpec"`
-	CNIResult   *cni.Result            `json:"cniResult"`
-	Metadata    *sandboxstore.Metadata `json:"sandboxMetadata"`
-}
-
 func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
-	sb, err := c.sandboxStore.Get(sandboxID)
-	if err != nil {
-		return sandbox.ControllerStatus{}, fmt.Errorf("an error occurred while trying to find sandbox %q: %w",
-			sandboxID, err)
+	sb := c.store.Get(sandboxID)
+	if sb == nil {
+		return sandbox.ControllerStatus{}, fmt.Errorf("unable to find sandbox %q: %w", sandboxID, errdefs.ErrNotFound)
 	}
 
-	status := sb.Status.Get()
 	cstatus := sandbox.ControllerStatus{
 		SandboxID: sandboxID,
-		Pid:       status.Pid,
-		State:     status.State.String(),
-		CreatedAt: status.CreatedAt,
+		Pid:       sb.Pid,
+		State:     sb.State.String(),
+		CreatedAt: sb.CreatedAt,
 		Extra:     nil,
 	}
-
-	if !status.ExitedAt.IsZero() {
-		cstatus.ExitedAt = status.ExitedAt
+	exitStatus := sb.GetExitStatus()
+	if exitStatus != nil {
+		cstatus.ExitedAt = exitStatus.ExitTime()
 	}
 
 	if verbose {
@@ -87,15 +62,16 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 }
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
-func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[string]string, error) {
-	si := &SandboxInfo{
-		Pid:            sandbox.Status.Get().Pid,
-		Config:         sandbox.Config,
-		RuntimeHandler: sandbox.RuntimeHandler,
-		CNIResult:      sandbox.CNIResult,
+func toCRISandboxInfo(ctx context.Context, sb *types.PodSandbox) (map[string]string, error) {
+	si := &base.SandboxInfo{
+		Pid:            sb.Pid,
+		Config:         sb.Metadata.Config,
+		RuntimeHandler: sb.Metadata.RuntimeHandler,
+		CNIResult:      sb.Metadata.CNIResult,
+		Metadata:       &sb.Metadata,
 	}
 
-	if container := sandbox.Container; container != nil {
+	if container := sb.Container; container != nil {
 		task, err := container.Task(ctx, nil)
 		if err != nil && !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get sandbox container task: %w", err)
@@ -145,17 +121,15 @@ func toCRISandboxInfo(ctx context.Context, sandbox sandboxstore.Sandbox) (map[st
 		// status which does not exist in containerd.
 		si.Status = "deleted"
 	}
-
-	if sandbox.NetNS != nil {
+	netns := getNetNS(&sb.Metadata)
+	if netns != nil {
 		// Add network closed information if sandbox is not using host network.
-		closed, err := sandbox.NetNS.Closed()
+		closed, err := netns.Closed()
 		if err != nil {
 			return nil, fmt.Errorf("failed to check network namespace closed: %w", err)
 		}
 		si.NetNSClosed = closed
 	}
-
-	si.Metadata = &sandbox.Metadata
 
 	infoBytes, err := json.Marshal(si)
 	if err != nil {

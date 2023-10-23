@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/errdefs"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
@@ -74,7 +75,12 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		}
 
 		if err := controller.Stop(ctx, id); err != nil {
-			return fmt.Errorf("failed to stop sandbox %q: %w", id, err)
+			// Log and ignore the error if controller already removed the sandbox
+			if errdefs.IsNotFound(err) {
+				log.G(ctx).Warnf("sandbox %q is not found when stopping it", id)
+			} else {
+				return fmt.Errorf("failed to stop sandbox %q: %w", id, err)
+			}
 		}
 	}
 

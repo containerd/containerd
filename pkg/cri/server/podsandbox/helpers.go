@@ -23,6 +23,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	docker "github.com/distribution/reference"
+	imagedigest "github.com/opencontainers/go-digest"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	clabels "github.com/containerd/containerd/v2/labels"
@@ -30,12 +36,8 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/log"
-	docker "github.com/distribution/reference"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-
-	imagedigest "github.com/opencontainers/go-digest"
 )
 
 const (
@@ -195,4 +197,25 @@ func (c *Controller) runtimeSnapshotter(ctx context.Context, ociRuntime criconfi
 
 	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
 	return ociRuntime.Snapshotter
+}
+
+func getMetadata(ctx context.Context, container containerd.Container) (*sandboxstore.Metadata, error) {
+	// Load sandbox metadata.
+	exts, err := container.Extensions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox container extensions: %w", err)
+	}
+	ext, ok := exts[crilabels.SandboxMetadataExtension]
+	if !ok {
+		return nil, fmt.Errorf("metadata extension %q not found", crilabels.SandboxMetadataExtension)
+	}
+	data, err := typeurl.UnmarshalAny(ext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
+	}
+	meta, ok := data.(*sandboxstore.Metadata)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert the extension to sandbox metadata")
+	}
+	return meta, nil
 }

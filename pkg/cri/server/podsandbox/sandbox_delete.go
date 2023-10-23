@@ -27,11 +27,8 @@ import (
 )
 
 func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
-	sandbox, err := c.sandboxStore.Get(sandboxID)
-	if err != nil {
-		if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("an error occurred when try to find sandbox %q: %w", sandboxID, err)
-		}
+	sandbox := c.store.Get(sandboxID)
+	if sandbox == nil {
 		// Do not return error if the id doesn't exist.
 		log.G(ctx).Tracef("Sandbox controller Delete called for sandbox %q that does not exist", sandboxID)
 		return nil
@@ -61,6 +58,8 @@ func (c *Controller) Shutdown(ctx context.Context, sandboxID string) error {
 			log.G(ctx).Tracef("Sandbox controller Delete called for sandbox container %q that does not exist", sandboxID)
 		}
 	}
+
+	c.store.Remove(sandboxID)
 
 	return nil
 }
