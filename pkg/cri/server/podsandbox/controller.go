@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
@@ -30,6 +32,8 @@ import (
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -38,8 +42,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -49,10 +51,12 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 			plugins.LeasePlugin,
+			plugins.SandboxStorePlugin,
+			plugins.InternalPlugin,
+			plugins.CRIImagePlugin,
 			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			c := Controller{}
 			client, err := containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
@@ -60,9 +64,31 @@ func init() {
 				containerd.WithInMemoryServices(ic),
 			)
 			if err != nil {
+				return nil, fmt.Errorf("unable to init client for podsandbox: %w", err)
+			}
+
+			// Get base CRI dependencies.
+			criBasePlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
+			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
 			}
-			c.client = client
+			criBase := criBasePlugin.(*base.CRIBase)
+
+			// Get image service.
+			criImagePlugin, err := ic.GetByID(plugins.CRIImagePlugin, "cri-image-service")
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
+			}
+			imageService := criImagePlugin.(*images.CRIImageService)
+
+			c := Controller{
+				client:       client,
+				config:       criBase.Config,
+				os:           osinterface.RealOS{},
+				baseOCISpecs: criBase.BaseOCISpecs,
+				imageService: imageService,
+				store:        NewStore(),
+			}
 			return &c, nil
 		},
 	})
@@ -103,20 +129,11 @@ type Controller struct {
 }
 
 func (c *Controller) Init(
-	config criconfig.Config,
 	sandboxStore *sandboxstore.Store,
-	os osinterface.OS,
 	cri CRIService,
-	imageService ImageService,
-	baseOCISpecs map[string]*oci.Spec,
 ) {
 	c.cri = cri
-	c.config = config
 	c.sandboxStore = sandboxStore
-	c.os = os
-	c.baseOCISpecs = baseOCISpecs
-	c.store = NewStore()
-	c.imageService = imageService
 }
 
 var _ sandbox.Controller = (*Controller)(nil)

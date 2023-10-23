@@ -67,6 +67,8 @@ const (
 	ImageVerifierPlugin plugin.Type = "io.containerd.image-verifier.v1"
 	// WarningPlugin implements a warning service
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
+	// CRIImagePlugin implements a cri image service
+	CRIImagePlugin plugin.Type = "io.containerd.cri.image.v1"
 )
 
 const (

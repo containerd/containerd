@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/plugin/registry"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
@@ -33,22 +32,23 @@ import (
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/services/warning"
 )
 
 // Register CRI service plugin
 func init() {
-	config := criconfig.DefaultConfig()
+
 	registry.Register(&plugin.Registration{
-		Type:   plugins.GRPCPlugin,
-		ID:     "cri-runtime-service",
-		Config: &config,
+		Type: plugins.GRPCPlugin,
+		ID:   "cri",
 		Requires: []plugin.Type{
+			plugins.CRIImagePlugin,
+			plugins.InternalPlugin,
+			plugins.SandboxControllerPlugin,
+			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
 			plugins.ServicePlugin,
-			plugins.NRIApiPlugin,
-			plugins.WarningPlugin,
-			plugins.SandboxControllerPlugin,
+			plugins.LeasePlugin,
+			plugins.SandboxStorePlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -56,29 +56,16 @@ func init() {
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
-	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
-		return nil, fmt.Errorf("invalid plugin config: %w", err)
-	} else if len(warnings) > 0 {
-		ws, err := ic.GetSingle(plugins.WarningPlugin)
-		if err != nil {
-			return nil, err
-		}
-		warn := ws.(warning.Service)
-		for _, w := range warnings {
-			warn.Emit(ctx, w)
-		}
-	}
 
 	// Get base CRI dependencies.
-	criBasePlugin, err := ic.GetByID(plugins.GRPCPlugin, "cri")
+	criBasePlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
 	if err != nil {
 		return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
 	}
 	criBase := criBasePlugin.(*base.CRIBase)
 
 	// Get image service.
-	criImagePlugin, err := ic.GetByID(plugins.GRPCPlugin, "cri-image-service")
+	criImagePlugin, err := ic.GetByID(plugins.CRIImagePlugin, "cri-image-service")
 	if err != nil {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 	}
@@ -92,8 +79,11 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithInMemoryServices(ic),
 		containerd.WithInMemorySandboxControllers(ic),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create containerd client: %w", err)
+	}
 
-	s, err := server.NewCRIService(criBase.Config, imageService, client, getNRIAPI(ic))
+	s, err := server.NewCRIService(criBase, imageService, client, getNRIAPI(ic))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
