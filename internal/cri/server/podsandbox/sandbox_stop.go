@@ -95,8 +95,8 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 		go func() {
 			defer close(stopCh)
 			err := c.waitSandboxExit(exitCtx, podSandbox, exitCh)
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to wait pod sandbox exit %+v", err)
+			if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
+				log.G(ctx).WithError(err).Errorf("Failed to wait sandbox exit %+v", err)
 			}
 		}()
 		defer func() {
