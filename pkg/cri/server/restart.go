@@ -146,6 +146,28 @@ func (c *criService) recover(ctx context.Context) error {
 		}
 	}
 
+	for _, sb := range c.sandboxStore.List() {
+		sb := sb
+		status := sb.Status.Get()
+		if status.State == sandboxstore.StateNotReady {
+			continue
+		}
+		controller, err := c.sandboxService.SandboxController(sb.Config, sb.RuntimeHandler)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to get sandbox controller while waiting sandbox")
+			continue
+		}
+		exitCh := make(chan containerd.ExitStatus, 1)
+		go func() {
+			exit, err := controller.Wait(ctrdutil.NamespacedContext(), sb.ID)
+			if err != nil {
+				log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
+				exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
+			}
+			exitCh <- *containerd.NewExitStatus(exit.ExitStatus, exit.ExitedAt, nil)
+		}()
+		c.eventMonitor.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
+	}
 	// Recover all containers.
 	containers, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindContainer))
 	if err != nil {

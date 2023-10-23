@@ -18,14 +18,15 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
-	"github.com/containerd/go-cni"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.
@@ -64,6 +65,12 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 			return nil, fmt.Errorf("failed to query controller status: %w", err)
 		}
 		state = runtime.PodSandboxState_SANDBOX_NOTREADY.String()
+		if r.GetVerbose() {
+			info, err = toDeletedCRISandboxInfo(sandbox)
+			if err != nil {
+				return nil, err
+			}
+		}
 	} else {
 		state = cstatus.State
 		createdAt = cstatus.CreatedAt
@@ -104,26 +111,6 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	return sandbox.IP, sandbox.AdditionalIPs, nil
 }
 
-// SandboxInfo is extra information for sandbox.
-// TODO (mikebrow): discuss predefining constants structures for some or all of these field names in CRI
-type SandboxInfo struct {
-	Pid         uint32 `json:"pid"`
-	Status      string `json:"processStatus"`
-	NetNSClosed bool   `json:"netNamespaceClosed"`
-	Image       string `json:"image"`
-	SnapshotKey string `json:"snapshotKey"`
-	Snapshotter string `json:"snapshotter"`
-	// Note: a new field `RuntimeHandler` has been added into the CRI PodSandboxStatus struct, and
-	// should be set. This `RuntimeHandler` field will be deprecated after containerd 1.3 (tracked
-	// in https://github.com/containerd/cri/issues/1064).
-	RuntimeHandler string                    `json:"runtimeHandler"` // see the Note above
-	RuntimeType    string                    `json:"runtimeType"`
-	RuntimeOptions interface{}               `json:"runtimeOptions"`
-	Config         *runtime.PodSandboxConfig `json:"config"`
-	RuntimeSpec    *runtimespec.Spec         `json:"runtimeSpec"`
-	CNIResult      *cni.Result               `json:"cniResult"`
-}
-
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.
 func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt time.Time, ip string, additionalIPs []string) *runtime.PodSandboxStatus {
 	// Set sandbox state to NOTREADY by default.
@@ -158,4 +145,41 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 		Annotations:    meta.Config.GetAnnotations(),
 		RuntimeHandler: meta.RuntimeHandler,
 	}
+}
+
+// toDeletedCRISandboxInfo converts cached sandbox to CRI sandbox status response info map.
+// In most cases, controller.Status() with verbose=true should have SandboxInfo in the return,
+// but if controller.Status() returns a NotFound error,
+// we should fallback to get SandboxInfo from cached sandbox itself.
+func toDeletedCRISandboxInfo(sandbox sandboxstore.Sandbox) (map[string]string, error) {
+	si := &base.SandboxInfo{
+		Pid:            sandbox.Status.Get().Pid,
+		Config:         sandbox.Config,
+		RuntimeHandler: sandbox.RuntimeHandler,
+		CNIResult:      sandbox.CNIResult,
+	}
+
+	// If processStatus is empty, it means that the task is deleted. Apply "deleted"
+	// status which does not exist in containerd.
+	si.Status = "deleted"
+
+	if sandbox.NetNS != nil {
+		// Add network closed information if sandbox is not using host network.
+		closed, err := sandbox.NetNS.Closed()
+		if err != nil {
+			return nil, fmt.Errorf("failed to check network namespace closed: %w", err)
+		}
+		si.NetNSClosed = closed
+	}
+
+	si.Metadata = &sandbox.Metadata
+
+	infoBytes, err := json.Marshal(si)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal info %v: %w", si, err)
+	}
+
+	return map[string]string{
+		"info": string(infoBytes),
+	}, nil
 }

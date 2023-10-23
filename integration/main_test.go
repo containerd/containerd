@@ -34,16 +34,6 @@ import (
 	"testing"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
-	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
-	"github.com/containerd/containerd/v2/integration/remote"
-	dialer "github.com/containerd/containerd/v2/integration/remote/util"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/log"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
@@ -52,6 +42,17 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/containers"
+	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
+	"github.com/containerd/containerd/v2/integration/remote"
+	dialer "github.com/containerd/containerd/v2/integration/remote/util"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
 const (
@@ -676,7 +677,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *base.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -689,7 +690,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, err
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info server.SandboxInfo
+	var info base.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}

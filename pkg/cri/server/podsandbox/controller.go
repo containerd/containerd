@@ -34,8 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
-	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/platforms"
@@ -116,8 +116,6 @@ type Controller struct {
 	client *containerd.Client
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
-	// sandboxStore stores all resources associated with sandboxes.
-	sandboxStore *sandboxstore.Store
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// cri is CRI service that provides missing gaps needed by controller.
@@ -129,11 +127,9 @@ type Controller struct {
 }
 
 func (c *Controller) Init(
-	sandboxStore *sandboxstore.Store,
 	cri CRIService,
 ) {
 	c.cri = cri
-	c.sandboxStore = sandboxStore
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
@@ -143,63 +139,46 @@ func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (platform
 }
 
 func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitStatus, error) {
-	status := c.store.Get(sandboxID)
-	if status == nil {
+	podSandbox := c.store.Get(sandboxID)
+	if podSandbox == nil {
 		return sandbox.ExitStatus{}, fmt.Errorf("failed to get exit channel. %q", sandboxID)
+
 	}
-
-	exitStatus, exitedAt, err := c.waitSandboxExit(ctx, sandboxID, status.Waiter)
-
+	exit, err := podSandbox.Wait(ctx)
+	if err != nil {
+		return sandbox.ExitStatus{}, fmt.Errorf("failed to wait pod sandbox, %w", err)
+	}
 	return sandbox.ExitStatus{
-		ExitStatus: exitStatus,
-		ExitedAt:   exitedAt,
+		ExitStatus: exit.ExitCode(),
+		ExitedAt:   exit.ExitTime(),
 	}, err
+
 }
 
-func (c *Controller) waitSandboxExit(ctx context.Context, id string, exitCh <-chan containerd.ExitStatus) (exitStatus uint32, exitedAt time.Time, err error) {
-	exitStatus = unknownExitCode
-	exitedAt = time.Now()
+func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) (exitStatus uint32, exitedAt time.Time, err error) {
 	select {
-	case exitRes := <-exitCh:
-		log.G(ctx).Debugf("received sandbox exit %+v", exitRes)
-
-		exitStatus, exitedAt, err = exitRes.Result()
+	case e := <-exitCh:
+		exitStatus, exitedAt, err = e.Result()
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to get task exit status for %q", id)
+			log.G(ctx).WithError(err).Errorf("failed to get task exit status for %q", p.ID)
 			exitStatus = unknownExitCode
 			exitedAt = time.Now()
 		}
-
-		err = func() error {
-			dctx := ctrdutil.NamespacedContext()
-			dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
-			defer dcancel()
-
-			sb, err := c.sandboxStore.Get(id)
-			if err == nil {
-				if err := handleSandboxExit(dctx, sb, &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}); err != nil {
-					return err
-				}
-				return nil
-			} else if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("failed to get sandbox %s: %w", id, err)
-			}
-			return nil
-		}()
-		if err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to handle sandbox TaskExit %s", id)
-			// Don't backoff, the caller is responsible for.
-			return
+		dctx := ctrdutil.NamespacedContext()
+		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
+		defer dcancel()
+		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
+		if cleanErr := handleSandboxTaskExit(dctx, p, event); cleanErr != nil {
+			c.cri.BackOffEvent(p.ID, e)
 		}
+		return
 	case <-ctx.Done():
-		return exitStatus, exitedAt, ctx.Err()
+		return unknownExitCode, time.Now(), ctx.Err()
 	}
-	return
 }
 
-// handleSandboxExit handles TaskExit event for sandbox.
-// TODO https://github.com/containerd/containerd/issues/7548
-func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, e *eventtypes.TaskExit) error {
+// handleSandboxTaskExit handles TaskExit event for sandbox.
+func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
@@ -212,17 +191,7 @@ func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, e *eventtyp
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}
-			// Move on to make sure container status is updated.
 		}
 	}
-	sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
-		status.State = sandboxstore.StateNotReady
-		status.Pid = 0
-		status.ExitStatus = e.ExitStatus
-		status.ExitedAt = e.ExitedAt.AsTime()
-		return status, nil
-	})
-	// Using channel to propagate the information of sandbox stop
-	sb.Stop()
 	return nil
 }

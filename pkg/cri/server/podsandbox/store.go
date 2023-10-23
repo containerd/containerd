@@ -17,33 +17,40 @@
 package podsandbox
 
 import (
+	"fmt"
 	"sync"
 
-	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 )
 
-type Status struct {
-	Waiter <-chan containerd.ExitStatus
-}
-
 type Store struct {
-	sync.Map
+	m sync.Map
 }
 
 func NewStore() *Store {
 	return &Store{}
 }
 
-func (s *Store) Save(id string, exitCh <-chan containerd.ExitStatus) {
-	s.Store(id, &Status{Waiter: exitCh})
+func (s *Store) Save(p *types.PodSandbox) error {
+	if p == nil {
+		return fmt.Errorf("pod sandbox should not be nil")
+	}
+	s.m.Store(p.ID, p)
+	return nil
 }
 
-func (s *Store) Get(id string) *Status {
-	i, ok := s.LoadAndDelete(id)
+func (s *Store) Get(id string) *types.PodSandbox {
+	i, ok := s.m.Load(id)
 	if !ok {
-		// not exist
 		return nil
 	}
-	// Only save *Status
-	return i.(*Status)
+	return i.(*types.PodSandbox)
+}
+
+func (s *Store) Remove(id string) *types.PodSandbox {
+	i, ok := s.m.LoadAndDelete(id)
+	if !ok {
+		return nil
+	}
+	return i.(*types.PodSandbox)
 }
