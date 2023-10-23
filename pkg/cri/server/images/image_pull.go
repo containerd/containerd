@@ -46,6 +46,9 @@ import (
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/pkg/cri/labels"
 	snpkg "github.com/containerd/containerd/pkg/snapshotters"
+	tximage "github.com/containerd/containerd/pkg/transfer/image"
+	txregistry "github.com/containerd/containerd/pkg/transfer/registry"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/tracing"
@@ -156,7 +159,8 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	var image containerd.Image
 
 	if imageTransferService != "" {
-		return nil, fmt.Errorf("no support of pulling image %q by image transfer service %s", ref, imageTransferService)
+		// TODO (Gerry Liu): support of Schema1 and encrypted images.
+		image, err = c.transferImage(pctx, r, ref, imageTransferService, snapshotter, labels, pullReporter)
 	} else {
 		var (
 			resolver = docker.NewResolver(docker.ResolverOptions{
@@ -242,6 +246,30 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
 	return &runtime.PullImageResponse{ImageRef: imageID}, nil
+}
+
+func (c *CRIImageService) transferImage(ctx context.Context, r *runtime.PullImageRequest,
+	ref, transferService, snapshotter string, labels map[string]string,
+	pullReporter *pullProgressReporter) (image containerd.Image, err error) {
+	isOpts := []tximage.StoreOpt{
+		tximage.WithImageLabels(labels),
+		tximage.WithPlatforms(platforms.DefaultSpec()),
+		tximage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+	}
+	is := tximage.NewStore(ref, isOpts...)
+	reg := txregistry.NewOCIRegistry(ref, c.config.Registry.Headers, &cisAuth{cis: c, auth: r.GetAuth()})
+
+	err = c.client.Transfer(ctx, reg, is)
+	if err != nil {
+		return nil, err
+	}
+
+	im, err := is.Get(ctx, c.imageStore.ImageStore())
+	if err != nil {
+		return nil, err
+	}
+
+	return containerd.NewImage(c.client, im), nil
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -836,4 +864,31 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 func (c *CRIImageService) transferServiceFromPodSandboxConfig(ctx context.Context, imageRef string,
 	s *runtime.PodSandboxConfig) (string, error) {
 	return "", nil
+}
+
+type cisAuth struct {
+	auth *runtime.AuthConfig
+	cis  *CRIImageService
+}
+
+func (a *cisAuth) GetCredentials(ctx context.Context, ref, host string) (txregistry.Credentials, error) {
+	hostauth := a.auth
+	if hostauth == nil {
+		config := a.cis.config.Registry.Configs[host]
+		if config.Auth != nil {
+			hostauth = toRuntimeAuthConfig(*config.Auth)
+		}
+	}
+
+	user, pw, err := ParseAuth(hostauth, host)
+	if err != nil {
+		return txregistry.Credentials{}, err
+
+	}
+
+	return txregistry.Credentials{
+		Host:     host,
+		Username: user,
+		Secret:   pw,
+	}, nil
 }

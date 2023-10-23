@@ -205,6 +205,11 @@ func (s *Store) List() []Image {
 	return s.store.list()
 }
 
+// Get the underlying image store.
+func (s *Store) ImageStore() images.Store {
+	return s.images
+}
+
 type store struct {
 	lock      sync.RWMutex
 	images    map[string]Image
