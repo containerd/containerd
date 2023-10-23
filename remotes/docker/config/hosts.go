@@ -100,12 +100,22 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				hosts[len(hosts)-1].host = "registry-1.docker.io"
 			} else if docker.IsLocalhost(host) {
 				hosts[len(hosts)-1].host = host
-				if options.DefaultScheme == "" || options.DefaultScheme == "http" {
-					hosts[len(hosts)-1].scheme = "http"
+				if options.DefaultScheme == "" {
+					_, port, _ := net.SplitHostPort(host)
+					if port == "" || port == "443" {
+						// If port is default or 443, only use https
+						hosts[len(hosts)-1].scheme = "https"
+					} else {
+						// HTTP fallback logic will be used when protocol is ambiguous
+						hosts[len(hosts)-1].scheme = "http"
+					}
 
-					// Skipping TLS verification for localhost
-					var skipVerify = true
-					hosts[len(hosts)-1].skipVerify = &skipVerify
+					// When port is 80, protocol is not ambiguous
+					if port != "80" {
+						// Skipping TLS verification for localhost
+						var skipVerify = true
+						hosts[len(hosts)-1].skipVerify = &skipVerify
+					}
 				} else {
 					hosts[len(hosts)-1].scheme = options.DefaultScheme
 				}
@@ -121,13 +131,13 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			hosts[len(hosts)-1].capabilities = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
 		}
 
-		// explicitTLS indicates that TLS was explicitly configured and HTTP endpoints should
+		// tlsConfigured indicates that TLS was configured and HTTP endpoints should
 		// attempt to use the TLS configuration before falling back to HTTP
-		var explicitTLS bool
+		var tlsConfigured bool
 
 		var defaultTLSConfig *tls.Config
 		if options.DefaultTLS != nil {
-			explicitTLS = true
+			tlsConfigured = true
 			defaultTLSConfig = options.DefaultTLS
 		} else {
 			defaultTLSConfig = &tls.Config{}
@@ -166,7 +176,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
-			explicitTLS := explicitTLS
+			explicitTLS := tlsConfigured
 
 			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
 				explicitTLS = true
@@ -232,13 +242,19 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 				rhosts[i].Authorizer = authorizer
 			}
 
-			// When TLS has been explicitly configured for the operation or host, use the
-			// docker.HTTPFallback roundtripper to catch TLS errors and re-attempt the request as http.
-			// This allows preference for https when configured but also catches TLS errors early enough
-			// in the request to avoid sending the request twice or consuming the request body.
+			// When TLS has been configured for the operation or host and
+			// the protocol from the port number is ambiguous, use the
+			// docker.HTTPFallback roundtripper to catch TLS errors and re-attempt the
+			// request as http. This allows preference for https when configured but
+			// also catches TLS errors early enough in the request to avoid sending
+			// the request twice or consuming the request body.
 			if host.scheme == "http" && explicitTLS {
-				host.scheme = "https"
-				rhosts[i].Client.Transport = docker.HTTPFallback{RoundTripper: rhosts[i].Client.Transport}
+				_, port, _ := net.SplitHostPort(host.host)
+				if port != "" && port != "80" {
+					log.G(ctx).WithField("host", host.host).Info("host will try HTTPS first since it is configured for HTTP with a TLS configuration, consider changing host to HTTPS or removing unused TLS configuration")
+					host.scheme = "https"
+					rhosts[i].Client.Transport = docker.HTTPFallback{RoundTripper: rhosts[i].Client.Transport}
+				}
 			}
 
 			rhosts[i].Scheme = host.scheme
