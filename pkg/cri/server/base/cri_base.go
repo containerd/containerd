@@ -17,29 +17,34 @@
 package base
 
 import (
+	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/containerd/containerd"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/v2/oci"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/plugins"
+	srvconfig "github.com/containerd/containerd/v2/services/server/config"
+	"github.com/containerd/containerd/v2/services/warning"
 )
 
 // CRIBase contains common dependencies for CRI's runtime, image, and podsandbox services.
 type CRIBase struct {
 	// Config contains all configurations.
 	Config criconfig.Config
-	// Client is an instance of the containerd client
-	Client *containerd.Client
+	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
+	BaseOCISpecs map[string]*oci.Spec
 }
 
 func init() {
@@ -47,13 +52,23 @@ func init() {
 
 	// Base plugin that other CRI services depend on.
 	registry.Register(&plugin.Registration{
-		Type:   plugins.GRPCPlugin,
+		Type:   plugins.InternalPlugin,
 		ID:     "cri",
 		Config: &config,
 		Requires: []plugin.Type{
-			plugins.EventPlugin,
-			plugins.ServicePlugin,
-			plugins.NRIApiPlugin,
+			plugins.WarningPlugin,
+		},
+		ConfigMigration: func(ctx context.Context, version int, plugins map[string]interface{}) error {
+			if version >= srvconfig.CurrentConfigVersion {
+				return nil
+			}
+			c, ok := plugins["io.containerd.grpc.v1.cri"]
+			if !ok {
+				return nil
+			}
+			conf := c.(map[string]interface{})
+			plugins["io.containerd.internal.v1.cri"] = conf
+			return nil
 		},
 		InitFn: initCRIBase,
 	})
@@ -64,8 +79,17 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
+	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
+	} else if len(warnings) > 0 {
+		ws, err := ic.GetSingle(plugins.WarningPlugin)
+		if err != nil {
+			return nil, err
+		}
+		warn := ws.(warning.Service)
+		for _, w := range warnings {
+			warn.Emit(ctx, w)
+		}
 	}
 
 	c := criconfig.Config{
@@ -82,21 +106,53 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
 	}
 
-	log.G(ctx).Info("Connect containerd service")
-	client, err := containerd.New(
-		"",
-		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
-		containerd.WithDefaultPlatform(platforms.Default()),
-		containerd.WithInMemoryServices(ic),
-	)
+	ociSpec, err := loadBaseOCISpecs(&c)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create containerd client: %w", err)
+		return nil, fmt.Errorf("failed to create load basic oci spec: %w", err)
 	}
 
 	return &CRIBase{
-		Config: c,
-		Client: client,
+		Config:       c,
+		BaseOCISpecs: ociSpec,
 	}, nil
+}
+
+func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
+	specs := map[string]*oci.Spec{}
+	for _, cfg := range config.Runtimes {
+		if cfg.BaseRuntimeSpec == "" {
+			continue
+		}
+
+		// Don't load same file twice
+		if _, ok := specs[cfg.BaseRuntimeSpec]; ok {
+			continue
+		}
+
+		spec, err := loadOCISpec(cfg.BaseRuntimeSpec)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load base OCI spec from file: %s: %w", cfg.BaseRuntimeSpec, err)
+		}
+
+		specs[cfg.BaseRuntimeSpec] = spec
+	}
+
+	return specs, nil
+}
+
+func loadOCISpec(filename string) (*oci.Spec, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open base OCI spec: %s: %w", filename, err)
+	}
+	defer file.Close()
+
+	spec := oci.Spec{}
+	if err := json.NewDecoder(file).Decode(&spec); err != nil {
+		return nil, fmt.Errorf("failed to parse base OCI spec file: %w", err)
+	}
+
+	return &spec, nil
 }
 
 // Set glog level.
