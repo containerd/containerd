@@ -126,26 +126,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 		return nil, fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
-	var (
-		pctx, pcancel = context.WithCancel(ctx)
-
-		pullReporter = newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
-
-		resolver = docker.NewResolver(docker.ResolverOptions{
-			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth(), pullReporter.optionUpdateClient),
-		})
-		isSchema1    bool
-		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
-			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-				isSchema1 = true
-			}
-			return nil, nil
-		}
-	)
-
+	pctx, pcancel := context.WithCancel(ctx)
 	defer pcancel()
+	pullReporter := newPullProgressReporter(ref, pcancel, imagePullProgressTimeout)
+
 	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
 	if err != nil {
 		return nil, err
@@ -156,35 +140,67 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 		tracing.Attribute("snapshotter.name", snapshotter),
 	)
 
+	imageTransferService, err := c.transferServiceFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
+	if err != nil {
+		return nil, err
+	}
+	if imageTransferService != "" {
+		log.G(ctx).Debugf("PullImage %q with image transfer service %s", ref, imageTransferService)
+		span.SetAttributes(
+			tracing.Attribute("transfer.name", imageTransferService),
+		)
+	}
+
 	labels := c.getLabels(ctx, ref)
+	isSchema1 := false
+	var image containerd.Image
 
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabels(labels),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
-		containerd.WithUnpackOpts([]containerd.UnpackOpt{
-			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
-		}),
+	if imageTransferService != "" {
+		return nil, fmt.Errorf("no support of pulling image %q by image transfer service %s", ref, imageTransferService)
+	} else {
+		var (
+			resolver = docker.NewResolver(docker.ResolverOptions{
+				Headers: c.config.Registry.Headers,
+				Hosts:   c.registryHosts(ctx, r.GetAuth(), pullReporter.optionUpdateClient),
+			})
+			imageHandler containerdimages.HandlerFunc = func(_ context.Context,
+				desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+				if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
+					isSchema1 = true
+				}
+				return nil, nil
+			}
+		)
+
+		pullOpts := []containerd.RemoteOpt{
+			containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+			containerd.WithResolver(resolver),
+			containerd.WithPullSnapshotter(snapshotter),
+			containerd.WithPullLabels(labels),
+			containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+			containerd.WithImageHandler(imageHandler),
+			containerd.WithPullUnpack,
+			containerd.WithUnpackOpts([]containerd.UnpackOpt{
+				containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+			}),
+		}
+
+		pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+		if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
+			pullOpts = append(pullOpts,
+				containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
+		}
+
+		if c.config.ContainerdConfig.DiscardUnpackedLayers {
+			// Allows GC to clean layers up from the content store after unpacking
+			pullOpts = append(pullOpts,
+				containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+		}
+
+		pullReporter.start(pctx)
+		image, err = c.client.Pull(pctx, ref, pullOpts...)
 	}
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
-	}
-
-	if c.config.ContainerdConfig.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
-
-	pullReporter.start(pctx)
-	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
@@ -815,4 +831,9 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 	}
 
 	return false
+}
+
+func (c *CRIImageService) transferServiceFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig) (string, error) {
+	return "", nil
 }
