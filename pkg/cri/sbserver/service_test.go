@@ -17,12 +17,17 @@
 package sbserver
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"testing"
 
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -99,4 +104,58 @@ func TestValidateMode(t *testing.T) {
 
 	mode = "nonexistent"
 	assert.Error(t, ValidateMode(mode))
+}
+
+func Test_loadBaseOCISpecs(t *testing.T) {
+	spec := oci.Spec{
+		Version:  "1.0.2",
+		Hostname: "default",
+		Process: &specs.Process{
+			Capabilities: &specs.LinuxCapabilities{
+				Inheritable: []string{"CAP_NET_RAW"},
+			},
+		},
+	}
+	file, err := os.CreateTemp("", "spec-test-")
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, file.Close())
+		assert.NoError(t, os.RemoveAll(file.Name()))
+	}()
+	err = json.NewEncoder(file).Encode(&spec)
+	require.NoError(t, err)
+	config := criconfig.Config{}
+	config.Runtimes = map[string]criconfig.Runtime{
+		"runc": {BaseRuntimeSpec: file.Name()},
+	}
+	var buffer bytes.Buffer
+	logger := &logrus.Logger{
+		Out:          &buffer,
+		Formatter:    new(logrus.TextFormatter),
+		Hooks:        make(logrus.LevelHooks),
+		Level:        logrus.InfoLevel,
+		ExitFunc:     os.Exit,
+		ReportCaller: false,
+	}
+	log.L = logrus.NewEntry(logger)
+	tests := []struct {
+		name    string
+		args    *criconfig.Config
+		message string
+	}{
+		{
+			name:    "args is not nil,print warning",
+			args:    &config,
+			message: "Provided base runtime spec includes inheritable capabilities, which may be unsafe. See CVE-2022-24769 for more details.",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			loadBaseOCISpecs(tt.args)
+			readAll, _ := io.ReadAll(&buffer)
+			if tt.message != "" {
+				assert.Contains(t, string(readAll), tt.message)
+			}
+		})
+	}
 }
