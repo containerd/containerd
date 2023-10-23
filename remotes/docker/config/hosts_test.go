@@ -295,27 +295,190 @@ func TestLoadCertFiles(t *testing.T) {
 	}
 }
 
-func TestLocalhostHTTPFallback(t *testing.T) {
-	opts := HostOptions{
-		DefaultTLS: &tls.Config{
-			InsecureSkipVerify: true,
+func TestHTTPFallback(t *testing.T) {
+	for _, tc := range []struct {
+		host           string
+		opts           HostOptions
+		expectedScheme string
+		usesFallback   bool
+	}{
+		{
+			host: "localhost:8080",
+			opts: HostOptions{
+				DefaultScheme: "http",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "https",
+			usesFallback:   true,
 		},
-	}
-	hosts := ConfigureHosts(context.TODO(), opts)
+		{
+			host: "localhost:8080",
+			opts: HostOptions{
+				DefaultScheme: "https",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host:           "localhost:8080",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   true,
+		},
+		{
+			host:           "localhost:80",
+			opts:           HostOptions{},
+			expectedScheme: "http",
+			usesFallback:   false,
+		},
+		{
+			host:           "localhost:443",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host: "localhost:80",
+			opts: HostOptions{
+				DefaultScheme: "http",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "http",
+			usesFallback:   false,
+		},
+		{
+			host: "localhost",
+			opts: HostOptions{
+				DefaultScheme: "http",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "http",
+			usesFallback:   false,
+		},
+		{
+			host: "localhost",
+			opts: HostOptions{
+				DefaultScheme: "https",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host:           "localhost",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host:           "localhost:5000",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   true,
+		},
+		{
+			host:           "example.com",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
 
-	testHosts, err := hosts("localhost:8080")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(testHosts) != 1 {
-		t.Fatalf("expected a single host for localhost config, got %d hosts", len(testHosts))
-	}
-	if testHosts[0].Scheme != "https" {
-		t.Fatalf("expected https scheme for localhost with tls config, got %q", testHosts[0].Scheme)
-	}
-	_, ok := testHosts[0].Client.Transport.(docker.HTTPFallback)
-	if !ok {
-		t.Fatal("expected http fallback configured for defaulted localhost endpoint")
+		{
+			host: "example.com",
+			opts: HostOptions{
+				DefaultScheme: "http",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "http",
+			usesFallback:   false,
+		},
+		{
+			host: "example.com:5000",
+			opts: HostOptions{
+				DefaultScheme: "http",
+				DefaultTLS: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+			expectedScheme: "https",
+			usesFallback:   true,
+		},
+		{
+			host:           "example.com:5000",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host: "example2.com",
+			opts: HostOptions{
+				DefaultScheme: "http",
+			},
+			expectedScheme: "http",
+			usesFallback:   false,
+		},
+		{
+			host:           "127.0.0.254:5000",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   true,
+		},
+		{
+			host:           "127.0.0.254",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+		{
+			host:           "[::1]:5000",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   true,
+		},
+		{
+			host:           "::1",
+			opts:           HostOptions{},
+			expectedScheme: "https",
+			usesFallback:   false,
+		},
+	} {
+		testName := tc.host
+		if tc.opts.DefaultScheme != "" {
+			testName = testName + "-default-" + tc.opts.DefaultScheme
+		}
+		t.Run(testName, func(t *testing.T) {
+			ctx := logtest.WithT(context.TODO(), t)
+			hosts := ConfigureHosts(ctx, tc.opts)
+			testHosts, err := hosts(tc.host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(testHosts) != 1 {
+				t.Fatalf("expected a single host for localhost config, got %d hosts", len(testHosts))
+			}
+			if testHosts[0].Scheme != tc.expectedScheme {
+				t.Fatalf("expected %s scheme for localhost with tls config, got %q", tc.expectedScheme, testHosts[0].Scheme)
+			}
+			_, ok := testHosts[0].Client.Transport.(docker.HTTPFallback)
+			if tc.usesFallback && !ok {
+				t.Fatal("expected http fallback configured for defaulted localhost endpoint")
+			} else if ok && !tc.usesFallback {
+				t.Fatal("expected no http fallback configured for defaulted localhost endpoint")
+			}
+		})
 	}
 }
 
