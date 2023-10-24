@@ -329,6 +329,9 @@ type PluginConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
+
+	// CustomUnpackMaps is a map of custom unpacking functions.
+	CustomUnpackMaps map[string]bool `toml:"custom_unpack_maps" json:"customUnpackMaps"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

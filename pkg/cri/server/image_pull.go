@@ -181,6 +181,8 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
 
+	pullOpts = append(pullOpts, containerd.WithCustomUnpackMap(c.config.CustomUnpackMaps))
+
 	pullReporter.start(pctx)
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
