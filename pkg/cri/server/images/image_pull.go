@@ -255,6 +255,8 @@ func (c *CRIImageService) transferImage(ctx context.Context, r *runtime.PullImag
 		tximage.WithImageLabels(labels),
 		tximage.WithPlatforms(platforms.DefaultSpec()),
 		tximage.WithUnpack(platforms.DefaultSpec(), snapshotter),
+		tximage.WithDisableSnapshotterAnnotations(c.config.ContainerdConfig.DisableSnapshotAnnotations),
+		tximage.WithDiscardUnpackedLayers(c.config.DiscardUnpackedLayers),
 	}
 	is := tximage.NewStore(ref, isOpts...)
 	reg := txregistry.NewOCIRegistry(ref, c.config.Registry.Headers, &cisAuth{cis: c, auth: r.GetAuth()})

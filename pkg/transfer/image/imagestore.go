@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
+	snpkg "github.com/containerd/containerd/pkg/snapshotters"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
@@ -42,12 +43,14 @@ func init() {
 }
 
 type Store struct {
-	imageName     string
-	imageLabels   map[string]string
-	platforms     []ocispec.Platform
-	allMetadata   bool
-	labelMap      func(ocispec.Descriptor) []string
-	manifestLimit int
+	imageName                  string
+	imageLabels                map[string]string
+	platforms                  []ocispec.Platform
+	allMetadata                bool
+	disableSnapshotAnnotations bool
+	discardUnpackedLayers      bool
+	labelMap                   func(ocispec.Descriptor) []string
+	manifestLimit              int
 
 	// extraReferences are used to store or lookup multiple references
 	extraReferences []Reference
@@ -171,6 +174,20 @@ func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
 	}
 }
 
+// Enable or disable passing snapshotter specific annnotations to snapshotters.
+func WithDisableSnapshotterAnnotations(disableSnapshotterAnnotations bool) StoreOpt {
+	return func(s *Store) {
+		s.disableSnapshotAnnotations = disableSnapshotterAnnotations
+	}
+}
+
+// Allow GC to remove layers from the content store after successfully unpacking these layers to the snapshotter.
+func WithDiscardUnpackedLayers(discardUnpackedLayer bool) StoreOpt {
+	return func(s *Store) {
+		s.discardUnpackedLayers = discardUnpackedLayer
+	}
+}
+
 // NewStore creates a new image store source or Destination
 func NewStore(image string, opts ...StoreOpt) *Store {
 	s := &Store{
@@ -195,7 +212,11 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 	} else {
 		p = platforms.Ordered(is.platforms...)
 	}
-	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
+	if is.labelMap == nil && is.discardUnpackedLayers {
+		h = images.SetChildrenMappedLabels(cs, h, images.ChildGCLabelsFilterLayers)
+	} else {
+		h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
+	}
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest
 		// and configuration for not-target platforms
@@ -357,15 +378,25 @@ func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	return unpacks
 }
 
+func (is *Store) WrapFetcherHandler(handler images.Handler) images.Handler {
+	if !is.disableSnapshotAnnotations {
+		handler = snpkg.AppendInfoHandlerWrapper(is.imageName)(handler)
+	}
+
+	return handler
+}
+
 func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
 	s := &transfertypes.ImageStore{
-		Name:            is.imageName,
-		Labels:          is.imageLabels,
-		ManifestLimit:   uint32(is.manifestLimit),
-		AllMetadata:     is.allMetadata,
-		Platforms:       types.OCIPlatformToProto(is.platforms),
-		ExtraReferences: referencesToProto(is.extraReferences),
-		Unpacks:         unpackToProto(is.unpacks),
+		Name:                          is.imageName,
+		Labels:                        is.imageLabels,
+		ManifestLimit:                 uint32(is.manifestLimit),
+		AllMetadata:                   is.allMetadata,
+		Platforms:                     types.OCIPlatformToProto(is.platforms),
+		ExtraReferences:               referencesToProto(is.extraReferences),
+		Unpacks:                       unpackToProto(is.unpacks),
+		DisableSnapshotterAnnotations: is.disableSnapshotAnnotations,
+		DiscardUnpackedLayers:         is.discardUnpackedLayers,
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -383,6 +414,8 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.platforms = types.OCIPlatformFromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
+	is.disableSnapshotAnnotations = s.DisableSnapshotterAnnotations
+	is.discardUnpackedLayers = s.DiscardUnpackedLayers
 
 	return nil
 }

@@ -98,6 +98,7 @@ type ImageExportStreamer interface {
 
 type ImageUnpacker interface {
 	UnpackPlatforms() []UnpackConfiguration
+	WrapFetcherHandler(images.Handler) images.Handler
 }
 
 // UnpackConfiguration specifies the platform and snapshotter to use for resolving
