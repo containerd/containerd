@@ -13,7 +13,7 @@ linters:
     - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
     - unused
-    - vet
+    - govet
     - dupword # Checks for duplicate words in the source code
   disable:
     - errcheck
@@ -72,9 +72,7 @@ linters-settings:
       - G402
       - G404
 
-run:
-  timeout: 8m
-  skip-dirs:
+  exclude-dirs:
     - api
     - cluster
     - design
@@ -83,3 +81,6 @@ run:
     - releases
     - reports
     - test # e2e scripts
+
+run:
+  timeout: 8m
