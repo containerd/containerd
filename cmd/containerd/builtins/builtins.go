@@ -18,6 +18,7 @@ package builtins
 
 // register containerd builtins here
 import (
+	_ "github.com/containerd/containerd/diff/erofs"
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	_ "github.com/containerd/containerd/events/plugin"
 	_ "github.com/containerd/containerd/gc/scheduler"

@@ -44,7 +44,7 @@ import (
 // Command is the cli command for managing snapshots
 var Command = cli.Command{
 	Name:    "snapshots",
-	Aliases: []string{"snapshot"},
+	Aliases: []string{"snapshot", "sn"},
 	Usage:   "Manage snapshots",
 	Flags:   commands.SnapshotterFlags,
 	Subcommands: cli.Commands{

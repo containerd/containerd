@@ -64,6 +64,7 @@ type unpackerConfig struct {
 
 	limiter               *semaphore.Weighted
 	duplicationSuppressor kmutex.KeyedLocker
+	customUnpacker        bool
 }
 
 // Platform represents a platform-specific unpack configuration which includes
@@ -102,6 +103,14 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 
 		c.platforms = append(c.platforms, &u)
 
+		return nil
+	})
+}
+
+// WithCustomUnpacker sets `CustomUnpacker` on the UnpackConfig.
+func WithCustomUnpacker() UnpackerOpt {
+	return UnpackerOpt(func(c *unpackerConfig) error {
+		c.customUnpacker = true
 		return nil
 	})
 }
@@ -283,6 +292,8 @@ func (u *Unpacker) unpack(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	eg, egctx := errgroup.WithContext(ctx)
+
 	doUnpackFn := func(i int, desc ocispec.Descriptor) error {
 		parent := identity.ChainID(chain)
 		chain = append(chain, diffIDs[i])
@@ -348,8 +359,45 @@ func (u *Unpacker) unpack(
 			}
 		}
 
-		if fetchErr == nil {
-			fetchErr = make(chan error, 1)
+		log.G(ctx).Infof("handling layer %v %v %v", desc.Digest, u.customUnpacker, mounts)
+		if !u.customUnpacker {
+			if fetchErr == nil {
+				fetchErr = make(chan error, 1)
+				fetchOffset = i
+				fetchC = make([]chan struct{}, len(layers)-fetchOffset)
+				for i := range fetchC {
+					fetchC[i] = make(chan struct{})
+				}
+
+				go func(i int) {
+					err := u.fetch(ctx, h, layers[i:], fetchC, a, mounts, unpack.ApplyOpts, eg, egctx, u.customUnpacker, diffIDs[i].String(), cs)
+					if err != nil {
+						fetchErr <- err
+					}
+					close(fetchErr)
+				}(i)
+			}
+			select {
+			case <-ctx.Done():
+				cleanup.Do(ctx, abort)
+				return ctx.Err()
+			case err := <-fetchErr:
+				if err != nil {
+					cleanup.Do(ctx, abort)
+					return err
+				}
+			case <-fetchC[i-fetchOffset]:
+			}
+			diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
+			if err != nil {
+				cleanup.Do(ctx, abort)
+				return fmt.Errorf("failed to extract layer %s: %w", diffIDs[i], err)
+			}
+			if diff.Digest != diffIDs[i] {
+				cleanup.Do(ctx, abort)
+				return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
+			}
+		} else {
 			fetchOffset = i
 			fetchC = make([]chan struct{}, len(layers)-fetchOffset)
 			for i := range fetchC {
@@ -357,34 +405,8 @@ func (u *Unpacker) unpack(
 			}
 
 			go func(i int) {
-				err := u.fetch(ctx, h, layers[i:], fetchC)
-				if err != nil {
-					fetchErr <- err
-				}
-				close(fetchErr)
+				u.fetch(ctx, h, layers[i:], fetchC, a, mounts, unpack.ApplyOpts, eg, egctx, u.customUnpacker, diffIDs[i].String(), cs)
 			}(i)
-		}
-
-		select {
-		case <-ctx.Done():
-			cleanup.Do(ctx, abort)
-			return ctx.Err()
-		case err := <-fetchErr:
-			if err != nil {
-				cleanup.Do(ctx, abort)
-				return err
-			}
-		case <-fetchC[i-fetchOffset]:
-		}
-
-		diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
-		if err != nil {
-			cleanup.Do(ctx, abort)
-			return fmt.Errorf("failed to extract layer %s: %w", diffIDs[i], err)
-		}
-		if diff.Digest != diffIDs[i] {
-			cleanup.Do(ctx, abort)
-			return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
 		}
 
 		if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
@@ -395,16 +417,18 @@ func (u *Unpacker) unpack(
 			return fmt.Errorf("failed to commit snapshot %s: %w", key, err)
 		}
 
-		// Set the uncompressed label after the uncompressed
-		// digest has been verified through apply.
-		cinfo := content.Info{
-			Digest: desc.Digest,
-			Labels: map[string]string{
-				labels.LabelUncompressed: diff.Digest.String(),
-			},
-		}
-		if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
-			return err
+		if !u.customUnpacker {
+			// Set the uncompressed label after the uncompressed
+			// digest has been verified through apply.
+			cinfo := content.Info{
+				Digest: desc.Digest,
+				Labels: map[string]string{
+					labels.LabelUncompressed: diffIDs[i].String(),
+				},
+			}
+			if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
+				return err
+			}
 		}
 		return nil
 	}
@@ -419,10 +443,12 @@ func (u *Unpacker) unpack(
 		if err := doUnpackFn(i, desc); err != nil {
 			layerSpan.SetStatus(err)
 			layerSpan.End()
-			return err
+			return fmt.Errorf("%v duunpackfunc failed: %w", desc.Digest, err)
 		}
 		layerSpan.End()
 	}
+
+	eg.Wait()
 
 	chainID := identity.ChainID(chain).String()
 	cinfo := content.Info{
@@ -443,9 +469,14 @@ func (u *Unpacker) unpack(
 	return nil
 }
 
-func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}) error {
-	eg, ctx2 := errgroup.WithContext(ctx)
+func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec.Descriptor, done []chan struct{}, a diff.Applier, mounts []mount.Mount, applyOpts []diff.ApplyOpt, eg *errgroup.Group, ctx2 context.Context, customUnpacker bool, diff string, cs content.Store) error {
+	if !customUnpacker {
+		eg, ctx2 = errgroup.WithContext(ctx)
+	} else {
+		layers = layers[:1]
+	}
 	for i, desc := range layers {
+		log.G(ctx).Infof("fetching layer %v", desc.Digest)
 		ctx2, layerSpan := tracing.StartSpan(ctx2, tracing.Name(unpackSpanPrefix, "fetchLayer"))
 		layerSpan.SetAttributes(
 			tracing.Attribute("layer.media.type", desc.MediaType),
@@ -475,12 +506,31 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			}
 			close(done[i])
 
+			if customUnpacker {
+				_, err := a.Apply(ctx, desc, mounts, applyOpts...)
+				if err != nil {
+					return fmt.Errorf("failed to apply layer %s: %w", desc.Digest, err)
+				}
+				// Set the uncompressed label after the uncompressed
+				// digest has been verified through apply.
+				cinfo := content.Info{
+					Digest: desc.Digest,
+					Labels: map[string]string{
+						labels.LabelUncompressed: diff,
+					},
+				}
+				if _, err := cs.Update(ctx, cinfo, "labels."+labels.LabelUncompressed); err != nil {
+					return err
+				}
+			}
 			return nil
 		})
 		layerSpan.End()
 	}
-
-	return eg.Wait()
+	if !customUnpacker {
+		return eg.Wait()
+	}
+	return nil
 }
 
 func (u *Unpacker) acquire(ctx context.Context) error {

@@ -136,6 +136,9 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	sandboxLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, containerKindSandbox)
 
 	snapshotterOpt := []snapshots.Opt{snapshots.WithLabels(snapshots.FilterInheritedLabels(config.Annotations))}
+	snapshotterOpt = append(snapshotterOpt, snapshots.WithLabels(map[string]string{
+		"containerd.io/snapshot/cri.container": id,
+	}))
 	extraSOpts, err := sandboxSnapshotterOpts(config)
 	if err != nil {
 		return cin, err

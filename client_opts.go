@@ -254,3 +254,11 @@ func WithAllMetadata() RemoteOpt {
 		return nil
 	}
 }
+
+// WithCustomUnpackMap sets a map of custom unpacking rules.
+func WithCustomUnpackMap(customMap map[string]bool) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.CustomUnpack = customMap
+		return nil
+	}
+}

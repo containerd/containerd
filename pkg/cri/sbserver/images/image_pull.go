@@ -150,7 +150,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	if err != nil {
 		return nil, err
 	}
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+	log.G(ctx).Infof("PullImage %q with snapshotter %s", ref, snapshotter)
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
@@ -182,6 +182,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 		pullOpts = append(pullOpts,
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
 	}
+	pullOpts = append(pullOpts, containerd.WithCustomUnpackMap(c.config.CustomUnpackMaps))
 
 	pullReporter.start(pctx)
 	image, err := c.client.Pull(pctx, ref, pullOpts...)

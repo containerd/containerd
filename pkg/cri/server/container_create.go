@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/containerd/containerd/snapshots"
 	"path/filepath"
 	goruntime "runtime"
 	"time"
@@ -188,6 +189,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, err
 	}
+	sOpts = append(sOpts, snapshots.WithLabels(map[string]string{
+		"containerd.io/snapshot/cri.container": id,
+	}))
 
 	// Set snapshotter before any other options.
 	opts := []containerd.NewContainerOpts{
