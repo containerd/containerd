@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
@@ -83,6 +84,42 @@ func TestPusherErrClosedRetry(t *testing.T) {
 	reg.uploadable = true
 	if err := tryUpload(ctx, t, p, layerContent); err != nil {
 		t.Errorf("upload should succeed but got %v", err)
+	}
+}
+
+func TestPusherHTTPFallback(t *testing.T) {
+	ctx := logtest.WithT(context.Background(), t)
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+
+	reg.uploadable = true
+	reg.username = "testuser"
+	reg.secret = "testsecret"
+	reg.locationPrefix = p.hosts[0].Scheme + "://" + p.hosts[0].Host
+
+	p.hosts[0].Scheme = "https"
+	client := p.hosts[0].Client
+	if client == nil {
+		clientC := *http.DefaultClient
+		client = &clientC
+	}
+	if client.Transport == nil {
+		client.Transport = http.DefaultTransport
+	}
+	client.Transport = HTTPFallback{client.Transport}
+	p.hosts[0].Client = client
+	phost := p.hosts[0].Host
+	p.hosts[0].Authorizer = NewDockerAuthorizer(WithAuthCreds(func(host string) (string, string, error) {
+		if host == phost {
+			return "testuser", "testsecret", nil
+		}
+		return "", "", nil
+	}))
+
+	layerContent := []byte("test")
+	if err := tryUpload(ctx, t, p, layerContent); err != nil {
+		t.Errorf("upload failed: %v", err)
 	}
 }
 
@@ -189,9 +226,20 @@ type uploadableMockRegistry struct {
 	availableContents []string
 	uploadable        bool
 	putHandlerFunc    func(w http.ResponseWriter, r *http.Request) bool
+	locationPrefix    string
+	username          string
+	secret            string
 }
 
 func (u *uploadableMockRegistry) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if u.secret != "" {
+		user, pass, ok := r.BasicAuth()
+		if !ok || user != u.username || pass != u.secret {
+			w.Header().Add("WWW-Authenticate", "basic realm=test")
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+	}
 	if r.Method == http.MethodPut && u.putHandlerFunc != nil {
 		// if true return the response witout calling default handler
 		if u.putHandlerFunc(w, r) {
@@ -205,9 +253,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 	if r.Method == http.MethodPost {
 		if matches := blobUploadRegexp.FindStringSubmatch(r.URL.Path); len(matches) != 0 {
 			if u.uploadable {
-				w.Header().Set("Location", "/upload")
+				w.Header().Set("Location", u.locationPrefix+"/upload")
 			} else {
-				w.Header().Set("Location", "/cannotupload")
+				w.Header().Set("Location", u.locationPrefix+"/cannotupload")
 			}
 
 			dgstr := digest.Canonical.Digester()
