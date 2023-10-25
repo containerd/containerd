@@ -22,14 +22,7 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	"github.com/containerd/containerd"
-	_ "github.com/containerd/containerd/cmd/containerd/builtins"
 	"github.com/containerd/containerd/namespaces"
-)
-
-const (
-	defaultRoot    = "/var/lib/containerd"
-	defaultState   = "/tmp/containerd"
-	defaultAddress = "/tmp/containerd/containerd.sock"
 )
 
 func fuzzContext() (context.Context, context.CancelFunc) {
