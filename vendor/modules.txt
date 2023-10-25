@@ -1,3 +1,5 @@
+# cloud.google.com/go/compute/metadata v0.2.3
+## explicit; go 1.19
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 ## explicit; go 1.13
 github.com/AdaLogics/go-fuzz-headers
@@ -56,7 +58,7 @@ github.com/blang/semver
 # github.com/cenkalti/backoff/v4 v4.1.2
 ## explicit; go 1.13
 github.com/cenkalti/backoff/v4
-# github.com/cespare/xxhash/v2 v2.1.2
+# github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
 # github.com/cilium/ebpf v0.7.0
@@ -234,7 +236,7 @@ github.com/gogo/protobuf/vanity/command
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
-# github.com/golang/protobuf v1.5.2
+# github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/descriptor
 github.com/golang/protobuf/jsonpb
@@ -415,7 +417,7 @@ go.etcd.io/bbolt
 # go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
 ## explicit; go 1.11
 go.mozilla.org/pkcs7
-# go.opencensus.io v0.23.0
+# go.opencensus.io v0.24.0
 ## explicit; go 1.13
 go.opencensus.io
 go.opencensus.io/internal
@@ -489,12 +491,12 @@ golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
-## explicit; go 1.11
+# golang.org/x/oauth2 v0.10.0
+## explicit; go 1.17
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sync v0.1.0
-## explicit
+# golang.org/x/sync v0.3.0
+## explicit; go 1.17
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 # golang.org/x/sys v0.13.0
@@ -528,14 +530,14 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
+# google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
 ## explicit; go 1.11
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.50.1
-## explicit; go 1.17
+# google.golang.org/grpc v1.58.3
+## explicit; go 1.19
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -568,6 +570,7 @@ google.golang.org/grpc/internal/grpclog
 google.golang.org/grpc/internal/grpcrand
 google.golang.org/grpc/internal/grpcsync
 google.golang.org/grpc/internal/grpcutil
+google.golang.org/grpc/internal/idle
 google.golang.org/grpc/internal/metadata
 google.golang.org/grpc/internal/pretty
 google.golang.org/grpc/internal/resolver
@@ -587,7 +590,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.28.1
+# google.golang.org/protobuf v1.31.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
