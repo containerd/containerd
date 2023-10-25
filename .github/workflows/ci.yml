@@ -244,7 +244,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2019, windows-2022]
+        os: [windows-2022] # windows-2019 is temporarily removed until mingw issue fixed
 
     defaults:
       run:
