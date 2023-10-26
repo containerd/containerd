@@ -23,7 +23,7 @@ import "fmt"
 // Load is currently only implemented on non-static, non-gccgo builds for amd64
 // and arm64, and plugins must be built with the exact same version of Go as
 // containerd itself.
-func Load(path string) (err error) {
+func Load(path string) (loaded int, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			rerr, ok := v.(error)

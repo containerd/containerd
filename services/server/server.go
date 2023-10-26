@@ -34,26 +34,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	csapi "github.com/containerd/containerd/api/services/content/v1"
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
-	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/content/local"
-	csproxy "github.com/containerd/containerd/content/proxy"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/diff"
-	diffproxy "github.com/containerd/containerd/diff/proxy"
-	"github.com/containerd/containerd/pkg/dialer"
-	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/dynamic"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	sbproxy "github.com/containerd/containerd/sandbox/proxy"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	ssproxy "github.com/containerd/containerd/snapshots/proxy"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/docker/go-metrics"
@@ -65,6 +45,29 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+
+	csapi "github.com/containerd/containerd/api/services/content/v1"
+	diffapi "github.com/containerd/containerd/api/services/diff/v1"
+	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
+	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	"github.com/containerd/containerd/content/local"
+	csproxy "github.com/containerd/containerd/content/proxy"
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/diff"
+	diffproxy "github.com/containerd/containerd/diff/proxy"
+	"github.com/containerd/containerd/pkg/deprecation"
+	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/plugin/dynamic"
+	"github.com/containerd/containerd/plugin/registry"
+	"github.com/containerd/containerd/plugins"
+	sbproxy "github.com/containerd/containerd/sandbox/proxy"
+	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/services/warning"
+	ssproxy "github.com/containerd/containerd/snapshots/proxy"
+	"github.com/containerd/containerd/sys"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -330,7 +333,33 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			return nil, err
 		}
 	}
+
+	recordConfigDeprecations(ctx, config, initialized)
 	return s, nil
+}
+
+// recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
+func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
+	// record any detected deprecations without blocking server startup
+	plugin, err := set.GetByID(plugins.WarningPlugin, plugins.DeprecationsPlugin)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	instance, err := plugin.Instance()
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	warn, ok := instance.(warning.Service)
+	if !ok {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations, unexpected plugin type")
+		return
+	}
+
+	if config.PluginDir != "" { //nolint:staticcheck
+		warn.Emit(ctx, deprecation.GoPluginLibrary)
+	}
 }
 
 // Server is the containerd main daemon
@@ -433,13 +462,15 @@ func (s *Server) Wait() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
-	path := config.PluginDir //nolint: staticcheck
+	path := config.PluginDir //nolint:staticcheck
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	log.G(ctx).Warning("`go_plugin` is deprecated, please use `external plugins` instead")
-	if err := dynamic.Load(path); err != nil {
+	if count, err := dynamic.Load(path); err != nil {
 		return nil, err
+	} else if count > 0 || config.PluginDir != "" { //nolint:staticcheck
+		config.PluginDir = path //nolint:staticcheck
+		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
 	}
 	// load additional plugins that don't automatically register themselves
 	registry.Register(&plugin.Registration{
