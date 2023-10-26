@@ -18,12 +18,15 @@ package archive
 
 import (
 	"archive/tar"
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -34,6 +37,7 @@ import (
 	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"golang.org/x/sys/unix"
 )
 
 var bufPool = &sync.Pool{
@@ -149,11 +153,61 @@ func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int
 	if options.Filter == nil {
 		options.Filter = all
 	}
+
 	if options.applyFunc == nil {
-		options.applyFunc = applyNaive
+		if options.UsePreunpackedLayer {
+			options.applyFunc = applyPreunpacked
+		} else {
+			options.applyFunc = applyNaive
+		}
 	}
 
 	return options.applyFunc(ctx, root, r, options)
+}
+
+// The refactored function
+func defaultConvertWhiteout(unpackedPaths map[string]struct{}, whiteoutOpaqueDir string, whiteoutPrefix string) ConvertWhiteout {
+	return func(hdr *tar.Header, path string) (bool, error) {
+		base := filepath.Base(path)
+		dir := filepath.Dir(path)
+
+		if base == whiteoutOpaqueDir {
+			_, err := os.Lstat(dir)
+			if err != nil {
+				return false, err
+			}
+
+			err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					if os.IsNotExist(err) {
+						err = nil // parent was deleted
+					}
+					return err
+				}
+
+				if path == dir {
+					return nil
+				}
+
+				if _, exists := unpackedPaths[path]; !exists {
+					err := os.RemoveAll(path)
+					return err
+				}
+
+				return nil
+			})
+			return false, err
+		}
+
+		if strings.HasPrefix(base, whiteoutPrefix) {
+			originalBase := base[len(whiteoutPrefix):]
+			originalPath := filepath.Join(dir, originalBase)
+
+			return false, os.RemoveAll(originalPath)
+		}
+
+		return true, nil
+	}
 }
 
 // applyNaive applies a tar stream of an OCI style diff tar to a directory
@@ -173,43 +227,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	)
 
 	if convertWhiteout == nil {
-		// handle whiteouts by removing the target files
-		convertWhiteout = func(hdr *tar.Header, path string) (bool, error) {
-			base := filepath.Base(path)
-			dir := filepath.Dir(path)
-			if base == whiteoutOpaqueDir {
-				_, err := os.Lstat(dir)
-				if err != nil {
-					return false, err
-				}
-				err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-					if err != nil {
-						if os.IsNotExist(err) {
-							err = nil // parent was deleted
-						}
-						return err
-					}
-					if path == dir {
-						return nil
-					}
-					if _, exists := unpackedPaths[path]; !exists {
-						err := os.RemoveAll(path)
-						return err
-					}
-					return nil
-				})
-				return false, err
-			}
-
-			if strings.HasPrefix(base, whiteoutPrefix) {
-				originalBase := base[len(whiteoutPrefix):]
-				originalPath := filepath.Join(dir, originalBase)
-
-				return false, os.RemoveAll(originalPath)
-			}
-
-			return true, nil
-		}
+		convertWhiteout = defaultConvertWhiteout(unpackedPaths, whiteoutOpaqueDir, whiteoutPrefix)
 	}
 
 	// Iterate through the files in the archive.
@@ -324,6 +342,148 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	}
 
 	return size, nil
+}
+
+// applyPreunpacked applies a preunpacked directory to a directory
+// applying each file as either a whole file or whiteout.
+// See https://github.com/opencontainers/image-spec/blob/main/layer.md#applying-changesets
+func applyPreunpacked(ctx context.Context, root string, r io.Reader, options ApplyOptions) (size int64, err error) {
+	var (
+		// Used for handling opaque directory markers which
+		// may occur out of order
+		unpackedPaths = make(map[string]struct{})
+
+		convertWhiteout = options.ConvertWhiteout
+	)
+
+	log.L.Debug("CONSUMING PREUNPACK: using preunpacked instead of native")
+
+	if convertWhiteout == nil {
+		convertWhiteout = defaultConvertWhiteout(unpackedPaths, whiteoutOpaqueDir, whiteoutPrefix)
+	}
+
+	tmpOverlayfsFolder := "/var/lib/containerd/tmpoverlayfs/blobs/"
+	// TODO: Add to options
+	fsPreUnpackPath := filepath.Join(tmpOverlayfsFolder, options.Desc.Digest.String())
+	if bpInfo, err := os.Stat(fsPreUnpackPath); err != nil || !bpInfo.IsDir() {
+		return 0, err
+	}
+	log.L.Debug("CONSUMING PREUNPACK: using preunpack logic with" + fsPreUnpackPath)
+
+	// The first layer is using a "bind" mode, path is a temp file with different mount point
+	// Rename will return error EXDEV, indicating that "rename() does not work across different mount points"
+	// TODO: Add to options
+	if len(options.Mounts) == 1 && options.Mounts[0].Type == "bind" {
+		root = options.Mounts[0].Source
+	}
+	if err := os.RemoveAll(root); err != nil {
+		log.G(ctx).WithField("tmpFolder", fsPreUnpackPath).WithField("root", root).
+			Error("failed to remove root dir")
+	}
+
+	// TODO: Add duplication logic in fetch()
+	// cp -al: copy a dir recursively using hard links
+	// We could use rename directory if no duplicate layer, but it has some bug for
+	// duplicate layers. Or potentially reuse layers between containers.
+	_, isDup := options.Desc.Annotations["isDuplicateLayer"]
+	if isDup {
+		if err = execCommand(ctx, fmt.Sprintf("cp -al %s %s", fsPreUnpackPath, root)); err != nil {
+			log.G(ctx).WithError(err).Error("failed to cp tmp")
+		}
+	} else {
+		if err = os.Rename(fsPreUnpackPath, root); err != nil {
+			log.G(ctx).WithError(err).Error("failed to rename tmp")
+		}
+	}
+
+	scanner := bufio.NewScanner(r)
+	var sha256sum string
+	if scanner.Scan() {
+		sha256sum = scanner.Text()
+		sha256sum = strings.Split(sha256sum, " ")[0]
+		log.L.Debug("CONSUMING PREUNPACK: sha256sum: " + sha256sum)
+	} else {
+		return 0, fmt.Errorf("no sha256 in .unpack")
+	}
+	var tarSize int
+	if scanner.Scan() {
+		tarSize, err = strconv.Atoi(scanner.Text())
+		if err != nil {
+			return 0, err
+		}
+		log.L.Debug("CONSUMING PREUNPACK: tarSize: " + strconv.Itoa(tarSize))
+	} else {
+		return 0, fmt.Errorf("no tarSize in .unpack %d", tarSize)
+	}
+
+	for scanner.Scan() {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		default:
+		}
+
+		whiteout := scanner.Text()
+
+		path := filepath.Join(root, whiteout)
+		// Naive whiteout convert function which handles whiteout files by
+		// removing the target files.
+		if err := validateWhiteout(path); err != nil {
+			return 0, err
+		}
+		writeFile, err := overlayConvertWhiteout(path)
+		if err != nil {
+			return 0, fmt.Errorf("failed to convert whiteout file %q: %w", path, err)
+		}
+		if !writeFile {
+			// Remove whiteout
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithField("tmpFolder", fsPreUnpackPath).WithField("path", path).
+					Error("failed to remove whiteout path")
+			}
+			continue
+		}
+
+		unpackedPaths[path] = struct{}{}
+
+	}
+	return size, nil
+}
+
+func execCommand(ctx context.Context, cmdStr string) error {
+	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+	out, err := cmd.Output()
+	if err != nil {
+		log.G(ctx).WithField("cmdStr", cmdStr).WithField("out", out).WithField("err", err).Info("Command failed")
+		return fmt.Errorf("Command failed: %s, out: %s, error: %s", cmdStr, out, err)
+	}
+	return nil
+}
+
+// overlayConvertWhiteout converts whiteout files for overlay.
+func overlayConvertWhiteout(path string) (bool, error) {
+	base := filepath.Base(path)
+	dir := filepath.Dir(path)
+
+	// if a directory is marked as opaque, we need to translate that to overlay
+	if base == whiteoutOpaqueDir {
+		// don't write the file itself
+		return false, unix.Setxattr(dir, "trusted.overlay.opaque", []byte{'y'}, 0)
+	}
+
+	// if a file was deleted and we are using overlay, we need to create a character device
+	if strings.HasPrefix(base, whiteoutPrefix) {
+		originalBase := base[len(whiteoutPrefix):]
+		originalPath := filepath.Join(dir, originalBase)
+
+		if err := unix.Mknod(originalPath, unix.S_IFCHR, 0); err != nil {
+			return false, err
+		}
+		// don't write the file itself
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
