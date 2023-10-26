@@ -249,7 +249,7 @@ FORCE:
 
 define BUILD_BINARY
 @echo "$(WHALE) $@"
-$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} ${GO_TAGS}  ./$<
+$(GO) build -C ./cmd ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o ../$@ ${GO_LDFLAGS} ${GO_TAGS}  ../$<
 endef
 
 # Build a binary from a cmd.
@@ -259,11 +259,11 @@ bin/%: cmd/% FORCE
 # gen-manpages must not have the urfave_cli_no_docs build-tag set
 bin/gen-manpages: cmd/gen-manpages FORCE
 	@echo "$(WHALE) $@"
-	$(GO) build ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o $@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./cmd/gen-manpages
+	$(GO) build -C ./cmd ${DEBUG_GO_GCFLAGS} ${GO_GCFLAGS} ${GO_BUILD_FLAGS} -o ../$@ ${GO_LDFLAGS} $(subst urfave_cli_no_docs,,${GO_TAGS})  ./gen-manpages
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build -C ./cmd ${GO_BUILD_FLAGS} -o ../$@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
@@ -473,6 +473,8 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod vendor
 	@$(GO) mod verify
 	@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
+	@(cd ${ROOTDIR}/cmd && ${GO} mod tidy)
+	@(cd ${ROOTDIR}/contrib/fuzz && ${GO} mod tidy)
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@echo "$(WHALE) $@"
