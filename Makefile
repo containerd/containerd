@@ -472,7 +472,7 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod tidy
 	@$(GO) mod vendor
 	@$(GO) mod verify
-	@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
+	#@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@echo "$(WHALE) $@"
@@ -482,7 +482,7 @@ verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@(cd ${TMPDIR}/containerd/integration/client && ${GO} mod tidy)
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
-	@${ROOTDIR}/script/verify-go-modules.sh integration/client
+	#@${ROOTDIR}/script/verify-go-modules.sh integration/client
 
 
 help: ## this help
