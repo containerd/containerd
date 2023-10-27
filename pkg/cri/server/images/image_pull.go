@@ -33,8 +33,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -171,7 +169,8 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 		}),
 	}
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	// Temporarily removed for v2 upgrade
+	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
 	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
@@ -545,15 +544,16 @@ func newTransport() *http.Transport {
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
-func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
-		ltdd := imgcrypt.Payload{}
-		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
-		return []containerd.RemoteOpt{opt}
-	}
-	return nil
-}
+// Temporarily removed for v2 upgrade
+//func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
+//	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
+//		ltdd := imgcrypt.Payload{}
+//		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+//		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
+//		return []containerd.RemoteOpt{opt}
+//	}
+//	return nil
+//}
 
 const (
 	// minPullProgressReportInternal is used to prevent the reporter from
