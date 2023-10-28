@@ -41,7 +41,6 @@ import (
 	exec "golang.org/x/sys/execabs"
 )
 
-//nolint:unused // Ignore on non-Linux
 func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {
 	if testing.Short() {
 		t.Skip()
@@ -262,11 +261,6 @@ func testRestartMonitorPausedTaskWithAlways(t *testing.T, client *Client, interv
 	if runtime.GOOS == "windows" {
 		t.Skip("Pause task is not supported on Windows")
 	}
-
-	const (
-		epsilon = 1 * time.Second
-		count   = 20
-	)
 
 	var (
 		ctx, cancel = testContext(t)
