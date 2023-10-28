@@ -18,6 +18,7 @@
 
 package client
 
+//nolint:unused // some variables used for fuzz
 const (
 	defaultRoot    = "/var/lib/containerd-test"
 	defaultState   = "/run/containerd-test"

@@ -33,6 +33,7 @@ const (
 	testNamespace = "testing"
 )
 
+//nolint:unused // some variables used in fuzz but not all platforms
 var (
 	address           string
 	ctrdStdioFilePath string

@@ -32,6 +32,8 @@ issues:
     - path: 'archive[\\/]tarheader[\\/]'
       # conversion is necessary on Linux, unnecessary on macOS
       text: "unnecessary conversion"
+    - path: 'integration[\\/]client'
+      text: "dot-imports:"
     - linters:
         - revive
       text: "if-return"
@@ -63,6 +65,8 @@ linters-settings:
       - G306
       - G402
       - G404
+  nolintlint:
+    allow-unused: true
 
 run:
   timeout: 8m
