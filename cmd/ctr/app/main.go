@@ -34,6 +34,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands/leases"
 	namespacesCmd "github.com/containerd/containerd/cmd/ctr/commands/namespaces"
 	ociCmd "github.com/containerd/containerd/cmd/ctr/commands/oci"
+	"github.com/containerd/containerd/cmd/ctr/commands/platform"
 	"github.com/containerd/containerd/cmd/ctr/commands/plugins"
 	"github.com/containerd/containerd/cmd/ctr/commands/pprof"
 	"github.com/containerd/containerd/cmd/ctr/commands/run"
@@ -121,6 +122,7 @@ containerd CLI
 		sandboxes.Command,
 		info.Command,
 		deprecations.Command,
+		platform.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
