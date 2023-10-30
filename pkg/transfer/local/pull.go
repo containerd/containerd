@@ -177,6 +177,10 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		appendDistSrcLabelHandler,
 	)...)
 
+	if iu, ok := is.(transfer.ImageUnpacker); ok {
+		handler = iu.WrapFetcherHandler(handler)
+	}
+
 	// First find suitable platforms to unpack into
 	// If image storer is also an unpacker type, i.e implemented UnpackPlatforms() func
 	if iu, ok := is.(transfer.ImageUnpacker); ok {

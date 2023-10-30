@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/imageverifier"
+	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/platforms"
@@ -143,6 +144,7 @@ func init() {
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
+			lc.DuplicationSuppressor = kmutex.New()
 
 			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc), nil
 		},

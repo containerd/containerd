@@ -40,6 +40,13 @@ message ImageStore {
 	// Unpack Configuration, multiple allowed
 
 	repeated UnpackConfiguration unpacks = 10;
+
+	// Disable to pass additional annotations (image related information) to snapshotters.
+	// It's required by some remote snapshotters such as stargz and nydu
+	bool disable_snapshotter_annotations = 11;
+
+	// Allow GC to remove layers from the content store after successfully unpacking these layers to the snapshotter.
+	bool discard_unpacked_layers = 12;
 }
 
 message UnpackConfiguration {

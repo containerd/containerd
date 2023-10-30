@@ -51,6 +51,7 @@ type services struct {
 	introspectionService introspection.Service
 	sandboxStore         sandbox.Store
 	sandboxers           map[string]sandbox.Controller
+	transferService      TransferService
 }
 
 // ServicesOpt allows callers to set options on the services
