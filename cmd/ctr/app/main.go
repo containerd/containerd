@@ -55,6 +55,14 @@ func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version)
 	}
+	cli.VersionFlag = cli.BoolFlag{
+		Name:  "version, v",
+		Usage: "Print the version",
+	}
+	cli.HelpFlag = cli.BoolFlag{
+		Name:  "help, h",
+		Usage: "Show help",
+	}
 }
 
 // New returns a *cli.App instance.
