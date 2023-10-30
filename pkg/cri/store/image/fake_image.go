@@ -19,7 +19,7 @@ package image
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 // NewFakeStore returns an image store with predefined images.

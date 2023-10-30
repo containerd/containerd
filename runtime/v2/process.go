@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 
-	task "github.com/containerd/containerd/api/runtime/task/v3"
-	tasktypes "github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/runtime"
+	task "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	tasktypes "github.com/containerd/containerd/v2/api/types/task"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/runtime"
 	"github.com/containerd/ttrpc"
 )
 

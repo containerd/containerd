@@ -19,10 +19,10 @@ package local
 import (
 	"testing"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/pkg/transfer"
+	"github.com/containerd/containerd/v2/pkg/unpack"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 func TestGetSupportedPlatform(t *testing.T) {

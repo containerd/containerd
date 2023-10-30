@@ -24,10 +24,10 @@ import (
 
 	"github.com/urfave/cli"
 
-	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/protobuf"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 )
 
 // Command is the parent for all commands under "deprecations"

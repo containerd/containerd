@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/v2"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 

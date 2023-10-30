@@ -30,17 +30,17 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 
-	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/services/warning"
+	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/filters"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/protobuf"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/containerd/v2/services/warning"
 )
 
 func init() {

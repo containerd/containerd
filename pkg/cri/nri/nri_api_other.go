@@ -21,15 +21,15 @@ package nri
 import (
 	"context"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	cstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/containers"
+	cstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	sstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/nri"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/nri"
 
 	"github.com/containerd/nri/pkg/api"
 )

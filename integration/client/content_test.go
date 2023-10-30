@@ -22,11 +22,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/content/testsuite"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
+	. "github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/content/testsuite"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 func newContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {

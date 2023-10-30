@@ -22,7 +22,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/namespaces"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 

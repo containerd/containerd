@@ -29,9 +29,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/archive/tarheader"
-	"github.com/containerd/containerd/pkg/epoch"
-	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/v2/archive/tarheader"
+	"github.com/containerd/containerd/v2/pkg/epoch"
+	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )

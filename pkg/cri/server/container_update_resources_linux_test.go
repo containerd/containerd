@@ -25,8 +25,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	criopts "github.com/containerd/containerd/pkg/cri/opts"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	criopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 )
 
 func TestUpdateOCILinuxResource(t *testing.T) {

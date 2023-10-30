@@ -24,8 +24,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/contrib/seccomp"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/contrib/seccomp"
+	"github.com/containerd/containerd/v2/oci"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

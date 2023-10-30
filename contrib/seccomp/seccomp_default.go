@@ -23,7 +23,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/contrib/seccomp/kernelversion"
+	"github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 

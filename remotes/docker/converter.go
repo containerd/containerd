@@ -22,9 +22,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/remotes"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

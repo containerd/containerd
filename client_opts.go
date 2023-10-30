@@ -19,10 +19,10 @@ package containerd
 import (
 	"time"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/containerd/v2/snapshots"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/grpc"

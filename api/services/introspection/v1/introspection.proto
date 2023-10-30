@@ -23,7 +23,7 @@ import "google/rpc/status.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/introspection/v1;introspection";
+option go_package = "github.com/containerd/containerd/v2/api/services/introspection/v1;introspection";
 
 service Introspection {
 	// Plugins returns a list of plugins in containerd.

@@ -49,7 +49,7 @@ file {
     json_name: "fieldpath"
   }
   options {
-    go_package: "github.com/containerd/containerd/protobuf/plugin"
+    go_package: "github.com/containerd/containerd/v2/protobuf/plugin"
   }
 }
 file {
@@ -163,7 +163,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -183,7 +183,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -279,7 +279,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -375,7 +375,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -461,7 +461,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
   }
   syntax: "proto3"
 }
@@ -535,7 +535,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -575,7 +575,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }
@@ -847,7 +847,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/events;events"
+    go_package: "github.com/containerd/containerd/v2/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -880,7 +880,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }
@@ -916,7 +916,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }
@@ -1334,7 +1334,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox"
+    go_package: "github.com/containerd/containerd/v2/api/runtime/sandbox/v1;sandbox"
   }
   syntax: "proto3"
 }
@@ -1481,7 +1481,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/task"
+    go_package: "github.com/containerd/containerd/v2/api/types/task"
   }
   syntax: "proto3"
 }
@@ -2196,7 +2196,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/runtime/task/v2;task"
+    go_package: "github.com/containerd/containerd/v2/api/runtime/task/v2;task"
   }
   syntax: "proto3"
 }
@@ -2911,7 +2911,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/runtime/task/v3;task"
+    go_package: "github.com/containerd/containerd/v2/api/runtime/task/v3;task"
   }
   syntax: "proto3"
 }
@@ -3241,7 +3241,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/containers/v1;containers"
+    go_package: "github.com/containerd/containerd/v2/api/services/containers/v1;containers"
   }
   syntax: "proto3"
 }
@@ -3724,7 +3724,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/content/v1;content"
+    go_package: "github.com/containerd/containerd/v2/api/services/content/v1;content"
   }
   syntax: "proto3"
 }
@@ -3784,7 +3784,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }
@@ -3948,7 +3948,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
+    go_package: "github.com/containerd/containerd/v2/api/services/diff/v1;diff"
   }
   syntax: "proto3"
 }
@@ -4054,7 +4054,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/events/v1;events"
+    go_package: "github.com/containerd/containerd/v2/api/services/events/v1;events"
   }
   syntax: "proto3"
 }
@@ -4296,7 +4296,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/images/v1;images"
+    go_package: "github.com/containerd/containerd/v2/api/services/images/v1;images"
   }
   syntax: "proto3"
 }
@@ -4512,7 +4512,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
+    go_package: "github.com/containerd/containerd/v2/api/services/introspection/v1;introspection"
   }
   syntax: "proto3"
 }
@@ -4762,7 +4762,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
+    go_package: "github.com/containerd/containerd/v2/api/services/leases/v1;leases"
   }
   syntax: "proto3"
 }
@@ -4942,7 +4942,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
+    go_package: "github.com/containerd/containerd/v2/api/services/namespaces/v1;namespaces"
   }
   syntax: "proto3"
 }
@@ -5076,7 +5076,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types;types"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }
@@ -5653,7 +5653,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/sandbox/v1;sandbox"
+    go_package: "github.com/containerd/containerd/v2/api/services/sandbox/v1;sandbox"
   }
   syntax: "proto3"
 }
@@ -6167,7 +6167,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
+    go_package: "github.com/containerd/containerd/v2/api/services/snapshots/v1;snapshots"
   }
   syntax: "proto3"
 }
@@ -6196,7 +6196,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/streaming/v1;streaming"
+    go_package: "github.com/containerd/containerd/v2/api/services/streaming/v1;streaming"
   }
   syntax: "proto3"
 }
@@ -6841,7 +6841,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
+    go_package: "github.com/containerd/containerd/v2/api/services/tasks/v1;tasks"
   }
   syntax: "proto3"
 }
@@ -6896,7 +6896,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/transfer/v1;transfer"
+    go_package: "github.com/containerd/containerd/v2/api/services/transfer/v1;transfer"
   }
   syntax: "proto3"
 }
@@ -6963,7 +6963,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/ttrpc/events/v1;events"
+    go_package: "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1;events"
   }
   syntax: "proto3"
 }
@@ -6997,7 +6997,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/services/version/v1;version"
+    go_package: "github.com/containerd/containerd/v2/api/services/version/v1;version"
   }
   syntax: "proto3"
 }
@@ -7138,7 +7138,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/transfer"
+    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7217,7 +7217,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/transfer"
+    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7263,7 +7263,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/transfer"
+    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7404,7 +7404,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/transfer"
+    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7432,7 +7432,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/api/types/transfer"
+    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
   }
   syntax: "proto3"
 }

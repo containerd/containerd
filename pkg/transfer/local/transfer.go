@@ -25,14 +25,14 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/pkg/imageverifier"
-	"github.com/containerd/containerd/pkg/kmutex"
-	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/unpack"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
+	"github.com/containerd/containerd/v2/pkg/kmutex"
+	"github.com/containerd/containerd/v2/pkg/transfer"
+	"github.com/containerd/containerd/v2/pkg/unpack"
 )
 
 type localTransferService struct {

@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/protobuf/proto"
+	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
 )

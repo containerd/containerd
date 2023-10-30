@@ -32,11 +32,11 @@ import (
 	"github.com/containerd/typeurl/v2"
 	exec "golang.org/x/sys/execabs"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/atomicfile"
-	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/atomicfile"
+	"github.com/containerd/containerd/v2/protobuf/proto"
+	"github.com/containerd/containerd/v2/protobuf/types"
 )
 
 type CommandConfig struct {

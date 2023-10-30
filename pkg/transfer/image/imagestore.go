@@ -23,17 +23,17 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd/api/types"
-	transfertypes "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/pkg/streaming"
-	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/transfer/plugins"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/v2/api/types"
+	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/pkg/streaming"
+	"github.com/containerd/containerd/v2/pkg/transfer"
+	"github.com/containerd/containerd/v2/pkg/transfer/plugins"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/remotes"
 )
 
 func init() {

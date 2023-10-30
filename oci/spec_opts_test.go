@@ -36,10 +36,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 type blob []byte

@@ -19,10 +19,10 @@ package images
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/mount"
 	"github.com/urfave/cli"
 )
 

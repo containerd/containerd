@@ -19,14 +19,14 @@ package content
 import (
 	"context"
 
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/services"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/services"
 	digest "github.com/opencontainers/go-digest"
 )
 

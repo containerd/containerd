@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func cleanupTest() {

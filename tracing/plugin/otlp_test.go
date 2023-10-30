@@ -21,7 +21,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2/errdefs"
 	"go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )

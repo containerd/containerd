@@ -21,7 +21,7 @@ package containerd.types;
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/types;types";
+option go_package = "github.com/containerd/containerd/v2/api/types;types";
 
 message Metric {
 	google.protobuf.Timestamp timestamp = 1;

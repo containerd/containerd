@@ -22,8 +22,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	apitask "github.com/containerd/containerd/api/runtime/task/v3"
-	"github.com/containerd/containerd/namespaces"
+	apitask "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 // TestIssue7496_ShouldRetryShutdown is based on https://github.com/containerd/containerd/issues/7496.

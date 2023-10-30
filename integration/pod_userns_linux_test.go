@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	runc "github.com/containerd/go-runc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

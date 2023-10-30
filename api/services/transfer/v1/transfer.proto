@@ -21,7 +21,7 @@ package containerd.services.transfer.v1;
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/transfer/v1;transfer";
+option go_package = "github.com/containerd/containerd/v2/api/services/transfer/v1;transfer";
 
 service Transfer {
 	rpc Transfer(TransferRequest) returns (google.protobuf.Empty);

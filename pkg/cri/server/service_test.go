@@ -21,18 +21,18 @@ import (
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/containerd/pkg/cri/store/label"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	servertesting "github.com/containerd/containerd/pkg/cri/testing"
-	ostesting "github.com/containerd/containerd/pkg/os/testing"
-	"github.com/containerd/containerd/pkg/registrar"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/cri/store/label"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	servertesting "github.com/containerd/containerd/v2/pkg/cri/testing"
+	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
+	"github.com/containerd/containerd/v2/pkg/registrar"
 )
 
 // newTestCRIService creates a fake criService for test.

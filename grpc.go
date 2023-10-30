@@ -19,7 +19,7 @@ package containerd
 import (
 	"context"
 
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/namespaces"
 	"google.golang.org/grpc"
 )
 

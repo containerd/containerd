@@ -30,9 +30,9 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	"github.com/containerd/containerd/pkg/cri/opts"
-	ostesting "github.com/containerd/containerd/pkg/os/testing"
+	"github.com/containerd/containerd/v2/pkg/cri/annotations"
+	"github.com/containerd/containerd/v2/pkg/cri/opts"
+	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {

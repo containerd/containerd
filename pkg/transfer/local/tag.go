@@ -19,7 +19,7 @@ package local
 import (
 	"context"
 
-	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/v2/pkg/transfer"
 )
 
 func (ts *localTransferService) tag(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageStorer, tops *transfer.Config) error {

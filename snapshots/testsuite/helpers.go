@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/randutil"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/randutil"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/continuity/fs/fstest"
 )
 

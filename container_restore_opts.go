@@ -21,11 +21,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/protobuf/proto"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/protobuf/proto"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )

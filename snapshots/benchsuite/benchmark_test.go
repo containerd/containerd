@@ -32,11 +32,11 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/containerd/snapshots/devmapper"
-	"github.com/containerd/containerd/snapshots/native"
-	"github.com/containerd/containerd/snapshots/overlay"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/snapshots/devmapper"
+	"github.com/containerd/containerd/v2/snapshots/native"
+	"github.com/containerd/containerd/v2/snapshots/overlay"
 	"github.com/containerd/log"
 )
 

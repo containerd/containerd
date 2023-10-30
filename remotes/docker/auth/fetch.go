@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	remoteserrors "github.com/containerd/containerd/remotes/errors"
-	"github.com/containerd/containerd/version"
+	remoteserrors "github.com/containerd/containerd/v2/remotes/errors"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 )
 

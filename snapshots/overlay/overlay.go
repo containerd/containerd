@@ -26,10 +26,10 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/containerd/snapshots/overlay/overlayutils"
-	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/snapshots/overlay/overlayutils"
+	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )

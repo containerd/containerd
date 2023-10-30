@@ -19,8 +19,8 @@ package local
 import (
 	"context"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/pkg/transfer"
 )
 
 func (ts *localTransferService) exportStream(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageExporter, tops *transfer.Config) error {

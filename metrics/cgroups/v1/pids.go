@@ -19,7 +19,7 @@
 package v1
 
 import (
-	v1 "github.com/containerd/containerd/metrics/types/v1"
+	v1 "github.com/containerd/containerd/v2/metrics/types/v1"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
 )

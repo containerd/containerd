@@ -20,14 +20,14 @@ import (
 	"context"
 	"os"
 
-	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/pkg/shutdown"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	taskAPI "github.com/containerd/containerd/v2/api/runtime/task/v2"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 )
 

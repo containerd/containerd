@@ -17,9 +17,9 @@
 package containerd
 
 import (
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/diff/proxy"
+	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
+	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/diff/proxy"
 )
 
 // DiffService handles the computation and application of diffs

@@ -22,12 +22,12 @@ import (
 	"syscall"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/errdefs"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/sandbox"
+	eventtypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/errdefs"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
 )
 

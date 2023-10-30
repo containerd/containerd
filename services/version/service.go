@@ -19,12 +19,12 @@ package version
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/version/v1"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	ctrdversion "github.com/containerd/containerd/version"
+	api "github.com/containerd/containerd/v2/api/services/version/v1"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	ctrdversion "github.com/containerd/containerd/v2/version"
 	"google.golang.org/grpc"
 )
 

@@ -19,14 +19,14 @@ package proxy
 import (
 	"context"
 
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/epoch"
-	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
+	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/epoch"
+	"github.com/containerd/containerd/v2/protobuf"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/protobuf/types/known/timestamppb"

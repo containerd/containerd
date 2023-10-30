@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

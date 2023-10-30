@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/filters"
+	"github.com/containerd/containerd/v2/images"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

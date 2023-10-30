@@ -26,10 +26,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/archive/compression"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/v2/archive"
+	"github.com/containerd/containerd/v2/archive/compression"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/images"
 )
 
 // Install a binary image into the opt service.

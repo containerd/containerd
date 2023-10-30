@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/errdefs"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/containerd/v2/errdefs"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/containerd/v2/tracing"
 	"github.com/containerd/log"
 	docker "github.com/distribution/reference"
 

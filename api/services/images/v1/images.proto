@@ -23,7 +23,7 @@ import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/descriptor.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/images/v1;images";
+option go_package = "github.com/containerd/containerd/v2/api/services/images/v1;images";
 
 // Images is a service that allows one to register images with containerd.
 //

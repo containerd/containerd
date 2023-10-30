@@ -19,7 +19,7 @@ package registry
 import (
 	"sync"
 
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 var register = struct {

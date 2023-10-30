@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/cleanup"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/cleanup"
+	"github.com/containerd/containerd/v2/snapshots"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

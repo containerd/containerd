@@ -26,11 +26,11 @@ import (
 	"github.com/containerd/continuity/fs"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 )
 

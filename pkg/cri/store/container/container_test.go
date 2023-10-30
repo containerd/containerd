@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	cio "github.com/containerd/containerd/pkg/cri/io"
-	"github.com/containerd/containerd/pkg/cri/store/label"
-	"github.com/containerd/containerd/pkg/cri/store/stats"
+	"github.com/containerd/containerd/v2/errdefs"
+	cio "github.com/containerd/containerd/v2/pkg/cri/io"
+	"github.com/containerd/containerd/v2/pkg/cri/store/label"
+	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
 
 	"github.com/opencontainers/selinux/go-selinux"
 	assertlib "github.com/stretchr/testify/assert"

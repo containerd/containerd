@@ -21,9 +21,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/pkg/cri/server/images"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

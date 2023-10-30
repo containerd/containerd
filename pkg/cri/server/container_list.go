@@ -22,7 +22,7 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 )
 
 // ListContainers lists all containers matching the filter.

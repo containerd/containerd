@@ -22,10 +22,10 @@ import (
 	"io"
 	"strings"
 
-	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/v2/archive"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {

@@ -26,9 +26,9 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"

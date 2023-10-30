@@ -22,8 +22,8 @@ import (
 	"io"
 	"sync/atomic"
 
-	transferapi "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/pkg/streaming"
+	transferapi "github.com/containerd/containerd/v2/api/types/transfer"
+	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 )

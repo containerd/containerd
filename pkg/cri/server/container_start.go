@@ -23,17 +23,17 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2"
+	containerdio "github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	cio "github.com/containerd/containerd/pkg/cri/io"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	cio "github.com/containerd/containerd/v2/pkg/cri/io"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
 
 // StartContainer starts the container.

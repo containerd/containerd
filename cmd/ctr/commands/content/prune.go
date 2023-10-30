@@ -21,9 +21,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/leases"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
 )

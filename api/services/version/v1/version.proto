@@ -21,7 +21,7 @@ package containerd.services.version.v1;
 import "google/protobuf/empty.proto";
 
 // TODO(stevvooe): Should version service actually be versioned?
-option go_package = "github.com/containerd/containerd/api/services/version/v1;version";
+option go_package = "github.com/containerd/containerd/v2/api/services/version/v1;version";
 
 service Version {
 	rpc Version(google.protobuf.Empty) returns (VersionResponse);

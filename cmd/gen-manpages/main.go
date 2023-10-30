@@ -23,8 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/containerd/containerd/cmd/containerd/command"
-	"github.com/containerd/containerd/cmd/ctr/app"
+	"github.com/containerd/containerd/v2/cmd/containerd/command"
+	"github.com/containerd/containerd/v2/cmd/ctr/app"
 	"github.com/urfave/cli"
 )
 

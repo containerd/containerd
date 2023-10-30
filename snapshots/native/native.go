@@ -22,9 +22,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/containerd/snapshots/storage"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/log"
 
 	"github.com/containerd/continuity/fs"

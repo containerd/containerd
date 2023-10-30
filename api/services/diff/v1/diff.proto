@@ -23,7 +23,7 @@ import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/descriptor.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/diff/v1;diff";
+option go_package = "github.com/containerd/containerd/v2/api/services/diff/v1;diff";
 
 // Diff service creates and applies diffs
 service Diff {

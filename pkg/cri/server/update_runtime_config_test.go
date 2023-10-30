@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	servertesting "github.com/containerd/containerd/pkg/cri/testing"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	servertesting "github.com/containerd/containerd/v2/pkg/cri/testing"
 )
 
 func TestUpdateRuntimeConfig(t *testing.T) {

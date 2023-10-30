@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/tracing"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

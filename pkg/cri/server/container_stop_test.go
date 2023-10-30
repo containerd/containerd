@@ -23,7 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 )
 
 func TestWaitContainerStop(t *testing.T) {

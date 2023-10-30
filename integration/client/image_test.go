@@ -23,12 +23,12 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	imagelist "github.com/containerd/containerd/integration/images"
-	"github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/platforms"
+	. "github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/images"
+	imagelist "github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

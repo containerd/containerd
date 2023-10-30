@@ -25,8 +25,8 @@ import (
 	"time"
 	"unsafe"
 
-	kernel "github.com/containerd/containerd/contrib/seccomp/kernelversion"
-	"github.com/containerd/containerd/pkg/randutil"
+	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	"github.com/containerd/containerd/v2/pkg/randutil"
 	"golang.org/x/sys/unix"
 )
 

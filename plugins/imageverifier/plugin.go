@@ -19,11 +19,11 @@ package imageverifier
 import (
 	"time"
 
-	"github.com/containerd/containerd/pkg/imageverifier/bindir"
-	"github.com/containerd/containerd/pkg/tomlext"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/v2/pkg/imageverifier/bindir"
+	"github.com/containerd/containerd/v2/pkg/tomlext"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 // Register default image verifier service plugin

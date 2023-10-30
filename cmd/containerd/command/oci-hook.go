@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"text/template"
 
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 )

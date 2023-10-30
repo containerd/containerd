@@ -18,8 +18,8 @@ package fuzz
 
 import (
 	// Windows specific imports
-	_ "github.com/containerd/containerd/diff/lcow"
-	_ "github.com/containerd/containerd/diff/windows"
-	_ "github.com/containerd/containerd/snapshots/lcow"
-	_ "github.com/containerd/containerd/snapshots/windows"
+	_ "github.com/containerd/containerd/v2/diff/lcow"
+	_ "github.com/containerd/containerd/v2/diff/windows"
+	_ "github.com/containerd/containerd/v2/snapshots/lcow"
+	_ "github.com/containerd/containerd/v2/snapshots/windows"
 )

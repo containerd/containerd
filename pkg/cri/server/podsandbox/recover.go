@@ -22,14 +22,14 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/containerd/containerd/pkg/netns"
+	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/errdefs"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/log"
 )
 

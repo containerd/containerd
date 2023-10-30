@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	cstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	cstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	sstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

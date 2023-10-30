@@ -25,9 +25,9 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
 	"github.com/opencontainers/image-spec/identity"
 )
 

@@ -24,10 +24,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	v2 "github.com/containerd/containerd/api/runtime/task/v2"
-	v3 "github.com/containerd/containerd/api/runtime/task/v3"
+	v2 "github.com/containerd/containerd/v2/api/runtime/task/v2"
+	v3 "github.com/containerd/containerd/v2/api/runtime/task/v3"
 
-	api "github.com/containerd/containerd/api/runtime/task/v3" // Current version used by TaskServiceClient
+	api "github.com/containerd/containerd/v2/api/runtime/task/v3" // Current version used by TaskServiceClient
 )
 
 // TaskServiceClient exposes a client interface to shims, which aims to hide

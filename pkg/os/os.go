@@ -22,7 +22,7 @@ import (
 
 	"github.com/moby/sys/symlink"
 
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/mount"
 )
 
 // OS collects system level operations that need to be mocked out

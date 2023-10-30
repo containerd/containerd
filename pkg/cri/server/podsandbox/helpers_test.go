@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/oci"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

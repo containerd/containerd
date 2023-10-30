@@ -25,9 +25,9 @@ import (
 
 	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/api/types"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/api/types"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
