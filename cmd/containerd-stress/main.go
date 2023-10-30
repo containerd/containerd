@@ -62,6 +62,11 @@ func init() {
 	if err := setRlimit(); err != nil {
 		panic(err)
 	}
+
+	cli.HelpFlag = cli.BoolFlag{
+		Name:  "help, h",
+		Usage: "Show help",
+	}
 }
 
 type worker interface {

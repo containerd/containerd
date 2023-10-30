@@ -35,19 +35,19 @@ generate the default configuration for containerd. The output of that command
 can be used and modified as necessary as a custom configuration.
 
 COMMANDS:
-   config    information on the containerd config
-   publish   binary to publish events to containerd
-   oci-hook  provides a base for OCI runtime hooks to allow arguments to be injected.
+   config    Information on the containerd config
+   publish   Binary to publish events to containerd
+   oci-hook  Provides a base for OCI runtime hooks to allow arguments to be injected.
    help, h   Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   --config value, -c value     path to the configuration file (default: "/etc/containerd/config.toml")
-   --log-level value, -l value  set the logging level [trace, debug, info, warn, error, fatal, panic]
-   --address value, -a value    address for containerd's GRPC server
+   --config value, -c value     Path to the configuration file (default: "/etc/containerd/config.toml")
+   --log-level value, -l value  Set the logging level [trace, debug, info, warn, error, fatal, panic]
+   --address value, -a value    Address for containerd's GRPC server
    --root value                 containerd root directory
    --state value                containerd state directory
-   --help, -h                   show help
-   --version, -v                print the version
+   --help, -h                   Show help
+   --version, -v                Print the version
 
 ```
 
