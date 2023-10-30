@@ -25,7 +25,7 @@ import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/platform.proto";
 import "github.com/containerd/containerd/api/types/metrics.proto";
 
-option go_package = "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox";
+option go_package = "github.com/containerd/containerd/v2/api/runtime/sandbox/v1;sandbox";
 
 // Sandbox is an optional interface that shim may implement to support sandboxes environments.
 // A typical example of sandbox is microVM or pause container - an entity that groups containers and/or

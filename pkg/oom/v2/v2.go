@@ -23,10 +23,10 @@ import (
 	"fmt"
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/pkg/oom"
-	"github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/pkg/oom"
+	"github.com/containerd/containerd/v2/runtime"
+	"github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/log"
 )
 

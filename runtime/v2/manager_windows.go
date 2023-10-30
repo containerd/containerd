@@ -17,7 +17,7 @@
 package v2
 
 import (
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 func defaultPlatforms() []string {

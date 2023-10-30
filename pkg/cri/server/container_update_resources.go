@@ -27,13 +27,13 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/log"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.

@@ -19,8 +19,8 @@ package podsandbox
 import (
 	"context"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
 )
 
 // TODO(dcantah): Implement metrics to be used for SandboxStats rpc.

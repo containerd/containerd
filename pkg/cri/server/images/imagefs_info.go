@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

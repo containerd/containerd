@@ -20,7 +20,7 @@ package containerd.events;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/events;events";
+option go_package = "github.com/containerd/containerd/v2/api/events;events";
 
 message SandboxCreate {
 	string sandbox_id = 1;

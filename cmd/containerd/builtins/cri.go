@@ -19,5 +19,5 @@
 package builtins
 
 import (
-	_ "github.com/containerd/containerd/pkg/cri"
+	_ "github.com/containerd/containerd/v2/pkg/cri"
 )

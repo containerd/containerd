@@ -20,12 +20,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/tracing"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/tracing"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
 const (

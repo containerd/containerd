@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/v2/content"
 )
 
 func contentStoreEnv(t testing.TB) (context.Context, string, content.Store, func()) {

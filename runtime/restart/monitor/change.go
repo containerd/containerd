@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/runtime/restart"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/runtime/restart"
 )
 
 type stopChange struct {

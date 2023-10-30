@@ -19,12 +19,12 @@ package proxy
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/sandbox"
+	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/sandbox"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

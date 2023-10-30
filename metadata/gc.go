@@ -24,8 +24,8 @@ import (
 	"strings"
 	"time"
 
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/gc"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/gc"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
 )

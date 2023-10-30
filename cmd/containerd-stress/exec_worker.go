@@ -23,9 +23,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

@@ -20,7 +20,7 @@ package containerd.services.leases.v1;
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/leases/v1;leases";
+option go_package = "github.com/containerd/containerd/v2/api/services/leases/v1;leases";
 
 // Leases service manages resources leases within the metadata store.
 service Leases {

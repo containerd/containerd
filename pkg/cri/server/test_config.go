@@ -16,7 +16,7 @@
 
 package server
 
-import criconfig "github.com/containerd/containerd/pkg/cri/config"
+import criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 
 const (
 	testRootDir  = "/test/root"

@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	"github.com/containerd/containerd/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/annotations"
+	"github.com/containerd/containerd/v2/pkg/cri/config"
 )
 
 func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandboxConfig,

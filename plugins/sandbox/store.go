@@ -17,10 +17,10 @@
 package sandbox
 
 import (
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 func init() {

@@ -17,7 +17,7 @@
 package nri
 
 import (
-	"github.com/containerd/containerd/pkg/tomlext"
+	"github.com/containerd/containerd/v2/pkg/tomlext"
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 

@@ -155,7 +155,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/runtime/v2/runc/options;options"
+    go_package: "github.com/containerd/containerd/v2/runtime/v2/runc/options;options"
   }
   syntax: "proto3"
 }

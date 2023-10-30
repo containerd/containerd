@@ -19,7 +19,7 @@ package plugin
 import (
 	"testing"
 
-	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/v2/services"
 )
 
 func mockPluginFilter(*Registration) bool {

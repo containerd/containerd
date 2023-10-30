@@ -19,12 +19,12 @@ package content
 import (
 	"errors"
 
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/services/content/contentserver"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/containerd/v2/services/content/contentserver"
 )
 
 func init() {

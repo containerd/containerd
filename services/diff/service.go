@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 
-	diffapi "github.com/containerd/containerd/api/services/diff/v1"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/services"
+	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/services"
 	"google.golang.org/grpc"
 )
 

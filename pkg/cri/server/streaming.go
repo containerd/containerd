@@ -33,7 +33,7 @@ import (
 	k8scert "k8s.io/client-go/util/cert"
 	"k8s.io/utils/exec"
 
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 

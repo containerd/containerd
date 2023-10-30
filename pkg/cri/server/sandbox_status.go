@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/errdefs"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	"github.com/containerd/go-cni"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

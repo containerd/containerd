@@ -1,4 +1,4 @@
-module github.com/containerd/containerd
+module github.com/containerd/containerd/v2
 
 go 1.20
 
@@ -82,6 +82,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
+	github.com/containerd/containerd v1.7.8 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.10.2 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect

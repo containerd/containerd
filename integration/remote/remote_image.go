@@ -42,10 +42,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/klog/v2"
 
-	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/integration/remote/util"
+	"github.com/containerd/containerd/v2/integration/remote/util"
 )
 
 // ImageService is a gRPC implementation of internalapi.ImageManagerService.

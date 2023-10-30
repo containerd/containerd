@@ -19,24 +19,24 @@ package transfer
 import (
 	"fmt"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/pkg/imageverifier"
-	"github.com/containerd/containerd/pkg/transfer/local"
-	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
+	"github.com/containerd/containerd/v2/pkg/transfer/local"
+	"github.com/containerd/containerd/v2/pkg/unpack"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 
 	// Load packages with type registrations
-	_ "github.com/containerd/containerd/pkg/transfer/archive"
-	_ "github.com/containerd/containerd/pkg/transfer/image"
-	_ "github.com/containerd/containerd/pkg/transfer/registry"
+	_ "github.com/containerd/containerd/v2/pkg/transfer/archive"
+	_ "github.com/containerd/containerd/v2/pkg/transfer/image"
+	_ "github.com/containerd/containerd/v2/pkg/transfer/registry"
 )
 
 // Register local transfer service plugin

@@ -24,11 +24,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/metadata/boltutil"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/filters"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/metadata/boltutil"
+	"github.com/containerd/containerd/v2/namespaces"
 	digest "github.com/opencontainers/go-digest"
 	bolt "go.etcd.io/bbolt"
 )

@@ -21,7 +21,7 @@ package containerd.events;
 import "google/protobuf/any.proto";
 import "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto";
 
-option go_package = "github.com/containerd/containerd/api/events;events";
+option go_package = "github.com/containerd/containerd/v2/api/events;events";
 option (containerd.plugin.fieldpath_all) = true;
 
 message ContainerCreate {

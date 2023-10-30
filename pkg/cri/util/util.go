@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/namespaces"
 
-	"github.com/containerd/containerd/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
 )
 
 // deferCleanupTimeout is the default timeout for containerd cleanup operations
