@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	remoteserrors "github.com/containerd/containerd/remotes/errors"
+	remoteserrors "github.com/containerd/containerd/v2/remotes/errors"
 	"github.com/stretchr/testify/assert"
 )
 

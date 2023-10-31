@@ -17,7 +17,6 @@
 package errors
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -77,7 +76,7 @@ func TestErrorsUnmarshalJSON(t *testing.T) {
 			},
 		},
 		{
-			name: "test with error",
+			name: "test with invalid json",
 			errs: new(Errors),
 			args: args{
 				data: []byte(`{"errors":`),
@@ -148,7 +147,6 @@ func TestErrorsMarshalJSON(t *testing.T) {
 				t.Errorf("Errors.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			fmt.Println(string(got))
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Errors.MarshalJSON() = %v, want %v", got, tt.want)
 			}
