@@ -148,6 +148,24 @@ func (s *createdCheckpointState) Start(ctx context.Context) error {
 	p := s.p
 	sio := p.stdio
 
+	defer func() {
+		if p.pid == 0 {
+			// containerd relies on a goroutine processExits to scan
+			// for exited processes continuously.  This works as long
+			// as the init process has ever been started.  For non-checkpoint
+			// scenario, it is always the case since the runc process
+			// will be morphed to the init process for the container
+			// under creation, so, by definition, it has been started.
+			// For checkpoint scenario, it works as long as the restoration
+			// succeeds.  The only exception here is when the restoration
+			// fails and no init process has ever been started -- processExits
+			// won't be able to identify the process as exited, causing
+			// both timeout and resource leakages.  To handle the case, we
+			// proactively mark the current process as exited here.
+			s.SetExited(0)
+		}
+	}()
+
 	var (
 		err    error
 		socket *runc.Socket
