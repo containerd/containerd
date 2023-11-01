@@ -22,19 +22,20 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/pkg/cri/nri"
-	"github.com/containerd/containerd/pkg/cri/sbserver"
-	nriservice "github.com/containerd/containerd/pkg/nri"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
+	"github.com/containerd/containerd/pkg/cri/nri"
+	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/server"
+	nriservice "github.com/containerd/containerd/pkg/nri"
+	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services/warning"
 )
 
 // Register CRI service plugin
@@ -48,6 +49,7 @@ func init() {
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
 			plugin.NRIApiPlugin,
+			plugin.WarningPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -58,8 +60,17 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
+	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
+	} else if len(warnings) > 0 {
+		ws, err := ic.Get(plugin.WarningPlugin)
+		if err != nil {
+			return nil, err
+		}
+		warn := ws.(warning.Service)
+		for _, w := range warnings {
+			warn.Emit(ctx, w)
+		}
 	}
 
 	c := criconfig.Config{
