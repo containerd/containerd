@@ -28,11 +28,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/pkg/seccomp"
-	"github.com/containerd/containerd/pkg/seutil"
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/seccomp"
+	"github.com/containerd/containerd/v2/pkg/seutil"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 
 	"github.com/moby/sys/mountinfo"

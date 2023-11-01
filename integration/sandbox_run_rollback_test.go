@@ -35,8 +35,8 @@ import (
 	"github.com/stretchr/testify/require"
 	criapiv1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/cri/server/podsandbox"
-	"github.com/containerd/containerd/pkg/failpoint"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
+	"github.com/containerd/containerd/v2/pkg/failpoint"
 )
 
 const (

@@ -21,7 +21,7 @@ package common
 import (
 	"context"
 
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/v2/protobuf/types"
 )
 
 // Statable type that returns cgroup metrics

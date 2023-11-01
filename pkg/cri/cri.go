@@ -21,20 +21,20 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/nri"
-	"github.com/containerd/containerd/pkg/cri/server"
-	nriservice "github.com/containerd/containerd/pkg/nri"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/pkg/cri/nri"
+	"github.com/containerd/containerd/v2/pkg/cri/server"
+	nriservice "github.com/containerd/containerd/v2/pkg/nri"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/constants"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
 )
 
 // Register CRI service plugin

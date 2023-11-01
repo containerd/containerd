@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/continuity/fs/fstest"
 )
 

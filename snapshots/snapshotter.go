@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/protobuf"
+	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/protobuf"
 )
 
 const (

@@ -20,11 +20,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/errdefs"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/platforms"
 	"github.com/stretchr/testify/assert"
 )
 

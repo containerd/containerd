@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/mount"
 )
 
 func setupSnapshotter(t *testing.T) ([]Opt, error) {

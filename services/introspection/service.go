@@ -20,12 +20,12 @@ import (
 	context "context"
 	"errors"
 
-	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/containerd/services"
+	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	"github.com/containerd/containerd/v2/plugin"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/services"
 	"google.golang.org/grpc"
 )
 

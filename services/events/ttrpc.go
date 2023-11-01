@@ -19,12 +19,12 @@ package events
 import (
 	"context"
 
-	api "github.com/containerd/containerd/api/services/ttrpc/events/v1"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/protobuf"
-	ptypes "github.com/containerd/containerd/protobuf/types"
+	api "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/events/exchange"
+	"github.com/containerd/containerd/v2/protobuf"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 )
 
 type ttrpcService struct {

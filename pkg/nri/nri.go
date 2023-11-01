@@ -24,7 +24,7 @@ import (
 
 	"github.com/containerd/log"
 
-	"github.com/containerd/containerd/version"
+	"github.com/containerd/containerd/v2/version"
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 

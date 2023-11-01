@@ -23,10 +23,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/protobuf"
 )
 
 // Process represents a system process

@@ -22,16 +22,16 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/pkg/shutdown"
-	"github.com/containerd/containerd/plugin/registry"
-	"github.com/containerd/containerd/plugins"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/plugin/registry"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 
-	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
-	"github.com/containerd/containerd/plugin"
+	api "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/v2/plugin"
 )
 
 func init() {

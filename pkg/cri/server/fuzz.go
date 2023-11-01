@@ -21,7 +21,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
 func SandboxStore(cs CRIService) (*sandbox.Store, error) {

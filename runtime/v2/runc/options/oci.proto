@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package containerd.runc.v1;
 
-option go_package = "github.com/containerd/containerd/runtime/v2/runc/options;options";
+option go_package = "github.com/containerd/containerd/v2/runtime/v2/runc/options;options";
 
 message Options {
 	// disable pivot root when creating a container

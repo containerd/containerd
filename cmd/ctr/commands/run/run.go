@@ -28,14 +28,14 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/cmd/ctr/commands/tasks"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
-	clabels "github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands/tasks"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/errdefs"
+	clabels "github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/log"
 )
 

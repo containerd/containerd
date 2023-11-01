@@ -26,16 +26,16 @@ import (
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/pkg/cri/store/stats"
-	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
+	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 )
 
 // ListContainerStats returns stats of all running containers.

@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/typeurl/v2"
 )
 

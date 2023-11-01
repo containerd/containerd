@@ -21,7 +21,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/pkg/rdt"
+	"github.com/containerd/containerd/v2/pkg/rdt"
 	"github.com/containerd/log"
 )
 

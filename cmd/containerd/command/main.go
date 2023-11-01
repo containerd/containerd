@@ -27,14 +27,14 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/errdefs"
-	_ "github.com/containerd/containerd/metrics" // import containerd build info
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/services/server"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/containerd/sys"
-	"github.com/containerd/containerd/version"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/errdefs"
+	_ "github.com/containerd/containerd/v2/metrics" // import containerd build info
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/services/server"
+	srvconfig "github.com/containerd/containerd/v2/services/server/config"
+	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"

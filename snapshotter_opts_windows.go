@@ -19,7 +19,7 @@ package containerd
 import (
 	"context"
 
-	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/containerd/v2/snapshots"
 )
 
 func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName string, snapshotter snapshots.Snapshotter, parent string, opts ...snapshots.Opt) (string, error) {

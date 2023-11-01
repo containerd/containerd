@@ -24,7 +24,7 @@ import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
 
-option go_package = "github.com/containerd/containerd/api/runtime/task/v2;task";
+option go_package = "github.com/containerd/containerd/v2/api/runtime/task/v2;task";
 
 // Shim service is launched for each container and is responsible for owning the IO
 // for the container and its additional processes.  The shim is also the parent of

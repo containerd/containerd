@@ -21,7 +21,7 @@ package overlayutils
 import (
 	"testing"
 
-	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 	exec "golang.org/x/sys/execabs"
 )

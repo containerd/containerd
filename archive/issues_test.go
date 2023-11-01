@@ -24,8 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/archive/compression"
-	"github.com/containerd/containerd/pkg/testutil"
+	"github.com/containerd/containerd/v2/archive/compression"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 // TestPrefixHeaderReadable tests that files that could be created with the

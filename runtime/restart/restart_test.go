@@ -19,7 +19,7 @@ package restart
 import (
 	"testing"
 
-	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/v2"
 	"github.com/stretchr/testify/assert"
 )
 

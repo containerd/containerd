@@ -33,7 +33,7 @@ import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/platform.proto";
 import "github.com/containerd/containerd/api/types/metrics.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
+option go_package = "github.com/containerd/containerd/v2/api/services/sandbox/v1;sandbox";
 
 // Store provides a metadata storage interface for sandboxes. Similarly to `Containers`,
 // sandbox object includes info required to start a new instance, but no runtime state.

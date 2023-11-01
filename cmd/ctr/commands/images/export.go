@@ -24,12 +24,12 @@ import (
 
 	"github.com/urfave/cli"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/pkg/transfer"
-	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
-	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/pkg/transfer"
+	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
+	"github.com/containerd/containerd/v2/pkg/transfer/image"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 var exportCommand = cli.Command{

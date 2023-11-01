@@ -34,12 +34,12 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 )
 
 const (

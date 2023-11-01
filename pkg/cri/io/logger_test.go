@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
 
 func TestRedirectLogs(t *testing.T) {

@@ -22,8 +22,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/v2"
+	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/log"
 )
 

@@ -21,10 +21,10 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd/content/local"
-	"github.com/containerd/containerd/diff/apply"
-	"github.com/containerd/containerd/diff/walking"
-	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/v2/content/local"
+	"github.com/containerd/containerd/v2/diff/apply"
+	"github.com/containerd/containerd/v2/diff/walking"
+	"github.com/containerd/containerd/v2/mount"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

@@ -20,8 +20,8 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/containerd/cio"
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	"github.com/containerd/containerd/v2/cio"
+	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 	"github.com/containerd/log"
 )
 

@@ -22,11 +22,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/v2/cio"
 	"github.com/containerd/log"
 
-	"github.com/containerd/containerd/pkg/cri/util"
-	cioutil "github.com/containerd/containerd/pkg/ioutil"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
+	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
 
 // streamKey generates a key for the stream.

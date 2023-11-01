@@ -22,8 +22,8 @@ import (
 	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
 	"github.com/opencontainers/selinux/go-selinux"
 
-	"github.com/containerd/containerd/pkg/cap"
-	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/containerd/v2/pkg/cap"
+	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 )

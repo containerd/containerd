@@ -26,7 +26,7 @@ import "github.com/containerd/containerd/api/types/descriptor.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/tasks/v1;tasks";
+option go_package = "github.com/containerd/containerd/v2/api/services/tasks/v1;tasks";
 
 service Tasks {
 	// Create a task.

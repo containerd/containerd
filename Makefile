@@ -179,8 +179,9 @@ protos: bin/protoc-gen-go-fieldpath
 	@mv ${ROOTDIR}/vendor ${TMPDIR}
 	@(cd ${ROOTDIR}/api && PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${API_PACKAGES})
 	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${NON_API_PACKAGES})
+	find v2 -name '*.pb.go' -exec sh -c 'f={}; mkdir -p $$(dirname "$${f#v2/}"); echo mv $$f $${f#v2/}; mv $$f $${f#v2/}' \;
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
-	@rm -rf ${TMPDIR}
+	@rm -rf ${TMPDIR} v2
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ runtime/ -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
@@ -472,7 +473,7 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod tidy
 	@$(GO) mod vendor
 	@$(GO) mod verify
-	@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
+	#@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@echo "$(WHALE) $@"
@@ -482,7 +483,7 @@ verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@(cd ${TMPDIR}/containerd/integration/client && ${GO} mod tidy)
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
-	@${ROOTDIR}/script/verify-go-modules.sh integration/client
+	#@${ROOTDIR}/script/verify-go-modules.sh integration/client
 
 
 help: ## this help

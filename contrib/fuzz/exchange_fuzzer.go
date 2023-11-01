@@ -19,10 +19,10 @@ import (
 	"context"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	eventstypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/namespaces"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/events/exchange"
+	"github.com/containerd/containerd/v2/namespaces"
 )
 
 func FuzzExchange(data []byte) int {

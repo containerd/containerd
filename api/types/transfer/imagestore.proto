@@ -20,7 +20,7 @@ package containerd.types.transfer;
 
 import "github.com/containerd/containerd/api/types/platform.proto";
 
-option go_package = "github.com/containerd/containerd/api/types/transfer";
+option go_package = "github.com/containerd/containerd/v2/api/types/transfer";
 
 message ImageStore {
 	string name = 1;

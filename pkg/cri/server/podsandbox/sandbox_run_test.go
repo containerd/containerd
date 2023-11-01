@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 )
 
 func TestSandboxContainerSpec(t *testing.T) {

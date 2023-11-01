@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/remotes/docker"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/remotes/docker"
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
 	tomlu "github.com/pelletier/go-toml/v2/unstable"

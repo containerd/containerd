@@ -24,7 +24,7 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 )
 
 // UpdateContainerResources updates ContainerConfig of the container.

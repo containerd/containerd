@@ -28,7 +28,7 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/atomicfile"
+	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/log"
 )
 

@@ -29,7 +29,7 @@ compile_fuzzers() {
         if [[ "$line" =~ (.*)/.*:.*(Fuzz[A-Za-z0-9]+) ]]; then
             local pkg=${BASH_REMATCH[1]}
             local func=${BASH_REMATCH[2]}
-            "$compile_fuzzer" "github.com/containerd/containerd/$pkg" "$func" "fuzz_$func"
+            "$compile_fuzzer" "github.com/containerd/containerd/v2/$pkg" "$func" "fuzz_$func"
         else
             echo "failed to parse: $line"
             exit 1

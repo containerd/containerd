@@ -60,6 +60,9 @@ github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
 github.com/Microsoft/hcsshim/pkg/go-runhcs
 github.com/Microsoft/hcsshim/pkg/ociwclayer
+# github.com/Microsoft/hcsshim/test v0.0.0-20210227013316-43a75bb4edd3
+## explicit; go 1.13
+github.com/Microsoft/hcsshim/test/functional/manifest
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -99,6 +102,10 @@ github.com/containerd/cgroups/v3/cgroup2/stats
 # github.com/containerd/console v1.0.3
 ## explicit; go 1.13
 github.com/containerd/console
+# github.com/containerd/containerd v1.7.8
+## explicit; go 1.19
+github.com/containerd/containerd/errdefs
+github.com/containerd/containerd/log
 # github.com/containerd/continuity v0.4.2
 ## explicit; go 1.19
 github.com/containerd/continuity
@@ -120,10 +127,6 @@ github.com/containerd/go-cni
 # github.com/containerd/go-runc v1.1.0
 ## explicit; go 1.18
 github.com/containerd/go-runc
-# github.com/containerd/imgcrypt v1.1.7
-## explicit; go 1.16
-github.com/containerd/imgcrypt
-github.com/containerd/imgcrypt/images/encryption
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
@@ -142,9 +145,6 @@ github.com/containerd/nri/types/v1
 # github.com/containerd/ttrpc v1.2.2
 ## explicit; go 1.13
 github.com/containerd/ttrpc
-# github.com/containerd/typeurl v1.0.2
-## explicit; go 1.13
-github.com/containerd/typeurl
 # github.com/containerd/typeurl/v2 v2.1.1
 ## explicit; go 1.13
 github.com/containerd/typeurl/v2
@@ -164,22 +164,6 @@ github.com/containernetworking/cni/pkg/version
 # github.com/containernetworking/plugins v1.3.0
 ## explicit; go 1.20
 github.com/containernetworking/plugins/pkg/ns
-# github.com/containers/ocicrypt v1.1.6
-## explicit; go 1.12
-github.com/containers/ocicrypt
-github.com/containers/ocicrypt/blockcipher
-github.com/containers/ocicrypt/config
-github.com/containers/ocicrypt/config/keyprovider-config
-github.com/containers/ocicrypt/crypto/pkcs11
-github.com/containers/ocicrypt/keywrap
-github.com/containers/ocicrypt/keywrap/jwe
-github.com/containers/ocicrypt/keywrap/keyprovider
-github.com/containers/ocicrypt/keywrap/pgp
-github.com/containers/ocicrypt/keywrap/pkcs11
-github.com/containers/ocicrypt/keywrap/pkcs7
-github.com/containers/ocicrypt/spec
-github.com/containers/ocicrypt/utils
-github.com/containers/ocicrypt/utils/keyprovider
 # github.com/coreos/go-systemd/v22 v22.5.0
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/daemon
@@ -225,7 +209,6 @@ github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
-github.com/gogo/protobuf/types
 # github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da
 ## explicit
 github.com/golang/groupcache/lru
@@ -294,9 +277,6 @@ github.com/klauspost/cpuid/v2
 # github.com/matttproud/golang_protobuf_extensions v1.0.4
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
-# github.com/miekg/pkcs11 v1.1.1
-## explicit; go 1.12
-github.com/miekg/pkcs11
 # github.com/minio/sha256-simd v1.0.1
 ## explicit; go 1.17
 github.com/minio/sha256-simd
@@ -388,9 +368,6 @@ github.com/russross/blackfriday/v2
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
-# github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980
-## explicit
-github.com/stefanberger/go-pkcs11uri
 # github.com/stretchr/testify v1.8.4
 ## explicit; go 1.20
 github.com/stretchr/testify/assert
@@ -414,9 +391,6 @@ github.com/vishvananda/netns
 # go.etcd.io/bbolt v1.3.7
 ## explicit; go 1.17
 go.etcd.io/bbolt
-# go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1
-## explicit; go 1.11
-go.mozilla.org/pkcs7
 # go.opencensus.io v0.24.0
 ## explicit; go 1.13
 go.opencensus.io
@@ -481,17 +455,6 @@ go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
-# golang.org/x/crypto v0.14.0
-## explicit; go 1.17
-golang.org/x/crypto/cast5
-golang.org/x/crypto/ed25519
-golang.org/x/crypto/openpgp
-golang.org/x/crypto/openpgp/armor
-golang.org/x/crypto/openpgp/elgamal
-golang.org/x/crypto/openpgp/errors
-golang.org/x/crypto/openpgp/packet
-golang.org/x/crypto/openpgp/s2k
-golang.org/x/crypto/pbkdf2
 # golang.org/x/mod v0.12.0
 ## explicit; go 1.17
 golang.org/x/mod/semver
@@ -673,11 +636,6 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/inf.v0 v0.9.1
 ## explicit
 gopkg.in/inf.v0
-# gopkg.in/square/go-jose.v2 v2.6.0
-## explicit
-gopkg.in/square/go-jose.v2
-gopkg.in/square/go-jose.v2/cipher
-gopkg.in/square/go-jose.v2/json
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2

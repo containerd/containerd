@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
