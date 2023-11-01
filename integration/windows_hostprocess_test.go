@@ -127,7 +127,7 @@ func runHostProcess(t *testing.T, expectErr bool, image string, action hpcAction
 	action(t, cn, containerConfig)
 }
 
-func runAndRemoveContainer(t *testing.T, sb string, sbConfig *runtime.PodSandboxConfig, cnConfig *runtime.ContainerConfig) {
+func runExecAndRemoveContainer(t *testing.T, sb string, sbConfig *runtime.PodSandboxConfig, cnConfig *runtime.ContainerConfig) {
 	t.Log("Create the container")
 	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
 	require.NoError(t, err)
@@ -135,6 +135,13 @@ func runAndRemoveContainer(t *testing.T, sb string, sbConfig *runtime.PodSandbox
 	require.NoError(t, runtimeService.StartContainer(cn))
 	// Wait few seconds for the container to be completely initialized
 	time.Sleep(5 * time.Second)
+
+	cmd := []string{"cmd", "/c", "echo", "hello"}
+	timeoutDuration := 10 * time.Second
+	stdout, _, err := runtimeService.ExecSync(cn, cmd, timeoutDuration)
+	require.NoError(t, err)
+	t.Logf("Exec response: %v", stdout)
+	require.Equal(t, "hello\r\n", string(stdout))
 
 	t.Log("Stop the container")
 	require.NoError(t, runtimeService.StopContainer(cn, 0))
@@ -187,6 +194,6 @@ func TestArgsEscapedImagesOnWindows(t *testing.T) {
 		localSystemUsername,
 	)
 
-	runAndRemoveContainer(t, sb, sbConfig, cnConfigWithCtrCmd)
-	runAndRemoveContainer(t, sb, sbConfig, cnConfigNoCtrCmd)
+	runExecAndRemoveContainer(t, sb, sbConfig, cnConfigWithCtrCmd)
+	runExecAndRemoveContainer(t, sb, sbConfig, cnConfigNoCtrCmd)
 }
