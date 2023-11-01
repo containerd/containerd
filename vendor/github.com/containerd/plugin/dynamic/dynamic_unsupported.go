@@ -1,3 +1,5 @@
+//go:build (!amd64 && !arm64) || static_build || gccgo
+
 /*
    Copyright The containerd Authors.
 
@@ -14,21 +16,13 @@
    limitations under the License.
 */
 
-package plugin
+package dynamic
 
-import (
-	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-)
-
-func init() {
-	registry.Register(&plugin.Registration{
-		Type: plugins.EventPlugin,
-		ID:   "exchange",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return exchange.NewExchange(), nil
-		},
-	})
+// loadPlugins is not supported;
+//
+// - with gccgo: gccgo has no plugin support golang/go#36403
+// - on static builds; https://github.com/containerd/containerd/commit/0d682e24a1ba8e93e5e54a73d64f7d256f87492f
+// - on architectures other than amd64 and arm64 (other architectures need to be tested)
+func loadPlugins(path string) (int, error) {
+	return 0, nil
 }

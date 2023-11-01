@@ -24,11 +24,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/tracing"
-	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -73,18 +72,8 @@ func init() {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
 			}
 			procs := make([]trace.SpanProcessor, 0, len(plugins))
-			for id, pctx := range plugins {
-				p, err := pctx.Instance()
-				if err != nil {
-					if plugin.IsSkipPlugin(err) {
-						log.G(ic.Context).WithError(err).Infof("skipping tracing processor initialization (no tracing plugin)")
-					} else {
-						log.G(ic.Context).WithError(err).Errorf("failed to initialize a tracing processor %q", id)
-					}
-					continue
-				}
-				proc := p.(trace.SpanProcessor)
-				procs = append(procs, proc)
+			for _, p := range plugins {
+				procs = append(procs, p.(trace.SpanProcessor))
 			}
 			return newTracer(ic.Context, ic.Config.(*TraceConfig), procs)
 		},

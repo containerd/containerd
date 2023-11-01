@@ -18,18 +18,17 @@ package snapshots
 
 import (
 	"context"
-	"errors"
 
 	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
 )
 
@@ -52,20 +51,11 @@ type service struct {
 }
 
 func newService(ic *plugin.InitContext) (interface{}, error) {
-	sps, err := ic.GetByType(plugins.ServicePlugin)
+	i, err := ic.GetByID(plugins.ServicePlugin, services.SnapshotsService)
 	if err != nil {
 		return nil, err
 	}
-	p, ok := sps[services.SnapshotsService]
-	if !ok {
-		return nil, errors.New("snapshots service not found")
-	}
-	i, err := p.Instance()
-	if err != nil {
-		return nil, err
-	}
-	ss := i.(map[string]snapshots.Snapshotter)
-	return &service{ss: ss}, nil
+	return &service{ss: i.(map[string]snapshots.Snapshotter)}, nil
 }
 
 func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {

@@ -34,13 +34,13 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/services/warning"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -49,16 +49,7 @@ func init() {
 		ID:       services.IntrospectionService,
 		Requires: []plugin.Type{plugins.WarningPlugin},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sps, err := ic.GetByType(plugins.WarningPlugin)
-			if err != nil {
-				return nil, err
-			}
-			p, ok := sps[plugins.DeprecationsPlugin]
-			if !ok {
-				return nil, errors.New("warning service not found")
-			}
-
-			i, err := p.Instance()
+			i, err := ic.GetByID(plugins.WarningPlugin, plugins.DeprecationsPlugin)
 			if err != nil {
 				return nil, err
 			}

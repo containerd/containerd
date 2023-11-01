@@ -22,11 +22,11 @@ import (
 	"errors"
 
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/snapshots/overlay"
 	"github.com/containerd/containerd/v2/snapshots/overlay/overlayutils"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 const (

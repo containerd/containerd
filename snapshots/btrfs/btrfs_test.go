@@ -31,10 +31,10 @@ import (
 
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
+	"github.com/containerd/plugin"
 	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )

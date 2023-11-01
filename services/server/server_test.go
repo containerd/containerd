@@ -20,9 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -18,13 +18,12 @@ package diff
 
 import (
 	"context"
-	"errors"
 
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
 )
 
@@ -36,15 +35,7 @@ func init() {
 			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sps, err := ic.GetByType(plugins.ServicePlugin)
-			if err != nil {
-				return nil, err
-			}
-			p, ok := sps[services.DiffService]
-			if !ok {
-				return nil, errors.New("diff service not found")
-			}
-			i, err := p.Instance()
+			i, err := ic.GetByID(plugins.ServicePlugin, services.DiffService)
 			if err != nil {
 				return nil, err
 			}

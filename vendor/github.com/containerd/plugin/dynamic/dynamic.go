@@ -14,21 +14,24 @@
    limitations under the License.
 */
 
-package plugin
+package dynamic
 
-import (
-	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-)
+import "fmt"
 
-func init() {
-	registry.Register(&plugin.Registration{
-		Type: plugins.EventPlugin,
-		ID:   "exchange",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return exchange.NewExchange(), nil
-		},
-	})
+// Load loads all plugins at the provided path into containerd.
+//
+// Load is currently only implemented on non-static, non-gccgo builds for amd64
+// and arm64, and plugins must be built with the exact same version of Go as
+// containerd itself.
+func Load(path string) (loaded int, err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			rerr, ok := v.(error)
+			if !ok {
+				rerr = fmt.Errorf("%s", v)
+			}
+			err = rerr
+		}
+	}()
+	return loadPlugins(path)
 }

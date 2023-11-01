@@ -142,6 +142,11 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
+# github.com/containerd/plugin v0.0.0-20231101173250-7ec69893e1e7
+## explicit; go 1.20
+github.com/containerd/plugin
+github.com/containerd/plugin/dynamic
+github.com/containerd/plugin/registry
 # github.com/containerd/ttrpc v1.2.2
 ## explicit; go 1.13
 github.com/containerd/ttrpc
