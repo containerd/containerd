@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -28,6 +30,7 @@ func TestValidateConfig(t *testing.T) {
 		config      *PluginConfig
 		expectedErr string
 		expected    *PluginConfig
+		warnings    []deprecation.Warning
 	}{
 		"no default_runtime_name": {
 			config:      &PluginConfig{},
@@ -143,12 +146,17 @@ func TestValidateConfig(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			err := ValidatePluginConfig(context.Background(), test.config)
+			w, err := ValidatePluginConfig(context.Background(), test.config)
 			if test.expectedErr != "" {
 				assert.Contains(t, err.Error(), test.expectedErr)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, test.expected, test.config)
+			}
+			if len(test.warnings) > 0 {
+				assert.ElementsMatch(t, test.warnings, w)
+			} else {
+				assert.Len(t, w, 0)
 			}
 		})
 	}
