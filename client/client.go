@@ -82,7 +82,7 @@ func init() {
 
 // New returns a new containerd client that is connected to the containerd
 // instance provided by address
-func New(address string, opts ...ClientOpt) (*Client, error) {
+func New(address string, opts ...Opt) (*Client, error) {
 	var copts clientOpts
 	for _, o := range opts {
 		if err := o(&copts); err != nil {
@@ -174,7 +174,7 @@ func New(address string, opts ...ClientOpt) (*Client, error) {
 
 // NewWithConn returns a new containerd client that is connected to the containerd
 // instance provided by the connection
-func NewWithConn(conn *grpc.ClientConn, opts ...ClientOpt) (*Client, error) {
+func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 	var copts clientOpts
 	for _, o := range opts {
 		if err := o(&copts); err != nil {

@@ -189,7 +189,7 @@ func TestMain(m *testing.M) {
 	os.Exit(status)
 }
 
-func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {
+func newClient(t testing.TB, address string, opts ...Opt) (*Client, error) {
 	if testing.Short() {
 		t.Skip()
 	}
