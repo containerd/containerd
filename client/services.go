@@ -183,7 +183,7 @@ func WithSandboxStore(client sandbox.Store) ServicesOpt {
 
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
-func WithInMemoryServices(ic *plugin.InitContext) ClientOpt {
+func WithInMemoryServices(ic *plugin.InitContext) Opt {
 	return func(c *clientOpts) error {
 		var opts []ServicesOpt
 		for t, fn := range map[plugin.Type]func(interface{}) ServicesOpt{

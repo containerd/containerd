@@ -38,14 +38,14 @@ type clientOpts struct {
 	timeout         time.Duration
 }
 
-// ClientOpt allows callers to set options on the containerd client
-type ClientOpt func(c *clientOpts) error
+// Opt allows callers to set options on the containerd client
+type Opt func(c *clientOpts) error
 
 // WithDefaultNamespace sets the default namespace on the client
 //
 // Any operation that does not have a namespace set on the context will
 // be provided the default namespace
-func WithDefaultNamespace(ns string) ClientOpt {
+func WithDefaultNamespace(ns string) Opt {
 	return func(c *clientOpts) error {
 		c.defaultns = ns
 		return nil
@@ -53,7 +53,7 @@ func WithDefaultNamespace(ns string) ClientOpt {
 }
 
 // WithDefaultRuntime sets the default runtime on the client
-func WithDefaultRuntime(rt string) ClientOpt {
+func WithDefaultRuntime(rt string) Opt {
 	return func(c *clientOpts) error {
 		c.defaultRuntime = rt
 		return nil
@@ -61,7 +61,7 @@ func WithDefaultRuntime(rt string) ClientOpt {
 }
 
 // WithDefaultPlatform sets the default platform matcher on the client
-func WithDefaultPlatform(platform platforms.MatchComparer) ClientOpt {
+func WithDefaultPlatform(platform platforms.MatchComparer) Opt {
 	return func(c *clientOpts) error {
 		c.defaultPlatform = platform
 		return nil
@@ -69,7 +69,7 @@ func WithDefaultPlatform(platform platforms.MatchComparer) ClientOpt {
 }
 
 // WithDialOpts allows grpc.DialOptions to be set on the connection
-func WithDialOpts(opts []grpc.DialOption) ClientOpt {
+func WithDialOpts(opts []grpc.DialOption) Opt {
 	return func(c *clientOpts) error {
 		c.dialOptions = opts
 		return nil
@@ -77,7 +77,7 @@ func WithDialOpts(opts []grpc.DialOption) ClientOpt {
 }
 
 // WithCallOpts allows grpc.CallOptions to be set on the connection
-func WithCallOpts(opts []grpc.CallOption) ClientOpt {
+func WithCallOpts(opts []grpc.CallOption) Opt {
 	return func(c *clientOpts) error {
 		c.callOptions = opts
 		return nil
@@ -85,7 +85,7 @@ func WithCallOpts(opts []grpc.CallOption) ClientOpt {
 }
 
 // WithServices sets services used by the client.
-func WithServices(opts ...ServicesOpt) ClientOpt {
+func WithServices(opts ...ServicesOpt) Opt {
 	return func(c *clientOpts) error {
 		c.services = &services{}
 		for _, o := range opts {
@@ -96,7 +96,7 @@ func WithServices(opts ...ServicesOpt) ClientOpt {
 }
 
 // WithTimeout sets the connection timeout for the client
-func WithTimeout(d time.Duration) ClientOpt {
+func WithTimeout(d time.Duration) Opt {
 	return func(c *clientOpts) error {
 		c.timeout = d
 		return nil
