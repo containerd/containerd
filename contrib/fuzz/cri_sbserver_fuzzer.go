@@ -21,7 +21,7 @@ package fuzz
 import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 )

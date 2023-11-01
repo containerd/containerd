@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2"
 	eventtypes "github.com/containerd/containerd/v2/api/events"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"

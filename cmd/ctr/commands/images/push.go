@@ -26,7 +26,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
 	"github.com/containerd/containerd/v2/images"

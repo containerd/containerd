@@ -19,7 +19,7 @@ package container
 import (
 	"sync"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	cio "github.com/containerd/containerd/v2/pkg/cri/io"
 	"github.com/containerd/containerd/v2/pkg/cri/store"

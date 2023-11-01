@@ -19,7 +19,7 @@ package commands
 import (
 	gocontext "context"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/log"

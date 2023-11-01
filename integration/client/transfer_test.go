@@ -23,7 +23,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/transfer/archive"
 )
 

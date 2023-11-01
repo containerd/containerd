@@ -36,8 +36,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/log"
 )

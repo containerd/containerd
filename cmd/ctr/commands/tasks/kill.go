@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	gocni "github.com/containerd/go-cni"
 	"github.com/containerd/log"

@@ -21,7 +21,7 @@ package nri
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	cstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
