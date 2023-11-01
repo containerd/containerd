@@ -36,8 +36,8 @@ import (
 	"github.com/pelletier/go-toml/v2"
 
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
 )
 
 // CurrentConfigVersion is the max config version which is supported

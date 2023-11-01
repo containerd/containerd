@@ -34,14 +34,14 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cleanup"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/runtime"
 	shimbinary "github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 // Config for the v2 runtime
@@ -72,7 +72,7 @@ func init() {
 
 			ic.Meta.Platforms = supportedPlatforms
 
-			m, err := ic.Get(plugins.MetadataPlugin)
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}

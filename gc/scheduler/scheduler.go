@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/gc"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 // config configures the garbage collection policies.
@@ -112,7 +112,7 @@ func init() {
 			StartupDelay:      duration(100 * time.Millisecond),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			md, err := ic.Get(plugins.MetadataPlugin)
+			md, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}

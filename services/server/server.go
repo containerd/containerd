@@ -59,15 +59,15 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/dynamic"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	sbproxy "github.com/containerd/containerd/v2/sandbox/proxy"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/containerd/v2/services/warning"
 	ssproxy "github.com/containerd/containerd/v2/snapshots/proxy"
 	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/dynamic"
+	"github.com/containerd/plugin/registry"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -341,9 +341,9 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 // recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
 func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
 	// record any detected deprecations without blocking server startup
-	plugin, err := set.GetByID(plugins.WarningPlugin, plugins.DeprecationsPlugin)
-	if err != nil {
-		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+	plugin := set.Get(plugins.WarningPlugin, plugins.DeprecationsPlugin)
+	if plugin == nil {
+		log.G(ctx).Warn("failed to find warning service to record deprecations")
 		return
 	}
 	instance, err := plugin.Instance()

@@ -27,11 +27,11 @@ import (
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -99,7 +99,7 @@ func init() {
 			if err := os.MkdirAll(root, 0711); err != nil {
 				return nil, err
 			}
-			cs, err := ic.Get(plugins.ContentPlugin)
+			cs, err := ic.GetSingle(plugins.ContentPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -111,18 +111,10 @@ func init() {
 
 			snapshotters := make(map[string]snapshots.Snapshotter)
 			for name, sn := range snapshottersRaw {
-				sn, err := sn.Instance()
-				if err != nil {
-					if !plugin.IsSkipPlugin(err) {
-						log.G(ic.Context).WithError(err).
-							Warnf("could not use snapshotter %v in metadata plugin", name)
-					}
-					continue
-				}
 				snapshotters[name] = sn.(snapshots.Snapshotter)
 			}
 
-			ep, err := ic.Get(plugins.EventPlugin)
+			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}

@@ -18,7 +18,6 @@ package sandbox
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -29,13 +28,13 @@ import (
 	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -47,20 +46,12 @@ func init() {
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugs, err := ic.GetByType(plugins.ServicePlugin)
-			if err != nil {
-				return nil, err
-			}
-			p, ok := plugs[services.SandboxControllersService]
-			if !ok {
-				return nil, errors.New("sandboxes service not found")
-			}
-			i, err := p.Instance()
+			i, err := ic.GetByID(plugins.ServicePlugin, services.SandboxControllersService)
 			if err != nil {
 				return nil, err
 			}
 			sc := i.(map[string]sandbox.Controller)
-			ep, err := ic.Get(plugins.EventPlugin)
+			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}

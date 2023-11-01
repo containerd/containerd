@@ -20,7 +20,7 @@
 // package.
 package plugins
 
-import "github.com/containerd/containerd/v2/plugin"
+import "github.com/containerd/plugin"
 
 const (
 	// InternalPlugin implements an internal plugin to containerd

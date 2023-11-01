@@ -36,13 +36,13 @@ import (
 	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

@@ -23,10 +23,10 @@ import (
 	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/metadata"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	digest "github.com/opencontainers/go-digest"
 )
 
@@ -45,11 +45,11 @@ func init() {
 			plugins.MetadataPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugins.MetadataPlugin)
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.Get(plugins.EventPlugin)
+			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}

@@ -25,10 +25,10 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/grpc"
@@ -66,13 +66,9 @@ func init() {
 			orderedNames := ic.Config.(*config).Order
 			ordered := make([]differ, len(orderedNames))
 			for i, n := range orderedNames {
-				differp, ok := differs[n]
+				d, ok := differs[n]
 				if !ok {
 					return nil, fmt.Errorf("needed differ not loaded: %s", n)
-				}
-				d, err := differp.Instance()
-				if err != nil {
-					return nil, fmt.Errorf("could not load required differ due plugin init error: %s: %w", n, err)
 				}
 
 				ordered[i], ok = d.(differ)

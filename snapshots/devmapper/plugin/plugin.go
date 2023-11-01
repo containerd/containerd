@@ -23,10 +23,10 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/snapshots/devmapper"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
