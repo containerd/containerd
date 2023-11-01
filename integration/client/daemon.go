@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"time"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 	exec "golang.org/x/sys/execabs"
 )
 

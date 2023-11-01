@@ -19,7 +19,7 @@ package transfer
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/leases"

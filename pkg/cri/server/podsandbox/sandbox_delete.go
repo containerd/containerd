@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2"
 	apitasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/log"
 )

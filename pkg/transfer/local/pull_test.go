@@ -19,7 +19,7 @@ package local
 import (
 	"testing"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/unpack"
 	"github.com/containerd/containerd/v2/platforms"

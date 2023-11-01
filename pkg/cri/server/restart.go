@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2"
 	containerdio "github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	containerdimages "github.com/containerd/containerd/v2/images"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"

@@ -24,7 +24,7 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/images/archive"

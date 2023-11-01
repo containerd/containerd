@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	criopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

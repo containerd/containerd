@@ -33,7 +33,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var

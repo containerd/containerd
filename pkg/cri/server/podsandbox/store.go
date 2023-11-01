@@ -19,7 +19,7 @@ package podsandbox
 import (
 	"sync"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 )
 
 type Status struct {

@@ -29,8 +29,8 @@ import (
 	"syscall"
 	"testing"
 
-	. "github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/oci"
 )
 

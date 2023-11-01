@@ -32,9 +32,9 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/archive/compression"
 	"github.com/containerd/containerd/v2/archive/tartest"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/images/archive"
 	"github.com/containerd/containerd/v2/leases"

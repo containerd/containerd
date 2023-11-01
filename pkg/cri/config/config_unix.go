@@ -21,7 +21,7 @@ package config
 import (
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/pelletier/go-toml/v2"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )

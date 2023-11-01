@@ -30,8 +30,8 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/containerd/containerd/v2"
 	eventtypes "github.com/containerd/containerd/v2/api/events"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/runtime/restart"

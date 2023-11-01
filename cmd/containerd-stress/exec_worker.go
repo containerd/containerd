@@ -23,8 +23,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
