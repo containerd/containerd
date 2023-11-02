@@ -23,8 +23,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/v2/containers"

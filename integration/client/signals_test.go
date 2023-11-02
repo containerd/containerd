@@ -21,7 +21,7 @@ import (
 	"syscall"
 	"testing"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 )
 
 func TestParseSignal(t *testing.T) {

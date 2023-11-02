@@ -32,7 +32,7 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/pkg/apparmor"
 	"github.com/containerd/containerd/v2/pkg/seccomp"

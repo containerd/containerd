@@ -32,7 +32,7 @@ import (
 	"go.opentelemetry.io/otel"
 	exec "golang.org/x/sys/execabs"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
@@ -189,7 +189,7 @@ func TestMain(m *testing.M) {
 	os.Exit(status)
 }
 
-func newClient(t testing.TB, address string, opts ...ClientOpt) (*Client, error) {
+func newClient(t testing.TB, address string, opts ...Opt) (*Client, error) {
 	if testing.Short() {
 		t.Skip()
 	}

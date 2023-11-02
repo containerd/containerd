@@ -25,7 +25,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/images/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer"

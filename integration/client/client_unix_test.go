@@ -21,7 +21,7 @@ package client
 import (
 	"testing"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/platforms"
 )

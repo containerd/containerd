@@ -26,8 +26,8 @@ import (
 	"os/signal"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/unix"

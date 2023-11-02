@@ -22,7 +22,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugin"

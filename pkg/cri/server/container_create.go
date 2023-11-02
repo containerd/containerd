@@ -33,7 +33,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/blockio"

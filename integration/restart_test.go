@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

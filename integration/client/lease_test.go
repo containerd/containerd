@@ -20,7 +20,7 @@ import (
 	"runtime"
 	"testing"
 
-	. "github.com/containerd/containerd/v2"
+	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	imagelist "github.com/containerd/containerd/v2/integration/images"

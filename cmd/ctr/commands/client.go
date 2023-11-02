@@ -19,7 +19,7 @@ package commands
 import (
 	gocontext "context"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/log"
@@ -54,7 +54,7 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 }
 
 // NewClient returns a new containerd client
-func NewClient(context *cli.Context, opts ...containerd.ClientOpt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
+func NewClient(context *cli.Context, opts ...containerd.Opt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
 	timeoutOpt := containerd.WithTimeout(context.GlobalDuration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
 	client, err := containerd.New(context.GlobalString("address"), opts...)

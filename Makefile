@@ -81,7 +81,7 @@ STATICRELEASE=containerd-static-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRIRELEASE=cri-containerd-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 CRICNIRELEASE=cri-containerd-cni-$(VERSION:v%=%)-${GOOS}-${GOARCH}
 
-PKG=github.com/containerd/containerd
+PKG=github.com/containerd/containerd/v2
 
 # Project binaries.
 COMMANDS=ctr containerd containerd-stress

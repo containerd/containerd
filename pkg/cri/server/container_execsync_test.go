@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2"
 	"github.com/containerd/containerd/v2/cio"
+	containerd "github.com/containerd/containerd/v2/client"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 	"github.com/stretchr/testify/assert"
 )

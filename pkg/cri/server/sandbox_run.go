@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/cri/bandwidth"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"

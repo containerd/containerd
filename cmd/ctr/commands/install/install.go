@@ -17,7 +17,7 @@
 package install
 
 import (
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/urfave/cli"
 )

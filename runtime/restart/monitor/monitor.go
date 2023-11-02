@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/containerd/v2/plugin/registry"

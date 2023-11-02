@@ -26,7 +26,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/snapshots"

@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/log"

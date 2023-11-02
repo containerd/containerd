@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/v2"
+	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
