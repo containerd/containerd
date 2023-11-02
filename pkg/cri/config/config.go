@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
 type SandboxControllerMode string
@@ -365,22 +367,23 @@ const (
 )
 
 // ValidatePluginConfig validates the given plugin configuration.
-func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
+func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.Warning, error) {
+	var warnings []deprecation.Warning
 	if c.ContainerdConfig.Runtimes == nil {
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
 	}
 
 	// Validation for default_runtime_name
 	if c.ContainerdConfig.DefaultRuntimeName == "" {
-		return errors.New("`default_runtime_name` is empty")
+		return warnings, errors.New("`default_runtime_name` is empty")
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
 		// If empty, use default podSandbox mode
 		if len(r.Sandboxer) == 0 {
@@ -392,9 +395,15 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 	useConfigPath := c.Registry.ConfigPath != ""
 	if len(c.Registry.Mirrors) > 0 {
 		if useConfigPath {
-			return errors.New("`mirrors` cannot be set when `config_path` is provided")
+			return warnings, errors.New("`mirrors` cannot be set when `config_path` is provided")
 		}
+		warnings = append(warnings, deprecation.CRIRegistryMirrors)
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
+	}
+
+	if len(c.Registry.Configs) != 0 {
+		warnings = append(warnings, deprecation.CRIRegistryConfigs)
+		log.G(ctx).Warning("`configs` is deprecated, please use `config_path` instead")
 	}
 
 	// Validation for deprecated auths options and mapping it to configs.
@@ -406,7 +415,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			auth := auth
 			u, err := url.Parse(endpoint)
 			if err != nil {
-				return fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
+				return warnings, fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
 			}
 			if u.Scheme != "" {
 				// Do not include the scheme in the new registry config.
@@ -416,28 +425,29 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) error {
 			config.Auth = &auth
 			c.Registry.Configs[endpoint] = config
 		}
-		log.G(ctx).Warning("`auths` is deprecated, please use `configs` instead")
+		warnings = append(warnings, deprecation.CRIRegistryAuths)
+		log.G(ctx).Warning("`auths` is deprecated, please use `ImagePullSecrets` instead")
 	}
 
 	// Validation for stream_idle_timeout
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
-			return fmt.Errorf("invalid stream idle timeout: %w", err)
+			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
 		}
 	}
 
 	// Validation for image_pull_progress_timeout
 	if c.ImagePullProgressTimeout != "" {
 		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
-			return fmt.Errorf("invalid image pull progress timeout: %w", err)
+			return warnings, fmt.Errorf("invalid image pull progress timeout: %w", err)
 		}
 	}
 
 	// Validation for drain_exec_sync_io_timeout
 	if c.DrainExecSyncIOTimeout != "" {
 		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
-			return fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
+			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
-	return nil
+	return warnings, nil
 }
