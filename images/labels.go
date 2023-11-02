@@ -1,5 +1,3 @@
-//go:build !go1.8 || windows || !amd64 || static_build || gccgo
-
 /*
    Copyright The containerd Authors.
 
@@ -16,9 +14,8 @@
    limitations under the License.
 */
 
-package plugin
+package images
 
-func loadPlugins(path string) (int, error) {
-	// plugins not supported until 1.8
-	return 0, nil
-}
+const (
+	ConvertedDockerSchema1LabelKey = "io.containerd.image/converted-docker-schema1"
+)
