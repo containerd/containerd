@@ -81,6 +81,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryAuths},
 		},
 		"invalid stream_idle_timeout": {
 			config: &PluginConfig{
