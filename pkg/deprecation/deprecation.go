@@ -29,6 +29,8 @@ const (
 	CRIRegistryMirrors Warning = Prefix + "cri-registry-mirrors"
 	// CRIRegistryAuths is a warning for the use of the `auths` property
 	CRIRegistryAuths Warning = Prefix + "cri-registry-auths"
+	// CRIRegistryConfigs is a warning for the use of the `configs` property
+	CRIRegistryConfigs Warning = Prefix + "cri-registry-configs"
 )
 
 var messages = map[Warning]string{
@@ -39,6 +41,8 @@ var messages = map[Warning]string{
 		"Use `config_path` instead.",
 	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.0." +
 		"Use `ImagePullSecrets` instead.",
+	CRIRegistryConfigs: "The `configs` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.0." +
+		"Use `config_path` instead.",
 }
 
 // Valid checks whether a given Warning is valid

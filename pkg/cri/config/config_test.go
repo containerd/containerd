@@ -393,6 +393,43 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
 		},
+		"deprecated configs": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			w, err := ValidatePluginConfig(context.Background(), test.config)
