@@ -24,10 +24,10 @@ import (
 	v1 "github.com/containerd/containerd/v2/metrics/cgroups/v1"
 	v2 "github.com/containerd/containerd/v2/metrics/cgroups/v2"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/runtime"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	metrics "github.com/docker/go-metrics"
 )
 
@@ -60,7 +60,7 @@ func New(ic *plugin.InitContext) (interface{}, error) {
 		err error
 	)
 
-	ep, err := ic.Get(plugins.EventPlugin)
+	ep, err := ic.GetSingle(plugins.EventPlugin)
 	if err != nil {
 		return nil, err
 	}

@@ -29,10 +29,10 @@ import (
 	"github.com/containerd/continuity/fs"
 
 	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
 )
 
 type snapshotter struct {

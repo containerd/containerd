@@ -19,8 +19,8 @@
 package tasks
 
 import (
-	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/plugin"
 )
 
 var tasksServiceRequires = []plugin.Type{

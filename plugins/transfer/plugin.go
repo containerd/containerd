@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/containerd/v2/pkg/transfer/local"
 	"github.com/containerd/containerd/v2/pkg/unpack"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/v2/pkg/transfer/archive"
@@ -53,12 +53,12 @@ func init() {
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			config := ic.Config.(*transferConfig)
-			m, err := ic.Get(plugins.MetadataPlugin)
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
 			ms := m.(*metadata.DB)
-			l, err := ic.Get(plugins.LeasePlugin)
+			l, err := ic.GetSingle(plugins.LeasePlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -70,11 +70,7 @@ func init() {
 			}
 
 			for name, vp := range vps {
-				inst, err := vp.Instance()
-				if err != nil {
-					return nil, err
-				}
-				vfs[name] = inst.(imageverifier.ImageVerifier)
+				vfs[name] = vp.(imageverifier.ImageVerifier)
 			}
 
 			// Set configuration based on default or user input
@@ -92,24 +88,19 @@ func init() {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
 
-				diffPlugins, err := ic.GetByType(plugins.DiffPlugin)
-				if err != nil {
-					return nil, fmt.Errorf("error loading diff plugins: %w", err)
-				}
 				var applier diff.Applier
 				target := platforms.OnlyStrict(p)
 				if uc.Differ != "" {
-					plugin, ok := diffPlugins[uc.Differ]
-					if !ok {
-						return nil, fmt.Errorf("diff plugin %q: %w", uc.Differ, errdefs.ErrNotFound)
-					}
-					inst, err := plugin.Instance()
+					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
 					if err != nil {
 						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
 					}
 					applier = inst.(diff.Applier)
 				} else {
-					for name, plugin := range diffPlugins {
+					for name, plugin := range ic.GetAll() {
+						if plugin.Registration.Type != plugins.DiffPlugin {
+							continue
+						}
 						var matched bool
 						for _, p := range plugin.Meta.Platforms {
 							if target.Match(p) {

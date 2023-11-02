@@ -30,12 +30,12 @@ import (
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/plugin"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/sandbox"
 	srv "github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/services/introspection"
 	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/plugin"
 )
 
 type services struct {
@@ -197,7 +197,7 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 				return WithSandboxStore(i.(sandbox.Store))
 			},
 		} {
-			i, err := ic.Get(t)
+			i, err := ic.GetSingle(t)
 			if err != nil {
 				return fmt.Errorf("failed to get %q plugin: %w", t, err)
 			}
@@ -237,16 +237,9 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 				return WithIntrospectionClient(s.(introspectionapi.IntrospectionClient))
 			},
 		} {
-			p := plugins[s]
-			if p == nil {
-				return fmt.Errorf("service %q not found", s)
-			}
-			i, err := p.Instance()
-			if err != nil {
-				return fmt.Errorf("failed to get instance of service %q: %w", s, err)
-			}
+			i := plugins[s]
 			if i == nil {
-				return fmt.Errorf("instance of service %q not found", s)
+				return fmt.Errorf("service %q not found", s)
 			}
 			opts = append(opts, fn(i))
 		}

@@ -25,9 +25,8 @@ import (
 	"runtime"
 )
 
-// loadPlugins loads all plugins for the OS and Arch that containerd is built
-// for inside the provided path and returns the count of successfully-loaded
-// plugins
+// loadPlugins loads all plugins for the OS and Arch
+// that containerd is built for inside the provided path
 func loadPlugins(path string) (int, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {

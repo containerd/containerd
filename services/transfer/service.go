@@ -25,11 +25,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tplugins "github.com/containerd/containerd/v2/pkg/transfer/plugins"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -64,11 +64,7 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 	// TODO: how to determine order?
 	t := make([]transfer.Transferrer, 0, len(sps))
 	for _, p := range sps {
-		i, err := p.Instance()
-		if err != nil {
-			return nil, err
-		}
-		t = append(t, i.(transfer.Transferrer))
+		t = append(t, p.(transfer.Transferrer))
 	}
 	sp, err := ic.GetByID(plugins.StreamingPlugin, "manager")
 	if err != nil {

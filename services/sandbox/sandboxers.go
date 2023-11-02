@@ -17,11 +17,11 @@
 package sandbox
 
 import (
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -38,11 +38,7 @@ func init() {
 			}
 			sandboxers := make(map[string]sandbox.Controller)
 			for name, srv := range sandboxesRaw {
-				inst, err := srv.Instance()
-				if err != nil {
-					return nil, err
-				}
-				sandboxers[name] = inst.(sandbox.Controller)
+				sandboxers[name] = srv.(sandbox.Controller)
 			}
 			return sandboxers, nil
 		},

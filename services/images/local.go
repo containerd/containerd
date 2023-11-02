@@ -33,12 +33,12 @@ import (
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/epoch"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/services/warning"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -52,19 +52,19 @@ func init() {
 			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.Get(plugins.MetadataPlugin)
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
-			g, err := ic.Get(plugins.GCPlugin)
+			g, err := ic.GetSingle(plugins.GCPlugin)
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.Get(plugins.EventPlugin)
+			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}
-			w, err := ic.Get(plugins.WarningPlugin)
+			w, err := ic.GetSingle(plugins.WarningPlugin)
 			if err != nil {
 				return nil, err
 			}

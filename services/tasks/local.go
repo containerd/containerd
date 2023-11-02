@@ -41,8 +41,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/rdt"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/protobuf/proto"
@@ -51,6 +49,8 @@ import (
 	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -96,17 +96,17 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 
-	m, err := ic.Get(plugins.MetadataPlugin)
+	m, err := ic.GetSingle(plugins.MetadataPlugin)
 	if err != nil {
 		return nil, err
 	}
 
-	ep, err := ic.Get(plugins.EventPlugin)
+	ep, err := ic.GetSingle(plugins.EventPlugin)
 	if err != nil {
 		return nil, err
 	}
 
-	monitor, err := ic.Get(plugins.TaskMonitorPlugin)
+	monitor, err := ic.GetSingle(plugins.TaskMonitorPlugin)
 	if err != nil {
 		if !errors.Is(err, plugin.ErrPluginNotFound) {
 			return nil, err

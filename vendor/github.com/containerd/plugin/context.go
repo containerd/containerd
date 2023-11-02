@@ -51,11 +51,6 @@ func NewContext(ctx context.Context, plugins *Set, properties map[string]string)
 	}
 }
 
-// Get returns the first plugin by its type
-func (i *InitContext) Get(t Type) (interface{}, error) {
-	return i.plugins.Get(t)
-}
-
 // Meta contains information gathered from the registration and initialization
 // process.
 type Meta struct {
@@ -119,30 +114,49 @@ func (ps *Set) Add(p *Plugin) error {
 	return nil
 }
 
-// Get returns the first plugin by its type
-func (ps *Set) Get(t Type) (interface{}, error) {
-	for _, v := range ps.byTypeAndID[t] {
-		return v.Instance()
-	}
-	return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
-}
-
-// GetByID returns the plugin of the given type and ID
-func (ps *Set) GetByID(t Type, id string) (*Plugin, error) {
-	typSet, ok := ps.byTypeAndID[t]
-	if !ok || len(typSet) == 0 {
-		return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
-	}
-	p, ok := typSet[id]
+// Get returns the plugin with the given type and id
+func (ps *Set) Get(t Type, id string) *Plugin {
+	p, ok := ps.byTypeAndID[t]
 	if !ok {
-		return nil, fmt.Errorf("no plugins registered for %s %q: %w", t, id, ErrPluginNotFound)
+		return nil
 	}
-	return p, nil
+	return p[id]
 }
 
 // GetAll returns all initialized plugins
 func (ps *Set) GetAll() []*Plugin {
 	return ps.ordered
+}
+
+// GetSingle returns a plugin instance of the given type when only a single instance
+// of that type is expected. Throws an ErrPluginNotFound if no plugin is found and
+// ErrPluginMultipleInstances when multiple instances are found.
+// Since plugins are not ordered, if multiple instances is suported then
+// GetByType should be used. If only one is expected, then to switch plugins,
+// disable or remove the unused plugins of the same type.
+func (i *InitContext) GetSingle(t Type) (interface{}, error) {
+	var (
+		found    bool
+		instance interface{}
+	)
+	for _, v := range i.plugins.byTypeAndID[t] {
+		i, err := v.Instance()
+		if err != nil {
+			if IsSkipPlugin(err) {
+				continue
+			}
+			return i, err
+		}
+		if found {
+			return nil, fmt.Errorf("multiple plugins registered for %s: %w", t, ErrPluginMultipleInstances)
+		}
+		instance = i
+		found = true
+	}
+	if !found {
+		return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
+	}
+	return instance, nil
 }
 
 // Plugins returns plugin set
@@ -157,23 +171,29 @@ func (i *InitContext) GetAll() []*Plugin {
 
 // GetByID returns the plugin of the given type and ID
 func (i *InitContext) GetByID(t Type, id string) (interface{}, error) {
-	ps, err := i.GetByType(t)
-	if err != nil {
-		return nil, err
-	}
-	p, ok := ps[id]
-	if !ok {
-		return nil, fmt.Errorf("no %s plugins with id %s: %w", t, id, ErrPluginNotFound)
+	p := i.plugins.Get(t, id)
+	if p == nil {
+		return nil, fmt.Errorf("no plugins registered for %s.%s: %w", t, id, ErrPluginNotFound)
 	}
 	return p.Instance()
 }
 
 // GetByType returns all plugins with the specific type.
-func (i *InitContext) GetByType(t Type) (map[string]*Plugin, error) {
-	p, ok := i.plugins.byTypeAndID[t]
-	if !ok {
+func (i *InitContext) GetByType(t Type) (map[string]interface{}, error) {
+	pi := map[string]interface{}{}
+	for id, p := range i.plugins.byTypeAndID[t] {
+		i, err := p.Instance()
+		if err != nil {
+			if IsSkipPlugin(err) {
+				continue
+			}
+			return nil, err
+		}
+		pi[id] = i
+	}
+	if len(pi) == 0 {
 		return nil, fmt.Errorf("no plugins registered for %s: %w", t, ErrPluginNotFound)
 	}
 
-	return p, nil
+	return pi, nil
 }

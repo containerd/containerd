@@ -37,6 +37,8 @@ var (
 	ErrPluginInitialized = errors.New("plugin: already initialized")
 	// ErrPluginNotFound is used when a plugin is looked up but not found
 	ErrPluginNotFound = errors.New("plugin: not found")
+	// ErrPluginMultipleInstances is used when a plugin is expected a single instance but has multiple
+	ErrPluginMultipleInstances = errors.New("plugin: multiple instances")
 
 	// ErrInvalidRequires will be thrown if the requirements for a plugin are
 	// defined in an invalid manner.

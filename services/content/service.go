@@ -17,14 +17,12 @@
 package content
 
 import (
-	"errors"
-
 	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/services/content/contentserver"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -35,15 +33,7 @@ func init() {
 			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			plugins, err := ic.GetByType(plugins.ServicePlugin)
-			if err != nil {
-				return nil, err
-			}
-			p, ok := plugins[services.ContentService]
-			if !ok {
-				return nil, errors.New("content store service not found")
-			}
-			cs, err := p.Instance()
+			cs, err := ic.GetByID(plugins.ServicePlugin, services.ContentService)
 			if err != nil {
 				return nil, err
 			}

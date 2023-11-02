@@ -18,9 +18,9 @@ package plugin
 
 import (
 	"github.com/containerd/containerd/v2/pkg/nri"
-	"github.com/containerd/containerd/v2/plugin"
-	"github.com/containerd/containerd/v2/plugin/registry"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
