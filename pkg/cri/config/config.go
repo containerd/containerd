@@ -469,6 +469,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		if useConfigPath {
 			return warnings, errors.New("`mirrors` cannot be set when `config_path` is provided")
 		}
+		warnings = append(warnings, deprecation.CRIRegistryMirrors)
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
 	}
 	var hasDeprecatedTLS bool
