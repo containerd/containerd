@@ -241,10 +241,14 @@ var (
 // LogURI provides the raw logging URI
 func LogURI(uri *url.URL) Creator {
 	return func(_ string) (IO, error) {
+		u, err := url.Parse(uri.String())
+		if err != nil {
+			return nil, err
+		}
 		return &logURI{
 			config: Config{
-				Stdout: uri.String(),
-				Stderr: uri.String(),
+				Stdout: u.Path,
+				Stderr: u.Path,
 			},
 		}, nil
 	}
@@ -254,10 +258,14 @@ func LogURI(uri *url.URL) Creator {
 // as well as sets the terminal option to true.
 func TerminalLogURI(uri *url.URL) Creator {
 	return func(_ string) (IO, error) {
+		u, err := url.Parse(uri.String())
+		if err != nil {
+			return nil, err
+		}
 		return &logURI{
 			config: Config{
-				Stdout:   uri.String(),
-				Stderr:   uri.String(),
+				Stdout:   u.Path,
+				Stderr:   u.Path,
 				Terminal: true,
 			},
 		}, nil
@@ -272,11 +280,14 @@ func BinaryIO(binary string, args map[string]string) Creator {
 			return nil, err
 		}
 
-		res := uri.String()
+		u, err := url.Parse(uri.String())
+		if err != nil {
+			return nil, err
+		}
 		return &logURI{
 			config: Config{
-				Stdout: res,
-				Stderr: res,
+				Stdout: u.Path,
+				Stderr: u.Path,
 			},
 		}, nil
 	}
@@ -291,11 +302,14 @@ func TerminalBinaryIO(binary string, args map[string]string) Creator {
 			return nil, err
 		}
 
-		res := uri.String()
+		u, err := url.Parse(uri.String())
+		if err != nil {
+			return nil, err
+		}
 		return &logURI{
 			config: Config{
-				Stdout:   res,
-				Stderr:   res,
+				Stdout:   u.Path,
+				Stderr:   u.Path,
 				Terminal: true,
 			},
 		}, nil
@@ -310,12 +324,14 @@ func LogFile(path string) Creator {
 		if err != nil {
 			return nil, err
 		}
-
-		res := uri.String()
+		u, err := url.Parse(uri.String())
+		if err != nil {
+			return nil, err
+		}
 		return &logURI{
 			config: Config{
-				Stdout: res,
-				Stderr: res,
+				Stdout: u.Path,
+				Stderr: u.Path,
 			},
 		}, nil
 	}
