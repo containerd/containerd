@@ -404,6 +404,45 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
 		},
+		"deprecated configs": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							SandboxMode: string(ModePodSandbox),
+						},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
+		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			config: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
