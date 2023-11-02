@@ -505,7 +505,8 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			config.Auth = &auth
 			c.Registry.Configs[endpoint] = config
 		}
-		log.G(ctx).Warning("`auths` is deprecated, please use `configs` instead")
+		warnings = append(warnings, deprecation.CRIRegistryAuths)
+		log.G(ctx).Warning("`auths` is deprecated, please use `ImagePullSecrets` instead")
 	}
 
 	// Validation for stream_idle_timeout
