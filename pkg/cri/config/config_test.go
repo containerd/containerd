@@ -363,6 +363,35 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`configs.tls` cannot be set when `config_path` is provided",
 		},
+		"deprecated mirrors": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			w, err := ValidatePluginConfig(context.Background(), test.config)
