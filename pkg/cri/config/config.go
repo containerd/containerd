@@ -401,6 +401,11 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
 	}
 
+	if len(c.Registry.Configs) != 0 {
+		warnings = append(warnings, deprecation.CRIRegistryConfigs)
+		log.G(ctx).Warning("`configs` is deprecated, please use `config_path` instead")
+	}
+
 	// Validation for deprecated auths options and mapping it to configs.
 	if len(c.Registry.Auths) != 0 {
 		if c.Registry.Configs == nil {
