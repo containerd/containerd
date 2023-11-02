@@ -19,6 +19,7 @@ package mount
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/containerd/continuity/testutil"
 )
@@ -82,7 +83,7 @@ func TestRwLoop(t *testing.T) {
 		}
 	}()
 
-	file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
+	file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,6 +110,56 @@ func TestAttachDetachLoopDevice(t *testing.T) {
 	}
 
 	if err = DetachLoopDevice(dev); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAutoclearTrueLoop(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	dev := func() string {
+		backingFile := createTempFile(t)
+		defer func() {
+			if err := os.Remove(backingFile); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		file, err := setupLoop(backingFile, LoopParams{Autoclear: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		dev := file.Name()
+		file.Close()
+		return dev
+	}()
+	time.Sleep(100 * time.Millisecond)
+	if err := removeLoop(dev); err == nil {
+		t.Fatalf("removeLoop should fail if Autoclear is true")
+	}
+}
+
+func TestAutoclearFalseLoop(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	dev := func() string {
+		backingFile := createTempFile(t)
+		defer func() {
+			if err := os.Remove(backingFile); err != nil {
+				t.Fatal(err)
+			}
+		}()
+
+		file, err := setupLoop(backingFile, LoopParams{Autoclear: false})
+		if err != nil {
+			t.Fatal(err)
+		}
+		dev := file.Name()
+		file.Close()
+		return dev
+	}()
+	time.Sleep(100 * time.Millisecond)
+	if err := removeLoop(dev); err != nil {
 		t.Fatal(err)
 	}
 }
