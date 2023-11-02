@@ -36,12 +36,8 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-var (
-	// ErrCheckpointRWUnsupported is returned if the container runtime does not support checkpoint
-	ErrCheckpointRWUnsupported = errors.New("rw checkpoint is only supported on v2 runtimes")
-	// ErrMediaTypeNotFound returns an error when a media type in the manifest is unknown
-	ErrMediaTypeNotFound = errors.New("media type not found")
-)
+// ErrMediaTypeNotFound returns an error when a media type in the manifest is unknown
+var ErrMediaTypeNotFound = errors.New("media type not found")
 
 // CheckpointOpts are options to manage the checkpoint operation
 type CheckpointOpts func(context.Context, *Client, *containers.Container, *imagespec.Index, *options.CheckpointOptions) error
