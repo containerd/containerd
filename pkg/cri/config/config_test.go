@@ -115,6 +115,37 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`mirrors` cannot be set when `config_path` is provided",
 		},
+		"deprecated mirrors": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
+		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			config: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
