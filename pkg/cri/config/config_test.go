@@ -21,8 +21,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/plugin"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/plugin"
+
+	"github.com/containerd/containerd/pkg/deprecation"
 )
 
 func TestValidateConfig(t *testing.T) {
@@ -30,6 +33,7 @@ func TestValidateConfig(t *testing.T) {
 		config      *PluginConfig
 		expectedErr string
 		expected    *PluginConfig
+		warnings    []deprecation.Warning
 	}{
 		"deprecated untrusted_workload_runtime": {
 			config: &PluginConfig{
@@ -313,6 +317,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryAuths},
 		},
 		"invalid stream_idle_timeout": {
 			config: &PluginConfig{
@@ -368,6 +373,76 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "`configs.tls` cannot be set when `config_path` is provided",
 		},
+		"deprecated mirrors": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							SandboxMode: string(ModePodSandbox),
+						},
+					},
+				},
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
+		},
+		"deprecated configs": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							SandboxMode: string(ModePodSandbox),
+						},
+					},
+				},
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
+							},
+						},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
+		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			config: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
@@ -399,12 +474,17 @@ func TestValidateConfig(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			err := ValidatePluginConfig(context.Background(), test.config)
+			w, err := ValidatePluginConfig(context.Background(), test.config)
 			if test.expectedErr != "" {
 				assert.Contains(t, err.Error(), test.expectedErr)
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, test.expected, test.config)
+			}
+			if len(test.warnings) > 0 {
+				assert.ElementsMatch(t, test.warnings, w)
+			} else {
+				assert.Len(t, w, 0)
 			}
 		})
 	}
