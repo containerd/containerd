@@ -502,8 +502,7 @@ jobs:
 
   vagrant:
     name: Vagrant
-    # nested virtualization is only available on macOS hosts
-    runs-on: macos-12
+    runs-on: ubuntu-latest-4-cores
     timeout-minutes: 45
     needs: [linters, protos, man]
     strategy:
@@ -516,52 +515,58 @@ jobs:
         box: ["fedora/37-cloud-base", "rockylinux/8"]
     env:
       GOTEST: gotestsum --
+      BOX: ${{ matrix.box }}
+
     steps:
       - uses: actions/checkout@v3
 
       - name: "Cache ~/.vagrant.d/boxes"
         uses: actions/cache@v3
         with:
-          path: ~/.vagrant.d/boxes
-          key: vagrant-${{ hashFiles('Vagrantfile*') }}
+          path: /root/.vagrant.d
+          key: vagrant-${{ matrix.box }}
+
+      - name: Set up Vagrant
+        run: |
+          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
+          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant
+          sudo systemctl enable --now libvirtd
+          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo vagrant plugin install vagrant-libvirt vagrant-scp
 
       - name: Vagrant start
-        env:
-          BOX: ${{ matrix.box }}
         run: |
           if [ "$BOX" = "rockylinux/8" ]; then
             # The latest version 5.0.0 seems 404 (as of March 30, 2022)
             export BOX_VERSION="4.0.0"
           fi
-          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
-          vagrant up || vagrant up
+          sudo BOX=$BOX vagrant up --no-tty
 
       - name: Integration
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
           GOTESTSUM_JUNITFILE: /tmp/test-integration-junit.xml
-        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
 
       - name: CRI test
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
           REPORT_DIR: /tmp/critestreport
-        run: vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
-
-      - name: Collect the VM's IP address for Docker Hub's throttling issue
-        if: failure()
-        run: vagrant ssh -- curl https://api64.ipify.org/
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
       - name: Get test reports
         if: always()
         run: |
-          set -e
-          vagrant plugin install vagrant-vbguest
-          vagrant plugin install vagrant-scp
-          vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
-          vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
+          sudo vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
+          sudo vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
       - uses: actions/upload-artifact@v3
         if: always()
         with:
@@ -573,8 +578,7 @@ jobs:
 
   cgroup2-misc:
     name: CGroupsV2 - rootless CRI test
-    # nested virtualization is only available on macOS hosts
-    runs-on: macos-12
+    runs-on: ubuntu-latest-4-cores
     timeout-minutes: 45
     needs: [linters, protos, man]
     steps:
@@ -583,22 +587,31 @@ jobs:
       - name: "Cache ~/.vagrant.d/boxes"
         uses: actions/cache@v3
         with:
-          path: ~/.vagrant.d/boxes
+          path: /root/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
+
+      - name: Set up Vagrant
+        run: |
+          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
+          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant
+          sudo systemctl enable --now libvirtd
+          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo vagrant plugin install vagrant-libvirt vagrant-scp
 
       - name: Vagrant start
         run: |
-          # Retry if it fails (download.fedoraproject.org returns 404 sometimes)
-          vagrant up || vagrant up
+          sudo vagrant up --no-tty
 
       # slow, so separated from the regular cgroup2 task
       - name: CRI-in-UserNS test with Rootless Podman
         run: |
-          vagrant up --provision-with=install-rootless-podman
+          sudo vagrant up --provision-with=install-rootless-podman
           # Execute rootless podman to create the UserNS env
-          vagrant ssh -- podman build --target cri-in-userns -t cri-in-userns -f /vagrant/contrib/Dockerfile.test /vagrant
-          vagrant ssh -- podman run --rm --privileged cri-in-userns
-
-      - name: Collect the VM's IP address for Docker Hub's throttling issue
-        if: failure()
-        run: vagrant ssh -- curl https://api64.ipify.org/
+          sudo vagrant ssh -- podman build --target cri-in-userns -t cri-in-userns -f /vagrant/contrib/Dockerfile.test /vagrant
+          sudo vagrant ssh -- podman run --rm --privileged cri-in-userns
