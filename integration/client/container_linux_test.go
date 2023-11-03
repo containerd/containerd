@@ -1453,7 +1453,7 @@ func TestIssue9103(t *testing.T) {
 			desc: "should be created status",
 			cntrOpts: []NewContainerOpts{
 				WithNewSpec(oci.WithImageConfig(image),
-					withProcessArgs("sleep", "30"),
+					withProcessArgs("sleep", "inf"),
 				),
 			},
 			expectedStatus: Created,
@@ -1462,7 +1462,7 @@ func TestIssue9103(t *testing.T) {
 			desc: "should be stopped status if init has been killed",
 			cntrOpts: []NewContainerOpts{
 				WithNewSpec(oci.WithImageConfig(image),
-					withProcessArgs("sleep", "30"),
+					withProcessArgs("sleep", "inf"),
 					oci.WithAnnotations(map[string]string{
 						"oci.runc.failpoint.profile": "issue9103",
 					}),
@@ -1492,7 +1492,7 @@ func TestIssue9103(t *testing.T) {
 
 			status, err := task.Status(ctx)
 			require.NoError(t, err)
-			require.Equal(t, status.Status, tc.expectedStatus)
+			require.Equal(t, tc.expectedStatus, status.Status)
 		})
 	}
 }
