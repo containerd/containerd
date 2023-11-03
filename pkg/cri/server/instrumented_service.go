@@ -18,14 +18,17 @@ package server
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/services/warning"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtime_alpha "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/containerd/pkg/deprecation"
 )
 
 // instrumentedService wraps service with containerd namespace and logs.
@@ -39,11 +42,13 @@ func newInstrumentedService(c *criService) grpcServices {
 
 // instrumentedAlphaService wraps service with containerd namespace and logs.
 type instrumentedAlphaService struct {
-	c *criService
+	c           *criService
+	warn        warning.Service
+	emitWarning sync.Once
 }
 
-func newInstrumentedAlphaService(c *criService) grpcAlphaServices {
-	return &instrumentedAlphaService{c: c}
+func newInstrumentedAlphaService(c *criService, warn warning.Service) grpcAlphaServices {
+	return &instrumentedAlphaService{c: c, warn: warn}
 }
 
 // checkInitialized returns error if the server is not fully initialized.
@@ -1427,6 +1432,13 @@ func (in *instrumentedService) Status(ctx context.Context, r *runtime.StatusRequ
 }
 
 func (in *instrumentedAlphaService) Status(ctx context.Context, r *runtime_alpha.StatusRequest) (res *runtime_alpha.StatusResponse, err error) {
+	// Only emit the warning the first time an v1alpha2 api is called
+	in.emitWarning.Do(func() {
+		log.G(ctx).Warning("CRI API v1alpha2 is deprecated since containerd v1.7 and removed in containerd v2.0. Use CRI API v1 instead.")
+		if in.warn != nil {
+			in.warn.Emit(ctx, deprecation.CRIAPIV1Alpha2)
+		}
+	})
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
@@ -1480,6 +1492,13 @@ func (in *instrumentedService) Version(ctx context.Context, r *runtime.VersionRe
 }
 
 func (in *instrumentedAlphaService) Version(ctx context.Context, r *runtime_alpha.VersionRequest) (res *runtime_alpha.VersionResponse, err error) {
+	// Only emit the warning the first time the v1alpha2 api is called
+	in.emitWarning.Do(func() {
+		log.G(ctx).Warning("CRI API v1alpha2 is deprecated since containerd v1.7 and removed in containerd v2.0. Use CRI API v1 instead.")
+		if in.warn != nil {
+			in.warn.Emit(ctx, deprecation.CRIAPIV1Alpha2)
+		}
+	})
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}

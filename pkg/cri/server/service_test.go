@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -25,7 +26,9 @@ import (
 	"github.com/containerd/go-cni"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 
+	"github.com/containerd/containerd/pkg/atomic"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	servertesting "github.com/containerd/containerd/pkg/cri/server/testing"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -33,6 +36,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/pkg/deprecation"
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
 	"github.com/containerd/containerd/pkg/registrar"
 )
@@ -70,6 +74,7 @@ func newTestCRIService() *criService {
 		netPlugin: map[string]cni.CNI{
 			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
 		},
+		initialized: atomic.NewBool(false),
 	}
 }
 
@@ -102,4 +107,19 @@ func TestLoadBaseOCISpec(t *testing.T) {
 
 	assert.Equal(t, "1.0.2", out.Version)
 	assert.Equal(t, "default", out.Hostname)
+}
+
+func TestAlphaCRIWarning(t *testing.T) {
+	ctx := context.Background()
+	ws := servertesting.NewFakeWarningService()
+	c := newInstrumentedAlphaService(newTestCRIService(), ws)
+
+	c.Version(ctx, &v1alpha2.VersionRequest{})
+	c.Status(ctx, &v1alpha2.StatusRequest{})
+
+	// Only emit the warning the first time an v1alpha2 api is called.
+	expectedWarnings := []deprecation.Warning{
+		deprecation.CRIAPIV1Alpha2,
+	}
+	assert.Equal(t, expectedWarnings, ws.GetWarnings())
 }
