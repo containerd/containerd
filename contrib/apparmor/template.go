@@ -25,11 +25,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"text/template"
-
-	exec "golang.org/x/sys/execabs"
 )
 
 // NOTE: This code is copied from <github.com/docker/docker/profiles/apparmor>.

@@ -17,13 +17,13 @@
 package integration
 
 import (
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

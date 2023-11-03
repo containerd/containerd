@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -28,8 +29,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -38,7 +39,6 @@ import (
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
 func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/v2/services/server"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
