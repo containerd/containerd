@@ -28,6 +28,7 @@ Vagrant.configure("2") do |config|
   config.vm.provider :libvirt do |v|
     v.memory = memory
     v.cpus = cpus
+    v.loader = "/usr/share/OVMF/OVMF_CODE.fd"
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync"
