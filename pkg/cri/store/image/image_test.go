@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/errdefs"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/opencontainers/go-digest/digestset"
 	assertlib "github.com/stretchr/testify/assert"
@@ -58,8 +59,9 @@ func TestInternalStore(t *testing.T) {
 	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 
 	s := &store{
-		images:    make(map[string]Image),
-		digestSet: digestset.NewSet(),
+		images:     make(map[string]Image),
+		digestSet:  digestset.NewSet(),
+		pinnedRefs: make(map[string]sets.Set[string]),
 	}
 
 	t.Logf("should be able to add image")
@@ -135,6 +137,73 @@ func TestInternalStore(t *testing.T) {
 		imgs = s.list()
 		assert.Len(imgs, imageNum)
 	}
+}
+
+func TestInternalStorePinnedImage(t *testing.T) {
+	assert := assertlib.New(t)
+	s := &store{
+		images:     make(map[string]Image),
+		digestSet:  digestset.NewSet(),
+		pinnedRefs: make(map[string]sets.Set[string]),
+	}
+
+	ref1 := "containerd.io/ref-1"
+	image := Image{
+		ID:         "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		ChainID:    "test-chain-id-1",
+		References: []string{ref1},
+		Size:       10,
+	}
+
+	t.Logf("add unpinned image ref, image should be unpinned")
+	assert.NoError(s.add(image))
+	i, err := s.get(image.ID)
+	assert.NoError(err)
+	assert.False(i.Pinned)
+	assert.False(s.isPinned(image.ID, ref1))
+
+	t.Logf("add pinned image ref, image should be pinned")
+	ref2 := "containerd.io/ref-2"
+	image.References = []string{ref2}
+	image.Pinned = true
+	assert.NoError(s.add(image))
+	i, err = s.get(image.ID)
+	assert.NoError(err)
+	assert.True(i.Pinned)
+	assert.False(s.isPinned(image.ID, ref1))
+	assert.True(s.isPinned(image.ID, ref2))
+
+	t.Logf("pin unpinned image ref, image should be pinned, all refs should be pinned")
+	assert.NoError(s.pin(image.ID, ref1))
+	i, err = s.get(image.ID)
+	assert.NoError(err)
+	assert.True(i.Pinned)
+	assert.True(s.isPinned(image.ID, ref1))
+	assert.True(s.isPinned(image.ID, ref2))
+
+	t.Logf("unpin one of image refs, image should be pinned")
+	assert.NoError(s.unpin(image.ID, ref2))
+	i, err = s.get(image.ID)
+	assert.NoError(err)
+	assert.True(i.Pinned)
+	assert.True(s.isPinned(image.ID, ref1))
+	assert.False(s.isPinned(image.ID, ref2))
+
+	t.Logf("unpin the remaining one image ref, image should be unpinned")
+	assert.NoError(s.unpin(image.ID, ref1))
+	i, err = s.get(image.ID)
+	assert.NoError(err)
+	assert.False(i.Pinned)
+	assert.False(s.isPinned(image.ID, ref1))
+	assert.False(s.isPinned(image.ID, ref2))
+
+	t.Logf("pin one of image refs, then delete this, image should be unpinned")
+	assert.NoError(s.pin(image.ID, ref1))
+	s.delete(image.ID, ref1)
+	i, err = s.get(image.ID)
+	assert.NoError(err)
+	assert.False(i.Pinned)
+	assert.False(s.isPinned(image.ID, ref2))
 }
 
 func TestImageStore(t *testing.T) {
