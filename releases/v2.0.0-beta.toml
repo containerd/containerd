@@ -4,6 +4,7 @@ commit = "HEAD"
 project_name = "containerd"
 github_repo = "containerd/containerd"
 match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
 
 # previous release
 previous = "v1.7.0"
@@ -31,3 +32,4 @@ See also the [Getting Started](https://github.com/containerd/containerd/blob/mai
 """
 
 override_deps."github.com/containerd/log".previous = "cf9777876edf6a4aa230c739bc7eec5ab8349e9c"
+override_deps."github.com/containerd/plugin".previous = "497c49344a4b9894a7e26497420cb7fa817facba"
