@@ -449,5 +449,8 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
+	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
+		return warnings, err
+	}
 	return warnings, nil
 }
