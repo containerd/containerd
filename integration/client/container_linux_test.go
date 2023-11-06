@@ -1492,7 +1492,7 @@ func TestIssue9103(t *testing.T) {
 
 			status, err := task.Status(ctx)
 			require.NoError(t, err)
-			require.Equal(t, status.Status, tc.expectedStatus)
+			require.Equal(t, tc.expectedStatus, status.Status)
 		})
 	}
 }
