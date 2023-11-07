@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
@@ -94,7 +95,14 @@ func (t *Task) Delete(ctx context.Context) (*runtime.Exit, error) {
 	rsp, shimErr := t.shim.Delete(ctx, empty)
 	if shimErr != nil {
 		shimErr = errdefs.FromGRPC(shimErr)
-		if !errdefs.IsNotFound(shimErr) {
+		if !errdefs.IsNotFound(shimErr) &&
+			// NOTE: The last Detete call has deleted the init process
+			// record in shim service. However, the last call took
+			// so long and then the client side canceled the call.
+			// After the client retries the Delete, the shim service
+			// doesn't find the init process and returns `container
+			// must be created`. We should tolerate this issue.
+			!(errdefs.IsFailedPrecondition(shimErr) && strings.Contains(shimErr.Error(), "container must be created")) {
 			return nil, shimErr
 		}
 	}

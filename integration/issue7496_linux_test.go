@@ -28,9 +28,10 @@ import (
 	"testing"
 	"time"
 
-	apitask "github.com/containerd/containerd/api/runtime/task/v2"
+	apitaskv2 "github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/integration/images"
 	"github.com/containerd/containerd/namespaces"
+	apitaskv1 "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
@@ -47,9 +48,7 @@ func TestIssue7496(t *testing.T) {
 	require.NoError(t, err)
 
 	typ := criCfg.ContainerdConfig.Runtimes[criCfg.ContainerdConfig.DefaultRuntimeName].Type
-	if !strings.HasSuffix(typ, "runc.v2") {
-		t.Skipf("default runtime should be runc.v2, but it's not: %s", typ)
-	}
+	isShimV1 := typ == "io.containerd.runtime.v1.linux"
 
 	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
 
@@ -58,14 +57,14 @@ func TestIssue7496(t *testing.T) {
 	sbID, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 
-	shimCli := connectToShim(ctx, t, sbID)
+	sCli := newShimCli(ctx, t, sbID, isShimV1)
 
 	delayInSec := 12
 	t.Logf("[shim pid: %d]: Injecting %d seconds delay to umount2 syscall",
-		shimPid(ctx, t, shimCli),
+		sCli.pid(ctx, t),
 		delayInSec)
 
-	doneCh := injectDelayToUmount2(ctx, t, shimCli, delayInSec /* CRI plugin uses 10 seconds to delete task */)
+	doneCh := injectDelayToUmount2(ctx, t, int(sCli.pid(ctx, t)), delayInSec /* CRI plugin uses 10 seconds to delete task */)
 
 	t.Logf("Create a container config and run container in a pod")
 	pauseImage := images.Get(images.Pause)
@@ -103,13 +102,13 @@ func TestIssue7496(t *testing.T) {
 	t.Logf("PodSandbox %s has been deleted and start to wait for strace exit", sbID)
 	select {
 	case <-time.After(15 * time.Second):
-		resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
+		shimPid, err := sCli.connect(ctx)
 		assert.Error(t, err, "should failed to call shim connect API")
 
 		t.Errorf("Strace doesn't exit in time")
 
-		t.Logf("Cleanup the shim (pid: %d)", resp.GetShimPid())
-		syscall.Kill(int(resp.GetShimPid()), syscall.SIGKILL)
+		t.Logf("Cleanup the shim (pid: %d)", shimPid)
+		syscall.Kill(int(shimPid), syscall.SIGKILL)
 		<-doneCh
 	case <-doneCh:
 	}
@@ -120,13 +119,11 @@ func TestIssue7496(t *testing.T) {
 // example, umount overlayfs rootfs which doesn't with volatile.
 //
 // REF: https://man7.org/linux/man-pages/man1/strace.1.html
-func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TaskService, delayInSec int) chan struct{} {
-	pid := shimPid(ctx, t, shimCli)
-
+func injectDelayToUmount2(ctx context.Context, t *testing.T, shimPid, delayInSec int) chan struct{} {
 	doneCh := make(chan struct{})
 
 	cmd := exec.CommandContext(ctx, "strace",
-		"-p", strconv.Itoa(int(pid)), "-f", // attach to all the threads
+		"-p", strconv.Itoa(shimPid), "-f", // attach to all the threads
 		"--detach-on=execve", // stop to attach runc child-processes
 		"--trace=umount2",    // only trace umount2 syscall
 		"-e", "inject=umount2:delay_enter="+strconv.Itoa(delayInSec)+"s",
@@ -162,7 +159,14 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.Tas
 	return doneCh
 }
 
-func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TaskService {
+type shimCli struct {
+	isV1 bool
+
+	cliV1 apitaskv1.ShimService
+	cliV2 apitaskv2.TaskService
+}
+
+func newShimCli(ctx context.Context, t *testing.T, id string, isV1 bool) *shimCli {
 	addr, err := shim.SocketAddress(ctx, containerdEndpoint, id)
 	require.NoError(t, err)
 	addr = strings.TrimPrefix(addr, "unix://")
@@ -171,11 +175,34 @@ func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TaskSer
 	require.NoError(t, err)
 
 	client := ttrpc.NewClient(conn)
-	return apitask.NewTaskClient(client)
+
+	cli := &shimCli{isV1: isV1}
+	if isV1 {
+		cli.cliV1 = apitaskv1.NewShimClient(client)
+	} else {
+		cli.cliV2 = apitaskv2.NewTaskClient(client)
+	}
+	return cli
 }
 
-func shimPid(ctx context.Context, t *testing.T, shimCli apitask.TaskService) uint32 {
-	resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
+func (cli *shimCli) connect(ctx context.Context) (uint32, error) {
+	if cli.isV1 {
+		resp, err := cli.cliV1.ShimInfo(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
+		return resp.GetShimPid(), nil
+	}
+
+	resp, err := cli.cliV2.Connect(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetShimPid(), nil
+}
+
+func (cli *shimCli) pid(ctx context.Context, t *testing.T) uint32 {
+	pid, err := cli.connect(ctx)
 	require.NoError(t, err)
-	return resp.GetShimPid()
+	return pid
 }
