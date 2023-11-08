@@ -1531,6 +1531,7 @@ func TestIssue9103(t *testing.T) {
 	for idx, tc := range []struct {
 		desc           string
 		cntrOpts       []NewContainerOpts
+		bakingFn       func(ctx context.Context, t *testing.T, task Task)
 		expectedStatus ProcessStatus
 	}{
 		{
@@ -1540,6 +1541,7 @@ func TestIssue9103(t *testing.T) {
 					withProcessArgs("sleep", "30"),
 				),
 			},
+			bakingFn:       func(context.Context, *testing.T, Task) {},
 			expectedStatus: Created,
 		},
 		{
@@ -1554,6 +1556,17 @@ func TestIssue9103(t *testing.T) {
 				WithRuntime(client.Runtime(), &options.Options{
 					BinaryName: "runc-fp",
 				}),
+			},
+			bakingFn: func(ctx context.Context, t *testing.T, task Task) {
+				waitCh, err := task.Wait(ctx)
+				require.NoError(t, err)
+
+				select {
+				case <-time.After(30 * time.Second):
+					t.Fatal("timeout")
+				case e := <-waitCh:
+					require.NoError(t, e.Error())
+				}
 			},
 			expectedStatus: Stopped,
 		},
@@ -1573,6 +1586,8 @@ func TestIssue9103(t *testing.T) {
 			require.NoError(t, err)
 
 			defer task.Delete(ctx, WithProcessKill)
+
+			tc.bakingFn(ctx, t, task)
 
 			status, err := task.Status(ctx)
 			require.NoError(t, err)
