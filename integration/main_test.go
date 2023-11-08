@@ -216,7 +216,9 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 			Uid:       util.GenerateID(),
 			Namespace: Randomize(ns),
 		},
-		Linux:       &runtime.LinuxPodSandboxConfig{},
+		Linux: &runtime.LinuxPodSandboxConfig{
+			CgroupParent: "/test.slice",
+		},
 		Annotations: make(map[string]string),
 		Labels:      make(map[string]string),
 	}

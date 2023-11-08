@@ -494,7 +494,18 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
+          cat /sys/fs/cgroup/cgroup.controllers
+          systemctl status
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+                  runc --version
+                  export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          }
+          [ "${RUNC_FLAVOR}" == "runc" ] && {
+                  runc --version
+          }
+          whoami
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: cri-tools critest
