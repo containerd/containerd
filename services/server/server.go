@@ -35,23 +35,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	csapi "github.com/containerd/containerd/api/services/content/v1"
-	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/content/local"
-	csproxy "github.com/containerd/containerd/content/proxy"
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/pkg/dialer"
-	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/plugin"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/containerd/snapshots"
-	ssproxy "github.com/containerd/containerd/snapshots/proxy"
-	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
 	metrics "github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -62,6 +45,26 @@ import (
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+
+	csapi "github.com/containerd/containerd/api/services/content/v1"
+	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/content/local"
+	csproxy "github.com/containerd/containerd/content/proxy"
+	"github.com/containerd/containerd/defaults"
+	"github.com/containerd/containerd/diff"
+	"github.com/containerd/containerd/events/exchange"
+	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/pkg/deprecation"
+	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/plugin"
+	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/services/warning"
+	"github.com/containerd/containerd/snapshots"
+	ssproxy "github.com/containerd/containerd/snapshots/proxy"
+	"github.com/containerd/containerd/sys"
 )
 
 const (
@@ -306,7 +309,33 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			return nil, err
 		}
 	}
+
+	recordConfigDeprecations(ctx, config, initialized)
 	return s, nil
+}
+
+// recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
+func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
+	// record any detected deprecations without blocking server startup
+	plugin, err := set.GetByID(plugin.WarningPlugin, plugin.DeprecationsPlugin)
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	instance, err := plugin.Instance()
+	if err != nil {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
+		return
+	}
+	warn, ok := instance.(warning.Service)
+	if !ok {
+		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations, unexpected plugin type")
+		return
+	}
+
+	if config.PluginDir != "" {
+		warn.Emit(ctx, deprecation.GoPluginLibrary)
+	}
 }
 
 // Server is the containerd main daemon
@@ -413,8 +442,11 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	if err := plugin.Load(path); err != nil {
+	if count, err := plugin.Load(path); err != nil {
 		return nil, err
+	} else if count > 0 || config.PluginDir != "" {
+		config.PluginDir = path
+		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
 	}
 	// load additional plugins that don't automatically register themselves
 	plugin.Register(&plugin.Registration{
