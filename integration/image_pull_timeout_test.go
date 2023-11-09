@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	criserver "github.com/containerd/containerd/pkg/cri/server"
+	servertesting "github.com/containerd/containerd/pkg/cri/server/testing"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -471,5 +472,5 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 		RootDir:           filepath.Join(criWorkDir, "root"),
 		StateDir:          filepath.Join(criWorkDir, "state"),
 	}
-	return criserver.NewCRIService(cfg, client, nil)
+	return criserver.NewCRIService(cfg, client, nil, servertesting.NewFakeWarningService())
 }

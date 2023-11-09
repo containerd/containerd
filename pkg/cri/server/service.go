@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services/warning"
 	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	cni "github.com/containerd/go-cni"
 	"github.com/sirupsen/logrus"
@@ -117,10 +118,12 @@ type criService struct {
 	// containerEventsChan is used to capture container events and send them
 	// to the caller of GetContainerEvents.
 	containerEventsChan chan runtime.ContainerEventResponse
+	// warn is used to emit warnings for cri-api v1alpha2 usage.
+	warn warning.Service
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API, warn warning.Service) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -136,6 +139,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 		initialized:                 atomic.NewBool(false),
 		netPlugin:                   make(map[string]cni.CNI),
 		unpackDuplicationSuppressor: kmutex.New(),
+		warn:                        warn,
 	}
 
 	// TODO: figure out a proper channel size.
@@ -328,7 +332,7 @@ func (c *criService) register(s *grpc.Server) error {
 	runtime.RegisterRuntimeServiceServer(s, instrumented)
 	runtime.RegisterImageServiceServer(s, instrumented)
 
-	instrumentedAlpha := instrument.NewAlphaService(c)
+	instrumentedAlpha := instrument.NewAlphaService(c, c.warn)
 	runtime_alpha.RegisterRuntimeServiceServer(s, instrumentedAlpha)
 	runtime_alpha.RegisterImageServiceServer(s, instrumentedAlpha)
 

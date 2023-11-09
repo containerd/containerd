@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
+	"github.com/containerd/containerd/pkg/cri/server/testing"
 )
 
 func FuzzCRISandboxServer(data []byte) int {
@@ -37,7 +38,7 @@ func FuzzCRISandboxServer(data []byte) int {
 	}
 	defer client.Close()
 
-	c, err := sbserver.NewCRIService(criconfig.Config{}, client, nil)
+	c, err := sbserver.NewCRIService(criconfig.Config{}, client, nil, testing.NewFakeWarningService())
 	if err != nil {
 		panic(err)
 	}
