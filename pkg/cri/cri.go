@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"path/filepath"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"k8s.io/klog/v2"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/api/services/diff/v1"
@@ -31,16 +34,14 @@ import (
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/services"
-	"github.com/containerd/containerd/snapshots"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"k8s.io/klog/v2"
-
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
+	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/services/warning"
+	"github.com/containerd/containerd/snapshots"
 )
 
 // Register CRI service plugin
@@ -53,6 +54,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
+			plugin.WarningPlugin,
 		},
 		InitFn: initCRIService,
 	})
@@ -63,8 +65,17 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
+	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
+	} else if len(warnings) > 0 {
+		ws, err := ic.Get(plugin.WarningPlugin)
+		if err != nil {
+			return nil, err
+		}
+		warn := ws.(warning.Service)
+		for _, w := range warnings {
+			warn.Emit(ctx, w)
+		}
 	}
 
 	c := criconfig.Config{
