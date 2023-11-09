@@ -27,12 +27,24 @@ containerd allows extensions through two methods:
 
 ### V2 Runtimes
 
-The runtime v2 interface allows resolving runtimes to binaries on the system.
-These binaries are used to start the shim process for containerd and allows
-containerd to manage those containers using the runtime shim api returned by
+containerd supports multiple container runtimes. Each container can be
+invoked with a different runtime.
+
+When using the Container Runtime Interface (CRI) plugin, named runtimes can be defined
+in the containerd configuration file. When a container is run without specifying a runtime,
+the configured default runtime is used. Alternatively, a different named runtime can be
+specified explicitly when creating a container via CRI gRPC by selecting the runtime handler to be used.
+
+When a client such as `ctr` or `nerdctl` creates a container, it can optionally specify a runtime and options to use.
+If a runtime is not specified, containerd will use its default runtime.
+
+containerd invokes v2 runtimes as binaries on the system,
+which are used to start the shim process for containerd. This, in turn, allows
+containerd to start and manage those containers using the runtime shim api returned by
 the binary.
 
-See [runtime v2 documentation](../runtime/v2/README.md)
+For more details on runtimes and shims, including how to invoke and configure them,
+see the [runtime v2 documentation](../runtime/v2/README.md)
 
 ### Proxy Plugins
 
