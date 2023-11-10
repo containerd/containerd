@@ -65,14 +65,15 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion, "CRIVersionAlpha": constants.CRIVersionAlpha}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.PluginConfig)
+	ws, err := ic.Get(plugin.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+	warn := ws.(warning.Service)
+
 	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
 	} else if len(warnings) > 0 {
-		ws, err := ic.Get(plugin.WarningPlugin)
-		if err != nil {
-			return nil, err
-		}
-		warn := ws.(warning.Service)
 		for _, w := range warnings {
 			warn.Emit(ctx, w)
 		}
@@ -107,7 +108,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := server.NewCRIService(c, client)
+	s, err := server.NewCRIService(c, client, warn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
