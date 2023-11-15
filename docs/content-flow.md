@@ -422,12 +422,12 @@ in turn, depends on the next layer down, so it is protected from collection, and
 ### Container
 
 With the above in place, we know how to create an active snapshot that is useful for the container. We simply
-need to [Prepare()](https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter) the active snapshot,
+need to [Prepare()](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter) the active snapshot,
 passing it an ID and the parent, in this case the top layer of committed snapshots.
 
 Thus, the steps are:
 
-1. Get the content into the content store, either via [Pull()](https://godoc.org/github.com/containerd/containerd#Client.Pull), or via loading it in the [content.Store API](https://godoc.org/github.com/containerd/containerd/content#Store)
-1. Unpack the image to create committed snapshots for each layer, using [image.Unpack()](https://godoc.org/github.com/containerd/containerd#Image). Alternatively, if you use [Pull()](https://godoc.org/github.com/containerd/containerd#Client.Pull), you can pass it an option to unpack when pulling, using [WithPullUnpack()](https://godoc.org/github.com/containerd/containerd#WithPullUnpack)
-1. Create an active snapshot using [Prepare()](https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter). You can skip this step if you plan on creating a container, as you can pass it as an option to the next step.
-1. Create a container using [NewContainer()](https://godoc.org/github.com/containerd/containerd#Client.NewContainer), optionally telling it to create a snapshot with [WithNewSnapshot()](https://godoc.org/github.com/containerd/containerd#WithNewSnapshot)
+1. Get the content into the content store, either via [Pull()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.Pull), or via loading it in the [content.Store API](https://godoc.org/github.com/containerd/containerd/v2/content#Store)
+1. Unpack the image to create committed snapshots for each layer, using [image.Unpack()](https://godoc.org/github.com/containerd/containerd/v2/client#Image). Alternatively, if you use [Pull()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.Pull), you can pass it an option to unpack when pulling, using [WithPullUnpack()](https://godoc.org/github.com/containerd/containerd/v2/client#WithPullUnpack)
+1. Create an active snapshot using [Prepare()](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter). You can skip this step if you plan on creating a container, as you can pass it as an option to the next step.
+1. Create a container using [NewContainer()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.NewContainer), optionally telling it to create a snapshot with [WithNewSnapshot()](https://godoc.org/github.com/containerd/containerd/v2/client#WithNewSnapshot)

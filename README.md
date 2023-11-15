@@ -1,10 +1,10 @@
 ![containerd banner light mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/color/containerd-horizontal-color.png#gh-light-mode-only)
 ![containerd banner dark mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/white/containerd-horizontal-white.png#gh-dark-mode-only)
 
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd)](https://pkg.go.dev/github.com/containerd/containerd)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd/v2)](https://pkg.go.dev/github.com/containerd/containerd/v2)
 [![Build Status](https://github.com/containerd/containerd/workflows/CI/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ACI)
 [![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
-[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd/v2)](https://goreportcard.com/report/github.com/containerd/containerd/v2)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
 
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness, and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
@@ -107,9 +107,9 @@ containerd offers a full client package to help you integrate containerd into yo
 import (
   "context"
 
-  "github.com/containerd/containerd"
-  "github.com/containerd/containerd/cio"
-  "github.com/containerd/containerd/namespaces"
+  containerd "github.com/containerd/containerd/v2/client"
+  "github.com/containerd/containerd/v2/cio"
+  "github.com/containerd/containerd/v2/namespaces"
 )
 
 

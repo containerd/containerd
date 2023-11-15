@@ -19,7 +19,7 @@ USAGE:
    containerd [global options] command [command options] [arguments...]
 
 VERSION:
-   v1.7.0-beta.0
+   v2.0.0-beta.0
 
 DESCRIPTION:
 
