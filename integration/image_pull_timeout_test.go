@@ -61,6 +61,41 @@ func TestCRIImagePullTimeout(t *testing.T) {
 
 	t.Run("HoldingContentOpenWriter", testCRIImagePullTimeoutByHoldingContentOpenWriter)
 	t.Run("NoDataTransferred", testCRIImagePullTimeoutByNoDataTransferred)
+	t.Run("SlowCommitWriter", testCRIImagePullTimeoutBySlowCommitWriter)
+}
+
+// testCRIImagePullTimeoutBySlowCommitWriter tests that
+//
+//	It should not cancel if the content.Commit takes long time.
+//
+// After copying all the data from registry, the request should be inactive
+// before content.Commit. If the blob is large, for instance, 2 GiB, the fsync
+// during content.Commit maybe take long time during IO pressure. The
+// content.Commit holds the bolt's writable mutex and blocks other goroutines
+// which are going to commit blob as well. If the progress tracker still
+// considers these requests active, it maybe file false alert and cancel the
+// ImagePull.
+//
+// It's reproducer for #9347.
+func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	delayDuration := 2 * defaultImagePullProgressTimeout
+	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
+
+	criService, err := initLocalCRIPlugin(cli, tmpDir, criconfig.Registry{})
+	assert.NoError(t, err)
+
+	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
+
+	_, err = criService.PullImage(ctx, &runtimeapi.PullImageRequest{
+		Image: &runtimeapi.ImageSpec{
+			Image: pullProgressTestImageName,
+		},
+	})
+	assert.NoError(t, err)
 }
 
 // testCRIImagePullTimeoutByHoldingContentOpenWriter tests that
@@ -75,7 +110,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	cli := buildLocalContainerdClient(t, tmpDir)
+	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
 	criService, err := initLocalCRIPlugin(cli, tmpDir, criconfig.Registry{})
 	assert.NoError(t, err)
@@ -213,7 +248,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	cli := buildLocalContainerdClient(t, tmpDir)
+	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
 	mirrorSrv := newMirrorRegistryServer(mirrorRegistryServerConfig{
 		limitedBytesPerConn: 1024 * 1024 * 3, // 3MB
