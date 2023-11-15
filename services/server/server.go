@@ -81,16 +81,16 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 		return errors.New("root and state must be different paths")
 	}
 
-	if err := sys.MkdirAllWithACL(config.Root, 0711); err != nil {
+	if err := sys.MkdirAllWithACL(config.Root, 0o711); err != nil {
 		return err
 	}
 
-	if err := sys.MkdirAllWithACL(config.State, 0711); err != nil {
+	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
 		return err
 	}
 
 	if config.TempDir != "" {
-		if err := sys.MkdirAllWithACL(config.TempDir, 0711); err != nil {
+		if err := sys.MkdirAllWithACL(config.TempDir, 0o711); err != nil {
 			return err
 		}
 		if runtime.GOOS == "windows" {

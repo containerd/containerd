@@ -86,7 +86,7 @@ func TestResolveImports(t *testing.T) {
 	tempDir := t.TempDir()
 
 	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml"} {
-		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
+		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0o600)
 		assert.NoError(t, err)
 	}
 
@@ -118,7 +118,7 @@ root = "/var/lib/containerd"
 	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err := os.WriteFile(path, []byte(data), 0600)
+	err := os.WriteFile(path, []byte(data), 0o600)
 	assert.NoError(t, err)
 
 	var out Config
@@ -147,10 +147,10 @@ disabled_plugins = ["io.containerd.v1.xyz"]
 
 	tempDir := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
+	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0o600)
 	assert.NoError(t, err)
 
 	var out Config
@@ -175,10 +175,10 @@ imports = ["data1.toml", "data2.toml"]
 `
 	tempDir := t.TempDir()
 
-	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
+	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0o600)
 	assert.NoError(t, err)
 
 	var out Config
@@ -207,7 +207,7 @@ version = 2
 	tempDir := t.TempDir()
 
 	path := filepath.Join(tempDir, "config.toml")
-	err := os.WriteFile(path, []byte(data), 0600)
+	err := os.WriteFile(path, []byte(data), 0o600)
 	assert.NoError(t, err)
 
 	var out Config
@@ -230,7 +230,7 @@ func TestDecodePluginInV1Config(t *testing.T) {
 `
 
 	path := filepath.Join(t.TempDir(), "config.toml")
-	err := os.WriteFile(path, []byte(data), 0600)
+	err := os.WriteFile(path, []byte(data), 0o600)
 	assert.NoError(t, err)
 
 	var out Config
