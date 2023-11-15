@@ -341,12 +341,12 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 // recordConfigDeprecations attempts to record use of any deprecated config field.  Failures are logged and ignored.
 func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set *plugin.Set) {
 	// record any detected deprecations without blocking server startup
-	plugin := set.Get(plugins.WarningPlugin, plugins.DeprecationsPlugin)
-	if plugin == nil {
+	p := set.Get(plugins.WarningPlugin, plugins.DeprecationsPlugin)
+	if p == nil {
 		log.G(ctx).Warn("failed to find warning service to record deprecations")
 		return
 	}
-	instance, err := plugin.Instance()
+	instance, err := p.Instance()
 	if err != nil {
 		log.G(ctx).WithError(err).Warn("failed to load warning service to record deprecations")
 		return
