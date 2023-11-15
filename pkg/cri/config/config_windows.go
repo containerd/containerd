@@ -19,7 +19,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -84,7 +83,7 @@ func DefaultConfig() PluginConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
-		ImagePullProgressTimeout: time.Minute.String(),
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		DrainExecSyncIOTimeout:   "0s",
 	}
 }
