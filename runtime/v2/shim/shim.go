@@ -189,13 +189,13 @@ func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
 
-	if err := run(ctx, manager, "", config); err != nil {
+	if err := run(ctx, manager, config); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, manager Manager, name string, config Config) error {
+func run(ctx context.Context, manager Manager, config Config) error {
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
