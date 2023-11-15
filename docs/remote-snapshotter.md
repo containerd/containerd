@@ -15,6 +15,10 @@ The containerd client's `Pull` API with unpacking-mode allows the underlying sna
 Remote snapshotter needs to be plugged into containerd in [the same ways as normal snapshotters](/docs/PLUGINS.md).
 
 ```go
+import (
+	containerd "github.com/containerd/containerd/v2/client"
+)
+
 image, err := client.Pull(ctx, ref,
 	containerd.WithPullUnpack,
 	containerd.WithPullSnapshotter("my-remote-snapshotter"),
@@ -39,7 +43,10 @@ This is useful if the values of these labels are determined statically regardles
 These user-defined labels must be prefixed by `containerd.io/snapshot/`.
 
 ```go
-import "github.com/containerd/containerd/snapshots"
+import (
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/snapshots"
+)
 
 image, err := client.Pull(ctx, ref,
 	containerd.WithPullUnpack,
@@ -61,10 +68,13 @@ Every time the containerd client queries remote snapshot, it passes `Annotations
 These annotations are passed to the snapshotter as user-defined labels.
 The values of annotations can be dynamically added and modified in the handler wrapper.
 Note that annotations must be prefixed by `containerd.io/snapshot/`.
-`github.com/containerd/containerd/pkg/snapshotters` is a handler implementation used by the CRI package, nerdctl and moby.
+`github.com/containerd/containerd/v2/pkg/snapshotters` is a handler implementation used by the CRI package, nerdctl and moby.
 
 ```go
-import "github.com/containerd/containerd/pkg/snapshotters"
+import (
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/snapshotters"
+)
 
 if _, err := client.Pull(ctx, ref,
 	containerd.WithPullUnpack,

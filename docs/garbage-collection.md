@@ -4,7 +4,7 @@
 longer being used. The client is responsible for ensuring that all resources
 which are created are either used or held by a lease at all times, else they
 will be considered eligible for removal. The Go client library
-(`github.com/containerd/containerd`) has built-in behavior to ensure resources
+(`github.com/containerd/containerd/v2/client`) has built-in behavior to ensure resources
 are properly tracked and leased. However, the lifecycles of leases are the
 responsibility of the caller of the library. The `containerd` daemon has strict
 resource management and will garbage collect any unused resource.
@@ -43,7 +43,7 @@ _But, of course, more complicated use cases are supported..._
 If the program or lease are intended to be longer lived, instead of the very
 easy `client.WithLease`, the lease manager can be used directly. This also
 allows for setting custom labels on the lease or manipulating its resources.
-Use `client.LeasesService()` to get a [lease Manager](https://godoc.org/github.com/containerd/containerd/leases#Manager)
+Use `client.LeasesService()` to get a [lease Manager](https://godoc.org/github.com/containerd/containerd/v2/leases#Manager)
 which can be used to create, list, and delete leases as well as manage the
 referenced resources for that lease.
 
@@ -157,9 +157,9 @@ may also request a garbage collection during resource removal. In this case,
 the garbage collection will be scheduled immediately (or after `schedule_delay`
 when configured to non-zero). The service will not return until the garbage
 collection has completed. This is currently supported on removal of images and
-leases. Use [`images.SynchronousDelete()`](https://godoc.org/github.com/containerd/containerd/images#SynchronousDelete)
-for [`images.Store`](https://godoc.org/github.com/containerd/containerd/images#Store)'s
+leases. Use [`images.SynchronousDelete()`](https://godoc.org/github.com/containerd/containerd/v2/images#SynchronousDelete)
+for [`images.Store`](https://godoc.org/github.com/containerd/containerd/v2/images#Store)'s
 `Delete` and
-[`leases.SynchronousDelete`](https://godoc.org/github.com/containerd/containerd/leases#SynchronousDelete)
-for [`leases.Manager`](https://godoc.org/github.com/containerd/containerd/leases#Manager)'s
+[`leases.SynchronousDelete`](https://godoc.org/github.com/containerd/containerd/v2/leases#SynchronousDelete)
+for [`leases.Manager`](https://godoc.org/github.com/containerd/containerd/v2/leases#Manager)'s
 `Delete`.
