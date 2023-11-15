@@ -235,6 +235,7 @@ func (u *Unpacker) unpack(
 	ctx := u.ctx
 	ctx, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpack"))
 	defer layerSpan.End()
+	unpackStart := time.Now()
 	p, err := content.ReadBlob(ctx, u.content, config)
 	if err != nil {
 		return err
@@ -411,6 +412,7 @@ func (u *Unpacker) unpack(
 
 	for i, desc := range layers {
 		_, layerSpan := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "unpackLayer"))
+		unpackLayerStart := time.Now()
 		layerSpan.SetAttributes(
 			tracing.Attribute("layer.media.type", desc.MediaType),
 			tracing.Attribute("layer.media.size", desc.Size),
@@ -422,6 +424,10 @@ func (u *Unpacker) unpack(
 			return err
 		}
 		layerSpan.End()
+		log.G(ctx).WithFields(log.Fields{
+			"layer":    desc.Digest,
+			"duration": time.Since(unpackLayerStart),
+		}).Debug("layer unpacked")
 	}
 
 	chainID := identity.ChainID(chain).String()
@@ -436,8 +442,9 @@ func (u *Unpacker) unpack(
 		return err
 	}
 	log.G(ctx).WithFields(log.Fields{
-		"config":  config.Digest,
-		"chainID": chainID,
+		"config":   config.Digest,
+		"chainID":  chainID,
+		"duration": time.Since(unpackStart),
 	}).Debug("image unpacked")
 
 	return nil
