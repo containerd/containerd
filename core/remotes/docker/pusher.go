@@ -528,13 +528,15 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		expected = status.Expected
 	}
 
-	actual, err := digest.Parse(resp.Header.Get("Docker-Content-Digest"))
-	if err != nil {
-		return fmt.Errorf("invalid content digest in response: %w", err)
-	}
+	if dgstHdr := resp.Header.Get("Docker-Content-Digest"); dgstHdr != "" {
+		actual, err := digest.Parse(dgstHdr)
+		if err != nil {
+			return fmt.Errorf("invalid content digest in response: %w", err)
+		}
 
-	if actual != expected {
-		return fmt.Errorf("got digest %s, expected %s", actual, expected)
+		if actual != expected {
+			return fmt.Errorf("got digest %s, expected %s", actual, expected)
+		}
 	}
 
 	status.Committed = true
