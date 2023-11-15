@@ -319,7 +319,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
 		pID := p.URI()
-		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", pID)
+		log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type}).Info("loading plugin")
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -353,7 +353,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", pID)
+				log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type, "error": err}).Info("skip loading plugin")
 				continue
 			}
 			return fmt.Errorf("failed to load plugin %s: %w", pID, err)
