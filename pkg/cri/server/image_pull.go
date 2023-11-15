@@ -576,9 +576,6 @@ func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
 }
 
 const (
-	// minPullProgressReportInternal is used to prevent the reporter from
-	// eating more CPU resources
-	minPullProgressReportInternal = 5 * time.Second
 	// defaultPullProgressReportInterval represents that how often the
 	// reporter checks that pull progress.
 	defaultPullProgressReportInterval = 10 * time.Second
@@ -626,10 +623,6 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 		// check progress more frequently if timeout < default internal
 		if reporter.timeout < reportInterval {
 			reportInterval = reporter.timeout / 2
-
-			if reportInterval < minPullProgressReportInternal {
-				reportInterval = minPullProgressReportInternal
-			}
 		}
 
 		var ticker = time.NewTicker(reportInterval)
