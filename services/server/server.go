@@ -247,7 +247,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 
 	for _, p := range loaded {
 		id := p.URI()
-		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
+		log.G(ctx).WithFields(log.Fields{"id": id, "type": p.Type}).Info("loading plugin")
 		var mustSucceed int32
 
 		initContext := plugin.NewContext(
@@ -281,9 +281,9 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
+				log.G(ctx).WithFields(log.Fields{"error": err, "id": id, "type": p.Type}).Info("skip loading plugin")
 			} else {
-				log.G(ctx).WithError(err).Warnf("failed to load plugin %s", id)
+				log.G(ctx).WithFields(log.Fields{"error": err, "id": id, "type": p.Type}).Warn("failed to load plugin")
 			}
 			if _, ok := required[id]; ok {
 				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
@@ -432,8 +432,7 @@ func (s *Server) Stop() {
 		p := s.plugins[i]
 		instance, err := p.Instance()
 		if err != nil {
-			log.L.WithError(err).WithField("id", p.Registration.URI()).
-				Error("could not get plugin instance")
+			log.L.WithFields(log.Fields{"error": err, "id": p.Registration.URI()}).Error("could not get plugin instance")
 			continue
 		}
 		closer, ok := instance.(io.Closer)
@@ -441,8 +440,7 @@ func (s *Server) Stop() {
 			continue
 		}
 		if err := closer.Close(); err != nil {
-			log.L.WithError(err).WithField("id", p.Registration.URI()).
-				Error("failed to close plugin")
+			log.L.WithFields(log.Fields{"error": err, "id": p.Registration.URI()}).Error("failed to close plugin")
 		}
 	}
 }
@@ -523,7 +521,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		if pp.Platform != "" {
 			p, err = platforms.Parse(pp.Platform)
 			if err != nil {
-				log.G(ctx).WithError(err).WithField("plugin", name).Warn("skipping proxy platform with bad platform")
+				log.G(ctx).WithFields(log.Fields{"error": err, "plugin": name}).Warn("skipping proxy platform with bad platform")
 			}
 		} else {
 			p = platforms.DefaultSpec()
