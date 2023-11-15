@@ -30,6 +30,30 @@ import (
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
+const (
+	// defaultImagePullProgressTimeoutDuration is the default value of imagePullProgressTimeout.
+	//
+	// NOTE:
+	//
+	// This ImagePullProgressTimeout feature is ported from kubelet/dockershim's
+	// --image-pull-progress-deadline. The original value is 1m0. Unlike docker
+	// daemon, the containerd doesn't have global concurrent download limitation
+	// before migrating to Transfer Service. If kubelet runs with concurrent
+	// image pull, the node will run under IO pressure. The ImagePull process
+	// could be impacted by self, if the target image is large one with a
+	// lot of layers. And also both container's writable layers and image's storage
+	// share one disk. The ImagePull process commits blob to content store
+	// with fsync, which might bring the unrelated files' dirty pages into
+	// disk in one transaction [1]. The 1m0 value isn't good enough. Based
+	// on #9347 case and kubernetes community's usage [2], the default value
+	// is updated to 5m0. If end-user still runs into unexpected cancel,
+	// they need to config it based on their environment.
+	//
+	// [1]: Fast commits for ext4 - https://lwn.net/Articles/842385/
+	// [2]: https://github.com/kubernetes/kubernetes/blob/1635c380b26a1d8cc25d36e9feace9797f4bae3c/cluster/gce/util.sh#L882
+	defaultImagePullProgressTimeoutDuration = 5 * time.Minute
+)
+
 type SandboxControllerMode string
 
 const (
