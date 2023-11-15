@@ -637,9 +637,9 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 					WithField("activeReqs", activeReqs).
 					WithField("totalBytesRead", bytesRead).
 					WithField("lastSeenBytesRead", lastSeenBytesRead).
-					WithField("lastSeenTimestamp", lastSeenTimestamp).
+					WithField("lastSeenTimestamp", lastSeenTimestamp.Format(time.RFC3339)).
 					WithField("reportInterval", reportInterval).
-					Tracef("progress for image pull")
+					Debugf("progress for image pull")
 
 				if activeReqs == 0 || bytesRead > lastSeenBytesRead {
 					lastSeenBytesRead = bytesRead
