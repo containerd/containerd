@@ -318,8 +318,8 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	)
 
 	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
-		id := p.URI()
-		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
+		pID := p.URI()
+		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", pID)
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -353,14 +353,14 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
+				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", pID)
 				continue
 			}
-			return fmt.Errorf("failed to load plugin %s: %w", id, err)
+			return fmt.Errorf("failed to load plugin %s: %w", pID, err)
 		}
 
 		if src, ok := instance.(TTRPCService); ok {
-			log.G(ctx).WithField("id", id).Debug("registering ttrpc service")
+			log.G(ctx).WithField("id", pID).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}
