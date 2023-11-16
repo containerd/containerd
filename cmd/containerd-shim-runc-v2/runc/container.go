@@ -240,7 +240,7 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform stdi
 
 // Container for operating on a runc container and its processes
 type Container struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	// ID of the container
 	ID string
@@ -256,8 +256,8 @@ type Container struct {
 
 // All processes in the container
 func (c *Container) All() (o []process.Process) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	for _, p := range c.processes {
 		o = append(o, p)
@@ -270,8 +270,8 @@ func (c *Container) All() (o []process.Process) {
 
 // ExecdProcesses added to the container
 func (c *Container) ExecdProcesses() (o []process.Process) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	for _, p := range c.processes {
 		o = append(o, p)
 	}
@@ -280,15 +280,13 @@ func (c *Container) ExecdProcesses() (o []process.Process) {
 
 // Pid of the main process of a container
 func (c *Container) Pid() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	return c.process.Pid()
 }
 
 // Cgroup of the container
 func (c *Container) Cgroup() interface{} {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.cgroup
 }
 
@@ -301,8 +299,8 @@ func (c *Container) CgroupSet(cg interface{}) {
 
 // Process returns the process by id
 func (c *Container) Process(id string) (process.Process, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if id == "" {
 		if c.process == nil {
 			return nil, fmt.Errorf("container must be created: %w", errdefs.ErrFailedPrecondition)
