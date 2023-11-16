@@ -40,7 +40,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		return nil, fmt.Errorf("failed to get sandbox ip: %w", err)
 	}
 
-	controller, err := c.getSandboxController(sandbox.Config, sandbox.RuntimeHandler)
+	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
 	}

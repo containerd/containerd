@@ -87,16 +87,6 @@ func WithSnapshotters(snapshotters map[string]snapshots.Snapshotter) ServicesOpt
 	}
 }
 
-// WithSandboxers sets the sandbox controllers.
-func WithSandboxers(sandboxers map[string]sandbox.Controller) ServicesOpt {
-	return func(s *services) {
-		s.sandboxers = make(map[string]sandbox.Controller)
-		for n, sn := range sandboxers {
-			s.sandboxers[n] = sn
-		}
-	}
-}
-
 // WithContainerClient sets the container service to use using a containers client.
 func WithContainerClient(containerService containersapi.ContainersClient) ServicesOpt {
 	return func(s *services) {
@@ -218,9 +208,6 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 			srv.SnapshotsService: func(s interface{}) ServicesOpt {
 				return WithSnapshotters(s.(map[string]snapshots.Snapshotter))
 			},
-			srv.SandboxControllersService: func(s interface{}) ServicesOpt {
-				return WithSandboxers(s.(map[string]sandbox.Controller))
-			},
 			srv.ContainersService: func(s interface{}) ServicesOpt {
 				return WithContainerClient(s.(containersapi.ContainersClient))
 			},
@@ -248,6 +235,21 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 		for _, o := range opts {
 			o(c.services)
 		}
+		return nil
+	}
+}
+
+func WithInMemorySandboxControllers(ic *plugin.InitContext) Opt {
+	return func(c *clientOpts) error {
+		sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
+		if err != nil {
+			return err
+		}
+		sc := make(map[string]sandbox.Controller)
+		for name, p := range sandboxers {
+			sc[name] = p.(sandbox.Controller)
+		}
+		c.services.sandboxers = sc
 		return nil
 	}
 }

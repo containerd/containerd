@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
 	"github.com/containerd/typeurl/v2"
@@ -32,15 +32,13 @@ import (
 	containerdio "github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/pkg/cri/annotations"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/log"
 )
 
 func init() {
@@ -91,7 +89,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
-	ociRuntime, err := c.getSandboxRuntime(config, metadata.RuntimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
@@ -299,58 +297,4 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
 	}
 	return &newImage, nil
-}
-
-// untrustedWorkload returns true if the sandbox contains untrusted workload.
-func untrustedWorkload(config *runtime.PodSandboxConfig) bool {
-	return config.GetAnnotations()[annotations.UntrustedWorkload] == "true"
-}
-
-// hostAccessingSandbox returns true if the sandbox configuration
-// requires additional host access for the sandbox.
-func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
-	securityContext := config.GetLinux().GetSecurityContext()
-
-	namespaceOptions := securityContext.GetNamespaceOptions()
-	if namespaceOptions.GetNetwork() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetPid() == runtime.NamespaceMode_NODE ||
-		namespaceOptions.GetIpc() == runtime.NamespaceMode_NODE {
-		return true
-	}
-
-	return false
-}
-
-// getSandboxRuntime returns the runtime configuration for sandbox.
-// If the sandbox contains untrusted workload, runtime for untrusted workload will be returned,
-// or else default runtime will be returned.
-func (c *Controller) getSandboxRuntime(config *runtime.PodSandboxConfig, runtimeHandler string) (criconfig.Runtime, error) {
-	if untrustedWorkload(config) {
-		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
-		if runtimeHandler != "" && runtimeHandler != criconfig.RuntimeUntrusted {
-			return criconfig.Runtime{}, errors.New("untrusted workload with explicit runtime handler is not allowed")
-		}
-
-		//  If the untrusted workload is requesting access to the host/node, this request will fail.
-		//
-		//  Note: If the workload is marked untrusted but requests privileged, this can be granted, as the
-		// runtime may support this.  For example, in a virtual-machine isolated runtime, privileged
-		// is a supported option, granting the workload to access the entire guest VM instead of host.
-		// TODO(windows): Deprecate this so that we don't need to handle it for windows.
-		if hostAccessingSandbox(config) {
-			return criconfig.Runtime{}, errors.New("untrusted workload with host access is not allowed")
-		}
-
-		runtimeHandler = criconfig.RuntimeUntrusted
-	}
-
-	if runtimeHandler == "" {
-		runtimeHandler = c.config.ContainerdConfig.DefaultRuntimeName
-	}
-
-	handler, ok := c.config.ContainerdConfig.Runtimes[runtimeHandler]
-	if !ok {
-		return criconfig.Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
-	}
-	return handler, nil
 }
