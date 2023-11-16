@@ -117,23 +117,19 @@ func (w *criWorker) runSandbox(tctx, ctx context.Context, id string) (err error)
 	// verify it is running ?
 
 	ticker := time.NewTicker(250 * time.Millisecond)
-	quit := make(chan struct{})
 	go func() {
 		for {
 			select {
 			case <-tctx.Done():
-				close(quit)
+				ticker.Stop()
 				return
 			case <-ticker.C:
 				// do stuff
 				status, err := w.client.PodSandboxStatus(sb)
 				if err != nil && status.GetState() == runtime.PodSandboxState_SANDBOX_READY {
-					close(quit)
+					ticker.Stop()
 					return
 				}
-			case <-quit:
-				ticker.Stop()
-				return
 			}
 		}
 	}()
