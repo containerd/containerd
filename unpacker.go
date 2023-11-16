@@ -88,6 +88,7 @@ func (u *unpacker) unpack(
 	config ocispec.Descriptor,
 	layers []ocispec.Descriptor,
 ) error {
+	unpackStart := time.Now()
 	p, err := content.ReadBlob(ctx, u.c.ContentStore(), config)
 	if err != nil {
 		return err
@@ -255,9 +256,14 @@ func (u *unpacker) unpack(
 	}
 
 	for i, desc := range layers {
+		unpackLayerStart := time.Now()
 		if err := doUnpackFn(i, desc); err != nil {
 			return err
 		}
+		log.G(ctx).WithFields(logrus.Fields{
+			"layer":    desc.Digest,
+			"duration": time.Since(unpackLayerStart),
+		}).Debug("layer unpacked")
 	}
 
 	chainID := identity.ChainID(chain).String()
@@ -272,8 +278,9 @@ func (u *unpacker) unpack(
 		return err
 	}
 	log.G(ctx).WithFields(logrus.Fields{
-		"config":  config.Digest,
-		"chainID": chainID,
+		"config":   config.Digest,
+		"chainID":  chainID,
+		"duration": time.Since(unpackStart),
 	}).Debug("image unpacked")
 
 	return nil
