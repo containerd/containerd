@@ -13,7 +13,7 @@ with an image registry, or loading an image from tar. containerd's Go client
 gives a user access to many points of extensions from creating their own
 options on container creation to resolving image registry names.
 
-See [containerd's Go documentation](https://godoc.org/github.com/containerd/containerd)
+See [containerd's Go documentation](https://godoc.org/github.com/containerd/containerd/v2/client)
 
 ## External Plugins
 
@@ -75,11 +75,11 @@ version = 2
 
 Implementing a proxy plugin is as easy as implementing the gRPC API for a
 service. For implementing a proxy plugin in Go, look at the go doc for
-[content store service](https://godoc.org/github.com/containerd/containerd/api/services/content/v1#ContentServer), [snapshotter service](https://godoc.org/github.com/containerd/containerd/api/services/snapshots/v1#SnapshotsServer), and [diff service](https://pkg.go.dev/github.com/containerd/containerd/api/services/diff/v1#DiffServer).
+[content store service](https://godoc.org/github.com/containerd/containerd/v2/api/services/content/v1#ContentServer), [snapshotter service](https://godoc.org/github.com/containerd/containerd/v2/api/services/snapshots/v1#SnapshotsServer), and [diff service](https://pkg.go.dev/github.com/containerd/containerd/v2/api/services/diff/v1#DiffServer).
 
 The following example creates a snapshot plugin binary which can be used
 with any implementation of
-[containerd's Snapshotter interface](https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter)
+[containerd's Snapshotter interface](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter)
 ```go
 package main
 
@@ -90,9 +90,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/contrib/snapshotservice"
-	"github.com/containerd/containerd/snapshots/native"
+	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
+	"github.com/containerd/containerd/v2/contrib/snapshotservice"
+	"github.com/containerd/containerd/v2/snapshots/native"
 )
 
 func main() {
