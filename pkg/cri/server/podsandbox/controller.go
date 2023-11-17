@@ -48,6 +48,7 @@ func init() {
 		ID:   "podsandbox",
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
+			plugins.LeasePlugin,
 			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
