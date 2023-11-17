@@ -538,7 +538,7 @@ jobs:
       fail-fast: false
       matrix:
         box:
-          - fedora/38-cloud-base
+          - fedora/39-cloud-base
           - rockylinux/8@8.0.0
     env:
       BOX: ${{ matrix.box }}
