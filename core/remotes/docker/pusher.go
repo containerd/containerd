@@ -526,6 +526,8 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 
 	if expected == "" {
 		expected = status.Expected
+	} else if expected != status.Expected {
+		return fmt.Errorf("unexpected digest received: got %q, expected %q", status.Expected, expected)
 	}
 
 	if dgstHdr := resp.Header.Get("Docker-Content-Digest"); dgstHdr != "" {
@@ -537,6 +539,8 @@ func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Di
 		if actual != expected {
 			return fmt.Errorf("got digest %s, expected %s", actual, expected)
 		}
+	} else {
+		log.G(ctx).Info("registry did not send a Docker-Content-Digest header")
 	}
 
 	status.Committed = true
