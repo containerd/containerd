@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/labels"
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/reference/docker"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
@@ -67,8 +68,9 @@ func NewStore(client *containerd.Client) *Store {
 		refCache: make(map[string]string),
 		client:   client,
 		store: &store{
-			images:    make(map[string]Image),
-			digestSet: digestset.NewSet(),
+			images:     make(map[string]Image),
+			digestSet:  digestset.NewSet(),
+			pinnedRefs: make(map[string]sets.Set[string]),
 		},
 	}
 }
@@ -106,7 +108,13 @@ func (s *Store) update(ref string, img *Image) error {
 	}
 	if oldExist {
 		if oldID == img.ID {
-			return nil
+			if s.store.isPinned(img.ID, ref) == img.Pinned {
+				return nil
+			}
+			if img.Pinned {
+				return s.store.pin(img.ID, ref)
+			}
+			return s.store.unpin(img.ID, ref)
 		}
 		// Updated. Remove tag from old image.
 		s.store.delete(oldID, ref)
@@ -178,9 +186,10 @@ func (s *Store) List() []Image {
 }
 
 type store struct {
-	lock      sync.RWMutex
-	images    map[string]Image
-	digestSet *digestset.Set
+	lock       sync.RWMutex
+	images     map[string]Image
+	digestSet  *digestset.Set
+	pinnedRefs map[string]sets.Set[string]
 }
 
 func (s *store) list() []Image {
@@ -205,6 +214,14 @@ func (s *store) add(img Image) error {
 		}
 	}
 
+	if img.Pinned {
+		if refs := s.pinnedRefs[img.ID]; refs == nil {
+			s.pinnedRefs[img.ID] = sets.New(img.References...)
+		} else {
+			refs.Insert(img.References...)
+		}
+	}
+
 	i, ok := s.images[img.ID]
 	if !ok {
 		// If the image doesn't exist, add it.
@@ -213,7 +230,75 @@ func (s *store) add(img Image) error {
 	}
 	// Or else, merge and sort the references.
 	i.References = docker.Sort(util.MergeStringSlices(i.References, img.References))
+	i.Pinned = i.Pinned || img.Pinned
 	s.images[img.ID] = i
+	return nil
+}
+
+func (s *store) isPinned(id, ref string) bool {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	digest, err := s.digestSet.Lookup(id)
+	if err != nil {
+		return false
+	}
+	refs := s.pinnedRefs[digest.String()]
+	return refs != nil && refs.Has(ref)
+}
+
+func (s *store) pin(id, ref string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	digest, err := s.digestSet.Lookup(id)
+	if err != nil {
+		if err == digestset.ErrDigestNotFound {
+			err = errdefs.ErrNotFound
+		}
+		return err
+	}
+	i, ok := s.images[digest.String()]
+	if !ok {
+		return errdefs.ErrNotFound
+	}
+
+	if refs := s.pinnedRefs[digest.String()]; refs == nil {
+		s.pinnedRefs[digest.String()] = sets.New(ref)
+	} else {
+		refs.Insert(ref)
+	}
+	i.Pinned = true
+	s.images[digest.String()] = i
+	return nil
+}
+
+func (s *store) unpin(id, ref string) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	digest, err := s.digestSet.Lookup(id)
+	if err != nil {
+		if err == digestset.ErrDigestNotFound {
+			err = errdefs.ErrNotFound
+		}
+		return err
+	}
+	i, ok := s.images[digest.String()]
+	if !ok {
+		return errdefs.ErrNotFound
+	}
+
+	refs := s.pinnedRefs[digest.String()]
+	if refs == nil {
+		return nil
+	}
+	if refs.Delete(ref); len(refs) > 0 {
+		return nil
+	}
+
+	// delete unpinned image, we only need to keep the pinned
+	// entries in the map
+	delete(s.pinnedRefs, digest.String())
+	i.Pinned = false
+	s.images[digest.String()] = i
 	return nil
 }
 
@@ -248,10 +333,20 @@ func (s *store) delete(id, ref string) {
 	}
 	i.References = util.SubtractStringSlice(i.References, ref)
 	if len(i.References) != 0 {
+		if refs := s.pinnedRefs[digest.String()]; refs != nil {
+			if refs.Delete(ref); len(refs) == 0 {
+				i.Pinned = false
+				// delete unpinned image, we only need to keep the pinned
+				// entries in the map
+				delete(s.pinnedRefs, digest.String())
+			}
+		}
+
 		s.images[digest.String()] = i
 		return
 	}
 	// Remove the image if it is not referenced any more.
 	s.digestSet.Remove(digest)
 	delete(s.images, digest.String())
+	delete(s.pinnedRefs, digest.String())
 }
