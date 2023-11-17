@@ -299,14 +299,14 @@ func (c *Container) CgroupSet(cg interface{}) {
 
 // Process returns the process by id
 func (c *Container) Process(id string) (process.Process, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	if id == "" {
 		if c.process == nil {
 			return nil, fmt.Errorf("container must be created: %w", errdefs.ErrFailedPrecondition)
 		}
 		return c.process, nil
 	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	p, ok := c.processes[id]
 	if !ok {
 		return nil, fmt.Errorf("process does not exist %s: %w", id, errdefs.ErrNotFound)
