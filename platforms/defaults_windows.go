@@ -117,3 +117,14 @@ func prefix(v string) string {
 func Default() MatchComparer {
 	return Only(DefaultSpec())
 }
+
+// TODO(kiashok): The compatibility martix for VM compat on windows will be implemented
+// in hcsshim in accordance with the following link:
+// https://learn.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/version-compatibility?tabs=windows-server-2022%2Cwindows-11
+// Changes will be updated here once the changes go into hcsshim repo.
+// This will help keep the platform matching details abstacted from containerd code and
+// can be updated on hcsshim side as new Windows releases are added.
+// Therefore returning true from this function for now.
+func AreWindowsHostAndGuestHyperVCompatible(hostPlatform, guestPlatform specs.Platform) bool {
+	return true
+}

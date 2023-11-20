@@ -38,3 +38,7 @@ func DefaultSpec() specs.Platform {
 func Default() MatchComparer {
 	return Only(DefaultSpec())
 }
+
+func AreWindowsHostAndGuestHyperVCompatible(hostPlatform, guestPlatform specs.Platform) bool {
+	return false
+}
