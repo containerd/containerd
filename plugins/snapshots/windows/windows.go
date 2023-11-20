@@ -21,8 +21,11 @@ package windows
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Microsoft/go-winio"
@@ -138,6 +141,81 @@ func (s *wcowSnapshotter) Commit(ctx context.Context, name, key string, opts ...
 	})
 }
 
+func (s *wcowSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
+	var newSnapshot storage.Snapshot
+	err = s.ms.WithTransaction(ctx, true, func(ctx context.Context) (retErr error) {
+		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
+		if err != nil {
+			return fmt.Errorf("failed to create snapshot: %w", err)
+		}
+
+		log.G(ctx).Debug("createSnapshot")
+		// Create the new snapshot dir
+		snDir := s.getSnapshotDir(newSnapshot.ID)
+		if err = os.MkdirAll(snDir, 0700); err != nil {
+			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
+		}
+		defer func() {
+			if retErr != nil {
+				os.RemoveAll(snDir)
+			}
+		}()
+
+		if strings.Contains(key, snapshots.UnpackKeyPrefix) {
+			// IO/disk space optimization: Do nothing
+			//
+			// We only need one sandbox.vhdx for the container. Skip making one for this
+			// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
+			// that will be mounted as the containers scratch. Currently the key for a snapshot
+			// where a layer will be extracted to will have the string `extract-` in it.
+			return nil
+		}
+
+		if len(newSnapshot.ParentIDs) == 0 {
+			// A parentless snapshot a new base layer. Valid base layers must have a "Files" folder.
+			// When committed, there'll be some post-processing to fill in the rest
+			// of the metadata.
+			filesDir := filepath.Join(snDir, "Files")
+			if err := os.MkdirAll(filesDir, 0700); err != nil {
+				return fmt.Errorf("creating Files dir: %w", err)
+			}
+			return nil
+		}
+
+		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
+		var snapshotInfo snapshots.Info
+		for _, o := range opts {
+			o(&snapshotInfo)
+		}
+
+		sizeInBytes, err := getRequestedScratchSize(ctx, snapshotInfo)
+		if err != nil {
+			return err
+		}
+
+		var makeUVMScratch bool
+		if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
+			makeUVMScratch = true
+		}
+
+		// This has    to be run first to avoid clashing with the containers sandbox.vhdx.
+		if makeUVMScratch {
+			if err = s.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
+				return fmt.Errorf("failed to make UVM's scratch layer: %w", err)
+			}
+		}
+		if err = s.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
+			return fmt.Errorf("failed to create scratch layer: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.mounts(newSnapshot, key), nil
+}
+
 // Remove abandons the transaction identified by key. All resources
 // associated with the key will be removed.
 func (s *wcowSnapshotter) Remove(ctx context.Context, key string) error {
@@ -152,6 +230,50 @@ func (s *wcowSnapshotter) Remove(ctx context.Context, key string) error {
 		log.G(ctx).WithError(err).WithField("renamedID", renamedID).Warnf("Failed to remove root filesystem")
 	}
 
+	return nil
+}
+
+// Mounts returns the mounts for the transaction identified by key. Can be
+// called on an read-write or readonly transaction.
+//
+// This can be used to recover mounts after calling View or Prepare.
+func (s *wcowSnapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, err error) {
+	var snapshot storage.Snapshot
+	err = s.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		snapshot, err = storage.GetSnapshot(ctx, key)
+		if err != nil {
+			return fmt.Errorf("failed to get snapshot mount: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return s.mounts(snapshot, key), nil
+}
+
+// This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
+// whistles like expanding the volume if a size is specified.
+func (s *wcowSnapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
+	parentLen := len(parentLayers)
+	if parentLen == 0 {
+		return fmt.Errorf("no parent layers present")
+	}
+
+	baseLayer := parentLayers[parentLen-1]
+	templateDiffDisk := filepath.Join(baseLayer, "blank.vhdx")
+	dest := filepath.Join(snDir, "sandbox.vhdx")
+	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
+		return err
+	}
+
+	if sizeInBytes != 0 {
+		if err := hcsshim.ExpandSandboxSize(s.info, filepath.Base(snDir), sizeInBytes); err != nil {
+			return fmt.Errorf("failed to expand sandbox vhdx size to %d bytes: %w", sizeInBytes, err)
+		}
+	}
 	return nil
 }
 
@@ -196,4 +318,41 @@ func (s *wcowSnapshotter) convertScratchToReadOnlyLayer(ctx context.Context, sna
 	// there first.
 
 	return nil
+}
+
+func (s *wcowSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
+	var (
+		roFlag string
+	)
+
+	if sn.Kind == snapshots.KindView {
+		roFlag = "ro"
+	} else {
+		roFlag = "rw"
+	}
+
+	source := s.getSnapshotDir(sn.ID)
+	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+
+	mountType := "windows-layer"
+
+	// error is not checked here, as a string array will never fail to Marshal
+	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
+	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
+
+	options := []string{
+		roFlag,
+	}
+	if len(sn.ParentIDs) != 0 {
+		options = append(options, parentLayersOption)
+	}
+	mounts := []mount.Mount{
+		{
+			Source:  source,
+			Type:    mountType,
+			Options: options,
+		},
+	}
+
+	return mounts
 }
