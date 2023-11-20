@@ -10,12 +10,12 @@ containerd config [command]
 
 ## DESCRIPTION
 
-containerd config command used for generating config file in TOML format.  
+containerd config command used for generating config file in TOML format.
 
 these commands' output can be piped to a __containerd-config.toml(5)__ file and placed in
 **/etc/containerd** to be used as the configuration for containerd on daemon
 startup. The configuration can be placed in any filesystem location and used
-with the **--config** option to the containerd daemon as well.  
+with the **--config** option to the containerd daemon as well.
 
 See __containerd-config.toml(5)__ for more information on the containerd
 configuration options.
@@ -25,7 +25,7 @@ configuration options.
 ## OPTIONS
 
 **default**
-: This subcommand will generate the default containerd configuration 
+: This subcommand will generate the default containerd configuration.
 
 **dump**
 : This subcommand will dump the config file of system with other subconfig files.
