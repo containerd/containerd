@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/mount"
 )
 
-func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
+func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _sync bool) error {
 	// We currently do not support mounts nor bind mounts on MacOS in the containerd daemon.
 	// Using this as an exception to enable native snapshotter and allow further research.
 	if len(mounts) == 1 && mounts[0].Type == "bind" {
@@ -38,6 +38,8 @@ func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
 		path := mounts[0].Source
 		_, err := archive.Apply(ctx, path, r, opts...)
 		return err
+
+		// TODO: Do we need to sync all the filesystems?
 	}
 
 	return mount.WithTempMount(ctx, mounts, func(root string) error {

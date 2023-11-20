@@ -106,6 +106,7 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 		}
 		opts = append(opts, diff.WithPayloads(payloads))
 	}
+	opts = append(opts, diff.WithSyncFs(er.SyncFs))
 
 	for _, differ := range l.differs {
 		ocidesc, err = differ.Apply(ctx, desc, mounts, opts...)

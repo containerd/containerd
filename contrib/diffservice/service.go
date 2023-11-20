@@ -60,6 +60,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 		}
 		opts = append(opts, diff.WithPayloads(payloads))
 	}
+	opts = append(opts, diff.WithSyncFs(er.SyncFs))
 
 	ocidesc, err = s.applier.Apply(ctx, desc, mounts, opts...)
 	if err != nil {
