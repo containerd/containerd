@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -42,15 +41,20 @@ func init() {
 		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
-			plugins.ServicePlugin,
+			plugins.SandboxControllerPlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			i, err := ic.GetByID(plugins.ServicePlugin, services.SandboxControllersService)
+			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 			if err != nil {
 				return nil, err
 			}
-			sc := i.(map[string]sandbox.Controller)
+
+			sc := make(map[string]sandbox.Controller)
+			for name, p := range sandboxers {
+				sc[name] = p.(sandbox.Controller)
+			}
+
 			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err

@@ -18,16 +18,23 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"os"
 	"testing"
 
-	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
@@ -35,10 +42,49 @@ import (
 	servertesting "github.com/containerd/containerd/v2/pkg/cri/testing"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 	"github.com/containerd/containerd/v2/pkg/registrar"
-	"github.com/containerd/log"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/sandbox"
 )
+
+type fakeSandboxService struct{}
+
+func (f *fakeSandboxService) SandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error) {
+	return &fakeSandboxController{}, nil
+}
+
+type fakeSandboxController struct{}
+
+func (f fakeSandboxController) Create(_ctx context.Context, _sandboxInfo sandbox.Sandbox, _opts ...sandbox.CreateOpt) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Start(ctx context.Context, sandboxID string) (sandbox.ControllerInstance, error) {
+	return sandbox.ControllerInstance{}, errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error) {
+	return platforms.DefaultSpec(), nil
+}
+
+func (f fakeSandboxController) Stop(_ctx context.Context, _sandboxID string, _opts ...sandbox.StopOpt) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Wait(_ctx context.Context, _sandboxID string) (sandbox.ExitStatus, error) {
+	return sandbox.ExitStatus{}, errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Status(_ctx context.Context, sandboxID string, _verbose bool) (sandbox.ControllerStatus, error) {
+	return sandbox.ControllerStatus{}, errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Shutdown(ctx context.Context, sandboxID string) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*types.Metric, error) {
+	return &types.Metric{}, errdefs.ErrNotImplemented
+}
 
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
@@ -54,6 +100,7 @@ func newTestCRIService() *criService {
 		netPlugin: map[string]cni.CNI{
 			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
 		},
+		sandboxService: &fakeSandboxService{},
 	}
 }
 

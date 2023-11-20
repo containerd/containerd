@@ -118,6 +118,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(lastInitContext),
+		containerd.WithInMemorySandboxControllers(lastInitContext),
 	)
 	assert.NoError(t, err)
 

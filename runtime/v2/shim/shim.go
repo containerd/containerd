@@ -189,13 +189,13 @@ func Run(ctx context.Context, manager Manager, opts ...BinaryOpts) {
 
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("runtime", manager.Name()))
 
-	if err := run(ctx, manager, "", config); err != nil {
+	if err := run(ctx, manager, config); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %s", manager.Name(), err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, manager Manager, name string, config Config) error {
+func run(ctx context.Context, manager Manager, config Config) error {
 	parseFlags()
 	if versionFlag {
 		fmt.Printf("%s:\n", filepath.Base(os.Args[0]))
@@ -318,8 +318,8 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 	)
 
 	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
-		id := p.URI()
-		log.G(ctx).WithField("type", p.Type).Infof("loading plugin %q...", id)
+		pID := p.URI()
+		log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type}).Info("loading plugin")
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -353,14 +353,14 @@ func run(ctx context.Context, manager Manager, name string, config Config) error
 		instance, err := result.Instance()
 		if err != nil {
 			if plugin.IsSkipPlugin(err) {
-				log.G(ctx).WithError(err).WithField("type", p.Type).Infof("skip loading plugin %q...", id)
+				log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type, "error": err}).Info("skip loading plugin")
 				continue
 			}
-			return fmt.Errorf("failed to load plugin %s: %w", id, err)
+			return fmt.Errorf("failed to load plugin %s: %w", pID, err)
 		}
 
 		if src, ok := instance.(TTRPCService); ok {
-			log.G(ctx).WithField("id", id).Debug("registering ttrpc service")
+			log.G(ctx).WithField("id", pID).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
 
 		}

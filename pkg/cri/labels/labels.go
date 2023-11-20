@@ -27,4 +27,14 @@ const (
 	PinnedImageLabelKey = criContainerdPrefix + ".pinned"
 	// PinnedImageLabelValue is the label value indicating the image is pinned.
 	PinnedImageLabelValue = "pinned"
+	// ContainerKindLabel is a label key indicating container is sandbox container or application container
+	ContainerKindLabel = criContainerdPrefix + ".kind"
+	// ContainerKindSandbox is a label value indicating container is sandbox container
+	ContainerKindSandbox = "sandbox"
+	// ContainerKindContainer is a label value indicating container is application container
+	ContainerKindContainer = "container"
+	// ContainerMetadataExtension is an extension name that identify metadata of container in CreateContainerRequest
+	ContainerMetadataExtension = criContainerdPrefix + ".container.metadata"
+	// SandboxMetadataExtension is an extension name that identify metadata of sandbox in CreateContainerRequest
+	SandboxMetadataExtension = criContainerdPrefix + ".sandbox.metadata"
 )

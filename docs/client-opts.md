@@ -65,7 +65,7 @@ If we want to make a `SpecOpt` to setup a container to monitor the host system w
 package monitor
 
 import (
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
