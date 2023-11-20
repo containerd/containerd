@@ -650,8 +650,10 @@ func (o *snapshotter) Close() error {
 
 // supportsIndex checks whether the "index=off" option is supported by the kernel.
 func supportsIndex() bool {
-	if _, err := os.Stat("/sys/module/overlay/parameters/index"); err == nil {
-		return true
+	indexPath := "/sys/module/overlay/parameters/index"
+	if _, err := os.Stat(indexPath); err == nil {
+		index, _ := os.ReadFile(indexPath)
+		return string(index) == "Y"
 	}
 	return false
 }
