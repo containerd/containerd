@@ -93,12 +93,17 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 		}
 	}
 
+	// For backward compatibility, we have to keep the rootDir and stateDir the same as before.
+	containerdRootDir := filepath.Dir(ic.Properties[plugins.PropertyRootDir])
+	rootDir := filepath.Join(containerdRootDir, "io.containerd.grpc.v1.cri")
+	containerdStateDir := filepath.Dir(ic.Properties[plugins.PropertyStateDir])
+	stateDir := filepath.Join(containerdStateDir, "io.containerd.grpc.v1.cri")
 	c := criconfig.Config{
 		PluginConfig:       *pluginConfig,
-		ContainerdRootDir:  filepath.Dir(ic.Properties[plugins.PropertyRootDir]),
+		ContainerdRootDir:  containerdRootDir,
 		ContainerdEndpoint: ic.Properties[plugins.PropertyGRPCAddress],
-		RootDir:            ic.Properties[plugins.PropertyRootDir],
-		StateDir:           ic.Properties[plugins.PropertyStateDir],
+		RootDir:            rootDir,
+		StateDir:           stateDir,
 	}
 
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
