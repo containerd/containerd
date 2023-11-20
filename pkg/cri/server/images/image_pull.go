@@ -555,9 +555,6 @@ func newTransport() *http.Transport {
 //}
 
 const (
-	// minPullProgressReportInternal is used to prevent the reporter from
-	// eating more CPU resources
-	minPullProgressReportInternal = 5 * time.Second
 	// defaultPullProgressReportInterval represents that how often the
 	// reporter checks that pull progress.
 	defaultPullProgressReportInterval = 10 * time.Second
@@ -605,10 +602,6 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 		// check progress more frequently if timeout < default internal
 		if reporter.timeout < reportInterval {
 			reportInterval = reporter.timeout / 2
-
-			if reportInterval < minPullProgressReportInternal {
-				reportInterval = minPullProgressReportInternal
-			}
 		}
 
 		var ticker = time.NewTicker(reportInterval)
@@ -623,9 +616,9 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 					WithField("activeReqs", activeReqs).
 					WithField("totalBytesRead", bytesRead).
 					WithField("lastSeenBytesRead", lastSeenBytesRead).
-					WithField("lastSeenTimestamp", lastSeenTimestamp).
+					WithField("lastSeenTimestamp", lastSeenTimestamp.Format(time.RFC3339)).
 					WithField("reportInterval", reportInterval).
-					Tracef("progress for image pull")
+					Debugf("progress for image pull")
 
 				if activeReqs == 0 || bytesRead > lastSeenBytesRead {
 					lastSeenBytesRead = bytesRead

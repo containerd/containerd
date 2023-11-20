@@ -19,8 +19,6 @@
 package config
 
 import (
-	"time"
-
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/pelletier/go-toml/v2"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -100,7 +98,7 @@ func DefaultConfig() PluginConfig {
 		},
 		EnableCDI:                false,
 		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
-		ImagePullProgressTimeout: time.Minute.String(),
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		DrainExecSyncIOTimeout:   "0s",
 		EnableUnprivilegedPorts:  true,
 		EnableUnprivilegedICMP:   true,
