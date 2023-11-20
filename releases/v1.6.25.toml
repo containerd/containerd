@@ -1,0 +1,51 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.6.24"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The twenty-fifth patch release for containerd 1.6 contains various fixes and updates.
+
+### Notable Updates
+
+* **Check whether content did not needs to be pushed to remote registry and cross-repo mounted or already existed** ([#9111](https://github.com/containerd/containerd/pull/9111))
+* **Soft deprecate log package** ([#9105](https://github.com/containerd/containerd/pull/9105))
+* **Always try to establish tls connection when tls configured** ([#9189](https://github.com/containerd/containerd/pull/9189))
+* **CRI: stop recommending disable_cgroup** ([#9169](https://github.com/containerd/containerd/pull/9169))
+* **Allow for images with artifacts layers to pull** ([#9150](https://github.com/containerd/containerd/pull/9150))
+* **Require plugins to succeed after registering readiness** ([#9166](https://github.com/containerd/containerd/pull/9166))
+* **Avoid potential deadlock in create handler in containerd-shim-runc-v2** ([#9210](https://github.com/containerd/containerd/pull/9210))
+* **Add handling for missing basic auth credentials** ([#9236](https://github.com/containerd/containerd/pull/9236))
+* **Add a new image label if it is docker schema 1** ([#9267](https://github.com/containerd/containerd/pull/9267))
+* **Fix ambiguous tls fallback** ([#9300](https://github.com/containerd/containerd/pull/9300))
+* **Expose usage of deprecated features** ([#9329](https://github.com/containerd/containerd/pull/9329))
+* **Fix shimv1 leak issue** ([#9345](https://github.com/containerd/containerd/pull/9345))
+* **Go version update to 1.20.10**([#9264](https://github.com/containerd/containerd/pull/9264))
+* **Update runc to v1.1.10** ([#9360](https://github.com/containerd/containerd/pull/9360))
+* **CRI: fix using the pinned label to pin image** ([#9382](https://github.com/containerd/containerd/pull/9382))
+
+See the changelog for complete list of changes"""
+
+# override dependency of containerd/log
+[override_deps]
+    [override_deps."github.com/containerd/log"]
+        # commit sha in containerd/log corresponding to the last commit in v1.6.24
+        previous="cf9777876edf6a4aa230c739bc7eec5ab8349e9c"
