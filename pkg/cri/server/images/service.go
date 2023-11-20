@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	snapshot "github.com/containerd/containerd/v2/snapshots"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -94,9 +95,19 @@ type CRIImageService struct {
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+	// Platform MatchComparer for each runtime class using default platform or
+	// Runtime.Platform specified for the runtime handler (see pkg/cri/config/config.go).
+	runtimeHandlerToPlatformMap map[string]specs.Platform
 }
 
 func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageService, error) {
+	// Initialize platform MatchComparer for each runtime handler defined in containerd toml
+	runtimeHandlerToPlatformMap := make(map[string]specs.Platform)
+	err := initializeRuntimeHandlerToPlatformMap(config, runtimeHandlerToPlatformMap)
+	if err != nil {
+		return nil, err
+	}
+
 	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
 		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
 	}
@@ -113,7 +124,6 @@ func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageSe
 
 	snapshotter := config.ContainerdConfig.Snapshotter
 	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
-	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
 
 	svc := CRIImageService{
 		config:                      config,
@@ -122,6 +132,7 @@ func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageSe
 		imageFSPaths:                imageFSPaths,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
+		runtimeHandlerToPlatformMap: runtimeHandlerToPlatformMap,
 	}
 
 	snapshotters := map[string]snapshot.Snapshotter{}
@@ -155,6 +166,37 @@ func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageSe
 	snapshotsSyncer.start()
 
 	return &svc, nil
+}
+
+func initializeRuntimeHandlerToPlatformMap(c criconfig.Config, platformMap map[string]specs.Platform) error {
+	for k, ociRuntime := range c.ContainerdConfig.Runtimes {
+		// consider ociRuntime.Platform values only if OS and Architecture are specified
+		if ociRuntime.Platform.OS != "" && ociRuntime.Platform.Architecture != "" {
+			// For windows: check if the runtime handler has sandbox isolation field set and use
+			// ociRuntime.Platform for platform matcher only for hyperV isolated runtime handlers.
+			// Process isolated containers run directly on the host and hence only the default platform
+			// matcher of the host needs to used. If ociRuntime.Platform was defined for process isolated
+			// runtime handlers, it would be better to explicitly throw an error here so that user can
+			// remove ociRuntime.Platform field for this runtime handler from the toml
+
+			if ociRuntime.Type == plugins.RuntimeRunhcsV1 {
+				// ensure that OSVersion is mentioned for windows runtime handlers
+				if ociRuntime.Platform.OSVersion == "" {
+					return fmt.Errorf("ociruntime.Platform.OSVersion needs to be specified for windows")
+				}
+				platformForRuntimeHandler, err := GetPlatformMatcherForRuntimeHandler(ociRuntime, k)
+				if err != nil {
+					return fmt.Errorf("failed to init platformMap: %w", err)
+				}
+				platformMap[k] = platformForRuntimeHandler
+			} else {
+				platformMap[k] = ociRuntime.Platform
+			}
+		} else {
+			platformMap[k] = platforms.DefaultSpec()
+		}
+	}
+	return nil
 }
 
 // imageFSPath returns containerd image filesystem path.

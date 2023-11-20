@@ -42,3 +42,7 @@ func Default() MatchComparer {
 		Architecture: runtime.GOARCH,
 	})
 }
+
+func AreWindowsHostAndGuestHyperVCompatible(hostPlatform, guestPlatform specs.Platform) bool {
+	return false
+}

@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
@@ -33,6 +33,7 @@ import (
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/plugins"
 	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 const (
@@ -112,6 +113,14 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+	// Platform specifies the host platform that containers are intended to run on.
+	// This is particularly used for image pulls to help pull the right manifest for an image
+	// based on the platform it is going to run on. This field will be used to initialize
+	// platform matchers for each runtime handler.
+	// On windows, this field is only honored for HyperV isolation as exact OSVersion match between
+	// the host and guest are required for process isolated containers. If this field is specified
+	// for process isolated runtime handler, an error will be thrown.
+	Platform specs.Platform `toml:"platform" json:"platform"`
 }
 
 // ContainerdConfig contains toml config related to containerd

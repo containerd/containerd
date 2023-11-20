@@ -41,3 +41,7 @@ func Default() MatchComparer {
 		Variant: cpuVariant(),
 	})
 }
+
+func AreWindowsHostAndGuestHyperVCompatible(hostPlatform, guestPlatform specs.Platform) bool {
+	return false
+}
