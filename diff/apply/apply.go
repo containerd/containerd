@@ -92,7 +92,7 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	if err := apply(ctx, mounts, rc); err != nil {
+	if err := apply(ctx, mounts, rc, config.SyncFs); err != nil {
 		return emptyDesc, err
 	}
 

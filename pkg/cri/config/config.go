@@ -357,6 +357,9 @@ type PluginConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
+	// ImagePullWithSyncFs is an experimental setting. It's to force sync
+	// filesystem during unpacking to ensure that data integrity.
+	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

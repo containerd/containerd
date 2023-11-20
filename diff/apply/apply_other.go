@@ -26,7 +26,8 @@ import (
 	"github.com/containerd/containerd/v2/mount"
 )
 
-func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
+func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _sync bool) error {
+	// TODO: for windows, how to sync?
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
 		return err

@@ -67,6 +67,8 @@ type Comparer interface {
 type ApplyConfig struct {
 	// ProcessorPayloads specifies the payload sent to various processors
 	ProcessorPayloads map[string]typeurl.Any
+	// SyncFs is to synchronize the underlying filesystem containing files
+	SyncFs bool
 }
 
 // ApplyOpt is used to configure an Apply operation
@@ -121,6 +123,14 @@ func WithLabels(labels map[string]string) Opt {
 func WithPayloads(payloads map[string]typeurl.Any) ApplyOpt {
 	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
 		c.ProcessorPayloads = payloads
+		return nil
+	}
+}
+
+// WithSyncFs sets sync flag to the config.
+func WithSyncFs(sync bool) ApplyOpt {
+	return func(_ context.Context, _ ocispec.Descriptor, c *ApplyConfig) error {
+		c.SyncFs = sync
 		return nil
 	}
 }

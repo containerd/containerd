@@ -20,15 +20,18 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/containerd/containerd/v2/archive"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/pkg/userns"
+
+	"golang.org/x/sys/unix"
 )
 
-func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
+func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, sync bool) (retErr error) {
 	switch {
 	case len(mounts) == 1 && mounts[0].Type == "overlay":
 		// OverlayConvertWhiteout (mknod c 0 0) doesn't work in userns.
@@ -50,7 +53,18 @@ func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {
 			opts = append(opts, archive.WithParents(parents))
 		}
 		_, err = archive.Apply(ctx, path, r, opts...)
+		if err == nil && sync {
+			err = doSyncFs(path)
+		}
 		return err
+	case sync && len(mounts) == 1 && mounts[0].Type == "bind":
+		defer func() {
+			if retErr != nil {
+				return
+			}
+
+			retErr = doSyncFs(mounts[0].Source)
+		}()
 	}
 	return mount.WithTempMount(ctx, mounts, func(root string) error {
 		_, err := archive.Apply(ctx, root, r)
@@ -74,4 +88,18 @@ func getOverlayPath(options []string) (upper string, lower []string, err error) 
 	}
 
 	return
+}
+
+func doSyncFs(file string) error {
+	fd, err := os.Open(file)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", file, err)
+	}
+	defer fd.Close()
+
+	_, _, errno := unix.Syscall(unix.SYS_SYNCFS, fd.Fd(), 0, 0)
+	if errno != 0 {
+		return fmt.Errorf("failed to syncfs for %s: %w", file, errno)
+	}
+	return nil
 }
