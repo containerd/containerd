@@ -81,9 +81,7 @@ run:
   skip-dirs:
     - api
     - cluster
-    - design
     - docs
     - docs/man
     - releases
-    - reports
     - test # e2e scripts
