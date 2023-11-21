@@ -46,6 +46,12 @@ type dockerPusher struct {
 	tracker StatusTracker
 }
 
+type chunk struct {
+	number int
+	offset int64
+	size   int64
+}
+
 // Writer implements Ingester API of content store. This allows the client
 // to receive ErrUnavailable when there is already an on-going upload.
 // Note that the tracker MUST implement StatusTrackLocker interface to avoid
@@ -156,6 +162,8 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		resp.Body.Close()
 	}
 
+	var pusher func() (*pushWriter, error)
+
 	if isManifest {
 		putPath := getManifestPath(p.object, desc.Digest)
 		req = p.request(host, http.MethodPut, putPath...)
@@ -224,45 +232,23 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			return nil, err
 		}
 
-		var (
-			location = resp.Header.Get("Location")
-			lurl     *url.URL
-			lhost    = host
-		)
-		// Support paths without host in location
-		if strings.HasPrefix(location, "/") {
-			lurl, err = url.Parse(lhost.Scheme + "://" + lhost.Host + location)
-			if err != nil {
-				return nil, fmt.Errorf("unable to parse location %v: %w", location, err)
+		if host.ChunkSize > 0 {
+			pusher = func() (*pushWriter, error) {
+				return p.pushInChunked(ctx, desc, ref, &host, resp)
 			}
 		} else {
-			if !strings.Contains(location, "://") {
-				location = lhost.Scheme + "://" + location
-			}
-			lurl, err = url.Parse(location)
+			lurl, lhost, err := parseLocation(ctx, resp, &host)
 			if err != nil {
-				return nil, fmt.Errorf("unable to parse location %v: %w", location, err)
+				return nil, err
 			}
 
-			if lurl.Host != lhost.Host || lhost.Scheme != lurl.Scheme {
-				lhost.Scheme = lurl.Scheme
-				lhost.Host = lurl.Host
+			q := lurl.Query()
+			q.Add("digest", desc.Digest.String())
 
-				// Check if different than what was requested, accounting for fallback in the transport layer
-				requested := resp.Request.URL
-				if requested.Host != lhost.Host || requested.Scheme != lhost.Scheme {
-					// Strip authorizer if change to host or scheme
-					lhost.Authorizer = nil
-					log.G(ctx).WithField("host", lhost.Host).WithField("scheme", lhost.Scheme).Debug("upload changed destination, authorizer removed")
-				}
-			}
+			req = p.request(*lhost, http.MethodPut)
+			req.header.Set("Content-Type", "application/octet-stream")
+			req.path = lurl.Path + "?" + q.Encode()
 		}
-		q := lurl.Query()
-		q.Add("digest", desc.Digest.String())
-
-		req = p.request(lhost, http.MethodPut)
-		req.header.Set("Content-Type", "application/octet-stream")
-		req.path = lurl.Path + "?" + q.Encode()
 	}
 	p.tracker.SetStatus(ref, Status{
 		Status: content.Status{
@@ -273,8 +259,14 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		},
 	})
 
-	// TODO: Support chunked upload
+	if pusher == nil {
+		return p.pushInMonolithic(ctx, req, desc, ref, isManifest)
+	}
 
+	return pusher()
+}
+
+func (p dockerPusher) pushInMonolithic(ctx context.Context, req *request, desc ocispec.Descriptor, ref string, isManifest bool) (*pushWriter, error) {
 	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, isManifest)
 
 	req.body = func() (io.ReadCloser, error) {
@@ -285,25 +277,149 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 	req.size = desc.Size
 
 	go func() {
-		resp, err := req.doWithRetries(ctx, nil)
+		resp, err := doPush(ctx, pushw, req)
 		if err != nil {
-			pushw.setError(err)
-			pushw.Close()
 			return
-		}
-
-		switch resp.StatusCode {
-		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
-		default:
-			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
-			pushw.setError(err)
-			pushw.Close()
 		}
 		pushw.setResponse(resp)
 	}()
 
 	return pushw, nil
+}
+
+func (p dockerPusher) pushInChunked(ctx context.Context, desc ocispec.Descriptor, ref string, host *RegistryHost, resp *http.Response) (*pushWriter, error) {
+	pushw := newPushWriter(p.dockerBase, ref, desc.Digest, p.tracker, false)
+
+	chunks := splitChunks(desc.Size, host.ChunkSize)
+	pr, pw := io.Pipe()
+	pushw.setPipe(pw)
+
+	go func() {
+		for idx, c := range chunks {
+			last := idx == len(chunks)-1
+
+			lurl, lhost, err := parseLocation(ctx, resp, host)
+			if err != nil {
+				pushw.setError(err)
+				pushw.Close()
+				return
+			}
+			q := lurl.Query()
+			q.Add("digest", desc.Digest.String())
+			req := p.request(*lhost, http.MethodPut)
+			req.path = lurl.Path + "?" + q.Encode()
+			req.body = func() (io.ReadCloser, error) {
+				if last {
+					return pr, nil
+				}
+				return io.NopCloser(io.LimitReader(pr, c.size)), nil
+			}
+			req.size = c.size
+			if last {
+				req.method = http.MethodPut
+			} else {
+				req.method = http.MethodPatch
+			}
+			req.header.Set("Content-Type", "application/octet-stream")
+			req.header.Set("Content-Range", fmt.Sprintf("%d-%d", c.offset, c.offset+c.size-1))
+			req.header.Set("Content-Length", fmt.Sprintf("%d", c.size))
+
+			resp, err = doPush(ctx, pushw, req)
+			if err != nil {
+				return
+			}
+		}
+		pushw.setResponse(resp)
+	}()
+
+	return pushw, nil
+}
+
+func doPush(ctx context.Context, pushw *pushWriter, req *request) (*http.Response, error) {
+	resp, err := req.doWithRetries(ctx, nil)
+	if err != nil {
+		pushw.setError(err)
+		pushw.Close()
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent, http.StatusAccepted:
+	default:
+		err := remoteserrors.NewUnexpectedStatusErr(resp)
+		log.G(ctx).WithField("resp", resp).WithField("body", string(err.(remoteserrors.ErrUnexpectedStatus).Body)).Debug("unexpected response")
+		pushw.setError(err)
+		pushw.Close()
+	}
+
+	return resp, nil
+}
+
+func parseLocation(ctx context.Context, resp *http.Response, host *RegistryHost) (*url.URL, *RegistryHost, error) {
+	var (
+		location = resp.Header.Get("Location")
+		lurl     *url.URL
+		lhost    = host
+		err      error
+	)
+	// Support paths without host in location
+	if strings.HasPrefix(location, "/") {
+
+		lurl, err = url.Parse(lhost.Scheme + "://" + lhost.Host + location)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to parse location %v: %w", location, err)
+		}
+	} else {
+		if !strings.Contains(location, "://") {
+			location = lhost.Scheme + "://" + location
+		}
+		lurl, err = url.Parse(location)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to parse location %v: %w", location, err)
+		}
+
+		if lurl.Host != lhost.Host || lhost.Scheme != lurl.Scheme {
+			lhost.Scheme = lurl.Scheme
+			lhost.Host = lurl.Host
+
+			// Check if different than what was requested, accounting for fallback in the transport layer
+			requested := resp.Request.URL
+			if requested.Host != lhost.Host || requested.Scheme != lhost.Scheme {
+				// Strip authorizer if change to host or scheme
+				lhost.Authorizer = nil
+				log.G(ctx).WithField("host", lhost.Host).WithField("scheme", lhost.Scheme).Debug("upload changed destination, authorizer removed")
+			}
+		}
+	}
+	return lurl, lhost, nil
+}
+
+func splitChunks(totalSize, chunkSize int64) []chunk {
+	chunks := []chunk{}
+	if chunkSize <= 0 {
+		return chunks
+	}
+
+	chunkN := totalSize / chunkSize
+
+	for i := int64(0); i < chunkN; i++ {
+		chunks = append(chunks, chunk{
+			number: int(i + 1),
+			offset: i * chunkSize,
+			size:   chunkSize,
+		})
+	}
+
+	if totalSize%chunkSize > 0 {
+		chunks = append(chunks, chunk{
+			number: len(chunks) + 1,
+			offset: int64(len(chunks)) * chunkSize,
+			size:   totalSize % chunkSize,
+		})
+	}
+
+	return chunks
 }
 
 func getManifestPath(object string, dgst digest.Digest) []string {
@@ -363,6 +479,7 @@ func (pw *pushWriter) setPipe(p *io.PipeWriter) {
 func (pw *pushWriter) setError(err error) {
 	pw.errC <- err
 }
+
 func (pw *pushWriter) setResponse(resp *http.Response) {
 	pw.respC <- resp
 }

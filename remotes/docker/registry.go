@@ -74,6 +74,7 @@ type RegistryHost struct {
 	Path         string
 	Capabilities HostCapabilities
 	Header       http.Header
+	ChunkSize    int64
 }
 
 func (h RegistryHost) isProxy(refhost string) bool {
@@ -115,6 +116,7 @@ type registryOpts struct {
 	plainHTTP  func(string) (bool, error)
 	host       func(string) (string, error)
 	client     *http.Client
+	chunkSize  int64
 }
 
 // RegistryOpt defines a registry default option
@@ -149,6 +151,14 @@ func WithClient(c *http.Client) RegistryOpt {
 	}
 }
 
+// WithChunkSize configures the chunk size on pushing a blob in chunked,
+// it only works on Pusher.
+func WithChunkSize(cz int64) RegistryOpt {
+	return func(opts *registryOpts) {
+		opts.chunkSize = cz
+	}
+}
+
 // ConfigureDefaultRegistries is used to create a default configuration for
 // registries. For more advanced configurations or per-domain setups,
 // the RegistryHosts interface should be used directly.
@@ -167,6 +177,7 @@ func ConfigureDefaultRegistries(ropts ...RegistryOpt) RegistryHosts {
 			Scheme:       "https",
 			Path:         "/v2",
 			Capabilities: HostCapabilityPull | HostCapabilityResolve | HostCapabilityPush,
+			ChunkSize:    opts.chunkSize,
 		}
 
 		if config.Client == nil {
