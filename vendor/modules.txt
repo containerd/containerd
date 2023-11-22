@@ -106,7 +106,7 @@ github.com/containerd/console
 ## explicit; go 1.19
 github.com/containerd/containerd/errdefs
 github.com/containerd/containerd/log
-# github.com/containerd/continuity v0.4.2
+# github.com/containerd/continuity v0.4.3
 ## explicit; go 1.19
 github.com/containerd/continuity
 github.com/containerd/continuity/devices
