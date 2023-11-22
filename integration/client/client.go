@@ -41,7 +41,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&address, "address", defaults.DefaultAddress, "The address to the containerd socket for use in the tests")
+	flag.StringVar(&address, "address", defaultAddress, "The address to the containerd socket for use in the tests")
 }
 
 func testContext(t testing.TB) (context.Context, context.CancelFunc) {
