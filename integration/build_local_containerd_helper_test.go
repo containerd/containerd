@@ -21,14 +21,17 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	ctrdsrv "github.com/containerd/containerd/services/server"
 	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/opencontainers/go-digest"
 
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	"github.com/containerd/containerd/events/exchange"
@@ -59,9 +62,11 @@ var (
 	loadedPluginsErr error
 )
 
+type tweakPluginInitFunc func(t *testing.T, p *plugin.Registration) *plugin.Registration
+
 // buildLocalContainerdClient is to return containerd client with initialized
 // core plugins in local.
-func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client {
+func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPluginInitFunc) *containerd.Client {
 	ctx := logtest.WithT(context.Background(), t)
 
 	// load plugins
@@ -107,6 +112,10 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 			initContext.Config = pc
 		}
 
+		if tweakInitFn != nil {
+			p = tweakInitFn(t, p)
+		}
+
 		result := p.Init(initContext)
 		assert.NoError(t, initialized.Add(result))
 
@@ -125,4 +134,62 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string) *containerd.Client 
 	assert.NoError(t, err)
 
 	return client
+}
+
+func tweakContentInitFnWithDelayer(commitDelayDuration time.Duration) tweakPluginInitFunc {
+	return func(t *testing.T, p *plugin.Registration) *plugin.Registration {
+		if p.URI() != "io.containerd.content.v1.content" {
+			return p
+		}
+
+		oldInitFn := p.InitFn
+		p.InitFn = func(ic *plugin.InitContext) (interface{}, error) {
+			instance, err := oldInitFn(ic)
+			if err != nil {
+				return nil, err
+			}
+
+			return &contentStoreDelayer{
+				t: t,
+
+				Store:               instance.(content.Store),
+				commitDelayDuration: commitDelayDuration,
+			}, nil
+		}
+		return p
+	}
+}
+
+type contentStoreDelayer struct {
+	t *testing.T
+
+	content.Store
+	commitDelayDuration time.Duration
+}
+
+func (cs *contentStoreDelayer) Writer(ctx context.Context, opts ...content.WriterOpt) (content.Writer, error) {
+	w, err := cs.Store.Writer(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &contentWriterDelayer{
+		t: cs.t,
+
+		Writer:              w,
+		commitDelayDuration: cs.commitDelayDuration,
+	}, nil
+}
+
+type contentWriterDelayer struct {
+	t *testing.T
+
+	content.Writer
+	commitDelayDuration time.Duration
+}
+
+func (w *contentWriterDelayer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
+	w.t.Logf("[testcase: %s] Commit %v blob after %v", w.t.Name(), expected, w.commitDelayDuration)
+	time.Sleep(w.commitDelayDuration)
+	return w.Writer.Commit(ctx, size, expected, opts...)
 }

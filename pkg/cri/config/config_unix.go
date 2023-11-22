@@ -19,8 +19,6 @@
 package config
 
 import (
-	"time"
-
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/pelletier/go-toml"
@@ -109,7 +107,7 @@ func DefaultConfig() PluginConfig {
 		},
 		EnableCDI:                false,
 		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
-		ImagePullProgressTimeout: time.Minute.String(),
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		DrainExecSyncIOTimeout:   "0s",
 	}
 }
