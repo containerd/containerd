@@ -321,3 +321,12 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 	}
 	return &newImage, nil
 }
+
+func (c *Controller) getSandboxImageName() string {
+	// SandboxImageNameKey is the name of the sandbox image used to scope pod shared resources used by the pod's containers,
+	// if nil the image service is not being used.
+	if c.imageService != nil {
+		return c.imageService.PinnedImage("sandbox")
+	}
+	return ""
+}
