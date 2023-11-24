@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
@@ -58,6 +59,9 @@ var (
 	// design puts large metadata in subobjects, as is consistent the
 	// intent of the manifest design.
 	MaxManifestSize int64 = 4 * 1048 * 1048
+
+	// Maximum connection waiting time for an endpoint.
+	defaultRequestTimeout = 5 * time.Second
 )
 
 // Authorizer is used to authorize HTTP requests based on 401 HTTP responses.
@@ -296,6 +300,10 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			}
 
 			log.G(ctx).Debug("resolving")
+
+			ctx, cancel := context.WithTimeout(ctx, defaultRequestTimeout)
+			defer cancel()
+
 			resp, err := req.doWithRetries(ctx, nil)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
