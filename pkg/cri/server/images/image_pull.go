@@ -496,11 +496,14 @@ func addDefaultScheme(endpoint string) (string, error) {
 // It also supports wildcard host matching with `*`.
 func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 	var endpoints []string
+	var nofallback bool
 	_, ok := c.config.Registry.Mirrors[host]
 	if ok {
 		endpoints = c.config.Registry.Mirrors[host].Endpoints
+		nofallback = c.config.Registry.Mirrors[host].NoFallback
 	} else {
 		endpoints = c.config.Registry.Mirrors["*"].Endpoints
+		nofallback = c.config.Registry.Mirrors["*"].NoFallback
 	}
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
@@ -522,6 +525,9 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 			// Do not add default if the endpoint already exists.
 			return endpoints, nil
 		}
+	}
+	if nofallback {
+		return endpoints, nil
 	}
 	return append(endpoints, defaultScheme(defaultHost)+"://"+defaultHost), nil
 }

@@ -163,6 +163,23 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 		{
+			desc: "mirror configured nofallback",
+			mirrors: map[string]criconfig.Mirror{
+				"registry-3.io": {
+					Endpoints: []string{
+						"https://registry-1.io",
+						"https://registry-2.io",
+					},
+					NoFallback: true,
+				},
+			},
+			host: "registry-3.io",
+			expected: []string{
+				"https://registry-1.io",
+				"https://registry-2.io",
+			},
+		},
+		{
 			desc: "wildcard mirror configured",
 			mirrors: map[string]criconfig.Mirror{
 				"*": {

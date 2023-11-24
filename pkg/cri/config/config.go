@@ -193,6 +193,9 @@ type Mirror struct {
 	// with host specified.
 	// The scheme, host and path from the endpoint URL will be used.
 	Endpoints []string `toml:"endpoint" json:"endpoint"`
+	// NoFallback field controls whether to fallback to the initial registry
+	// when pulling a mirror failed from mirror registry.
+	NoFallback bool `toml:"nofallback" json:"nofallback"`
 }
 
 // AuthConfig contains the config related to authentication to a specific registry
