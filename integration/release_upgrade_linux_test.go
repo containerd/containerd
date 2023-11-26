@@ -48,8 +48,9 @@ func TestUpgrade(t *testing.T) {
 	downloadPreviousReleaseBinary(t, previousReleaseBinDir)
 
 	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
+	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
 	// TODO:
-	// Add exec/stats/stop-existing-running-pods/...
+	// Add stats/stop-existing-running-pods/...
 }
 
 func runUpgradeTestCase(
@@ -186,6 +187,75 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, criRuntimeService cri.Run
 			}
 		}
 	}
+}
+
+func execToExistingContainer(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+	var busyboxImage = images.Get(images.BusyBox)
+
+	t.Logf("Pulling image %q", busyboxImage)
+	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
+	require.NoError(t, err)
+
+	t.Log("Create sandbox")
+	sbConfig := PodSandboxConfig("sandbox", "running")
+	sbConfig.LogDirectory = t.TempDir()
+	sb, err := criRuntimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+
+	t.Logf("Create a running container")
+	containerConfig := ContainerConfig("running", busyboxImage, WithCommand("sh", "-c", "while true; do date; sleep 1; done"))
+	containerConfig.LogPath = "running#0.log"
+	cntr, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	require.NoError(t, criRuntimeService.StartContainer(cntr))
+
+	// NOTE: Wait for containerd to flush data into log
+	time.Sleep(2 * time.Second)
+
+	return func(t *testing.T, criRuntimeService cri.RuntimeService) {
+		pods, err := criRuntimeService.ListPodSandbox(nil)
+		require.NoError(t, err)
+		require.Len(t, pods, 1)
+
+		cntrs, err := criRuntimeService.ListContainers(&criruntime.ContainerFilter{
+			PodSandboxId: pods[0].Id,
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, len(cntrs))
+		assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING, cntrs[0].State)
+
+		func() {
+			logPath := filepath.Join(sbConfig.LogDirectory, "running#0.log")
+
+			// NOTE: containerd should recover container's IO as well
+			t.Logf("Check container's log %s", logPath)
+
+			logSizeChange := false
+			curSize := getFileSize(t, logPath)
+			for i := 0; i < 30; i++ {
+				time.Sleep(1 * time.Second)
+
+				if curSize < getFileSize(t, logPath) {
+					logSizeChange = true
+					break
+				}
+			}
+			require.True(t, logSizeChange)
+		}()
+
+		t.Log("Run ExecSync")
+		stdout, stderr, err := criRuntimeService.ExecSync(cntrs[0].Id, []string{"echo", "-n", "true"}, 0)
+		require.NoError(t, err)
+		require.Len(t, stderr, 0)
+		require.Equal(t, "true", string(stdout))
+	}
+}
+
+// getFileSize returns file's size.
+func getFileSize(t *testing.T, filePath string) int64 {
+	st, err := os.Stat(filePath)
+	require.NoError(t, err)
+	return st.Size()
 }
 
 // cleanupPods deletes all the pods based on the cri.RuntimeService connection.
