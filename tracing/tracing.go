@@ -23,8 +23,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-	httpconv "go.opentelemetry.io/otel/semconv/v1.17.0/httpconv"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -37,11 +36,13 @@ type SpanOpt func(config *StartConfig)
 
 // WithHTTPRequest marks span as a HTTP request operation from client to server.
 // It'll append attributes from the HTTP request object and mark it with `SpanKindClient` type.
-func WithHTTPRequest(request *http.Request) SpanOpt {
+//
+// Deprecated: use upstream functionality from otelhttp directly instead. This function is kept for API compatibility
+// but no longer works as expected due to required functionality no longer exported in OpenTelemetry libraries.
+func WithHTTPRequest(_ *http.Request) SpanOpt {
 	return func(config *StartConfig) {
 		config.spanOpts = append(config.spanOpts,
-			trace.WithSpanKind(trace.SpanKindClient),                 // A client making a request to a server
-			trace.WithAttributes(httpconv.ClientRequest(request)...), // Add HTTP attributes
+			trace.WithSpanKind(trace.SpanKindClient), // A client making a request to a server
 		)
 	}
 }
