@@ -1,0 +1,31 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.9"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The tenth patch release for containerd 1.7 contains various fixes and updates.
+### Notable Updates
+* **Enhance container image unpack client logs** ([#9379](https://github.com/containerd/containerd/pull/9379))
+* **cri: fix using the pinned label to pin image** ([#9381](https://github.com/containerd/containerd/pull/9381))
+* **fix: ImagePull should close http connection if there is no available data to read.** ([#9409](https://github.com/containerd/containerd/pull/9409))
+
+See the changelog for complete list of changes"""
