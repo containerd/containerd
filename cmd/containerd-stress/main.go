@@ -264,13 +264,12 @@ func serve(c config) error {
 
 func criTest(c config) error {
 	var (
-		timeout     = 1 * time.Minute
-		wg          sync.WaitGroup
-		ctx         = namespaces.WithNamespace(context.Background(), stressNs)
-		criEndpoint = "unix:///run/containerd/containerd.sock"
+		timeout = 1 * time.Minute
+		wg      sync.WaitGroup
+		ctx     = namespaces.WithNamespace(context.Background(), stressNs)
 	)
 
-	client, err := remote.NewRuntimeService(criEndpoint, timeout)
+	client, err := remote.NewRuntimeService(c.Address, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}
