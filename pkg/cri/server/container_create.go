@@ -263,14 +263,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindContainer)
 
-	sandboxInfo, err := c.client.SandboxStore().Get(ctx, sandboxID)
+	// TODO the sandbox in the cache should hold this info
+	runtimeName, runtimeOption, err := c.runtimeInfo(ctx, sandboxID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get sandbox %q metdata: %w", sandboxID, err)
+		return nil, fmt.Errorf("unable to get sandbox %q runtime info: %w", sandboxID, err)
 	}
 
 	opts = append(opts,
 		containerd.WithSpec(spec, specOpts...),
-		containerd.WithRuntime(sandboxInfo.Runtime.Name, sandboxInfo.Runtime.Options),
+		containerd.WithRuntime(runtimeName, runtimeOption),
 		containerd.WithContainerLabels(containerLabels),
 		containerd.WithContainerExtension(crilabels.ContainerMetadataExtension, &meta),
 	)
@@ -1054,4 +1055,17 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		})
 	}
 	return mounts
+}
+
+func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeurl.Any, error) {
+	sandboxInfo, err := c.client.SandboxStore().Get(ctx, id)
+	if err == nil {
+		return sandboxInfo.Runtime.Name, sandboxInfo.Runtime.Options, nil
+	}
+	sandboxContainer, legacyErr := c.client.ContainerService().Get(ctx, id)
+	if legacyErr == nil {
+		return sandboxContainer.Runtime.Name, sandboxContainer.Runtime.Options, nil
+	}
+
+	return "", nil, err
 }
