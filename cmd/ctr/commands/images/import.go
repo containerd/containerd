@@ -86,7 +86,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "no-unpack",
 			Usage: "Skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run import locally rather than through transfer API",
 		},
@@ -113,7 +113,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			var opts []image.StoreOpt
 			prefix := context.String("base-name")
 			var overwrite bool

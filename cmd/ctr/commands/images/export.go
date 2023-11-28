@@ -61,7 +61,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Name:  "all-platforms",
 			Usage: "Exports content from all platforms",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run export locally rather than through transfer API",
 		},
@@ -93,7 +93,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 		defer w.Close()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
