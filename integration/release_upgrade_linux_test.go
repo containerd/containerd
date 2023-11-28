@@ -49,6 +49,7 @@ func TestUpgrade(t *testing.T) {
 
 	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
+	t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
 	// TODO:
 	// Add stats/stop-existing-running-pods/...
 }
@@ -195,7 +196,6 @@ func execToExistingContainer(t *testing.T, criRuntimeService cri.RuntimeService,
 	t.Logf("Pulling image %q", busyboxImage)
 	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
 	require.NoError(t, err)
-
 	t.Log("Create sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "running")
 	sbConfig.LogDirectory = t.TempDir()
@@ -256,6 +256,94 @@ func getFileSize(t *testing.T, filePath string) int64 {
 	st, err := os.Stat(filePath)
 	require.NoError(t, err)
 	return st.Size()
+}
+
+func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+	var busyboxImage = images.Get(images.BusyBox)
+
+	t.Logf("Pulling image %q", busyboxImage)
+	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
+	require.NoError(t, err)
+
+	t.Log("Create a sandbox")
+	sbConfig := PodSandboxConfig("sandbox", "running-pod")
+	sb, err := criRuntimeService.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+
+	t.Logf("Create a container config and run container in the pod")
+	containerConfig := ContainerConfig("running", busyboxImage, WithCommand("sleep", "1d"))
+	cn1, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	require.NoError(t, criRuntimeService.StartContainer(cn1))
+
+	t.Logf("Just create a container in the pod")
+	containerConfig = ContainerConfig("created", busyboxImage)
+	cn2, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Logf("Just create stopped container in the pod")
+	containerConfig = ContainerConfig("stopped", busyboxImage, WithCommand("sleep", "1d"))
+	cn3, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+	require.NoError(t, err)
+	require.NoError(t, criRuntimeService.StartContainer(cn3))
+	require.NoError(t, criRuntimeService.StopContainer(cn3, 0))
+
+	return func(t *testing.T, criRuntimeService cri.RuntimeService) {
+		t.Log("Manipulating containers in the previous pod")
+		// For the running container, we get status and stats of it,
+		// exec and execsync in it, stop and remove it
+		status, err := criRuntimeService.ContainerStatus(cn1)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
+		_, err = criRuntimeService.ContainerStats(cn1)
+		require.NoError(t, err)
+		_, err = criRuntimeService.Exec(&criruntime.ExecRequest{
+			ContainerId: cn1,
+			Cmd:         []string{"/bin/sh"},
+			Stderr:      false,
+			Stdout:      true,
+			Stdin:       true,
+			Tty:         true,
+		})
+		require.NoError(t, err)
+		require.NoError(t, criRuntimeService.StopContainer(cn1, 0))
+		status, err = criRuntimeService.ContainerStatus(cn1)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
+		require.NoError(t, criRuntimeService.RemoveContainer(cn1))
+
+		// For the created container, we start it, stop it and remove it
+		status, err = criRuntimeService.ContainerStatus(cn2)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_CREATED)
+		require.NoError(t, criRuntimeService.StartContainer(cn2))
+		status, err = criRuntimeService.ContainerStatus(cn2)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
+		require.NoError(t, criRuntimeService.StopContainer(cn2, 0))
+		status, err = criRuntimeService.ContainerStatus(cn2)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
+		require.NoError(t, criRuntimeService.RemoveContainer(cn2))
+
+		// For the stopped container, we remove it
+		status, err = criRuntimeService.ContainerStatus(cn3)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
+		require.NoError(t, criRuntimeService.RemoveContainer(cn3))
+
+		// Create a new container in the previous pod, start, stop, and remove it
+		t.Logf("Create a container config and run container in the previous pod")
+		containerConfig = ContainerConfig("runinpreviouspod", busyboxImage, WithCommand("sleep", "1d"))
+		cn4, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+		require.NoError(t, err)
+		require.NoError(t, criRuntimeService.StartContainer(cn4))
+		status, err = criRuntimeService.ContainerStatus(cn4)
+		require.NoError(t, err)
+		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
+		require.NoError(t, criRuntimeService.StopContainer(cn4, 0))
+		require.NoError(t, criRuntimeService.RemoveContainer(cn4))
+	}
 }
 
 // cleanupPods deletes all the pods based on the cri.RuntimeService connection.
