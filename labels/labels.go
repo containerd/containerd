@@ -16,14 +16,21 @@
 
 package labels
 
-// LabelUncompressed is added to compressed layer contents.
-// The value is digest of the uncompressed content.
-const LabelUncompressed = "containerd.io/uncompressed"
+const (
+	// LabelUncompressed is added to compressed layer contents.
+	// The value is digest of the uncompressed content.
+	LabelUncompressed = "containerd.io/uncompressed"
 
-// LabelSharedNamespace is added to a namespace to allow that namespaces
-// contents to be shared.
-const LabelSharedNamespace = "containerd.io/namespace.shareable"
+	// LabelSharedNamespace is added to a namespace to allow that namespaces
+	// contents to be shared.
+	LabelSharedNamespace = "containerd.io/namespace.shareable"
 
-// LabelDistributionSource is added to content to indicate its origin.
-// e.g., "containerd.io/distribution.source.docker.io=library/redis"
-const LabelDistributionSource = "containerd.io/distribution.source"
+	// LabelDistributionSource is added to content to indicate its origin.
+	// e.g., "containerd.io/distribution.source.docker.io=library/redis"
+	LabelDistributionSource = "containerd.io/distribution.source"
+
+	// RuntimeHandlerLabelPrefix is common prefix for runtime handler used for image pull
+	RuntimeHandlerLabelPrefix = "containerd.io/imagePullRuntimeHandler"
+
+	RuntimeHandlerLabelFormat = "%s.%s"
+)
