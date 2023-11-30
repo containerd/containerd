@@ -59,9 +59,11 @@ configuration and build files, no source files will be accepted in root since co
 - `client` - All Go files for the containerd client (formerly in `containerd/containerd` root in 1.x)
 - `cmd` - All Go main packages and the packages used only for that main package
 - `contrib` - Files, configurations, and packages related to external tools or libraries
+- `core` - Core Go packages with interface definitions and built-in implementations
 - `docs` - All containerd technical documentation using markdown
+- `internal` - All utility packages used by containerd and not intended for direct import
 - `man`- All containerd reference manuals used for the `man` command
-- `pkg` - All Go packages shared and used by other containerd packages.
+- `pkg` - Non-core Go packages used by clients and other containerd packages
 - `plugins` - All included containerd plugins which are registered via init
 - `releases` - All release note files
 - `script` - All scripts used for testing, development, and CI
