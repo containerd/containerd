@@ -20,17 +20,20 @@ import (
 	"context"
 	"errors"
 
+	"google.golang.org/grpc"
+
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/snapshots"
-	"google.golang.org/grpc"
 )
 
 func init() {
@@ -39,6 +42,7 @@ func init() {
 		ID:   "snapshots",
 		Requires: []plugin.Type{
 			plugin.ServicePlugin,
+			plugin.WarningPlugin,
 		},
 		InitFn: newService,
 	})
@@ -47,7 +51,8 @@ func init() {
 var empty = &ptypes.Empty{}
 
 type service struct {
-	ss map[string]snapshots.Snapshotter
+	ss       map[string]snapshots.Snapshotter
+	warnings warning.Service
 	snapshotsapi.UnimplementedSnapshotsServer
 }
 
@@ -65,7 +70,14 @@ func newService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, err
 	}
 	ss := i.(map[string]snapshots.Snapshotter)
-	return &service{ss: ss}, nil
+	w, err := ic.Get(plugin.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+	return &service{
+		ss:       ss,
+		warnings: w.(warning.Service),
+	}, nil
 }
 
 func (s *service) getSnapshotter(name string) (snapshots.Snapshotter, error) {
@@ -147,6 +159,7 @@ func (s *service) Commit(ctx context.Context, cr *snapshotsapi.CommitSnapshotReq
 	if err != nil {
 		return nil, err
 	}
+	s.emitSnapshotterWarning(ctx, cr.Snapshotter)
 
 	var opts []snapshots.Opt
 	if cr.Labels != nil {
@@ -274,6 +287,14 @@ func (s *service) Cleanup(ctx context.Context, cr *snapshotsapi.CleanupRequest) 
 	}
 
 	return empty, nil
+}
+
+func (s *service) emitSnapshotterWarning(ctx context.Context, sn string) {
+	switch sn {
+	case "aufs":
+		log.G(ctx).Warn("aufs snapshotter is deprecated")
+		s.warnings.Emit(ctx, deprecation.AUFSSnapshotter)
+	}
 }
 
 func fromKind(kind snapshots.Kind) snapshotsapi.Kind {
