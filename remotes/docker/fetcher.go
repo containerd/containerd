@@ -17,6 +17,8 @@
 package docker
 
 import (
+	"compress/flate"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -30,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/remotes"
 	"github.com/containerd/log"
+	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -262,6 +265,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	} else {
 		req.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
 	}
+	req.header.Set("Accept-Encoding", "zstd;q=1.0, gzip;q=0.8, deflate;q=0.5")
 
 	if offset > 0 {
 		// Note: "Accept-Ranges: bytes" cannot be trusted as some endpoints
@@ -320,5 +324,32 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 	}
 
-	return resp.Body, nil
+	body := resp.Body
+	encoding := strings.FieldsFunc(resp.Header.Get("Content-Encoding"), func(r rune) bool {
+		return r == ' ' || r == '\t' || r == ','
+	})
+	for i := len(encoding) - 1; i >= 0; i-- {
+		algorithm := strings.ToLower(encoding[i])
+		switch algorithm {
+		case "zstd":
+			r, err := zstd.NewReader(body)
+			if err != nil {
+				return nil, err
+			}
+			body = r.IOReadCloser()
+		case "gzip":
+			body, err = gzip.NewReader(body)
+			if err != nil {
+				return nil, err
+			}
+		case "deflate":
+			body = flate.NewReader(body)
+		case "identity", "":
+			// no content-encoding applied, use raw body
+		default:
+			return nil, errors.New("unsupported Content-Encoding algorithm: " + algorithm)
+		}
+	}
+
+	return body, nil
 }
