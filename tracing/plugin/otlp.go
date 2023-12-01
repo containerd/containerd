@@ -117,10 +117,9 @@ func newExporter(ctx context.Context, cfg *OTLPConfig) (*otlptrace.Exporter, err
 			opts = append(opts, otlptracegrpc.WithInsecure())
 		}
 		return otlptracegrpc.New(ctx, opts...)
-	} else {
-		// Other protocols such as "http/json" are not supported.
-		return nil, fmt.Errorf("OpenTelemetry protocol %q is not supported", cfg.Protocol)
 	}
+	// Other protocols such as "http/json" are not supported.
+	return nil, fmt.Errorf("OpenTelemetry protocol %q is not supported", cfg.Protocol)
 }
 
 // newTracer configures protocol-agonostic tracing settings such as
