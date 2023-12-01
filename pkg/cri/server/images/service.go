@@ -19,20 +19,65 @@ package images
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"time"
+
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	docker "github.com/distribution/reference"
+	imagedigest "github.com/opencontainers/go-digest"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/pkg/kmutex"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/plugins"
 	snapshot "github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/log"
-	docker "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 )
+
+func init() {
+	registry.Register(&plugin.Registration{
+		Type: plugins.CRIImagePlugin,
+		ID:   "cri-image-service",
+		Requires: []plugin.Type{
+			plugins.LeasePlugin,
+			plugins.EventPlugin,
+			plugins.SandboxStorePlugin,
+			plugins.InternalPlugin,
+			plugins.ServicePlugin,
+		},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			// Get base CRI dependencies.
+			criPlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
+			if err != nil {
+				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+			}
+			cri := criPlugin.(*base.CRIBase)
+
+			client, err := containerd.New(
+				"",
+				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
+				containerd.WithDefaultPlatform(platforms.Default()),
+				containerd.WithInMemoryServices(ic),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
+			}
+			service, err := NewService(cri.Config, client)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create image service: %w", err)
+			}
+
+			return service, nil
+		},
+	})
+}
 
 type CRIImageService struct {
 	// config contains all configurations.
@@ -51,7 +96,25 @@ type CRIImageService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
-func NewService(config criconfig.Config, imageFSPaths map[string]string, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageService, error) {
+	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
+	}
+
+	imageFSPaths := map[string]string{}
+	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
+		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
+		snapshotter := ociRuntime.Snapshotter
+		if snapshotter != "" {
+			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
+			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+		}
+	}
+
+	snapshotter := config.ContainerdConfig.Snapshotter
+	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
+	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+
 	svc := CRIImageService{
 		config:                      config,
 		client:                      client,
@@ -92,6 +155,12 @@ func NewService(config criconfig.Config, imageFSPaths map[string]string, client 
 	snapshotsSyncer.start()
 
 	return &svc, nil
+}
+
+// imageFSPath returns containerd image filesystem path.
+// Note that if containerd changes directory layout, we also needs to change this.
+func imageFSPath(rootDir, snapshotter string) string {
+	return filepath.Join(rootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
@@ -147,4 +216,8 @@ func (c *CRIImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Sn
 		Snapshotter: snapshotter,
 	}
 	return c.snapshotStore.Get(snapshotKey)
+}
+
+func (c *CRIImageService) ImageFSPaths() map[string]string {
+	return c.imageFSPaths
 }

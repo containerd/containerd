@@ -22,8 +22,11 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 )
 
 func FuzzCRIServer(data []byte) int {
@@ -37,7 +40,19 @@ func FuzzCRIServer(data []byte) int {
 	}
 	defer client.Close()
 
-	c, err := server.NewCRIService(criconfig.Config{}, client, nil)
+	config := criconfig.Config{}
+
+	criBase := &base.CRIBase{
+		Config:       config,
+		BaseOCISpecs: map[string]*oci.Spec{},
+	}
+
+	imageService, err := images.NewService(config, client)
+	if err != nil {
+		panic(err)
+	}
+
+	c, err := server.NewCRIService(criBase, imageService, client, nil)
 	if err != nil {
 		panic(err)
 	}

@@ -33,17 +33,21 @@ import (
 	"testing"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/leases"
-	"github.com/containerd/containerd/v2/namespaces"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	criserver "github.com/containerd/containerd/v2/pkg/cri/server"
 	"github.com/containerd/log"
 	"github.com/containerd/log/logtest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/oci"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	criserver "github.com/containerd/containerd/v2/pkg/cri/server"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 )
 
 var (
@@ -500,5 +504,16 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 		RootDir:           filepath.Join(criWorkDir, "root"),
 		StateDir:          filepath.Join(criWorkDir, "state"),
 	}
-	return criserver.NewCRIService(cfg, client, nil)
+
+	criBase := &base.CRIBase{
+		Config:       cfg,
+		BaseOCISpecs: map[string]*oci.Spec{},
+	}
+
+	imageService, err := images.NewService(cfg, client)
+	if err != nil {
+		panic(err)
+	}
+
+	return criserver.NewCRIService(criBase, imageService, client, nil)
 }
