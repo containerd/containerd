@@ -32,6 +32,7 @@ var tasksServiceRequires = []plugin.Type{
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
+	plugin.WarningPlugin,
 }
 
 func loadV1Runtimes(ic *plugin.InitContext) (map[string]runtime.PlatformRuntime, error) {

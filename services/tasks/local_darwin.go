@@ -27,6 +27,7 @@ var tasksServiceRequires = []plugin.Type{
 	plugin.RuntimePluginV2,
 	plugin.MetadataPlugin,
 	plugin.TaskMonitorPlugin,
+	plugin.WarningPlugin,
 }
 
 // loadV1Runtimes on darwin returns an empty map. There are no v1 runtimes
