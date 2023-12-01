@@ -219,9 +219,6 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			Options: m.Options,
 		})
 	}
-	if container.Runtime.Name == plugin.RuntimeRuncV1 {
-		log.G(ctx).Warnf("%q is deprecated since containerd v1.4, consider using %q", plugin.RuntimeRuncV1, plugin.RuntimeRuncV2)
-	}
 	l.emitRuntimeWarning(ctx, container.Runtime.Name)
 	rtime, err := l.getRuntime(container.Runtime.Name)
 	if err != nil {
@@ -257,6 +254,9 @@ func (l *local) emitRuntimeWarning(ctx context.Context, runtime string) {
 	case plugin.RuntimeLinuxV1:
 		log.G(ctx).Warnf("%q is deprecated since containerd v1.4 and will be removed in containerd v2.0, use %q instead", plugin.RuntimeLinuxV1, plugin.RuntimeRuncV2)
 		l.warnings.Emit(ctx, deprecation.RuntimeV1)
+	case plugin.RuntimeRuncV1:
+		log.G(ctx).Warnf("%q is deprecated since containerd v1.4 and will be removed in containerd v2.0, use %q instead", plugin.RuntimeRuncV1, plugin.RuntimeRuncV2)
+		l.warnings.Emit(ctx, deprecation.RuntimeRuncV1)
 	}
 }
 func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (*api.StartResponse, error) {
