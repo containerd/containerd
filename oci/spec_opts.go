@@ -190,41 +190,30 @@ func WithEnv(environmentVariables []string) SpecOpts {
 // replaceOrAppendEnvValues returns the defaults with the overrides either
 // replaced by env key or appended to the list
 func replaceOrAppendEnvValues(defaults, overrides []string) []string {
-	cache := make(map[string]int, len(defaults))
-	results := make([]string, 0, len(defaults))
-	for i, e := range defaults {
-		k, _, _ := strings.Cut(e, "=")
-		results = append(results, e)
-		cache[k] = i
-	}
+	cache := make(map[string]int, len(defaults)+len(overrides))
+	merged := make([]string, 0, len(defaults)+len(overrides))
 
-	for _, value := range overrides {
-		// Values w/o = means they want this env to be removed/unset.
-		k, _, ok := strings.Cut(value, "=")
-		if !ok {
-			if i, exists := cache[k]; exists {
-				results[i] = "" // Used to indicate it should be removed
-			}
+	for n, e := range append(defaults, overrides...) {
+		if !strings.Contains(e, "=") {
+			// Values w/o = means they want this env to be removed/unset.
+			delete(cache, e)
 			continue
 		}
-
-		// Just do a normal set/update
-		if i, exists := cache[k]; exists {
-			results[i] = value
-		} else {
-			results = append(results, value)
-		}
+		// Keep track of the position of the last instance of an env-var.
+		parts := strings.SplitN(e, "=", 2)
+		cache[parts[0]] = n
 	}
 
-	// Now remove all entries that we want to "unset"
-	for i := 0; i < len(results); i++ {
-		if results[i] == "" {
-			results = append(results[:i], results[i+1:]...)
-			i--
+	for n, e := range append(defaults, overrides...) {
+		parts := strings.SplitN(e, "=", 2)
+		if i, ok := cache[parts[0]]; !ok || n != i {
+			// This is not the last instance, or var has been removed and
+			// should not be added.
+			continue
 		}
+		merged = append(merged, e)
 	}
-
-	return results
+	return merged
 }
 
 // WithProcessArgs replaces the args on the generated spec
