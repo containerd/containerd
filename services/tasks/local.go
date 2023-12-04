@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/blockio"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/pkg/rdt"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
@@ -50,6 +51,8 @@ import (
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/containerd/services/warning"
+
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -117,6 +120,11 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		monitor = runtime.NewNoopMonitor()
 	}
 
+	w, err := ic.Get(plugin.WarningPlugin)
+	if err != nil {
+		return nil, err
+	}
+
 	db := m.(*metadata.DB)
 	l := &local{
 		runtimes:   runtimes,
@@ -125,6 +133,7 @@ func initFunc(ic *plugin.InitContext) (interface{}, error) {
 		publisher:  ep.(events.Publisher),
 		monitor:    monitor.(runtime.TaskMonitor),
 		v2Runtime:  v2r.(runtime.PlatformRuntime),
+		warnings:   w.(warning.Service),
 	}
 	for _, r := range runtimes {
 		tasks, err := r.Tasks(ic.Context, true)
@@ -161,6 +170,7 @@ type local struct {
 
 	monitor   runtime.TaskMonitor
 	v2Runtime runtime.PlatformRuntime
+	warnings  warning.Service
 }
 
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
@@ -221,11 +231,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			Options: m.Options,
 		})
 	}
-	if strings.HasPrefix(container.Runtime.Name, "io.containerd.runtime.v1.") {
-		log.G(ctx).Warn("runtime v1 is deprecated since containerd v1.4, consider using runtime v2")
-	} else if container.Runtime.Name == plugin.RuntimeRuncV1 {
-		log.G(ctx).Warnf("%q is deprecated since containerd v1.4, consider using %q", plugin.RuntimeRuncV1, plugin.RuntimeRuncV2)
-	}
+	l.emitRuntimeWarning(ctx, container.Runtime.Name)
 	rtime, err := l.getRuntime(container.Runtime.Name)
 	if err != nil {
 		return nil, err
@@ -255,6 +261,16 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}, nil
 }
 
+func (l *local) emitRuntimeWarning(ctx context.Context, runtime string) {
+	switch runtime {
+	case plugin.RuntimeLinuxV1:
+		log.G(ctx).Warnf("%q is deprecated since containerd v1.4 and will be removed in containerd v2.0, use %q instead", plugin.RuntimeLinuxV1, plugin.RuntimeRuncV2)
+		l.warnings.Emit(ctx, deprecation.RuntimeV1)
+	case plugin.RuntimeRuncV1:
+		log.G(ctx).Warnf("%q is deprecated since containerd v1.4 and will be removed in containerd v2.0, use %q instead", plugin.RuntimeRuncV1, plugin.RuntimeRuncV2)
+		l.warnings.Emit(ctx, deprecation.RuntimeRuncV1)
+	}
+}
 func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOption) (*api.StartResponse, error) {
 	t, err := l.getTask(ctx, r.ContainerID)
 	if err != nil {
