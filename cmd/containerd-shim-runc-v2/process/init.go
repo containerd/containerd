@@ -206,6 +206,10 @@ func (p *Init) validateIDMapMounts(ctx context.Context, spec *specs.Spec) error 
 			used = true
 			break
 		}
+		if sliceContainsStr(m.Options, "idmap") || sliceContainsStr(m.Options, "ridmap") {
+			used = true
+			break
+		}
 	}
 
 	if !used {
@@ -551,4 +555,13 @@ func withConditionalIO(c stdio.Stdio) runc.IOOpt {
 		o.OpenStdout = c.Stdout != ""
 		o.OpenStderr = c.Stderr != ""
 	}
+}
+
+func sliceContainsStr(s []string, str string) bool {
+	for _, s := range s {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
