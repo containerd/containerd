@@ -29,8 +29,6 @@ import (
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/oci"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
@@ -83,9 +81,8 @@ func init() {
 
 			c := Controller{
 				client:       client,
-				config:       criBase.Config,
 				os:           osinterface.RealOS{},
-				baseOCISpecs: criBase.BaseOCISpecs,
+				criBase:      criBase,
 				imageService: imageService,
 				store:        NewStore(),
 			}
@@ -111,7 +108,7 @@ type ImageService interface {
 
 type Controller struct {
 	// config contains all configurations.
-	config criconfig.Config
+	//config criconfig.Config
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// imageService is a dependency to CRI image service.
@@ -122,8 +119,8 @@ type Controller struct {
 	os osinterface.OS
 	// cri is CRI service that provides missing gaps needed by controller.
 	cri CRIService
-	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	baseOCISpecs map[string]*oci.Spec
+	// criBase is common dependencies for CRI's runtime
+	criBase *base.CRIBase
 
 	store *Store
 }

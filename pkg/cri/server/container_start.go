@@ -109,7 +109,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return cntr.IO, nil
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	ociRuntime, err := c.criBase.Config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
@@ -229,10 +229,10 @@ func (c *criService) createContainerLoggers(logPath string, tty bool) (stdout io
 		}()
 		var stdoutCh, stderrCh <-chan struct{}
 		wc := cioutil.NewSerialWriteCloser(f)
-		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.config.MaxContainerLogLineSize)
+		stdout, stdoutCh = cio.NewCRILogger(logPath, wc, cio.Stdout, c.criBase.Config.MaxContainerLogLineSize)
 		// Only redirect stderr when there is no tty.
 		if !tty {
-			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.config.MaxContainerLogLineSize)
+			stderr, stderrCh = cio.NewCRILogger(logPath, wc, cio.Stderr, c.criBase.Config.MaxContainerLogLineSize)
 		}
 		go func() {
 			if stdoutCh != nil {

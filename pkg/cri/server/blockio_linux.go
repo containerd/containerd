@@ -34,7 +34,7 @@ func (c *criService) blockIOClassFromAnnotations(containerName string, container
 	}
 
 	if cls != "" && !blockio.IsEnabled() {
-		if c.config.ContainerdConfig.IgnoreBlockIONotEnabledErrors {
+		if c.criBase.Config.ContainerdConfig.IgnoreBlockIONotEnabledErrors {
 			cls = ""
 			log.L.Debugf("continuing create container %s, ignoring blockio not enabled (%v)", containerName, err)
 		} else {

@@ -58,7 +58,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		}},
 	}
 	if r.Verbose {
-		configByt, err := json.Marshal(c.config)
+		configByt, err := json.Marshal(c.criBase.Config)
 		if err != nil {
 			return nil, err
 		}

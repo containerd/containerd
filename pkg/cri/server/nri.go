@@ -28,7 +28,7 @@ type criImplementation struct {
 }
 
 func (i *criImplementation) Config() *criconfig.Config {
-	return &i.c.config
+	return &i.c.criBase.Config
 }
 
 func (i *criImplementation) SandboxStore() *sstore.Store {

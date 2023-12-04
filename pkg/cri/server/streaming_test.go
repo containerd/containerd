@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -33,8 +34,10 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should pass with default withoutTLS",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.DefaultConfig(),
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.DefaultConfig(),
+					},
 				},
 			},
 			tlsMode:   withoutTLS,
@@ -43,12 +46,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should pass with x509KeyPairTLS",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: true,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "non-empty",
-							TLSCertFile: "non-empty",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: true,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "non-empty",
+								TLSCertFile: "non-empty",
+							},
 						},
 					},
 				},
@@ -59,9 +64,11 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should pass with selfSign",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: true,
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: true,
+						},
 					},
 				},
 			},
@@ -71,12 +78,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should return error with X509 keypair but not EnableTLSStreaming",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: false,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "non-empty",
-							TLSCertFile: "non-empty",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: false,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "non-empty",
+								TLSCertFile: "non-empty",
+							},
 						},
 					},
 				},
@@ -87,12 +96,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should return error with X509 TLSCertFile empty",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: true,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "non-empty",
-							TLSCertFile: "",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: true,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "non-empty",
+								TLSCertFile: "",
+							},
 						},
 					},
 				},
@@ -103,12 +114,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should return error with X509 TLSKeyFile empty",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: true,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "",
-							TLSCertFile: "non-empty",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: true,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "",
+								TLSCertFile: "non-empty",
+							},
 						},
 					},
 				},
@@ -119,12 +132,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should return error without EnableTLSStreaming and only TLSCertFile set",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: false,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "",
-							TLSCertFile: "non-empty",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: false,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "",
+								TLSCertFile: "non-empty",
+							},
 						},
 					},
 				},
@@ -135,12 +150,14 @@ func TestValidateStreamServer(t *testing.T) {
 		{
 			desc: "should return error without EnableTLSStreaming and only TLSKeyFile set",
 			criService: &criService{
-				config: config.Config{
-					PluginConfig: config.PluginConfig{
-						EnableTLSStreaming: false,
-						X509KeyPairStreaming: config.X509KeyPairStreaming{
-							TLSKeyFile:  "non-empty",
-							TLSCertFile: "",
+				criBase: &base.CRIBase{
+					Config: config.Config{
+						PluginConfig: config.PluginConfig{
+							EnableTLSStreaming: false,
+							X509KeyPairStreaming: config.X509KeyPairStreaming{
+								TLSKeyFile:  "non-empty",
+								TLSCertFile: "",
+							},
 						},
 					},
 				},

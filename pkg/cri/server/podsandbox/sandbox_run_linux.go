@@ -58,7 +58,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 
 	// Set cgroups parent.
-	if c.config.DisableCgroup {
+	if c.criBase.Config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
 		if config.GetLinux().GetCgroupParent() != "" {
@@ -163,10 +163,10 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	_, ipUnprivilegedPortStart := sysctls["net.ipv4.ip_unprivileged_port_start"]
 	_, pingGroupRange := sysctls["net.ipv4.ping_group_range"]
 	if nsOptions.GetNetwork() != runtime.NamespaceMode_NODE {
-		if c.config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
+		if c.criBase.Config.EnableUnprivilegedPorts && !ipUnprivilegedPortStart {
 			sysctls["net.ipv4.ip_unprivileged_port_start"] = "0"
 		}
-		if c.config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() && !usernsEnabled {
+		if c.criBase.Config.EnableUnprivilegedICMP && !pingGroupRange && !userns.RunningInUserNS() && !usernsEnabled {
 			sysctls["net.ipv4.ping_group_range"] = "0 2147483647"
 		}
 	}
@@ -174,7 +174,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
-	if !c.config.DisableCgroup {
+	if !c.criBase.Config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 	}
 
@@ -186,7 +186,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 			customopts.WithAnnotation(annotations.SandboxMem, strconv.FormatInt(res.MemoryLimitInBytes, 10)))
 	}
 
-	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.config.RestrictOOMScoreAdj))
+	specOpts = append(specOpts, customopts.WithPodOOMScoreAdj(int(defaultSandboxOOMAdj), c.criBase.Config.RestrictOOMScoreAdj))
 
 	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
@@ -210,7 +210,7 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	if ssp == nil {
 		ssp, err = generateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
-			c.config.UnsetSeccompProfile)
+			c.criBase.Config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}

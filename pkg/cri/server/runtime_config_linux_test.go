@@ -94,8 +94,8 @@ func TestRuntimeConfig(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
-			c.config.PluginConfig.ContainerdConfig.DefaultRuntimeName = test.defaultRuntime
-			c.config.PluginConfig.ContainerdConfig.Runtimes = test.runtimes
+			c.criBase.Config.PluginConfig.ContainerdConfig.DefaultRuntimeName = test.defaultRuntime
+			c.criBase.Config.PluginConfig.ContainerdConfig.Runtimes = test.runtimes
 
 			resp, err := c.RuntimeConfig(context.TODO(), &runtime.RuntimeConfigRequest{})
 			assert.NoError(t, err)

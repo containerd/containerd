@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
@@ -86,8 +85,8 @@ type imageService interface {
 // criService implements CRIService.
 type criService struct {
 	imageService
-	// config contains all configurations.
-	config criconfig.Config
+	// criBase is common dependencies for CRI's runtime
+	criBase *base.CRIBase
 	// imageFSPaths contains path to image filesystem for snapshotters.
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
@@ -116,8 +115,6 @@ type criService struct {
 	// cniNetConfMonitor is used to reload cni network conf if there is
 	// any valid fs change events from cni network conf dir.
 	cniNetConfMonitor map[string]*cniNetConfSyncer
-	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	baseOCISpecs map[string]*oci.Spec
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
@@ -137,11 +134,10 @@ func NewCRIService(criBase *base.CRIBase, imageService imageService, client *con
 	config := criBase.Config
 	c := &criService{
 		imageService:       imageService,
-		config:             config,
+		criBase:            criBase,
 		client:             client,
 		imageFSPaths:       imageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		baseOCISpecs:       criBase.BaseOCISpecs,
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
@@ -167,9 +163,9 @@ func NewCRIService(criBase *base.CRIBase, imageService imageService, client *con
 
 	c.cniNetConfMonitor = make(map[string]*cniNetConfSyncer)
 	for name, i := range c.netPlugin {
-		path := c.config.NetworkPluginConfDir
+		path := c.criBase.Config.NetworkPluginConfDir
 		if name != defaultNetworkPlugin {
-			if rc, ok := c.config.Runtimes[name]; ok {
+			if rc, ok := c.criBase.Config.Runtimes[name]; ok {
 				path = rc.NetworkPluginConfDir
 			}
 		}
@@ -205,7 +201,7 @@ func (c *criService) Register(s *grpc.Server) error {
 // RegisterTCP register all required services onto a GRPC server on TCP.
 // This is used by containerd CRI plugin.
 func (c *criService) RegisterTCP(s *grpc.Server) error {
-	if !c.config.DisableTCPService {
+	if !c.criBase.Config.DisableTCPService {
 		return c.register(s)
 	}
 	return nil

@@ -120,11 +120,11 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	var drainExecSyncIOTimeout time.Duration
 	var err error
 
-	if c.config.DrainExecSyncIOTimeout != "" {
-		drainExecSyncIOTimeout, err = time.ParseDuration(c.config.DrainExecSyncIOTimeout)
+	if c.criBase.Config.DrainExecSyncIOTimeout != "" {
+		drainExecSyncIOTimeout, err = time.ParseDuration(c.criBase.Config.DrainExecSyncIOTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse drain_exec_sync_io_timeout %q: %w",
-				c.config.DrainExecSyncIOTimeout, err)
+				c.criBase.Config.DrainExecSyncIOTimeout, err)
 		}
 	}
 

@@ -396,8 +396,8 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
-			c.config.EnableUnprivilegedICMP = true
-			c.config.EnableUnprivilegedPorts = true
+			c.criBase.Config.EnableUnprivilegedICMP = true
+			c.criBase.Config.EnableUnprivilegedPorts = true
 			config, imageConfig, specCheck := getRunPodSandboxTestData()
 			if test.configChange != nil {
 				test.configChange(config)
@@ -681,7 +681,7 @@ options timeout:1
 func TestSandboxDisableCgroup(t *testing.T) {
 	config, imageConfig, _ := getRunPodSandboxTestData()
 	c := newControllerService()
-	c.config.DisableCgroup = true
+	c.criBase.Config.DisableCgroup = true
 	spec, err := c.sandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
 	require.NoError(t, err)
 

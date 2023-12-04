@@ -82,13 +82,13 @@ const (
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
 func (c *criService) getSandboxRootDir(id string) string {
-	return filepath.Join(c.config.RootDir, sandboxesDir, id)
+	return filepath.Join(c.criBase.Config.RootDir, sandboxesDir, id)
 }
 
 // getVolatileSandboxRootDir returns the root directory for managing volatile sandbox files,
 // e.g. named pipes.
 func (c *criService) getVolatileSandboxRootDir(id string) string {
-	return filepath.Join(c.config.StateDir, sandboxesDir, id)
+	return filepath.Join(c.criBase.Config.StateDir, sandboxesDir, id)
 }
 
 // getSandboxHostname returns the hostname file path inside the sandbox root directory.
@@ -138,13 +138,13 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 // getContainerRootDir returns the root directory for managing container files,
 // e.g. state checkpoint.
 func (c *criService) getContainerRootDir(id string) string {
-	return filepath.Join(c.config.RootDir, containersDir, id)
+	return filepath.Join(c.criBase.Config.RootDir, containersDir, id)
 }
 
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
 // e.g. named pipes.
 func (c *criService) getVolatileContainerRootDir(id string) string {
-	return filepath.Join(c.config.StateDir, containersDir, id)
+	return filepath.Join(c.criBase.Config.StateDir, containersDir, id)
 }
 
 // criContainerStateToString formats CRI container state to string.

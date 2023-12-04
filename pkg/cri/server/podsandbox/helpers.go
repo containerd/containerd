@@ -60,13 +60,13 @@ const (
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
 func (c *Controller) getSandboxRootDir(id string) string {
-	return filepath.Join(c.config.RootDir, sandboxesDir, id)
+	return filepath.Join(c.criBase.Config.RootDir, sandboxesDir, id)
 }
 
 // getVolatileSandboxRootDir returns the root directory for managing volatile sandbox files,
 // e.g. named pipes.
 func (c *Controller) getVolatileSandboxRootDir(id string) string {
-	return filepath.Join(c.config.StateDir, sandboxesDir, id)
+	return filepath.Join(c.criBase.Config.StateDir, sandboxesDir, id)
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -158,7 +158,7 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {
-		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
+		baseSpec, ok := c.criBase.GetOCISpec(baseSpecFile)
 		if !ok {
 			return nil, fmt.Errorf("can't find base OCI spec %q", baseSpecFile)
 		}
@@ -190,7 +190,7 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 // See https://github.com/containerd/containerd/issues/6657
 func (c *Controller) runtimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
 	if ociRuntime.Snapshotter == "" {
-		return c.config.ContainerdConfig.Snapshotter
+		return c.criBase.Config.ContainerdConfig.Snapshotter
 	}
 
 	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)

@@ -67,7 +67,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		return nil, fmt.Errorf("get routes: %w", err)
 	}
 
-	confTemplate := c.config.NetworkPluginConfTemplate
+	confTemplate := c.criBase.Config.NetworkPluginConfTemplate
 	if confTemplate == "" {
 		log.G(ctx).Info("No cni config template is specified, wait for other system components to drop the config.")
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
@@ -90,7 +90,7 @@ func (c *criService) UpdateRuntimeConfig(ctx context.Context, r *runtime.UpdateR
 		log.G(ctx).Infof("CNI config is successfully loaded, skip generating cni config from template %q", confTemplate)
 		return &runtime.UpdateRuntimeConfigResponse{}, nil
 	}
-	if err := writeCNIConfigFile(ctx, c.config.NetworkPluginConfDir, confTemplate, cidrs[0], cidrs, routes); err != nil {
+	if err := writeCNIConfigFile(ctx, c.criBase.Config.NetworkPluginConfDir, confTemplate, cidrs[0], cidrs, routes); err != nil {
 		return nil, err
 	}
 	return &runtime.UpdateRuntimeConfigResponse{}, nil

@@ -35,16 +35,16 @@ const networkAttachCount = 2
 // initPlatform handles linux specific initialization for the CRI service.
 func (c *criService) initPlatform() (err error) {
 	if userns.RunningInUserNS() {
-		if c.apparmorEnabled() || !c.config.RestrictOOMScoreAdj {
+		if c.apparmorEnabled() || !c.criBase.Config.RestrictOOMScoreAdj {
 			log.L.Warn("Running CRI plugin in a user namespace typically requires disable_apparmor and restrict_oom_score_adj to be true")
 		}
 	}
 
-	if c.config.EnableSelinux {
+	if c.criBase.Config.EnableSelinux {
 		if !selinux.GetEnabled() {
 			log.L.Warn("Selinux is not supported")
 		}
-		if r := c.config.SelinuxCategoryRange; r > 0 {
+		if r := c.criBase.Config.SelinuxCategoryRange; r > 0 {
 			selinux.CategoryRange = uint32(r)
 		}
 	} else {
@@ -52,9 +52,9 @@ func (c *criService) initPlatform() (err error) {
 	}
 
 	pluginDirs := map[string]string{
-		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
+		defaultNetworkPlugin: c.criBase.Config.NetworkPluginConfDir,
 	}
-	for name, conf := range c.config.Runtimes {
+	for name, conf := range c.criBase.Config.Runtimes {
 		if conf.NetworkPluginConfDir != "" {
 			pluginDirs[name] = conf.NetworkPluginConfDir
 		}
@@ -62,9 +62,9 @@ func (c *criService) initPlatform() (err error) {
 
 	c.netPlugin = make(map[string]cni.CNI)
 	for name, dir := range pluginDirs {
-		max := c.config.NetworkPluginMaxConfNum
+		max := c.criBase.Config.NetworkPluginMaxConfNum
 		if name != defaultNetworkPlugin {
-			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
+			if m := c.criBase.Config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
 				max = m
 			}
 		}
@@ -75,7 +75,7 @@ func (c *criService) initPlatform() (err error) {
 		i, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+			cni.WithPluginDir([]string{c.criBase.Config.NetworkPluginBinDir}))
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}
@@ -89,9 +89,9 @@ func (c *criService) initPlatform() (err error) {
 		}
 	}
 
-	if c.config.EnableCDI {
+	if c.criBase.Config.EnableCDI {
 		reg := cdi.GetRegistry()
-		err = reg.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
+		err = reg.Configure(cdi.WithSpecDirs(c.criBase.Config.CDISpecDirs...))
 		if err != nil {
 			return fmt.Errorf("failed to configure CDI registry")
 		}

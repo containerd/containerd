@@ -94,7 +94,7 @@ func (c *criService) updateContainerResources(ctx context.Context,
 	if err != nil {
 		return newStatus, fmt.Errorf("failed to get container spec: %w", err)
 	}
-	newSpec, err := updateOCIResource(ctx, oldSpec, r, c.config)
+	newSpec, err := updateOCIResource(ctx, oldSpec, r, c.criBase.Config)
 	if err != nil {
 		return newStatus, fmt.Errorf("failed to update resource in spec: %w", err)
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/contrib/seccomp"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -993,8 +994,10 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			cri := &criService{}
-			cri.config.UnsetSeccompProfile = test.defaultProfile
+			cri := &criService{
+				criBase: &base.CRIBase{},
+			}
+			cri.criBase.Config.UnsetSeccompProfile = test.defaultProfile
 			ssp := test.sp
 			csp, err := generateSeccompSecurityProfile(
 				test.profile,
@@ -1275,7 +1278,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			c.config.DisableProcMount = test.disableProcMount
+			c.criBase.Config.DisableProcMount = test.disableProcMount
 			containerConfig.Linux.SecurityContext.MaskedPaths = test.masked
 			containerConfig.Linux.SecurityContext.ReadonlyPaths = test.readonly
 			containerConfig.Linux.SecurityContext.Privileged = test.privileged
@@ -1347,7 +1350,7 @@ func TestDisableCgroup(t *testing.T) {
 	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
-	c.config.DisableCgroup = true
+	c.criBase.Config.DisableCgroup = true
 	spec, err := c.buildContainerSpec(currentPlatform, "test-id", "sandbox-id", 1234, "", "container-name", testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime)
 	require.NoError(t, err)
 
@@ -1568,7 +1571,7 @@ func TestNonRootUserAndDevices(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			c.config.DeviceOwnershipFromSecurityContext = test.deviceOwnershipFromSecurityContext
+			c.criBase.Config.DeviceOwnershipFromSecurityContext = test.deviceOwnershipFromSecurityContext
 			containerConfig.Linux.SecurityContext.RunAsUser = test.uid
 			containerConfig.Linux.SecurityContext.RunAsGroup = test.gid
 			containerConfig.Devices = []*runtime.Device{
@@ -1682,7 +1685,7 @@ func TestPrivilegedDevices(t *testing.T) {
 func TestBaseOCISpec(t *testing.T) {
 	c := newTestCRIService()
 	baseLimit := int64(100)
-	c.baseOCISpecs = map[string]*oci.Spec{
+	c.criBase.BaseOCISpecs = map[string]*oci.Spec{
 		"/etc/containerd/cri-base.json": {
 			Process: &runtimespec.Process{
 				User: runtimespec.User{AdditionalGids: []uint32{9999}},
