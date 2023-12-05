@@ -173,6 +173,8 @@ func TestImport(t *testing.T) {
 
 	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
+	importLabels := map[string]string{"foo": "bar"}
+
 	c2, _ := createConfig(runtime.GOOS, runtime.GOARCH, "test2")
 	m2, d5, _ := createManifest(c2, [][]byte{{1, 2, 3, 4, 5}})
 
@@ -313,6 +315,29 @@ func TestImport(t *testing.T) {
 
 				checkImages(t, d3, imgs, names...)
 				checkManifest(ctx, t, client.ContentStore(), imgs[0].Target, expManifest)
+			},
+		},
+		{
+			Name: "OCI-Labels",
+			Writer: tartest.TarAll(
+				tc.Dir(ocispec.ImageBlobsDir, 0o755),
+				tc.Dir(ocispec.ImageBlobsDir+"/sha256", 0o755),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d1.Encoded(), b1, 0o644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d2.Encoded(), c1, 0o644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d3.Encoded(), m1, 0o644),
+				tc.File(ocispec.ImageIndexFile, createIndex(m1, "latest", "docker.io/lib/img:ok"), 0o644),
+				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0o644),
+			),
+			Check: func(ctx context.Context, t *testing.T, _ *Client, imgs []images.Image) {
+				for i := range imgs {
+					if !reflect.DeepEqual(imgs[i].Labels, importLabels) {
+						t.Fatalf("DeepEqual on labels failed img.Labels: %+v expected: %+v", imgs[i].Labels, importLabels)
+					}
+				}
+			},
+			Opts: []ImportOpt{
+				WithImageLabels(importLabels),
+				WithImageRefTranslator(archive.AddRefPrefix("localhost:5000/myimage")),
 			},
 		},
 		{

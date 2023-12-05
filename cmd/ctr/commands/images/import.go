@@ -98,7 +98,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "discard-unpacked-layers",
 			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
 		},
-	}, commands.SnapshotterFlags...),
+	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 
 	Action: func(context *cli.Context) error {
 		var (
@@ -121,6 +121,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
 				// Allow overwriting auto-generated prefix with named annotation
 				overwrite = true
+			}
+
+			labels := context.StringSlice("label")
+			if len(labels) > 0 {
+				opts = append(opts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
 			if context.Bool("digests") {
@@ -235,6 +240,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
 			}
 			opts = append(opts, containerd.WithDiscardUnpackedLayers())
+		}
+
+		labels := context.StringSlice("label")
+		if len(labels) > 0 {
+			opts = append(opts, containerd.WithImageLabels(commands.LabelArgs(labels)))
 		}
 
 		ctx, done, err := client.WithLease(ctx)
