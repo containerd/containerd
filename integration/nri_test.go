@@ -401,6 +401,7 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 	)
 
 	t.Log("Test that NRI plugins can update linux cpusets of existing containers.")
+	t.Logf("availableCpuset values is %v", availableCpuset)
 
 	var (
 		out = t.TempDir()
@@ -423,10 +424,12 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 					Type:        "bind",
 					Options:     []string{"bind"},
 				})
+				t.Logf("ctr0 availableCpuset values is %v", availableCpuset)
 				adjust.SetLinuxCPUSetCPUs(availableCpuset[0])
 			} else {
 				update = []*api.ContainerUpdate{{}}
 				update[0].SetContainerId(ctr0)
+				t.Logf("ctr1 availableCpuset values is %v", availableCpuset)
 				update[0].SetLinuxCPUSetCPUs(availableCpuset[1])
 			}
 			return adjust, update, nil
@@ -442,6 +445,7 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 			`prev=""
              while true; do
                  cpus="$(grep Cpus_allowed_list: /proc/self/status)"
+                 echo "$cpus"
                  [ "$cpus" != "$prev" ] && echo "$cpus" > /out/result
                  cpus="$prev"
                  sleep 0.2
@@ -451,12 +455,14 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 		WithCommand("/bin/sh", "-c", "sleep 3600"),
 	)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	chk, err := waitForFileAndRead(filepath.Join(out, "result"), time.Second)
 	require.NoError(t, err, "read result")
 
 	expected := "Cpus_allowed_list:\t" + availableCpuset[1] + "\n"
+	t.Logf("expected: %s", expected)
+	t.Logf("got: %s", string(chk))
 	require.Equal(t, expected, string(chk), "check result")
 }
 
