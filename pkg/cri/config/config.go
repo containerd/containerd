@@ -398,6 +398,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			if r.Type != plugin.RuntimeLinuxV1 {
 				return warnings, fmt.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
+			warnings = append(warnings, deprecation.CRIRuntimeRoot)
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
 	}
