@@ -67,6 +67,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIUntrustedWorkloadRuntime},
 		},
 		"both untrusted_workload_runtime and runtime[untrusted]": {
 			config: &PluginConfig{

@@ -433,6 +433,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		if _, ok := c.ContainerdConfig.Runtimes[RuntimeUntrusted]; ok {
 			return warnings, fmt.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
 		}
+		warnings = append(warnings, deprecation.CRIUntrustedWorkloadRuntime)
 		c.ContainerdConfig.Runtimes[RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
 	}
 
