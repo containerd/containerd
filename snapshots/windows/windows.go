@@ -282,7 +282,9 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 				log.G(ctx).WithError(err1).WithField("path", renamed).Error("Failed to rename after failed commit")
 			}
 		}
-		return err
+		// Return the error wrapped in ErrFailedPrecondition so that cleanup of other snapshots will
+		// still continue.
+		return errors.Join(errdefs.ErrFailedPrecondition, err)
 	}
 
 	if err = hcsshim.DestroyLayer(s.info, renamedID); err != nil {
