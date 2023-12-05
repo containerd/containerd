@@ -106,6 +106,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIDefaultRuntime},
 		},
 		"no default_runtime_name": {
 			config:      &PluginConfig{},

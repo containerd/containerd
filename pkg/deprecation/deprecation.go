@@ -29,6 +29,8 @@ const (
 	CRISystemdCgroupV1 Warning = Prefix + "cri-systemd-cgroup-v1"
 	// CRIUntrustedWorkloadRuntime is a warning for the `untrusted_workload_runtime` property
 	CRIUntrustedWorkloadRuntime Warning = Prefix + "cri-untrusted-workload-runtime"
+	// CRIDefaultRuntime is a warning for the `default_runtime` property
+	CRIDefaultRuntime Warning = Prefix + "cri-default-runtime"
 	// CRIRegistryMirrors is a warning for the use of the `mirrors` property
 	CRIRegistryMirrors Warning = Prefix + "cri-registry-mirrors"
 	// CRIRegistryAuths is a warning for the use of the `auths` property
@@ -53,6 +55,8 @@ var messages = map[Warning]string{
 		"Use `SystemdCgroup` in [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc.options] options instead.",
 	CRIUntrustedWorkloadRuntime: "The `untrusted_workload_runtime` property of [plugins.\"io.containerd.grpc.v1.cri\".containerd] is deprecated since containerd v1.2 and will be removed in containerd v2.0. " +
 		"Create an `untrusted` runtime in `runtimes` instead.",
+	CRIDefaultRuntime: "The `default_runtime` property of [plugins.\"io.containerd.grpc.v1.cri\".containerd] is deprecated since containerd v1.3 and will be removed in containerd v2.0. " +
+		"Use `default_runtime_name` instead.",
 	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.0." +
 		"Use `config_path` instead.",
 	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.0." +

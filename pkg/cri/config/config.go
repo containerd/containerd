@@ -357,6 +357,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 
 	// Validation for deprecated default_runtime field.
 	if c.ContainerdConfig.DefaultRuntime.Type != "" {
+		warnings = append(warnings, deprecation.CRIDefaultRuntime)
 		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
 		c.ContainerdConfig.DefaultRuntimeName = RuntimeDefault
 		c.ContainerdConfig.Runtimes[RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
