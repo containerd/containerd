@@ -227,6 +227,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIRuntimeEngine},
 		},
 		"deprecated runtime_engine for v2 runtime": {
 			config: &PluginConfig{

@@ -31,6 +31,8 @@ const (
 	CRIUntrustedWorkloadRuntime Warning = Prefix + "cri-untrusted-workload-runtime"
 	// CRIDefaultRuntime is a warning for the `default_runtime` property
 	CRIDefaultRuntime Warning = Prefix + "cri-default-runtime"
+	// CRIRuntimeEngine is a warning for the `runtime_engine` property
+	CRIRuntimeEngine Warning = Prefix + "cri-runtime-engine"
 	// CRIRegistryMirrors is a warning for the use of the `mirrors` property
 	CRIRegistryMirrors Warning = Prefix + "cri-registry-mirrors"
 	// CRIRegistryAuths is a warning for the use of the `auths` property
@@ -57,6 +59,8 @@ var messages = map[Warning]string{
 		"Create an `untrusted` runtime in `runtimes` instead.",
 	CRIDefaultRuntime: "The `default_runtime` property of [plugins.\"io.containerd.grpc.v1.cri\".containerd] is deprecated since containerd v1.3 and will be removed in containerd v2.0. " +
 		"Use `default_runtime_name` instead.",
+	CRIRuntimeEngine: "The `runtime_engine` property of [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.*] is deprecated since containerd v1.3 and will be removed in containerd v2.0. " +
+		"Use a v2 runtime and `options` instead.",
 	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.0." +
 		"Use `config_path` instead.",
 	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.0." +
