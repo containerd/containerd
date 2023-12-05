@@ -391,6 +391,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			if r.Type != plugin.RuntimeLinuxV1 {
 				return warnings, fmt.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
+			warnings = append(warnings, deprecation.CRIRuntimeEngine)
 			log.G(ctx).Warning("`runtime_engine` is deprecated, please use runtime `options` instead")
 		}
 		if r.Root != "" {
