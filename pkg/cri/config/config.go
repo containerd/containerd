@@ -374,6 +374,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
 			return warnings, fmt.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
 		}
+		warnings = append(warnings, deprecation.CRISystemdCgroupV1)
 		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
 	}
 	if c.NoPivot {

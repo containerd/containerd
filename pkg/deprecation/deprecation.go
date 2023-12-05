@@ -25,6 +25,8 @@ const (
 	PullSchema1Image Warning = Prefix + "pull-schema-1-image"
 	// GoPluginLibrary is a warning for the use of dynamic library Go plugins
 	GoPluginLibrary Warning = Prefix + "go-plugin-library"
+	// CRISystemdCgroupV1 is a warning for the `systemd_cgroup` property
+	CRISystemdCgroupV1 Warning = Prefix + "cri-systemd-cgroup-v1"
 	// CRIRegistryMirrors is a warning for the use of the `mirrors` property
 	CRIRegistryMirrors Warning = Prefix + "cri-registry-mirrors"
 	// CRIRegistryAuths is a warning for the use of the `auths` property
@@ -45,6 +47,8 @@ var messages = map[Warning]string{
 	PullSchema1Image: "Schema 1 images will be deprecated in containerd v1.7 and removed in containerd v2.0. " +
 		`Since containerd v1.6.25, schema 1 images are identified by the "io.containerd.image/converted-docker-schema1" label.`,
 	GoPluginLibrary: "Dynamically-linked Go plugins as containerd runtimes are deprecated since containerd v2.0 and removed in containerd v2.1.",
+	CRISystemdCgroupV1: "The `systemd_cgroup` property (old form) of `[plugins.\"io.containerd.grpc.v1.cri\"] is deprecated since containerd v1.3 and will be removed in containerd v2.0. " +
+		"Use `SystemdCgroup` in [plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.runc.options] options instead.",
 	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.0." +
 		"Use `config_path` instead.",
 	CRIRegistryAuths: "The `auths` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.3 and will be removed in containerd v2.0." +
