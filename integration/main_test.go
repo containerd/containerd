@@ -51,11 +51,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 )
 
 const (
-	timeout      = 1 * time.Minute
-	k8sNamespace = constants.K8sContainerdNamespace
+	timeout                    = 1 * time.Minute
+	k8sNamespace               = constants.K8sContainerdNamespace
+	defaultCgroupSystemdParent = "/containerd-test.slice"
 )
 
 var (
@@ -208,6 +210,13 @@ func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
+	var cgroupParent string
+	runtimeConfig, err := runtimeService.RuntimeConfig(&runtime.RuntimeConfigRequest{})
+	if err != nil {
+		klog.Errorf("runtime service call RuntimeConfig error %s", err.Error())
+	} else if runtimeConfig.GetLinux().GetCgroupDriver() == runtime.CgroupDriver_SYSTEMD {
+		cgroupParent = defaultCgroupSystemdParent
+	}
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name: name,
@@ -216,7 +225,9 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 			Uid:       util.GenerateID(),
 			Namespace: Randomize(ns),
 		},
-		Linux:       &runtime.LinuxPodSandboxConfig{},
+		Linux: &runtime.LinuxPodSandboxConfig{
+			CgroupParent: cgroupParent,
+		},
 		Annotations: make(map[string]string),
 		Labels:      make(map[string]string),
 	}
