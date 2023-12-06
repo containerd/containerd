@@ -433,11 +433,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		if _, ok := c.ContainerdConfig.Runtimes[RuntimeUntrusted]; ok {
 			return warnings, fmt.Errorf("conflicting definitions: configuration includes both `untrusted_workload_runtime` and `runtimes[%q]`", RuntimeUntrusted)
 		}
+		warnings = append(warnings, deprecation.CRIUntrustedWorkloadRuntime)
 		c.ContainerdConfig.Runtimes[RuntimeUntrusted] = c.ContainerdConfig.UntrustedWorkloadRuntime
 	}
 
 	// Validation for deprecated default_runtime field.
 	if c.ContainerdConfig.DefaultRuntime.Type != "" {
+		warnings = append(warnings, deprecation.CRIDefaultRuntime)
 		log.G(ctx).Warning("`default_runtime` is deprecated, please use `default_runtime_name` to reference the default configuration you have defined in `runtimes`")
 		c.ContainerdConfig.DefaultRuntimeName = RuntimeDefault
 		c.ContainerdConfig.Runtimes[RuntimeDefault] = c.ContainerdConfig.DefaultRuntime
@@ -456,6 +458,7 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		if c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName].Type != plugin.RuntimeLinuxV1 {
 			return warnings, fmt.Errorf("`systemd_cgroup` only works for runtime %s", plugin.RuntimeLinuxV1)
 		}
+		warnings = append(warnings, deprecation.CRISystemdCgroupV1)
 		log.G(ctx).Warning("`systemd_cgroup` is deprecated, please use runtime `options` instead")
 	}
 	if c.NoPivot {
@@ -470,12 +473,14 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			if r.Type != plugin.RuntimeLinuxV1 {
 				return warnings, fmt.Errorf("`runtime_engine` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
+			warnings = append(warnings, deprecation.CRIRuntimeEngine)
 			log.G(ctx).Warning("`runtime_engine` is deprecated, please use runtime `options` instead")
 		}
 		if r.Root != "" {
 			if r.Type != plugin.RuntimeLinuxV1 {
 				return warnings, fmt.Errorf("`runtime_root` only works for runtime %s", plugin.RuntimeLinuxV1)
 			}
+			warnings = append(warnings, deprecation.CRIRuntimeRoot)
 			log.G(ctx).Warning("`runtime_root` is deprecated, please use runtime `options` instead")
 		}
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
