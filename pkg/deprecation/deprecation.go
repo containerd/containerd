@@ -49,6 +49,8 @@ const (
 	RuntimeV1 Warning = Prefix + "runtime-v1"
 	// RuntimeRuncV1 is a warning for the io.containerd.runc.v1 runtime
 	RuntimeRuncV1 Warning = Prefix + "runtime-runc-v1"
+	// CRICRIUPath is a warning for the use of the `CriuPath` property
+	CRICRIUPath Warning = Prefix + "cri-criu-path"
 )
 
 var messages = map[Warning]string{
@@ -75,6 +77,8 @@ var messages = map[Warning]string{
 	AUFSSnapshotter: "The aufs snapshotter is deprecated since containerd v1.5 and removed in containerd v2.0. Use the overlay snapshotter instead.",
 	RuntimeV1:       "The `io.containerd.runtime.v1.linux` runtime is deprecated since containerd v1.4 and removed in containerd v2.0. Use the `io.containerd.runc.v2` runtime instead.",
 	RuntimeRuncV1:   "The `io.containerd.runc.v1` runtime is deprecated since containerd v1.4 and removed in containerd v2.0. Use the `io.containerd.runc.v2` runtime instead.",
+	CRICRIUPath: "The `CriuPath` property of `[plugins.\"io.containerd.grpc.v1.cri\".containerd.runtimes.*.options]` is deprecated since containerd v1.7 and will be removed in containerd v2.0. " +
+		"Use a criu binary in $PATH instead.",
 }
 
 // Valid checks whether a given Warning is valid
