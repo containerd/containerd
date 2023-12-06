@@ -430,6 +430,33 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
 		},
+		"deprecated CRIU path": {
+			config: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Options: map[string]interface{}{
+								"CriuPath": "/path/to/criu-binary",
+							},
+						},
+					},
+				},
+			},
+			expected: &PluginConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Options: map[string]interface{}{
+								"CriuPath": "/path/to/criu-binary",
+							},
+						},
+					},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRICRIUPath},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			w, err := ValidatePluginConfig(context.Background(), test.config)
