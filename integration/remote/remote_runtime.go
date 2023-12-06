@@ -535,6 +535,15 @@ func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeSta
 	return resp.Status, nil
 }
 
+// RuntimeConfig returns the CgroupDriver of the runtime.
+func (r *RuntimeService) RuntimeConfig(in *runtimeapi.RuntimeConfigRequest, opts ...grpc.CallOption) (*runtimeapi.RuntimeConfigResponse, error) {
+	klog.V(10).Infof("[RuntimeService] RuntimeConfig (timeout=%v)", r.timeout)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+	runtimeConfig, err := r.runtimeClient.RuntimeConfig(ctx, in)
+	return runtimeConfig, err
+}
+
 // ContainerStats returns the stats of the container.
 func (r *RuntimeService) ContainerStats(containerID string, opts ...grpc.CallOption) (*runtimeapi.ContainerStats, error) {
 	klog.V(10).Infof("[RuntimeService] ContainerStats (containerID=%v, timeout=%v)", containerID, r.timeout)
