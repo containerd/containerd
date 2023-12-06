@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/version"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var (
@@ -586,12 +585,9 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 			return nil
 		}
 	}
-	client.Transport = otelhttp.NewTransport(
-		client.Transport,
-		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
-			return tracing.Name("remotes.docker.resolver", "HTTPRequest")
-		}),
-	)
+
+	tracing.UpdateHTTPClient(client, tracing.Name("remotes.docker.resolver", "HTTPRequest"))
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to do request: %w", err)

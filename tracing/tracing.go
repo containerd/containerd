@@ -20,6 +20,7 @@ import (
 	"context"
 	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -45,6 +46,16 @@ func WithHTTPRequest(_ *http.Request) SpanOpt {
 			trace.WithSpanKind(trace.SpanKindClient), // A client making a request to a server
 		)
 	}
+}
+
+// UpdateHTTPClient updates the http client with the necessary otel transport
+func UpdateHTTPClient(client *http.Client, name string) {
+	client.Transport = otelhttp.NewTransport(
+		client.Transport,
+		otelhttp.WithSpanNameFormatter(func(operation string, r *http.Request) string {
+			return name
+		}),
+	)
 }
 
 // StartSpan starts child span in a context.
