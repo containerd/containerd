@@ -47,6 +47,19 @@ type CRIBase struct {
 	BaseOCISpecs map[string]*oci.Spec
 }
 
+const (
+	// legacyPluginID is the ID of the plugin before the CRI plugin was moved
+	// internal.
+	//
+	// For backward-compatibility, this ID is still used for state-directories
+	// ([criconfig.Config.RootDir], [criconfig.Config.StateDir]), and as key
+	// in the config-file.
+	legacyPluginID = "io.containerd.grpc.v1.cri"
+
+	// pluginID is the ID of the plugin as used internally.
+	pluginID = "io.containerd.internal.v1.cri"
+)
+
 func init() {
 	config := criconfig.DefaultConfig()
 
@@ -62,13 +75,16 @@ func init() {
 			if version >= srvconfig.CurrentConfigVersion {
 				return nil
 			}
-			c, ok := plugins["io.containerd.grpc.v1.cri"]
+			// For backward compatibility, we continue using the legacy plugin
+			// ID in the configuration file, but migrate the key to the new ID,
+			// which is used to refer to the plugin internally.
+			c, ok := plugins[legacyPluginID]
 			if !ok {
 				return nil
 			}
 			conf := c.(map[string]interface{})
 			migrateConfig(conf)
-			plugins["io.containerd.internal.v1.cri"] = conf
+			plugins[pluginID] = conf
 			return nil
 		},
 		InitFn: initCRIBase,
@@ -95,9 +111,9 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 
 	// For backward compatibility, we have to keep the rootDir and stateDir the same as before.
 	containerdRootDir := filepath.Dir(ic.Properties[plugins.PropertyRootDir])
-	rootDir := filepath.Join(containerdRootDir, "io.containerd.grpc.v1.cri")
+	rootDir := filepath.Join(containerdRootDir, legacyPluginID)
 	containerdStateDir := filepath.Dir(ic.Properties[plugins.PropertyStateDir])
-	stateDir := filepath.Join(containerdStateDir, "io.containerd.grpc.v1.cri")
+	stateDir := filepath.Join(containerdStateDir, legacyPluginID)
 	c := criconfig.Config{
 		PluginConfig:       *pluginConfig,
 		ContainerdRootDir:  containerdRootDir,
@@ -108,7 +124,7 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 
 	// Ignoring errors here; this should never fail.
 	cfg, _ := json.Marshal(c)
-	log.G(ctx).WithFields(log.Fields{"config": string(cfg)}).Info("starting cri plugin")
+	log.G(ctx).WithFields(log.Fields{"config": string(cfg), "id": pluginID, "type": plugins.InternalPlugin}).Info("starting cri plugin")
 
 	if err := setGLogLevel(); err != nil {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
