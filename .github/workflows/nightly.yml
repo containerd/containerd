@@ -7,7 +7,7 @@ on:
       - ".github/workflows/nightly.yml"
 
 env:
-  GO_VERSION: "1.21.3"
+  GO_VERSION: "1.21.5"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
