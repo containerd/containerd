@@ -31,11 +31,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2019]
+        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'actuated-arm64-4cpu-16gb'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -232,11 +232,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.12", "1.21.5"]
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04'
+        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'actuated-arm64-4cpu-16gb'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -347,7 +347,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     needs: [linters, protos, man]
 
@@ -356,11 +356,16 @@ jobs:
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
+        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb]
         exclude:
           - runtime: io.containerd.runc.v1
             runc: crun
           - runtime: io.containerd.runtime.v1.linux
             runc: crun
+          - runtime: io.containerd.runc.v1
+            os: actuated-arm64-4cpu-16gb
+          - runtime: io.containerd.runtime.v1.linux
+            os: actuated-arm64-4cpu-16gb
 
     env:
       GOTEST: gotestsum --
@@ -375,7 +380,7 @@ jobs:
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
-          sudo apt-get install -y gperf libbtrfs-dev
+          sudo apt-get install -y gperf libbtrfs-dev dmsetup strace xfsprogs
           script/setup/install-seccomp
           script/setup/install-runc
           script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
@@ -383,6 +388,10 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
+        # NOTE: Required actuated enable CONFIG_CHECKPOINT_RESTORE
+        #
+        # REF: https://criu.org/Linux_kernel
+        if: matrix.os != 'actuated-arm64-4cpu-16gb'
         run: |
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
@@ -467,6 +476,13 @@ jobs:
           mount
           df
           losetup -l
+
+      - name: Kernel Message
+        if: failure()
+        run: |
+          sudo lsmod
+          sudo dmesg -T -f kern
+
       - uses: actions/upload-artifact@v3
         if: always()
         with:
