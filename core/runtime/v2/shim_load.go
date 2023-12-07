@@ -77,6 +77,8 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		if len(id) > 0 && id[0] == '.' {
 			continue
 		}
+		logger := log.G(ctx).WithField("id", id)
+
 		bundle, err := LoadBundle(ctx, m.state, id)
 		if err != nil {
 			// fine to return error here, it is a programmer error if the context
@@ -87,7 +89,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		f, err := os.Open(bundle.Path)
 		if err != nil {
 			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			logger.WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
 			continue
 		}
 
@@ -95,7 +97,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		f.Close()
 		if err != nil {
 			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			logger.WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
 			continue
 		}
 		if len(bf) == 0 {
@@ -103,24 +105,22 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 			continue
 		}
 
-		var (
-			runtime string
-		)
+		var runtime string
 
 		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
 		if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
 			runtime = string(data)
 		} else if err != nil && !os.IsNotExist(err) {
-			log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
+			logger.WithError(err).Error("failed to read runtime path from bundle")
 		}
 
 		// Query runtime name from metadata store
 		if runtime == "" {
 			container, err := m.containers.Get(ctx, id)
 			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading container %s", id)
+				logger.WithError(err).Error("loading container")
 				if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-					log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
+					logger.WithError(err).Error("failed to unmount rootfs")
 				}
 				bundle.Delete()
 				continue
@@ -131,7 +131,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		runtime, err = m.resolveRuntimePath(runtime)
 		if err != nil {
 			bundle.Delete()
-			log.G(ctx).WithError(err).Error("failed to resolve runtime path")
+			logger.WithError(err).Error("failed to resolve runtime path")
 			continue
 		}
 
@@ -143,14 +143,14 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 				schedCore:    m.schedCore,
 			})
 		shim, err := loadShimTask(ctx, bundle, func() {
-			log.G(ctx).WithField("id", id).Info("shim disconnected")
+			logger.WithError(err).Info("shim disconnected")
 
 			cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
 			// Remove self from the runtime task list.
 			m.shims.Delete(ctx, id)
 		})
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("unable to load shim %q", id)
+			logger.WithError(err).Error("unable to load shim")
 			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 			continue
 		}
@@ -166,7 +166,7 @@ func (m *ShimManager) loadShims(ctx context.Context) error {
 		_, sgetErr := m.sandboxStore.Get(ctx, id)
 		pInfo, pidErr := shim.Pids(ctx)
 		if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-			log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
+			logger.Info("cleaning leaked shim process")
 			// We are unable to get Pids from the shim and it's not a sandbox
 			// shim. We should clean it up her.
 			// No need to do anything for removeTask since we never added this shim.
