@@ -491,6 +491,11 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 			r.SandboxMode = string(ModePodSandbox)
 			c.ContainerdConfig.Runtimes[k] = r
 		}
+
+		if p, ok := r.Options["CriuPath"].(string); ok && p != "" {
+			log.G(ctx).Warning("`CriuPath` is deprecated, please use a criu binary in $PATH instead.")
+			warnings = append(warnings, deprecation.CRICRIUPath)
+		}
 	}
 
 	useConfigPath := c.Registry.ConfigPath != ""
