@@ -99,7 +99,9 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 		StateDir:           stateDir,
 	}
 
-	log.G(ctx).WithFields(log.Fields{"config": fmt.Sprintf("%+v", c)}).Info("starting cri plugin")
+	// Ignoring errors here; this should never fail.
+	cfg, _ := json.Marshal(c)
+	log.G(ctx).WithFields(log.Fields{"config": string(cfg)}).Info("starting cri plugin")
 
 	if err := setGLogLevel(); err != nil {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
