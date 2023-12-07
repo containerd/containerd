@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"testing"
 
+	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
@@ -44,6 +45,13 @@ var (
 
 func TestGetUsernsFD(t *testing.T) {
 	testutil.RequiresRoot(t)
+
+	k512 := kernel.KernelVersion{Kernel: 5, Major: 12}
+	ok, err := kernel.GreaterEqualThan(k512)
+	require.NoError(t, err)
+	if !ok {
+		t.Skip("GetUsernsFD requires kernel >= 5.12")
+	}
 
 	t.Run("basic", testGetUsernsFDBasic)
 

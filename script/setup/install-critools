@@ -25,7 +25,9 @@ script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 # e2e will fail with "sudo: command not found"
 SUDO=''
 if (( $EUID != 0 )); then
-    SUDO='sudo'
+    # The actuated ARM64 env needs PATH=$PATH to get `go` path. Otherwise
+    # `make install` recipe will fail.
+    SUDO="sudo -E PATH=$PATH"
 fi
 
 cd "$(go env GOPATH)"
