@@ -126,10 +126,11 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
+	} else {
+		log.G(ctx).WithField("id", id).Info("cleaned up after shim disconnected")
 	}
 
 	if _, err := rt.Get(ctx, id); err != nil {
