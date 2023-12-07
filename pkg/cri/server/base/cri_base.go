@@ -106,7 +106,7 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 		StateDir:           stateDir,
 	}
 
-	log.G(ctx).Infof("Start cri plugin with config %+v", c)
+	log.G(ctx).WithFields(log.Fields{"config": fmt.Sprintf("%+v", c)}).Info("starting cri plugin")
 
 	if err := setGLogLevel(); err != nil {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
