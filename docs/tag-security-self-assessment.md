@@ -5,9 +5,7 @@ documentation for their users. This document is ideal for projects currently in 
 CNCF **sandbox** as well as projects that are looking to receive a joint assessment and
 currently in CNCF **incubation**.
 
-For a detailed guide with step-by-step discussion and examples, check out the free 
-Express Learning course provided by Linux Foundation Training & Certification: 
-[Security Assessments for Open Source Projects](https://training.linuxfoundation.org/express-learning/security-self-assessments-for-open-source-projects-lfel1005/).
+For a detailed guide with step-by-step discussion and examples, check out the free Express Learning course provided by Linux Foundation Training & Certification: [Security Assessments for Open Source Projects](https://training.linuxfoundation.org/express-learning/security-self-assessments-for-open-source-projects-lfel1005/).
 
 # Self-assessment outline
 
@@ -51,7 +49,7 @@ use the table below as an example:
 
 ## Overview
 
-Containerd is a Cloud Native Computing Foundation (CNCF) Project focused on providing the core functionalities for container orchestration. Specifically architected to focus on modularity and compatibility, this provides a secure and minimal approach making it a great option for integrating into different container systems. 
+Containerd is a Cloud Native Computing Foundation (CNCF) Project focused on providing the core functionalities for container orchestration. Specifically architected to focus on modularity and compatibility, this provides a secure and minimal approach making it a great option for integrating into different container systems.
 
 ![Sample Image](https://github.com/containerd/containerd/blob/main/docs/historical/design/architecture.png)
 
@@ -199,11 +197,11 @@ Logging persistence is considered out of scope. Clients can handle and persist c
 
 ## Self-assessment use
 
-This self-assessment is created by the Containerd team to perform an internal analysis of the project's security.  It is not intended to provide a security audit of Containerd, or function as an independent assessment or attestation of Containerd's security health.
+This self-assessment is created by the Containerd team to perform an internal analysis of the project's security. It is not intended to provide a security audit of Containerd, or function as an independent assessment or attestation of Containerd's security health.
 
 This document serves to provide Containerd users with an initial understanding of Containerd's security, where to find existing security documentation, Containerd plans for security, and general overview of Containerd security practices, both for development of Containerd as well as security of Containerd.
 
-This document provides the CNCF TAG-Security with an initial understanding of Containerd to assist in a joint-assessment, necessary for projects under incubation.  Taken together, this document and the joint-assessment serve as a cornerstone for if and when Containerd seeks graduation and is preparing for a security audit.
+This document provides the CNCF TAG-Security with an initial understanding of Containerd to assist in a joint-assessment, necessary for projects under incubation. Taken together, this document and the joint-assessment serve as a cornerstone for if and when Containerd seeks graduation and is preparing for a security audit.
 
 ## Security functions and features
 
@@ -243,19 +241,18 @@ Containerd only stores identical content once, reducing risk of storing multiple
 
 Containerd is not documented as meeting any major security standards except for having bypassed a test in fuzzing. The testing done by Adacompliance deemed that the fuzzing prevention was strong and with further testing was incredibly robust for industry application.
 
-It is reasonable to suggest its minimal framework could support CIS Benchmarks on least privilege and access control policies in ISO. However, there is no public documentation with proof to having matched any of these requirements. 
-
+It is reasonable to suggest its minimal framework could support CIS Benchmarks on least privilege and access control policies in ISO. However, there is no public documentation with proof to having matched any of these requirements.
 ## Secure development practices
 
 **Development pipeline:**
 
-- Containerd contributors must sign commits to ensure contributor identity and prevent unauthorized code changes.  
+- Containerd contributors must sign commits to ensure contributor identity and prevent unauthorized code changes.
 - Containerd images are immutable and signed. Additionally, all images are signed with a GPG key, which helps to verify the authenticity of the image.
-- Continuous integration and deployment pipelines automatically test all changes in Containerd, enabling prompt issue detection. 
+- Continuous integration and deployment pipelines automatically test all changes in Containerd, enabling prompt issue detection.
 - The open-source code, hosted on GitHub, encourages transparency and community involvement in reviews, aiding in early issue detection.
 - All pull requests to the containerd codebase must be reviewed by at least two reviewers before they can be merged.
 - Compliant with industry standards, including NIST SP 800-190 and CIS Docker Benchmark, Containerd prioritizes security and reliability benchmarks. It integrates with image scanning tools (Clair, Synk, Trivy, etc.), promoting trusted image registries.
-- Containerd employs privilege-dropping techniques, supports Seccomp profiles, and can operate in unprivileged user mode to minimize attack surfaces and limit security impact. 
+- Containerd employs privilege-dropping techniques, supports Seccomp profiles, and can operate in unprivileged user mode to minimize attack surfaces and limit security impact.
 - Resource quotas and cgroups enforce fair resource allocation, preventing resource exhaustion attacks in Containerd.
 - TLS encryption safeguards data exchange, and secure networking configurations and communication protocols protect against unauthorized access. 
 - The use of secure communication protocols, such as HTTPS, when communicating with external services to protect data from exposure is also promoted.
@@ -272,7 +269,6 @@ It is reasonable to suggest its minimal framework could support CIS Benchmarks o
 
 Containerd plays a pivotal role in the cloud-native ecosystem due to its core functionality as a lightweight container runtime, its integration with various container orchestration platforms, and its active participation in open-source projects. This makes it an essential component for building, deploying, and managing scalable and reliable cloud-native applications.
 
-
 ## Security issue resolution
 
 **- Responsible Disclosures Process**:
@@ -288,7 +284,6 @@ The responsibility for responding to a reported vulnerability rests with the com
 Defined procedures are in place for triaging reported vulnerabilities, assessing their severity and relevance. The confirmation process involves validating the reported vulnerability to determine its authenticity and impact. If the vulnerability is confirmed, the involved parties, including the reporter(s), are notified. A timeline for developing a patch and making updates available is determined. Depending on the embargo period, the vulnerability and patch release details are publicly disclosed using the security announce mailing list. Reporters are expected to comply with agreed-upon dates for public disclosure, ensuring a responsible and coordinated release of information. This process ensures a systematic and transparent approach to handling security issues, promoting responsible disclosure, and achieving timely resolution.
 
 ## Appendix
-
 
 * Known Issues Over Time:
   
@@ -344,5 +339,3 @@ Defined procedures are in place for triaging reported vulnerabilities, assessing
   https://humalect.com/blog/containerd-vs-docker/
   
   https://www.wallarm.com/cloud-native-products-101/containerd-vs-docker-what-is-the-difference-between-the-tools/
-  
-  
