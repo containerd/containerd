@@ -56,7 +56,7 @@ RUN \
 # check git working tree after build
 RUN \
 	export GIT_STATUS_OUTPUT=$(git status --porcelain) && \
-	test -z $GIT_STATUS_OUTPUT || (echo $GIT_STATUS_OUTPUT && exit 1)
+	test -z $GIT_STATUS_OUTPUT || (echo "repository contains uncommitted changes" && exit 1)
 
 FROM scratch AS release
 COPY --from=target /go/src/github.com/containerd/containerd/releases/ /
