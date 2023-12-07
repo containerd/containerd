@@ -75,6 +75,9 @@ const (
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
 	RuntimeRuncV2 = "io.containerd.runc.v2"
 
+	// RuntimeRunhcsV1 is the runtime type for runhcs.
+	RuntimeRunhcsV1 = "io.containerd.runhcs.v1"
+
 	DeprecationsPlugin = "deprecations"
 )
 

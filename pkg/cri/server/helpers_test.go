@@ -175,7 +175,7 @@ systemd_cgroup = true
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			opts, err := generateRuntimeOptions(test.r)
+			opts, err := criconfig.GenerateRuntimeOptions(test.r)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedOptions, opts)
 		})
