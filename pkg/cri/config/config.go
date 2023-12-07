@@ -24,10 +24,15 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
+	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
+	"github.com/containerd/containerd/v2/plugins"
+	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 )
 
 const (
@@ -534,4 +539,41 @@ func hostAccessingSandbox(config *runtime.PodSandboxConfig) bool {
 	}
 
 	return false
+}
+
+// GenerateRuntimeOptions generates runtime options from cri plugin config.
+func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
+	if r.Options == nil {
+		return nil, nil
+	}
+
+	b, err := toml.Marshal(r.Options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %w", r.Type, err)
+	}
+
+	options := getRuntimeOptionsType(r.Type)
+	if err := toml.Unmarshal(b, options); err != nil {
+		return nil, err
+	}
+
+	// For generic configuration, if no config path specified (preserving old behavior), pass
+	// the whole TOML configuration section to the runtime.
+	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
+		runtimeOpts.ConfigBody = b
+	}
+
+	return options, nil
+}
+
+// getRuntimeOptionsType gets empty runtime options by the runtime type name.
+func getRuntimeOptionsType(t string) interface{} {
+	switch t {
+	case plugins.RuntimeRuncV2:
+		return &runcoptions.Options{}
+	case plugins.RuntimeRunhcsV1:
+		return &runhcsoptions.Options{}
+	default:
+		return &runtimeoptions.Options{}
+	}
 }

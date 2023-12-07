@@ -20,6 +20,7 @@ import (
 	"context"
 	"sort"
 
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/systemd"
 	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/log"
@@ -48,7 +49,7 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 	})
 
 	for _, handler := range handlerNames {
-		opts, err := generateRuntimeOptions(c.config.ContainerdConfig.Runtimes[handler])
+		opts, err := criconfig.GenerateRuntimeOptions(c.config.ContainerdConfig.Runtimes[handler])
 		if err != nil {
 			log.G(ctx).Debugf("failed to parse runtime handler options for %q", handler)
 			continue

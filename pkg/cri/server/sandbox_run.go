@@ -96,7 +96,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	runtimeStart := time.Now()
 	// Retrieve runtime options
-	runtimeOpts, err := generateRuntimeOptions(ociRuntime)
+	runtimeOpts, err := criconfig.GenerateRuntimeOptions(ociRuntime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox runtime options: %w", err)
 	}
