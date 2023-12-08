@@ -627,6 +627,65 @@ daemon:x:2:root,bin,daemon
 		})
 	}
 }
+
+func TestWithAppendAdditionalGroupsNoEtcGroup(t *testing.T) {
+	t.Parallel()
+	td := t.TempDir()
+	apply := fstest.Apply()
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+
+	testCases := []struct {
+		name           string
+		additionalGIDs []uint32
+		groups         []string
+		expected       []uint32
+		err            string
+	}{
+		{
+			name:     "no additional gids",
+			groups:   []string{},
+			expected: []uint32{0},
+		},
+		{
+			name:     "no additional gids, append root group",
+			groups:   []string{"root"},
+			err:      fmt.Sprintf("unable to find group root: open %s: no such file or directory", filepath.Join(td, "etc", "group")),
+			expected: []uint32{0},
+		},
+		{
+			name:     "append group id",
+			groups:   []string{"999"},
+			expected: []uint32{0, 999},
+		},
+	}
+
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+				Process: &specs.Process{
+					User: specs.User{
+						AdditionalGids: testCase.additionalGIDs,
+					},
+				},
+			}
+			err := WithAppendAdditionalGroups(testCase.groups...)(context.Background(), nil, &c, &s)
+			if err != nil {
+				assert.EqualError(t, err, testCase.err)
+			}
+			assert.Equal(t, testCase.expected, s.Process.User.AdditionalGids)
+		})
+	}
+}
+
 func TestWithLinuxDeviceFollowSymlinks(t *testing.T) {
 
 	// Create symlink to /dev/zero for the symlink test case
