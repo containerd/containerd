@@ -189,6 +189,7 @@ func populateDefaultUnixSpec(ctx context.Context, s *Spec, id string) error {
 				"/proc/timer_stats",
 				"/proc/sched_debug",
 				"/sys/firmware",
+				"/sys/devices/virtual/powercap",
 				"/proc/scsi",
 			},
 			ReadonlyPaths: []string{
