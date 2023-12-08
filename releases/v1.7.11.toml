@@ -1,0 +1,45 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.10"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The eleventh patch release for containerd 1.7 contains various fixes and updates including
+one security issue.
+
+### Notable Updates
+
+* **Fix Windows default path overwrite issue** ([#9440](https://github.com/containerd/containerd/pull/9440))
+* **Update push to always inherit distribution sources from parent** ([#9452](https://github.com/containerd/containerd/pull/9452))
+* **Update shim to use net dial for gRPC shim sockets** ([#9458](https://github.com/containerd/containerd/pull/9458))
+* **Fix otel version incompatibility** ([#9483](https://github.com/containerd/containerd/pull/9483))
+* **Fix Windows snapshotter blocking snapshot GC on remove failure** ([#9482](https://github.com/containerd/containerd/pull/9482))
+* **Mask `/sys/devices/virtual/powercap` path in runtime spec and deny in default apparmor profile** ([GHSA-7ww5-4wqc-m92c](https://github.com/containerd/containerd/security/advisories/GHSA-7ww5-4wqc-m92c))
+
+### Deprecation Warnings
+
+* **Emit deprecation warning for AUFS snapshotter** ([#9436](https://github.com/containerd/containerd/pull/9436))
+* **Emit deprecation warning for v1 runtime** ([#9450](https://github.com/containerd/containerd/pull/9450))
+* **Emit deprecation warning for deprecated CRI configs** ([#9469](https://github.com/containerd/containerd/pull/9469))
+* **Emit deprecation warning for CRI v1alpha1 usage** ([#9479](https://github.com/containerd/containerd/pull/9479))
+* **Emit deprecation warning for CRIU config in CRI** ([#9481](https://github.com/containerd/containerd/pull/9481))
+
+See the changelog for complete list of changes"""
