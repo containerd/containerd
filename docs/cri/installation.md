@@ -106,7 +106,7 @@ sudo apt-get update
 sudo apt-get install libseccomp2
 ```
 Note that:
-1) If you are using Ubuntu <=Trusty or Debian <=jessie, a backported version of `libseccomp2` is needed. (See the [trusty-backports](https://packages.ubuntu.com/trusty-backports/libseccomp2) and [jessie-backports](https://packages.debian.org/jessie-backports/libseccomp2)).
+1) If you are using Ubuntu <=Trusty or Debian <=jessie, a backported version of `libseccomp2` is needed. (See the [trusty-backports](https://packages.ubuntu.com/trusty-backports/libseccomp2) and [buster-backports](https://packages.debian.org/buster-backports/libseccomp2)).
 ## Step 1: Download Release Tarball
 Download release tarball for the `containerd` version you want to install from the GCS bucket.
 ```bash

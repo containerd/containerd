@@ -309,7 +309,7 @@ The `cri` plugin has reached GA status, representing that it is:
 * Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
 * Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
-See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+See results on the containerd k8s [test dashboard](https://prow.k8s.io/?repo=containerd%2Fcontainerd)
 
 #### Validating Your `cri` Setup
 A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).
