@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/containerd/containerd/v2/runtime/v2/shim"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -262,12 +263,20 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err := task.Start(ctx); err != nil {
 		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
+
+	// For podsandbox we can only get the address by the same rule shim creates the task address
+	address, err := shim.SocketAddress(ctx, c.config.ContainerdEndpoint, id)
+	if err != nil {
+		return cin, fmt.Errorf("failed to get podsandbox %s task address %w", id, err)
+	}
+
 	podSandbox.State = sandboxstore.StateReady
 
 	cin.SandboxID = id
 	cin.Pid = task.Pid()
 	cin.CreatedAt = info.CreatedAt
 	cin.Labels = labels
+	cin.Address = address
 
 	go func() {
 		code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh)

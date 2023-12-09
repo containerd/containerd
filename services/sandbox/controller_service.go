@@ -21,6 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 
@@ -28,12 +32,10 @@ import (
 	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 func init() {
@@ -41,16 +43,27 @@ func init() {
 		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
+			plugins.PodSandboxPlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			// add the legacy podsandbox controller plugin
+			// there is only one plugin of type PodSandboxPlugin,
+			// we do not use GetSingle here because we need the plugin name as the sandboxer name.
+			podSandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
+			if err != nil {
+				return nil, err
+			}
+			sc := make(map[string]sandbox.Controller)
+			for name, p := range podSandboxers {
+				sc[name] = p.(sandbox.Controller)
+			}
+
 			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			sc := make(map[string]sandbox.Controller)
 			for name, p := range sandboxers {
 				sc[name] = p.(sandbox.Controller)
 			}
@@ -136,6 +149,7 @@ func (s *controllerService) Start(ctx context.Context, req *api.ControllerStartR
 		Pid:       inst.Pid,
 		CreatedAt: protobuf.ToTimestamp(inst.CreatedAt),
 		Labels:    inst.Labels,
+		Address:   inst.Address,
 	}, nil
 }
 
@@ -222,5 +236,41 @@ func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetr
 	}
 	return &api.ControllerMetricsResponse{
 		Metrics: metrics,
+	}, nil
+}
+
+func (s *controllerService) UpdateResources(ctx context.Context, req *api.ControllerUpdateResourceRequest) (*api.ControllerUpdateResourceResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("sandbox update resources")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	spec, err := typeurl.MarshalAny(req.Spec)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	var rootfs []mount.Mount
+	for _, m := range req.Rootfs {
+		if m != nil {
+			rootfs = append(rootfs, mount.Mount{
+				Type:    m.Type,
+				Source:  m.Source,
+				Target:  m.Target,
+				Options: m.Options,
+			})
+		}
+	}
+	err = ctrl.UpdateResource(ctx, req.GetSandboxID(), sandbox.TaskResources{
+		ID:     req.ContainerID,
+		Op:     req.Op,
+		Spec:   spec,
+		Rootfs: rootfs,
+		Extra:  nil,
+	})
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	return &api.ControllerUpdateResourceResponse{
+		Options: nil,
 	}, nil
 }

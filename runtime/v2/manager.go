@@ -26,10 +26,16 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
+	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events/exchange"
 	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/cleanup"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -38,10 +44,6 @@ import (
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/runtime"
 	shimbinary "github.com/containerd/containerd/v2/runtime/v2/shim"
-	"github.com/containerd/containerd/v2/sandbox"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 )
 
 // Config for the v2 runtime
@@ -53,12 +55,45 @@ type Config struct {
 }
 
 func init() {
+	// Task manager uses shim manager as a dependency to manage shim instances.
+	// However, due to time limits and to avoid migration steps in 1.6 release,
+	// use the following workaround.
+	// This expected to be removed in 1.7.
+	registry.Register(&plugin.Registration{
+		Type: plugins.ShimPlugin,
+		ID:   "shim",
+		Requires: []plugin.Type{
+			plugins.EventPlugin,
+			plugins.MetadataPlugin,
+		},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
+			if err != nil {
+				return nil, err
+			}
+			events := ep.(*exchange.Exchange)
+			cs := metadata.NewContainerStore(m.(*metadata.DB))
+			return NewShimManager(&ManagerConfig{
+				Address:      ic.Properties[plugins.PropertyGRPCAddress],
+				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
+				Events:       events,
+				Store:        cs,
+			})
+		},
+	})
+
 	registry.Register(&plugin.Registration{
 		Type: plugins.RuntimePluginV2,
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 			plugins.MetadataPlugin,
+			plugins.ShimPlugin,
+			plugins.SandboxControllerPlugin,
 		},
 		Config: &Config{
 			Platforms: defaultPlatforms(),
@@ -76,84 +111,55 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.GetByID(plugins.EventPlugin, "exchange")
-			if err != nil {
-				return nil, err
-			}
-			cs := metadata.NewContainerStore(m.(*metadata.DB))
 			ss := metadata.NewSandboxStore(m.(*metadata.DB))
-			events := ep.(*exchange.Exchange)
 
-			shimManager, err := NewShimManager(ic.Context, &ManagerConfig{
-				Root:         ic.Properties[plugins.PropertyRootDir],
-				State:        ic.Properties[plugins.PropertyStateDir],
-				Address:      ic.Properties[plugins.PropertyGRPCAddress],
-				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
-				Events:       events,
-				Store:        cs,
-				SchedCore:    config.SchedCore,
-				SandboxStore: ss,
-			})
+			client, err := containerd.New(
+				"",
+				containerd.WithServices(containerd.WithSandboxStore(ss)),
+				containerd.WithInMemorySandboxControllers(ic),
+			)
+			if err != nil {
+				return nil, err
+			}
+			sandboxedTaskManager := NewSandboxedTaskManager(client)
+
+			shimManagerI, err := ic.GetByID(plugins.ShimPlugin, "shim")
+			if err != nil {
+				return nil, err
+			}
+			shimManager := shimManagerI.(*ShimManager)
 			if err != nil {
 				return nil, err
 			}
 
-			return NewTaskManager(shimManager), nil
-		},
-	})
-
-	// Task manager uses shim manager as a dependency to manage shim instances.
-	// However, due to time limits and to avoid migration steps in 1.6 release,
-	// use the following workaround.
-	// This expected to be removed in 1.7.
-	registry.Register(&plugin.Registration{
-		Type: plugins.RuntimePluginV2,
-		ID:   "shim",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			taskManagerI, err := ic.GetByID(plugins.RuntimePluginV2, "task")
-			if err != nil {
-				return nil, err
+			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
+			for _, d := range []string{root, state} {
+				if err := os.MkdirAll(d, 0711); err != nil {
+					return nil, err
+				}
 			}
-
-			taskManager := taskManagerI.(*TaskManager)
-			return taskManager.manager, nil
+			return NewTaskManager(ic.Context, root, state, shimManager, sandboxedTaskManager)
 		},
 	})
 }
 
 type ManagerConfig struct {
-	Root         string
-	State        string
 	Store        containers.Store
 	Events       *exchange.Exchange
 	Address      string
 	TTRPCAddress string
 	SchedCore    bool
-	SandboxStore sandbox.Store
 }
 
 // NewShimManager creates a manager for v2 shims
-func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, error) {
-	for _, d := range []string{config.Root, config.State} {
-		if err := os.MkdirAll(d, 0711); err != nil {
-			return nil, err
-		}
-	}
-
+func NewShimManager(config *ManagerConfig) (*ShimManager, error) {
 	m := &ShimManager{
-		root:                   config.Root,
-		state:                  config.State,
 		containerdAddress:      config.Address,
 		containerdTTRPCAddress: config.TTRPCAddress,
 		shims:                  runtime.NewNSMap[ShimInstance](),
 		events:                 config.Events,
 		containers:             config.Store,
 		schedCore:              config.SchedCore,
-		sandboxStore:           config.SandboxStore,
-	}
-
-	if err := m.loadExistingTasks(ctx); err != nil {
-		return nil, err
 	}
 
 	return m, nil
@@ -164,8 +170,6 @@ func NewShimManager(ctx context.Context, config *ManagerConfig) (*ShimManager, e
 // The manager is unaware of the underlying services shim provides and lets higher level services consume them,
 // but don't care about lifecycle management.
 type ShimManager struct {
-	root                   string
-	state                  string
 	containerdAddress      string
 	containerdTTRPCAddress string
 	schedCore              bool
@@ -174,7 +178,6 @@ type ShimManager struct {
 	containers             containers.Store
 	// runtimePaths is a cache of `runtime names` -> `resolved fs path`
 	runtimePaths sync.Map
-	sandboxStore sandbox.Store
 }
 
 // ID of the shim manager
@@ -183,50 +186,7 @@ func (m *ShimManager) ID() string {
 }
 
 // Start launches a new shim instance
-func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	bundle, err := NewBundle(ctx, m.root, m.state, id, opts.Spec)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if retErr != nil {
-			bundle.Delete()
-		}
-	}()
-
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		process, err := m.Get(ctx, opts.SandboxID)
-		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-		}
-
-		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), opts.SandboxID))
-		if err != nil {
-			return nil, err
-		}
-
-		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
-			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
-		}
-
-		shim, err := loadShim(ctx, bundle, func() {})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
-		}
-
-		if err := m.shims.Add(ctx, shim); err != nil {
-			return nil, err
-		}
-
-		return shim, nil
-	}
-
+func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
 		return nil, err
@@ -421,16 +381,103 @@ func (m *ShimManager) Delete(ctx context.Context, id string) error {
 	return err
 }
 
+func (m *ShimManager) Load(ctx context.Context, bundle *Bundle) error {
+	var (
+		runtime string
+		id      = bundle.ID
+	)
+
+	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
+	if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
+		runtime = string(data)
+	} else if err != nil && !os.IsNotExist(err) {
+		log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
+	}
+
+	// Query runtime name from metadata store
+	if runtime == "" {
+		container, err := m.containers.Get(ctx, id)
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("loading container %s", id)
+			if umountErr := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); umountErr != nil {
+				log.G(ctx).WithError(umountErr).Errorf("failed to unmount of rootfs %s", id)
+			}
+			return err
+		}
+		runtime = container.Runtime.Name
+	}
+
+	runtime, err := m.resolveRuntimePath(runtime)
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime path: %w", err)
+	}
+
+	binaryCall := shimBinary(bundle,
+		shimBinaryConfig{
+			runtime:      runtime,
+			address:      m.containerdAddress,
+			ttrpcAddress: m.containerdTTRPCAddress,
+			schedCore:    m.schedCore,
+		})
+	shim, err := loadShimTask(ctx, bundle, func() {
+		log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
+		// Remove self from the runtime task list.
+		m.shims.Delete(ctx, id)
+	})
+	if err != nil {
+		cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
+		return fmt.Errorf("unable to load shim %q: %w", id, err)
+	}
+
+	// There are 2 possibilities for the loaded shim here:
+	// 1. It could be a shim that is running a task.
+	// 3. Or it could be a shim that was created for running a task but
+	// something happened (probably a containerd crash) and the task was never
+	// created. This shim process should be cleaned up here. Look at
+	// containerd/containerd#6860 for further details.
+	pInfo, pidErr := shim.Pids(ctx)
+	if len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound) {
+		log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
+		// We are unable to get Pids from the shim, we should clean it up here.
+		// No need to do anything for removeTask since we never added this shim.
+		shim.delete(ctx, func(ctx context.Context, id string) {})
+	} else {
+		m.shims.Add(ctx, shim.ShimInstance)
+	}
+	return nil
+}
+
+func (m *ShimManager) LoadShim(ctx context.Context, bundle *Bundle, onClose func()) error {
+	shim, err := loadShim(ctx, bundle, onClose)
+	if err != nil {
+		return err
+	}
+	return m.shims.Add(ctx, shim)
+}
+
 // TaskManager wraps task service client on top of shim manager.
 type TaskManager struct {
-	manager *ShimManager
+	root                 string
+	state                string
+	shimManager          *ShimManager
+	sandboxedTaskManager *SandboxedTaskManager
 }
 
 // NewTaskManager creates a new task manager instance.
-func NewTaskManager(shims *ShimManager) *TaskManager {
-	return &TaskManager{
-		manager: shims,
+func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager, sandboxes *SandboxedTaskManager) (*TaskManager, error) {
+	m := &TaskManager{
+		root:                 root,
+		state:                state,
+		shimManager:          shims,
+		sandboxedTaskManager: sandboxes,
 	}
+
+	if err := m.loadExistingTasks(ctx); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // ID of the task manager
@@ -439,8 +486,25 @@ func (m *TaskManager) ID() string {
 }
 
 // Create launches new shim instance and creates new task
-func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (runtime.Task, error) {
-	shim, err := m.manager.Start(ctx, taskID, opts)
+func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.CreateOpts) (t runtime.Task, retErr error) {
+	bundle, err := NewBundle(ctx, m.root, m.state, taskID, opts.Spec)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if retErr != nil {
+			bundle.Delete()
+		}
+	}()
+
+	if len(opts.SandboxID) > 0 {
+		// if err==ErrCanNotHandle, we should fallback to the shim
+		if t, err := m.sandboxedTaskManager.Create(ctx, taskID, bundle, opts); err != ErrCanNotHandle {
+			return t, err
+		}
+	}
+
+	shim, err := m.shimManager.Start(ctx, taskID, bundle, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
@@ -452,16 +516,15 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, err
 	}
 
-	t, err := shimTask.Create(ctx, opts)
+	task, err := shimTask.Create(ctx, opts)
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
-		m.manager.shims.Delete(ctx, taskID)
+		m.shimManager.shims.Delete(ctx, taskID)
 
 		dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
 		defer cancel()
 
-		sandboxed := opts.SandboxID != ""
-		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
+		_, errShim := shimTask.delete(dctx, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
 				dctx, cancel = timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
@@ -475,43 +538,57 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, fmt.Errorf("failed to create shim task: %w", err)
 	}
 
-	return t, nil
+	return task, nil
 }
 
 // Get a specific task
 func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) {
-	shim, err := m.manager.shims.Get(ctx, id)
-	if err != nil {
-		return nil, err
+	t, err := m.sandboxedTaskManager.Get(ctx, id)
+	if errdefs.IsNotFound(err) {
+		shim, shimErr := m.shimManager.shims.Get(ctx, id)
+		if shimErr != nil {
+			return nil, shimErr
+		}
+		return newShimTask(shim)
 	}
-	return newShimTask(shim)
+	return t, err
 }
 
 // Tasks lists all tasks
 func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
-	shims, err := m.manager.shims.GetAll(ctx, all)
+	var tasks []runtime.Task
+	sts, err := m.sandboxedTaskManager.GetAll(ctx, all)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]runtime.Task, len(shims))
-	for i := range shims {
-		newClient, err := newShimTask(shims[i])
+	tasks = append(tasks, sts...)
+
+	shims, err := m.shimManager.shims.GetAll(ctx, all)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range shims {
+		st, err := newShimTask(s)
 		if err != nil {
 			return nil, err
 		}
-		out[i] = newClient
+		tasks = append(tasks, st)
 	}
-	return out, nil
+	return tasks, nil
 }
 
 // Delete deletes the task and shim instance
 func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit, error) {
-	shim, err := m.manager.shims.Get(ctx, taskID)
-	if err != nil {
+	exit, err := m.sandboxedTaskManager.Delete(ctx, taskID)
+	if err == nil {
+		return exit, nil
+	}
+	if !errdefs.IsNotFound(err) {
 		return nil, err
 	}
 
-	container, err := m.manager.containers.Get(ctx, taskID)
+	shim, err := m.shimManager.shims.Get(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -521,10 +598,8 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 		return nil, err
 	}
 
-	sandboxed := container.SandboxID != ""
-
-	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
-		m.manager.shims.Delete(ctx, id)
+	exit, err = shimTask.delete(ctx, func(ctx context.Context, id string) {
+		m.shimManager.shims.Delete(ctx, id)
 	})
 
 	if err != nil {
@@ -532,4 +607,136 @@ func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit,
 	}
 
 	return exit, nil
+}
+
+func (m *TaskManager) loadExistingTasks(ctx context.Context) error {
+	nsDirs, err := os.ReadDir(m.state)
+	if err != nil {
+		return err
+	}
+	for _, nsd := range nsDirs {
+		if !nsd.IsDir() {
+			continue
+		}
+		ns := nsd.Name()
+		// skip hidden directories
+		if len(ns) > 0 && ns[0] == '.' {
+			continue
+		}
+		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
+		if err := m.loadTasks(namespaces.WithNamespace(ctx, ns)); err != nil {
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
+			continue
+		}
+		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+			continue
+		}
+	}
+	return nil
+}
+
+func (m *TaskManager) loadTasks(ctx context.Context) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
+
+	bundles, err := os.ReadDir(filepath.Join(m.state, ns))
+	if err != nil {
+		return err
+	}
+	for _, sd := range bundles {
+		if !sd.IsDir() {
+			continue
+		}
+		id := sd.Name()
+		// skip hidden directories
+		if len(id) > 0 && id[0] == '.' {
+			continue
+		}
+		bundle, err := LoadBundle(ctx, m.state, id)
+		if err != nil {
+			// fine to return error here, it is a programmer error if the context
+			// does not have a namespace
+			return err
+		}
+		// fast path
+		f, err := os.Open(bundle.Path)
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+
+		bf, err := f.Readdirnames(-1)
+		f.Close()
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+		if len(bf) == 0 {
+			bundle.Delete()
+			continue
+		}
+
+		// Read sandbox ID this task belongs to.
+		// it will return ErrorNotExit if it is not a sandboxed task
+		sbID, err := os.ReadFile(filepath.Join(bundle.Path, "sandbox"))
+		if err == nil {
+			loadErr := m.sandboxedTaskManager.Load(ctx, string(sbID), bundle)
+			if loadErr != nil && loadErr != ErrCanNotHandle {
+				log.G(ctx).WithError(loadErr).Errorf("failed to load %s", bundle.Path)
+				bundle.Delete()
+			}
+			// if loadErr == ErrCanNotHandle, should fallback to the shim load
+			if loadErr == nil {
+				continue
+			}
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			bundle.Delete()
+			continue
+		}
+
+		if err := m.shimManager.Load(ctx, bundle); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+			bundle.Delete()
+			continue
+		}
+	}
+	return nil
+}
+
+func (m *TaskManager) cleanupWorkDirs(ctx context.Context) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(filepath.Join(m.root, ns))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dirs, err := f.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, dir := range dirs {
+		// if the task was not loaded, cleanup and empty working directory
+		// this can happen on a reboot where /run for the bundle state is cleaned up
+		// but that persistent working dir is left
+		if _, err := m.Get(ctx, dir); err != nil {
+			path := filepath.Join(m.root, ns, dir)
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
+			}
+		}
+	}
+	return nil
 }

@@ -29,8 +29,8 @@ import (
 )
 
 type process struct {
-	id   string
-	shim *shimTask
+	id     string
+	remote *remoteTask
 }
 
 func (p *process) ID() string {
@@ -38,9 +38,9 @@ func (p *process) ID() string {
 }
 
 func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
-	_, err := p.shim.task.Kill(ctx, &task.KillRequest{
+	_, err := p.remote.taskClient.Kill(ctx, &task.KillRequest{
 		Signal: signal,
-		ID:     p.shim.ID(),
+		ID:     p.remote.id,
 		ExecID: p.id,
 	})
 	if err != nil {
@@ -67,8 +67,8 @@ func statusFromProto(from tasktypes.Status) runtime.Status {
 }
 
 func (p *process) State(ctx context.Context) (runtime.State, error) {
-	response, err := p.shim.task.State(ctx, &task.StateRequest{
-		ID:     p.shim.ID(),
+	response, err := p.remote.taskClient.State(ctx, &task.StateRequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 	})
 	if err != nil {
@@ -91,8 +91,8 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 
 // ResizePty changes the side of the process's PTY to the provided width and height
 func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
-	_, err := p.shim.task.ResizePty(ctx, &task.ResizePtyRequest{
-		ID:     p.shim.ID(),
+	_, err := p.remote.taskClient.ResizePty(ctx, &task.ResizePtyRequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 		Width:  size.Width,
 		Height: size.Height,
@@ -105,8 +105,8 @@ func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 
 // CloseIO closes the provided IO pipe for the process
 func (p *process) CloseIO(ctx context.Context) error {
-	_, err := p.shim.task.CloseIO(ctx, &task.CloseIORequest{
-		ID:     p.shim.ID(),
+	_, err := p.remote.taskClient.CloseIO(ctx, &task.CloseIORequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 		Stdin:  true,
 	})
@@ -118,8 +118,8 @@ func (p *process) CloseIO(ctx context.Context) error {
 
 // Start the process
 func (p *process) Start(ctx context.Context) error {
-	_, err := p.shim.task.Start(ctx, &task.StartRequest{
-		ID:     p.shim.ID(),
+	_, err := p.remote.taskClient.Start(ctx, &task.StartRequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 	})
 	if err != nil {
@@ -130,8 +130,8 @@ func (p *process) Start(ctx context.Context) error {
 
 // Wait on the process to exit and return the exit status and timestamp
 func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
-	response, err := p.shim.task.Wait(ctx, &task.WaitRequest{
-		ID:     p.shim.ID(),
+	response, err := p.remote.taskClient.Wait(ctx, &task.WaitRequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 	})
 	if err != nil {
@@ -144,8 +144,8 @@ func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
 }
 
 func (p *process) Delete(ctx context.Context) (*runtime.Exit, error) {
-	response, err := p.shim.task.Delete(ctx, &task.DeleteRequest{
-		ID:     p.shim.ID(),
+	response, err := p.remote.taskClient.Delete(ctx, &task.DeleteRequest{
+		ID:     p.remote.id,
 		ExecID: p.id,
 	})
 	if err != nil {

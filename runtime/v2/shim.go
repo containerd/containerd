@@ -37,13 +37,10 @@ import (
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	task "github.com/containerd/containerd/v2/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/identifiers"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/protobuf"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/containerd/v2/runtime"
 	client "github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/log"
@@ -117,6 +114,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		bundle:  bundle,
 		client:  conn,
 		version: params.Version,
+		address: params.Address,
 	}
 
 	return shim, nil
@@ -187,6 +185,8 @@ type ShimInstance interface {
 	Delete(ctx context.Context) error
 	// Version returns shim's features compatibility version.
 	Version() int
+	// Address returns shim's address to connect for task and sandbox api
+	Address() string
 }
 
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
@@ -362,6 +362,7 @@ type shim struct {
 	bundle  *Bundle
 	client  any
 	version int
+	address string
 }
 
 var _ ShimInstance = (*shim)(nil)
@@ -385,6 +386,10 @@ func (s *shim) Bundle() string {
 
 func (s *shim) Client() any {
 	return s.client
+}
+
+func (s *shim) Address() string {
+	return s.address
 }
 
 // Close closes the underlying client connection.
@@ -436,7 +441,7 @@ var _ runtime.Task = &shimTask{}
 // shimTask wraps shim process and adds task service client for compatibility with existing shim manager.
 type shimTask struct {
 	ShimInstance
-	task TaskServiceClient
+	*remoteTask
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
@@ -447,12 +452,15 @@ func newShimTask(shim ShimInstance) (*shimTask, error) {
 
 	return &shimTask{
 		ShimInstance: shim,
-		task:         taskClient,
+		remoteTask: &remoteTask{
+			id:         shim.ID(),
+			taskClient: taskClient,
+		},
 	}, nil
 }
 
 func (s *shimTask) Shutdown(ctx context.Context) error {
-	_, err := s.task.Shutdown(ctx, &task.ShutdownRequest{
+	_, err := s.remoteTask.taskClient.Shutdown(ctx, &task.ShutdownRequest{
 		ID: s.ID(),
 	})
 	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
@@ -467,20 +475,8 @@ func (s *shimTask) waitShutdown(ctx context.Context) error {
 	return s.Shutdown(ctx)
 }
 
-// PID of the task
-func (s *shimTask) PID(ctx context.Context) (uint32, error) {
-	response, err := s.task.Connect(ctx, &task.ConnectRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return 0, errdefs.FromGRPC(err)
-	}
-
-	return response.TaskPid, nil
-}
-
-func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
-	response, shimErr := s.task.Delete(ctx, &task.DeleteRequest{
+func (s *shimTask) delete(ctx context.Context, removeTask func(ctx context.Context, id string)) (*runtime.Exit, error) {
+	response, shimErr := s.remoteTask.taskClient.Delete(ctx, &task.DeleteRequest{
 		ID: s.ID(),
 	})
 	if shimErr != nil {
@@ -513,16 +509,12 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
-	// Don't shutdown sandbox as there may be other containers running.
-	// Let controller decide when to shutdown.
-	if !sandboxed {
-		if err := s.waitShutdown(ctx); err != nil {
-			// FIXME(fuweid):
-			//
-			// If the error is context canceled, should we use context.TODO()
-			// to wait for it?
-			log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
-		}
+	if err := s.waitShutdown(ctx); err != nil {
+		// FIXME(fuweid):
+		//
+		// If the error is context canceled, should we use context.TODO()
+		// to wait for it?
+		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to shutdown shim task and the shim might be leaked")
 	}
 
 	if err := s.ShimInstance.Delete(ctx); err != nil {
@@ -545,218 +537,8 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 }
 
 func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
-	topts := opts.TaskOptions
-	if topts == nil || topts.GetValue() == nil {
-		topts = opts.RuntimeOptions
+	if err := s.remoteTask.Create(ctx, s.Bundle(), opts); err != nil {
+		return nil, err
 	}
-	request := &task.CreateTaskRequest{
-		ID:         s.ID(),
-		Bundle:     s.Bundle(),
-		Stdin:      opts.IO.Stdin,
-		Stdout:     opts.IO.Stdout,
-		Stderr:     opts.IO.Stderr,
-		Terminal:   opts.IO.Terminal,
-		Checkpoint: opts.Checkpoint,
-		Options:    protobuf.FromAny(topts),
-	}
-	for _, m := range opts.Rootfs {
-		request.Rootfs = append(request.Rootfs, &types.Mount{
-			Type:    m.Type,
-			Source:  m.Source,
-			Target:  m.Target,
-			Options: m.Options,
-		})
-	}
-
-	_, err := s.task.Create(ctx, request)
-	if err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-
 	return s, nil
-}
-
-func (s *shimTask) Pause(ctx context.Context) error {
-	if _, err := s.task.Pause(ctx, &task.PauseRequest{
-		ID: s.ID(),
-	}); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Resume(ctx context.Context) error {
-	if _, err := s.task.Resume(ctx, &task.ResumeRequest{
-		ID: s.ID(),
-	}); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Start(ctx context.Context) error {
-	_, err := s.task.Start(ctx, &task.StartRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
-	if _, err := s.task.Kill(ctx, &task.KillRequest{
-		ID:     s.ID(),
-		Signal: signal,
-		All:    all,
-	}); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
-	if err := identifiers.Validate(id); err != nil {
-		return nil, fmt.Errorf("invalid exec id %s: %w", id, err)
-	}
-	request := &task.ExecProcessRequest{
-		ID:       s.ID(),
-		ExecID:   id,
-		Stdin:    opts.IO.Stdin,
-		Stdout:   opts.IO.Stdout,
-		Stderr:   opts.IO.Stderr,
-		Terminal: opts.IO.Terminal,
-		Spec:     opts.Spec,
-	}
-	if _, err := s.task.Exec(ctx, request); err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-	return &process{
-		id:   id,
-		shim: s,
-	}, nil
-}
-
-func (s *shimTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
-	resp, err := s.task.Pids(ctx, &task.PidsRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-	var processList []runtime.ProcessInfo
-	for _, p := range resp.Processes {
-		processList = append(processList, runtime.ProcessInfo{
-			Pid:  p.Pid,
-			Info: p.Info,
-		})
-	}
-	return processList, nil
-}
-
-func (s *shimTask) ResizePty(ctx context.Context, size runtime.ConsoleSize) error {
-	_, err := s.task.ResizePty(ctx, &task.ResizePtyRequest{
-		ID:     s.ID(),
-		Width:  size.Width,
-		Height: size.Height,
-	})
-	if err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) CloseIO(ctx context.Context) error {
-	_, err := s.task.CloseIO(ctx, &task.CloseIORequest{
-		ID:    s.ID(),
-		Stdin: true,
-	})
-	if err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
-	taskPid, err := s.PID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	response, err := s.task.Wait(ctx, &task.WaitRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-	return &runtime.Exit{
-		Pid:       taskPid,
-		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
-		Status:    response.ExitStatus,
-	}, nil
-}
-
-func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.Any) error {
-	request := &task.CheckpointTaskRequest{
-		ID:      s.ID(),
-		Path:    path,
-		Options: options,
-	}
-	if _, err := s.task.Checkpoint(ctx, request); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
-	if _, err := s.task.Update(ctx, &task.UpdateTaskRequest{
-		ID:          s.ID(),
-		Resources:   resources,
-		Annotations: annotations,
-	}); err != nil {
-		return errdefs.FromGRPC(err)
-	}
-	return nil
-}
-
-func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
-	response, err := s.task.Stats(ctx, &task.StatsRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-	return response.Stats, nil
-}
-
-func (s *shimTask) Process(ctx context.Context, id string) (runtime.ExecProcess, error) {
-	p := &process{
-		id:   id,
-		shim: s,
-	}
-	if _, err := p.State(ctx); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
-	response, err := s.task.State(ctx, &task.StateRequest{
-		ID: s.ID(),
-	})
-	if err != nil {
-		if !errors.Is(err, ttrpc.ErrClosed) {
-			return runtime.State{}, errdefs.FromGRPC(err)
-		}
-		return runtime.State{}, errdefs.ErrNotFound
-	}
-	return runtime.State{
-		Pid:        response.Pid,
-		Status:     statusFromProto(response.Status),
-		Stdin:      response.Stdin,
-		Stdout:     response.Stdout,
-		Stderr:     response.Stderr,
-		Terminal:   response.Terminal,
-		ExitStatus: response.ExitStatus,
-		ExitedAt:   protobuf.FromTimestamp(response.ExitedAt),
-	}, nil
 }

@@ -540,7 +540,7 @@ func (c *criService) buildContainerSpec(
 	case isLinux:
 		// Generate container mounts.
 		// No mounts are passed for other platforms.
-		linuxMounts := c.linuxContainerMounts(sandboxID, config)
+		//linuxMounts := c.linuxContainerMounts(sandboxID, config)
 
 		specOpts, err = c.buildLinuxSpec(
 			id,
@@ -552,7 +552,7 @@ func (c *criService) buildContainerSpec(
 			config,
 			sandboxConfig,
 			imageConfig,
-			append(linuxMounts, extraMounts...),
+			extraMounts, //append(linuxMounts, extraMounts...),
 			ociRuntime,
 		)
 	case isWindows:

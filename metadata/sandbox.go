@@ -96,7 +96,7 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 		}
 
 		if len(fieldpaths) == 0 {
-			fieldpaths = []string{"labels", "extensions", "spec", "runtime"}
+			fieldpaths = []string{"labels", "extensions", "spec", "runtime", "address"}
 
 			if updated.Runtime.Name != sandbox.Runtime.Name {
 				return fmt.Errorf("sandbox.Runtime.Name field is immutable: %w", errdefs.ErrInvalidArgument)
@@ -131,6 +131,8 @@ func (s *sandboxStore) Update(ctx context.Context, sandbox api.Sandbox, fieldpat
 				updated.Runtime = sandbox.Runtime
 			case "spec":
 				updated.Spec = sandbox.Spec
+			case "address":
+				updated.Address = sandbox.Address
 			default:
 				return fmt.Errorf("cannot update %q field on sandbox %q: %w", path, sandbox.ID, errdefs.ErrInvalidArgument)
 			}
@@ -299,6 +301,10 @@ func (s *sandboxStore) write(parent *bbolt.Bucket, instance *api.Sandbox, overwr
 		return err
 	}
 
+	if err := bucket.Put(bucketKeySandboxAddress, []byte(instance.Address)); err != nil {
+		return err
+	}
+
 	runtimeBucket, err := bucket.CreateBucketIfNotExists(bucketKeyRuntime)
 	if err != nil {
 		return err
@@ -362,6 +368,13 @@ func (s *sandboxStore) read(parent *bbolt.Bucket, id []byte) (api.Sandbox, error
 		inst.Sandboxer = ""
 	} else {
 		inst.Sandboxer = string(sandboxer)
+	}
+
+	address := bucket.Get(bucketKeySandboxAddress)
+	if address == nil {
+		inst.Address = ""
+	} else {
+		inst.Address = string(address)
 	}
 
 	return inst, nil

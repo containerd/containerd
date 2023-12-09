@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/sandbox"
 )
 
@@ -139,6 +140,7 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
 		Info:      resp.GetInfo(),
+		Address:   resp.GetAddress(),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
@@ -151,4 +153,30 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 		return nil, errdefs.FromGRPC(err)
 	}
 	return resp.Metrics, nil
+}
+
+func (s *remoteSandboxController) UpdateResource(ctx context.Context, sandboxID string, resources sandbox.TaskResources) error {
+	var rootfs []*types.Mount
+	for _, m := range resources.Rootfs {
+		rootfs = append(rootfs, &types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		})
+	}
+	req := api.ControllerUpdateResourceRequest{
+		SandboxID:   sandboxID,
+		ContainerID: resources.ID,
+		Op:          resources.Op,
+		Spec:        protobuf.FromAny(resources.Spec),
+		Rootfs:      rootfs,
+		Extra:       nil,
+	}
+
+	_, err := s.client.UpdateResources(ctx, &req)
+	if err != nil {
+		return err
+	}
+	return nil
 }

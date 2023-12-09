@@ -37,6 +37,8 @@ type Sandbox struct {
 	Spec typeurl.Any
 	// Sandboxer is the sandbox controller who manages the sandbox
 	Sandboxer string
+	// Address is the sandbox address for Task or Sandbox API
+	Address string
 	// CreatedAt is the time at which the sandbox was created
 	CreatedAt time.Time
 	// UpdatedAt is the time at which the sandbox was updated

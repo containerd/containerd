@@ -36,13 +36,13 @@ import (
 
 // Register CRI service plugin
 func init() {
-
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "cri",
 		Requires: []plugin.Type{
 			plugins.CRIImagePlugin,
 			plugins.InternalPlugin,
+			plugins.PodSandboxPlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
@@ -78,6 +78,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(ic),
 		containerd.WithInMemorySandboxControllers(ic),
+		containerd.WithPodSandboxController(ic),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)

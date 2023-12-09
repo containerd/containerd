@@ -28,6 +28,8 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
+	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	"github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/sandbox"
 )
 
@@ -57,6 +59,14 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 
 		cstatus.Info = info
 	}
+
+	// For podsandbox we can only get the address by the same rule shim creates the task address
+	namespacedCtx := ctrdutil.WithNamespace(ctx)
+	address, err := shim.SocketAddress(namespacedCtx, c.config.ContainerdEndpoint, sb.ID)
+	if err != nil {
+		return cstatus, fmt.Errorf("failed to get podsandbox %s task address %w", sb.ID, err)
+	}
+	cstatus.Address = address
 
 	return cstatus, nil
 }

@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"time"
 
+	sandboxapi "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	api "github.com/containerd/containerd/v2/sandbox"
+	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/typeurl/v2"
 )
 
@@ -35,18 +37,18 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// NewContainer creates new container that will belong to this sandbox
-	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
 	Labels(ctx context.Context) (map[string]string, error)
 	// Status returns sandbox current status
-	Status(ctx context.Context, verbose bool) (api.ControllerStatus, error)
+	Status(ctx context.Context, verbose bool) (sandbox.ControllerStatus, error)
 	// Platform returns sandbox platform
 	Platform(ctx context.Context) (platforms.Platform, error)
 	// Create creates sandbox in controller
-	Create(ctx context.Context, opts ...api.CreateOpt) error
+	Create(ctx context.Context, opts ...sandbox.CreateOpt) error
+	// Metadata returns the metadata of the sandbox
+	Metadata() sandbox.Sandbox
 	// Start starts new sandbox instance
-	Start(ctx context.Context) (api.ControllerInstance, error)
+	Start(ctx context.Context) (sandbox.ControllerInstance, error)
 	// Stop sends stop request to the shim instance.
 	Stop(ctx context.Context) error
 	// Wait blocks until sandbox process exits.
@@ -55,14 +57,66 @@ type Sandbox interface {
 	Shutdown(ctx context.Context) error
 	// AddExtension adds extension into the sandbox.
 	AddExtension(ctx context.Context, name string, obj interface{}) error
+	// NewTask appends a new task's resources in sandbox
+	NewTask(ctx context.Context, id string, spec typeurl.Any, rootfs []mount.Mount) error
+	// UpdateTask updates a task's resources in sandbox
+	UpdateTask(ctx context.Context, id string, resources typeurl.Any) error
+	// RemoveTask removes a task's resources in the sandbox
+	RemoveTask(ctx context.Context, id string) error
 }
 
 type sandboxClient struct {
 	client   *Client
-	metadata api.Sandbox
+	metadata sandbox.Sandbox
 }
 
-func NewSandboxClient(client *Client, metadata api.Sandbox) Sandbox {
+func (s *sandboxClient) Metadata() sandbox.Sandbox {
+	return s.metadata
+}
+
+func (s *sandboxClient) NewTask(ctx context.Context, id string, spec typeurl.Any, rootfs []mount.Mount) error {
+	req := sandbox.TaskResources{
+		ID:     id,
+		Op:     sandboxapi.ResourceOp_ADD,
+		Spec:   spec,
+		Rootfs: rootfs,
+		Extra:  nil,
+	}
+	err := s.client.SandboxController(s.metadata.Sandboxer).UpdateResource(ctx, s.ID(), req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *sandboxClient) UpdateTask(ctx context.Context, id string, resources typeurl.Any) error {
+	req := sandbox.TaskResources{
+		ID:    id,
+		Op:    sandboxapi.ResourceOp_UPDATE,
+		Spec:  resources,
+		Extra: nil,
+	}
+	err := s.client.SandboxController(s.metadata.Sandboxer).UpdateResource(ctx, s.ID(), req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *sandboxClient) RemoveTask(ctx context.Context, id string) error {
+	req := sandbox.TaskResources{
+		ID:    id,
+		Op:    sandboxapi.ResourceOp_REMOVE,
+		Extra: nil,
+	}
+	err := s.client.SandboxController(s.metadata.Sandboxer).UpdateResource(ctx, s.ID(), req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewSandboxClient(client *Client, metadata sandbox.Sandbox) Sandbox {
 	return &sandboxClient{
 		client:   client,
 		metadata: metadata,
@@ -73,20 +127,16 @@ func (s *sandboxClient) ID() string {
 	return s.metadata.ID
 }
 
-func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
-	return s.client.NewContainer(ctx, id, append(opts, WithSandbox(s.ID()))...)
-}
-
 func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
-	sandbox, err := s.client.SandboxStore().Get(ctx, s.ID())
+	sb, err := s.client.SandboxStore().Get(ctx, s.ID())
 	if err != nil {
 		return nil, err
 	}
 
-	return sandbox.Labels, nil
+	return sb.Labels, nil
 }
 
-func (s *sandboxClient) Status(ctx context.Context, verbose bool) (api.ControllerStatus, error) {
+func (s *sandboxClient) Status(ctx context.Context, verbose bool) (sandbox.ControllerStatus, error) {
 	return s.client.SandboxController(s.metadata.Sandboxer).Status(ctx, s.metadata.ID, verbose)
 }
 
@@ -94,11 +144,11 @@ func (s *sandboxClient) Platform(ctx context.Context) (platforms.Platform, error
 	return s.client.SandboxController(s.metadata.Sandboxer).Platform(ctx, s.ID())
 }
 
-func (s *sandboxClient) Create(ctx context.Context, opts ...api.CreateOpt) error {
+func (s *sandboxClient) Create(ctx context.Context, opts ...sandbox.CreateOpt) error {
 	return s.client.SandboxController(s.metadata.Sandboxer).Create(ctx, s.metadata, opts...)
 }
 
-func (s *sandboxClient) Start(ctx context.Context) (api.ControllerInstance, error) {
+func (s *sandboxClient) Start(ctx context.Context) (sandbox.ControllerInstance, error) {
 	return s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
 }
 
@@ -161,7 +211,7 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 		return nil, errors.New("sandbox ID must be specified")
 	}
 
-	newSandbox := api.Sandbox{
+	newSandbox := sandbox.Sandbox{
 		ID:        sandboxID,
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
@@ -186,23 +236,23 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 
 // LoadSandbox laods existing sandbox metadata object using the id
 func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
-	sandbox, err := c.SandboxStore().Get(ctx, id)
+	sb, err := c.SandboxStore().Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	return &sandboxClient{
 		client:   c,
-		metadata: sandbox,
+		metadata: sb,
 	}, nil
 }
 
 // NewSandboxOpts is a sandbox options and extensions to be provided by client
-type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *api.Sandbox) error
+type NewSandboxOpts func(ctx context.Context, client *Client, sandbox *sandbox.Sandbox) error
 
 // WithSandboxRuntime allows a user to specify the runtime to be used to run a sandbox
 func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
+	return func(ctx context.Context, client *Client, s *sandbox.Sandbox) error {
 		if options == nil {
 			options = &types.Empty{}
 		}
@@ -212,7 +262,7 @@ func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 			return fmt.Errorf("failed to marshal sandbox runtime options: %w", err)
 		}
 
-		s.Runtime = api.RuntimeOpts{
+		s.Runtime = sandbox.RuntimeOpts{
 			Name:    name,
 			Options: opts,
 		}
@@ -223,8 +273,8 @@ func WithSandboxRuntime(name string, options interface{}) NewSandboxOpts {
 
 // WithSandboxSpec will provide the sandbox runtime spec
 func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
-		c := &containers.Container{ID: sandbox.ID}
+	return func(ctx context.Context, client *Client, sb *sandbox.Sandbox) error {
+		c := &containers.Container{ID: sb.ID}
 
 		if err := oci.ApplyOpts(ctx, client, c, s, opts...); err != nil {
 			return err
@@ -235,14 +285,14 @@ func WithSandboxSpec(s *oci.Spec, opts ...oci.SpecOpts) NewSandboxOpts {
 			return fmt.Errorf("failed to marshal spec: %w", err)
 		}
 
-		sandbox.Spec = spec
+		sb.Spec = spec
 		return nil
 	}
 }
 
 // WithSandboxExtension attaches an extension to sandbox
 func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, s *api.Sandbox) error {
+	return func(ctx context.Context, client *Client, s *sandbox.Sandbox) error {
 		if s.Extensions == nil {
 			s.Extensions = make(map[string]typeurl.Any)
 		}
@@ -259,15 +309,15 @@ func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
 
 // WithSandboxLabels attaches map of labels to sandbox
 func WithSandboxLabels(labels map[string]string) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
-		sandbox.Labels = labels
+	return func(ctx context.Context, client *Client, s *sandbox.Sandbox) error {
+		s.Labels = labels
 		return nil
 	}
 }
 
 // WithSandboxer attaches sandboxer name to sandbox
 func WithSandboxer(sandboxer string) NewSandboxOpts {
-	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
+	return func(ctx context.Context, client *Client, sandbox *sandbox.Sandbox) error {
 		sandbox.Sandboxer = sandboxer
 		return nil
 	}

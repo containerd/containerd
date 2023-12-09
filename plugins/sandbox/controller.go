@@ -19,24 +19,32 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
-	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
-	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/events"
-	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/runtime"
-	v2 "github.com/containerd/containerd/v2/runtime/v2"
-	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
-	"google.golang.org/protobuf/types/known/anypb"
+	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/events/exchange"
+	"github.com/containerd/containerd/v2/identifiers"
+	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/runtime"
+	v2 "github.com/containerd/containerd/v2/runtime/v2"
+	"github.com/containerd/containerd/v2/sandbox"
 )
 
 func init() {
@@ -44,12 +52,12 @@ func init() {
 		Type: plugins.SandboxControllerPlugin,
 		ID:   "shim",
 		Requires: []plugin.Type{
-			plugins.RuntimePluginV2,
 			plugins.EventPlugin,
 			plugins.SandboxStorePlugin,
+			plugins.ShimPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimPlugin, err := ic.GetByID(plugins.RuntimePluginV2, "shim")
+			shimPlugin, err := ic.GetByID(plugins.ShimPlugin, "shim")
 			if err != nil {
 				return nil, err
 			}
@@ -63,16 +71,26 @@ func init() {
 				shims     = shimPlugin.(*v2.ShimManager)
 				publisher = exchangePlugin.(*exchange.Exchange)
 			)
+			state := ic.Properties[plugins.PropertyStateDir]
 
-			return &controllerLocal{
+			if err := os.MkdirAll(state, 0711); err != nil {
+				return nil, err
+			}
+			c := &controllerLocal{
+				state:     state,
 				shims:     shims,
 				publisher: publisher,
-			}, nil
+			}
+			if err := c.loadExistingShims(ic.Context); err != nil {
+				return nil, err
+			}
+			return c, nil
 		},
 	})
 }
 
 type controllerLocal struct {
+	state     string
 	shims     *v2.ShimManager
 	publisher events.Publisher
 }
@@ -98,7 +116,7 @@ func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc
 	}
 }
 
-func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
+func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) (retErr error) {
 	var coptions sandbox.CreateOptions
 	sandboxID := info.ID
 	for _, opt := range opts {
@@ -109,8 +127,34 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		return fmt.Errorf("sandbox %s already running: %w", sandboxID, errdefs.ErrAlreadyExists)
 	}
 
-	shim, err := c.shims.Start(ctx, sandboxID, runtime.CreateOpts{
-		Spec:           info.Spec,
+	// Generate an empty sandbox spec to start the shim process
+	// need to specify the id and the annotation of SandboxID and ContainerType
+	// so that "shim start" command will treat it as a sandbox and start the shim process
+	spec := info.Spec
+	if spec == nil || spec.GetValue() == nil {
+		container := &containers.Container{ID: sandboxID}
+		s, err := oci.GenerateSpec(ctx, nil, container, defaultSandboxSpecOpts(sandboxID))
+		if err != nil {
+			return fmt.Errorf("failed to generate spec for sandbox %q: %w", sandboxID, err)
+		}
+		spec, err = typeurl.MarshalAny(s)
+		if err != nil {
+			return fmt.Errorf("failed to marshal spec of %q to any: %w", sandboxID, err)
+		}
+	}
+
+	bundle, err := c.newBundle(ctx, sandboxID, spec)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if retErr != nil {
+			bundle.Delete()
+		}
+	}()
+
+	shim, err := c.shims.Start(ctx, sandboxID, bundle, runtime.CreateOpts{
+		Spec:           spec,
 		RuntimeOptions: info.Runtime.Options,
 		Runtime:        info.Runtime.Name,
 		TaskOptions:    nil,
@@ -121,22 +165,15 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 
 	svc, err := sandbox.NewClient(shim.Client())
 	if err != nil {
+		c.cleanupShim(ctx, sandboxID, svc)
 		return err
-	}
-
-	var options *anypb.Any
-	if coptions.Options != nil {
-		options = &anypb.Any{
-			TypeUrl: coptions.Options.GetTypeUrl(),
-			Value:   coptions.Options.GetValue(),
-		}
 	}
 
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  sandboxID,
 		BundlePath: shim.Bundle(),
 		Rootfs:     mount.ToProto(coptions.Rootfs),
-		Options:    options,
+		Options:    protobuf.FromAny(coptions.Options),
 		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
 		c.cleanupShim(ctx, sandboxID, svc)
@@ -167,6 +204,7 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		SandboxID: sandboxID,
 		Pid:       resp.GetPid(),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
+		Address:   shim.Address(),
 	}, nil
 }
 
@@ -251,6 +289,11 @@ func (c *controllerLocal) Wait(ctx context.Context, sandboxID string) (sandbox.E
 }
 
 func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {
+	shim, err := c.shims.Get(ctx, sandboxID)
+	if err != nil {
+		return sandbox.ControllerStatus{}, fmt.Errorf("unable to find shim for sandbox %q: %w", sandboxID, errdefs.ErrNotFound)
+	}
+
 	svc, err := c.getSandbox(ctx, sandboxID)
 	if errdefs.IsNotFound(err) {
 		return sandbox.ControllerStatus{
@@ -271,9 +314,10 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 	}
 
 	return sandbox.ControllerStatus{
-		SandboxID: resp.GetSandboxID(),
+		SandboxID: sandboxID,
 		Pid:       resp.GetPid(),
 		State:     resp.GetState(),
+		Address:   shim.Address(),
 		Info:      resp.GetInfo(),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 		ExitedAt:  resp.GetExitedAt().AsTime(),
@@ -294,6 +338,10 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 	return resp.Metrics, nil
 }
 
+func (c *controllerLocal) UpdateResource(ctx context.Context, sandboxID string, req sandbox.TaskResources) error {
+	return nil
+}
+
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {
@@ -301,4 +349,169 @@ func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI
 	}
 
 	return sandbox.NewClient(shim.Client())
+}
+
+// newBundle returns a new bundle on disk
+func (c *controllerLocal) newBundle(ctx context.Context, id string, spec typeurl.Any) (b *v2.Bundle, err error) {
+	if err := identifiers.Validate(id); err != nil {
+		return nil, fmt.Errorf("invalid sandbox id %s: %w", id, err)
+	}
+
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, err
+	}
+	b = &v2.Bundle{
+		ID:        id,
+		Path:      filepath.Join(c.state, ns, id),
+		Namespace: ns,
+	}
+	var paths []string
+	defer func() {
+		if err != nil {
+			for _, d := range paths {
+				os.RemoveAll(d)
+			}
+		}
+	}()
+
+	// create state directory for the bundle
+	if err := os.MkdirAll(filepath.Dir(b.Path), 0711); err != nil {
+		return nil, err
+	}
+	if err := os.Mkdir(b.Path, 0700); err != nil {
+		return nil, err
+	}
+	if spec := spec.GetValue(); spec != nil {
+		// write the spec to the bundle
+		specPath := filepath.Join(b.Path, oci.ConfigFilename)
+		err = os.WriteFile(specPath, spec, 0666)
+		if err != nil {
+			return nil, fmt.Errorf("failed to write bundle spec: %w", err)
+		}
+	}
+	paths = append(paths, b.Path)
+
+	return b, nil
+}
+
+func defaultSandboxSpecOpts(sandboxID string) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		if s.Annotations == nil {
+			s.Annotations = make(map[string]string)
+		}
+		s.Annotations["io.kubernetes.cri.sandbox-id"] = sandboxID
+		s.Annotations["io.kubernetes.cri.container-type"] = "sandbox"
+		return nil
+	}
+}
+
+func (c *controllerLocal) loadExistingShims(ctx context.Context) error {
+	nsDirs, err := os.ReadDir(c.state)
+	if err != nil {
+		return err
+	}
+	for _, nsd := range nsDirs {
+		if !nsd.IsDir() {
+			continue
+		}
+		ns := nsd.Name()
+		// skip hidden directories
+		if len(ns) > 0 && ns[0] == '.' {
+			continue
+		}
+		log.G(ctx).WithField("namespace", ns).Debug("loading sandbox shims in namespace")
+		if err := c.loadShims(namespaces.WithNamespace(ctx, ns)); err != nil {
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading sandbox shims in namespace")
+			continue
+		}
+		if err := c.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns)); err != nil {
+			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
+			continue
+		}
+	}
+	return nil
+}
+
+func (c *controllerLocal) loadShims(ctx context.Context) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+	bundles, err := os.ReadDir(filepath.Join(c.state, ns))
+	if err != nil {
+		return err
+	}
+	for _, sd := range bundles {
+		if !sd.IsDir() {
+			continue
+		}
+		id := sd.Name()
+		// skip hidden directories
+		if len(id) > 0 && id[0] == '.' {
+			continue
+		}
+		bundle := &v2.Bundle{
+			ID:        id,
+			Path:      filepath.Join(c.state, ns, id),
+			Namespace: ns,
+		}
+		// fast path
+		f, err := os.Open(bundle.Path)
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+
+		bf, err := f.Readdirnames(-1)
+		f.Close()
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+		if len(bf) == 0 {
+			bundle.Delete()
+			continue
+		}
+
+		if err := c.shims.LoadShim(ctx, bundle, func() {}); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+			bundle.Delete()
+			continue
+		}
+	}
+	return nil
+}
+
+func (c *controllerLocal) cleanupWorkDirs(ctx context.Context) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Open(filepath.Join(c.state, ns))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	dirs, err := f.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
+
+	for _, dir := range dirs {
+		// if the shim was not loaded, cleanup and empty working directory
+		// this can happen on a reboot where /run for the bundle state is cleaned up
+		// but that persistent working dir is left
+		if _, err := c.shims.Get(ctx, dir); err != nil {
+			path := filepath.Join(c.state, ns, dir)
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
+			}
+		}
+	}
+	return nil
 }

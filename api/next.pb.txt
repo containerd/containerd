@@ -5329,6 +5329,13 @@ file {
       type_name: ".containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry"
       json_name: "labels"
     }
+    field {
+      name: "address"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "address"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
@@ -5519,6 +5526,13 @@ file {
       type_name: ".google.protobuf.Any"
       json_name: "extra"
     }
+    field {
+      name: "address"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "address"
+    }
     nested_type {
       name: "InfoEntry"
       field {
@@ -5586,6 +5600,88 @@ file {
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Metric"
       json_name: "metrics"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateResourceRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
+    field {
+      name: "container_id"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "containerId"
+    }
+    field {
+      name: "op"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.services.sandbox.v1.ResourceOp"
+      json_name: "op"
+    }
+    field {
+      name: "spec"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+    field {
+      name: "rootfs"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "rootfs"
+    }
+    field {
+      name: "extra"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "extra"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateResourceResponse"
+    field {
+      name: "options"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "options"
+    }
+  }
+  enum_type {
+    name: "ResourceOp"
+    value {
+      name: "ADD"
+      number: 0
+    }
+    value {
+      name: "REMOVE"
+      number: 1
+    }
+    value {
+      name: "UPDATE"
+      number: 2
     }
   }
   service {
@@ -5657,6 +5753,11 @@ file {
       name: "Metrics"
       input_type: ".containerd.services.sandbox.v1.ControllerMetricsRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerMetricsResponse"
+    }
+    method {
+      name: "UpdateResources"
+      input_type: ".containerd.services.sandbox.v1.ControllerUpdateResourceRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerUpdateResourceResponse"
     }
   }
   options {
