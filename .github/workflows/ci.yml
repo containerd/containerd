@@ -28,7 +28,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2019]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
       - uses: actions/setup-go@v4
@@ -208,7 +208,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.12", "1.21.5"]
     steps:
       - uses: actions/setup-go@v4
@@ -396,7 +396,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -406,6 +406,7 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc, crun]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb]
 
     env:
       GOTEST: gotestsum --
@@ -422,7 +423,7 @@ jobs:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y gperf
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
           script/setup/install-seccomp
           script/setup/install-runc
           script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
@@ -430,6 +431,10 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
+        # NOTE: Required actuated enable CONFIG_CHECKPOINT_RESTORE
+        #
+        # REF: https://criu.org/Linux_kernel
+        if: matrix.os != 'actuated-arm64-4cpu-16gb'
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
@@ -514,7 +519,9 @@ jobs:
           losetup -l
       - name: Kernel Message
         if: failure()
-        run: sudo dmesg -T -f kern
+        run: |
+          sudo lsmod
+          sudo dmesg -T -f kern
 
       - uses: actions/upload-artifact@v3
         if: always()
