@@ -20,7 +20,7 @@ jobs:
         with:
           # Fail action on broken links
           fail: true
-          args: --exclude-path vendor --timeout 30 --no-progress './**/*.md'
+          args: --exclude-path vendor --exclude-path releases --timeout 30 --no-progress './**/*.md'
           format: markdown
           # Write GitHub job summary
           jobSummary: true
