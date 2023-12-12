@@ -1,0 +1,8 @@
+# This file accompanies links verification nightly CI job. Add links to ignore here.
+
+# These fail often due its popularity
+https://packages.debian.org/buster-backports/libseccomp2
+https://packages.ubuntu.com/trusty-backports/libseccomp2
+
+# Fails often with 'Too Many Requests', easy to scare
+https://tanzu.vmware.com/kubernetes-grid

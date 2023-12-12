@@ -102,7 +102,7 @@ In terms of testing, we've passed:
 
 The containerd test coverage on GCE is equivalent with Docker now.
 
-All the test results are public: https://k8s-testgrid.appspot.com/sig-node-containerd.
+All the test results are public: https://prow.k8s.io/?repo=containerd%2Fcontainerd.
 
 ### Performance
 
