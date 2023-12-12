@@ -3821,6 +3821,13 @@ file {
       type_name: ".containerd.services.diff.v1.ApplyRequest.PayloadsEntry"
       json_name: "payloads"
     }
+    field {
+      name: "sync_fs"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "syncFs"
+    }
     nested_type {
       name: "PayloadsEntry"
       field {
