@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/remotes/docker"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -105,7 +106,12 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			wrapper = pushCtx.HandlerWrapper
 		}
 	*/
-	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper); err != nil {
+
+	appendDistSrcLabelHandler, err := docker.AppendDistributionSourceLabel(ts.content, img.Name)
+	if err != nil {
+		return err
+	}
+	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper, appendDistSrcLabelHandler); err != nil {
 		return err
 	}
 	if tops.Progress != nil {
