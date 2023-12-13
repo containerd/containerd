@@ -27,23 +27,17 @@ import (
 	"strings"
 	"time"
 
-	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	clabels "github.com/containerd/containerd/v2/labels"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
-	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
-	"github.com/containerd/containerd/v2/plugins"
-	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/log"
 )
 
@@ -74,9 +68,6 @@ const (
 
 	// defaultIfName is the default network interface for the pods
 	defaultIfName = "eth0"
-
-	// runtimeRunhcsV1 is the runtime type for runhcs.
-	runtimeRunhcsV1 = "io.containerd.runhcs.v1"
 
 	// devShm is the default path of /dev/shm.
 	devShm = "/dev/shm"
@@ -248,43 +239,6 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	}
 	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
-}
-
-// generateRuntimeOptions generates runtime options from cri plugin config.
-func generateRuntimeOptions(r criconfig.Runtime) (interface{}, error) {
-	if r.Options == nil {
-		return nil, nil
-	}
-
-	b, err := toml.Marshal(r.Options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal TOML blob for runtime %q: %w", r.Type, err)
-	}
-
-	options := getRuntimeOptionsType(r.Type)
-	if err := toml.Unmarshal(b, options); err != nil {
-		return nil, err
-	}
-
-	// For generic configuration, if no config path specified (preserving old behavior), pass
-	// the whole TOML configuration section to the runtime.
-	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
-		runtimeOpts.ConfigBody = b
-	}
-
-	return options, nil
-}
-
-// getRuntimeOptionsType gets empty runtime options by the runtime type name.
-func getRuntimeOptionsType(t string) interface{} {
-	switch t {
-	case plugins.RuntimeRuncV2:
-		return &runcoptions.Options{}
-	case runtimeRunhcsV1:
-		return &runhcsoptions.Options{}
-	default:
-		return &runtimeoptions.Options{}
-	}
 }
 
 // getRuntimeOptions get runtime options from container metadata.
