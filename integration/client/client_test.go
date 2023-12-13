@@ -41,6 +41,7 @@ import (
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/log"
 )
 
@@ -49,12 +50,31 @@ var (
 	noCriu       bool
 	supportsCriu bool
 	noShimCgroup bool
+	binaryName   = "runc"
+	runtimeOpts  NewContainerOpts
 )
 
 func init() {
 	flag.BoolVar(&noDaemon, "no-daemon", false, "Do not start a dedicated daemon for the tests")
 	flag.BoolVar(&noCriu, "no-criu", false, "Do not run the checkpoint tests")
 	flag.BoolVar(&noShimCgroup, "no-shim-cgroup", false, "Do not run the shim cgroup tests")
+
+	binaryNameEnv, valid := os.LookupEnv("RUNTIME_BINARY")
+	if valid {
+		if _, err := os.Stat(binaryNameEnv); os.IsNotExist(err) {
+			fmt.Fprintf(os.Stderr, "could not find RUNTIME_BINARY: %s\n", err)
+			os.Exit(1)
+		} else {
+			runtimeOpts = WithRuntime("io.containerd.runc.v2", &options.Options{
+				BinaryName: binaryNameEnv,
+			})
+		}
+	} else {
+		runtimeOpts = WithRuntime("io.containerd.runc.v2", &options.Options{
+			// use runc as default runtime
+			BinaryName: binaryName,
+		})
+	}
 }
 
 func TestMain(m *testing.M) {
