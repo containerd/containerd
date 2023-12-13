@@ -31,7 +31,7 @@ jobs:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -53,7 +53,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -87,7 +87,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -120,7 +120,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -154,7 +154,7 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -211,7 +211,7 @@ jobs:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.12", "1.21.5"]
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           cache: false # see actions/setup-go#368
@@ -252,7 +252,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -411,7 +411,7 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
@@ -618,7 +618,7 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
