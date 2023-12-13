@@ -14,7 +14,7 @@ jobs:
     name: lychee
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: lycheeverse/lychee-action@v1.8.0
         with:

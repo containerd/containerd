@@ -36,7 +36,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.55.2
@@ -58,7 +58,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -92,7 +92,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
@@ -124,7 +124,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -158,7 +158,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: |
           set -e -x
 
@@ -216,7 +216,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
       # builtin MinGW version leads to DLL loading errors during runtime.
@@ -257,11 +257,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
@@ -416,7 +416,7 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install containerd dependencies
         env:
@@ -558,7 +558,7 @@ jobs:
           cat /etc/os-release
           cat /proc/cpuinfo
           free -mt
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/cache@v3
         with:
           path: /root/.vagrant.d
@@ -593,7 +593,7 @@ jobs:
     needs: [project, linters, protos, man]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up cgroup v2 delegation
         run: |
           sudo mkdir -p /etc/systemd/system/user@.service.d
@@ -622,7 +622,7 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
