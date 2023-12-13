@@ -39,7 +39,7 @@ require (
 	github.com/klauspost/compress v1.17.4
 	github.com/minio/sha256-simd v1.0.1
 	github.com/moby/locker v1.0.1
-	github.com/moby/sys/mountinfo v0.6.2
+	github.com/moby/sys/mountinfo v0.7.1
 	github.com/moby/sys/sequential v0.5.0
 	github.com/moby/sys/signal v0.7.0
 	github.com/moby/sys/symlink v0.2.0
