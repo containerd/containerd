@@ -50,6 +50,9 @@ type (
 
 	ShutdownRequest  = Empty
 	ShutdownResponse = Empty
+
+	PostNetworkDeletedRequest  = StateChangeEvent
+	PostNetworkDeletedResponse = Empty
 )
 
 // EventMask corresponds to a set of enumerated Events.
@@ -71,6 +74,12 @@ func ParseEventMask(events ...string) (EventMask, error) {
 		"postupdatecontainer": Event_POST_UPDATE_CONTAINER,
 		"stopcontainer":       Event_STOP_CONTAINER,
 		"removecontainer":     Event_REMOVE_CONTAINER,
+
+		"networkconfigurationchanged": Event_NETWORK_CONFIGURATION_CHANGED,
+		"presetupnetwork":             Event_PRE_SETUP_NETWORK,
+		"postsetupnetwork":            Event_POST_SETUP_NETWORK,
+		"prenetworkdeleted":           Event_PRE_NETWORK_DELETED,
+		"postnetworkdeleted":          Event_POST_NETWORK_DELETED,
 	}
 
 	for _, event := range events {
@@ -130,6 +139,12 @@ func (m *EventMask) PrettyString() string {
 		Event_POST_UPDATE_CONTAINER: "PostUpdateContainer",
 		Event_STOP_CONTAINER:        "StopContainer",
 		Event_REMOVE_CONTAINER:      "RemoveContainer",
+
+		Event_NETWORK_CONFIGURATION_CHANGED: "NetworkConfigurationChanged",
+		Event_PRE_SETUP_NETWORK:             "PreSetupNetwork",
+		Event_POST_SETUP_NETWORK:            "PostSetupNetwork",
+		Event_PRE_NETWORK_DELETED:            "NetworkDeleted",
+		Event_POST_NETWORK_DELETED:          "PostNetworkDeleted",
 	}
 
 	mask := *m

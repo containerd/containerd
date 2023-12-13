@@ -81,6 +81,21 @@ type API interface {
 
 	// RemoveContainer relays container removal events to NRI.
 	RemoveContainer(context.Context, PodSandbox, Container) error
+
+	// PreSetupNetwork is called before setting up CNI
+	PreSetupNetwork(context.Context, PodSandbox, []*nri.CNIConfig) ([]*nri.CNICapabilities, error)
+
+	// PostSetupNetwork is called with final CNI result, aka "prevResult"
+	PostSetupNetwork(context.Context, PodSandbox, []*nri.Result) ([]*nri.Result, error)
+
+	// NetworkConfigurationChanged is called when a network configuration file has been changed on disk
+	NetworkConfigurationChanged(context.Context, []*nri.CNIConfig) ([]*nri.CNIConfig, error)
+
+	// PreNetworkDeleted is called before the pod network is deleted
+	PreNetworkDeleted(context.Context, PodSandbox) error
+
+	// PostNetworkDeleted is called after the pod network has been deleted
+	PostNetworkDeleted(context.Context, PodSandbox) error
 }
 
 type State int
@@ -431,6 +446,102 @@ func (l *local) RemoveContainer(ctx context.Context, pod PodSandbox, ctr Contain
 	}
 	err := l.nri.RemoveContainer(ctx, request)
 	l.setState(request.Container.Id, Removed)
+
+	return err
+}
+
+func (l *local) PreSetupNetwork(ctx context.Context, pod PodSandbox, cniconfigs []*nri.CNIConfig) ([]*nri.CNICapabilities, error) {
+	if !l.IsEnabled() {
+		return nil, nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.PreSetupNetworkRequest{
+		Pod: podSandboxToNRI(pod),
+		CNIConfig: cniconfigs,
+	}
+
+	response, err := l.nri.PreSetupNetwork(ctx, request)
+	if err != nil || response == nil {
+		return nil, err
+	}
+
+	return response.CNICapabilities, err
+}
+
+func (l *local) PostSetupNetwork(ctx context.Context, pod PodSandbox, result []*nri.Result) ([]*nri.Result, error) {
+	if !l.IsEnabled() {
+		return nil, nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.PostSetupNetworkRequest{
+		Pod: podSandboxToNRI(pod),
+		Result: result,
+	}
+
+	response, err := l.nri.PostSetupNetwork(ctx, request)
+	if err != nil || response == nil {
+		return nil, err
+	}
+
+	return response.Result, err
+}
+
+func (l *local) NetworkConfigurationChanged(ctx context.Context, cniconfigs []*nri.CNIConfig) ([]*nri.CNIConfig, error) {
+	if !l.IsEnabled() {
+		return nil, nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.NetworkConfigurationChangedRequest{
+		CNIConfig: cniconfigs,
+	}
+
+	response, err := l.nri.NetworkConfigurationChanged(ctx, request)
+	if err != nil || response == nil {
+		return nil, err
+	}
+
+	return response.CNIConfig, err
+}
+
+func (l *local) PreNetworkDeleted(ctx context.Context, pod PodSandbox) error {
+	if !l.IsEnabled() {
+		return nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.PreNetworkDeletedRequest{
+		Pod: podSandboxToNRI(pod),
+	}
+
+	err := l.nri.PreNetworkDeleted(ctx, request)
+
+	return err
+}
+
+func (l *local) PostNetworkDeleted(ctx context.Context, pod PodSandbox) error {
+	if !l.IsEnabled() {
+		return nil
+	}
+
+	l.Lock()
+	defer l.Unlock()
+
+	request := &nri.PostNetworkDeletedRequest{
+		Pod: podSandboxToNRI(pod),
+	}
+
+	err := l.nri.PostNetworkDeleted(ctx, request)
 
 	return err
 }

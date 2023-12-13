@@ -40,6 +40,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/nri/pkg/api"
 	nrigen "github.com/containerd/nri/pkg/runtime-tools/generate"
+
+	nriapi "github.com/containerd/nri/pkg/adaptation"
 )
 
 type API struct {
@@ -90,6 +92,60 @@ func (a *API) RunPodSandbox(ctx context.Context, criPod *sstore.Sandbox) error {
 		a.nri.StopPodSandbox(ctx, pod)
 		a.nri.RemovePodSandbox(ctx, pod)
 	}
+
+	return err
+}
+
+func (a *API) NetworkConfigurationChanged(ctx context.Context, cniconfigs []*nriapi.CNIConfig) ([]*nriapi.CNIConfig, error) {
+	if a.IsDisabled() {
+		return nil, nil
+	}
+
+	modconfigs, err := a.nri.NetworkConfigurationChanged(ctx, cniconfigs)
+
+	return modconfigs, err
+}
+
+func (a *API) PreSetupNetwork(ctx context.Context, criPod *sstore.Sandbox, cniconfigs []*nriapi.CNIConfig)  ([]*nriapi.CNICapabilities, error) {
+	if a.IsDisabled() {
+		return nil, nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	capabilities, err := a.nri.PreSetupNetwork(ctx, pod, cniconfigs)
+
+	return capabilities, err
+}
+
+func (a *API) PostSetupNetwork(ctx context.Context, criPod *sstore.Sandbox, result []*nriapi.Result)  ([]*nriapi.Result, error) {
+	if a.IsDisabled() {
+		return nil, nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	reply, err := a.nri.PostSetupNetwork(ctx, pod, result)
+
+	return reply, err
+}
+
+func (a *API) PreNetworkDeleted(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.PreNetworkDeleted(ctx, pod)
+
+	return err
+}
+
+func (a *API) PostNetworkDeleted(ctx context.Context, criPod *sstore.Sandbox) error {
+	if a.IsDisabled() {
+		return nil
+	}
+
+	pod := a.nriPodSandbox(criPod)
+	err := a.nri.PostNetworkDeleted(ctx, pod)
 
 	return err
 }

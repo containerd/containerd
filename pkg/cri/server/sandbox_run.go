@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"path/filepath"
 	"strings"
 	"time"
@@ -40,6 +41,9 @@ import (
 	"github.com/containerd/containerd/v2/pkg/netns"
 	sb "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
+
+	nri "github.com/containerd/nri/pkg/adaptation"
+	"github.com/containernetworking/cni/pkg/types"
 )
 
 func init() {
@@ -447,6 +451,183 @@ func (c *criService) getNetworkPlugin(runtimeClass string) cni.CNI {
 	return i
 }
 
+func (c *criService) nriPreSetupNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox, opts []cni.NamespaceOpts) ([]cni.NamespaceOpts, error) {
+	var cniconfigs []*nri.CNIConfig
+
+	netPlugin := c.getNetworkPlugin(sandbox.RuntimeHandler)
+	if netPlugin == nil {
+		return opts, nil
+	}
+
+	configresult := netPlugin.GetConfig()
+	for _, confnetwork := range configresult.Networks {
+		cniconfigs = append(cniconfigs, &nri.CNIConfig{
+			Name: confnetwork.Config.Name,
+			NetworkConf: confnetwork.Config.Source,
+		})
+	}
+
+	log.G(ctx).WithField("cniconfigs", cniconfigs).Debugf("NRI PreSetupNetwork request sent")
+	cnicapabilities, err := c.nri.PreSetupNetwork(ctx, sandbox, cniconfigs)
+	log.G(ctx).WithField("cnicapabilities", cnicapabilities).Debugf("NRI PreSetupNetwork reply received (error %v)", err)
+
+	if err != nil {
+		return opts, fmt.Errorf("NRI PreSetupNetwork failed: %w", err)
+	}
+
+	for _, cnicapability := range cnicapabilities {
+		for name, capability := range cnicapability.Capabilities {
+			var v interface{}
+
+			err := json.Unmarshal(capability, v)
+			if err != nil {
+				continue
+			}
+			opts = append(opts, cni.WithCapability(name, v))
+		}
+		for name, arg := range cnicapability.Args {
+			opts = append(opts, cni.WithArgs(name, arg))
+		}
+	}
+
+	return opts, nil
+}
+
+func cniResult2NRI(ctx context.Context, name string, cniresult *cni.Result) *nri.Result {
+	var ifindex uint64 = 0
+
+	nriresult := &nri.Result{
+		Name: name,
+		DNS: &nri.DNS{},
+	}
+
+	if cniresult == nil {
+		return nriresult
+	}
+
+	for ifname, config := range cniresult.Interfaces {
+		nriresult.Interfaces = append(nriresult.Interfaces, &nri.Interfaces{
+			Name: ifname,
+			MAC: config.Mac,
+			Sandbox: config.Sandbox,
+		})
+
+		for _, ipconfig := range config.IPConfigs {
+			nriresult.IPs = append(nriresult.IPs, &nri.IPs{
+				Interface: ifindex,
+				Address: ipconfig.IP.String(),
+				Gateway: ipconfig.Gateway.String(),
+			})
+		}
+		ifindex = ifindex + 1
+	}
+
+	for _, routes := range cniresult.Routes {
+		nriresult.Routes = append(nriresult.Routes, &nri.Routes{
+			Dst: routes.Dst.String(),
+			GW: routes.GW.String(),
+		})
+	}
+
+	for _, dns := range cniresult.DNS{
+		nriresult.DNS.Nameservers = append(nriresult.DNS.Nameservers, dns.Nameservers...)
+		nriresult.DNS.Domain = dns.Domain
+		nriresult.DNS.Search = append(nriresult.DNS.Search, dns.Search...)
+		nriresult.DNS.Options = append(nriresult.DNS.Options, dns.Options...)
+	}
+
+	return nriresult
+}
+
+func nriResult2CNI(ctx context.Context, nriresult *nri.Result) *cni.Result {
+	idx2name := make(map[uint64]string)
+	var maxifindex uint64
+
+	cniresult := &cni.Result{
+		Interfaces: make(map[string]*cni.Config),
+	}
+
+	for ifindex, nriInterface := range nriresult.Interfaces {
+		cniresult.Interfaces[nriInterface.Name] = &cni.Config{
+			Mac: nriInterface.MAC,
+			Sandbox: nriInterface.Sandbox,
+		}
+		idx2name[uint64(ifindex)] = nriInterface.Name
+		maxifindex = maxifindex + 1
+	}
+
+	for _, nriIPs := range nriresult.IPs {
+		if nriIPs.Interface > maxifindex {
+			log.G(ctx).Infof("NRI IP index %d out of range (max index %d)", nriIPs.Interface, maxifindex)
+			continue
+		}
+
+		name := idx2name[nriIPs.Interface]
+		config := cniresult.Interfaces[name]
+
+		ip, _, err := net.ParseCIDR(nriIPs.Address)
+		if err != nil {
+			// address was not CIDR formatted after all
+			ip = net.ParseIP(nriIPs.Address)
+			if ip == nil {
+				log.G(ctx).Infof("Can not parse NRI IP address '%s' for interface '%s'", nriIPs.Address, name)
+				continue
+			}
+			log.G(ctx).Debugf("Can not parse NRI CIDR address, found plain IP address '%s' for interface '%s'", ip, name)
+		}
+		gateway := net.ParseIP(nriIPs.Gateway)
+		if gateway == nil {
+			log.G(ctx).Debugf("No NRI interface gateway address for interface '%s'", name)
+		}
+
+		config.IPConfigs = append(config.IPConfigs, &cni.IPConfig{
+			IP: ip,
+			Gateway: gateway,
+		})
+	}
+
+	for _, nriRoutes := range nriresult.Routes {
+		_, dst, err := net.ParseCIDR(nriRoutes.Dst)
+		if err != nil {
+			log.G(ctx).Infof("Cannot parse NRI route destination '%s'", nriRoutes.Dst)
+		}
+		gateway := net.ParseIP(nriRoutes.GW)
+		if gateway == nil {
+			log.G(ctx).Debugf("No NRI route gateway address")
+		}
+		cniresult.Routes = append(cniresult.Routes, &types.Route{
+			Dst: *dst,
+			GW: gateway,
+		})
+	}
+
+	cniresult.DNS = append(cniresult.DNS, types.DNS{
+		Nameservers: nriresult.DNS.Nameservers,
+		Domain: nriresult.DNS.Domain,
+		Search: nriresult.DNS.Search,
+		Options: nriresult.DNS.Options,
+	})
+
+	return cniresult
+}
+
+func (c *criService) nriPostSetupNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox, result *cni.Result) (*cni.Result, error) {
+	// There is only one cni.Result supplied and no name/id...
+	nriResult := append([]*nri.Result{}, cniResult2NRI(ctx, "", result))
+
+	log.G(ctx).WithField("nriResult", nriResult).Debugf("NRI PostSetupNetwork request sent")
+	nriResult, err := c.nri.PostSetupNetwork(ctx, sandbox, nriResult)
+	log.G(ctx).WithField("nriResult", nriResult).Debugf("NRI PostSetupNetwork response received (error %v) with %d results", err, len(nriResult))
+
+	if err != nil || len(nriResult) == 0 {
+		// When error or no result is received, return original result
+		return result, err
+	}
+
+	// Only one cni.Result can be handled by sandbox_run...
+	return nriResult2CNI(ctx, nriResult[0]), nil
+}
+
 // setupPodNetwork setups up the network for a pod
 func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.Sandbox) error {
 	var (
@@ -465,7 +646,14 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)
 	}
+
+	opts, err = c.nriPreSetupNetwork(ctx, sandbox, opts)
+	if err != nil {
+		return fmt.Errorf("PreSetupNetwork failed for '%s': %w", id, err)
+	}
+
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
+
 	netStart := time.Now()
 	if c.config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
@@ -478,6 +666,12 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 		networkPluginOperationsErrors.WithValues(networkSetUpOp).Inc()
 		return err
 	}
+
+	result, err = c.nriPostSetupNetwork(ctx, sandbox, result)
+	if err != nil {
+		log.G(ctx).Infof("PostSetupNetwork failed: %w", err)
+	}
+
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {

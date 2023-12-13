@@ -81,7 +81,7 @@ type process interface {
 	Pid() uint32
 }
 
-// Task is ta subset of containerd's Task interface.
+// Task is a subset of containerd's Task interface.
 type Task interface {
 	process
 

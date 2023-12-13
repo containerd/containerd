@@ -102,7 +102,7 @@ github.com/containerd/cgroups/v3/cgroup2/stats
 # github.com/containerd/console v1.0.3
 ## explicit; go 1.13
 github.com/containerd/console
-# github.com/containerd/containerd v1.7.8
+# github.com/containerd/containerd v1.7.0
 ## explicit; go 1.19
 github.com/containerd/containerd/errdefs
 # github.com/containerd/continuity v0.4.3
@@ -120,7 +120,7 @@ github.com/containerd/continuity/testutil/loopback
 # github.com/containerd/fifo v1.1.0
 ## explicit; go 1.18
 github.com/containerd/fifo
-# github.com/containerd/go-cni v1.1.9
+# github.com/containerd/go-cni v1.1.9 => github.com/pfl/go-cni v0.7.0
 ## explicit; go 1.19
 github.com/containerd/go-cni
 # github.com/containerd/go-runc v1.1.0
@@ -130,7 +130,7 @@ github.com/containerd/go-runc
 ## explicit; go 1.20
 github.com/containerd/log
 github.com/containerd/log/logtest
-# github.com/containerd/nri v0.5.0
+# github.com/containerd/nri v0.5.0 => github.com/pfl/nri v0.8.0
 ## explicit; go 1.19
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation

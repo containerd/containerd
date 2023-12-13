@@ -81,6 +81,8 @@ type libcni struct {
 	networkCount int // minimum network plugin configurations needed to initialize cni
 	networks     []*Network
 	sync.RWMutex
+	nriarg       interface{}
+	nrifunc      NRIPolicy
 }
 
 func defaultCNIConfig() *libcni {
