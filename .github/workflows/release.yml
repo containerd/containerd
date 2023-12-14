@@ -103,7 +103,7 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           use: true
       - uses: crazy-max/ghaction-github-runtime@v3 # sets up needed vars for caching to github
