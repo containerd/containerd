@@ -21,7 +21,7 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.12.0-rc.0
+# github.com/Microsoft/hcsshim v0.12.0-rc.1
 ## explicit; go 1.18
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
@@ -105,7 +105,6 @@ github.com/containerd/console
 # github.com/containerd/containerd v1.7.8
 ## explicit; go 1.19
 github.com/containerd/containerd/errdefs
-github.com/containerd/containerd/log
 # github.com/containerd/continuity v0.4.3
 ## explicit; go 1.19
 github.com/containerd/continuity
