@@ -15,11 +15,10 @@
 package cgroups
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 // cgroups blkio parameter filenames.
@@ -35,9 +34,10 @@ var blkioThrottleWriteIOPSFiles = []string{"blkio.throttle.write_iops_device"}
 // Effects of Weight and Rate values in SetBlkioParameters():
 // Value  |  Effect
 // -------+-------------------------------------------------------------------
-//    -1  |  Do not write to cgroups, value is missing.
-//     0  |  Write to cgroups, will clear the setting as specified in cgroups blkio interface.
-//  other |  Write to cgroups, sets the value.
+//
+//	  -1  |  Do not write to cgroups, value is missing.
+//	   0  |  Write to cgroups, will clear the setting as specified in cgroups blkio interface.
+//	other |  Write to cgroups, sets the value.
 type BlockIOParameters struct {
 	Weight                  int64
 	WeightDevice            DeviceWeights
@@ -142,7 +142,7 @@ type devMajMin struct {
 
 // ResetBlkioParameters adds new, changes existing and removes missing blockIO parameters in cgroupsDir.
 func ResetBlkioParameters(groupDir string, blockIO BlockIOParameters) error {
-	var errors *multierror.Error
+	errs := []error{}
 	oldBlockIO, _ := GetBlkioParameters(groupDir)
 	newBlockIO := NewBlockIOParameters()
 	newBlockIO.Weight = blockIO.Weight
@@ -151,8 +151,8 @@ func ResetBlkioParameters(groupDir string, blockIO BlockIOParameters) error {
 	newBlockIO.ThrottleWriteBpsDevice = resetDevRates(oldBlockIO.ThrottleWriteBpsDevice, blockIO.ThrottleWriteBpsDevice)
 	newBlockIO.ThrottleReadIOPSDevice = resetDevRates(oldBlockIO.ThrottleReadIOPSDevice, blockIO.ThrottleReadIOPSDevice)
 	newBlockIO.ThrottleWriteIOPSDevice = resetDevRates(oldBlockIO.ThrottleWriteIOPSDevice, blockIO.ThrottleWriteIOPSDevice)
-	errors = multierror.Append(errors, SetBlkioParameters(groupDir, newBlockIO))
-	return errors.ErrorOrNil()
+	errs = append(errs, SetBlkioParameters(groupDir, newBlockIO))
+	return errors.Join(errs...)
 }
 
 // resetDevWeights adds wanted weight parameters to new and resets unwanted weights.
@@ -189,16 +189,16 @@ func resetDevRates(old, wanted []DeviceRate) []DeviceRate {
 
 // GetBlkioParameters returns BlockIO parameters from files in cgroups blkio controller directory.
 func GetBlkioParameters(group string) (BlockIOParameters, error) {
-	var errors *multierror.Error
+	errs := []error{}
 	blockIO := NewBlockIOParameters()
 
-	errors = multierror.Append(errors, readWeight(group, blkioWeightFiles, &blockIO.Weight))
-	errors = multierror.Append(errors, readDeviceParameters(group, blkioWeightDeviceFiles, &blockIO.WeightDevice))
-	errors = multierror.Append(errors, readDeviceParameters(group, blkioThrottleReadBpsFiles, &blockIO.ThrottleReadBpsDevice))
-	errors = multierror.Append(errors, readDeviceParameters(group, blkioThrottleWriteBpsFiles, &blockIO.ThrottleWriteBpsDevice))
-	errors = multierror.Append(errors, readDeviceParameters(group, blkioThrottleReadIOPSFiles, &blockIO.ThrottleReadIOPSDevice))
-	errors = multierror.Append(errors, readDeviceParameters(group, blkioThrottleWriteIOPSFiles, &blockIO.ThrottleWriteIOPSDevice))
-	return blockIO, errors.ErrorOrNil()
+	errs = append(errs, readWeight(group, blkioWeightFiles, &blockIO.Weight))
+	errs = append(errs, readDeviceParameters(group, blkioWeightDeviceFiles, &blockIO.WeightDevice))
+	errs = append(errs, readDeviceParameters(group, blkioThrottleReadBpsFiles, &blockIO.ThrottleReadBpsDevice))
+	errs = append(errs, readDeviceParameters(group, blkioThrottleWriteBpsFiles, &blockIO.ThrottleWriteBpsDevice))
+	errs = append(errs, readDeviceParameters(group, blkioThrottleReadIOPSFiles, &blockIO.ThrottleReadIOPSDevice))
+	errs = append(errs, readDeviceParameters(group, blkioThrottleWriteIOPSFiles, &blockIO.ThrottleWriteIOPSDevice))
+	return blockIO, errors.Join(errs...)
 }
 
 // readWeight parses int64 from a cgroups entry.
@@ -217,7 +217,7 @@ func readWeight(groupDir string, filenames []string, rv *int64) error {
 
 // readDeviceParameters parses device lines used for weights and throttling rates.
 func readDeviceParameters(groupDir string, filenames []string, params DeviceParameters) error {
-	var errors *multierror.Error
+	errs := []error{}
 	contents, err := readFirstFile(groupDir, filenames)
 	if err != nil {
 		return err
@@ -230,38 +230,38 @@ func readDeviceParameters(groupDir string, filenames []string, params DevicePara
 		// Expect syntax MAJOR:MINOR VALUE
 		devVal := strings.Split(line, " ")
 		if len(devVal) != 2 {
-			errors = multierror.Append(errors, fmt.Errorf("invalid line %q, single space expected", line))
+			errs = append(errs, fmt.Errorf("invalid line %q, single space expected", line))
 			continue
 		}
 		majMin := strings.Split(devVal[0], ":")
 		if len(majMin) != 2 {
-			errors = multierror.Append(errors, fmt.Errorf("invalid line %q, single colon expected before space", line))
+			errs = append(errs, fmt.Errorf("invalid line %q, single colon expected before space", line))
 			continue
 		}
 		major, majErr := strconv.ParseInt(majMin[0], 10, 64)
 		minor, minErr := strconv.ParseInt(majMin[1], 10, 64)
 		value, valErr := strconv.ParseInt(devVal[1], 10, 64)
 		if majErr != nil || minErr != nil || valErr != nil {
-			errors = multierror.Append(errors, fmt.Errorf("invalid number when parsing \"major:minor value\" from \"%s:%s %s\"", majMin[0], majMin[1], devVal[1]))
+			errs = append(errs, fmt.Errorf("invalid number when parsing \"major:minor value\" from \"%s:%s %s\"", majMin[0], majMin[1], devVal[1]))
 			continue
 		}
 		params.Append(major, minor, value)
 	}
-	return errors.ErrorOrNil()
+	return errors.Join(errs...)
 }
 
 // readFirstFile returns contents of the first successfully read entry.
 func readFirstFile(groupDir string, filenames []string) (string, error) {
-	var errors *multierror.Error
+	errs := []error{}
 	// If reading all the files fails, return list of read errors.
 	for _, filename := range filenames {
 		content, err := Blkio.Group(groupDir).Read(filename)
 		if err == nil {
 			return content, nil
 		}
-		errors = multierror.Append(errors, err)
+		errs = append(errs, err)
 	}
-	err := errors.ErrorOrNil()
+	err := errors.Join(errs...)
 	if err != nil {
 		return "", fmt.Errorf("could not read any of files %q: %w", filenames, err)
 	}
@@ -270,40 +270,40 @@ func readFirstFile(groupDir string, filenames []string) (string, error) {
 
 // SetBlkioParameters writes BlockIO parameters to files in cgroups blkio contoller directory.
 func SetBlkioParameters(group string, blockIO BlockIOParameters) error {
-	var errors *multierror.Error
+	errs := []error{}
 	if blockIO.Weight >= 0 {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioWeightFiles, "%d", blockIO.Weight))
+		errs = append(errs, writeFirstFile(group, blkioWeightFiles, "%d", blockIO.Weight))
 	}
 	for _, wd := range blockIO.WeightDevice {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioWeightDeviceFiles, "%d:%d %d", wd.Major, wd.Minor, wd.Weight))
+		errs = append(errs, writeFirstFile(group, blkioWeightDeviceFiles, "%d:%d %d", wd.Major, wd.Minor, wd.Weight))
 	}
 	for _, rd := range blockIO.ThrottleReadBpsDevice {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioThrottleReadBpsFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
+		errs = append(errs, writeFirstFile(group, blkioThrottleReadBpsFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
 	}
 	for _, rd := range blockIO.ThrottleWriteBpsDevice {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioThrottleWriteBpsFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
+		errs = append(errs, writeFirstFile(group, blkioThrottleWriteBpsFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
 	}
 	for _, rd := range blockIO.ThrottleReadIOPSDevice {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioThrottleReadIOPSFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
+		errs = append(errs, writeFirstFile(group, blkioThrottleReadIOPSFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
 	}
 	for _, rd := range blockIO.ThrottleWriteIOPSDevice {
-		errors = multierror.Append(errors, writeFirstFile(group, blkioThrottleWriteIOPSFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
+		errs = append(errs, writeFirstFile(group, blkioThrottleWriteIOPSFiles, "%d:%d %d", rd.Major, rd.Minor, rd.Rate))
 	}
-	return errors.ErrorOrNil()
+	return errors.Join(errs...)
 }
 
 // writeFirstFile writes content to the first existing file in the list under groupDir.
 func writeFirstFile(groupDir string, filenames []string, format string, args ...interface{}) error {
-	var errors *multierror.Error
+	errs := []error{}
 	// Returns list of errors from writes, list of single error due to all filenames missing or nil on success.
 	for _, filename := range filenames {
 		if err := Blkio.Group(groupDir).Write(filename, format, args...); err != nil {
-			errors = multierror.Append(errors, err)
+			errs = append(errs, err)
 			continue
 		}
 		return nil
 	}
-	err := errors.ErrorOrNil()
+	err := errors.Join(errs...)
 	if err != nil {
 		data := fmt.Sprintf(format, args...)
 		return fmt.Errorf("writing all files %v failed, errors: %w, content %q", filenames, err, data)

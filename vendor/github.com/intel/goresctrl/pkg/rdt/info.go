@@ -19,7 +19,6 @@ package rdt
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -336,6 +335,6 @@ func readFileBitmask(path string) (bitmask, error) {
 }
 
 func readFileString(path string) (string, error) {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	return strings.TrimSpace(string(data)), err
 }

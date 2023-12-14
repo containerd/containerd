@@ -31,7 +31,7 @@ type Controller int
 // Group represents a control group.
 type Group string
 
-//nolint
+// nolint
 const (
 	// UnkownController represents a controller of unknown type.
 	UnknownController Controller = iota
@@ -105,7 +105,7 @@ func (c Controller) String() string {
 
 // Path returns the absolute path of the given controller.
 func (c Controller) Path() string {
-	return path.Join(mountDir, c.String())
+	return cgroupPath(c.String())
 }
 
 // RelPath returns the relative path of the given controller.
@@ -115,7 +115,7 @@ func (c Controller) RelPath() string {
 
 // Group returns the given group for the controller.
 func (c Controller) Group(group string) Group {
-	return Group(path.Join(mountDir, c.String(), group))
+	return Group(cgroupPath(c.String(), group))
 }
 
 // AsGroup returns the group for the given absolute directory path.
@@ -125,7 +125,7 @@ func AsGroup(absDir string) Group {
 
 // Controller returns the controller for the group.
 func (g Group) Controller() Controller {
-	relPath := strings.TrimPrefix(string(g), mountDir+"/")
+	relPath := strings.TrimPrefix(string(g), cgroupPath()+"/")
 	split := strings.SplitN(relPath, "/", 2)
 	if len(split) > 0 {
 		return controllerDirs[split[0]]
@@ -232,6 +232,6 @@ func (g Group) writePids(entry string, pids ...string) error {
 
 // error returns a formatted group-specific error.
 func (g Group) errorf(format string, args ...interface{}) error {
-	name := strings.TrimPrefix(string(g), mountDir+"/")
+	name := strings.TrimPrefix(string(g), cgroupPath()+"/")
 	return fmt.Errorf("cgroup "+name+": "+format, args...)
 }
