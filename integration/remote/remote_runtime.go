@@ -41,13 +41,12 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/klog/v2"
-
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"k8s.io/component-base/logs/logreduction"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/v2/integration/remote/util"
 )
 
@@ -597,7 +596,7 @@ func (r *RuntimeService) ReopenContainerLog(containerID string, opts ...grpc.Cal
 
 // GetContainerEvents returns a GRPC client to stream container events
 func (r *RuntimeService) GetContainerEvents(ctx context.Context, request *runtimeapi.GetEventsRequest, opts ...grpc.CallOption) (runtimeapi.RuntimeService_GetContainerEventsClient, error) {
-	klog.V(10).Infof("[RuntimeService] GetContainerEvents", r.timeout)
+	klog.V(10).Infof("[RuntimeService] GetContainerEvents (timeout=%v)", r.timeout)
 
 	client, err := r.runtimeClient.GetContainerEvents(ctx, request, opts...)
 	if err != nil {
