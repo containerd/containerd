@@ -20,12 +20,13 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+
+	goresctrlpath "github.com/intel/goresctrl/pkg/path"
 )
 
 func ReadMSR(cpu ID, msr int64) (uint64, error) {
-	str := fmt.Sprintf("/dev/cpu/%d/msr", cpu)
-
-	file, err := os.Open(str)
+	path := goresctrlpath.Path("dev/cpu", fmt.Sprintf("%d", cpu), "msr")
+	file, err := os.Open(path)
 	if err != nil {
 		return 0, err
 	}
