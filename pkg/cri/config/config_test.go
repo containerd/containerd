@@ -64,6 +64,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIUntrustedWorkloadRuntime},
 		},
 		"both untrusted_workload_runtime and runtime[untrusted]": {
 			config: &PluginConfig{
@@ -105,6 +106,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIDefaultRuntime},
 		},
 		"no default_runtime_name": {
 			config:      &PluginConfig{},
@@ -141,6 +143,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRISystemdCgroupV1},
 		},
 		"deprecated systemd_cgroup for v2 runtime": {
 			config: &PluginConfig{
@@ -217,6 +220,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIRuntimeEngine},
 		},
 		"deprecated runtime_engine for v2 runtime": {
 			config: &PluginConfig{
@@ -255,6 +259,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRIRuntimeRoot},
 		},
 		"deprecated runtime_root for v2 runtime": {
 			config: &PluginConfig{
