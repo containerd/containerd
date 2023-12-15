@@ -25,28 +25,28 @@ limitations under the License.
 // Monitoring (MBM).
 //
 // Basic usage example:
-//   rdt.SetLogger(logrus.New())
 //
-//   if err := rdt.Initialize(""); err != nil {
-//   	return fmt.Errorf("RDT not supported: %v", err)
-//   }
+//	rdt.SetLogger(logrus.New())
 //
-//   if err := rdt.SetConfigFromFile("/path/to/rdt.conf.yaml", false); err != nil {
-//   	return fmt.Errorf("RDT configuration failed: %v", err)
-//   }
+//	if err := rdt.Initialize(""); err != nil {
+//		return fmt.Errorf("RDT not supported: %v", err)
+//	}
 //
-//   if cls, ok := rdt.GetClass("my-class"); ok {
-//      //  Set PIDs 12345 and 12346 to class "my-class"
-//   	if err := cls.AddPids("12345", "12346"); err != nil {
-//   		return fmt.Errorf("failed to add PIDs to RDT class: %v", err)
-//   	}
-//   }
+//	if err := rdt.SetConfigFromFile("/path/to/rdt.conf.yaml", false); err != nil {
+//		return fmt.Errorf("RDT configuration failed: %v", err)
+//	}
+//
+//	if cls, ok := rdt.GetClass("my-class"); ok {
+//	   //  Set PIDs 12345 and 12346 to class "my-class"
+//		if err := cls.AddPids("12345", "12346"); err != nil {
+//			return fmt.Errorf("failed to add PIDs to RDT class: %v", err)
+//		}
+//	}
 package rdt
 
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	stdlog "log"
 	"os"
 	"path/filepath"
@@ -244,7 +244,7 @@ func SetConfigFromData(data []byte, force bool) error {
 // SetConfigFromFile reads configuration from the filesystem and reconfigures
 // the resctrl filesystem.
 func SetConfigFromFile(path string, force bool) error {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %v", err)
 	}
@@ -490,11 +490,11 @@ func (c *control) pruneMonGroups() error {
 }
 
 func (c *control) readRdtFile(rdtPath string) ([]byte, error) {
-	return ioutil.ReadFile(filepath.Join(info.resctrlPath, rdtPath))
+	return os.ReadFile(filepath.Join(info.resctrlPath, rdtPath))
 }
 
 func (c *control) writeRdtFile(rdtPath string, data []byte) error {
-	if err := ioutil.WriteFile(filepath.Join(info.resctrlPath, rdtPath), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(info.resctrlPath, rdtPath), data, 0644); err != nil {
 		return c.cmdError(err)
 	}
 	return nil
@@ -728,7 +728,7 @@ func (r *resctrlGroup) GetMonData() MonData {
 }
 
 func (r *resctrlGroup) getMonL3Data() (MonL3Data, error) {
-	files, err := ioutil.ReadDir(r.path("mon_data"))
+	files, err := os.ReadDir(r.path("mon_data"))
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +759,7 @@ func (r *resctrlGroup) getMonL3Data() (MonL3Data, error) {
 }
 
 func (r *resctrlGroup) getMonLeafData(path string) (MonLeafData, error) {
-	files, err := ioutil.ReadDir(r.path(path))
+	files, err := os.ReadDir(r.path(path))
 	if err != nil {
 		return nil, err
 	}
@@ -826,7 +826,7 @@ func (m *monGroup) GetAnnotations() map[string]string {
 }
 
 func resctrlGroupsFromFs(prefix string, path string) ([]string, error) {
-	files, err := ioutil.ReadDir(path)
+	files, err := os.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}
