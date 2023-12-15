@@ -140,6 +140,45 @@ func WithSkipNonDistributableBlobs() ExportOpt {
 	return WithBlobFilter(f)
 }
 
+// WithSkipMissing excludes blobs referenced by manifests if not all blobs
+// would be included in the archive.
+// The manifest itself is excluded only if it's not present locally.
+// This allows to export multi-platform images if not all platforms are present
+// while still persisting the multi-platform index.
+func WithSkipMissing(store ContentProvider) ExportOpt {
+	return func(ctx context.Context, o *exportOptions) error {
+		o.blobRecordOptions.childrenHandler = images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+			children, err := images.Children(ctx, store, desc)
+			if !images.IsManifestType(desc.MediaType) {
+				return children, err
+			}
+
+			if err != nil {
+				// If manifest itself is missing, skip it from export.
+				if errdefs.IsNotFound(err) {
+					return nil, images.ErrSkipDesc
+				}
+				return nil, err
+			}
+
+			// Don't export manifest descendants if any of them doesn't exist.
+			for _, child := range children {
+				exists, err := content.Exists(ctx, store, child)
+				if err != nil {
+					return nil, err
+				}
+
+				// If any child is missing, only export the manifest, but don't export its descendants.
+				if !exists {
+					return nil, nil
+				}
+			}
+			return children, nil
+		})
+		return nil
+	}
+}
+
 func addNameAnnotation(name string, base map[string]string) map[string]string {
 	annotations := map[string]string{}
 	for k, v := range base {
@@ -152,8 +191,14 @@ func addNameAnnotation(name string, base map[string]string) map[string]string {
 	return annotations
 }
 
+// ContentProvider provides both content and info about content
+type ContentProvider interface {
+	content.Provider
+	content.InfoProvider
+}
+
 // Export implements Exporter.
-func Export(ctx context.Context, store content.Provider, writer io.Writer, opts ...ExportOpt) error {
+func Export(ctx context.Context, store ContentProvider, writer io.Writer, opts ...ExportOpt) error {
 	var eo exportOptions
 	for _, opt := range opts {
 		if err := opt(ctx, &eo); err != nil {
@@ -291,7 +336,10 @@ func getRecords(ctx context.Context, store content.Provider, desc ocispec.Descri
 		return nil, nil
 	}
 
-	childrenHandler := images.ChildrenHandler(store)
+	childrenHandler := brOpts.childrenHandler
+	if childrenHandler == nil {
+		childrenHandler = images.ChildrenHandler(store)
+	}
 
 	handlers := images.Handlers(
 		childrenHandler,
@@ -313,7 +361,8 @@ type tarRecord struct {
 }
 
 type blobRecordOptions struct {
-	blobFilter BlobFilter
+	blobFilter      BlobFilter
+	childrenHandler images.HandlerFunc
 }
 
 func blobRecord(cs content.Provider, desc ocispec.Descriptor, opts *blobRecordOptions) tarRecord {

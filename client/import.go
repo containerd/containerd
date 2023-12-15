@@ -37,6 +37,7 @@ type importOpts struct {
 	platformMatcher platforms.MatchComparer
 	compress        bool
 	discardLayers   bool
+	skipMissing     bool
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -113,6 +114,15 @@ func WithDiscardUnpackedLayers() ImportOpt {
 	}
 }
 
+// WithSkipMissing allows to import an archive which doesn't contain all the
+// referenced blobs.
+func WithSkipMissing() ImportOpt {
+	return func(c *importOpts) error {
+		c.skipMissing = true
+		return nil
+	}
+}
+
 // Import imports an image from a Tar stream using reader.
 // Caller needs to specify importer. Future version may use oci.v1 as the default.
 // Note that unreferenced blobs may be imported to the content store as well.
@@ -162,7 +172,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		// Only save images at top level
 		if desc.Digest != index.Digest {
-			return images.Children(ctx, cs, desc)
+			// Don't set labels on missing content.
+			children, err := images.Children(ctx, cs, desc)
+			if iopts.skipMissing && errdefs.IsNotFound(err) {
+				return nil, images.ErrSkipDesc
+			}
+			return children, err
 		}
 
 		idx, err := decodeIndex(ctx, cs, desc)
