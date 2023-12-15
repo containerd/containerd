@@ -24,11 +24,14 @@ import (
 	"io"
 	"path"
 	"sort"
+	"strings"
 
 	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispecs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -191,6 +194,23 @@ func addNameAnnotation(name string, base map[string]string) map[string]string {
 	return annotations
 }
 
+func copySourceLabels(ctx context.Context, infoProvider content.InfoProvider, desc ocispec.Descriptor) (ocispec.Descriptor, error) {
+	info, err := infoProvider.Info(ctx, desc.Digest)
+	if err != nil {
+		return desc, err
+	}
+	for k, v := range info.Labels {
+		if strings.HasPrefix(k, labels.LabelDistributionSource) {
+			if desc.Annotations == nil {
+				desc.Annotations = map[string]string{k: v}
+			} else {
+				desc.Annotations[k] = v
+			}
+		}
+	}
+	return desc, nil
+}
+
 // ContentProvider provides both content and info about content
 type ContentProvider interface {
 	content.Provider
@@ -208,13 +228,22 @@ func Export(ctx context.Context, store ContentProvider, writer io.Writer, opts .
 
 	records := []tarRecord{
 		ociLayoutFile(""),
-		ociIndexRecord(eo.manifests),
+	}
+
+	manifests := make([]ocispec.Descriptor, 0, len(eo.manifests))
+	for _, desc := range eo.manifests {
+		d, err := copySourceLabels(ctx, store, desc)
+		if err != nil {
+			log.G(ctx).WithError(err).WithField("desc", desc).Warn("failed to copy distribution.source labels")
+			continue
+		}
+		manifests = append(manifests, d)
 	}
 
 	algorithms := map[string]struct{}{}
 	dManifests := map[digest.Digest]*exportManifest{}
 	resolvedIndex := map[digest.Digest]digest.Digest{}
-	for _, desc := range eo.manifests {
+	for _, desc := range manifests {
 		if images.IsManifestType(desc.MediaType) {
 			mt, ok := dManifests[desc.Digest]
 			if !ok {
@@ -303,6 +332,8 @@ func Export(ctx context.Context, store ContentProvider, writer io.Writer, opts .
 			return fmt.Errorf("only manifests may be exported: %w", errdefs.ErrInvalidArgument)
 		}
 	}
+
+	records = append(records, ociIndexRecord(manifests))
 
 	if !eo.skipDockerManifest && len(dManifests) > 0 {
 		tr, err := manifestsRecord(ctx, store, dManifests)
