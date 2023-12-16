@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
@@ -728,34 +727,6 @@ func TestLinuxContainerMounts(t *testing.T) {
 			},
 			securityContext: &runtime.LinuxContainerSecurityContext{},
 			expectedMounts:  nil,
-		},
-		{
-			desc: "should skip hostname mount if the old sandbox doesn't have hostname file",
-			statFn: func(path string) (os.FileInfo, error) {
-				assert.Equal(t, filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hostname"), path)
-				return nil, errors.New("random error")
-			},
-			securityContext: &runtime.LinuxContainerSecurityContext{},
-			expectedMounts: []*runtime.Mount{
-				{
-					ContainerPath:  "/etc/hosts",
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "hosts"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  resolvConfPath,
-					HostPath:       filepath.Join(testRootDir, sandboxesDir, testSandboxID, "resolv.conf"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-				{
-					ContainerPath:  "/dev/shm",
-					HostPath:       filepath.Join(testStateDir, sandboxesDir, testSandboxID, "shm"),
-					Readonly:       false,
-					SelinuxRelabel: true,
-				},
-			},
 		},
 	} {
 		test := test

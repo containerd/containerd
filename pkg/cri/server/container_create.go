@@ -989,22 +989,12 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	}
 
 	if !isInCRIMounts(etcHostname, config.GetMounts()) {
-		// /etc/hostname is added since 1.1.6, 1.2.4 and 1.3.
-		// For in-place upgrade, the old sandbox doesn't have the hostname file,
-		// do not mount this in that case.
-		// TODO(random-liu): Remove the check and always mount this when
-		// containerd 1.1 and 1.2 are deprecated.
-		hostpath := c.getSandboxHostname(sandboxID)
-		if _, err := c.os.Stat(hostpath); err == nil {
-			mounts = append(mounts, &runtime.Mount{
-				ContainerPath:  etcHostname,
-				HostPath:       hostpath,
-				Readonly:       securityContext.GetReadonlyRootfs(),
-				SelinuxRelabel: true,
-				UidMappings:    uidMappings,
-				GidMappings:    gidMappings,
-			})
-		}
+		mounts = append(mounts, &runtime.Mount{
+			ContainerPath:  etcHostname,
+			HostPath:       c.getSandboxHostname(sandboxID),
+			Readonly:       securityContext.GetReadonlyRootfs(),
+			SelinuxRelabel: true,
+		})
 	}
 
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
