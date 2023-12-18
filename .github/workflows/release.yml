@@ -142,7 +142,7 @@ jobs:
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: builds
       - name: Create Release
