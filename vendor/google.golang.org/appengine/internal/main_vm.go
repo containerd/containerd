@@ -2,7 +2,6 @@
 // Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-//go:build !appengine
 // +build !appengine
 
 package internal
@@ -30,7 +29,7 @@ func Main() {
 	if IsDevAppServer() {
 		host = "127.0.0.1"
 	}
-	if err := http.ListenAndServe(host+":"+port, Middleware(http.DefaultServeMux)); err != nil {
+	if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
 		log.Fatalf("http.ListenAndServe: %v", err)
 	}
 }

@@ -2,22 +2,21 @@
 // Use of this source code is governed by the Apache 2.0
 // license that can be found in the LICENSE file.
 
-//go:build appengine
 // +build appengine
 
 package internal
 
 import (
-	"context"
-
 	"appengine"
+
+	netcontext "golang.org/x/net/context"
 )
 
 func init() {
 	appengineStandard = true
 }
 
-func DefaultVersionHostname(ctx context.Context) string {
+func DefaultVersionHostname(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {
 		panic(errNotAppEngineContext)
@@ -25,12 +24,12 @@ func DefaultVersionHostname(ctx context.Context) string {
 	return appengine.DefaultVersionHostname(c)
 }
 
-func Datacenter(_ context.Context) string { return appengine.Datacenter() }
-func ServerSoftware() string              { return appengine.ServerSoftware() }
-func InstanceID() string                  { return appengine.InstanceID() }
-func IsDevAppServer() bool                { return appengine.IsDevAppServer() }
+func Datacenter(_ netcontext.Context) string { return appengine.Datacenter() }
+func ServerSoftware() string                 { return appengine.ServerSoftware() }
+func InstanceID() string                     { return appengine.InstanceID() }
+func IsDevAppServer() bool                   { return appengine.IsDevAppServer() }
 
-func RequestID(ctx context.Context) string {
+func RequestID(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {
 		panic(errNotAppEngineContext)
@@ -38,14 +37,14 @@ func RequestID(ctx context.Context) string {
 	return appengine.RequestID(c)
 }
 
-func ModuleName(ctx context.Context) string {
+func ModuleName(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {
 		panic(errNotAppEngineContext)
 	}
 	return appengine.ModuleName(c)
 }
-func VersionID(ctx context.Context) string {
+func VersionID(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {
 		panic(errNotAppEngineContext)
@@ -53,7 +52,7 @@ func VersionID(ctx context.Context) string {
 	return appengine.VersionID(c)
 }
 
-func fullyQualifiedAppID(ctx context.Context) string {
+func fullyQualifiedAppID(ctx netcontext.Context) string {
 	c := fromContext(ctx)
 	if c == nil {
 		panic(errNotAppEngineContext)

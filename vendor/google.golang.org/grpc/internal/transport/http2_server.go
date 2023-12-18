@@ -68,15 +68,18 @@ var serverConnectionCounter uint64
 
 // http2Server implements the ServerTransport interface with HTTP2.
 type http2Server struct {
-	lastRead        int64 // Keep this field 64-bit aligned. Accessed atomically.
-	done            chan struct{}
-	conn            net.Conn
-	loopy           *loopyWriter
-	readerDone      chan struct{} // sync point to enable testing.
-	loopyWriterDone chan struct{}
-	peer            peer.Peer
-	inTapHandle     tap.ServerInHandle
-	framer          *framer
+	lastRead    int64 // Keep this field 64-bit aligned. Accessed atomically.
+	ctx         context.Context
+	done        chan struct{}
+	conn        net.Conn
+	loopy       *loopyWriter
+	readerDone  chan struct{} // sync point to enable testing.
+	writerDone  chan struct{} // sync point to enable testing.
+	remoteAddr  net.Addr
+	localAddr   net.Addr
+	authInfo    credentials.AuthInfo // auth info about the connection
+	inTapHandle tap.ServerInHandle
+	framer      *framer
 	// The max number of concurrent streams.
 	maxStreams uint32
 	// controlBuf delivers all the control related tasks (e.g., window
@@ -240,18 +243,16 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 	}
 
 	done := make(chan struct{})
-	peer := peer.Peer{
-		Addr:      conn.RemoteAddr(),
-		LocalAddr: conn.LocalAddr(),
-		AuthInfo:  authInfo,
-	}
 	t := &http2Server{
+		ctx:               setConnection(context.Background(), rawConn),
 		done:              done,
 		conn:              conn,
-		peer:              peer,
+		remoteAddr:        conn.RemoteAddr(),
+		localAddr:         conn.LocalAddr(),
+		authInfo:          authInfo,
 		framer:            framer,
 		readerDone:        make(chan struct{}),
-		loopyWriterDone:   make(chan struct{}),
+		writerDone:        make(chan struct{}),
 		maxStreams:        config.MaxStreams,
 		inTapHandle:       config.InTapHandle,
 		fc:                &trInFlow{limit: uint32(icwz)},
@@ -266,6 +267,8 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 		bufferPool:        newBufferPool(),
 	}
 	t.logger = prefixLoggerForServerTransport(t)
+	// Add peer information to the http2server context.
+	t.ctx = peer.NewContext(t.ctx, t.getPeer())
 
 	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {
@@ -274,7 +277,15 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 			updateFlowControl: t.updateFlowControl,
 		}
 	}
-	t.channelzID, err = channelz.RegisterNormalSocket(t, config.ChannelzParentID, fmt.Sprintf("%s -> %s", t.peer.Addr, t.peer.LocalAddr))
+	for _, sh := range t.stats {
+		t.ctx = sh.TagConn(t.ctx, &stats.ConnTagInfo{
+			RemoteAddr: t.remoteAddr,
+			LocalAddr:  t.localAddr,
+		})
+		connBegin := &stats.ConnBegin{}
+		sh.HandleConn(t.ctx, connBegin)
+	}
+	t.channelzID, err = channelz.RegisterNormalSocket(t, config.ChannelzParentID, fmt.Sprintf("%s -> %s", t.remoteAddr, t.localAddr))
 	if err != nil {
 		return nil, err
 	}
@@ -323,7 +334,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		t.loopy.run()
-		close(t.loopyWriterDone)
+		close(t.writerDone)
 	}()
 	go t.keepalive()
 	return t, nil
@@ -331,7 +342,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 
 // operateHeaders takes action on the decoded headers. Returns an error if fatal
 // error encountered and transport needs to close, otherwise returns nil.
-func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeadersFrame, handle func(*Stream)) error {
+func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream)) error {
 	// Acquire max stream ID lock for entire duration
 	t.maxStreamMu.Lock()
 	defer t.maxStreamMu.Unlock()
@@ -358,11 +369,10 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 
 	buf := newRecvBuffer()
 	s := &Stream{
-		id:               streamID,
-		st:               t,
-		buf:              buf,
-		fc:               &inFlow{limit: uint32(t.initialWindowSize)},
-		headerWireLength: int(frame.Header().Length),
+		id:  streamID,
+		st:  t,
+		buf: buf,
+		fc:  &inFlow{limit: uint32(t.initialWindowSize)},
 	}
 	var (
 		// if false, content-type was missing or invalid
@@ -501,9 +511,9 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 		s.state = streamReadDone
 	}
 	if timeoutSet {
-		s.ctx, s.cancel = context.WithTimeout(ctx, timeout)
+		s.ctx, s.cancel = context.WithTimeout(t.ctx, timeout)
 	} else {
-		s.ctx, s.cancel = context.WithCancel(ctx)
+		s.ctx, s.cancel = context.WithCancel(t.ctx)
 	}
 
 	// Attach the received metadata to the context.
@@ -582,6 +592,18 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 	s.requestRead = func(n int) {
 		t.adjustWindow(s, uint32(n))
 	}
+	for _, sh := range t.stats {
+		s.ctx = sh.TagRPC(s.ctx, &stats.RPCTagInfo{FullMethodName: s.method})
+		inHeader := &stats.InHeader{
+			FullMethod:  s.method,
+			RemoteAddr:  t.remoteAddr,
+			LocalAddr:   t.localAddr,
+			Compression: s.recvCompress,
+			WireLength:  int(frame.Header().Length),
+			Header:      mdata.Copy(),
+		}
+		sh.HandleRPC(s.ctx, inHeader)
+	}
 	s.ctxDone = s.ctx.Done()
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
 	s.trReader = &transportReader{
@@ -607,11 +629,8 @@ func (t *http2Server) operateHeaders(ctx context.Context, frame *http2.MetaHeade
 // HandleStreams receives incoming streams using the given handler. This is
 // typically run in a separate goroutine.
 // traceCtx attaches trace to ctx and returns the new context.
-func (t *http2Server) HandleStreams(ctx context.Context, handle func(*Stream)) {
-	defer func() {
-		<-t.loopyWriterDone
-		close(t.readerDone)
-	}()
+func (t *http2Server) HandleStreams(handle func(*Stream)) {
+	defer close(t.readerDone)
 	for {
 		t.controlBuf.throttle()
 		frame, err := t.framer.fr.ReadFrame()
@@ -645,7 +664,7 @@ func (t *http2Server) HandleStreams(ctx context.Context, handle func(*Stream)) {
 		}
 		switch frame := frame.(type) {
 		case *http2.MetaHeadersFrame:
-			if err := t.operateHeaders(ctx, frame, handle); err != nil {
+			if err := t.operateHeaders(frame, handle); err != nil {
 				t.Close(err)
 				break
 			}
@@ -1223,6 +1242,10 @@ func (t *http2Server) Close(err error) {
 	for _, s := range streams {
 		s.cancel()
 	}
+	for _, sh := range t.stats {
+		connEnd := &stats.ConnEnd{}
+		sh.HandleConn(t.ctx, connEnd)
+	}
 }
 
 // deleteStream deletes the stream s from transport's active streams.
@@ -1286,6 +1309,10 @@ func (t *http2Server) closeStream(s *Stream, rst bool, rstCode http2.ErrCode, eo
 		rstCode:  rstCode,
 		onWrite:  func() {},
 	})
+}
+
+func (t *http2Server) RemoteAddr() net.Addr {
+	return t.remoteAddr
 }
 
 func (t *http2Server) Drain(debugData string) {
@@ -1370,11 +1397,11 @@ func (t *http2Server) ChannelzMetric() *channelz.SocketInternalMetric {
 		LastMessageReceivedTimestamp:     time.Unix(0, atomic.LoadInt64(&t.czData.lastMsgRecvTime)),
 		LocalFlowControlWindow:           int64(t.fc.getSize()),
 		SocketOptions:                    channelz.GetSocketOption(t.conn),
-		LocalAddr:                        t.peer.LocalAddr,
-		RemoteAddr:                       t.peer.Addr,
+		LocalAddr:                        t.localAddr,
+		RemoteAddr:                       t.remoteAddr,
 		// RemoteName :
 	}
-	if au, ok := t.peer.AuthInfo.(credentials.ChannelzSecurityInfo); ok {
+	if au, ok := t.authInfo.(credentials.ChannelzSecurityInfo); ok {
 		s.Security = au.GetSecurityValue()
 	}
 	s.RemoteFlowControlWindow = t.getOutFlowWindow()
@@ -1406,12 +1433,10 @@ func (t *http2Server) getOutFlowWindow() int64 {
 	}
 }
 
-// Peer returns the peer of the transport.
-func (t *http2Server) Peer() *peer.Peer {
+func (t *http2Server) getPeer() *peer.Peer {
 	return &peer.Peer{
-		Addr:      t.peer.Addr,
-		LocalAddr: t.peer.LocalAddr,
-		AuthInfo:  t.peer.AuthInfo, // Can be nil
+		Addr:     t.remoteAddr,
+		AuthInfo: t.authInfo, // Can be nil
 	}
 }
 
@@ -1436,6 +1461,6 @@ func GetConnection(ctx context.Context) net.Conn {
 // SetConnection adds the connection to the context to be able to get
 // information about the destination ip and port for an incoming RPC. This also
 // allows any unary or streaming interceptors to see the connection.
-func SetConnection(ctx context.Context, conn net.Conn) context.Context {
+func setConnection(ctx context.Context, conn net.Conn) context.Context {
 	return context.WithValue(ctx, connectionKey{}, conn)
 }
