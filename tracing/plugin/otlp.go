@@ -18,6 +18,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -66,7 +67,7 @@ func init() {
 			TraceSamplingRatio: 1.0,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			//get TracingProcessorPlugin which is a dependency
+			// get TracingProcessorPlugin which is a dependency
 			plugins, err := ic.GetByType(plugins.TracingProcessorPlugin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
@@ -178,13 +179,12 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProce
 
 	return &closer{close: func() error {
 		for _, p := range procs {
-			if err := p.Shutdown(ctx); err != nil {
+			if err := p.Shutdown(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				return err
 			}
 		}
 		return nil
 	}}, nil
-
 }
 
 // Returns a composite TestMap propagator
