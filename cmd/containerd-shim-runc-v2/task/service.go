@@ -279,10 +279,20 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	case "":
 		switch cg := container.Cgroup().(type) {
 		case cgroup1.Cgroup:
+			if cg == nil {
+				log.G(ctx).Debug("nil cgroup1.Cgroup for container", container.ID)
+				break
+			}
+
 			if err := s.ep.Add(container.ID, cg); err != nil {
 				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
 			}
 		case *cgroupsv2.Manager:
+			if cg == nil {
+				log.G(ctx).Debug("nil *cgroupsv2.Manager for container", container.ID)
+				break
+			}
+
 			allControllers, err := cg.RootControllers()
 			if err != nil {
 				log.G(ctx).WithError(err).Error("failed to get root controllers")
@@ -298,6 +308,8 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			if err := s.ep.Add(container.ID, cg); err != nil {
 				log.G(ctx).WithError(err).Error("add cg to OOM monitor")
 			}
+		case nil:
+			log.G(ctx).Debug("nil cgroup for container", container.ID)
 		}
 
 		s.send(&eventstypes.TaskStart{
@@ -594,12 +606,18 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	var statsx interface{}
 	switch cg := cgx.(type) {
 	case cgroup1.Cgroup:
+		if cg == nil {
+			return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
+		}
 		stats, err := cg.Stat(cgroup1.IgnoreNotExist)
 		if err != nil {
 			return nil, err
 		}
 		statsx = stats
 	case *cgroupsv2.Manager:
+		if cg == nil {
+			return nil, errdefs.ToGRPCf(errdefs.ErrNotFound, "cgroup does not exist")
+		}
 		stats, err := cg.Stat()
 		if err != nil {
 			return nil, err

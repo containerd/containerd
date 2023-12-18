@@ -153,7 +153,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 			}
 			cg, err = cgroupsv2.Load(g)
 			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", pid)
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 %q for %d", g, pid)
 			}
 		} else {
 			cg, err = cgroup1.Load(cgroup1.PidPath(pid))
@@ -373,7 +373,7 @@ func (c *Container) Start(ctx context.Context, r *task.StartRequest) (process.Pr
 			}
 			cg, err = cgroupsv2.Load(g)
 			if err != nil {
-				log.G(ctx).WithError(err).Errorf("loading cgroup2 for %d", p.Pid())
+				log.G(ctx).WithError(err).Errorf("loading cgroup2 %q for %d", g, p.Pid())
 			}
 		} else {
 			cg, err = cgroup1.Load(cgroup1.PidPath(p.Pid()))
