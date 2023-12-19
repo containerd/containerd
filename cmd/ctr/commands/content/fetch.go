@@ -131,7 +131,7 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		Labels:    clicontext.StringSlice("label"),
 		TraceHTTP: clicontext.Bool("http-trace"),
 	}
-	if !clicontext.GlobalBool("debug") {
+	if !clicontext.GlobalBool("debug") && !clicontext.Bool("quiet") {
 		config.ProgressOutput = os.Stdout
 	}
 	if !clicontext.Bool("all-platforms") {

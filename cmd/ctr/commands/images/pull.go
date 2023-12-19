@@ -83,6 +83,10 @@ command. As part of this process, we do the following:
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
+		cli.BoolFlag{
+			Name:  "quiet,q",
+			Usage: "Suppress verbose output",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		var (
@@ -97,6 +101,8 @@ command. As part of this process, we do the following:
 			return err
 		}
 		defer cancel()
+
+		quiet := context.Bool("quiet")
 
 		if !context.BoolT("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
@@ -180,7 +186,9 @@ command. As part of this process, we do the following:
 
 		start := time.Now()
 		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+			if !quiet {
+				fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+			}
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
 			err = i.Unpack(ctx, context.String("snapshotter"))
 			if err != nil {
@@ -192,10 +200,14 @@ command. As part of this process, we do the following:
 					return err
 				}
 				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
+				if !quiet {
+					fmt.Printf("image chain ID: %s\n", chainID)
+				}
 			}
 		}
-		fmt.Printf("done: %s\t\n", time.Since(start))
+		if !quiet {
+			fmt.Printf("done: %s\t\n", time.Since(start))
+		}
 		return nil
 	},
 }
