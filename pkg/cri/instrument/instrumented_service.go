@@ -18,7 +18,6 @@ package instrument
 
 import (
 	"context"
-	"errors"
 
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/tracing"
@@ -63,7 +62,7 @@ func (in *instrumentedService) checkInitialized() error {
 	if in.c.IsInitialized() {
 		return nil
 	}
-	return errors.New("server is not initialized yet")
+	return errdefs.ToGRPCf(errdefs.ErrUnavailable, "server is not initialized yet")
 }
 
 func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (res *runtime.RunPodSandboxResponse, err error) {
