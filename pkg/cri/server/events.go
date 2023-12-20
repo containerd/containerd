@@ -362,6 +362,7 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 		if err != nil {
 			return fmt.Errorf("failed to update container status for TaskOOM event: %w", err)
 		}
+	// TODO: ImageService should handle these events directly
 	case *eventtypes.ImageCreate:
 		log.L.Infof("ImageCreate event %+v", e)
 		return em.c.UpdateImage(ctx, e.Name)

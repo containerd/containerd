@@ -54,9 +54,11 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				Registry: Registry{
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Auths: map[string]AuthConfig{
+							"https://gcr.io": {Username: "test"},
+						},
 					},
 				},
 			},
@@ -69,16 +71,18 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Configs: map[string]RegistryConfig{
+							"gcr.io": {
+								Auth: &AuthConfig{
+									Username: "test",
+								},
 							},
 						},
-					},
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
+						Auths: map[string]AuthConfig{
+							"https://gcr.io": {Username: "test"},
+						},
 					},
 				},
 			},
@@ -108,10 +112,12 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				Registry: Registry{
-					ConfigPath: "/etc/containerd/conf.d",
-					Mirrors: map[string]Mirror{
-						"something.io": {},
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						ConfigPath: "/etc/containerd/conf.d",
+						Mirrors: map[string]Mirror{
+							"something.io": {},
+						},
 					},
 				},
 			},
@@ -125,9 +131,11 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				Registry: Registry{
-					Mirrors: map[string]Mirror{
-						"example.com": {},
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Mirrors: map[string]Mirror{
+							"example.com": {},
+						},
 					},
 				},
 			},
@@ -140,9 +148,11 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				Registry: Registry{
-					Mirrors: map[string]Mirror{
-						"example.com": {},
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Mirrors: map[string]Mirror{
+							"example.com": {},
+						},
 					},
 				},
 			},
@@ -156,11 +166,13 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Configs: map[string]RegistryConfig{
+							"gcr.io": {
+								Auth: &AuthConfig{
+									Username: "test",
+								},
 							},
 						},
 					},
@@ -175,11 +187,13 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
+				ImageConfig: ImageConfig{
+					Registry: Registry{
+						Configs: map[string]RegistryConfig{
+							"gcr.io": {
+								Auth: &AuthConfig{
+									Username: "test",
+								},
 							},
 						},
 					},

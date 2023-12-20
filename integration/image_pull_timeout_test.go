@@ -478,17 +478,17 @@ func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg cr
 
 	cfg := criconfig.Config{
 		PluginConfig: criconfig.PluginConfig{
-			ContainerdConfig: criconfig.ContainerdConfig{
-				Snapshotter: containerd.DefaultSnapshotter,
+			ImageConfig: criconfig.ImageConfig{
+				Snapshotter:              containerd.DefaultSnapshotter,
+				Registry:                 registryCfg,
+				ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
+				StatsCollectPeriod:       10,
 			},
-			Registry:                 registryCfg,
-			ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
-			StatsCollectPeriod:       10,
 		},
 		ContainerdRootDir: containerdRootDir,
 		RootDir:           filepath.Join(criWorkDir, "root"),
 		StateDir:          filepath.Join(criWorkDir, "state"),
 	}
 
-	return images.NewService(cfg, map[string]string{}, client)
+	return images.NewService(cfg.ImageConfig, map[string]string{}, map[string]images.RuntimePlatform{}, client)
 }

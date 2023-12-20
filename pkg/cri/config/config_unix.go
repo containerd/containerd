@@ -62,8 +62,18 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
 		},
+		ImageConfig: ImageConfig{
+			Snapshotter:                containerd.DefaultSnapshotter,
+			DisableSnapshotAnnotations: true,
+			MaxConcurrentDownloads:     3,
+			ImageDecryption: ImageDecryption{
+				KeyModel: KeyModelNode,
+			},
+			ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
+			ImagePullWithSyncFs:      false,
+			StatsCollectPeriod:       10,
+		},
 		ContainerdConfig: ContainerdConfig{
-			Snapshotter:        containerd.DefaultSnapshotter,
 			DefaultRuntimeName: "runc",
 			Runtimes: map[string]Runtime{
 				"runc": {
@@ -72,7 +82,6 @@ func DefaultConfig() PluginConfig {
 					Sandboxer: string(ModePodSandbox),
 				},
 			},
-			DisableSnapshotAnnotations: true,
 		},
 		DisableTCPService:    true,
 		StreamServerAddress:  "127.0.0.1",
@@ -86,22 +95,15 @@ func DefaultConfig() PluginConfig {
 			TLSCertFile: "",
 		},
 		SandboxImage:                     "registry.k8s.io/pause:3.9",
-		StatsCollectPeriod:               10,
 		MaxContainerLogLineSize:          16 * 1024,
-		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		ImageDecryption: ImageDecryption{
-			KeyModel: KeyModelNode,
-		},
-		EnableCDI:                false,
-		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
-		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
-		DrainExecSyncIOTimeout:   "0s",
-		ImagePullWithSyncFs:      false,
-		EnableUnprivilegedPorts:  true,
-		EnableUnprivilegedICMP:   true,
+		EnableCDI:                        false,
+		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
+		DrainExecSyncIOTimeout:           "0s",
+		EnableUnprivilegedPorts:          true,
+		EnableUnprivilegedICMP:           true,
 	}
 }

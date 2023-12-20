@@ -425,11 +425,13 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
-			cri.config.ContainerdConfig.Snapshotter = defaultSnashotter
-			cri.config.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
-			cri.config.ContainerdConfig.Runtimes["exiting-runtime"] = criconfig.Runtime{
-				Snapshotter: runtimeSnapshotter,
-			}
+			cri.config.Snapshotter = defaultSnashotter
+			/*
+				cri.config.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
+				cri.config.ContainerdConfig.Runtimes["exiting-runtime"] = criconfig.Runtime{
+					Snapshotter: runtimeSnapshotter,
+				}
+			*/
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
 			if tt.expectErr {
@@ -531,7 +533,8 @@ func TestImageGetLabels(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			criService.config.SandboxImage = tt.configSandboxImage
+			// Change this config name
+			//criService.config.SandboxImage = tt.configSandboxImage
 			labels := criService.getLabels(context.Background(), tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 

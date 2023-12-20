@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/containers"
 	clabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
@@ -186,17 +185,6 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 	}
 
 	return spec, nil
-}
-
-// Overrides the default snapshotter if Snapshotter is set for this runtime.
-// See https://github.com/containerd/containerd/issues/6657
-func (c *Controller) runtimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
-	if ociRuntime.Snapshotter == "" {
-		return c.config.ContainerdConfig.Snapshotter
-	}
-
-	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
-	return ociRuntime.Snapshotter
 }
 
 func getMetadata(ctx context.Context, container containerd.Container) (*sandboxstore.Metadata, error) {

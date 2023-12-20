@@ -138,7 +138,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
 
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
+		containerd.WithSnapshotter(c.imageService.RuntimeSnapshotter(ctx, ociRuntime)),
 		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),

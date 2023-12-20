@@ -275,6 +275,8 @@ func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cr
 
 func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { return nil }
 
+func (s *fakeImageService) CheckImages(ctx context.Context) error { return nil }
+
 func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
 
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {

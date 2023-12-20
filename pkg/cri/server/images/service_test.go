@@ -41,7 +41,7 @@ const (
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
-		config:        testConfig,
+		config:        testConfig.ImageConfig,
 		imageFSPaths:  map[string]string{"overlayfs": testImageFSPath},
 		imageStore:    imagestore.NewStore(nil, nil, platforms.Default()),
 		snapshotStore: snapshotstore.NewStore(),
@@ -125,9 +125,7 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
-			cri.config = criconfig.Config{
-				PluginConfig: criconfig.DefaultConfig(),
-			}
+			cri.config = criconfig.DefaultConfig().ImageConfig
 			assert.Equal(t, test.expectSnapshotter, cri.RuntimeSnapshotter(context.Background(), test.runtime))
 		})
 	}

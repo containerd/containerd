@@ -44,7 +44,7 @@ func FuzzCRIServer(data []byte) int {
 
 	config := criconfig.Config{}
 
-	imageService, err := images.NewService(config, map[string]string{}, client)
+	imageService, err := images.NewService(config.ImageConfig, map[string]string{}, map[string]images.RuntimePlatform{}, client)
 	if err != nil {
 		panic(err)
 	}
