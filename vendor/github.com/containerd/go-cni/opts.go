@@ -120,6 +120,9 @@ func WithConfIndex(bytes []byte, index int) Opt {
 		if err != nil {
 			return err
 		}
+
+		confList = nriPolicy(c, getIfName(c.prefix, index), confList)
+
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
@@ -143,6 +146,9 @@ func WithConfFile(fileName string) Opt {
 		if err != nil {
 			return err
 		}
+
+		confList = nriPolicy(c, getIfName(c.prefix, 0), confList)
+
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
@@ -161,6 +167,9 @@ func WithConfListBytes(bytes []byte) Opt {
 			return err
 		}
 		i := len(c.networks)
+
+		confList = nriPolicy(c, getIfName(c.prefix, i), confList)
+
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
@@ -180,6 +189,9 @@ func WithConfListFile(fileName string) Opt {
 			return err
 		}
 		i := len(c.networks)
+
+		confList = nriPolicy(c, getIfName(c.prefix, i), confList)
+
 		c.networks = append(c.networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
@@ -255,6 +267,9 @@ func loadFromConfDir(c *libcni, max int) error {
 			return fmt.Errorf("CNI config list in config file %s has no networks, skipping: %w", confFile, ErrInvalidConfig)
 
 		}
+
+		confList = nriPolicy(c, getIfName(c.prefix, i), confList)
+
 		networks = append(networks, &Network{
 			cni:    c.cniConfig,
 			config: confList,
@@ -270,4 +285,26 @@ func loadFromConfDir(c *libcni, max int) error {
 	}
 	c.networks = append(c.networks, networks...)
 	return nil
+}
+
+type NRIPolicy func(string, *cnilibrary.NetworkConfigList, interface{}) *cnilibrary.NetworkConfigList
+
+func WithNRICallback (f NRIPolicy, a interface{}) Opt {
+	return func(c *libcni) error {
+		c.nriarg = a
+		c.nrifunc = f
+		return nil
+	}
+}
+
+func nriPolicy(c *libcni, ifname string, conflist *cnilibrary.NetworkConfigList) *cnilibrary.NetworkConfigList {
+	if c.nrifunc == nil {
+		return conflist
+	}
+
+	if l := c.nrifunc(ifname, conflist, c.nriarg); l != nil {
+		return l
+	}
+
+	return conflist
 }

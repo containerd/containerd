@@ -204,6 +204,84 @@ The following pieces of container metadata are available to plugins in NRI:
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's OCI Spec.
 
+## Pod Network Lifecycle Events
+
+NRI plugins can subscribe to the following pod network events:
+
+  - Pod network configuration change
+  - Pod network pre-creation before CNI plugins are called
+  - Pod network post-creation after CNI plugins have been called
+  - Pod network removal
+
+### Pod Network Configuration Change
+
+<details>
+<summary>NRI pod network configuration change event</summary>
+<p align="center">
+<img src="./docs/nri-cni-conf.svg" title="NRI Pod Network Configuration Change Event">
+</p>
+</details>
+
+A NetworkConfigurationChanged event is sent each time a change in CNI
+configuration is detected. It is left as an implementation detail for the
+runtime whether a NetworkConfigurationChanged evet contains one or more
+changed CNI configurations should a simultaneous modification of more than
+one configuration be detected at the same time.
+
+NRI plugins are able to alter only those CNI configuraions that are sent by the
+runtime, no additions are allowed. An NRI plugin can return either a modified
+version of one or more CNI configurations received, unmodified versions or an
+empty value or nil. Returned values will later be used by the runtime when a
+pod network is created.
+
+### Pod Network Creation
+
+<details>
+<summary>NRI pod network setup events</summary>
+<p align="center">
+<img src="./docs/nri-cni-setup.svg" title="NRI Pod Network Setup Events">
+</p>
+</details>
+
+### PreSetupNetwork
+
+The PreSetupNetwork event is sent immediately before CNI is invoked to set
+up the pod network in its namespace. In addition to the PodSandbox object,
+arguments to PreSetupNetwork includes an array of strings containing all JSON
+formatted CNI configuration files associated with the pod.
+
+The reply data consists of CNI capabilities and 'args' arguments. Any returned
+capabilities and arguments will be added to the ones already set for the pod
+network.
+
+### PostSetupNetwork
+
+The PostSetupNetwork event is sent immediately after a successful CNI
+invocation. In addtion to the PodSandbox objedct, the message carries a
+structure containing the output CNI Result Type data received from CNI, which
+is equivalent of the output of the last CNI plugn processed.
+
+NRI is allowed to modify and return the modified contents of the Result Type.
+NRI may reshuffle for example the order of the interface information thus
+changing the default interface or otherwise keep track of CNI parameters
+when implementing its policy.
+
+### Pod Network Deletion
+
+<details>
+<summary>NRI pod network deletion events</summary>
+<p align="center">
+<img src="./docs/nri-cni-delete.svg" title="NRI Pod Network Delete Event">
+</p>
+</details>
+
+A PreNetworkDeleted method call is sent on pod network deletion before the
+network namespace is removed. As an empty return message is expected, NRI has
+time to undo any modifications that relate to the network namespace. Once all
+plugins have processed the event, the namespace is removed, and a
+PostNetworkDeleted event is sent signalling the finalization of the network
+removal.
+
 ### Container Adjustment
 
 During container creation plugins can request changes to the following

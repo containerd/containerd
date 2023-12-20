@@ -21,10 +21,15 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"context"
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 	"github.com/fsnotify/fsnotify"
+
+	"github.com/containerd/containerd/v2/pkg/cri/nri"
+	nriapi "github.com/containerd/nri/pkg/adaptation"
+	cnilibrary "github.com/containernetworking/cni/libcni"
 )
 
 // cniNetConfSyncer is used to reload cni network conf triggered by fs change
@@ -130,4 +135,32 @@ func (syncer *cniNetConfSyncer) updateLastStatus(err error) {
 // stop stops watcher in the syncLoop.
 func (syncer *cniNetConfSyncer) stop() error {
 	return syncer.watcher.Close()
+}
+
+func networkconfigurationchanged (ifname string, conflist *cnilibrary.NetworkConfigList, a interface{}) *cnilibrary.NetworkConfigList {
+	n := a.(**nri.API)
+	ctx := context.Background()
+
+	if (ctx == nil) {
+		return nil
+	}
+
+	cniconfig := append([]*nriapi.CNIConfig{}, &nriapi.CNIConfig{
+		Name: ifname,
+		NetworkConf: string(conflist.Bytes[:]),
+	})
+
+	log.L.Debugf("NetworkConfigurationChanged request sent: '%v", cniconfig)
+	reply, err := (*n).NetworkConfigurationChanged(ctx, cniconfig)
+	if (err == nil && len(reply) > 0) {
+		replyconflist, err := cnilibrary.ConfListFromBytes([]byte(reply[0].NetworkConf))
+		log.L.Debugf("NetworkConfigurationChanged reply received (err '%v'): '%v", err, reply)
+		if err == nil {
+			return replyconflist
+		}
+	} else {
+		log.L.Debugf("NetworkConfigurationChanged error '%v', reply %v", err, reply)
+	}
+
+	return nil
 }

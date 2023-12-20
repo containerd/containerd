@@ -105,6 +105,14 @@ service Plugin {
   // plugin-specific processing which needs to occur in connection with any of
   // these events.
   rpc StateChange(StateChangeEvent) returns (Empty);
+
+  rpc NetworkConfigurationChanged(NetworkConfigurationChangedRequest) returns (NetworkConfigurationChangedResponse);
+
+  //
+  rpc PreSetupNetwork(PreSetupNetworkRequest) returns (PreSetupNetworkResponse);
+  rpc PostSetupNetwork(PostSetupNetworkRequest) returns (PostSetupNetworkResponse);
+
+  rpc PreNetworkDeleted(PreNetworkDeletedRequest) returns (PreNetworkDeletedResponse);
 }
 
 message ConfigureRequest {
@@ -192,6 +200,119 @@ message StateChangeEvent {
 // Empty response for those *Requests that are semantically events.
 message Empty {}
 
+message NetworkConfigurationChangedRequest {
+  // CNI configuration that changed, in rare cases more than one
+  repeated CNIConfig CNIConfig = 1;
+}
+
+message NetworkConfigurationChangedResponse {
+  // updated CNI configuration(s), if any
+  repeated CNIConfig CNIConfig = 1;
+}
+
+message PreSetupNetworkRequest {
+  // Pod whose network is set up
+  PodSandbox pod = 1;
+  // CNI configs associated with this pod
+  repeated CNIConfig CNIConfig = 2;
+}
+
+message CNIConfig {
+  // CNI config name/identifier
+  string name = 1;
+  // CNI Network configuration
+  string networkConf = 2;
+}
+
+message PreSetupNetworkResponse {
+  // Capabilities and argumets added by NRI
+  repeated CNICapabilities CNICapabilities = 1;
+}
+
+message CNICapabilities {
+  // CNI config name/identifier
+  string name = 1;
+  // Network Capabilities with values unmarshalled in CNI (aka 'interface{}')
+  map<string, bytes> capabilities = 2;
+  // Args added by NRI
+  map<string, string> args = 3;
+}
+
+message PostSetupNetworkRequest {
+  // Pod whose network has been set up
+  PodSandbox pod = 1;
+  // Final output(s) from the CNI plugin chain
+  repeated Result result = 2;
+}
+
+message PostSetupNetworkResponse {
+  // setupResult contents are modified or sorted differently by NRI,
+  // omitted if no modifications
+  repeated Result result = 1;
+}
+
+// prevResult as in CNI spec, section 5 Result Types
+message Result {
+  // CNI config name/identifier, if there will be more than one
+  // prevResult returned from CNI
+  string name = 1;
+  // CNI version
+  string cniVersion = 2;
+  // Pod network interfaces
+  repeated Interfaces interfaces = 3;
+  // Pod netowrk IP addresses
+  repeated IPs iPs = 4;
+  // Pod network routes
+  repeated Routes routes = 5;
+  // Pod DNS configuration
+  DNS DNS = 6;
+}
+
+message Interfaces {
+  // Name of the interface
+  string name = 1;
+  // Mac address if applicable
+  string MAC = 2;
+  // The isolation domain reference (e.g. path to network namespace)
+  // for the interface, or empty if on the host
+  string sandbox = 3;
+}
+
+message IPs {
+  // Address in CIDR notation
+  string address = 1;
+  // The default gateway for this subnet, if any
+  string gateway = 2;
+  // Index into the interfaces list for a CNI Plugin Result indicating
+  // which interface this IP configuration should be applied to.
+  uint64 interface = 3;
+}
+
+message Routes {
+  // Destination of the route in CIDR notation
+  string dst = 1;
+  // Next hop address. If unset, gateway in the ips array may be used
+  string GW = 2;
+}
+
+message DNS {
+  // Priority-ordered list of DNS nameservers
+  repeated string nameservers = 1;
+  // Local domain used for short hostname lookups
+  string domain = 2;
+  // Priority ordered search domains for short hostname lookups
+  repeated string search = 3;
+  // Options that can be passed to the resolver
+  repeated string options = 4;
+}
+
+message PreNetworkDeletedRequest {
+  // Pod whose network is to be deleted
+  PodSandbox pod = 1;
+}
+
+message PreNetworkDeletedResponse { }
+
 // Events that plugins can subscribe to in ConfigureResponse.
 enum Event {
   UNKNOWN = 0;
@@ -206,7 +327,12 @@ enum Event {
   POST_UPDATE_CONTAINER = 9;
   STOP_CONTAINER = 10;
   REMOVE_CONTAINER = 11;
-  LAST = 12;
+  NETWORK_CONFIGURATION_CHANGED = 12;
+  PRE_SETUP_NETWORK = 13;
+  POST_SETUP_NETWORK = 14;
+  PRE_NETWORK_DELETED = 15;
+  POST_NETWORK_DELETED = 16;
+  LAST = 17;
 }
 
 // Pod metadata that is considered relevant for a plugin.
@@ -274,6 +400,7 @@ message Hooks {
   repeated Hook start_container = 4;
   repeated Hook poststart = 5;
   repeated Hook poststop = 6;
+  repeated Hook postnetworkdeleted = 7;
 }
 
 // One OCI hook.

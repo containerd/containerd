@@ -183,6 +183,12 @@ func (r *Adaptation) RemovePodSandbox(ctx context.Context, evt *StateChangeEvent
 	return r.StateChange(ctx, evt)
 }
 
+// PostNetworkDeleted relays the corresponding CRI event to plugins.
+func (r *Adaptation) PostNetworkDeleted(ctx context.Context, evt *StateChangeEvent) error {
+	evt.Event = Event_POST_NETWORK_DELETED
+	return r.StateChange(ctx, evt)
+}
+
 // CreateContainer relays the corresponding CRI request to plugins.
 func (r *Adaptation) CreateContainer(ctx context.Context, req *CreateContainerRequest) (*CreateContainerResponse, error) {
 	r.Lock()
@@ -274,6 +280,86 @@ func (r *Adaptation) StopContainer(ctx context.Context, req *StopContainerReques
 func (r *Adaptation) RemoveContainer(ctx context.Context, evt *StateChangeEvent) error {
 	evt.Event = Event_REMOVE_CONTAINER
 	return r.StateChange(ctx, evt)
+}
+
+func (r *Adaptation) NetworkConfigurationChanged(ctx context.Context, req *NetworkConfigurationChangedRequest) (*NetworkConfigurationChangedResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	result := collectNetworkConfigurationChangedResult(req)
+
+	for _, plugin := range r.plugins {
+		reply, err := plugin.networkConfigurationChanged(ctx, req)
+		if err != nil {
+			log.Errorf(ctx, "NetworkConfigurationChanged response from '%s' failed: %v", plugin.name(), err)
+			continue
+		}
+		err = result.apply(reply, plugin.name())
+		if err != nil {
+			log.Errorf(ctx, "NetworkConfigurationChanged result from '%s' failed: %v", plugin.name(), err)
+			continue
+		}
+		// update request for next plugin
+		result.updateNetworkConfigurationChangedRequest(req)
+	}
+	return result.networkConfigurationChangedResponse(), nil
+}
+
+func (r *Adaptation) PreSetupNetwork(ctx context.Context, req *PreSetupNetworkRequest) (*PreSetupNetworkResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	result := collectPreSetupNetworkResult(req)
+	for _, plugin := range r.plugins {
+		reply, err := plugin.preSetupNetwork(ctx, req)
+		if err != nil {
+			log.Errorf(ctx, "PreSetupNetwork response from '%s' failed: %v", plugin.name(), err)
+			continue
+		}
+		err = result.apply(reply, plugin.name())
+		if err != nil {
+			log.Errorf(ctx, "PreSetupNetwork result from '%s' failed: %v", plugin.name(), err)
+		}
+	}
+	return result.preSetupNetworkResponse(), nil
+}
+
+func (r *Adaptation) PostSetupNetwork(ctx context.Context, req *PostSetupNetworkRequest) (*PostSetupNetworkResponse, error) {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	result := collectPostSetupNetworkResult(req)
+	for _, plugin := range r.plugins {
+		reply, err := plugin.postSetupNetwork(ctx, req)
+		if err != nil {
+			log.Errorf(ctx, "PostSetupNetwork response from '%s' failed: %v", plugin.name(), err)
+			continue
+		}
+		err = result.apply(reply, plugin.name())
+		if err != nil {
+			log.Errorf(ctx, "PostSetupNetwork result from '%s' failed: %v", plugin.name(), err)
+			continue
+		}
+		// update request for next plugin
+		result.updatePostSetupNetworkRequest(req)
+	}
+	return result.postSetupNetworkResponse(), nil
+}
+
+func (r *Adaptation) PreNetworkDeleted(ctx context.Context, req *PreNetworkDeletedRequest) error {
+	r.Lock()
+	defer r.Unlock()
+	defer r.removeClosedPlugins()
+
+	for _, plugin := range r.plugins {
+		if _, err := plugin.networkDeleted(ctx, req); err != nil {
+			log.Errorf(ctx, "PreNetworkDeleted response from '%s' failed: %w", plugin.name(), err)
+		}
+	}
+	return nil
 }
 
 // StateChange relays pod- or container events to plugins.

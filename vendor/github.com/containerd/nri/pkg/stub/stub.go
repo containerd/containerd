@@ -135,6 +135,26 @@ type PostUpdateContainerInterface interface {
 	PostUpdateContainer(context.Context, *api.PodSandbox, *api.Container) error
 }
 
+type NetworkConfigurationChangedInterface interface {
+	NetworkConfigurationChanged(context.Context, []*api.CNIConfig) ([]*api.CNIConfig, error)
+}
+
+type PreSetupNetworkInterface interface {
+	PreSetupNetwork(context.Context, *api.PodSandbox, []*api.CNIConfig) ([]*api.CNICapabilities, error)
+}
+
+type PostSetupNetworkInterface interface {
+	PostSetupNetwork(context.Context, *api.PodSandbox, []*api.Result) ([]*api.Result, error)
+}
+
+type PreNetworkDeletedInterface interface {
+	PreNetworkDeleted(context.Context, *api.PodSandbox) error
+}
+
+type PostNetworkDeletedInterface interface {
+	PostNetworkDeleted(context.Context, *api.PodSandbox) error
+}
+
 // Stub is the interface the stub provides for the plugin implementation.
 type Stub interface {
 	// Run the plugin. Starts the plugin then waits for an error or the plugin to stop
@@ -267,6 +287,12 @@ type handlers struct {
 	PostCreateContainer func(context.Context, *api.PodSandbox, *api.Container) error
 	PostStartContainer  func(context.Context, *api.PodSandbox, *api.Container) error
 	PostUpdateContainer func(context.Context, *api.PodSandbox, *api.Container) error
+
+	NetworkConfigurationChanged func(context.Context, []*api.CNIConfig) ([]*api.CNIConfig, error)
+	PreSetupNetwork             func(context.Context, *api.PodSandbox, []*api.CNIConfig) ([]*api.CNICapabilities, error)
+	PostSetupNetwork            func(context.Context, *api.PodSandbox, []*api.Result) ([]*api.Result, error)
+	PreNetworkDeleted           func(context.Context, *api.PodSandbox) error
+	PostNetworkDeleted          func(context.Context, *api.PodSandbox) error
 }
 
 // New creates a stub with the given plugin and options.
@@ -637,6 +663,47 @@ func (stub *stub) StopContainer(ctx context.Context, req *api.StopContainerReque
 	}, err
 }
 
+func (stub *stub) NetworkConfigurationChanged(ctx context.Context, req *api.NetworkConfigurationChangedRequest) (*api.NetworkConfigurationChangedResponse, error) {
+	handler := stub.handlers.NetworkConfigurationChanged
+	if handler == nil {
+		return &api.NetworkConfigurationChangedResponse{}, nil
+	}
+	configs, err := handler(ctx, req.CNIConfig)
+	return &api.NetworkConfigurationChangedResponse{
+		CNIConfig: configs,
+	}, err
+}
+func (stub *stub) PreSetupNetwork(ctx context.Context, req *api.PreSetupNetworkRequest) (*api.PreSetupNetworkResponse, error) {
+	handler := stub.handlers.PreSetupNetwork
+	if handler == nil {
+		return &api.PreSetupNetworkResponse{}, nil
+	}
+	capabilities, err := handler(ctx, req.Pod, req.CNIConfig)
+	return &api.PreSetupNetworkResponse{
+		CNICapabilities: capabilities,
+	}, err
+}
+
+func (stub *stub) PostSetupNetwork(ctx context.Context, req *api.PostSetupNetworkRequest) (*api.PostSetupNetworkResponse, error) {
+	handler := stub.handlers.PostSetupNetwork
+	if handler == nil {
+		return &api.PostSetupNetworkResponse{}, nil
+	}
+	result, err := handler(ctx, req.Pod, req.Result)
+	return &api.PostSetupNetworkResponse{
+		Result: result,
+	}, err
+}
+
+func (stub *stub) PreNetworkDeleted(ctx context.Context, req *api.PreNetworkDeletedRequest) (*api.PreNetworkDeletedResponse, error) {
+	handler := stub.handlers.PreNetworkDeleted
+	if handler == nil {
+		return &api.PreNetworkDeletedResponse{}, nil
+	}
+
+	return &api.PreNetworkDeletedResponse{}, handler(ctx, req.Pod)
+}
+
 // StateChange event handler.
 func (stub *stub) StateChange(ctx context.Context, evt *api.StateChangeEvent) (*api.Empty, error) {
 	var err error
@@ -672,6 +739,10 @@ func (stub *stub) StateChange(ctx context.Context, evt *api.StateChangeEvent) (*
 	case api.Event_REMOVE_CONTAINER:
 		if handler := stub.handlers.RemoveContainer; handler != nil {
 			err = handler(ctx, evt.Pod, evt.Container)
+		}
+	case api.Event_POST_NETWORK_DELETED:
+		if handler := stub.handlers.PostNetworkDeleted; handler != nil {
+			err = handler(ctx, evt.Pod)
 		}
 	}
 
@@ -755,6 +826,27 @@ func (stub *stub) setupHandlers() error {
 	if plugin, ok := stub.plugin.(PostUpdateContainerInterface); ok {
 		stub.handlers.PostUpdateContainer = plugin.PostUpdateContainer
 		stub.events.Set(api.Event_POST_UPDATE_CONTAINER)
+	}
+
+	if plugin, ok := stub.plugin.(NetworkConfigurationChangedInterface); ok {
+		stub.handlers.NetworkConfigurationChanged = plugin.NetworkConfigurationChanged
+		stub.events.Set(api.Event_NETWORK_CONFIGURATION_CHANGED)
+	}
+	if plugin, ok := stub.plugin.(PreSetupNetworkInterface); ok {
+		stub.handlers.PreSetupNetwork = plugin.PreSetupNetwork
+		stub.events.Set(api.Event_PRE_SETUP_NETWORK)
+	}
+	if plugin, ok := stub.plugin.(PostSetupNetworkInterface); ok {
+		stub.handlers.PostSetupNetwork = plugin.PostSetupNetwork
+		stub.events.Set(api.Event_POST_SETUP_NETWORK)
+	}
+	if plugin, ok := stub.plugin.(PreNetworkDeletedInterface); ok {
+		stub.handlers.PreNetworkDeleted = plugin.PreNetworkDeleted
+		stub.events.Set(api.Event_PRE_NETWORK_DELETED)
+	}
+	if plugin, ok := stub.plugin.(PostNetworkDeletedInterface); ok {
+		stub.handlers.PostNetworkDeleted = plugin.PostNetworkDeleted
+		stub.events.Set(api.Event_POST_NETWORK_DELETED)
 	}
 
 	if stub.events == 0 {

@@ -44,6 +44,7 @@ PLUGINS := \
 	$(BIN_PATH)/differ \
 	$(BIN_PATH)/ulimit-adjuster \
 	$(BIN_PATH)/v010-adapter \
+	$(BIN_PATH)/setupnetwork \
 	$(BIN_PATH)/template
 
 
@@ -115,6 +116,10 @@ $(BIN_PATH)/v010-adapter: $(wildcard plugins/v010-adapter/*.go)
 	cd $(dir $<) && $(GO_BUILD) -o $@ .
 
 $(BIN_PATH)/template: $(wildcard plugins/template/*.go)
+	$(Q)echo "Building $@..."; \
+	cd $(dir $<) && $(GO_BUILD) -o $@ .
+
+$(BIN_PATH)/setupnetwork: $(wildcard plugins/setupnetwork/*.go)
 	$(Q)echo "Building $@..."; \
 	cd $(dir $<) && $(GO_BUILD) -o $@ .
 

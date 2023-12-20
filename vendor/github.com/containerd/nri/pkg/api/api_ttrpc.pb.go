@@ -67,6 +67,10 @@ type PluginService interface {
 	UpdateContainer(context.Context, *UpdateContainerRequest) (*UpdateContainerResponse, error)
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
 	StateChange(context.Context, *StateChangeEvent) (*Empty, error)
+	NetworkConfigurationChanged(context.Context, *NetworkConfigurationChangedRequest) (*NetworkConfigurationChangedResponse, error)
+	PreSetupNetwork(context.Context, *PreSetupNetworkRequest) (*PreSetupNetworkResponse, error)
+	PostSetupNetwork(context.Context, *PostSetupNetworkRequest) (*PostSetupNetworkResponse, error)
+	PreNetworkDeleted(context.Context, *PreNetworkDeletedRequest) (*PreNetworkDeletedResponse, error)
 }
 
 func RegisterPluginService(srv *ttrpc.Server, svc PluginService) {
@@ -120,6 +124,34 @@ func RegisterPluginService(srv *ttrpc.Server, svc PluginService) {
 					return nil, err
 				}
 				return svc.StateChange(ctx, &req)
+			},
+			"NetworkConfigurationChanged": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req NetworkConfigurationChangedRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.NetworkConfigurationChanged(ctx, &req)
+			},
+			"PreSetupNetwork": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req PreSetupNetworkRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.PreSetupNetwork(ctx, &req)
+			},
+			"PostSetupNetwork": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req PostSetupNetworkRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.PostSetupNetwork(ctx, &req)
+			},
+			"PreNetworkDeleted": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req PreNetworkDeletedRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.PreNetworkDeleted(ctx, &req)
 			},
 		},
 	})
@@ -186,6 +218,38 @@ func (c *pluginClient) StopContainer(ctx context.Context, req *StopContainerRequ
 func (c *pluginClient) StateChange(ctx context.Context, req *StateChangeEvent) (*Empty, error) {
 	var resp Empty
 	if err := c.client.Call(ctx, "nri.pkg.api.v1alpha1.Plugin", "StateChange", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *pluginClient) NetworkConfigurationChanged(ctx context.Context, req *NetworkConfigurationChangedRequest) (*NetworkConfigurationChangedResponse, error) {
+	var resp NetworkConfigurationChangedResponse
+	if err := c.client.Call(ctx, "nri.pkg.api.v1alpha1.Plugin", "NetworkConfigurationChanged", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *pluginClient) PreSetupNetwork(ctx context.Context, req *PreSetupNetworkRequest) (*PreSetupNetworkResponse, error) {
+	var resp PreSetupNetworkResponse
+	if err := c.client.Call(ctx, "nri.pkg.api.v1alpha1.Plugin", "PreSetupNetwork", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *pluginClient) PostSetupNetwork(ctx context.Context, req *PostSetupNetworkRequest) (*PostSetupNetworkResponse, error) {
+	var resp PostSetupNetworkResponse
+	if err := c.client.Call(ctx, "nri.pkg.api.v1alpha1.Plugin", "PostSetupNetwork", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *pluginClient) PreNetworkDeleted(ctx context.Context, req *PreNetworkDeletedRequest) (*PreNetworkDeletedResponse, error) {
+	var resp PreNetworkDeletedResponse
+	if err := c.client.Call(ctx, "nri.pkg.api.v1alpha1.Plugin", "PreNetworkDeleted", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil

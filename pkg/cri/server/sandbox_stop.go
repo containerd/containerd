@@ -95,6 +95,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 		} else if closed {
 			sandbox.NetNSPath = ""
 		}
+
+		if err := c.nri.PreNetworkDeleted(ctx, &sandbox); err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI PreNetworkDeleted failed")
+		}
+
 		if err := c.teardownPodNetwork(ctx, sandbox); err != nil {
 			return fmt.Errorf("failed to destroy network for sandbox %q: %w", id, err)
 		}
@@ -102,6 +107,10 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 			return fmt.Errorf("failed to remove network namespace for sandbox %q: %w", id, err)
 		}
 		sandboxDeleteNetwork.UpdateSince(netStop)
+
+		if err := c.nri.PostNetworkDeleted(ctx, &sandbox); err != nil {
+			log.G(ctx).WithError(err).Errorf("NRI PostNetworkDeleted failed (sandbox '%v'", sandbox)
+		}
 	}
 
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
