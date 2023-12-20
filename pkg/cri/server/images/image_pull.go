@@ -194,12 +194,12 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	// Temporarily removed for v2 upgrade
 	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
+	if !c.config.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
 	}
 
-	if c.config.ContainerdConfig.DiscardUnpackedLayers {
+	if c.config.DiscardUnpackedLayers {
 		// Allows GC to clean layers up from the content store after unpacking
 		pullOpts = append(pullOpts,
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
@@ -333,7 +333,8 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
-	configSandboxImage := c.config.SandboxImage
+	// TODO: Separate config here to generalize pinned image list
+	configSandboxImage := "" //c.config.SandboxImage
 	// parse sandbox image
 	sandboxNamedRef, err := distribution.ParseDockerRef(configSandboxImage)
 	if err != nil {
@@ -756,7 +757,7 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // See https://github.com/containerd/containerd/issues/6657
 func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
 	s *runtime.PodSandboxConfig) (string, error) {
-	snapshotter := c.config.ContainerdConfig.Snapshotter
+	snapshotter := c.config.Snapshotter
 	if s == nil || s.Annotations == nil {
 		return snapshotter, nil
 	}
@@ -766,13 +767,10 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 		return snapshotter, nil
 	}
 
-	// TODO: Find other way to retrieve sandbox runtime, this must belong to the Runtime part of the CRI.
-	ociRuntime, err := c.config.GetSandboxRuntime(s, runtimeHandler)
-	if err != nil {
-		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s: %w", runtimeHandler, err)
+	if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
+		snapshotter = p.Snapshotter
+		log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	}
 
-	snapshotter = c.RuntimeSnapshotter(ctx, ociRuntime)
-	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	return snapshotter, nil
 }

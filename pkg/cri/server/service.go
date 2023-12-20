@@ -70,14 +70,14 @@ type ImageService interface {
 	PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig) (string, error)
 	UpdateImage(ctx context.Context, r string) error
 
+	CheckImages(ctx context.Context) error
+
 	GetImage(id string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
-
-	//ImageFsInfo(context.Context, *ImageFsInfoRequest) (*ImageFsInfoResponse, error)
 }
 
 // criService implements CRIService.

@@ -116,24 +116,12 @@ type Runtime struct {
 
 // ContainerdConfig contains toml config related to containerd
 type ContainerdConfig struct {
-	// Snapshotter is the snapshotter used by containerd.
-	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
-
-	// DisableSnapshotAnnotations disables to pass additional annotations (image
-	// related information) to snapshotters. These annotations are required by
-	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
-	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
-
-	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
-	// remove layers from the content store after successfully unpacking these
-	// layers to the snapshotter.
-	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
 
 	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
 	// blockio related errors when blockio support has not been
@@ -249,17 +237,57 @@ type ImageDecryption struct {
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
 
+type ImageConfig struct {
+	// Snapshotter is the snapshotter used by containerd.
+	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+
+	// DisableSnapshotAnnotations disables to pass additional annotations (image
+	// related information) to snapshotters. These annotations are required by
+	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
+	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
+
+	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
+	// remove layers from the content store after successfully unpacking these
+	// layers to the snapshotter.
+	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// Registry contains config related to the registry
+	Registry Registry `toml:"registry" json:"registry"`
+
+	// ImageDecryption contains config related to handling decryption of encrypted container images
+	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
+
+	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
+	// TODO: Migrate to transfer service
+	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
+
+	// ImagePullProgressTimeout is the maximum duration that there is no
+	// image data read from image registry in the open connection. It will
+	// be reset whatever a new byte has been read. If timeout, the image
+	// pulling will be cancelled. A zero value means there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+
+	// ImagePullWithSyncFs is an experimental setting. It's to force sync
+	// filesystem during unpacking to ensure that data integrity.
+	// TODO: Migrate to transfer service
+	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
+
+	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
+	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
+	// ImageConfig is the image service configuration
+	ImageConfig
 	// ContainerdConfig contains config related to containerd
 	ContainerdConfig `toml:"containerd" json:"containerd"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni"`
-	// Registry contains config related to the registry
-	Registry Registry `toml:"registry" json:"registry"`
-	// ImageDecryption contains config related to handling decryption of encrypted container images
-	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -278,8 +306,6 @@ type PluginConfig struct {
 	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
 	// SandboxImage is the image used by sandbox container.
 	SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
-	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
-	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
 	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
@@ -298,8 +324,6 @@ type PluginConfig struct {
 	// current OOMScoreADj.
 	// This is useful when the containerd does not have permission to decrease OOMScoreAdj.
 	RestrictOOMScoreAdj bool `toml:"restrict_oom_score_adj" json:"restrictOOMScoreAdj"`
-	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
-	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
@@ -345,14 +369,7 @@ type PluginConfig struct {
 	// For more details about CDI configuration please refer to
 	// https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-	// ImagePullProgressTimeout is the maximum duration that there is no
-	// image data read from image registry in the open connection. It will
-	// be reset whatever a new byte has been read. If timeout, the image
-	// pulling will be cancelled. A zero value means there is no timeout.
-	//
-	// The string is in the golang duration format, see:
-	//   https://golang.org/pkg/time/#ParseDuration
-	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
@@ -362,9 +379,6 @@ type PluginConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
-	// ImagePullWithSyncFs is an experimental setting. It's to force sync
-	// filesystem during unpacking to ensure that data integrity.
-	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

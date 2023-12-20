@@ -94,8 +94,8 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	// TODO: Update this logic to use runtime snapshotter
-	if client.SnapshotService(c.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", c.ContainerdConfig.Snapshotter)
+	if client.SnapshotService(c.ImageConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", c.ImageConfig.Snapshotter)
 	}
 
 	// TODO(dmcgowan): Get the full list directly from configured plugins

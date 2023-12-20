@@ -34,8 +34,16 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
 		},
+		ImageConfig: ImageConfig{
+			Snapshotter:            containerd.DefaultSnapshotter,
+			StatsCollectPeriod:     10,
+			MaxConcurrentDownloads: 3,
+			ImageDecryption: ImageDecryption{
+				KeyModel: KeyModelNode,
+			},
+			ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
+		},
 		ContainerdConfig: ContainerdConfig{
-			Snapshotter:        containerd.DefaultSnapshotter,
 			DefaultRuntimeName: "runhcs-wcow-process",
 			Runtimes: map[string]Runtime{
 				"runhcs-wcow-process": {
@@ -74,16 +82,10 @@ func DefaultConfig() PluginConfig {
 			TLSCertFile: "",
 		},
 		SandboxImage:              "registry.k8s.io/pause:3.9",
-		StatsCollectPeriod:        10,
 		MaxContainerLogLineSize:   16 * 1024,
-		MaxConcurrentDownloads:    3,
 		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.
 
-		ImageDecryption: ImageDecryption{
-			KeyModel: KeyModelNode,
-		},
-		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
-		DrainExecSyncIOTimeout:   "0s",
+		DrainExecSyncIOTimeout: "0s",
 	}
 }

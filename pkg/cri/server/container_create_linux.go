@@ -264,7 +264,7 @@ func appArmorProfileExists(profile string) (bool, error) {
 }
 
 // snapshotterOpts returns any Linux specific snapshotter options for the rootfs snapshot
-func snapshotterOpts(snapshotterName string, config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
+func snapshotterOpts(config *runtime.ContainerConfig) ([]snapshots.Opt, error) {
 	nsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions()
 	return snapshotterRemapOpts(nsOpts)
 }
