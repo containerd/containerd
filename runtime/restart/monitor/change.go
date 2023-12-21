@@ -22,9 +22,11 @@ import (
 	"net/url"
 	"syscall"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/runtime/restart"
 )
 
 type stopChange struct {
@@ -41,6 +43,8 @@ type startChange struct {
 
 	// Deprecated(in release 1.5): but recognized now, prefer to use logURI
 	logPath string
+	// logPathCallback is a func invoked if logPath is defined, used for emitting deprecation warnings
+	logPathCallback func()
 }
 
 func (s *startChange) apply(ctx context.Context, client *containerd.Client) error {
@@ -54,6 +58,11 @@ func (s *startChange) apply(ctx context.Context, client *containerd.Client) erro
 		log = cio.LogURI(uri)
 	} else if s.logPath != "" {
 		log = cio.LogFile(s.logPath)
+	}
+	if s.logPath != "" && s.logPathCallback != nil {
+		logrus.WithField("container", s.container.ID()).WithField(restart.LogPathLabel, s.logPath).
+			Warnf("%q label is deprecated in containerd v1.5 and will be removed in containerd v2.0. Use %q instead.", restart.LogPathLabel, restart.LogURILabel)
+		s.logPathCallback()
 	}
 
 	if s.logURI != "" && s.logPath != "" {
