@@ -23,11 +23,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/restart"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/containerd/services/warning"
 )
 
 type duration struct {
@@ -56,6 +59,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugin.EventPlugin,
 			plugin.ServicePlugin,
+			plugin.WarningPlugin,
 		},
 		ID: "restart",
 		Config: &Config{
@@ -69,8 +73,14 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
+			ws, err := ic.Get(plugin.WarningPlugin)
+			if err != nil {
+				return nil, err
+			}
+			warn := ws.(warning.Service)
 			m := &monitor{
 				client: client,
+				warn:   warn,
 			}
 			go m.run(ic.Config.(*Config).Interval.Duration)
 			return m, nil
@@ -84,6 +94,7 @@ type change interface {
 
 type monitor struct {
 	client *containerd.Client
+	warn   warning.Service
 }
 
 func (m *monitor) run(interval time.Duration) {
@@ -178,8 +189,12 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 			changes = append(changes, &startChange{
 				container: c,
 				logPath:   labels[restart.LogPathLabel],
-				logURI:    labels[restart.LogURILabel],
-				count:     restartCount + 1,
+				logPathCallback: func() {
+
+					m.warn.Emit(ctx, deprecation.RestartLogpath)
+				},
+				logURI: labels[restart.LogURILabel],
+				count:  restartCount + 1,
 			})
 		case containerd.Stopped:
 			changes = append(changes, &stopChange{
