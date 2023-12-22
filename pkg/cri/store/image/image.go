@@ -55,8 +55,8 @@ type Image struct {
 	Pinned bool
 }
 
-// ImageGetter is used to get images but does not make changes
-type ImageGetter interface {
+// Getter is used to get images but does not make changes
+type Getter interface {
 	Get(ctx context.Context, name string) (images.Image, error)
 }
 
@@ -67,7 +67,7 @@ type Store struct {
 	refCache map[string]string
 
 	// images is the local image store
-	images ImageGetter
+	images Getter
 
 	// content provider
 	provider content.InfoReaderProvider
@@ -81,7 +81,7 @@ type Store struct {
 }
 
 // NewStore creates an image store.
-func NewStore(img ImageGetter, provider content.InfoReaderProvider, platform platforms.MatchComparer) *Store {
+func NewStore(img Getter, provider content.InfoReaderProvider, platform platforms.MatchComparer) *Store {
 	return &Store{
 		refCache: make(map[string]string),
 		images:   img,

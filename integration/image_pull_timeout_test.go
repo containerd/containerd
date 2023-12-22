@@ -86,7 +86,7 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
 	delayDuration := 2 * defaultImagePullProgressTimeout
 	cli := buildLocalContainerdClient(t, tmpDir, tweakContentInitFnWithDelayer(delayDuration))
 
-	criService, err := initLocalCRIPlugin(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -109,7 +109,7 @@ func testCRIImagePullTimeoutByHoldingContentOpenWriter(t *testing.T) {
 
 	cli := buildLocalContainerdClient(t, tmpDir, nil)
 
-	criService, err := initLocalCRIPlugin(cli, tmpDir, criconfig.Registry{})
+	criService, err := initLocalCRIImageService(cli, tmpDir, criconfig.Registry{})
 	assert.NoError(t, err)
 
 	ctx := namespaces.WithNamespace(logtest.WithT(context.Background(), t), k8sNamespace)
@@ -287,7 +287,7 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 			},
 		},
 	} {
-		criService, err := initLocalCRIPlugin(cli, tmpDir, registryCfg)
+		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg)
 		assert.NoError(t, err)
 
 		dctx, _, err := cli.WithLease(ctx)
@@ -468,27 +468,27 @@ func (l *ioCopyLimiter) limitedCopy(ctx context.Context, dst io.Writer, src io.R
 	return nil
 }
 
-// initLocalCRIPlugin uses containerd.Client to init CRI plugin.
+// initLocalCRIImageService uses containerd.Client to init CRI plugin.
 //
 // NOTE: We don't need to start the CRI plugin here because we just need the
 // ImageService API.
-func initLocalCRIPlugin(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.ImageService, error) {
+func initLocalCRIImageService(client *containerd.Client, tmpDir string, registryCfg criconfig.Registry) (criserver.ImageService, error) {
 	containerdRootDir := filepath.Join(tmpDir, "root")
-	criWorkDir := filepath.Join(tmpDir, "cri-plugin")
 
-	cfg := criconfig.Config{
-		PluginConfig: criconfig.PluginConfig{
-			ImageConfig: criconfig.ImageConfig{
-				Snapshotter:              containerd.DefaultSnapshotter,
-				Registry:                 registryCfg,
-				ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
-				StatsCollectPeriod:       10,
-			},
-		},
-		ContainerdRootDir: containerdRootDir,
-		RootDir:           filepath.Join(criWorkDir, "root"),
-		StateDir:          filepath.Join(criWorkDir, "state"),
+	cfg := criconfig.ImageConfig{
+		Snapshotter:              containerd.DefaultSnapshotter,
+		Registry:                 registryCfg,
+		ImagePullProgressTimeout: defaultImagePullProgressTimeout.String(),
+		StatsCollectPeriod:       10,
 	}
 
-	return images.NewService(cfg.ImageConfig, map[string]string{}, map[string]images.RuntimePlatform{}, client)
+	return images.NewService(cfg, &images.CRIImageServiceOptions{
+		ImageFSPaths: map[string]string{
+			containerd.DefaultSnapshotter: containerdRootDir,
+		},
+		RuntimePlatforms: map[string]images.ImagePlatform{},
+		Content:          client.ContentStore(),
+		Images:           client.ImageService(),
+		Client:           client,
+	})
 }

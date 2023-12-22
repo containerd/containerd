@@ -38,6 +38,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	eventstypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/errdefs"
@@ -319,32 +320,44 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
 	// TODO: Call CRIImageService directly
-	oldImg, err := c.client.ImageService().Create(ctx, img)
-	if err == nil || !errdefs.IsAlreadyExists(err) {
+	oldImg, err := c.images.Create(ctx, img)
+	if err == nil {
+		if c.publisher != nil {
+			if err := c.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
+				Name:   img.Name,
+				Labels: img.Labels,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	} else if !errdefs.IsAlreadyExists(err) {
 		return err
 	}
 	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[crilabels.ImageLabelKey] == labels[crilabels.ImageLabelKey] {
 		return nil
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
+	_, err = c.images.Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
+	if err == nil && c.publisher != nil {
+		if c.publisher != nil {
+			if err := c.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
+				Name:   img.Name,
+				Labels: img.Labels,
+			}); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
-	// TODO: Separate config here to generalize pinned image list
-	configSandboxImage := "" //c.config.SandboxImage
-	// parse sandbox image
-	sandboxNamedRef, err := distribution.ParseDockerRef(configSandboxImage)
-	if err != nil {
-		log.G(ctx).Errorf("failed to parse sandbox image from config %s", sandboxNamedRef)
-		return nil
-	}
-	sandboxRef := sandboxNamedRef.String()
-	// Adding pinned image label to sandbox image
-	if sandboxRef == name {
-		labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
+	for _, pinned := range c.config.PinnedImages {
+		if pinned == name {
+			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
+		}
 	}
 	return labels
 }
@@ -767,9 +780,12 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 		return snapshotter, nil
 	}
 
-	if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-		snapshotter = p.Snapshotter
-		log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+	// TODO: Ensure error is returned if runtime not found?
+	if c.runtimePlatforms != nil {
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
+			snapshotter = p.Snapshotter
+			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+		}
 	}
 
 	return snapshotter, nil

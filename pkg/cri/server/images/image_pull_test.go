@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/platforms"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -402,14 +403,13 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			expectSnapshotter: defaultSnashotter,
 		},
 		{
-			desc: "should return error for runtime not found",
+			desc: "should return default snapshotter for runtime not found",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: map[string]string{
 					annotations.RuntimeHandler: "runtime-not-exists",
 				},
 			},
-			expectErr:         true,
-			expectSnapshotter: "",
+			expectSnapshotter: defaultSnashotter,
 		},
 		{
 			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
@@ -426,12 +426,10 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
 			cri.config.Snapshotter = defaultSnashotter
-			/*
-				cri.config.ContainerdConfig.Runtimes = make(map[string]criconfig.Runtime)
-				cri.config.ContainerdConfig.Runtimes["exiting-runtime"] = criconfig.Runtime{
-					Snapshotter: runtimeSnapshotter,
-				}
-			*/
+			cri.runtimePlatforms["exiting-runtime"] = ImagePlatform{
+				Platform:    platforms.DefaultSpec(),
+				Snapshotter: runtimeSnapshotter,
+			}
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
 			if tt.expectErr {
@@ -492,49 +490,51 @@ func TestImageGetLabels(t *testing.T) {
 	criService, _ := newTestCRIService()
 
 	tests := []struct {
-		name               string
-		expectedLabel      map[string]string
-		configSandboxImage string
-		pullImageName      string
+		name          string
+		expectedLabel map[string]string
+		pinnedImages  []string
+		pullImageName string
 	}{
 		{
-			name:               "pinned image labels should get added on sandbox image",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9",
-			pullImageName:      "k8s.gcr.io/pause:3.9",
+			name:          "pinned image labels should get added on sandbox image",
+			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			pinnedImages:  []string{"k8s.gcr.io/pause:3.9"},
+			pullImageName: "k8s.gcr.io/pause:3.9",
 		},
 		{
-			name:               "pinned image labels should get added on sandbox image without tag",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause",
-			pullImageName:      "k8s.gcr.io/pause:latest",
+			name:          "pinned image labels should get added on sandbox image without tag",
+			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			pinnedImages:  []string{"k8s.gcr.io/pause", "k8s.gcr.io/pause:latest"},
+			pullImageName: "k8s.gcr.io/pause:latest",
 		},
 		{
-			name:               "pinned image labels should get added on sandbox image specified with tag and digest both",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-		},
-
-		{
-			name:               "pinned image labels should get added on sandbox image specified with digest",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-			pullImageName:      "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			name:          "pinned image labels should get added on sandbox image specified with tag and digest both",
+			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			pinnedImages: []string{
+				"k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+				"k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			},
+			pullImageName: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 		},
 
 		{
-			name:               "pinned image labels should not get added on other image",
-			expectedLabel:      map[string]string{labels.ImageLabelKey: labels.ImageLabelValue},
-			configSandboxImage: "k8s.gcr.io/pause:3.9",
-			pullImageName:      "k8s.gcr.io/random:latest",
+			name:          "pinned image labels should get added on sandbox image specified with digest",
+			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
+			pinnedImages:  []string{"k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2"},
+			pullImageName: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+		},
+
+		{
+			name:          "pinned image labels should not get added on other image",
+			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue},
+			pinnedImages:  []string{"k8s.gcr.io/pause:3.9"},
+			pullImageName: "k8s.gcr.io/random:latest",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Change this config name
-			//criService.config.SandboxImage = tt.configSandboxImage
+			criService.config.PinnedImages = tt.pinnedImages
 			labels := criService.getLabels(context.Background(), tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 

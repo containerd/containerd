@@ -23,6 +23,10 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/metadata"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
@@ -31,7 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/kmutex"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	snapshot "github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -48,9 +52,11 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.LeasePlugin,
 			plugins.EventPlugin,
+			plugins.MetadataPlugin,
 			plugins.SandboxStorePlugin,
 			plugins.InternalPlugin,
 			plugins.ServicePlugin,
+			plugins.SnapshotPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			// Get base CRI dependencies.
@@ -58,9 +64,30 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
 			}
+			// TODO: Move this to migration directly
 			c := criPlugin.(*base.CRIBase).Config
 
-			client, err := containerd.New(
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			mdb := m.(*metadata.DB)
+
+			ep, err := ic.GetSingle(plugins.EventPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			options := &CRIImageServiceOptions{
+				Content:          mdb.ContentStore(),
+				Images:           metadata.NewImageStore(mdb),
+				RuntimePlatforms: map[string]ImagePlatform{},
+				Snapshotters:     map[string]snapshots.Snapshotter{},
+				ImageFSPaths:     map[string]string{},
+				Publisher:        ep.(events.Publisher),
+			}
+
+			options.Client, err = containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 				containerd.WithDefaultPlatform(platforms.Default()),
@@ -70,28 +97,62 @@ func init() {
 				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
 			}
 
-			snapshotterOverrides := map[string]RuntimePlatform{}
-			imageFSPaths := map[string]string{}
-			// TODO: Figure out a way to break this plugin's dependency on a shared runtime config
-			for runtimeName, ociRuntime := range c.ContainerdConfig.Runtimes {
+			allSnapshotters := mdb.Snapshotters()
+			defaultSnapshotter := c.ImageConfig.Snapshotter
+			if s, ok := allSnapshotters[defaultSnapshotter]; ok {
+				options.Snapshotters[defaultSnapshotter] = s
+			} else {
+				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
+			}
+			var snapshotRoot string
+			if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, defaultSnapshotter); plugin != nil {
+				snapshotRoot = plugin.Meta.Exports["root"]
+			}
+			if snapshotRoot == "" {
+				// Try a root in the same parent as this plugin
+				snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+defaultSnapshotter)
+			}
+			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
+			log.L.Infof("Get image filesystem path %q for snapshotter %q", snapshotRoot, defaultSnapshotter)
+
+			for runtimeName, rp := range c.ImageConfig.RuntimePlatforms {
 				// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
-				snapshotter := ociRuntime.Snapshotter
-				if snapshotter != "" {
-					snapshotterOverrides[runtimeName] = RuntimePlatform{
-						Snapshotter: snapshotter,
-						// TODO: This must be provided by runtime
-						Platform: platforms.DefaultSpec(),
+				snapshotter := rp.Snapshotter
+				if snapshotter == "" {
+					snapshotter = defaultSnapshotter
+				} else if _, ok := options.ImageFSPaths[snapshotter]; !ok {
+					if s, ok := options.Snapshotters[defaultSnapshotter]; ok {
+						options.Snapshotters[defaultSnapshotter] = s
+					} else {
+						return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 					}
-					imageFSPaths[snapshotter] = filepath.Join(c.ContainerdRootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
-					log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+					var snapshotRoot string
+					if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
+						snapshotRoot = plugin.Meta.Exports["root"]
+					}
+					if snapshotRoot == "" {
+						// Try a root in the same parent as this plugin
+						snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+snapshotter)
+					}
+
+					options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
+					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
+				}
+				platform := platforms.DefaultSpec()
+				if rp.Platform != "" {
+					p, err := platforms.Parse(rp.Platform)
+					if err != nil {
+						return nil, fmt.Errorf("unable to parse platform %q: %w", rp.Platform, err)
+					}
+					platform = p
+				}
+				options.RuntimePlatforms[runtimeName] = ImagePlatform{
+					Snapshotter: snapshotter,
+					Platform:    platform,
 				}
 			}
-			snapshotter := c.ImageConfig.Snapshotter
-			imageFSPaths[snapshotter] = filepath.Join(c.ContainerdRootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
 
-			// TODO: Pull out image specific configs here!
-			service, err := NewService(c.ImageConfig, imageFSPaths, snapshotterOverrides, client)
+			service, err := NewService(c.ImageConfig, options)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create image service: %w", err)
 			}
@@ -101,7 +162,13 @@ func init() {
 	})
 }
 
-type RuntimePlatform struct {
+type imageClient interface {
+	ListImages(context.Context, ...string) ([]containerd.Image, error)
+	GetImage(context.Context, string) (containerd.Image, error)
+	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+}
+
+type ImagePlatform struct {
 	Snapshotter string
 	Platform    platforms.Platform
 }
@@ -121,13 +188,18 @@ type CRIImageService struct {
 	// - default runtime
 	// - stats collection interval (only used to startup snapshot sync)
 	config criconfig.ImageConfig
-	// client is an instance of the containerd client
-	// TODO: Remove this in favor of using plugins directly
-	client *containerd.Client
+	// images is the lower level image store used for raw storage,
+	// no event publishing should currently be assumed
+	images images.Store
+	// publisher is the events publisher
+	publisher events.Publisher
+	// client is a subset of the containerd client
+	// and will be replaced by image store and transfer service
+	client imageClient
 	// imageFSPaths contains path to image filesystem for snapshotters.
 	imageFSPaths map[string]string
 	// runtimePlatforms are the platforms configured for a runtime.
-	runtimePlatforms map[string]RuntimePlatform
+	runtimePlatforms map[string]ImagePlatform
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -142,6 +214,22 @@ type GRPCCRIImageService struct {
 	*CRIImageService
 }
 
+type CRIImageServiceOptions struct {
+	Content content.Store
+
+	Images images.Store
+
+	ImageFSPaths map[string]string
+
+	RuntimePlatforms map[string]ImagePlatform
+
+	Snapshotters map[string]snapshots.Snapshotter
+
+	Publisher events.Publisher
+
+	Client imageClient
+}
+
 // NewService creates a new CRI Image Service
 //
 // TODO:
@@ -152,40 +240,22 @@ type GRPCCRIImageService struct {
 //     - Image Service (from metadata)
 //     - Content store (from metadata)
 //  3. Separate image cache and snapshot cache to first class plugins, make the snapshot cache much more efficient and intelligent
-func NewService(config criconfig.ImageConfig, imageFSPaths map[string]string, runtimePlatforms map[string]RuntimePlatform, client *containerd.Client) (*CRIImageService, error) {
+func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (*CRIImageService, error) {
 	svc := CRIImageService{
 		config:                      config,
-		client:                      client,
-		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
-		imageFSPaths:                imageFSPaths,
-		runtimePlatforms:            runtimePlatforms,
+		images:                      options.Images,
+		client:                      options.Client,
+		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
+		imageFSPaths:                options.ImageFSPaths,
+		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
 
-	snapshotters := map[string]snapshot.Snapshotter{}
-
-	for _, rp := range runtimePlatforms {
-		if snapshotter := svc.client.SnapshotService(rp.Snapshotter); snapshotter != nil {
-			snapshotters[rp.Snapshotter] = snapshotter
-		} else {
-			return nil, fmt.Errorf("failed to find snapshotter %q", rp.Snapshotter)
-		}
-	}
-
-	// Add default snapshotter
-	snapshotterName := svc.config.Snapshotter
-	if snapshotter := svc.client.SnapshotService(snapshotterName); snapshotter != nil {
-		snapshotters[snapshotterName] = snapshotter
-	} else {
-		return nil, fmt.Errorf("failed to find snapshotter %q", snapshotterName)
-	}
-
-	// Start snapshot stats syncer, it doesn't need to be stopped.
 	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,
-		snapshotters,
+		options.Snapshotters,
 		time.Duration(svc.config.StatsCollectPeriod)*time.Second,
 	)
 	snapshotsSyncer.start()
