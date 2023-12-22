@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/protobuf/types"
 	api "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/typeurl/v2"
@@ -34,38 +35,42 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// PID returns sandbox's process PID or error if its not yet started.
-	PID() (uint32, error)
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
 	Labels(ctx context.Context) (map[string]string, error)
+	// Status returns sandbox current status
+	Status(ctx context.Context, verbose bool) (api.ControllerStatus, error)
+	// Platform returns sandbox platform
+	Platform(ctx context.Context) (platforms.Platform, error)
+	// Create creates sandbox in controller
+	Create(ctx context.Context, opts ...api.CreateOpt) error
 	// Start starts new sandbox instance
-	Start(ctx context.Context) error
+	Start(ctx context.Context) (api.ControllerInstance, error)
 	// Stop sends stop request to the shim instance.
 	Stop(ctx context.Context) error
 	// Wait blocks until sandbox process exits.
 	Wait(ctx context.Context) (<-chan ExitStatus, error)
 	// Shutdown removes sandbox from the metadata store and shutdowns shim instance.
 	Shutdown(ctx context.Context) error
+	// AddExtension adds extension into the sandbox.
+	AddExtension(ctx context.Context, name string, obj interface{}) error
 }
 
 type sandboxClient struct {
-	pid      *uint32
 	client   *Client
 	metadata api.Sandbox
 }
 
-func (s *sandboxClient) ID() string {
-	return s.metadata.ID
+func NewSandboxClient(client *Client, metadata api.Sandbox) Sandbox {
+	return &sandboxClient{
+		client:   client,
+		metadata: metadata,
+	}
 }
 
-func (s *sandboxClient) PID() (uint32, error) {
-	if s.pid == nil {
-		return 0, fmt.Errorf("sandbox not started")
-	}
-
-	return *s.pid, nil
+func (s *sandboxClient) ID() string {
+	return s.metadata.ID
 }
 
 func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -81,14 +86,20 @@ func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
 	return sandbox.Labels, nil
 }
 
-func (s *sandboxClient) Start(ctx context.Context) error {
-	resp, err := s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
-	if err != nil {
-		return err
-	}
+func (s *sandboxClient) Status(ctx context.Context, verbose bool) (api.ControllerStatus, error) {
+	return s.client.SandboxController(s.metadata.Sandboxer).Status(ctx, s.metadata.ID, verbose)
+}
 
-	s.pid = &resp.Pid
-	return nil
+func (s *sandboxClient) Platform(ctx context.Context) (platforms.Platform, error) {
+	return s.client.SandboxController(s.metadata.Sandboxer).Platform(ctx, s.ID())
+}
+
+func (s *sandboxClient) Create(ctx context.Context, opts ...api.CreateOpt) error {
+	return s.client.SandboxController(s.metadata.Sandboxer).Create(ctx, s.metadata, opts...)
+}
+
+func (s *sandboxClient) Start(ctx context.Context) (api.ControllerInstance, error) {
+	return s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
 }
 
 func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
@@ -130,6 +141,20 @@ func (s *sandboxClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (s *sandboxClient) AddExtension(ctx context.Context, name string, obj interface{}) error {
+	metadata := s.metadata
+	if err := metadata.AddExtension(name, obj); err != nil {
+		return fmt.Errorf("unable to add extension to sandbox %q metadata: %w", s.ID(), err)
+	}
+	// Save sandbox metadata to store
+	newMetadata, err := s.client.SandboxStore().Update(ctx, metadata, "extensions")
+	if err != nil {
+		return fmt.Errorf("unable to update extensions for sandbox %q: %w", s.ID(), err)
+	}
+	s.metadata = newMetadata
+	return nil
+}
+
 // NewSandbox creates new sandbox client
 func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSandboxOpts) (Sandbox, error) {
 	if sandboxID == "" {
@@ -154,7 +179,6 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}
 
 	return &sandboxClient{
-		pid:      nil, // Not yet started
 		client:   c,
 		metadata: metadata,
 	}, nil
@@ -167,13 +191,7 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController(sandbox.Sandboxer).Status(ctx, id, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
-	}
-
 	return &sandboxClient{
-		pid:      &status.Pid,
 		client:   c,
 		metadata: sandbox,
 	}, nil
@@ -243,6 +261,14 @@ func WithSandboxExtension(name string, extension interface{}) NewSandboxOpts {
 func WithSandboxLabels(labels map[string]string) NewSandboxOpts {
 	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
 		sandbox.Labels = labels
+		return nil
+	}
+}
+
+// WithSandboxer attaches sandboxer name to sandbox
+func WithSandboxer(sandboxer string) NewSandboxOpts {
+	return func(ctx context.Context, client *Client, sandbox *api.Sandbox) error {
+		sandbox.Sandboxer = sandboxer
 		return nil
 	}
 }

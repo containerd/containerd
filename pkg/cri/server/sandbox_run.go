@@ -81,18 +81,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
-	var (
-		err         error
-		sandboxInfo = sb.Sandbox{ID: id}
-	)
-
 	ociRuntime, err := c.config.GetSandboxRuntime(config, r.GetRuntimeHandler())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get OCI runtime for sandbox %q: %w", id, err)
 	}
-
-	sandboxInfo.Runtime.Name = ociRuntime.Type
-	sandboxInfo.Sandboxer = ociRuntime.Sandboxer
 
 	runtimeStart := time.Now()
 	// Retrieve runtime options
@@ -100,16 +92,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate sandbox runtime options: %w", err)
 	}
-
-	if runtimeOpts != nil {
-		sandboxInfo.Runtime.Options, err = typeurl.MarshalAny(runtimeOpts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal runtime options: %w", err)
-		}
-	}
-
-	// Save sandbox name
-	sandboxInfo.AddLabel("name", name)
 
 	// Create initial internal sandbox object.
 	sandbox := sandboxstore.NewSandbox(
@@ -124,9 +106,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 
-	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
+	sandboxClient, err := c.client.NewSandbox(ctx, id,
+		containerd.WithSandboxRuntime(ociRuntime.Type, runtimeOpts),
+		containerd.WithSandboxLabels(map[string]string{"name": name}),
+		containerd.WithSandboxer(ociRuntime.Sandboxer),
+	)
+	if err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
 	}
+	sandbox.Sandbox = sandboxClient
+
 	defer func() {
 		if retErr != nil && cleanupErr == nil {
 			cleanupErr = c.client.SandboxStore().Delete(ctx, id)
@@ -197,12 +186,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}()
 
-		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-		}
 		// Save sandbox metadata to store
-		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		if err := sandboxClient.AddExtension(ctx, podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 		}
 
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
@@ -235,25 +221,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
-	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+	if err := sandboxClient.AddExtension(ctx, podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 	}
 
-	controller, err := c.sandboxService.SandboxController(config, r.GetRuntimeHandler())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
-
-	// Save sandbox metadata to store
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
-	}
-
-	if err := controller.Create(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
+	if err := sandboxClient.Create(ctx, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
-	ctrl, err := controller.Start(ctx, id)
+	ctrl, err := sandboxClient.Start(ctx)
 	if err != nil {
 		var cerr podsandbox.CleanupErr
 		if errors.As(err, &cerr) {
@@ -313,12 +289,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}
 		}()
 
-		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-		}
 		// Save sandbox metadata to store
-		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		if err := sandboxClient.AddExtension(ctx, podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 		}
 
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
@@ -389,7 +362,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update sandbox status: %w", err)
 	}
-
 	// Add sandbox into sandbox store in INIT state.
 	if err := c.sandboxStore.Add(sandbox); err != nil {
 		return nil, fmt.Errorf("failed to add sandbox %+v into store: %w", sandbox, err)
@@ -400,21 +372,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// SandboxStatus from the store and include it in the event.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
 
-	// TODO: Use sandbox client instead
-	exitCh := make(chan containerd.ExitStatus, 1)
-	go func() {
-		defer close(exitCh)
-
-		ctx := util.NamespacedContext()
-		resp, err := controller.Wait(ctx, id)
-		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
-			exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
-			return
-		}
-
-		exitCh <- *containerd.NewExitStatus(resp.ExitStatus, resp.ExitedAt, nil)
-	}()
+	exitCh, err := sandboxClient.Wait(util.NamespacedContext())
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait for sandbox exit: %w", err)
+	}
 
 	// start the monitor after adding sandbox into the store, this ensures
 	// that sandbox is in the store, when event monitor receives the TaskExit event.
