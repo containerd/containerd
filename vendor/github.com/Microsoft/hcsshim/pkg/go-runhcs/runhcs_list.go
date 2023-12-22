@@ -17,8 +17,8 @@ type ContainerState = irunhcs.ContainerState
 //
 // Note: This is specific to the Runhcs.Root namespace provided in the global
 // settings.
-func (r *Runhcs) List(context context.Context) ([]*ContainerState, error) {
-	data, err := cmdOutput(r.command(context, "list", "--format=json"), false)
+func (r *Runhcs) List(ctx context.Context) ([]*ContainerState, error) {
+	data, err := cmdOutput(r.command(ctx, "list", "--format=json"), false)
 	if err != nil {
 		return nil, err
 	}

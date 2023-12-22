@@ -5,6 +5,7 @@ package ociwclayer
 import (
 	"archive/tar"
 	"context"
+	"errors"
 	"io"
 	"path/filepath"
 
@@ -62,7 +63,7 @@ func writeTarFromLayer(ctx context.Context, r wclayer.LayerReader, w io.Writer) 
 		}
 
 		name, size, fileInfo, err := r.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
