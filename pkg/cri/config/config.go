@@ -237,6 +237,15 @@ type ImageDecryption struct {
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
 
+// ImagePlatform represents the platform to use for an image including the
+// snapshotter to use. If snapshotter is not provided, the platform default
+// can be assumed. When platform is not provided, the default platform can
+// be assumed
+type ImagePlatform struct {
+	Platform    string
+	Snapshotter string
+}
+
 type ImageConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
@@ -250,6 +259,20 @@ type ImageConfig struct {
 	// remove layers from the content store after successfully unpacking these
 	// layers to the snapshotter.
 	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// PinnedImages are images which the CRI plugin uses and should not be
+	// removed by the CRI client.
+	// Image names should be full names including domain and tag
+	// Examples:
+	//   docker.io/library/ubuntu:latest
+	//   images.k8s.io/core/pause:1.55
+	PinnedImages []string
+
+	// RuntimePlatforms is map between the runtime and the image platform to
+	// use for that runtime. When resolving an image for a runtime, this
+	// mapping will be used to select the image for the platform and the
+	// snapshotter for unpacking.
+	RuntimePlatforms map[string]ImagePlatform
 
 	// Registry contains config related to the registry
 	Registry Registry `toml:"registry" json:"registry"`
