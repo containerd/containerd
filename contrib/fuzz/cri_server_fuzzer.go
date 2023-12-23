@@ -43,13 +43,14 @@ func FuzzCRIServer(data []byte) int {
 	defer client.Close()
 
 	config := criconfig.Config{}
+	imageConfig := criconfig.ImageConfig{}
 
-	imageService, err := images.NewService(config.ImageConfig, map[string]string{}, map[string]images.RuntimePlatform{}, client)
+	imageService, err := images.NewService(imageConfig, &images.CRIImageServiceOptions{
+		Client: client,
+	})
 	if err != nil {
 		panic(err)
 	}
-
-	is := images.NewGRPCService(imageService)
 
 	c, rs, err := server.NewCRIService(config, &server.CRIServiceOptions{
 		ImageService: imageService,
@@ -63,7 +64,7 @@ func FuzzCRIServer(data []byte) int {
 	return fuzzCRI(f, &service{
 		CRIService:           c,
 		RuntimeServiceServer: rs,
-		ImageServiceServer:   is,
+		ImageServiceServer:   imageService.GRPCService(),
 	})
 }
 
