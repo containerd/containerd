@@ -24,6 +24,21 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
+func DefaultImageConfig() ImageConfig {
+	return ImageConfig{
+		Snapshotter:            containerd.DefaultSnapshotter,
+		StatsCollectPeriod:     10,
+		MaxConcurrentDownloads: 3,
+		ImageDecryption: ImageDecryption{
+			KeyModel: KeyModelNode,
+		},
+		PinnedImages: map[string]string{
+			"sandbox": DefaultSandboxImage,
+		},
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
+	}
+}
+
 // DefaultConfig returns default configurations of cri plugin.
 func DefaultConfig() PluginConfig {
 	return PluginConfig{
@@ -33,15 +48,6 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginMaxConfNum:    1,
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
-		},
-		ImageConfig: ImageConfig{
-			Snapshotter:            containerd.DefaultSnapshotter,
-			StatsCollectPeriod:     10,
-			MaxConcurrentDownloads: 3,
-			ImageDecryption: ImageDecryption{
-				KeyModel: KeyModelNode,
-			},
-			ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runhcs-wcow-process",
@@ -81,7 +87,6 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:              "registry.k8s.io/pause:3.9",
 		MaxContainerLogLineSize:   16 * 1024,
 		IgnoreImageDefinedVolumes: false,
 		// TODO(windows): Add platform specific config, so that most common defaults can be shared.

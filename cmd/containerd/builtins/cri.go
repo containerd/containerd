@@ -20,4 +20,5 @@ package builtins
 
 import (
 	_ "github.com/containerd/containerd/v2/pkg/cri"
+	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 )

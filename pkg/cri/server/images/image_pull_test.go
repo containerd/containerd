@@ -492,27 +492,27 @@ func TestImageGetLabels(t *testing.T) {
 	tests := []struct {
 		name          string
 		expectedLabel map[string]string
-		pinnedImages  []string
+		pinnedImages  map[string]string
 		pullImageName string
 	}{
 		{
 			name:          "pinned image labels should get added on sandbox image",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  []string{"k8s.gcr.io/pause:3.9"},
+			pinnedImages:  map[string]string{"sandbox": "k8s.gcr.io/pause:3.9"},
 			pullImageName: "k8s.gcr.io/pause:3.9",
 		},
 		{
 			name:          "pinned image labels should get added on sandbox image without tag",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  []string{"k8s.gcr.io/pause", "k8s.gcr.io/pause:latest"},
+			pinnedImages:  map[string]string{"sandboxnotag": "k8s.gcr.io/pause", "sandbox": "k8s.gcr.io/pause:latest"},
 			pullImageName: "k8s.gcr.io/pause:latest",
 		},
 		{
 			name:          "pinned image labels should get added on sandbox image specified with tag and digest both",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages: []string{
-				"k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
-				"k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+			pinnedImages: map[string]string{
+				"sandboxtagdigest": "k8s.gcr.io/pause:3.9@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
+				"sandbox":          "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 			},
 			pullImageName: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 		},
@@ -520,14 +520,14 @@ func TestImageGetLabels(t *testing.T) {
 		{
 			name:          "pinned image labels should get added on sandbox image specified with digest",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue, labels.PinnedImageLabelKey: labels.PinnedImageLabelValue},
-			pinnedImages:  []string{"k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2"},
+			pinnedImages:  map[string]string{"sandbox": "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2"},
 			pullImageName: "k8s.gcr.io/pause@sha256:45b23dee08af5e43a7fea6c4cf9c25ccf269ee113168c19722f87876677c5cb2",
 		},
 
 		{
 			name:          "pinned image labels should not get added on other image",
 			expectedLabel: map[string]string{labels.ImageLabelKey: labels.ImageLabelValue},
-			pinnedImages:  []string{"k8s.gcr.io/pause:3.9"},
+			pinnedImages:  map[string]string{"sandbox": "k8s.gcr.io/pause:3.9"},
 			pullImageName: "k8s.gcr.io/random:latest",
 		},
 	}
