@@ -126,7 +126,7 @@ func WritePidFile(path string, pid int) error {
 	if err != nil {
 		return err
 	}
-	f, err := atomicfile.New(path, 0o666)
+	f, err := atomicfile.New(path, 0o644)
 	if err != nil {
 		return err
 	}
