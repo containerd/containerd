@@ -135,11 +135,6 @@ type CRIServiceOptions struct {
 	// SandboxControllers is a map of all the loaded sandbox controllers
 	SandboxControllers map[string]sandbox.Controller
 
-	// ImageFSPath is the filesystem path for images
-	//
-	// TODO: Move this to cached snapshot metadata
-	ImageFSPaths map[string]string
-
 	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
 	BaseOCISpecs map[string]*oci.Spec
 
@@ -159,7 +154,7 @@ func NewCRIService(config criconfig.Config, options *CRIServiceOptions) (CRIServ
 		ImageService:       options.ImageService,
 		config:             config,
 		client:             options.Client,
-		imageFSPaths:       options.ImageFSPaths,
+		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
 		baseOCISpecs:       options.BaseOCISpecs,
 		sandboxStore:       sandboxstore.NewStore(labels),

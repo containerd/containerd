@@ -30,8 +30,6 @@ import (
 
 const (
 	testImageFSPath = "/test/image/fs/path"
-	testRootDir     = "/test/root"
-	testStateDir    = "/test/state"
 	// Use an image id as test sandbox image to avoid image name resolve.
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
@@ -41,7 +39,7 @@ const (
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	service := &CRIImageService{
-		config:           testConfig.ImageConfig,
+		config:           testImageConfig,
 		runtimePlatforms: map[string]ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
 		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
@@ -51,15 +49,9 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 	return service, &GRPCCRIImageService{service}
 }
 
-var testConfig = criconfig.Config{
-	RootDir:  testRootDir,
-	StateDir: testStateDir,
-	PluginConfig: criconfig.PluginConfig{
-		ImageConfig: criconfig.ImageConfig{
-			PinnedImages: []string{testSandboxImage},
-		},
-		SandboxImage:                     testSandboxImage,
-		TolerateMissingHugetlbController: true,
+var testImageConfig = criconfig.ImageConfig{
+	PinnedImages: map[string]string{
+		"sandbox": testSandboxImage,
 	},
 }
 
@@ -119,7 +111,7 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		{
 			desc:              "should return default snapshotter when runtime.Snapshotter is not set",
 			runtime:           defaultRuntime,
-			expectSnapshotter: criconfig.DefaultConfig().Snapshotter,
+			expectSnapshotter: criconfig.DefaultImageConfig().Snapshotter,
 		},
 		{
 			desc:              "should return overridden snapshotter when runtime.Snapshotter is set",
@@ -130,7 +122,7 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
-			cri.config = criconfig.DefaultConfig().ImageConfig
+			cri.config = criconfig.DefaultImageConfig()
 			assert.Equal(t, test.expectSnapshotter, cri.RuntimeSnapshotter(context.Background(), test.runtime))
 		})
 	}

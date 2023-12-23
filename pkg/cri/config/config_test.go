@@ -28,10 +28,13 @@ import (
 
 func TestValidateConfig(t *testing.T) {
 	for desc, test := range map[string]struct {
-		config      *PluginConfig
-		expectedErr string
-		expected    *PluginConfig
-		warnings    []deprecation.Warning
+		config           *PluginConfig
+		expectedErr      string
+		expected         *PluginConfig
+		imageConfig      *ImageConfig
+		imageExpectedErr string
+		imageExpected    *ImageConfig
+		warnings         []deprecation.Warning
 	}{
 		"no default_runtime_name": {
 			config:      &PluginConfig{},
@@ -54,13 +57,6 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Auths: map[string]AuthConfig{
-							"https://gcr.io": {Username: "test"},
-						},
-					},
-				},
 			},
 			expected: &PluginConfig{
 				ContainerdConfig: ContainerdConfig{
@@ -71,18 +67,25 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Configs: map[string]RegistryConfig{
-							"gcr.io": {
-								Auth: &AuthConfig{
-									Username: "test",
-								},
+			},
+			imageConfig: &ImageConfig{
+				Registry: Registry{
+					Auths: map[string]AuthConfig{
+						"https://gcr.io": {Username: "test"},
+					},
+				},
+			},
+			imageExpected: &ImageConfig{
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
 							},
 						},
-						Auths: map[string]AuthConfig{
-							"https://gcr.io": {Username: "test"},
-						},
+					},
+					Auths: map[string]AuthConfig{
+						"https://gcr.io": {Username: "test"},
 					},
 				},
 			},
@@ -103,25 +106,15 @@ func TestValidateConfig(t *testing.T) {
 			expectedErr: "invalid stream idle timeout",
 		},
 		"conflicting mirror registry config": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						ConfigPath: "/etc/containerd/conf.d",
-						Mirrors: map[string]Mirror{
-							"something.io": {},
-						},
+			imageConfig: &ImageConfig{
+				Registry: Registry{
+					ConfigPath: "/etc/containerd/conf.d",
+					Mirrors: map[string]Mirror{
+						"something.io": {},
 					},
 				},
 			},
-			expectedErr: "`mirrors` cannot be set when `config_path` is provided",
+			imageExpectedErr: "`mirrors` cannot be set when `config_path` is provided",
 		},
 		"deprecated mirrors": {
 			config: &PluginConfig{
@@ -131,11 +124,11 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Mirrors: map[string]Mirror{
-							"example.com": {},
-						},
+			},
+			imageConfig: &ImageConfig{
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
 					},
 				},
 			},
@@ -148,11 +141,11 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Mirrors: map[string]Mirror{
-							"example.com": {},
-						},
+			},
+			imageExpected: &ImageConfig{
+				Registry: Registry{
+					Mirrors: map[string]Mirror{
+						"example.com": {},
 					},
 				},
 			},
@@ -166,13 +159,13 @@ func TestValidateConfig(t *testing.T) {
 						RuntimeDefault: {},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Configs: map[string]RegistryConfig{
-							"gcr.io": {
-								Auth: &AuthConfig{
-									Username: "test",
-								},
+			},
+			imageConfig: &ImageConfig{
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
 							},
 						},
 					},
@@ -187,13 +180,13 @@ func TestValidateConfig(t *testing.T) {
 						},
 					},
 				},
-				ImageConfig: ImageConfig{
-					Registry: Registry{
-						Configs: map[string]RegistryConfig{
-							"gcr.io": {
-								Auth: &AuthConfig{
-									Username: "test",
-								},
+			},
+			imageExpected: &ImageConfig{
+				Registry: Registry{
+					Configs: map[string]RegistryConfig{
+						"gcr.io": {
+							Auth: &AuthConfig{
+								Username: "test",
 							},
 						},
 					},
@@ -232,17 +225,32 @@ func TestValidateConfig(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			w, err := ValidatePluginConfig(context.Background(), test.config)
-			if test.expectedErr != "" {
-				assert.Contains(t, err.Error(), test.expectedErr)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, test.expected, test.config)
+			var warnings []deprecation.Warning
+			if test.config != nil {
+				w, err := ValidatePluginConfig(context.Background(), test.config)
+				if test.expectedErr != "" {
+					assert.Contains(t, err.Error(), test.expectedErr)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, test.expected, test.config)
+				}
+				warnings = append(warnings, w...)
 			}
+			if test.imageConfig != nil {
+				w, err := ValidateImageConfig(context.Background(), test.imageConfig)
+				if test.imageExpectedErr != "" {
+					assert.Contains(t, err.Error(), test.imageExpectedErr)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, test.imageExpected, test.imageConfig)
+				}
+				warnings = append(warnings, w...)
+			}
+
 			if len(test.warnings) > 0 {
-				assert.ElementsMatch(t, test.warnings, w)
+				assert.ElementsMatch(t, test.warnings, warnings)
 			} else {
-				assert.Len(t, w, 0)
+				assert.Len(t, warnings, 0)
 			}
 		})
 	}

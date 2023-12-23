@@ -39,6 +39,7 @@ import (
 	_ "github.com/containerd/containerd/v2/gc/scheduler"
 	_ "github.com/containerd/containerd/v2/leases/plugin"
 	_ "github.com/containerd/containerd/v2/metadata/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/runtime/v2"
 	_ "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/v2/services/containers"
@@ -53,7 +54,7 @@ import (
 	_ "github.com/containerd/containerd/v2/services/tasks"
 	_ "github.com/containerd/containerd/v2/services/version"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -72,7 +73,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 	// load plugins
 	loadPluginOnce.Do(func() {
 		loadedPlugins, loadedPluginsErr = ctrdsrv.LoadPlugins(ctx, &srvconfig.Config{})
-		assert.NoError(t, loadedPluginsErr)
+		require.NoError(t, loadedPluginsErr)
 	})
 
 	// init plugins
@@ -104,7 +105,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
 			pc, err := config.Decode(ctx, p.URI(), p.Config)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			initContext.Config = pc
 		}
@@ -114,10 +115,10 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		}
 
 		result := p.Init(initContext)
-		assert.NoError(t, initialized.Add(result))
+		require.NoError(t, initialized.Add(result))
 
 		_, err := result.Instance()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		lastInitContext = initContext
 	}
@@ -129,7 +130,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		containerd.WithInMemoryServices(lastInitContext),
 		containerd.WithInMemorySandboxControllers(lastInitContext),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return client
 }

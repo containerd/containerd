@@ -24,6 +24,23 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
+func DefaultImageConfig() ImageConfig {
+	return ImageConfig{
+		Snapshotter:                containerd.DefaultSnapshotter,
+		DisableSnapshotAnnotations: true,
+		MaxConcurrentDownloads:     3,
+		ImageDecryption: ImageDecryption{
+			KeyModel: KeyModelNode,
+		},
+		PinnedImages: map[string]string{
+			"sandbox": DefaultSandboxImage,
+		},
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
+		ImagePullWithSyncFs:      false,
+		StatsCollectPeriod:       10,
+	}
+}
+
 // DefaultConfig returns default configurations of cri plugin.
 func DefaultConfig() PluginConfig {
 	defaultRuncV2Opts := `
@@ -62,17 +79,6 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
 		},
-		ImageConfig: ImageConfig{
-			Snapshotter:                containerd.DefaultSnapshotter,
-			DisableSnapshotAnnotations: true,
-			MaxConcurrentDownloads:     3,
-			ImageDecryption: ImageDecryption{
-				KeyModel: KeyModelNode,
-			},
-			ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
-			ImagePullWithSyncFs:      false,
-			StatsCollectPeriod:       10,
-		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runc",
 			Runtimes: map[string]Runtime{
@@ -94,7 +100,6 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:                     "registry.k8s.io/pause:3.9",
 		MaxContainerLogLineSize:          16 * 1024,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,

@@ -32,6 +32,7 @@ import (
 	containerdio "github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
@@ -74,10 +75,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
+	sandboxImage := c.imageService.PinnedImage("sandbox")
+	if sandboxImage == "" {
+		sandboxImage = criconfig.DefaultSandboxImage
+	}
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
+	image, err := c.ensureImageExists(ctx, sandboxImage, config)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
