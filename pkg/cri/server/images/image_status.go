@@ -25,9 +25,9 @@ import (
 
 	"github.com/containerd/containerd/v2/errdefs"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/tracing"
 	"github.com/containerd/log"
-	docker "github.com/distribution/reference"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -65,7 +65,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 
 // toCRIImage converts internal image object to CRI runtime.Image.
 func toCRIImage(image imagestore.Image) *runtime.Image {
-	repoTags, repoDigests := ParseImageReferences(image.References)
+	repoTags, repoDigests := util.ParseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
 		Id:          image.ID,
 		RepoTags:    repoTags,
@@ -99,24 +99,6 @@ func getUserFromImage(user string) (*int64, string) {
 	}
 	// If user is a numeric uid.
 	return &uid, ""
-}
-
-// ParseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
-func ParseImageReferences(refs []string) ([]string, []string) {
-	var tags, digests []string
-	for _, ref := range refs {
-		parsed, err := docker.ParseAnyReference(ref)
-		if err != nil {
-			continue
-		}
-		if _, ok := parsed.(docker.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(docker.Tagged); ok {
-			tags = append(tags, parsed.String())
-		}
-	}
-	return tags, digests
 }
 
 // TODO (mikebrow): discuss moving this struct and / or constants for info map for some or all of these fields to CRI
