@@ -26,6 +26,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
 func TestImageStatus(t *testing.T) {
@@ -84,7 +85,7 @@ func TestParseImageReferences(t *testing.T) {
 		"gcr.io/library/busybox:1.2",
 	}
 	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
-	tags, digests := ParseImageReferences(refs)
+	tags, digests := util.ParseImageReferences(refs)
 	assert.Equal(t, expectedTags, tags)
 	assert.Equal(t, expectedDigests, digests)
 }
