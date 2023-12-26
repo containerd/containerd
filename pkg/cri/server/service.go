@@ -248,6 +248,11 @@ func (c *criService) Run(ready func()) error {
 		}()
 	}
 
+	// register CRI domain with NRI
+        if err := c.nri.Register(&criImplementation{c}); err != nil {
+                return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
+        }
+
 	// Start streaming server.
 	log.L.Info("Start streaming server")
 	streamServerErrCh := make(chan error)
@@ -258,11 +263,6 @@ func (c *criService) Run(ready func()) error {
 			streamServerErrCh <- err
 		}
 	}()
-
-	// register CRI domain with NRI
-	if err := c.nri.Register(&criImplementation{c}); err != nil {
-		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
-	}
 
 	// Set the server as initialized. GRPC services could start serving traffic.
 	c.initialized.Store(true)
