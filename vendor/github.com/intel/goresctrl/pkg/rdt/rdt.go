@@ -234,7 +234,7 @@ func SetConfig(c *Config, force bool) error {
 // reconfigures the resctrl filesystem.
 func SetConfigFromData(data []byte, force bool) error {
 	cfg := &Config{}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.UnmarshalStrict(data, cfg); err != nil {
 		return fmt.Errorf("failed to parse configuration data: %v", err)
 	}
 
