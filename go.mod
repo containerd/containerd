@@ -34,7 +34,7 @@ require (
 	github.com/google/uuid v1.5.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/intel/goresctrl v0.5.0
+	github.com/intel/goresctrl v0.6.0
 	github.com/klauspost/compress v1.17.4
 	github.com/minio/sha256-simd v1.0.1
 	github.com/moby/locker v1.0.1

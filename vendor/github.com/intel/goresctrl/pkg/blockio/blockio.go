@@ -115,7 +115,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 
-	"github.com/intel/goresctrl/pkg/cgroups"
 	grclog "github.com/intel/goresctrl/pkg/log"
 	goresctrlpath "github.com/intel/goresctrl/pkg/path"
 )
@@ -143,7 +142,7 @@ var log grclog.Logger = grclog.NewLoggerWrapper(stdlog.New(os.Stderr, "[ blockio
 
 // classBlockIO connects user-defined block I/O classes to
 // corresponding cgroups blockio controller parameters.
-var classBlockIO = map[string]cgroups.BlockIOParameters{}
+var classBlockIO = map[string]BlockIOParameters{}
 
 // SetLogger sets the logger instance to be used by the package.
 // Examples:
@@ -173,7 +172,7 @@ func SetConfigFromFile(filename string, force bool) error {
 // SetConfigFromData parses and applies configuration from data.
 func SetConfigFromData(data []byte, force bool) error {
 	config := &Config{}
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.UnmarshalStrict(data, &config); err != nil {
 		return err
 	}
 	return SetConfig(config, force)
@@ -184,7 +183,7 @@ func SetConfig(opt *Config, force bool) error {
 	if opt == nil {
 		// Setting nil configuration clears current configuration.
 		// SetConfigFromData([]byte(""), dontcare) arrives here.
-		classBlockIO = map[string]cgroups.BlockIOParameters{}
+		classBlockIO = map[string]BlockIOParameters{}
 		return nil
 	}
 
@@ -193,7 +192,7 @@ func SetConfig(opt *Config, force bool) error {
 		log.Warnf("configuration validation partly disabled due to I/O scheduler detection error %#v", ioSchedulerDetectionError.Error())
 	}
 
-	classBlockIO = map[string]cgroups.BlockIOParameters{}
+	classBlockIO = map[string]BlockIOParameters{}
 	// Create cgroup blockio parameters for each blockio class
 	for class := range opt.Classes {
 		cgBlockIO, err := devicesParametersToCgBlockIO(opt.Classes[class], currentIOSchedulers)
@@ -217,22 +216,6 @@ func GetClasses() []string {
 	}
 	sort.Strings(classNames)
 	return classNames
-}
-
-// SetCgroupClass sets cgroup blkio controller parameters to match
-// blockio class. "group" is the cgroup directory of the container
-// without mountpoint and controller (blkio) directories:
-// "/kubepods/burstable/POD_ID/CONTAINER_ID".
-func SetCgroupClass(group string, class string) error {
-	cgBlockIO, ok := classBlockIO[class]
-	if !ok {
-		return fmt.Errorf("no BlockIO parameters for class %#v", class)
-	}
-	err := cgroups.ResetBlkioParameters(group, cgBlockIO)
-	if err != nil {
-		return fmt.Errorf("assigning container in cgroup %q to class %#v failed: %w", group, class, err)
-	}
-	return nil
 }
 
 // getCurrentIOSchedulers returns currently active I/O scheduler used for each block device in the system.
@@ -274,9 +257,9 @@ func getCurrentIOSchedulers() (map[string]string, error) {
 }
 
 // deviceParametersToCgBlockIO converts single blockio class parameters into cgroups blkio format.
-func devicesParametersToCgBlockIO(dps []DevicesParameters, currentIOSchedulers map[string]string) (cgroups.BlockIOParameters, error) {
+func devicesParametersToCgBlockIO(dps []DevicesParameters, currentIOSchedulers map[string]string) (BlockIOParameters, error) {
 	errs := []error{}
-	blkio := cgroups.NewBlockIOParameters()
+	blkio := NewBlockIOParameters()
 	for _, dp := range dps {
 		var err error
 		var weight, throttleReadBps, throttleWriteBps, throttleReadIOPS, throttleWriteIOPS int64
