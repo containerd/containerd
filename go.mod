@@ -3,6 +3,7 @@ module github.com/containerd/containerd
 go 1.19
 
 require (
+	dario.cat/mergo v1.0.0
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 	github.com/Microsoft/go-winio v0.6.1
@@ -36,7 +37,6 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/imdario/mergo v0.3.13
 	github.com/intel/goresctrl v0.3.0
 	github.com/klauspost/compress v1.16.0
 	github.com/minio/sha256-simd v1.0.0
