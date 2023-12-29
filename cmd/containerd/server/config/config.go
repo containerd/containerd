@@ -30,6 +30,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"dario.cat/mergo"
@@ -310,12 +311,6 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 		pending = append(pending, imports...)
 	}
 
-	// Fix up the list of config files loaded
-	out.Imports = []string{}
-	for path := range loaded {
-		out.Imports = append(out.Imports, path)
-	}
-
 	err := out.ValidateVersion()
 	if err != nil {
 		return fmt.Errorf("failed to load TOML from %s: %w", path, err)
@@ -408,9 +403,11 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // 0            1           1
 // []{"1"}      []{"2"}     []{"1","2"}
 // []{"1"}      []{}        []{"1"}
+// []{"1", "2"} []{"1"}     []{"1","2"}
+// []{}         []{"2"}     []{"2"}
 // Maps merged by keys, but values are replaced entirely.
 func mergeConfig(to, from *Config) error {
-	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithAppendSlice)
+	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithTransformers(sliceTransformer{}))
 	if err != nil {
 		return err
 	}
@@ -433,6 +430,43 @@ func mergeConfig(to, from *Config) error {
 	}
 
 	return nil
+}
+
+type sliceTransformer struct{}
+
+func (sliceTransformer) Transformer(t reflect.Type) func(dst, src reflect.Value) error {
+	if t.Kind() != reflect.Slice {
+		return nil
+	}
+	return func(dst, src reflect.Value) error {
+		if !dst.CanSet() {
+			return nil
+		}
+		if src.Type() != dst.Type() {
+			return fmt.Errorf("cannot append two slice with different type (%s, %s)", src.Type(), dst.Type())
+		}
+		for i := 0; i < src.Len(); i++ {
+			found := false
+			for j := 0; j < dst.Len(); j++ {
+				srcv := src.Index(i)
+				dstv := dst.Index(j)
+				if !srcv.CanInterface() || !dstv.CanInterface() {
+					if srcv.Equal(dstv) {
+						found = true
+						break
+					}
+				} else if reflect.DeepEqual(srcv.Interface(), dstv.Interface()) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				dst.Set(reflect.Append(dst, src.Index(i)))
+			}
+		}
+
+		return nil
+	}
 }
 
 // V2DisabledFilter matches based on URI

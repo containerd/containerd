@@ -50,6 +50,7 @@ func TestMergeConfigs(t *testing.T) {
 		Version:          2,
 		Root:             "new_root",
 		RequiredPlugins:  []string{"io.containerd.new_plugin1.v1", "io.containerd.new_plugin2.v1"},
+		DisabledPlugins:  []string{"io.containerd.old_plugin.v1"},
 		OOMScore:         2,
 		Timeouts:         map[string]string{"b": "2"},
 		StreamProcessors: map[string]StreamProcessor{"1": {Path: "3"}},
@@ -191,8 +192,8 @@ imports = ["data1.toml", "data2.toml"]
 
 	sort.Strings(out.Imports)
 	assert.Equal(t, []string{
-		filepath.Join(tempDir, "data1.toml"),
-		filepath.Join(tempDir, "data2.toml"),
+		"data1.toml",
+		"data2.toml",
 	}, out.Imports)
 }
 
