@@ -77,6 +77,17 @@ func init() {
 			var lc local.TransferConfig
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+
+			// If UnpackConfiguration is not defined, set the default.
+			// If UnpackConfiguration is defined and empty, ignore.
+			if config.UnpackConfiguration == nil {
+				config.UnpackConfiguration = []unpackConfiguration{
+					{
+						Platform:    platforms.Format(platforms.DefaultSpec()),
+						Snapshotter: defaults.DefaultSnapshotter,
+					},
+				}
+			}
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
 				if err != nil {
@@ -148,7 +159,7 @@ type transferConfig struct {
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
 
 	// UnpackConfiguration is used to read config from toml
-	UnpackConfiguration []unpackConfiguration `toml:"unpack_config"`
+	UnpackConfiguration []unpackConfiguration `toml:"unpack_config,omitempty"`
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
@@ -169,11 +180,5 @@ func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
-		UnpackConfiguration: []unpackConfiguration{
-			{
-				Platform:    platforms.Format(platforms.DefaultSpec()),
-				Snapshotter: defaults.DefaultSnapshotter,
-			},
-		},
 	}
 }
