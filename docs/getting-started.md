@@ -173,10 +173,13 @@ For non-managed environments, see the following Kubernetes documentations:
 
 ## Customizing containerd
 
-containerd uses a configuration file located in `/etc/containerd/config.toml` for specifying daemon level options.
-A sample configuration file can be found [here](/docs/man/containerd-config.toml.5.md).
+containerd uses a configuration file located at `/etc/containerd/config.toml` to set daemon-level options.
 
-The default configuration can be generated via `containerd config default > /etc/containerd/config.toml`.
+Unlike some systems where you may override only the required values, containerd requires specifying the entire configuration file, even if most values are default.
+
+You can find a sample configuration file [here](/docs/man/containerd-config.toml.5.md).
+
+To generate a `config.toml` file populated with the default values for modification, run `containerd config default > /etc/containerd/config.toml`.
 
 ## Implementing your own containerd client
 There are many different ways to use containerd.
