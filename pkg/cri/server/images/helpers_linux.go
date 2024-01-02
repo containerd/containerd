@@ -20,9 +20,9 @@ package images
 
 import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/platforms"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func GetPlatformMatcherForRuntimeHandler(ociRuntime criconfig.Runtime, runtimeHandler string) (platforms.MatchComparer, error) {
-	return nil, nil
+func GetPlatformForRuntimeHandler(ociRuntime criconfig.Runtime, runtimeHandler string) (specs.Platform, error) {
+	return specs.Platform{}, nil
 }

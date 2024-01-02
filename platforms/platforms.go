@@ -285,6 +285,7 @@ func Format(platform specs.Platform) string {
 func Normalize(platform specs.Platform) specs.Platform {
 	platform.OS = normalizeOS(platform.OS)
 	platform.Architecture, platform.Variant = normalizeArch(platform.Architecture, platform.Variant)
+	platform.OSFeatures = normalizeOSFeatures(platform.OSFeatures)
 
 	return platform
 }

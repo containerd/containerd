@@ -53,6 +53,10 @@ command. As part of this process, we do the following:
 3. Register metadata for the image.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
+		cli.StringFlag{
+			Name:  "runtime-handler",
+			Usage: "runtime handler to use to pull the image. This can be default or runtimeHandler for the --platform being asked to pull the image for",
+		},
 		cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
@@ -91,6 +95,10 @@ command. As part of this process, we do the following:
 		if ref == "" {
 			return fmt.Errorf("please provide an image reference to pull")
 		}
+		// runtime handler
+		if context.String("runtime-handler") == "" {
+			return fmt.Errorf("specify runtime handler to use to pull the image")
+		}
 
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
@@ -110,6 +118,7 @@ command. As part of this process, we do the following:
 				if err != nil {
 					return err
 				}
+
 				if len(p) == 0 {
 					p = append(p, platforms.DefaultSpec())
 				}
@@ -152,6 +161,7 @@ command. As part of this process, we do the following:
 		if err != nil {
 			return err
 		}
+		log.G(ctx).Debugf("fetch config %v", config)
 
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {

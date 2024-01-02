@@ -38,7 +38,19 @@ import (
 // kubernetes/kubernetes#46255)
 func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+
+	// get runtimehandler of the image
+	runtimeHdlr := r.Image.GetRuntimeHandler()
+	if runtimeHdlr == "" {
+		runtimeHdlr = c.config.ContainerdConfig.DefaultRuntimeName
+	}
+	// validate the runtimehandler to use for this image pull
+	_, ok := c.config.ContainerdConfig.Runtimes[runtimeHdlr]
+	if !ok {
+		return nil, fmt.Errorf("no runtime for %q is configured", runtimeHdlr)
+	}
+
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHdlr)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
@@ -47,7 +59,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
-	span.SetAttributes(tracing.Attribute("image.id", image.ID))
+	span.SetAttributes(tracing.Attribute("image.id", image.Key.ID))
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
@@ -67,11 +79,12 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 func toCRIImage(image imagestore.Image) *runtime.Image {
 	repoTags, repoDigests := ParseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
-		Id:          image.ID,
+		Id:          image.Key.ID,
 		RepoTags:    repoTags,
 		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
 		Pinned:      image.Pinned,
+		Spec:        &runtime.ImageSpec{RuntimeHandler: image.Key.RuntimeHandler},
 	}
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {

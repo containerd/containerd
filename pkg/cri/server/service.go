@@ -46,6 +46,7 @@ import (
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/registrar"
 	"github.com/containerd/containerd/v2/sandbox"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // defaultNetworkPlugin is used for the default CNI configuration
@@ -73,12 +74,12 @@ type imageService interface {
 
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
 
-	UpdateImage(ctx context.Context, r string) error
+	UpdateImage(ctx context.Context, r string, runtimeHandler string) error
 
-	GetImage(id string) (imagestore.Image, error)
+	GetImage(id string, runtimeHandler string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
 
-	LocalResolve(refOrID string) (imagestore.Image, error)
+	LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
 }
@@ -128,26 +129,29 @@ type criService struct {
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
+	// runtimeHandlerToPlatformMap store the platform that each runtime handler uses (see pkg/cri/config/config.go).
+	runtimeHandlerToPlatformMap map[string]specs.Platform
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(criBase *base.CRIBase, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
+func NewCRIService(criBase *base.CRIBase, imageService imageService, client *containerd.Client, nri *nri.API, runtimeHandlerToPlatformMap map[string]specs.Platform) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	config := criBase.Config
 	c := &criService{
-		imageService:       imageService,
-		config:             config,
-		client:             client,
-		imageFSPaths:       imageService.ImageFSPaths(),
-		os:                 osinterface.RealOS{},
-		baseOCISpecs:       criBase.BaseOCISpecs,
-		sandboxStore:       sandboxstore.NewStore(labels),
-		containerStore:     containerstore.NewStore(labels),
-		sandboxNameIndex:   registrar.NewRegistrar(),
-		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin:          make(map[string]cni.CNI),
-		sandboxService:     newCriSandboxService(&config, client),
+		imageService:                imageService,
+		config:                      config,
+		client:                      client,
+		imageFSPaths:                imageService.ImageFSPaths(),
+		os:                          osinterface.RealOS{},
+		baseOCISpecs:                criBase.BaseOCISpecs,
+		sandboxStore:                sandboxstore.NewStore(labels),
+		containerStore:              containerstore.NewStore(labels),
+		sandboxNameIndex:            registrar.NewRegistrar(),
+		containerNameIndex:          registrar.NewRegistrar(),
+		netPlugin:                   make(map[string]cni.CNI),
+		sandboxService:              newCriSandboxService(&config, client),
+		runtimeHandlerToPlatformMap: runtimeHandlerToPlatformMap,
 	}
 
 	// TODO: figure out a proper channel size.

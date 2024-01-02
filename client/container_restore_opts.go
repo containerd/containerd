@@ -58,7 +58,7 @@ func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint
 			return err
 		}
 
-		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), client.platform)
+		diffIDs, err := i.(*image).i.RootFS(ctx, client.ContentStore(), checkpoint.Platform())
 		if err != nil {
 			return err
 		}

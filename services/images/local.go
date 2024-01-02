@@ -137,8 +137,9 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 	resp.Image = imageToProto(&created)
 
 	if err := l.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
+		Name:           resp.Image.Name,
+		Labels:         resp.Image.Labels,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}
@@ -176,8 +177,9 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 	resp.Image = imageToProto(&updated)
 
 	if err := l.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
+		Name:           resp.Image.Name,
+		Labels:         resp.Image.Labels,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}
@@ -201,7 +203,8 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 	}
 
 	if err := l.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
-		Name: req.Name,
+		Name:           req.Name,
+		RuntimeHandler: req.RuntimeHandler,
 	}); err != nil {
 		return nil, err
 	}

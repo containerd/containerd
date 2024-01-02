@@ -73,6 +73,15 @@ func normalizeOS(os string) string {
 }
 
 // normalizeArch normalizes the architecture.
+func normalizeOSFeatures(OSFeatures []string) []string {
+	var features []string
+	for i, val := range OSFeatures {
+		features[i] = strings.ToLower(val)
+	}
+	return features
+}
+
+// normalizeArch normalizes the architecture.
 func normalizeArch(arch, variant string) (string, string) {
 	arch, variant = strings.ToLower(arch), strings.ToLower(variant)
 	switch arch {

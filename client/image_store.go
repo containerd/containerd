@@ -18,11 +18,14 @@ package client
 
 import (
 	"context"
+	"strings"
 
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
+	ctrdlabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
@@ -63,8 +66,18 @@ func (s *remoteImages) List(ctx context.Context, filters ...string) ([]images.Im
 }
 
 func (s *remoteImages) Create(ctx context.Context, image images.Image) (images.Image, error) {
+	// get runtimehandler image label from the image
+	runtimeHandler := ""
+	for labelKey, _ := range image.Labels {
+		if strings.HasPrefix(labelKey, ctrdlabels.RuntimeHandlerLabelPrefix) {
+			runtimeHandler = strings.TrimPrefix(labelKey, ctrdlabels.RuntimeHandlerLabelPrefix+".")
+			break
+		}
+	}
+
 	req := &imagesapi.CreateImageRequest{
-		Image: imageToProto(&image),
+		Image:          imageToProto(&image),
+		RuntimeHandler: runtimeHandler,
 	}
 	if tm := epoch.FromContext(ctx); tm != nil {
 		req.SourceDateEpoch = timestamppb.New(*tm)
@@ -77,7 +90,24 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image) (images.I
 	return imageFromProto(created.Image), nil
 }
 
+func getNewRuntimeHandlerLabel(image images.Image, fieldpaths *[]string) string {
+	for _, value := range *fieldpaths {
+		if strings.Contains(value, "newRuntimeHandler.") {
+
+			runtimeHandler := strings.TrimPrefix(value, "newRuntimeHandler.")
+			*fieldpaths = util.SubtractStringSlice(*fieldpaths, value)
+			return runtimeHandler
+		}
+	}
+	return ""
+}
+
 func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpaths ...string) (images.Image, error) {
+
+	// Check if the image exists and if so find out the newest
+	// runtimeHandler label to add to this image from fieldpaths
+	runtimeHandler := getNewRuntimeHandlerLabel(image, &fieldpaths)
+
 	var updateMask *ptypes.FieldMask
 	if len(fieldpaths) > 0 {
 		updateMask = &ptypes.FieldMask{
@@ -85,8 +115,9 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpath
 		}
 	}
 	req := &imagesapi.UpdateImageRequest{
-		Image:      imageToProto(&image),
-		UpdateMask: updateMask,
+		Image:          imageToProto(&image),
+		UpdateMask:     updateMask,
+		RuntimeHandler: runtimeHandler,
 	}
 	if tm := epoch.FromContext(ctx); tm != nil {
 		req.SourceDateEpoch = timestamppb.New(*tm)
@@ -107,8 +138,9 @@ func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.D
 		}
 	}
 	req := &imagesapi.DeleteImageRequest{
-		Name: name,
-		Sync: do.Synchronous,
+		Name:           name,
+		Sync:           do.Synchronous,
+		RuntimeHandler: do.RuntimeHandler,
 	}
 	if do.Target != nil {
 		req.Target = oci.DescriptorToProto(*do.Target)

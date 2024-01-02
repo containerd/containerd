@@ -38,7 +38,7 @@ func isRuntimeHandlerVMBased(runtimeOpts interface{}) bool {
 	return false
 }
 
-func GetPlatformMatcherForRuntimeHandler(ociRuntime criconfig.Runtime, runtimeHandler string) (specs.Platform, error) {
+func GetPlatformForRuntimeHandler(ociRuntime criconfig.Runtime, runtimeHandler string) (specs.Platform, error) {
 	runtimeOpts, err := criconfig.GenerateRuntimeOptions(ociRuntime)
 	if err != nil {
 		return specs.Platform{}, fmt.Errorf("failed to get runtime options for runtime: %v", runtimeHandler)
@@ -51,7 +51,8 @@ func GetPlatformMatcherForRuntimeHandler(ociRuntime criconfig.Runtime, runtimeHa
 		if !isCompat {
 			return specs.Platform{}, fmt.Errorf("incompatible host and guest OSVersions")
 		}
-		return ociRuntime.Platform, nil
+
+		return platforms.Normalize(ociRuntime.Platform), nil
 	}
 	return specs.Platform{}, fmt.Errorf("runtime.Platform cannot override the host platform for process isolation")
 }

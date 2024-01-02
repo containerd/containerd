@@ -18,9 +18,12 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,9 +38,11 @@ import (
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/errgroup"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	ctrdlabels "github.com/containerd/containerd/v2/labels"
 	cio "github.com/containerd/containerd/v2/pkg/cri/io"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
@@ -422,6 +427,28 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 	return netns.LoadNetNS(meta.NetNSPath)
 }
 
+func getAllRuntimeHandlerLabels(img containerd.Image) map[string]specs.Platform {
+	// always try to load image with default platform matcher and empty runtime handler ""
+	runtimeHandlersLabelToPlatform := map[string]specs.Platform{}
+	imageLabels := img.Labels()
+	for imageLabelKey, imageLabelValue := range imageLabels {
+		if strings.HasPrefix(imageLabelKey, ctrdlabels.RuntimeHandlerLabelPrefix) {
+			runtimeHandler := strings.TrimPrefix(imageLabelKey, ctrdlabels.RuntimeHandlerLabelPrefix+".")
+			runtimeHandlersLabelToPlatform[runtimeHandler], _ = getOciPlatformForRuntimeHandler(imageLabelValue)
+		}
+	}
+
+	return runtimeHandlersLabelToPlatform
+}
+
+func getOciPlatformForRuntimeHandler(platform string) (specs.Platform, error) {
+	var ocispecPlatform specs.Platform
+	if err := json.Unmarshal([]byte(platform), &ocispecPlatform); err != nil {
+		return specs.Platform{}, fmt.Errorf("unable to unmarshal runtimeHandlerPlatform %v", platform)
+	}
+	return ocispecPlatform, nil
+}
+
 // loadImages loads images from containerd.
 func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
 	snapshotter := c.config.ContainerdConfig.Snapshotter
@@ -431,30 +458,55 @@ func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image)
 		i := i
 		go func() {
 			defer wg.Done()
-			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
-				return
+
+			// an image can exist for more than one runtimeHandler. So make sure that each one of them
+			// is restored
+			runtimeHandlersLabelToPlatform := getAllRuntimeHandlerLabels(i)
+			if len(runtimeHandlersLabelToPlatform) == 0 {
+				// image possibly pulled without runtime handler (eg: via transfer service)
+				// TODO DISCUSS(kiashok): Should we try update cri with only default platform matcher
+				// or attempt to unapck with all platform matchers to see which platform it
+				// has been unpacked for?
+				runtimeHandlersLabelToPlatform[""] = platforms.DefaultSpec()
 			}
-			if !ok {
-				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
-				return
+
+			for runtimeHandler, ocispecPlatform := range runtimeHandlersLabelToPlatform {
+				// check to see if the runtime handler platform field has changed after restart.
+				// if yes, throw error and do not restore image for this runtime handler.
+				// TODO DISCUSS(kiashok): Needs further discussion based on last discussion in community meeting.
+				// Do we manually add a call to delete this runtime handler label on the image via c.client.ImageService().Update()?
+				if !reflect.DeepEqual(c.runtimeHandlerToPlatformMap[runtimeHandler], ocispecPlatform) {
+					log.G(ctx).Errorf("Current %#v and old platform %#v fields for runtime handler %v do not match", c.runtimeHandlerToPlatformMap[runtimeHandler],
+						ocispecPlatform, runtimeHandler)
+					return
+				}
+
+				ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Only(ocispecPlatform))
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
+					return
+				}
+				if !ok {
+					log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
+					return
+				}
+				// Checking existence of top-level snapshot for each image being recovered.
+				unpacked, err := i.IsUnpacked(ctx, snapshotter)
+				if err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
+					return
+				}
+				if !unpacked {
+					log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
+					// TODO(random-liu): Consider whether we should try unpack here.
+				}
+				if err := c.UpdateImage(ctx, i.Name(), runtimeHandler); err != nil {
+					log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
+					return
+				}
+				log.G(ctx).Debugf("Loaded image %q", i.Name())
 			}
-			// Checking existence of top-level snapshot for each image being recovered.
-			unpacked, err := i.IsUnpacked(ctx, snapshotter)
-			if err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
-				return
-			}
-			if !unpacked {
-				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
-				// TODO(random-liu): Consider whether we should try unpack here.
-			}
-			if err := c.UpdateImage(ctx, i.Name()); err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
-				return
-			}
-			log.G(ctx).Debugf("Loaded image %q", i.Name())
+
 		}()
 	}
 	wg.Wait()

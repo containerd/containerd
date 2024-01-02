@@ -29,13 +29,14 @@ import (
 )
 
 type clientOpts struct {
-	defaultns       string
-	defaultRuntime  string
-	defaultPlatform platforms.MatchComparer
-	services        *services
-	dialOptions     []grpc.DialOption
-	callOptions     []grpc.CallOption
-	timeout         time.Duration
+	defaultns                   string
+	defaultRuntime              string
+	defaultPlatform             platforms.MatchComparer
+	services                    *services
+	dialOptions                 []grpc.DialOption
+	callOptions                 []grpc.CallOption
+	timeout                     time.Duration
+	runtimeHandlerToPlatformMap map[string]ocispec.Platform
 }
 
 // Opt allows callers to set options on the containerd client
@@ -64,6 +65,14 @@ func WithDefaultRuntime(rt string) Opt {
 func WithDefaultPlatform(platform platforms.MatchComparer) Opt {
 	return func(c *clientOpts) error {
 		c.defaultPlatform = platform
+		return nil
+	}
+}
+
+// WithRuntimeHandlerToPlatformMap sets the runtimeHandlerToPlatformMap on the client
+func WithRuntimeHandlerToPlatformMap(runtimeHandlerToPlatformMap map[string]ocispec.Platform) Opt {
+	return func(c *clientOpts) error {
+		c.runtimeHandlerToPlatformMap = runtimeHandlerToPlatformMap
 		return nil
 	}
 }
@@ -155,6 +164,16 @@ func WithPullSnapshotter(snapshotterName string, opts ...snapshots.Opt) RemoteOp
 	return func(_ *Client, c *RemoteContext) error {
 		c.Snapshotter = snapshotterName
 		c.SnapshotterOpts = opts
+		return nil
+	}
+}
+
+// WithRuntimeHandler specifies the runtime handler used
+// while pulling the image. If none was specified at image
+// pull, default platform matcher is used.
+func WithRuntimeHandler(runtimeHandler string) RemoteOpt {
+	return func(_ *Client, c *RemoteContext) error {
+		c.RuntimeHandler = runtimeHandler
 		return nil
 	}
 }

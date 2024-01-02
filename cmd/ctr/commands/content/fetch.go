@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
+	ctrdlabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/remotes"
@@ -117,7 +118,8 @@ type FetchConfig struct {
 	// RemoteOpts to configure object resolutions and transfers with remote content providers
 	RemoteOpts []containerd.RemoteOpt
 	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
-	TraceHTTP bool
+	TraceHTTP      bool
+	RuntimeHandler string
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -126,11 +128,22 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 	if err != nil {
 		return nil, err
 	}
+
 	config := &FetchConfig{
-		Resolver:  resolver,
-		Labels:    clicontext.StringSlice("label"),
-		TraceHTTP: clicontext.Bool("http-trace"),
+		Resolver:       resolver,
+		Labels:         clicontext.StringSlice("label"),
+		TraceHTTP:      clicontext.Bool("http-trace"),
+		RuntimeHandler: clicontext.String("runtime-handler"),
 	}
+	runtimeHandler := clicontext.String("runtime-handler")
+	if runtimeHandler != "" {
+		runtimeHandlerLabelKey := fmt.Sprintf(ctrdlabels.RuntimeHandlerLabelFormat, ctrdlabels.RuntimeHandlerLabelPrefix, runtimeHandler)
+		// the value of the runtime handler label is the ocispec.Platform field defined in containerd.toml
+		// this will be set in cri layer.
+		runtimeHandlerLabel := fmt.Sprintf("%v=%v", runtimeHandlerLabelKey, "")
+		config.Labels = append(config.Labels, runtimeHandlerLabel)
+	}
+
 	if !clicontext.GlobalBool("debug") {
 		config.ProgressOutput = os.Stdout
 	}
@@ -195,6 +208,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
+		containerd.WithRuntimeHandler(config.RuntimeHandler),
 		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	}
 	opts = append(opts, config.RemoteOpts...)

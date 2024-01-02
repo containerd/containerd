@@ -70,7 +70,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 	}
 	imageService := criImagePlugin.(*images.CRIImageService)
-
+	runtimeHandlerToPlatformsMap := imageService.RuntimeHandlerToPlatforms()
 	log.G(ctx).Info("Connect containerd service")
 	client, err := containerd.New(
 		"",
@@ -78,12 +78,13 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(ic),
 		containerd.WithInMemorySandboxControllers(ic),
+		containerd.WithRuntimeHandlerToPlatformMap(runtimeHandlerToPlatformsMap),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	s, err := server.NewCRIService(criBase, imageService, client, getNRIAPI(ic))
+	s, err := server.NewCRIService(criBase, imageService, client, getNRIAPI(ic), runtimeHandlerToPlatformsMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}

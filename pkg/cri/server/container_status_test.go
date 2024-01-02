@@ -64,7 +64,9 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		CreatedAt: createdAt,
 	}
 	image := &imagestore.Image{
-		ID: imageID,
+		Key: imagestore.ImageIDKey{
+			ID: imageID,
+		},
 		References: []string{
 			"gcr.io/library/busybox:latest",
 			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
@@ -274,15 +276,19 @@ func (s *fakeImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cr
 	return ""
 }
 
-func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { return nil }
+func (s *fakeImageService) UpdateImage(ctx context.Context, r string, runtimeHandler string) error {
+	return nil
+}
 
-func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
+func (s *fakeImageService) GetImage(id string, runtimeHandler string) (imagestore.Image, error) {
+	return s.imageStore.Get(id, runtimeHandler)
+}
 
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 
-func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+func (s *fakeImageService) LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")
 }
 

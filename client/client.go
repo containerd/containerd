@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/images"
+	ctrdlabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/leases"
 	leasesproxy "github.com/containerd/containerd/v2/leases/proxy"
 	"github.com/containerd/containerd/v2/namespaces"
@@ -193,6 +194,10 @@ func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 		c.platform = platforms.Default()
 	}
 
+	if copts.runtimeHandlerToPlatformMap != nil {
+		c.runtimeHandlerToPlatformMap = copts.runtimeHandlerToPlatformMap
+	}
+
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && c.defaultns != "" {
 		if label, err := c.GetLabel(context.Background(), defaults.DefaultRuntimeNSLabel); err != nil {
@@ -212,12 +217,13 @@ func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 // using a uniform interface
 type Client struct {
 	services
-	connMu    sync.Mutex
-	conn      *grpc.ClientConn
-	runtime   string
-	defaultns string
-	platform  platforms.MatchComparer
-	connector func() (*grpc.ClientConn, error)
+	connMu                      sync.Mutex
+	conn                        *grpc.ClientConn
+	runtime                     string
+	defaultns                   string
+	platform                    platforms.MatchComparer
+	runtimeHandlerToPlatformMap map[string]ocispec.Platform
+	connector                   func() (*grpc.ClientConn, error)
 }
 
 // Reconnect re-establishes the GRPC connection to the containerd daemon
@@ -334,6 +340,9 @@ type RemoteContext struct {
 	// Snapshotter used for unpacking
 	Snapshotter string
 
+	// runtime handler used to pull the image
+	RuntimeHandler string
+
 	// SnapshotterOpts are additional options to be passed to a snapshotter during pull
 	SnapshotterOpts []snapshots.Opt
 
@@ -421,7 +430,7 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	if err != nil {
 		return images.Image{}, err
 	}
-	return c.createNewImage(ctx, img)
+	return c.createNewImage(ctx, img, fetchCtx.RuntimeHandler)
 }
 
 // Push uploads the provided content to a remote resource
@@ -476,13 +485,45 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 	return remotes.PushContent(ctx, pusher, desc, c.ContentStore(), limiter, pushCtx.PlatformMatcher, wrapper)
 }
 
+func (c *Client) getPlatformMatcherForImage(img images.Image) (platforms.MatchComparer, error) {
+	platformString := ""
+	for key, value := range img.Labels {
+		if strings.HasPrefix(key, ctrdlabels.RuntimeHandlerLabelPrefix) {
+			platformString = value
+			break
+		}
+	}
+
+	if platformString != "" {
+		var ocispecPlatform ocispec.Platform
+		if err := json.Unmarshal([]byte(platformString), &ocispecPlatform); err != nil {
+			return nil, fmt.Errorf("unable to unmarshal runtimeHandlerPlatform %v", platformString)
+		}
+		return platforms.Only(ocispecPlatform), nil
+	}
+
+	// return with default runtime handler
+	return c.platform, nil
+}
+
 // GetImage returns an existing image
 func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
 	i, err := c.ImageService().Get(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
+
 	return NewImage(c, i), nil
+}
+
+// GetImageWithPlatform returns an existing image with platform matcher as specified
+func (c *Client) GetImageWithPlatform(ctx context.Context, ref string, platform ocispec.Platform) (Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewImageWithPlatform(c, i, platforms.Only(platform)), nil
 }
 
 // ListImages returns all existing images
@@ -493,7 +534,13 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 	}
 	images := make([]Image, len(imgs))
 	for i, img := range imgs {
-		images[i] = NewImage(c, img)
+		// get the actual platform matcher used to pull the image based on the runtime handler fields set.
+		// if none if set, then use the default platform matcher from the client.
+		platformMatcher, err := c.getPlatformMatcherForImage(img)
+		if err != nil {
+			return nil, err
+		}
+		images[i] = NewImageWithPlatform(c, img, platformMatcher)
 	}
 	return images, nil
 }
