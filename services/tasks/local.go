@@ -19,6 +19,7 @@ package tasks
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/cgroups"
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/task"
@@ -39,6 +41,7 @@ import (
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
@@ -615,9 +618,84 @@ func (l *local) Metrics(ctx context.Context, r *api.MetricsRequest, _ ...grpc.Ca
 		if err != nil {
 			return nil, err
 		}
-		getTasksMetrics(ctx, filter, tasks, &resp)
+		if r.ID() == plugin.RuntimeLinuxV1 {
+			l.getTasksMetrics(ctx, filter, tasks, &resp)
+		} else {
+			getTasksMetrics(ctx, filter, tasks, &resp)
+		}
 	}
 	return &resp, nil
+}
+
+func (l *local) getTasksMetrics(ctx context.Context, filter filters.Filter, tasks []runtime.Task, r *api.MetricsResponse) {
+	for _, tk := range tasks {
+		if !filter.Match(filters.AdapterFunc(func(fieldpath []string) (string, bool) {
+			t := tk
+			switch fieldpath[0] {
+			case "id":
+				return t.ID(), true
+			case "namespace":
+				return t.Namespace(), true
+			case "runtime":
+				// return t.Info().Runtime, true
+			}
+			return "", false
+		})) {
+			continue
+		}
+		collected := time.Now()
+		ctr, err := l.containers.Get(ctx, tk.ID())
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Errorf("does not found container for %s", tk.ID())
+			}
+			continue
+		}
+		stats, err := getTaskStats(ctr)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Errorf("collecting metrics for %s", tk.ID())
+			}
+			continue
+		}
+		r.Metrics = append(r.Metrics, &types.Metric{
+			Timestamp: collected,
+			ID:        tk.ID(),
+			Data:      stats,
+		})
+	}
+}
+
+func getTaskStats(c containers.Container) (*ptypes.Any, error) {
+	cgroupPath := getContainerCgroupPath(c.Spec.Value)
+	if cgroupPath == "" {
+		return nil, fmt.Errorf("failed to get cgroup metrics for container %v because cgroupPath is empty", c.ID)
+	}
+	control, err := cgroups.Load(cgroups.V1, cgroups.StaticPath(cgroupPath))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load sandbox cgroup %v: %w", cgroupPath, err)
+	}
+	stats, err := control.Stat(cgroups.IgnoreNotExist)
+	if err != nil {
+		return nil, err
+	}
+	return typeurl.MarshalAny(stats)
+}
+
+func getContainerCgroupPath(b []byte) string {
+	var s oci.Spec
+	if err := json.Unmarshal(b, &s); err != nil {
+		return ""
+	}
+	cgroupsPath := s.Linux.CgroupsPath
+	parts := strings.Split(cgroupsPath, ":")
+	if len(parts) == 3 {
+		parent := parts[0]
+		prefix := parts[1]
+		name := parts[2] + ".scope"
+		cgroupsPath = "/" + parent + "/" + prefix + "-" + name
+	}
+	return cgroupsPath
 }
 
 func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOption) (*api.WaitResponse, error) {
