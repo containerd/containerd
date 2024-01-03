@@ -35,14 +35,17 @@ import (
 	"github.com/containerd/containerd/v2/archive/compression"
 	"github.com/containerd/containerd/v2/archive/tartest"
 	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/content"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/images/archive"
 	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/google/uuid"
 
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
@@ -159,12 +162,6 @@ func TestImport(t *testing.T) {
 	ctx, cancel := testContext(t)
 	defer cancel()
 
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
 	tc := tartest.TarContext{}
 
 	b1, d1 := createContent(256, 1)
@@ -176,9 +173,12 @@ func TestImport(t *testing.T) {
 
 	m1, d3, expManifest := createManifest(c1, [][]byte{b1})
 
-	provider := client.ContentStore()
+	c2, _ := createConfig(runtime.GOOS, runtime.GOARCH, "test2")
+	m2, d5, _ := createManifest(c2, [][]byte{{1, 2, 3, 4, 5}})
 
-	checkManifest := func(ctx context.Context, t *testing.T, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
+	ml1, d6 := createManifestList(m1, m2)
+
+	checkManifest := func(ctx context.Context, t *testing.T, provider content.Provider, d ocispec.Descriptor, expManifest *ocispec.Manifest) {
 		m, err := images.Manifest(ctx, provider, d, nil)
 		if err != nil {
 			t.Fatalf("unable to read target blob: %+v", err)
@@ -209,9 +209,40 @@ func TestImport(t *testing.T) {
 	for _, tc := range []struct {
 		Name   string
 		Writer tartest.WriterToTar
-		Check  func(*testing.T, []images.Image)
+		Check  func(context.Context, *testing.T, *Client, []images.Image)
 		Opts   []ImportOpt
 	}{
+		{
+			Name: "OCI-IndexWithoutAnyManifest",
+			Writer: tartest.TarAll(
+				tc.Dir(ocispec.ImageBlobsDir, 0755),
+				tc.Dir(ocispec.ImageBlobsDir+"/sha256", 0755),
+				tc.File(ocispec.ImageIndexFile, createIndex(ml1, ocispec.MediaTypeImageIndex, "docker.io/library/sparse:ok"), 0644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d6.Encoded(), ml1, 0644),
+				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
+			),
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
+				checkImages(t, d6, imgs, "docker.io/library/sparse:ok")
+				mfsts, err := images.Children(ctx, client.ContentStore(), imgs[0].Target)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				for _, m := range mfsts {
+					exists, err := content.Exists(ctx, client.ContentStore(), m)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+
+					if exists {
+						t.Fatal("no manifest should be imported")
+					}
+				}
+			},
+			Opts: []ImportOpt{
+				WithSkipMissing(),
+			},
+		},
 		{
 			Name: "DockerV2.0",
 			Writer: tartest.TarAll(
@@ -232,7 +263,7 @@ func TestImport(t *testing.T) {
 				tc.File("e95212f7aa2cab51d0abd765cd43.json", c1, 0644),
 				tc.File("manifest.json", []byte(`[{"Config":"e95212f7aa2cab51d0abd765cd43.json","RepoTags":["test-import:notlatest", "another/repo:tag"],"Layers":["bd765cd43e95212f7aa2cab51d0a/layer.tar"]}]`), 0644),
 			),
-			Check: func(t *testing.T, imgs []images.Image) {
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
 				if len(imgs) == 0 {
 					t.Fatalf("no images")
 				}
@@ -243,7 +274,7 @@ func TestImport(t *testing.T) {
 				}
 
 				checkImages(t, imgs[0].Target.Digest, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, nil)
+				checkManifest(ctx, t, client.ContentStore(), imgs[0].Target, nil)
 			},
 		},
 		{
@@ -271,17 +302,17 @@ func TestImport(t *testing.T) {
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d1.Encoded(), b1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d2.Encoded(), c1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File(ocispec.ImageIndexFile, createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
+				tc.File(ocispec.ImageIndexFile, createIndex(m1, ocispec.MediaTypeImageManifest, "latest", "docker.io/lib/img:ok"), 0644),
 				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
 			),
-			Check: func(t *testing.T, imgs []images.Image) {
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
 				names := []string{
 					"latest",
 					"docker.io/lib/img:ok",
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
+				checkManifest(ctx, t, client.ContentStore(), imgs[0].Target, expManifest)
 			},
 		},
 		{
@@ -292,17 +323,17 @@ func TestImport(t *testing.T) {
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d1.Encoded(), b1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d2.Encoded(), c1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File(ocispec.ImageIndexFile, createIndex(m1, "latest", "docker.io/lib/img:ok"), 0644),
+				tc.File(ocispec.ImageIndexFile, createIndex(m1, ocispec.MediaTypeImageManifest, "latest", "docker.io/lib/img:ok"), 0644),
 				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
 			),
-			Check: func(t *testing.T, imgs []images.Image) {
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
 				names := []string{
 					"localhost:5000/myimage:latest",
 					"docker.io/lib/img:ok",
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
+				checkManifest(ctx, t, client.ContentStore(), imgs[0].Target, expManifest)
 			},
 			Opts: []ImportOpt{
 				WithImageRefTranslator(archive.AddRefPrefix("localhost:5000/myimage")),
@@ -316,24 +347,94 @@ func TestImport(t *testing.T) {
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d1.Encoded(), b1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d2.Encoded(), c1, 0644),
 				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d3.Encoded(), m1, 0644),
-				tc.File(ocispec.ImageIndexFile, createIndex(m1, "latest", "localhost:5000/myimage:old", "docker.io/lib/img:ok"), 0644),
+				tc.File(ocispec.ImageIndexFile, createIndex(m1, ocispec.MediaTypeImageManifest, "latest", "localhost:5000/myimage:old", "docker.io/lib/img:ok"), 0644),
 				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
 			),
-			Check: func(t *testing.T, imgs []images.Image) {
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
 				names := []string{
 					"localhost:5000/myimage:latest",
 					"localhost:5000/myimage:old",
 				}
 
 				checkImages(t, d3, imgs, names...)
-				checkManifest(ctx, t, imgs[0].Target, expManifest)
+				checkManifest(ctx, t, client.ContentStore(), imgs[0].Target, expManifest)
 			},
 			Opts: []ImportOpt{
 				WithImageRefTranslator(archive.FilterRefPrefix("localhost:5000/myimage")),
 			},
 		},
+		{
+			Name: "OCI-IndexWithMissingManifestDescendants",
+			Writer: tartest.TarAll(
+				tc.Dir(ocispec.ImageBlobsDir, 0755),
+				tc.Dir(ocispec.ImageBlobsDir+"/sha256", 0755),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d1.Encoded(), b1, 0644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d2.Encoded(), c1, 0644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d3.Encoded(), m1, 0644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d5.Encoded(), m2, 0644),
+				tc.File(ocispec.ImageIndexFile, createIndex(ml1, ocispec.MediaTypeImageIndex, "docker.io/library/sparse:ok"), 0644),
+				tc.File(ocispec.ImageBlobsDir+"/sha256/"+d6.Encoded(), ml1, 0644),
+				tc.File(ocispec.ImageLayoutFile, []byte(`{"imageLayoutVersion":"`+ocispec.ImageLayoutVersion+`"}`), 0644),
+			),
+			Check: func(ctx context.Context, t *testing.T, client *Client, imgs []images.Image) {
+				checkImages(t, d6, imgs, "docker.io/library/sparse:ok")
+				mfsts, err := images.Children(ctx, client.ContentStore(), imgs[0].Target)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				var importedManifest *ocispec.Descriptor
+				var secondManifest *ocispec.Descriptor
+				for _, m := range mfsts {
+					exists, err := content.Exists(ctx, client.ContentStore(), m)
+					if err != nil {
+						t.Fatalf("unexpected error: %v", err)
+					}
+
+					if exists {
+						if m.Digest == d3 {
+							m := m
+							importedManifest = &m
+						} else if m.Digest == d5 {
+							m := m
+							secondManifest = &m
+						} else {
+							t.Fatalf("imported manifest with unexpected digest: %v", m.Digest)
+						}
+					}
+				}
+				if importedManifest == nil {
+					t.Fatal("the expected manifest was not loaded")
+				}
+				checkManifest(ctx, t, client.ContentStore(), *importedManifest, expManifest)
+
+				if secondManifest == nil {
+					t.Fatal("the expected manifest was not loaded")
+				}
+				_, _, _, missing, err := images.Check(ctx, client.ContentStore(), *secondManifest, nil)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+
+				if len(missing) != 2 {
+					t.Fatalf("expected 2 missing blobs, got %+v", missing)
+				}
+
+			},
+			Opts: []ImportOpt{
+				WithSkipMissing(),
+			},
+		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
+			client, err := newClient(t, address)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+
+			ctx := namespaces.WithNamespace(ctx, uuid.New().String())
+
 			images, err := client.Import(ctx, tartest.TarFromWriterTo(tc.Writer), tc.Opts...)
 			if err != nil {
 				if tc.Check != nil {
@@ -344,7 +445,7 @@ func TestImport(t *testing.T) {
 				t.Fatalf("expected error on import")
 			}
 
-			tc.Check(t, images)
+			tc.Check(ctx, t, client, images)
 		})
 	}
 }
@@ -363,7 +464,8 @@ func checkImages(t *testing.T, target digest.Digest, actual []images.Image, name
 		}
 
 		if actual[i].Target.MediaType != ocispec.MediaTypeImageManifest &&
-			actual[i].Target.MediaType != images.MediaTypeDockerSchema2Manifest {
+			actual[i].Target.MediaType != images.MediaTypeDockerSchema2Manifest &&
+			actual[i].Target.MediaType != ocispec.MediaTypeImageIndex {
 			t.Fatalf("image(%d) unexpected media type: %s", i, actual[i].Target.MediaType)
 		}
 	}
@@ -430,14 +532,35 @@ func createManifest(config []byte, layers [][]byte) ([]byte, digest.Digest, *oci
 	return b, digest.FromBytes(b), &manifest
 }
 
-func createIndex(manifest []byte, tags ...string) []byte {
+func createManifestList(manifests ...[]byte) ([]byte, digest.Digest) {
+	idx := ocispec.Index{
+		Versioned: specs.Versioned{
+			SchemaVersion: 2,
+		},
+	}
+
+	for _, manifest := range manifests {
+		d := ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageManifest,
+			Digest:    digest.FromBytes(manifest),
+			Size:      int64(len(manifest)),
+		}
+		idx.Manifests = append(idx.Manifests, d)
+	}
+
+	b, _ := json.Marshal(idx)
+
+	return b, digest.FromBytes(b)
+}
+
+func createIndex(manifest []byte, mt string, tags ...string) []byte {
 	idx := ocispec.Index{
 		Versioned: specs.Versioned{
 			SchemaVersion: 2,
 		},
 	}
 	d := ocispec.Descriptor{
-		MediaType: ocispec.MediaTypeImageManifest,
+		MediaType: mt,
 		Digest:    digest.FromBytes(manifest),
 		Size:      int64(len(manifest)),
 	}

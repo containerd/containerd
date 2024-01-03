@@ -19,144 +19,315 @@ package client
 import (
 	"archive/tar"
 	"context"
-	"encoding/json"
 	"io"
 	"os"
+	"runtime"
+	"strings"
 	"testing"
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/platforms"
+	"github.com/google/uuid"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-// TestExport exports testImage as a tar stream
-func TestExport(t *testing.T) {
+func TestExportAllCases(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
-	ctx, cancel := testContext(t)
-	defer cancel()
 
-	client, err := New(address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
+	for _, tc := range []struct {
+		name    string
+		prepare func(context.Context, *testing.T, *Client) images.Image
+		check   func(context.Context, *testing.T, *Client, *os.File, images.Image)
+	}{
+		{
+			name: "export all platforms without SkipMissing",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				if runtime.GOOS == "windows" {
+					t.Skip("skipping test on windows - the testimage index has only one platform")
+				}
+				img, err := client.Fetch(ctx, testImage, WithPlatform(platforms.DefaultString()), WithAllMetadata())
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, _ images.Image) {
+				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithPlatform(platforms.All))
+				if !errdefs.IsNotFound(err) {
+					t.Fatal("should fail with not found error")
+				}
+			},
+		},
+		{
+			name: "export all platforms with SkipMissing",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				if runtime.GOOS == "windows" {
+					t.Skip("skipping test on windows - the testimage index has only one platform")
+				}
+				img, err := client.Fetch(ctx, testImage, WithPlatform(platforms.DefaultString()), WithAllMetadata())
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				defaultPlatformManifest, err := getPlatformManifest(ctx, client.ContentStore(), img.Target, platforms.Default())
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithPlatform(platforms.All), archive.WithSkipMissing(client.ContentStore()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				dstFile.Seek(0, 0)
+				assertOCITar(t, dstFile, true)
 
-	_, err = client.Fetch(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dstFile, err := os.CreateTemp("", "export-import-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		dstFile.Close()
-		os.Remove(dstFile.Name())
-	}()
+				// Check if archive contains only one manifest for the default platform
+				if !isImageInArchive(ctx, t, client, dstFile, defaultPlatformManifest) {
+					t.Fatal("archive does not contain manifest for the default platform")
+				}
 
-	err = client.Export(ctx, dstFile, archive.WithPlatform(platforms.Default()), archive.WithImage(client.ImageService(), testImage))
-	if err != nil {
-		t.Fatal(err)
-	}
+				if isImageInArchive(ctx, t, client, dstFile, img.Target) {
+					t.Fatal("archive shouldn't contain all platforms")
+				}
+			},
+		},
+		{
+			name: "export full image",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImage)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithPlatform(platforms.All), archive.WithImage(client.ImageService(), testImage))
+				if err != nil {
+					t.Fatal(err)
+				}
 
-	// Seek to beginning of file before passing it to assertOCITar()
-	dstFile.Seek(0, 0)
-	assertOCITar(t, dstFile, true)
+				// Seek to beginning of file before passing it to assertOCITar()
+				dstFile.Seek(0, 0)
+				assertOCITar(t, dstFile, true)
+
+				// Archive should contain all platforms.
+				if !isImageInArchive(ctx, t, client, dstFile, img.Target) {
+					t.Fatalf("archive does not contain all platforms")
+				}
+			},
+		},
+		{
+			name: "export multi-platform with SkipDockerManifest",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImage)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithManifest(img.Target), archive.WithSkipDockerManifest())
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Seek to beginning of file before passing it to assertOCITar()
+				dstFile.Seek(0, 0)
+				assertOCITar(t, dstFile, false)
+
+				if !isImageInArchive(ctx, t, client, dstFile, img.Target) {
+					t.Fatalf("archive does not contain expected platform")
+				}
+			},
+		},
+		{
+			name: "export single-platform with SkipDockerManifest",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImage, WithPlatform(platforms.DefaultString()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				result, err := getPlatformManifest(ctx, client.ContentStore(), img.Target, platforms.Default())
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				err = client.Export(ctx, dstFile, archive.WithManifest(result), archive.WithSkipDockerManifest())
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Seek to beginning of file before passing it to assertOCITar()
+				dstFile.Seek(0, 0)
+				assertOCITar(t, dstFile, false)
+
+				if !isImageInArchive(ctx, t, client, dstFile, result) {
+					t.Fatalf("archive does not contain expected platform")
+				}
+			},
+		},
+		{
+			name: "export index only",
+			prepare: func(ctx context.Context, t *testing.T, client *Client) images.Image {
+				img, err := client.Fetch(ctx, testImage, WithPlatform(platforms.DefaultString()))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var all []ocispec.Descriptor
+				err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+					ch, err := images.Children(ctx, client.ContentStore(), desc)
+					if err != nil {
+						if errdefs.IsNotFound(err) {
+							return nil, images.ErrSkipDesc
+						}
+						return nil, err
+					}
+					all = append(all, ch...)
+
+					return ch, nil
+				}), img.Target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, d := range all {
+					if images.IsIndexType(d.MediaType) {
+						continue
+					}
+					if err := client.ContentStore().Delete(ctx, d.Digest); err != nil && !errdefs.IsNotFound(err) {
+						t.Fatalf("failed to delete %v: %v", d.Digest, err)
+					}
+				}
+
+				return img
+			},
+			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
+				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithSkipMissing(client.ContentStore()))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Seek to beginning of file before passing it to assertOCITar()
+				dstFile.Seek(0, 0)
+				assertOCITar(t, dstFile, false)
+
+				defaultPlatformManifest, err := getPlatformManifest(ctx, client.ContentStore(), img.Target, platforms.Default())
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Check if archive contains only one manifest for the default platform
+				if isImageInArchive(ctx, t, client, dstFile, defaultPlatformManifest) {
+					t.Fatal("archive shouldn't contain manifest for the default platform")
+				}
+			},
+		},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := testContext(t)
+			defer cancel()
+
+			namespace := uuid.New().String()
+			client, err := newClient(t, address, WithDefaultNamespace(namespace))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer client.Close()
+
+			ctx = namespaces.WithNamespace(ctx, namespace)
+
+			img := tc.prepare(ctx, t, client)
+
+			dstFile, err := os.CreateTemp("", "export-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				dstFile.Close()
+				os.Remove(dstFile.Name())
+			}()
+
+			tc.check(ctx, t, client, dstFile, img)
+		})
+	}
 }
 
-// TestExportDockerManifest exports testImage as a tar stream, using the
-// WithSkipDockerManifest option
-func TestExportDockerManifest(t *testing.T) {
-	if testing.Short() {
-		t.Skip()
-	}
-	ctx, cancel := testContext(t)
-	defer cancel()
-
-	client, err := New(address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	_, err = client.Fetch(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dstFile, err := os.CreateTemp("", "export-import-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		dstFile.Close()
-		os.Remove(dstFile.Name())
-	}()
-
-	img, err := client.ImageService().Get(ctx, testImage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// test multi-platform export
-	err = client.Export(ctx, dstFile, archive.WithManifest(img.Target), archive.WithSkipDockerManifest())
-	if err != nil {
-		t.Fatal(err)
-	}
+func isImageInArchive(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, mfst ocispec.Descriptor) bool {
 	dstFile.Seek(0, 0)
-	assertOCITar(t, dstFile, false)
+	tr := tar.NewReader(dstFile)
 
-	// reset to beginning
-	dstFile.Seek(0, 0)
-
-	// test single-platform export
-	var result ocispec.Descriptor
-	err = images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		if images.IsManifestType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
-			if err != nil {
-				return nil, err
+	var blobs []string
+	for {
+		h, err := tr.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
 			}
-
-			var manifest ocispec.Manifest
-			if err := json.Unmarshal(p, &manifest); err != nil {
-				return nil, err
-			}
-
-			if desc.Platform == nil || platforms.Default().Match(platforms.Normalize(*desc.Platform)) {
-				result = desc
-			}
-			return nil, nil
-		} else if images.IsIndexType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, client.ContentStore(), desc)
-			if err != nil {
-				return nil, err
-			}
-
-			var idx ocispec.Index
-			if err := json.Unmarshal(p, &idx); err != nil {
-				return nil, err
-			}
-			return idx.Manifests, nil
+			t.Fatal(err)
 		}
-		return nil, nil
-	}), img.Target)
-	if err != nil {
-		t.Fatal(err)
+
+		digest := strings.TrimPrefix(h.Name, "blobs/sha256/")
+		if digest != h.Name && digest != "" {
+			blobs = append(blobs, digest)
+		}
 	}
-	err = client.Export(ctx, dstFile, archive.WithManifest(result), archive.WithSkipDockerManifest())
+
+	allPresent := true
+	// Check if the archive contains all blobs referenced by the manifest.
+	images.Walk(ctx, images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		for _, b := range blobs {
+			if desc.Digest.Hex() == b {
+				return images.Children(ctx, client.ContentStore(), desc)
+			}
+		}
+		allPresent = false
+		return nil, images.ErrStopHandler
+	}), mfst)
+
+	return allPresent
+}
+
+func getPlatformManifest(ctx context.Context, cs content.Store, target ocispec.Descriptor, platform platforms.MatchComparer) (ocispec.Descriptor, error) {
+	mfst, err := images.LimitManifests(images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		children, err := images.Children(ctx, cs, desc)
+		if !images.IsManifestType(desc.MediaType) {
+			return children, err
+		}
+
+		if err != nil {
+			if errdefs.IsNotFound(err) {
+				return nil, images.ErrSkipDesc
+			}
+			return nil, err
+		}
+
+		return children, nil
+	}), platform, 1)(ctx, target)
+
 	if err != nil {
-		t.Fatal(err)
+		return ocispec.Descriptor{}, err
 	}
-	dstFile.Seek(0, 0)
-	assertOCITar(t, dstFile, false)
+	if len(mfst) == 0 {
+		return ocispec.Descriptor{}, errdefs.ErrNotFound
+	}
+	return mfst[0], nil
 }
 
 func assertOCITar(t *testing.T, r io.Reader, docker bool) {
+	t.Helper()
 	// TODO: add more assertion
 	tr := tar.NewReader(r)
 	foundOCILayout := false
@@ -168,8 +339,7 @@ func assertOCITar(t *testing.T, r io.Reader, docker bool) {
 			break
 		}
 		if err != nil {
-			t.Error(err)
-			continue
+			t.Fatal(err)
 		}
 		if h.Name == ocispec.ImageLayoutFile {
 			foundOCILayout = true
