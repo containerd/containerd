@@ -218,7 +218,7 @@ type ContentProvider interface {
 }
 
 // Export implements Exporter.
-func Export(ctx context.Context, store ContentProvider, writer io.Writer, opts ...ExportOpt) error {
+func Export(ctx context.Context, store content.Provider, writer io.Writer, opts ...ExportOpt) error {
 	var eo exportOptions
 	for _, opt := range opts {
 		if err := opt(ctx, &eo); err != nil {
@@ -231,13 +231,17 @@ func Export(ctx context.Context, store ContentProvider, writer io.Writer, opts .
 	}
 
 	manifests := make([]ocispec.Descriptor, 0, len(eo.manifests))
-	for _, desc := range eo.manifests {
-		d, err := copySourceLabels(ctx, store, desc)
-		if err != nil {
-			log.G(ctx).WithError(err).WithField("desc", desc).Warn("failed to copy distribution.source labels")
-			continue
+	if infoProvider, ok := store.(content.InfoProvider); ok {
+		for _, desc := range eo.manifests {
+			d, err := copySourceLabels(ctx, infoProvider, desc)
+			if err != nil {
+				log.G(ctx).WithError(err).WithField("desc", desc).Warn("failed to copy distribution.source labels")
+				continue
+			}
+			manifests = append(manifests, d)
 		}
-		manifests = append(manifests, d)
+	} else {
+		manifests = append(manifests, eo.manifests...)
 	}
 
 	algorithms := map[string]struct{}{}
