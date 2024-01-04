@@ -45,11 +45,11 @@ jobs:
         win_ver: [ltsc2019, ltsc2022]
         include:
         - win_ver: ltsc2019
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:17763.4377.230505"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2019/"
         - win_ver: ltsc2022
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.1607.230310"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
