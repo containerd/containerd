@@ -70,7 +70,7 @@ func init() {
 // NewCimFSSnapshotter returns a new CimFS based windows snapshotter
 func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 	if !cimfs.IsCimFSSupported() {
-		return nil, fmt.Errorf("host windows version doesn't support CimFS")
+		return nil, fmt.Errorf("host windows version doesn't support CimFS: %w", plugin.ErrSkipPlugin)
 	}
 
 	baseSn, err := newBaseSnapshotter(root)

@@ -51,7 +51,7 @@ func init() {
 			}
 
 			if !cimfs.IsCimFSSupported() {
-				return nil, fmt.Errorf("host windows version doesn't support CimFS")
+				return nil, fmt.Errorf("host windows version doesn't support CimFS: %w", plugin.ErrSkipPlugin)
 			}
 			ic.Meta.Platforms = append(ic.Meta.Platforms, platforms.DefaultSpec())
 			return NewCimDiff(md.(*metadata.DB).ContentStore())
