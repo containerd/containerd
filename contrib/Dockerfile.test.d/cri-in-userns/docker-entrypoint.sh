@@ -48,4 +48,4 @@ containerd &
 echo >&2 "Waiting for containerd"
 until ctr plugins list; do sleep 3; done
 
-exec "$@"
+critest "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"

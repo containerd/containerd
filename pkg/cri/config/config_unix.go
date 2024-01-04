@@ -50,6 +50,9 @@ func DefaultConfig() PluginConfig {
 
 	# CriuWorkPath is the criu work path.
 	CriuWorkPath = ""
+
+	# SystemdCgroup is default to use the systemd cgroup driver with runc
+	SystemdCgroup = true
 `
 	var m map[string]interface{}
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
