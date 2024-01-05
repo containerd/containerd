@@ -121,7 +121,7 @@ import (
 )
 
 var (
-	specifierRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	specifierRe = regexp.MustCompile(`^[A-Za-z0-9_."-]+$`)
 )
 
 // Platform is a type alias for convenience, so there is no need to import image-spec package everywhere.
@@ -174,7 +174,7 @@ func ParseAll(specifiers []string) ([]specs.Platform, error) {
 
 // Parse parses the platform specifier syntax into a platform declaration.
 //
-// Platform specifiers are in the format `<os>|<arch>|<os>/<arch>[/<variant>]`.
+// Platform specifiers are in the format `<os>|<arch>|<os>/<arch>[/<variant>]|<os>/<arch>/<variant>[/<osversion>]`.
 // The minimum required information for a platform specifier is the operating
 // system or architecture. If there is only a single string (no slashes), the
 // value will be matched against the known set of operating systems, then fall
@@ -223,6 +223,9 @@ func Parse(specifier string) (specs.Platform, error) {
 		}
 		if isKnownArch(p.Architecture) {
 			p.OS = runtime.GOOS
+			if p.OS == "windows" {
+				p.OSVersion = GetWindowsOsVersion()
+			}
 			return p, nil
 		}
 
@@ -254,6 +257,21 @@ func Parse(specifier string) (specs.Platform, error) {
 		}
 
 		return p, nil
+	case 4:
+		// we have a fully specified variant, this is rare
+		p.OS = normalizeOS(parts[0])
+		variant := parts[2]
+		if variant == "\"\"" { // empty variant
+			variant = ""
+		}
+		p.Architecture, p.Variant = normalizeArch(parts[1], variant)
+		if p.Architecture == "arm64" && p.Variant == "" {
+			p.Variant = "v8"
+		}
+
+		p.OSVersion = parts[3]
+
+		return p, nil
 	}
 
 	return specs.Platform{}, fmt.Errorf("%q: cannot parse platform specifier: %w", specifier, errInvalidArgument)
@@ -270,12 +288,22 @@ func MustParse(specifier string) specs.Platform {
 }
 
 // Format returns a string specifier from the provided platform specification.
-func Format(platform specs.Platform) string {
-	if platform.OS == "" {
+func Format(ocispecPlatform specs.Platform) string {
+	if ocispecPlatform.OS == "" {
 		return "unknown"
 	}
 
-	return path.Join(platform.OS, platform.Architecture, platform.Variant)
+	if ocispecPlatform.OSVersion != "" {
+		variant := ocispecPlatform.Variant
+		if variant == "" {
+			variant = "\"\""
+		}
+
+		platform := []string{ocispecPlatform.OS, ocispecPlatform.Architecture, variant, ocispecPlatform.OSVersion}
+		return strings.Join(platform, "/")
+	}
+
+	return path.Join(ocispecPlatform.OS, ocispecPlatform.Architecture, ocispecPlatform.Variant)
 }
 
 // Normalize validates and translate the platform to the canonical value.

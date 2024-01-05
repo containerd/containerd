@@ -20,6 +20,7 @@ import (
 	"path"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
@@ -27,7 +28,6 @@ import (
 
 func TestParseSelector(t *testing.T) {
 	var (
-		defaultOS      = runtime.GOOS
 		defaultArch    = runtime.GOARCH
 		defaultVariant = ""
 	)
@@ -200,45 +200,45 @@ func TestParseSelector(t *testing.T) {
 			formatted: "linux/arm/v7",
 		},
 		{
-			input: "arm",
+			input: "linux/arm",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "arm",
 			},
-			formatted: path.Join(defaultOS, "arm"),
+			formatted: path.Join("linux", "arm"),
 		},
 		{
-			input: "armel",
+			input: "linux/armel",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "arm",
 				Variant:      "v6",
 			},
-			formatted: path.Join(defaultOS, "arm/v6"),
+			formatted: path.Join("linux", "arm/v6"),
 		},
 		{
-			input: "armhf",
+			input: "linux/armhf",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "arm",
 			},
-			formatted: path.Join(defaultOS, "arm"),
+			formatted: path.Join("linux", "arm"),
 		},
 		{
-			input: "Aarch64",
+			input: "linux/Aarch64",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "arm64",
 			},
-			formatted: path.Join(defaultOS, "arm64"),
+			formatted: path.Join("linux", "arm64"),
 		},
 		{
-			input: "x86_64",
+			input: "linux/x86_64",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "amd64",
 			},
-			formatted: path.Join(defaultOS, "amd64"),
+			formatted: path.Join("linux", "amd64"),
 		},
 		{
 			input: "Linux/x86_64",
@@ -249,12 +249,12 @@ func TestParseSelector(t *testing.T) {
 			formatted: "linux/amd64",
 		},
 		{
-			input: "i386",
+			input: "linux/i386",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "386",
 			},
-			formatted: path.Join(defaultOS, "386"),
+			formatted: path.Join("linux", "386"),
 		},
 		{
 			input: "linux",
@@ -266,12 +266,12 @@ func TestParseSelector(t *testing.T) {
 			formatted: path.Join("linux", defaultArch, defaultVariant),
 		},
 		{
-			input: "s390x",
+			input: "linux/s390x",
 			expected: specs.Platform{
-				OS:           defaultOS,
+				OS:           "linux",
 				Architecture: "s390x",
 			},
-			formatted: path.Join(defaultOS, "s390x"),
+			formatted: path.Join("linux", "s390x"),
 		},
 		{
 			input: "linux/s390x",
@@ -290,12 +290,35 @@ func TestParseSelector(t *testing.T) {
 			},
 			formatted: path.Join("darwin", defaultArch, defaultVariant),
 		},
+		{
+			input: "windows/amd64",
+			expected: specs.Platform{
+				OS:           "windows",
+				Architecture: "amd64",
+				Variant:      "",
+				OSVersion:    GetWindowsOsVersion(),
+			},
+			formatted: strings.Join([]string{"windows", "amd64", "\"\"", GetWindowsOsVersion()}, "/"),
+		},
+
+		{
+			input: "windows/amd64/\"\"/10.0.20348",
+			expected: specs.Platform{
+				OS:           "windows",
+				Architecture: "amd64",
+				Variant:      "",
+				OSVersion:    "10.0.20348",
+			},
+			formatted: strings.Join([]string{"windows", "amd64", "\"\"", "10.0.20348"}, "/"),
+		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
 			if testcase.skip {
 				t.Skip("this case is not yet supported")
 			}
+			t.Logf("testcase.input %v", testcase.input)
 			p, err := Parse(testcase.input)
+			t.Logf("parse the testcase.input %v", p)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -317,6 +340,7 @@ func TestParseSelector(t *testing.T) {
 			}
 
 			formatted := Format(p)
+			t.Logf("formatted string %v", formatted)
 			if formatted != testcase.formatted {
 				t.Fatalf("unexpected format: %q != %q", formatted, testcase.formatted)
 			}
@@ -352,9 +376,6 @@ func TestParseSelectorInvalid(t *testing.T) {
 		},
 		{
 			input: "linux/&arm", // invalid character
-		},
-		{
-			input: "linux/arm/foo/bar", // too many components
 		},
 	} {
 		t.Run(testcase.input, func(t *testing.T) {
