@@ -21,13 +21,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"golang.org/x/mod/semver"
-	exec "golang.org/x/sys/execabs"
 
 	"github.com/containerd/containerd/v2/archive"
 	"github.com/containerd/containerd/v2/version"
