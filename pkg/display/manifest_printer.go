@@ -58,11 +58,6 @@ var LineTreeFormat = TreeFormat{
 	Spacer:     "    ",
 }
 
-type ContentReader interface {
-	content.Provider
-	content.InfoProvider
-}
-
 type ImageTreePrinter struct {
 	verbose bool
 	w       io.Writer
@@ -101,7 +96,7 @@ func NewImageTreePrinter(opts ...PrintOpt) *ImageTreePrinter {
 }
 
 // PrintImageTree prints an image and all its sub elements
-func (p *ImageTreePrinter) PrintImageTree(ctx context.Context, img images.Image, store ContentReader) error {
+func (p *ImageTreePrinter) PrintImageTree(ctx context.Context, img images.Image, store content.InfoReaderProvider) error {
 	fmt.Fprintln(p.w, img.Name)
 	subchild := p.format.SkipLine
 	fmt.Fprintf(p.w, "%s Created: %s\n", subchild, img.CreatedAt)
@@ -113,12 +108,12 @@ func (p *ImageTreePrinter) PrintImageTree(ctx context.Context, img images.Image,
 }
 
 // PrintManifestTree prints a manifest and all its sub elements
-func (p *ImageTreePrinter) PrintManifestTree(ctx context.Context, desc ocispec.Descriptor, store ContentReader) error {
+func (p *ImageTreePrinter) PrintManifestTree(ctx context.Context, desc ocispec.Descriptor, store content.InfoReaderProvider) error {
 	// start displaying tree from the root descriptor perspective, which is a single child view
 	return p.printManifestTree(ctx, desc, store, p.format.LastDrop, p.format.Spacer)
 }
 
-func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.Descriptor, store ContentReader, prefix, childprefix string) error {
+func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.Descriptor, store content.InfoReaderProvider, prefix, childprefix string) error {
 	subprefix := childprefix + p.format.MiddleDrop
 	subchild := childprefix + p.format.SkipLine
 	fmt.Fprintf(p.w, "%s%s @%s (%d bytes)\n", prefix, desc.MediaType, desc.Digest, desc.Size)
@@ -177,7 +172,7 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	return nil
 }
 
-func (p *ImageTreePrinter) showContent(ctx context.Context, store ContentReader, desc ocispec.Descriptor, prefix string) error {
+func (p *ImageTreePrinter) showContent(ctx context.Context, store content.InfoReaderProvider, desc ocispec.Descriptor, prefix string) error {
 	if p.verbose {
 		info, err := store.Info(ctx, desc.Digest)
 		if err != nil {

@@ -32,7 +32,6 @@ import (
 	docker "github.com/distribution/reference"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/opencontainers/go-digest"
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
@@ -56,12 +55,6 @@ type Image struct {
 	Pinned bool
 }
 
-// InfoProvider provides both content and info about content
-type InfoProvider interface {
-	content.Provider
-	Info(ctx context.Context, dgst digest.Digest) (content.Info, error)
-}
-
 // Store stores all images.
 type Store struct {
 	lock sync.RWMutex
@@ -72,7 +65,7 @@ type Store struct {
 	images images.Store
 
 	// content provider
-	provider InfoProvider
+	provider content.InfoReaderProvider
 
 	// platform represents the currently supported platform for images
 	// TODO: Make this store multi-platform
@@ -83,7 +76,7 @@ type Store struct {
 }
 
 // NewStore creates an image store.
-func NewStore(img images.Store, provider InfoProvider, platform platforms.MatchComparer) *Store {
+func NewStore(img images.Store, provider content.InfoReaderProvider, platform platforms.MatchComparer) *Store {
 	return &Store{
 		refCache: make(map[string]string),
 		images:   img,

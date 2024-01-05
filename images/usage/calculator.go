@@ -75,13 +75,7 @@ func WithManifestUsage() Opt {
 	}
 }
 
-// ContentProvider provides both content and info about content
-type ContentProvider interface {
-	content.Provider
-	content.InfoProvider
-}
-
-func CalculateImageUsage(ctx context.Context, i images.Image, provider ContentProvider, opts ...Opt) (int64, error) {
+func CalculateImageUsage(ctx context.Context, i images.Image, provider content.InfoReaderProvider, opts ...Opt) (int64, error) {
 	var config usageOptions
 	for _, opt := range opts {
 		if err := opt(&config); err != nil {
