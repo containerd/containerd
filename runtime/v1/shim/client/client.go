@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -40,7 +41,6 @@ import (
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/ttrpc"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 
