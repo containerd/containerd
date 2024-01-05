@@ -121,6 +121,14 @@ type RuntimeService interface {
 	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig, opts ...grpc.CallOption) error
 	// Status returns the status of the runtime.
 	Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeStatus, error)
+	// RuntimeConfig returns configuration information of the runtime.
+	// A couple of notes:
+	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
+	//     The former is for having runtime tell Kubelet what to do, the latter vice versa.
+	//   - It is the expectation of the Kubelet that these fields are static for the lifecycle of the Kubelet.
+	//     The Kubelet will not re-request the RuntimeConfiguration after startup, and CRI implementations should
+	//     avoid updating them without a full node reboot.
+	RuntimeConfig(in *runtimeapi.RuntimeConfigRequest, opts ...grpc.CallOption) (*runtimeapi.RuntimeConfigResponse, error)
 }
 
 // ImageManagerService interface should be implemented by a container image
