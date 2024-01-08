@@ -27,6 +27,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"runtime/debug"
@@ -48,7 +49,6 @@ import (
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/ttrpc"
 	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

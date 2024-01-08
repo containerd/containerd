@@ -19,6 +19,7 @@ package integration
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -27,7 +28,6 @@ import (
 	"github.com/containerd/containerd/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

@@ -18,10 +18,10 @@ package client
 
 import (
 	"fmt"
+	"os/exec"
 	"syscall"
 
 	"github.com/containerd/cgroups/v3/cgroup1"
-	exec "golang.org/x/sys/execabs"
 )
 
 func getSysProcAttr() *syscall.SysProcAttr {

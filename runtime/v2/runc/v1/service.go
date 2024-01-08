@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"sync"
@@ -51,7 +52,6 @@ import (
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/sirupsen/logrus"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 

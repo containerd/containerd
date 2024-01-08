@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"syscall"
@@ -39,7 +40,6 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/runtime/v2/shim"
 	runcC "github.com/containerd/go-runc"
-	exec "golang.org/x/sys/execabs"
 	"golang.org/x/sys/unix"
 )
 
