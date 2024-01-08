@@ -17,22 +17,26 @@
 package base
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/fsnotify/fsnotify"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
@@ -108,6 +112,14 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 
 	log.G(ctx).Infof("Start cri plugin with config %+v", c)
 
+	if c.ContainerdConfig.RuntimeConfigPath != "" {
+		runtimeConfig := criconfig.NewRuntimeConfig(c.RuntimeConfigPath, c.DefaultRuntimeName, loadOCISpec)
+		if err := runtimeConfig.Init(ctx); err != nil {
+			return nil, fmt.Errorf("failed to init runtime config: %w", err)
+		}
+		c.CRIRc = runtimeConfig
+	}
+
 	if err := setGLogLevel(); err != nil {
 		return nil, fmt.Errorf("failed to set glog level: %w", err)
 	}
@@ -117,10 +129,16 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create load basic oci spec: %w", err)
 	}
 
-	return &CRIBase{
+	base := &CRIBase{
 		Config:       c,
 		BaseOCISpecs: ociSpec,
-	}, nil
+	}
+	if c.ContainerdConfig.RuntimeConfigPath != "" {
+		if err := base.watchDefaultRuntimeNameValue(ctx); err != nil {
+			return nil, fmt.Errorf("faild to watch default runtime name: %w", err)
+		}
+	}
+	return base, nil
 }
 
 func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
@@ -144,6 +162,15 @@ func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {
 	}
 
 	return specs, nil
+}
+
+func (cb *CRIBase) GetOCISpec(baseRuntimeSpec string) (*oci.Spec, bool) {
+	if cb.Config.RuntimeConfigPath != "" {
+		ociSpec, _ := cb.Config.CRIRc.GetOCISpec(baseRuntimeSpec)
+		return ociSpec, true
+	}
+	v, ok := cb.BaseOCISpecs[baseRuntimeSpec]
+	return v, ok
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {
@@ -199,4 +226,58 @@ func migrateConfig(conf map[string]interface{}) {
 			}
 		}
 	}
+}
+
+type configPathKey struct{}
+
+// WithConfigPath set config
+func WithConfigPath(ctx context.Context, configPath string) context.Context {
+	ctx = context.WithValue(ctx, configPathKey{}, configPath) // set our key for namespace
+	return ctx
+}
+
+// WatchDefaultRuntimeNameValue watch config file, only handler default_runtime_name field change.
+func (cb *CRIBase) watchDefaultRuntimeNameValue(ctx context.Context) error {
+	configPathValue := ctx.Value(configPathKey{})
+	if configPathValue == nil || configPathValue == "" {
+		return nil
+	}
+	configPath := configPathValue.(string)
+	notifyFile, err := util.NewNotifyFile()
+	if err != nil {
+		log.G(ctx).Errorf("create fsnotify watcher error %+v", err)
+		return err
+	}
+	return notifyFile.WatchFile(ctx, configPath, cb.notifyEventFunc)
+}
+
+func (cb *CRIBase) notifyEventFunc(ctx context.Context, event fsnotify.Event) error {
+	name := event.Name
+	_, fileName := filepath.Split(name)
+	if fileName != "config.toml" {
+		return nil
+	}
+	if event.Op&fsnotify.Chmod == fsnotify.Chmod || event.Op&fsnotify.Rename == fsnotify.Rename {
+		return nil
+	}
+
+	if event.Op&fsnotify.Create == fsnotify.Create || event.Op&fsnotify.Write == fsnotify.Write {
+		file, err := os.Open(event.Name)
+		if err != nil {
+			return nil
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			if strings.Contains(scanner.Text(), "default_runtime_name") {
+				defaultRuntimeName := strings.TrimSpace(strings.ReplaceAll(strings.Split(scanner.Text(), "=")[1], "\"", ""))
+				if cb.Config.DefaultRuntimeName == defaultRuntimeName {
+					break
+				}
+				log.G(ctx).Infof("watch default_runtime_name having change, old value %s, new value %s", cb.Config.DefaultRuntimeName, defaultRuntimeName)
+				cb.Config.DefaultRuntimeName = defaultRuntimeName
+			}
+		}
+	}
+	return nil
 }

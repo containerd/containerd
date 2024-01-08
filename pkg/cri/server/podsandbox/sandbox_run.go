@@ -79,9 +79,9 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	)
 
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
+	image, err := c.ensureImageExists(ctx, c.criBase.Config.SandboxImage, config)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.criBase.Config.SandboxImage, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
@@ -89,7 +89,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
+	ociRuntime, err := c.criBase.Config.GetSandboxRuntime(config, metadata.RuntimeHandler)
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}

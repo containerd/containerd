@@ -107,7 +107,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 			confName := filepath.Join(confDir, cniConfigFileName)
 
 			c := newTestCRIService()
-			c.config.CniConfig = criconfig.CniConfig{
+			c.criBase.Config.CniConfig = criconfig.CniConfig{
 				NetworkPluginConfDir:      confDir,
 				NetworkPluginConfTemplate: templateName,
 			}
@@ -119,7 +119,7 @@ func TestUpdateRuntimeConfig(t *testing.T) {
 				},
 			}
 			if test.noTemplate {
-				c.config.CniConfig.NetworkPluginConfTemplate = ""
+				c.criBase.Config.CniConfig.NetworkPluginConfTemplate = ""
 			}
 			if test.emptyCIDR {
 				req.RuntimeConfig.NetworkConfig.PodCidr = ""

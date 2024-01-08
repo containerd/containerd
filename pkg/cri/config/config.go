@@ -121,6 +121,10 @@ type ContainerdConfig struct {
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 
+	// RuntimeConfigPath is a path to the root directory containing runtime
+	// If ConfigPath is set, the config.toml about runtime config content are ignored.
+	RuntimeConfigPath string `toml:"runtime_config_path" json:"configPath"`
+
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
@@ -388,6 +392,8 @@ type Config struct {
 	RootDir string `json:"rootDir"`
 	// StateDir is the root directory path for managing volatile pod/container data
 	StateDir string `json:"stateDir"`
+	// CRIRc is runtime config
+	CRIRc *CRIRuntimeConfig
 }
 
 const (
@@ -403,27 +409,9 @@ const (
 // ValidatePluginConfig validates the given plugin configuration.
 func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
-	if c.ContainerdConfig.Runtimes == nil {
-		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
-	}
 
-	// Validation for default_runtime_name
-	if c.ContainerdConfig.DefaultRuntimeName == "" {
-		return warnings, errors.New("`default_runtime_name` is empty")
-	}
-	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
-	}
-
-	for k, r := range c.ContainerdConfig.Runtimes {
-		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
-		}
-		// If empty, use default podSandbox mode
-		if len(r.Sandboxer) == 0 {
-			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
-		}
+	if err := validateRuntimeConfig(c.DefaultRuntimeName, c.Runtimes); err != nil {
+		return warnings, err
 	}
 
 	useConfigPath := c.Registry.ConfigPath != ""
@@ -489,6 +477,33 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 	return warnings, nil
 }
 
+// validateRuntimeConfig validate runtime config
+func validateRuntimeConfig(defaultRuntimeName string, runtimes map[string]Runtime) error {
+	if runtimes == nil {
+		runtimes = make(map[string]Runtime)
+	}
+
+	// Validation for default_runtime_name
+	if defaultRuntimeName == "" {
+		return errors.New("`default_runtime_name` is empty")
+	}
+	if _, ok := runtimes[defaultRuntimeName]; !ok {
+		return fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", defaultRuntimeName)
+	}
+
+	for k, r := range runtimes {
+		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+			return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+		}
+		// If empty, use default podSandbox mode
+		if len(r.Sandboxer) == 0 {
+			r.Sandboxer = string(ModePodSandbox)
+			runtimes[k] = r
+		}
+	}
+	return nil
+}
+
 func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConfig, runtimeHandler string) (Runtime, error) {
 	if untrustedWorkload(podSandboxConfig) {
 		// If the untrusted annotation is provided, runtimeHandler MUST be empty.
@@ -511,6 +526,15 @@ func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConf
 
 	if runtimeHandler == "" {
 		runtimeHandler = config.DefaultRuntimeName
+	}
+
+	// If ConfigPath is set, the config.toml about runtime config content are ignored.
+	if config.RuntimeConfigPath != "" {
+		r, ok := config.CRIRc.GetRuntime(runtimeHandler)
+		if !ok {
+			return Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
+		}
+		return r, nil
 	}
 
 	r, ok := config.Runtimes[runtimeHandler]

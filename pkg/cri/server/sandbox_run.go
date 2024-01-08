@@ -86,7 +86,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxInfo = sb.Sandbox{ID: id}
 	)
 
-	ociRuntime, err := c.config.GetSandboxRuntime(config, r.GetRuntimeHandler())
+	ociRuntime, err := c.criBase.Config.GetSandboxRuntime(config, r.GetRuntimeHandler())
 	if err != nil {
 		return nil, fmt.Errorf("unable to get OCI runtime for sandbox %q: %w", id, err)
 	}
@@ -177,8 +177,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// namespaces. If the pod is in host network namespace then both are empty and should not
 		// be used.
 		var netnsMountDir = "/var/run/netns"
-		if c.config.NetNSMountsUnderStateDir {
-			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
+		if c.criBase.Config.NetNSMountsUnderStateDir {
+			netnsMountDir = filepath.Join(c.criBase.Config.StateDir, "netns")
 		}
 		sandbox.NetNS, err = netns.NewNetNS(netnsMountDir)
 		if err != nil {
@@ -292,8 +292,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// namespaces. If the pod is in host network namespace then both are empty and should not
 		// be used.
 		var netnsMountDir = "/var/run/netns"
-		if c.config.NetNSMountsUnderStateDir {
-			netnsMountDir = filepath.Join(c.config.StateDir, "netns")
+		if c.criBase.Config.NetNSMountsUnderStateDir {
+			netnsMountDir = filepath.Join(c.criBase.Config.StateDir, "netns")
 		}
 
 		sandbox.NetNS, err = netns.NewNetNSFromPID(netnsMountDir, ctrl.Pid)
@@ -467,7 +467,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
-	if c.config.CniConfig.NetworkPluginSetupSerially {
+	if c.criBase.Config.CniConfig.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
 	} else {
 		result, err = netPlugin.Setup(ctx, id, path, opts...)
@@ -481,7 +481,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	logDebugCNIResult(ctx, id, result)
 	// Check if the default interface has IP config
 	if configs, ok := result.Interfaces[defaultIfName]; ok && len(configs.IPConfigs) > 0 {
-		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.config.IPPreference)
+		sandbox.IP, sandbox.AdditionalIPs = selectPodIPs(ctx, configs.IPConfigs, c.criBase.Config.IPPreference)
 		sandbox.CNIResult = result
 		return nil
 	}

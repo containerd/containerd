@@ -81,7 +81,7 @@ func (c *criService) getMetricsHandler(ctx context.Context, sandboxID string) (m
 		return nil, err
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
+	ociRuntime, err := c.criBase.Config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get runtimeHandler %q: %w", sandbox.RuntimeHandler, err)
 	}

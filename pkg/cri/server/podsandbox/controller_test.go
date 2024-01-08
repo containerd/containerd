@@ -22,6 +22,7 @@ import (
 	"time"
 
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
@@ -50,7 +51,9 @@ var testConfig = criconfig.Config{
 func newControllerService() *Controller {
 	labels := label.NewStore()
 	return &Controller{
-		config:       testConfig,
+		criBase: &base.CRIBase{
+			Config: testConfig,
+		},
 		os:           ostesting.NewFakeOS(),
 		sandboxStore: sandboxstore.NewStore(labels),
 	}

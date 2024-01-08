@@ -29,9 +29,9 @@ const windowsNetworkAttachCount = 1
 // initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
 	pluginDirs := map[string]string{
-		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
+		defaultNetworkPlugin: c.criBase.Config.NetworkPluginConfDir,
 	}
-	for name, conf := range c.config.Runtimes {
+	for name, conf := range c.criBase.Config.Runtimes {
 		if conf.NetworkPluginConfDir != "" {
 			pluginDirs[name] = conf.NetworkPluginConfDir
 		}
@@ -39,9 +39,9 @@ func (c *criService) initPlatform() error {
 
 	c.netPlugin = make(map[string]cni.CNI)
 	for name, dir := range pluginDirs {
-		max := c.config.NetworkPluginMaxConfNum
+		max := c.criBase.Config.NetworkPluginMaxConfNum
 		if name != defaultNetworkPlugin {
-			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
+			if m := c.criBase.Config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
 				max = m
 			}
 		}
@@ -53,7 +53,7 @@ func (c *criService) initPlatform() error {
 		i, err := cni.New(cni.WithMinNetworkCount(windowsNetworkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+			cni.WithPluginDir([]string{c.criBase.Config.NetworkPluginBinDir}))
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}

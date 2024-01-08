@@ -197,22 +197,22 @@ func (c *criService) recover(ctx context.Context) error {
 	}{
 		{
 			cntrs:  sandboxes,
-			base:   filepath.Join(c.config.RootDir, sandboxesDir),
+			base:   filepath.Join(c.criBase.Config.RootDir, sandboxesDir),
 			errMsg: "failed to cleanup orphaned sandbox directories",
 		},
 		{
 			cntrs:  sandboxes,
-			base:   filepath.Join(c.config.StateDir, sandboxesDir),
+			base:   filepath.Join(c.criBase.Config.StateDir, sandboxesDir),
 			errMsg: "failed to cleanup orphaned volatile sandbox directories",
 		},
 		{
 			cntrs:  containers,
-			base:   filepath.Join(c.config.RootDir, containersDir),
+			base:   filepath.Join(c.criBase.Config.RootDir, containersDir),
 			errMsg: "failed to cleanup orphaned container directories",
 		},
 		{
 			cntrs:  containers,
-			base:   filepath.Join(c.config.StateDir, containersDir),
+			base:   filepath.Join(c.criBase.Config.StateDir, containersDir),
 			errMsg: "failed to cleanup orphaned volatile container directories",
 		},
 	} {
@@ -424,7 +424,7 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 
 // loadImages loads images from containerd.
 func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
-	snapshotter := c.config.ContainerdConfig.Snapshotter
+	snapshotter := c.criBase.Config.ContainerdConfig.Snapshotter
 	var wg sync.WaitGroup
 	for _, i := range cImages {
 		wg.Add(1)

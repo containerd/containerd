@@ -38,7 +38,7 @@ func (c *criService) rdtClassFromAnnotations(containerName string, containerAnno
 	}
 
 	if err != nil {
-		if !rdt.IsEnabled() && c.config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
+		if !rdt.IsEnabled() && c.criBase.Config.ContainerdConfig.IgnoreRdtNotEnabledErrors {
 			log.L.Debugf("continuing create container %s, ignoring rdt not enabled (%v)", containerName, err)
 			return "", nil
 		}

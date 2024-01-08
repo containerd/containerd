@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	_ "github.com/containerd/containerd/v2/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/services/server"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/containerd/v2/sys"
@@ -133,6 +134,7 @@ can be used and modified as necessary as a custom configuration.`
 				return err
 			}
 		}
+		ctx = base.WithConfigPath(ctx, configPath)
 
 		// Apply flags to the config
 		if err := applyFlags(context, config); err != nil {

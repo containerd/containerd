@@ -46,22 +46,22 @@ const (
 )
 
 func getStreamListenerMode(c *criService) (streamListenerMode, error) {
-	if c.config.EnableTLSStreaming {
-		if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+	if c.criBase.Config.EnableTLSStreaming {
+		if c.criBase.Config.X509KeyPairStreaming.TLSCertFile != "" && c.criBase.Config.X509KeyPairStreaming.TLSKeyFile != "" {
 			return x509KeyPairTLS, nil
 		}
-		if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile == "" {
+		if c.criBase.Config.X509KeyPairStreaming.TLSCertFile != "" && c.criBase.Config.X509KeyPairStreaming.TLSKeyFile == "" {
 			return -1, errors.New("must set X509KeyPairStreaming.TLSKeyFile")
 		}
-		if c.config.X509KeyPairStreaming.TLSCertFile == "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+		if c.criBase.Config.X509KeyPairStreaming.TLSCertFile == "" && c.criBase.Config.X509KeyPairStreaming.TLSKeyFile != "" {
 			return -1, errors.New("must set X509KeyPairStreaming.TLSCertFile")
 		}
 		return selfSignTLS, nil
 	}
-	if c.config.X509KeyPairStreaming.TLSCertFile != "" {
+	if c.criBase.Config.X509KeyPairStreaming.TLSCertFile != "" {
 		return -1, errors.New("X509KeyPairStreaming.TLSCertFile is set but EnableTLSStreaming is not set")
 	}
-	if c.config.X509KeyPairStreaming.TLSKeyFile != "" {
+	if c.criBase.Config.X509KeyPairStreaming.TLSKeyFile != "" {
 		return -1, errors.New("X509KeyPairStreaming.TLSKeyFile is set but EnableTLSStreaming is not set")
 	}
 	return withoutTLS, nil
@@ -91,7 +91,7 @@ func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (strea
 	}
 	switch tlsMode {
 	case x509KeyPairTLS:
-		tlsCert, err := tls.LoadX509KeyPair(c.config.X509KeyPairStreaming.TLSCertFile, c.config.X509KeyPairStreaming.TLSKeyFile)
+		tlsCert, err := tls.LoadX509KeyPair(c.criBase.Config.X509KeyPairStreaming.TLSCertFile, c.criBase.Config.X509KeyPairStreaming.TLSKeyFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
 		}

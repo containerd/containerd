@@ -44,7 +44,7 @@ import (
 // apparmorEnabled returns true if apparmor is enabled, supported by the host,
 // if apparmor_parser is installed, and if we are not running docker-in-docker.
 func (c *criService) apparmorEnabled() bool {
-	if c.config.DisableApparmor {
+	if c.criBase.Config.DisableApparmor {
 		return false
 	}
 	return apparmor.HostSupports()

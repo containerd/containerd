@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
@@ -77,9 +78,12 @@ func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
 	labels := label.NewStore()
+	criBase := &base.CRIBase{
+		Config: testConfig,
+	}
 	return &criService{
 		imageService:       &fakeImageService{},
-		config:             testConfig,
+		criBase:            criBase,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),

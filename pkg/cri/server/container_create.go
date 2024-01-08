@@ -156,14 +156,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	var volumeMounts []*runtime.Mount
-	if !c.config.IgnoreImageDefinedVolumes {
+	if !c.criBase.Config.IgnoreImageDefinedVolumes {
 		// Create container image volumes mounts.
 		volumeMounts = c.volumeMounts(platform, containerRootDir, config, &image.ImageSpec.Config)
 	} else if len(image.ImageSpec.Config.Volumes) != 0 {
 		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
+	ociRuntime, err := c.criBase.Config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
@@ -208,7 +208,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	log.G(ctx).Debugf("Container %q spec: %#+v", id, spew.NewFormatter(spec))
 
 	// Grab any platform specific snapshotter opts.
-	sOpts, err := snapshotterOpts(c.config.ContainerdConfig.Snapshotter, config)
+	sOpts, err := snapshotterOpts(c.criBase.Config.ContainerdConfig.Snapshotter, config)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (c *criService) runtimeSpec(id string, platform platforms.Platform, baseSpe
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {
-		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
+		baseSpec, ok := c.criBase.GetOCISpec(baseSpecFile)
 		if !ok {
 			return nil, fmt.Errorf("can't find base OCI spec %q", baseSpecFile)
 		}
@@ -685,7 +685,7 @@ func (c *criService) buildLinuxSpec(
 
 	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
 
-	if !c.config.DisableProcMount {
+	if !c.criBase.Config.DisableProcMount {
 		// Change the default masked/readonly paths to empty slices
 		// See https://github.com/containerd/containerd/issues/5029
 		// TODO: Provide an option to set default paths to the ones in oci.populateDefaultUnixSpec()
@@ -704,7 +704,7 @@ func (c *criService) buildLinuxSpec(
 		}
 	}
 
-	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.config.DeviceOwnershipFromSecurityContext),
+	specOpts = append(specOpts, customopts.WithDevices(c.os, config, c.criBase.Config.DeviceOwnershipFromSecurityContext),
 		customopts.WithCapabilities(securityContext, c.allCaps))
 
 	if securityContext.GetPrivileged() {
@@ -738,10 +738,10 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithRootFSReadonly())
 	}
 
-	if c.config.DisableCgroup {
+	if c.criBase.Config.DisableCgroup {
 		specOpts = append(specOpts, customopts.WithDisabledCgroups)
 	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
+		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.criBase.Config.TolerateMissingHugetlbController, c.criBase.Config.DisableHugetlbController))
 		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
 			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
 			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
@@ -809,7 +809,7 @@ func (c *criService) buildLinuxSpec(
 	}
 
 	specOpts = append(specOpts,
-		customopts.WithOOMScoreAdj(config, c.config.RestrictOOMScoreAdj),
+		customopts.WithOOMScoreAdj(config, c.criBase.Config.RestrictOOMScoreAdj),
 		customopts.WithPodNamespaces(securityContext, sandboxPid, targetPid, uids, gids),
 		customopts.WithSupplementalGroups(supplementalGroups),
 	)

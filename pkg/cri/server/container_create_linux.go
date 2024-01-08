@@ -90,7 +90,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	if ssp == nil {
 		ssp, err = generateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
-			c.config.UnsetSeccompProfile)
+			c.criBase.Config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
@@ -105,7 +105,7 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	if seccompSpecOpts != nil {
 		specOpts = append(specOpts, seccompSpecOpts)
 	}
-	if c.config.EnableCDI {
+	if c.criBase.Config.EnableCDI {
 		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, config.CDIDevices))
 	}
 	return specOpts, nil
