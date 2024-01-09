@@ -218,13 +218,6 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        run: |
-          choco upgrade mingw --version=12.2.0.3042023
-
       - name: Make
         run: |
           make build
@@ -244,7 +237,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022] # windows-2019 is temporarily removed until mingw issue fixed
+        os: [windows-2022, windows-2019]
 
     defaults:
       run:
@@ -275,14 +268,64 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
+      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
+      - name: Upgrade Chocolaty on Windows 2019
+        if: matrix.os == 'windows-2019'
+        shell: powershell
+        run: |
+          Write-Output '::group::Update chocolaty'
+          choco upgrade -y chocolatey
+          Write-Output '::endgroup::'
+
+          if ( $LASTEXITCODE ) {
+            Write-Output '::error::Could not update chocolatey.'
+            exit $LASTEXITCODE
+          }
+
       - name: Upgrade MinGW on Windows 2019
         if: matrix.os == 'windows-2019'
+        shell: powershell
         run: |
-          choco upgrade mingw --version=12.2.0.3042023
+          # Add retry and backoff
+          foreach ( $i in 1..3 ) {
+            Write-Output "::group::Attempt $i"
+            if ( $i -gt 1 ) {
+              # remove any left-over state
+              choco uninstall -y --no-progress --force mingw
+
+              Write-Output 'Sleeping for 60 seconds'
+              Sleep -Seconds 60
+            }
+
+            Write-Output 'manually force remove C:\mingw64'
+            Remove-Item -Path "C:\mingw64" -Recurse -Force -ErrorAction Ignore
+
+            choco install -y --no-progress --stop-on-first-failure --force mingw --allow-downgrade --version 12.2.0.3042023
+            Write-Output '::endgroup::'
+            if ( -not $LASTEXITCODE ) {
+              Write-Output "Attempt $i succeeded (exit code: $LASTEXITCODE)"
+              break
+            }
+            Write-Output "::warning title=mingw::Attempt $i failed (exit code: $LASTEXITCODE)"
+          }
+
+          if ( $LASTEXITCODE ) {
+            Write-Output "::error::Could not install mingw after $i attempts."
+            exit $LASTEXITCODE
+          }
+
+          # Copy to default path
+          Copy-Item -Path "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64" -Destination "C:\mingw64" -Recurse -Force
+
+          # Copy as make.exe
+          $path = "C:\mingw64\bin\mingw32-make.exe" | Get-Item
+          Copy-Item -Path $path.FullName -Destination (Join-Path $path.Directory.FullName 'make.exe') -Force
+
+          # verify mingw32-make was installed
+          Get-Command -CommandType Application -ErrorAction Stop mingw32-make.exe
 
       - name: Binaries
+        shell: bash
         env:
           CGO_ENABLED: 1
         run: |
