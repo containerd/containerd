@@ -31,3 +31,7 @@ func IsEnabled(path string) (bool, error) {
 func Enable(_ string) error {
 	return fmt.Errorf("fsverity is only supported on Linux systems")
 }
+
+func Measure(_ string) (string, error) {
+	return "", fmt.Errorf("fsverity is only supported on Linux systems")
+}
