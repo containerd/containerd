@@ -201,12 +201,18 @@ func (c *controllerLocal) Stop(ctx context.Context, sandboxID string, opts ...sa
 	}
 
 	svc, err := c.getSandbox(ctx, sandboxID)
+	if errdefs.IsNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
 	if _, err := svc.StopSandbox(ctx, req); err != nil {
-		return fmt.Errorf("failed to stop sandbox: %w", errdefs.FromGRPC(err))
+		err = errdefs.FromGRPC(err)
+		if !errdefs.IsNotFound(err) && !errdefs.IsUnavailable(err) {
+			return fmt.Errorf("failed to stop sandbox: %w", err)
+		}
 	}
 
 	return nil
