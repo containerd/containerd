@@ -183,7 +183,7 @@ func NewCRIService(criBase *base.CRIBase, imageService imageService, client *con
 	}
 
 	podSandboxController := client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
-	podSandboxController.Init(c.sandboxStore, c)
+	podSandboxController.Init(c)
 
 	c.nri = nri
 

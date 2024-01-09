@@ -21,11 +21,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	containerd "github.com/containerd/containerd/v2/client"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/store/label"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
-	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -48,11 +50,10 @@ var testConfig = criconfig.Config{
 
 // newControllerService creates a fake criService for test.
 func newControllerService() *Controller {
-	labels := label.NewStore()
 	return &Controller{
-		config:       testConfig,
-		os:           ostesting.NewFakeOS(),
-		sandboxStore: sandboxstore.NewStore(labels),
+		config: testConfig,
+		os:     ostesting.NewFakeOS(),
+		store:  NewStore(),
 	}
 }
 
@@ -60,20 +61,14 @@ func Test_Status(t *testing.T) {
 	sandboxID, pid, exitStatus := "1", uint32(1), uint32(0)
 	createdAt, exitedAt := time.Now(), time.Now()
 	controller := newControllerService()
-	status := sandboxstore.Status{
-		Pid:        pid,
-		CreatedAt:  createdAt,
-		ExitStatus: exitStatus,
-		ExitedAt:   exitedAt,
-		State:      sandboxstore.StateReady,
-	}
-	sb := sandboxstore.Sandbox{
-		Metadata: sandboxstore.Metadata{
-			ID: sandboxID,
-		},
-		Status: sandboxstore.StoreStatus(status),
-	}
-	err := controller.sandboxStore.Add(sb)
+
+	sb := types.NewPodSandbox(sandboxID, sandboxstore.Status{
+		State:     sandboxstore.StateReady,
+		Pid:       pid,
+		CreatedAt: createdAt,
+	})
+	sb.Metadata = sandboxstore.Metadata{ID: sandboxID}
+	err := controller.store.Save(sb)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +77,20 @@ func Test_Status(t *testing.T) {
 		t.Fatal(err)
 	}
 	assert.Equal(t, s.Pid, pid)
-	assert.Equal(t, s.ExitedAt, exitedAt)
+	assert.Equal(t, s.CreatedAt, createdAt)
 	assert.Equal(t, s.State, sandboxstore.StateReady.String())
+
+	sb.Exit(*containerd.NewExitStatus(exitStatus, exitedAt, nil))
+	exit, err := controller.Wait(context.Background(), sandboxID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, exit.ExitStatus, exitStatus)
+	assert.Equal(t, exit.ExitedAt, exitedAt)
+
+	s, err = controller.Status(context.Background(), sandboxID, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, s.State, sandboxstore.StateNotReady.String())
 }

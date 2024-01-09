@@ -22,16 +22,16 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/netns"
-	"github.com/containerd/typeurl/v2"
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
-	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/log"
+	"github.com/containerd/containerd/v2/pkg/netns"
+	sandbox2 "github.com/containerd/containerd/v2/sandbox"
 )
 
 // loadContainerTimeout is the default timeout for loading a container/sandbox.
@@ -51,36 +51,29 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
 	var sandbox sandboxstore.Sandbox
-	// Load sandbox metadata.
-	exts, err := cntr.Extensions(ctx)
+	meta, err := getMetadata(ctx, cntr)
 	if err != nil {
-		return sandbox, fmt.Errorf("failed to get sandbox container extensions: %w", err)
+		return sandbox, err
 	}
-	ext, ok := exts[crilabels.SandboxMetadataExtension]
-	if !ok {
-		return sandbox, fmt.Errorf("metadata extension %q not found", crilabels.SandboxMetadataExtension)
-	}
-	data, err := typeurl.UnmarshalAny(ext)
-	if err != nil {
-		return sandbox, fmt.Errorf("failed to unmarshal metadata extension %q: %w", ext, err)
-	}
-	meta := data.(*sandboxstore.Metadata)
 
-	s, err := func() (sandboxstore.Status, error) {
+	// Load sandbox created timestamp.
+	info, err := cntr.Info(ctx)
+	if err != nil {
+		return sandbox, fmt.Errorf("failed to get sandbox container info: %w", err)
+	}
+
+	s, ch, err := func() (sandboxstore.Status, <-chan containerd.ExitStatus, error) {
 		status := sandboxstore.Status{
 			State: sandboxstore.StateUnknown,
 		}
-		// Load sandbox created timestamp.
-		info, err := cntr.Info(ctx)
-		if err != nil {
-			return status, fmt.Errorf("failed to get sandbox container info: %w", err)
-		}
+		var channel <-chan containerd.ExitStatus
+
 		status.CreatedAt = info.CreatedAt
 
 		// Load sandbox state.
 		t, err := cntr.Task(ctx, nil)
 		if err != nil && !errdefs.IsNotFound(err) {
-			return status, fmt.Errorf("failed to load task: %w", err)
+			return status, channel, fmt.Errorf("failed to load task: %w", err)
 		}
 		var taskStatus containerd.Status
 		var notFound bool
@@ -93,7 +86,7 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			if err != nil {
 				// It's still possible that task is deleted during this window.
 				if !errdefs.IsNotFound(err) {
-					return status, fmt.Errorf("failed to get task status: %w", err)
+					return status, channel, fmt.Errorf("failed to get task status: %w", err)
 				}
 				notFound = true
 			}
@@ -103,35 +96,46 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			status.State = sandboxstore.StateNotReady
 		} else {
 			if taskStatus.Status == containerd.Running {
-				// Wait for the task for sandbox monitor.
-				// wait is a long running background request, no timeout needed.
+				status.State = sandboxstore.StateReady
+				status.Pid = t.Pid()
 				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
-					if !errdefs.IsNotFound(err) {
-						return status, fmt.Errorf("failed to wait for task: %w", err)
-					}
-					status.State = sandboxstore.StateNotReady
-				} else {
-					// Task is running, set sandbox state as READY.
-					status.State = sandboxstore.StateReady
-					status.Pid = t.Pid()
-
-					go func() {
-						c.waitSandboxExit(context.Background(), meta.ID, exitCh)
-					}()
+					return status, channel, fmt.Errorf("failed to wait for sandbox container task: %w", err)
 				}
+				channel = exitCh
 			} else {
 				// Task is not running. Delete the task and set sandbox state as NOTREADY.
 				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
-					return status, fmt.Errorf("failed to delete task: %w", err)
+					return status, channel, fmt.Errorf("failed to delete task: %w", err)
 				}
 				status.State = sandboxstore.StateNotReady
 			}
 		}
-		return status, nil
+		return status, channel, nil
 	}()
 	if err != nil {
 		log.G(ctx).WithError(err).Errorf("Failed to load sandbox status for %q", cntr.ID())
+	}
+
+	// save it to cache in the podsandbox controller
+	podSandbox := types.NewPodSandbox(cntr.ID(), s)
+	podSandbox.Container = cntr
+	if meta != nil {
+		podSandbox.Metadata = *meta
+	}
+	podSandbox.Runtime = sandbox2.RuntimeOpts{
+		Name:    info.Runtime.Name,
+		Options: info.Runtime.Options,
+	}
+	if ch != nil {
+		go func() {
+			code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, ch)
+			podSandbox.Exit(*containerd.NewExitStatus(code, exitTime, err))
+		}()
+	}
+
+	if err := c.store.Save(podSandbox); err != nil {
+		return sandbox, fmt.Errorf("failed to save pod sandbox container in mem store: %w", err)
 	}
 
 	sandbox = sandboxstore.NewSandbox(*meta, s)
