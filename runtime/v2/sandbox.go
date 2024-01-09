@@ -121,7 +121,7 @@ func (s *SandboxedTaskManager) Delete(ctx context.Context, taskID string) (*runt
 	}
 	err = st.sandbox.RemoveTask(ctx, taskID)
 	if err != nil {
-		log.G(ctx).WithField("id", taskID).WithError(err).Debug("failed to remote task from sandbox")
+		log.G(ctx).WithField("id", taskID).WithError(err).Debug("failed to remove task from sandbox")
 		if !errdefs.IsNotFound(err) {
 			return nil, err
 		}
@@ -208,7 +208,7 @@ func (s *sandboxedTask) Namespace() string {
 
 // Update Override the Update in remoteTask to update the resource in sandbox first
 func (s *sandboxedTask) Update(ctx context.Context, resources *types.Any, annotations map[string]string) error {
-	// call Update of task in the sandbox first
+	// call Update of task API first
 	err := s.remoteTask.Update(ctx, resources, annotations)
 	if err != nil {
 		return err
