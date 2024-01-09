@@ -105,7 +105,7 @@ func DefaultConfig() PluginConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
-		EnableCDI:                false,
+		EnableCDI:                true,
 		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
 		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		DrainExecSyncIOTimeout:   "0s",
