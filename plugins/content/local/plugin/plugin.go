@@ -20,6 +20,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
+	"github.com/containerd/containerd/v2/pkg/integrity"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 )
@@ -28,10 +29,18 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ContentPlugin,
 		ID:   "content",
+		Requires: []plugin.Type{
+			plugins.IntegrityVerifierPlugin,
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
 			ic.Meta.Exports["root"] = root
-			return local.NewStore(root)
+
+			iv, err := ic.GetSingle(plugins.IntegrityVerifierPlugin)
+			if err != nil {
+				return nil, err
+			}
+			return local.NewStore(root, iv.(integrity.Verifier))
 		},
 	})
 }
