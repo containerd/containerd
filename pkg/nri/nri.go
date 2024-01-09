@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
 
 	"github.com/containerd/containerd/v2/version"
 	nri "github.com/containerd/nri/pkg/adaptation"
@@ -104,13 +105,12 @@ var _ API = &local{}
 
 // New creates an instance of the NRI interface with the given configuration.
 func New(cfg *Config) (API, error) {
-	l := &local{
-		cfg: cfg,
+	if cfg.Disable {
+		return nil, fmt.Errorf("NRI interface is disabled by configuration: %w", plugin.ErrSkipPlugin)
 	}
 
-	if cfg.Disable {
-		log.L.Info("NRI interface is disabled by configuration.")
-		return l, nil
+	l := &local{
+		cfg: cfg,
 	}
 
 	var (
