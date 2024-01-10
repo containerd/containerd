@@ -167,7 +167,7 @@ func redirectLogs(path string, rc io.ReadCloser, w io.Writer, s StreamType, maxL
 		}
 		if err != nil {
 			if err == io.EOF {
-				log.L.Debugf("Getting EOF from stream %q while redirecting to log file %q", s, path)
+				log.L.Tracef("Getting EOF from stream %q while redirecting to log file %q", s, path)
 			} else {
 				log.L.WithError(err).Errorf("An error occurred when redirecting stream %q to log file %q", s, path)
 			}
