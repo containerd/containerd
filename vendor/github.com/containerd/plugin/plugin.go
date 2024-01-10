@@ -65,6 +65,12 @@ type Registration struct {
 	Config interface{}
 	// Requires is a list of plugins that the registered plugin requires to be available
 	Requires []Type
+	// RequiresExcludes is a list of plugins that the registered plugin excludes from it's Requires
+	// Requires is defined by Type, but sometimes we only require a specific plugin of a Type
+	// but not all the plugins of this Type, with RequiresExcludes,
+	// we can exclude some plugins from the Requires. The elements in RequiresExcludes are strings,
+	// which is the URI of the plugin, with the form of <Type>.<ID>
+	RequiresExcludes []string
 
 	// InitFn is called when initializing a plugin. The registration and
 	// context are passed in. The init function may modify the registration to
@@ -135,7 +141,7 @@ func (registry Registry) Graph(filter DisableFilter) []Registration {
 func children(reg *Registration, registry []*Registration, added, disabled map[*Registration]bool, ordered *[]Registration) {
 	for _, t := range reg.Requires {
 		for _, r := range registry {
-			if !disabled[r] && r.URI() != reg.URI() && (t == "*" || r.Type == t) {
+			if !disabled[r] && r.URI() != reg.URI() && (t == "*" || r.Type == t) && !excluded(reg, r) {
 				children(r, registry, added, disabled, ordered)
 				if !added[r] {
 					*ordered = append(*ordered, *r)
@@ -144,6 +150,15 @@ func children(reg *Registration, registry []*Registration, added, disabled map[*
 			}
 		}
 	}
+}
+
+func excluded(reg *Registration, requiredReg *Registration) bool {
+	for _, ex := range reg.RequiresExcludes {
+		if requiredReg.URI() == ex {
+			return true
+		}
+	}
+	return false
 }
 
 // Register adds the registration to a Registry and returns the

@@ -54,6 +54,9 @@ func init() {
 			plugins.ShimPlugin,
 			plugins.SandboxControllerPlugin,
 		},
+		RequiresExcludes: []string{
+			plugins.SandboxControllerPlugin.String() + "." + "podsandbox",
+		},
 		Config: &Config{
 			Platforms: defaultPlatforms(),
 		},
