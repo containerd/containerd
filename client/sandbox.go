@@ -149,7 +149,16 @@ func (s *sandboxClient) Create(ctx context.Context, opts ...sandbox.CreateOpt) e
 }
 
 func (s *sandboxClient) Start(ctx context.Context) (sandbox.ControllerInstance, error) {
-	return s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
+	ctrl, err := s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
+	if err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+	s.metadata.Address = ctrl.Address
+	if _, err := s.client.SandboxStore().Update(ctx, s.metadata, "address"); err != nil {
+		return sandbox.ControllerInstance{}, err
+	}
+	return ctrl, err
+
 }
 
 func (s *sandboxClient) Wait(ctx context.Context) (<-chan ExitStatus, error) {
