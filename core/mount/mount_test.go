@@ -148,3 +148,114 @@ func TestReadonlyMounts(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoveVolatileTempMount(t *testing.T) {
+	testCases := []struct {
+		desc     string
+		input    []Mount
+		expected []Mount
+	}{
+		{
+			desc: "remove volatile option from overlay mounts, ignore non overlay",
+			input: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+						"volatile",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"volatile",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"volatile",
+					},
+				},
+			},
+		},
+		{
+			desc: "return original slice since no volatile options on overlay",
+			input: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"volatile",
+					},
+				},
+			},
+			expected: []Mount{
+				{
+					Type:   "overlay",
+					Source: "overlay",
+					Options: []string{
+						"index=off",
+						"workdir=/path/to/snapshots/4/work",
+						"upperdir=/path/to/snapshots/4/fs",
+						"lowerdir=/path/to/snapshots/1/fs",
+					},
+				},
+				{
+					Type:   "underlay",
+					Source: "underlay",
+					Options: []string{
+						"index=on",
+						"lowerdir=/another/path/to/snapshots/2/fs",
+						"volatile",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		original := copyMounts(tc.input)
+		actual := removeVolatileTempMount(tc.input)
+		if !reflect.DeepEqual(actual, tc.expected) {
+			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, tc.expected, actual)
+		}
+		if !reflect.DeepEqual(original, tc.input) {
+			t.Fatalf("modified original mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, original, tc.input)
+		}
+	}
+}
