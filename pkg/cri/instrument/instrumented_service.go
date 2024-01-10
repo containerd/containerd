@@ -270,7 +270,7 @@ func (in *instrumentedService) ExecSync(ctx context.Context, r *runtime.ExecSync
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("ExecSync for %q failed", r.GetContainerId())
 		} else {
-			log.G(ctx).Debugf("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
+			log.G(ctx).Tracef("ExecSync for %q returns with exit code %d", r.GetContainerId(), res.GetExitCode())
 		}
 	}()
 	res, err = in.c.ExecSync(ctrdutil.WithNamespace(ctx), r)
@@ -411,12 +411,12 @@ func (in *instrumentedService) ImageFsInfo(ctx context.Context, r *runtime.Image
 	}
 	ctx, span := tracing.StartSpan(ctx, tracing.Name(criSpanPrefix, "ImageFsInfo"))
 	defer span.End()
-	log.G(ctx).Debugf("ImageFsInfo")
+	log.G(ctx).Tracef("ImageFsInfo")
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Error("ImageFsInfo failed")
 		} else {
-			log.G(ctx).Debugf("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
+			log.G(ctx).Tracef("ImageFsInfo returns filesystem info %+v", res.ImageFilesystems)
 		}
 		span.SetStatus(err)
 	}()
@@ -428,12 +428,12 @@ func (in *instrumentedService) PodSandboxStats(ctx context.Context, r *runtime.P
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Debugf("PodSandboxStats for %q", r.GetPodSandboxId())
+	log.G(ctx).Tracef("PodSandboxStats for %q", r.GetPodSandboxId())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("PodSandboxStats for %q failed", r.GetPodSandboxId())
 		} else {
-			log.G(ctx).Debugf("PodSandboxStats for %q returns stats %+v", r.GetPodSandboxId(), res.GetStats())
+			log.G(ctx).Tracef("PodSandboxStats for %q returns stats %+v", r.GetPodSandboxId(), res.GetStats())
 		}
 	}()
 	res, err = in.c.PodSandboxStats(ctrdutil.WithNamespace(ctx), r)
@@ -444,12 +444,12 @@ func (in *instrumentedService) ContainerStats(ctx context.Context, r *runtime.Co
 	if err := in.checkInitialized(); err != nil {
 		return nil, err
 	}
-	log.G(ctx).Debugf("ContainerStats for %q", r.GetContainerId())
+	log.G(ctx).Tracef("ContainerStats for %q", r.GetContainerId())
 	defer func() {
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("ContainerStats for %q failed", r.GetContainerId())
 		} else {
-			log.G(ctx).Debugf("ContainerStats for %q returns stats %+v", r.GetContainerId(), res.GetStats())
+			log.G(ctx).Tracef("ContainerStats for %q returns stats %+v", r.GetContainerId(), res.GetStats())
 		}
 	}()
 	res, err = in.c.ContainerStats(ctrdutil.WithNamespace(ctx), r)
@@ -596,7 +596,7 @@ func (in *instrumentedService) ListMetricDescriptors(ctx context.Context, r *run
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("ListMetricDescriptors failed, error")
 		} else {
-			log.G(ctx).Debug("ListMetricDescriptors returns successfully")
+			log.G(ctx).Trace("ListMetricDescriptors returns successfully")
 		}
 	}()
 
@@ -613,7 +613,7 @@ func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *run
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("ListPodSandboxMetrics failed, error")
 		} else {
-			log.G(ctx).Debug("ListPodSandboxMetrics returns successfully")
+			log.G(ctx).Trace("ListPodSandboxMetrics returns successfully")
 		}
 	}()
 
