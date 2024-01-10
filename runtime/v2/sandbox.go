@@ -44,7 +44,7 @@ func (s *SandboxedTaskManager) Create(ctx context.Context, taskID string, bundle
 		return nil, fmt.Errorf("failed to get sandbox %s: %w", opts.SandboxID, err)
 	}
 
-	if _, ok := s.client.InMemorySandboxController(sb.Metadata().Sandboxer); !ok {
+	if sb.Metadata().Sandboxer == "podsandbox" {
 		return nil, ErrCanNotHandle
 	}
 
@@ -74,7 +74,7 @@ func (s *SandboxedTaskManager) Load(ctx context.Context, sandboxID string, bundl
 	if err != nil {
 		return fmt.Errorf("failed to get sandbox %s: %w", sandboxID, err)
 	}
-	if _, ok := s.client.InMemorySandboxController(sb.Metadata().Sandboxer); !ok {
+	if sb.Metadata().Sandboxer == "podsandbox" {
 		return ErrCanNotHandle
 	}
 

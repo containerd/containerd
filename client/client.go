@@ -728,15 +728,6 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
 }
 
-// InMemorySandboxController returns the sandbox controller in memory
-func (c *Client) InMemorySandboxController(name string) (sandbox.Controller, bool) {
-	if c.sandboxers != nil {
-		s, ok := c.sandboxers[name]
-		return s, ok
-	}
-	return nil, false
-}
-
 // VersionService returns the underlying VersionClient
 func (c *Client) VersionService() versionservice.VersionClient {
 	c.connMu.Lock()
