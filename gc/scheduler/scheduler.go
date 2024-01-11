@@ -330,7 +330,7 @@ func (s *gcScheduler) run(ctx context.Context) {
 
 		gcTime := stats.Elapsed()
 		gcTimeHist.Update(gcTime)
-		log.G(ctx).WithField("d", gcTime).Debug("garbage collected")
+		log.G(ctx).WithField("d", gcTime).Trace("garbage collected")
 		gcTimeSum += gcTime
 		collections++
 		collectionCounter.WithValues("success").Inc()
