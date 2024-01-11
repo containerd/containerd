@@ -69,6 +69,8 @@ const (
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
 	// CRIImagePlugin implements a cri image service
 	CRIImagePlugin plugin.Type = "io.containerd.cri.image.v1"
+	// ShimPlugin implements a shim service
+	ShimPlugin plugin.Type = "io.containerd.shim.v1"
 )
 
 const (

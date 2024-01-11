@@ -26,8 +26,12 @@ import (
 	v1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/errdefs"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/platforms"
+	sandboxapi "github.com/containerd/containerd/v2/sandbox"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -336,6 +340,54 @@ func TestContainerMetricsMemory(t *testing.T) {
 	}
 }
 
+type fakeSandboxClient struct {
+	id string
+}
+
+func (f *fakeSandboxClient) ID() string {
+	return f.id
+}
+
+func (f *fakeSandboxClient) NewContainer(ctx context.Context, id string, opts ...client.NewContainerOpts) (client.Container, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Labels(ctx context.Context) (map[string]string, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Status(ctx context.Context, verbose bool) (sandboxapi.ControllerStatus, error) {
+	return sandboxapi.ControllerStatus{}, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Platform(ctx context.Context) (platforms.Platform, error) {
+	return platforms.DefaultSpec(), nil
+}
+
+func (f *fakeSandboxClient) Create(ctx context.Context, opts ...sandboxapi.CreateOpt) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Start(ctx context.Context) (sandboxapi.ControllerInstance, error) {
+	return sandboxapi.ControllerInstance{}, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Stop(ctx context.Context) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Wait(ctx context.Context) (<-chan client.ExitStatus, error) {
+	return nil, errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) Shutdown(ctx context.Context) error {
+	return errdefs.ErrNotImplemented
+}
+
+func (f *fakeSandboxClient) AddExtension(ctx context.Context, name string, obj interface{}) error {
+	return errdefs.ErrNotImplemented
+}
+
 func TestListContainerStats(t *testing.T) {
 	c := newTestCRIService()
 	type args struct {
@@ -408,6 +460,7 @@ func TestListContainerStats(t *testing.T) {
 					Metadata: sandboxstore.Metadata{
 						ID: "s2",
 					},
+					Sandbox: &fakeSandboxClient{id: "s2"},
 				})
 			},
 			wantErr: true,

@@ -148,6 +148,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		bundle:  b.bundle,
 		client:  conn,
 		version: params.Version,
+		address: params.Address,
 	}, nil
 }
 

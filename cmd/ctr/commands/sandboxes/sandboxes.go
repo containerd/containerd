@@ -87,7 +87,7 @@ var runCommand = cli.Command{
 			return fmt.Errorf("failed to create new sandbox: %w", err)
 		}
 
-		err = sandbox.Start(ctx)
+		_, err = sandbox.Start(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to start: %w", err)
 		}

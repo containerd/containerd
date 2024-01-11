@@ -152,7 +152,6 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 		ExitStatus: exit.ExitCode(),
 		ExitedAt:   exit.ExitTime(),
 	}, err
-
 }
 
 func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) (exitStatus uint32, exitedAt time.Time, err error) {

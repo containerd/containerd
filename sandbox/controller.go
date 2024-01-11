@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/platforms"
@@ -111,12 +112,15 @@ type Controller interface {
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Metrics queries the sandbox for metrics.
 	Metrics(ctx context.Context, sandboxID string) (*types.Metric, error)
+	// UpdateResource updates the resources in sandbox for task create/delete/update.
+	UpdateResource(ctx context.Context, sandboxID string, req TaskResources) error
 }
 
 type ControllerInstance struct {
 	SandboxID string
 	Pid       uint32
 	CreatedAt time.Time
+	Address   string
 	Labels    map[string]string
 }
 
@@ -129,8 +133,17 @@ type ControllerStatus struct {
 	SandboxID string
 	Pid       uint32
 	State     string
+	Address   string
 	Info      map[string]string
 	CreatedAt time.Time
 	ExitedAt  time.Time
 	Extra     typeurl.Any
+}
+
+type TaskResources struct {
+	ID     string
+	Op     sandbox.ResourceOp
+	Spec   typeurl.Any
+	Rootfs []mount.Mount
+	Extra  typeurl.Any
 }

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
 	v1 "github.com/containerd/nri/types/v1"
@@ -262,6 +261,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err := task.Start(ctx); err != nil {
 		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
+
 	podSandbox.State = sandboxstore.StateReady
 
 	cin.SandboxID = id

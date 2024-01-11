@@ -95,6 +95,7 @@ service Controller {
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
 	rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
+	rpc UpdateResources(ControllerUpdateResourceRequest) returns (ControllerUpdateResourceResponse);
 }
 
 message ControllerCreateRequest {
@@ -120,6 +121,7 @@ message ControllerStartResponse {
 	uint32 pid = 2;
 	google.protobuf.Timestamp created_at = 3;
 	map<string, string> labels = 4;
+	string address = 5;
 }
 
 message ControllerPlatformRequest {
@@ -163,6 +165,7 @@ message ControllerStatusResponse {
 	google.protobuf.Timestamp created_at = 5;
 	google.protobuf.Timestamp exited_at = 6;
 	google.protobuf.Any extra = 7;
+	string address = 8;
 }
 
 message ControllerShutdownRequest {
@@ -179,4 +182,24 @@ message ControllerMetricsRequest {
 
 message ControllerMetricsResponse {
 	types.Metric metrics = 1;
+}
+
+message ControllerUpdateResourceRequest {
+	string sandbox_id = 1;
+	string sandboxer = 2;
+	string container_id = 3;
+	ResourceOp op = 4;
+	google.protobuf.Any spec = 5;
+	repeated containerd.types.Mount rootfs = 6;
+	google.protobuf.Any extra = 7;
+}
+
+message	ControllerUpdateResourceResponse {
+	google.protobuf.Any options = 1;
+}
+
+enum ResourceOp {
+	ADD = 0;
+	REMOVE = 1;
+	UPDATE = 2;
 }

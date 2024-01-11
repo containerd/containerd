@@ -63,12 +63,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 
-	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
-
-	cstatus, err := controller.Status(ctx, sandbox.ID, false)
+	cstatus, err := sandbox.Sandbox.Status(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get controller status: %w", err)
 	}
@@ -150,7 +145,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
-	platform, err := controller.Platform(ctx, sandboxID)
+	platform, err := sandbox.Sandbox.Platform(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
 	}
@@ -545,7 +540,7 @@ func (c *criService) buildContainerSpec(
 	case isLinux:
 		// Generate container mounts.
 		// No mounts are passed for other platforms.
-		linuxMounts := c.linuxContainerMounts(sandboxID, config)
+		//linuxMounts := c.linuxContainerMounts(sandboxID, config)
 
 		specOpts, err = c.buildLinuxSpec(
 			id,
@@ -557,7 +552,7 @@ func (c *criService) buildContainerSpec(
 			config,
 			sandboxConfig,
 			imageConfig,
-			append(linuxMounts, extraMounts...),
+			extraMounts, //append(linuxMounts, extraMounts...),
 			ociRuntime,
 		)
 	case isWindows:

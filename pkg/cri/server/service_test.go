@@ -74,6 +74,10 @@ func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*
 	return &types.Metric{}, errdefs.ErrNotImplemented
 }
 
+func (f fakeSandboxController) UpdateResource(ctx context.Context, sandboxID string, req sandbox.TaskResources) error {
+	return nil
+}
+
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() *criService {
 	labels := label.NewStore()

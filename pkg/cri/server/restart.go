@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/platforms"
+	sandboxapi "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
@@ -81,6 +82,27 @@ func (c *criService) recover(ctx context.Context) error {
 
 				return nil
 			}
+
+			// Create sandbox client from the pause container metadata
+			info, err := sb.Container.Info(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to load sandbox %q: %w", sb.ID, err)
+			}
+			sandboxClient := containerd.NewSandboxClient(c.client, sandboxapi.Sandbox{
+				ID:         sb.ID,
+				Labels:     info.Labels,
+				Runtime:    sandboxapi.RuntimeOpts{Name: info.Runtime.Name, Options: info.Runtime.Options},
+				Spec:       info.Spec,
+				Sandboxer:  string(criconfig.ModePodSandbox),
+				CreatedAt:  info.CreatedAt,
+				UpdatedAt:  info.UpdatedAt,
+				Extensions: info.Extensions,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to load sandbox %q: %w", sb.ID, err)
+			}
+			sb.Sandbox = sandboxClient
+
 			log.G(ctx2).Debugf("Loaded sandbox %+v", sb)
 			if err := c.sandboxStore.Add(sb); err != nil {
 				return fmt.Errorf("failed to add sandbox %q to store: %w", sandbox.ID(), err)
@@ -111,12 +133,13 @@ func (c *criService) recover(ctx context.Context) error {
 			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
 		}
 
-		var (
-			state      = sandboxstore.StateUnknown
-			controller = c.client.SandboxController(sbx.Sandboxer)
-		)
+		sandboxClient, err := c.client.LoadSandbox(ctx, sbx.ID)
+		if err != nil {
+			return fmt.Errorf("failed to load sandbox %q: %w", sbx.ID, err)
+		}
 
-		status, err := controller.Status(ctx, sbx.ID, false)
+		state := sandboxstore.StateUnknown
+		status, err := sandboxClient.Status(ctx, false)
 		if err != nil {
 			log.G(ctx).
 				WithError(err).
@@ -137,7 +160,7 @@ func (c *criService) recover(ctx context.Context) error {
 		}
 
 		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
-
+		sb.Sandbox = sandboxClient
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
 
@@ -152,20 +175,21 @@ func (c *criService) recover(ctx context.Context) error {
 		if status.State == sandboxstore.StateNotReady {
 			continue
 		}
-		controller, err := c.sandboxService.SandboxController(sb.Config, sb.RuntimeHandler)
+		exitCh, err := sb.Sandbox.Wait(ctrdutil.NamespacedContext())
 		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to get sandbox controller while waiting sandbox")
-			continue
-		}
-		exitCh := make(chan containerd.ExitStatus, 1)
-		go func() {
-			exit, err := controller.Wait(ctrdutil.NamespacedContext(), sb.ID)
-			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
-				exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
+			log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("failed to wait for task: %w", err)
 			}
-			exitCh <- *containerd.NewExitStatus(exit.ExitStatus, exit.ExitedAt, nil)
-		}()
+			// Sandbox was in running state, but its task has been deleted,
+			// set unknown exited state.
+			sb.Status.Update(func(s sandboxstore.Status) (sandboxstore.Status, error) {
+				s.ExitStatus = containerd.UnknownExitStatus
+				s.State = sandboxstore.StateNotReady
+				s.ExitedAt = time.Now()
+				return status, nil
+			})
+		}
 		c.eventMonitor.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
 	}
 	// Recover all containers.

@@ -129,7 +129,7 @@ type Bundle struct {
 func (b *Bundle) Delete() error {
 	work, werr := os.Readlink(filepath.Join(b.Path, "work"))
 	rootfs := filepath.Join(b.Path, "rootfs")
-	if runtime.GOOS != "darwin" {
+	if _, err := os.Stat(rootfs); !os.IsNotExist(err) && runtime.GOOS != "darwin" {
 		if err := mount.UnmountRecursive(rootfs, 0); err != nil {
 			return fmt.Errorf("unmount rootfs %s: %w", rootfs, err)
 		}

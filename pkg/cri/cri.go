@@ -36,7 +36,6 @@ import (
 
 // Register CRI service plugin
 func init() {
-
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "cri",
