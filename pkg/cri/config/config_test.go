@@ -45,45 +45,6 @@ func TestValidateConfig(t *testing.T) {
 			},
 			expectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
-
-		"deprecated auths": {
-			config: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {},
-					},
-				},
-				Registry: Registry{
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
-					},
-				},
-			},
-			expected: &PluginConfig{
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Sandboxer: string(ModePodSandbox),
-						},
-					},
-				},
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
-							},
-						},
-					},
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
-					},
-				},
-			},
-			warnings: []deprecation.Warning{deprecation.CRIRegistryAuths},
-		},
 		"invalid stream_idle_timeout": {
 			config: &PluginConfig{
 				StreamIdleTimeout: "invalid",
