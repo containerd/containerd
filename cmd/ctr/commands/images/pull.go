@@ -206,6 +206,18 @@ type progressNode struct {
 	root     bool
 }
 
+func (n *progressNode) mainDesc() *ocispec.Descriptor {
+	if n.Desc != nil {
+		return n.Desc
+	}
+	for _, c := range n.children {
+		if desc := c.mainDesc(); desc != nil {
+			return desc
+		}
+	}
+	return nil
+}
+
 // ProgressHandler continuously updates the output with job progress
 // by checking status in the content store.
 func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc, func()) {
@@ -329,6 +341,11 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 
 func DisplayHierarchy(w io.Writer, status string, roots []*progressNode, start time.Time) {
 	total := displayNode(w, "", roots)
+	for _, r := range roots {
+		if desc := r.mainDesc(); desc != nil {
+			fmt.Fprintf(w, "%s %s\n", desc.MediaType, desc.Digest)
+		}
+	}
 	// Print the Status line
 	fmt.Fprintf(w, "%s\telapsed: %-4.1fs\ttotal: %7.6v\t(%v)\t\n",
 		status,
