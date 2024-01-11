@@ -63,6 +63,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			Event: "pushing content",
 			Name:  img.Name,
 			//Digest: img.Target.Digest.String(),
+			Desc: &img.Target,
 		})
 	}
 
@@ -109,9 +110,11 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			Event: "pushed content",
 			Name:  img.Name,
 			//Digest: img.Target.Digest.String(),
+			Desc: &img.Target,
 		})
 		tops.Progress(transfer.Progress{
 			Event: fmt.Sprintf("Completed push to %s", p),
+			Desc:  &img.Target,
 		})
 	}
 

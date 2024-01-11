@@ -25,11 +25,13 @@ import (
 
 	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type proxyTransferrer struct {
@@ -74,12 +76,18 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 				}
 				switch v := i.(type) {
 				case *transfertypes.Progress:
+					var descp *ocispec.Descriptor
+					if v.Desc != nil {
+						desc := oci.DescriptorFromProto(v.Desc)
+						descp = &desc
+					}
 					o.Progress(transfer.Progress{
 						Event:    v.Event,
 						Name:     v.Name,
 						Parents:  v.Parents,
 						Progress: v.Progress,
 						Total:    v.Total,
+						Desc:     descp,
 					})
 				default:
 					log.G(ctx).Warnf("unhandled progress object %T: %v", i, a.GetTypeUrl())

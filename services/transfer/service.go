@@ -20,8 +20,10 @@ import (
 	"context"
 
 	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
+	"github.com/containerd/containerd/v2/api/types"
 	transferTypes "github.com/containerd/containerd/v2/api/types/transfer"
 	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tplugins "github.com/containerd/containerd/v2/pkg/transfer/plugins"
@@ -92,12 +94,17 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 			defer stream.Close()
 
 			pf := func(p transfer.Progress) {
+				var descp *types.Descriptor
+				if p.Desc != nil {
+					descp = oci.DescriptorToProto(*p.Desc)
+				}
 				progress, err := typeurl.MarshalAny(&transferTypes.Progress{
 					Event:    p.Event,
 					Name:     p.Name,
 					Parents:  p.Parents,
 					Progress: p.Progress,
 					Total:    p.Total,
+					Desc:     descp,
 				})
 				if err != nil {
 					log.G(ctx).WithError(err).Warnf("event could not be marshaled: %v/%v", p.Event, p.Name)

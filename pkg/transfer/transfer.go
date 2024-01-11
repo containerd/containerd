@@ -132,5 +132,5 @@ type Progress struct {
 	Parents  []string
 	Progress int64
 	Total    int64
-	// Descriptor?
+	Desc     *ocispec.Descriptor // since containerd v2.0
 }

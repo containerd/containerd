@@ -7231,6 +7231,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/types/transfer/progress.proto"
   package: "containerd.types.transfer"
+  dependency: "github.com/containerd/containerd/api/types/descriptor.proto"
   message_type {
     name: "Progress"
     field {
@@ -7267,6 +7268,14 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_INT64
       json_name: "total"
+    }
+    field {
+      name: "desc"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Descriptor"
+      json_name: "desc"
     }
   }
   options {
