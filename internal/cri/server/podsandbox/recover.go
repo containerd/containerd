@@ -134,8 +134,9 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	}
 	if ch != nil {
 		go func() {
-			code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, ch)
-			podSandbox.Exit(*containerd.NewExitStatus(code, exitTime, err))
+			if err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, ch); err != nil {
+				log.G(context.Background()).Warnf("failed to wait pod sandbox exit %v", err)
+			}
 		}()
 	}
 

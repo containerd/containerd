@@ -158,10 +158,10 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 
 }
 
-func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) (exitStatus uint32, exitedAt time.Time, err error) {
+func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) error {
 	select {
 	case e := <-exitCh:
-		exitStatus, exitedAt, err = e.Result()
+		exitStatus, exitedAt, err := e.Result()
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("failed to get task exit status for %q", p.ID)
 			exitStatus = unknownExitCode
@@ -171,12 +171,16 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 		defer dcancel()
 		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
-		if cleanErr := handleSandboxTaskExit(dctx, p, event); cleanErr != nil {
+		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+			// TODO will backoff the event to the controller's own EventMonitor, but not cri's,
+			// because we should call handleSandboxTaskExit again the next time
+			// eventMonitor handle this event. but now it goes into cri's EventMonitor,
+			// the handleSandboxTaskExit will not be called anymore
 			c.cri.BackOffEvent(p.ID, e)
 		}
-		return
+		return nil
 	case <-ctx.Done():
-		return unknownExitCode, time.Now(), ctx.Err()
+		return ctx.Err()
 	}
 }
 
@@ -195,6 +199,9 @@ func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventty
 				return fmt.Errorf("failed to stop sandbox: %w", err)
 			}
 		}
+	}
+	if err := sb.Exit(e.ExitStatus, protobuf.FromTimestamp(e.ExitedAt)); err != nil {
+		return err
 	}
 	return nil
 }

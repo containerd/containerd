@@ -18,7 +18,6 @@ package types
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -28,16 +27,12 @@ import (
 )
 
 type PodSandbox struct {
-	mu         sync.Mutex
-	ID         string
-	Container  containerd.Container
-	State      sandboxstore.State
-	Metadata   sandboxstore.Metadata
-	Runtime    sandbox.RuntimeOpts
-	Pid        uint32
-	CreatedAt  time.Time
-	stopChan   *store.StopCh
-	exitStatus *containerd.ExitStatus
+	ID        string
+	Container containerd.Container
+	Metadata  sandboxstore.Metadata
+	Runtime   sandbox.RuntimeOpts
+	Status    sandboxstore.StatusStorage
+	stopChan  *store.StopCh
 }
 
 func NewPodSandbox(id string, status sandboxstore.Status) *PodSandbox {
@@ -45,39 +40,34 @@ func NewPodSandbox(id string, status sandboxstore.Status) *PodSandbox {
 		ID:        id,
 		Container: nil,
 		stopChan:  store.NewStopCh(),
-		CreatedAt: status.CreatedAt,
-		State:     status.State,
-		Pid:       status.Pid,
+		Status:    sandboxstore.StoreStatus(status),
 	}
 	if status.State == sandboxstore.StateNotReady {
-		podSandbox.Exit(*containerd.NewExitStatus(status.ExitStatus, status.ExitedAt, nil))
+		podSandbox.stopChan.Stop()
 	}
 	return podSandbox
 }
 
-func (p *PodSandbox) Exit(status containerd.ExitStatus) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.exitStatus = &status
-	p.State = sandboxstore.StateNotReady
+func (p *PodSandbox) Exit(code uint32, exitTime time.Time) error {
+	if err := p.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.State = sandboxstore.StateNotReady
+		status.ExitStatus = code
+		status.ExitedAt = exitTime
+		status.Pid = 0
+		return status, nil
+	}); err != nil {
+		return err
+	}
 	p.stopChan.Stop()
+	return nil
 }
 
-func (p *PodSandbox) Wait(ctx context.Context) (*containerd.ExitStatus, error) {
-	s := p.GetExitStatus()
-	if s != nil {
-		return s, nil
-	}
+func (p *PodSandbox) Wait(ctx context.Context) (containerd.ExitStatus, error) {
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return containerd.ExitStatus{}, ctx.Err()
 	case <-p.stopChan.Stopped():
-		return p.GetExitStatus(), nil
+		status := p.Status.Get()
+		return *containerd.NewExitStatus(status.ExitStatus, status.ExitedAt, nil), nil
 	}
-}
-
-func (p *PodSandbox) GetExitStatus() *containerd.ExitStatus {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.exitStatus
 }

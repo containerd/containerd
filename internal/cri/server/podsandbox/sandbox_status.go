@@ -36,17 +36,14 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 	if sb == nil {
 		return sandbox.ControllerStatus{}, fmt.Errorf("unable to find sandbox %q: %w", sandboxID, errdefs.ErrNotFound)
 	}
-
+	status := sb.Status.Get()
 	cstatus := sandbox.ControllerStatus{
 		SandboxID: sandboxID,
-		Pid:       sb.Pid,
-		State:     sb.State.String(),
-		CreatedAt: sb.CreatedAt,
+		Pid:       status.Pid,
+		State:     status.State.String(),
+		CreatedAt: status.CreatedAt,
+		ExitedAt:  status.ExitedAt,
 		Extra:     nil,
-	}
-	exitStatus := sb.GetExitStatus()
-	if exitStatus != nil {
-		cstatus.ExitedAt = exitStatus.ExitTime()
 	}
 
 	if verbose {
@@ -64,7 +61,7 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
 func toCRISandboxInfo(ctx context.Context, sb *types.PodSandbox) (map[string]string, error) {
 	si := &critypes.SandboxInfo{
-		Pid:            sb.Pid,
+		Pid:            sb.Status.Get().Pid,
 		Config:         sb.Metadata.Config,
 		RuntimeHandler: sb.Metadata.RuntimeHandler,
 		CNIResult:      sb.Metadata.CNIResult,

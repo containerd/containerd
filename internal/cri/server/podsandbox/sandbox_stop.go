@@ -22,16 +22,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/errdefs"
 )
 
 func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.StopOpt) error {
@@ -46,7 +45,7 @@ func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.St
 	if err != nil {
 		return err
 	}
-	state := podSandbox.State
+	state := podSandbox.Status.Get().State
 	if state == sandboxstore.StateReady || state == sandboxstore.StateUnknown {
 		if err := c.stopSandboxContainer(ctx, podSandbox); err != nil {
 			return fmt.Errorf("failed to stop sandbox container %q in %q state: %w", sandboxID, state, err)
@@ -64,7 +63,7 @@ func (c *Controller) Stop(ctx context.Context, sandboxID string, _ ...sandbox.St
 func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types.PodSandbox) error {
 	id := podSandbox.ID
 	container := podSandbox.Container
-	state := podSandbox.State
+	state := podSandbox.Status.Get().State
 	task, err := container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
@@ -95,12 +94,8 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 		stopCh := make(chan struct{})
 		go func() {
 			defer close(stopCh)
-			exitStatus, exitedAt, err := c.waitSandboxExit(exitCtx, podSandbox, exitCh)
-			if err != context.Canceled && err != context.DeadlineExceeded {
-				// The error of context.Canceled or context.DeadlineExceeded indicates the task.Wait is not finished,
-				// so we can not set the exit status of the pod sandbox.
-				podSandbox.Exit(*containerd.NewExitStatus(exitStatus, exitedAt, err))
-			} else {
+			err := c.waitSandboxExit(exitCtx, podSandbox, exitCh)
+			if err != nil {
 				log.G(ctx).WithError(err).Errorf("Failed to wait pod sandbox exit %+v", err)
 			}
 		}()
