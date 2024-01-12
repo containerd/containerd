@@ -23,6 +23,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/progress"
 
 	"github.com/opencontainers/image-spec/identity"
@@ -48,7 +49,7 @@ var usageCommand = cli.Command{
 
 		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
-			snapshotter = containerd.DefaultSnapshotter
+			snapshotter = defaults.DefaultSnapshotter
 		}
 
 		img, err := client.ImageService().Get(ctx, ref)

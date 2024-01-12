@@ -23,7 +23,6 @@ import (
 	"os"
 	"testing"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/log/logtest"
@@ -37,7 +36,7 @@ const (
 var (
 	address           string
 	ctrdStdioFilePath string
-	testSnapshotter   = containerd.DefaultSnapshotter
+	testSnapshotter   = defaults.DefaultSnapshotter
 	ctrd              = &daemon{}
 )
 
