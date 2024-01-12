@@ -1,0 +1,41 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+# project_name is used to refer to the project in the notes
+project_name = "containerd"
+
+# github_repo is the github project, only github is currently supported
+github_repo = "containerd/containerd"
+
+# match_deps is a pattern to determine which dependencies should be included
+# as part of this release. The changelog will also include changes for these
+# dependencies based on the change in the dependency's version.
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+
+# previous release of this project for determining changes
+previous = "v1.7.11"
+
+# pre_release is whether to include a disclaimer about being a pre-release
+pre_release = false
+
+# preface is the description of the release which precedes the author list
+# and changelog. This description could include highlights as well as any
+# description of changes. Use markdown formatting.
+preface = """\
+The twelfth patch release for containerd 1.7 contains various fixes and updates.
+
+### Notable Updates
+
+* **Fix on dialer function for Windows** ([#9501](https://github.com/containerd/containerd/pull/9501))
+* **Improve `/etc/group` handling when appending groups** ([#9544](https://github.com/containerd/containerd/pull/9544))
+* **Update shim pidfile permissions to 0644** ([#9548](https://github.com/containerd/containerd/pull/9548))
+* **Update runc binary to v1.1.11** ([#9596](https://github.com/containerd/containerd/pull/9596))
+* **Allow import and export to reference missing content** ([#9600](https://github.com/containerd/containerd/pull/9600))
+* **Remove runc import** ([#9605](https://github.com/containerd/containerd/pull/9605))
+* **Update Go version to 1.20.13** ([#9624](https://github.com/containerd/containerd/pull/9624))
+
+### Deprecation Warnings
+
+* **Emit deprecation warning for `containerd.io/restart.logpath` label usage** ([#9567](https://github.com/containerd/containerd/pull/9567))
+
+See the changelog for complete list of changes"""
