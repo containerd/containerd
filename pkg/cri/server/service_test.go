@@ -78,7 +78,7 @@ func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*
 func newTestCRIService() *criService {
 	labels := label.NewStore()
 	return &criService{
-		imageService:       &fakeImageService{},
+		ImageService:       &fakeImageService{},
 		config:             testConfig,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels),

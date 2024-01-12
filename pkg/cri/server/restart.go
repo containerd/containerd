@@ -21,18 +21,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	containerdio "github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
-	containerdimages "github.com/containerd/containerd/v2/images"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	"github.com/containerd/containerd/v2/pkg/netns"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/errgroup"
@@ -201,11 +198,9 @@ func (c *criService) recover(ctx context.Context) error {
 	}
 
 	// Recover all images.
-	cImages, err := c.client.ListImages(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to list images: %w", err)
+	if err := c.ImageService.CheckImages(ctx); err != nil {
+		return fmt.Errorf("failed to check images: %w", err)
 	}
-	c.loadImages(ctx, cImages)
 
 	// It's possible that containerd containers are deleted unexpectedly. In that case,
 	// we can't even get metadata, we should cleanup orphaned sandbox/container directories
@@ -442,44 +437,6 @@ func getNetNS(meta *sandboxstore.Metadata) *netns.NetNS {
 		return nil
 	}
 	return netns.LoadNetNS(meta.NetNSPath)
-}
-
-// loadImages loads images from containerd.
-func (c *criService) loadImages(ctx context.Context, cImages []containerd.Image) {
-	snapshotter := c.config.ContainerdConfig.Snapshotter
-	var wg sync.WaitGroup
-	for _, i := range cImages {
-		wg.Add(1)
-		i := i
-		go func() {
-			defer wg.Done()
-			ok, _, _, _, err := containerdimages.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
-			if err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
-				return
-			}
-			if !ok {
-				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
-				return
-			}
-			// Checking existence of top-level snapshot for each image being recovered.
-			unpacked, err := i.IsUnpacked(ctx, snapshotter)
-			if err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
-				return
-			}
-			if !unpacked {
-				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
-				// TODO(random-liu): Consider whether we should try unpack here.
-			}
-			if err := c.UpdateImage(ctx, i.Name()); err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
-				return
-			}
-			log.G(ctx).Debugf("Loaded image %q", i.Name())
-		}()
-	}
-	wg.Wait()
 }
 
 func cleanupOrphanedIDDirs(ctx context.Context, cntrs []containerd.Container, base string) error {

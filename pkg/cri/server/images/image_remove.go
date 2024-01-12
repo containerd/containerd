@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	eventstypes "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/tracing"
@@ -33,8 +34,10 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec.
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
-func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
+func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
 	span := tracing.SpanFromContext(ctx)
+
+	// TODO: Move to separate function
 	image, err := c.LocalResolve(r.GetImage().GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -54,11 +57,19 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImag
 			// someone else before this point.
 			opts = []images.DeleteOpt{images.SynchronousDelete()}
 		}
-		err = c.client.ImageService().Delete(ctx, ref, opts...)
+		err = c.images.Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
 			if err := c.imageStore.Update(ctx, ref); err != nil {
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
+			}
+
+			if c.publisher != nil {
+				if err := c.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
+					Name: ref,
+				}); err != nil {
+					return nil, err
+				}
 			}
 			continue
 		}

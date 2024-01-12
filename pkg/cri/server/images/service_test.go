@@ -30,8 +30,6 @@ import (
 
 const (
 	testImageFSPath = "/test/image/fs/path"
-	testRootDir     = "/test/root"
-	testStateDir    = "/test/state"
 	// Use an image id as test sandbox image to avoid image name resolve.
 	// TODO(random-liu): Change this to image name after we have complete image
 	// management unit test framework.
@@ -39,21 +37,21 @@ const (
 )
 
 // newTestCRIService creates a fake criService for test.
-func newTestCRIService() *CRIImageService {
-	return &CRIImageService{
-		config:        testConfig,
-		imageFSPaths:  map[string]string{"overlayfs": testImageFSPath},
-		imageStore:    imagestore.NewStore(nil, nil, platforms.Default()),
-		snapshotStore: snapshotstore.NewStore(),
+func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
+	service := &CRIImageService{
+		config:           testImageConfig,
+		runtimePlatforms: map[string]ImagePlatform{},
+		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
+		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
+		snapshotStore:    snapshotstore.NewStore(),
 	}
+
+	return service, &GRPCCRIImageService{service}
 }
 
-var testConfig = criconfig.Config{
-	RootDir:  testRootDir,
-	StateDir: testStateDir,
-	PluginConfig: criconfig.PluginConfig{
-		SandboxImage:                     testSandboxImage,
-		TolerateMissingHugetlbController: true,
+var testImageConfig = criconfig.ImageConfig{
+	PinnedImages: map[string]string{
+		"sandbox": testSandboxImage,
 	},
 }
 
@@ -67,7 +65,7 @@ func TestLocalResolve(t *testing.T) {
 		},
 		Size: 10,
 	}
-	c := newTestCRIService()
+	c, _ := newTestCRIService()
 	var err error
 	c.imageStore, err = imagestore.NewFakeStore([]imagestore.Image{image})
 	assert.NoError(t, err)
@@ -113,7 +111,7 @@ func TestRuntimeSnapshotter(t *testing.T) {
 		{
 			desc:              "should return default snapshotter when runtime.Snapshotter is not set",
 			runtime:           defaultRuntime,
-			expectSnapshotter: criconfig.DefaultConfig().Snapshotter,
+			expectSnapshotter: criconfig.DefaultImageConfig().Snapshotter,
 		},
 		{
 			desc:              "should return overridden snapshotter when runtime.Snapshotter is set",
@@ -123,10 +121,8 @@ func TestRuntimeSnapshotter(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
-			cri := newTestCRIService()
-			cri.config = criconfig.Config{
-				PluginConfig: criconfig.DefaultConfig(),
-			}
+			cri, _ := newTestCRIService()
+			cri.config = criconfig.DefaultImageConfig()
 			assert.Equal(t, test.expectSnapshotter, cri.RuntimeSnapshotter(context.Background(), test.runtime))
 		})
 	}

@@ -38,6 +38,7 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	eventstypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/errdefs"
@@ -93,7 +94,30 @@ import (
 // contents are missing but snapshots are ready, is the image still "READY"?
 
 // PullImage pulls an image with authentication config.
-func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
+func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (_ *runtime.PullImageResponse, err error) {
+
+	imageRef := r.GetImage().GetImage()
+
+	credentials := func(host string) (string, string, error) {
+		hostauth := r.GetAuth()
+		if hostauth == nil {
+			config := c.config.Registry.Configs[host]
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+			}
+		}
+		return ParseAuth(hostauth, host)
+	}
+
+	ref, err := c.CRIImageService.PullImage(ctx, imageRef, credentials, r.SandboxConfig)
+	if err != nil {
+		return nil, err
+	}
+	return &runtime.PullImageResponse{ImageRef: ref}, nil
+}
+
+func (c *CRIImageService) PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig) (_ string, err error) {
+
 	span := tracing.SpanFromContext(ctx)
 	defer func() {
 		// TODO: add domain label for imagePulls metrics, and we may need to provide a mechanism
@@ -109,19 +133,18 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	defer inProgressImagePulls.Dec()
 	startTime := time.Now()
 
-	imageRef := r.GetImage().GetImage()
-	namedRef, err := distribution.ParseDockerRef(imageRef)
+	namedRef, err := distribution.ParseDockerRef(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse image reference %q: %w", imageRef, err)
+		return "", fmt.Errorf("failed to parse image reference %q: %w", name, err)
 	}
 	ref := namedRef.String()
-	if ref != imageRef {
+	if ref != name {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
 	}
 
 	imagePullProgressTimeout, err := time.ParseDuration(c.config.ImagePullProgressTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
+		return "", fmt.Errorf("failed to parse image_pull_progress_timeout %q: %w", c.config.ImagePullProgressTimeout, err)
 	}
 
 	var (
@@ -131,7 +154,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 
 		resolver = docker.NewResolver(docker.ResolverOptions{
 			Headers: c.config.Registry.Headers,
-			Hosts:   c.registryHosts(ctx, r.GetAuth(), pullReporter.optionUpdateClient),
+			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
@@ -144,9 +167,9 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	)
 
 	defer pcancel()
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, r.SandboxConfig)
+	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
 	span.SetAttributes(
@@ -172,12 +195,12 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 
 	// Temporarily removed for v2 upgrade
 	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
+	if !c.config.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
 	}
 
-	if c.config.ContainerdConfig.DiscardUnpackedLayers {
+	if c.config.DiscardUnpackedLayers {
 		// Allows GC to clean layers up from the content store after unpacking
 		pullOpts = append(pullOpts,
 			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
@@ -187,13 +210,13 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	image, err := c.client.Pull(pctx, ref, pullOpts...)
 	pcancel()
 	if err != nil {
-		return nil, fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
 	}
 	span.AddEvent("Pull and unpack image complete")
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("get image config descriptor: %w", err)
+		return "", fmt.Errorf("get image config descriptor: %w", err)
 	}
 	imageID := configDesc.Digest.String()
 
@@ -203,13 +226,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 			continue
 		}
 		if err := c.createImageReference(ctx, r, image.Target(), labels); err != nil {
-			return nil, fmt.Errorf("failed to create image reference %q: %w", r, err)
+			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
+		// TODO: Use image service directly
 		if err := c.imageStore.Update(ctx, r); err != nil {
-			return nil, fmt.Errorf("failed to update image store %q: %w", r, err)
+			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
 
@@ -218,14 +242,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, r *runtime.PullImageReq
 	imagePullingSpeed := float64(size) / mbToByte / time.Since(startTime).Seconds()
 	imagePullThroughput.Observe(imagePullingSpeed)
 
-	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", imageRef, imageID,
+	log.G(ctx).Infof("Pulled image %q with image id %q, repo tag %q, repo digest %q, size %q in %s", name, imageID,
 		repoTag, repoDigest, strconv.FormatInt(size, 10), time.Since(startTime))
 	// NOTE(random-liu): the actual state in containerd is the source of truth, even we maintain
 	// in-memory image store, it's only for in-memory indexing. The image could be removed
 	// by someone else anytime, before/during/after we create the metadata. We should always
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
-	return &runtime.PullImageResponse{ImageRef: imageID}, nil
+	return imageID, nil
 }
 
 // getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
@@ -295,31 +319,45 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	oldImg, err := c.client.ImageService().Create(ctx, img)
-	if err == nil || !errdefs.IsAlreadyExists(err) {
+	// TODO: Call CRIImageService directly
+	oldImg, err := c.images.Create(ctx, img)
+	if err == nil {
+		if c.publisher != nil {
+			if err := c.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
+				Name:   img.Name,
+				Labels: img.Labels,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	} else if !errdefs.IsAlreadyExists(err) {
 		return err
 	}
 	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[crilabels.ImageLabelKey] == labels[crilabels.ImageLabelKey] {
 		return nil
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
+	_, err = c.images.Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
+	if err == nil && c.publisher != nil {
+		if c.publisher != nil {
+			if err := c.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
+				Name:   img.Name,
+				Labels: img.Labels,
+			}); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
-	configSandboxImage := c.config.SandboxImage
-	// parse sandbox image
-	sandboxNamedRef, err := distribution.ParseDockerRef(configSandboxImage)
-	if err != nil {
-		log.G(ctx).Errorf("failed to parse sandbox image from config %s", sandboxNamedRef)
-		return nil
-	}
-	sandboxRef := sandboxNamedRef.String()
-	// Adding pinned image label to sandbox image
-	if sandboxRef == name {
-		labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
+	for _, pinned := range c.config.PinnedImages {
+		if pinned == name {
+			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
+		}
 	}
 	return labels
 }
@@ -328,6 +366,7 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
+	// TODO: Use image service
 	img, err := c.client.GetImage(ctx, r)
 	if err != nil && !errdefs.IsNotFound(err) {
 		return fmt.Errorf("get image by reference: %w", err)
@@ -377,22 +416,13 @@ func hostDirFromRoots(roots []string) func(string) (string, error) {
 }
 
 // registryHosts is the registry hosts to be used by the resolver.
-func (c *CRIImageService) registryHosts(ctx context.Context, auth *runtime.AuthConfig, updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
+func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(host string) (string, string, error), updateClientFn config.UpdateClientFunc) docker.RegistryHosts {
 	paths := filepath.SplitList(c.config.Registry.ConfigPath)
 	if len(paths) > 0 {
 		hostOptions := config.HostOptions{
 			UpdateClient: updateClientFn,
 		}
-		hostOptions.Credentials = func(host string) (string, string, error) {
-			hostauth := auth
-			if hostauth == nil {
-				config := c.config.Registry.Configs[host]
-				if config.Auth != nil {
-					hostauth = toRuntimeAuthConfig(*config.Auth)
-				}
-			}
-			return ParseAuth(hostauth, host)
-		}
+		hostOptions.Credentials = credentials
 		hostOptions.HostDir = hostDirFromRoots(paths)
 
 		return config.ConfigureHosts(ctx, hostOptions)
@@ -424,11 +454,15 @@ func (c *CRIImageService) registryHosts(ctx context.Context, auth *runtime.AuthC
 				}
 			}
 
-			// Make a copy of `auth`, so that different authorizers would not reference
-			// the same auth variable.
-			auth := auth
-			if auth == nil && config.Auth != nil {
-				auth = toRuntimeAuthConfig(*config.Auth)
+			// Make a copy of `credentials`, so that different authorizers would not reference
+			// the same credentials variable.
+			credentials := credentials
+			if credentials == nil && config.Auth != nil {
+				auth := toRuntimeAuthConfig(*config.Auth)
+				credentials = func(host string) (string, string, error) {
+					return ParseAuth(auth, host)
+				}
+
 			}
 
 			if updateClientFn != nil {
@@ -439,9 +473,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, auth *runtime.AuthC
 
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
-				docker.WithAuthCreds(func(host string) (string, string, error) {
-					return ParseAuth(auth, host)
-				}))
+				docker.WithAuthCreds(credentials))
 
 			if u.Path == "" {
 				u.Path = "/v2"
@@ -738,7 +770,7 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // See https://github.com/containerd/containerd/issues/6657
 func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
 	s *runtime.PodSandboxConfig) (string, error) {
-	snapshotter := c.config.ContainerdConfig.Snapshotter
+	snapshotter := c.config.Snapshotter
 	if s == nil || s.Annotations == nil {
 		return snapshotter, nil
 	}
@@ -748,13 +780,13 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 		return snapshotter, nil
 	}
 
-	// TODO: Find other way to retrieve sandbox runtime, this must belong to the Runtime part of the CRI.
-	ociRuntime, err := c.config.GetSandboxRuntime(s, runtimeHandler)
-	if err != nil {
-		return "", fmt.Errorf("experimental: failed to get sandbox runtime for %s: %w", runtimeHandler, err)
+	// TODO: Ensure error is returned if runtime not found?
+	if c.runtimePlatforms != nil {
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
+			snapshotter = p.Snapshotter
+			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
+		}
 	}
 
-	snapshotter = c.RuntimeSnapshotter(ctx, ociRuntime)
-	log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
 	return snapshotter, nil
 }

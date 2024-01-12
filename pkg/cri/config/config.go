@@ -67,6 +67,9 @@ const (
 	ModePodSandbox SandboxControllerMode = "podsandbox"
 	// ModeShim means use whatever Controller implementation provided by shim.
 	ModeShim SandboxControllerMode = "shim"
+	// DefaultSandboxImage is the default image to use for sandboxes when empty or
+	// for default configurations.
+	DefaultSandboxImage = "registry.k8s.io/pause:3.9"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -116,24 +119,12 @@ type Runtime struct {
 
 // ContainerdConfig contains toml config related to containerd
 type ContainerdConfig struct {
-	// Snapshotter is the snapshotter used by containerd.
-	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
-
-	// DisableSnapshotAnnotations disables to pass additional annotations (image
-	// related information) to snapshotters. These annotations are required by
-	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
-	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
-
-	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
-	// remove layers from the content store after successfully unpacking these
-	// layers to the snapshotter.
-	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
 
 	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
 	// blockio related errors when blockio support has not been
@@ -249,6 +240,78 @@ type ImageDecryption struct {
 	KeyModel string `toml:"key_model" json:"keyModel"`
 }
 
+// ImagePlatform represents the platform to use for an image including the
+// snapshotter to use. If snapshotter is not provided, the platform default
+// can be assumed. When platform is not provided, the default platform can
+// be assumed
+type ImagePlatform struct {
+	Platform string `toml:"platform" json:"platform"`
+	// Snapshotter setting snapshotter at runtime level instead of making it as a global configuration.
+	// An example use case is to use devmapper or other snapshotters in Kata containers for performance and security
+	// while using default snapshotters for operational simplicity.
+	// See https://github.com/containerd/containerd/issues/6657 for details.
+	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+}
+
+type ImageConfig struct {
+	// Snapshotter is the snapshotter used by containerd.
+	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
+
+	// DisableSnapshotAnnotations disables to pass additional annotations (image
+	// related information) to snapshotters. These annotations are required by
+	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
+	DisableSnapshotAnnotations bool `toml:"disable_snapshot_annotations" json:"disableSnapshotAnnotations"`
+
+	// DiscardUnpackedLayers is a boolean flag to specify whether to allow GC to
+	// remove layers from the content store after successfully unpacking these
+	// layers to the snapshotter.
+	DiscardUnpackedLayers bool `toml:"discard_unpacked_layers" json:"discardUnpackedLayers"`
+
+	// PinnedImages are images which the CRI plugin uses and should not be
+	// removed by the CRI client. The images have a key which can be used
+	// by other plugins to lookup the current image name.
+	// Image names should be full names including domain and tag
+	// Examples:
+	//   "sandbox": "k8s.gcr.io/pause:3.9"
+	//   "base": "docker.io/library/ubuntu:latest"
+	// Migrated from:
+	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
+	PinnedImages map[string]string
+
+	// RuntimePlatforms is map between the runtime and the image platform to
+	// use for that runtime. When resolving an image for a runtime, this
+	// mapping will be used to select the image for the platform and the
+	// snapshotter for unpacking.
+	RuntimePlatforms map[string]ImagePlatform `toml:"runtime_platforms" json:"runtimePlatforms"`
+
+	// Registry contains config related to the registry
+	Registry Registry `toml:"registry" json:"registry"`
+
+	// ImageDecryption contains config related to handling decryption of encrypted container images
+	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
+
+	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
+	// TODO: Migrate to transfer service
+	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
+
+	// ImagePullProgressTimeout is the maximum duration that there is no
+	// image data read from image registry in the open connection. It will
+	// be reset whatever a new byte has been read. If timeout, the image
+	// pulling will be cancelled. A zero value means there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+
+	// ImagePullWithSyncFs is an experimental setting. It's to force sync
+	// filesystem during unpacking to ensure that data integrity.
+	// TODO: Migrate to transfer service
+	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
+
+	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
+	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+}
+
 // PluginConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
 type PluginConfig struct {
@@ -256,10 +319,6 @@ type PluginConfig struct {
 	ContainerdConfig `toml:"containerd" json:"containerd"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni"`
-	// Registry contains config related to the registry
-	Registry Registry `toml:"registry" json:"registry"`
-	// ImageDecryption contains config related to handling decryption of encrypted container images
-	ImageDecryption `toml:"image_decryption" json:"imageDecryption"`
 	// DisableTCPService disables serving CRI on the TCP server.
 	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
@@ -276,10 +335,6 @@ type PluginConfig struct {
 	// SelinuxCategoryRange allows the upper bound on the category range to be set.
 	// If not specified or set to 0, defaults to 1024 from the selinux package.
 	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
-	// SandboxImage is the image used by sandbox container.
-	SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
-	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
-	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
 	// EnableTLSStreaming indicates to enable the TLS streaming support.
 	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
 	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
@@ -298,8 +353,6 @@ type PluginConfig struct {
 	// current OOMScoreADj.
 	// This is useful when the containerd does not have permission to decrease OOMScoreAdj.
 	RestrictOOMScoreAdj bool `toml:"restrict_oom_score_adj" json:"restrictOOMScoreAdj"`
-	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
-	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 	// DisableProcMount disables Kubernetes ProcMount support. This MUST be set to `true`
 	// when using containerd with Kubernetes <=1.11.
 	DisableProcMount bool `toml:"disable_proc_mount" json:"disableProcMount"`
@@ -345,14 +398,7 @@ type PluginConfig struct {
 	// For more details about CDI configuration please refer to
 	// https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-	// ImagePullProgressTimeout is the maximum duration that there is no
-	// image data read from image registry in the open connection. It will
-	// be reset whatever a new byte has been read. If timeout, the image
-	// pulling will be cancelled. A zero value means there is no timeout.
-	//
-	// The string is in the golang duration format, see:
-	//   https://golang.org/pkg/time/#ParseDuration
-	ImagePullProgressTimeout string `toml:"image_pull_progress_timeout" json:"imagePullProgressTimeout"`
+
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
@@ -362,9 +408,6 @@ type PluginConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
-	// ImagePullWithSyncFs is an experimental setting. It's to force sync
-	// filesystem during unpacking to ensure that data integrity.
-	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -400,31 +443,9 @@ const (
 	KeyModelNode = "node"
 )
 
-// ValidatePluginConfig validates the given plugin configuration.
-func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.Warning, error) {
+// ValidateImageConfig validates the given image configuration
+func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
-	if c.ContainerdConfig.Runtimes == nil {
-		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
-	}
-
-	// Validation for default_runtime_name
-	if c.ContainerdConfig.DefaultRuntimeName == "" {
-		return warnings, errors.New("`default_runtime_name` is empty")
-	}
-	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
-	}
-
-	for k, r := range c.ContainerdConfig.Runtimes {
-		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
-		}
-		// If empty, use default podSandbox mode
-		if len(r.Sandboxer) == 0 {
-			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
-		}
-	}
 
 	useConfigPath := c.Registry.ConfigPath != ""
 	if len(c.Registry.Mirrors) > 0 {
@@ -463,17 +484,46 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		log.G(ctx).Warning("`auths` is deprecated, please use `ImagePullSecrets` instead")
 	}
 
-	// Validation for stream_idle_timeout
-	if c.StreamIdleTimeout != "" {
-		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
-			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
-		}
-	}
-
 	// Validation for image_pull_progress_timeout
 	if c.ImagePullProgressTimeout != "" {
 		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
 			return warnings, fmt.Errorf("invalid image pull progress timeout: %w", err)
+		}
+	}
+
+	return warnings, nil
+}
+
+// ValidatePluginConfig validates the given plugin configuration.
+func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.Warning, error) {
+	var warnings []deprecation.Warning
+	if c.ContainerdConfig.Runtimes == nil {
+		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
+	}
+
+	// Validation for default_runtime_name
+	if c.ContainerdConfig.DefaultRuntimeName == "" {
+		return warnings, errors.New("`default_runtime_name` is empty")
+	}
+	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
+		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	}
+
+	for k, r := range c.ContainerdConfig.Runtimes {
+		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+		}
+		// If empty, use default podSandbox mode
+		if len(r.Sandboxer) == 0 {
+			r.Sandboxer = string(ModePodSandbox)
+			c.ContainerdConfig.Runtimes[k] = r
+		}
+	}
+
+	// Validation for stream_idle_timeout
+	if c.StreamIdleTimeout != "" {
+		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
+			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
 		}
 	}
 

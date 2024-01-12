@@ -22,8 +22,8 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/cri/util"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -49,7 +49,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 			return nil, fmt.Errorf("failed to get image %q: %w", imageRef, err)
 		}
 	} else {
-		repoTags, repoDigests := images.ParseImageReferences(image.References)
+		repoTags, repoDigests := util.ParseImageReferences(image.References)
 		if len(repoTags) > 0 {
 			// Based on current behavior of dockershim, this field should be
 			// image tag.

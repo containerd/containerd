@@ -29,7 +29,7 @@ import (
 )
 
 func TestImageFsInfo(t *testing.T) {
-	c := newTestCRIService()
+	c, g := newTestCRIService()
 	snapshots := []snapshotstore.Snapshot{
 		{
 			Key: snapshotstore.Key{
@@ -71,7 +71,7 @@ func TestImageFsInfo(t *testing.T) {
 	for _, sn := range snapshots {
 		c.snapshotStore.Add(sn)
 	}
-	resp, err := c.ImageFsInfo(context.Background(), &runtime.ImageFsInfoRequest{})
+	resp, err := g.ImageFsInfo(context.Background(), &runtime.ImageFsInfoRequest{})
 	require.NoError(t, err)
 	stats := resp.GetImageFilesystems()
 	// stats[0] is for default snapshotter, stats[1] is for `overlayfs`

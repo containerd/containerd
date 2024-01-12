@@ -26,16 +26,14 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
-	"google.golang.org/grpc"
+
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
@@ -53,27 +51,26 @@ const defaultNetworkPlugin = "default"
 
 // CRIService is the interface implement CRI remote service server.
 type CRIService interface {
-	runtime.RuntimeServiceServer
-	runtime.ImageServiceServer
 	// Closer is used by containerd to gracefully stop cri service.
 	io.Closer
 
-	Run(ready func()) error
+	IsInitialized() bool
 
-	Register(*grpc.Server) error
+	Run(ready func()) error
 }
 
 type sandboxService interface {
 	SandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error)
 }
 
-// imageService specifies dependencies to image service.
-type imageService interface {
-	runtime.ImageServiceServer
-
+// ImageService specifies dependencies to image service.
+type ImageService interface {
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
 
+	PullImage(ctx context.Context, name string, credentials func(string) (string, string, error), sandboxConfig *runtime.PodSandboxConfig) (string, error)
 	UpdateImage(ctx context.Context, r string) error
+
+	CheckImages(ctx context.Context) error
 
 	GetImage(id string) (imagestore.Image, error)
 	GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error)
@@ -85,7 +82,7 @@ type imageService interface {
 
 // criService implements CRIService.
 type criService struct {
-	imageService
+	ImageService
 	// config contains all configurations.
 	config criconfig.Config
 	// imageFSPaths contains path to image filesystem for snapshotters.
@@ -130,37 +127,55 @@ type criService struct {
 	sandboxService sandboxService
 }
 
+type CRIServiceOptions struct {
+	ImageService ImageService
+
+	NRI *nri.API
+
+	// SandboxControllers is a map of all the loaded sandbox controllers
+	SandboxControllers map[string]sandbox.Controller
+
+	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
+	BaseOCISpecs map[string]*oci.Spec
+
+	// Client is the base containerd client used for accessing services,
+	//
+	// TODO: Replace this gradually with directly configured instances
+	Client *containerd.Client
+}
+
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(criBase *base.CRIBase, imageService imageService, client *containerd.Client, nri *nri.API) (CRIService, error) {
+// TODO: Add criBase.BaseOCISpecs to options
+func NewCRIService(config criconfig.Config, options *CRIServiceOptions) (CRIService, runtime.RuntimeServiceServer, error) {
 	var err error
 	labels := label.NewStore()
-	config := criBase.Config
+
 	c := &criService{
-		imageService:       imageService,
+		ImageService:       options.ImageService,
 		config:             config,
-		client:             client,
-		imageFSPaths:       imageService.ImageFSPaths(),
+		client:             options.Client,
+		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		baseOCISpecs:       criBase.BaseOCISpecs,
+		baseOCISpecs:       options.BaseOCISpecs,
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
-		sandboxService:     newCriSandboxService(&config, client),
+		sandboxService:     newCriSandboxService(&config, options.Client),
 	}
 
 	// TODO: figure out a proper channel size.
 	c.containerEventsChan = make(chan runtime.ContainerEventResponse, 1000)
 
 	if err := c.initPlatform(); err != nil {
-		return nil, fmt.Errorf("initialize platform: %w", err)
+		return nil, nil, fmt.Errorf("initialize platform: %w", err)
 	}
 
 	// prepare streaming server
 	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort, config.StreamIdleTimeout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stream server: %w", err)
+		return nil, nil, fmt.Errorf("failed to create stream server: %w", err)
 	}
 
 	c.eventMonitor = newEventMonitor(c)
@@ -176,39 +191,26 @@ func NewCRIService(criBase *base.CRIBase, imageService imageService, client *con
 		if path != "" {
 			m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
 			if err != nil {
-				return nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
+				return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
 			}
 			c.cniNetConfMonitor[name] = m
 		}
 	}
 
-	podSandboxController := client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
+	// Initialize pod sandbox controller
+	// TODO: Get this from options, NOT client
+	podSandboxController := options.Client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
 	podSandboxController.Init(c)
 
-	c.nri = nri
+	c.nri = options.NRI
 
-	return c, nil
+	return c, c, nil
 }
 
 // BackOffEvent is a temporary workaround to call eventMonitor from controller.Stop.
 // TODO: get rid of this.
 func (c *criService) BackOffEvent(id string, event interface{}) {
 	c.eventMonitor.backOff.enBackOff(id, event)
-}
-
-// Register registers all required services onto a specific grpc server.
-// This is used by containerd cri plugin.
-func (c *criService) Register(s *grpc.Server) error {
-	return c.register(s)
-}
-
-// RegisterTCP register all required services onto a GRPC server on TCP.
-// This is used by containerd CRI plugin.
-func (c *criService) RegisterTCP(s *grpc.Server) error {
-	if !c.config.DisableTCPService {
-		return c.register(s)
-	}
-	return nil
 }
 
 // Run starts the CRI service.
@@ -319,11 +321,4 @@ func (c *criService) Close() error {
 // IsInitialized indicates whether CRI service has finished initialization.
 func (c *criService) IsInitialized() bool {
 	return c.initialized.Load()
-}
-
-func (c *criService) register(s *grpc.Server) error {
-	instrumented := instrument.NewService(c)
-	runtime.RegisterRuntimeServiceServer(s, instrumented)
-	runtime.RegisterImageServiceServer(s, instrumented)
-	return nil
 }

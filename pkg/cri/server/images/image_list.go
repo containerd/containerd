@@ -25,7 +25,8 @@ import (
 // ListImages lists existing images.
 // TODO(random-liu): Add image list filters after CRI defines this more clear, and kubelet
 // actually needs it.
-func (c *CRIImageService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
+func (c *GRPCCRIImageService) ListImages(ctx context.Context, r *runtime.ListImagesRequest) (*runtime.ListImagesResponse, error) {
+	// TODO: From CRIImageService directly
 	imagesInStore := c.imageStore.List()
 
 	var images []*runtime.Image

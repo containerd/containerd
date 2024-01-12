@@ -24,6 +24,23 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
+func DefaultImageConfig() ImageConfig {
+	return ImageConfig{
+		Snapshotter:                containerd.DefaultSnapshotter,
+		DisableSnapshotAnnotations: true,
+		MaxConcurrentDownloads:     3,
+		ImageDecryption: ImageDecryption{
+			KeyModel: KeyModelNode,
+		},
+		PinnedImages: map[string]string{
+			"sandbox": DefaultSandboxImage,
+		},
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
+		ImagePullWithSyncFs:      false,
+		StatsCollectPeriod:       10,
+	}
+}
+
 // DefaultConfig returns default configurations of cri plugin.
 func DefaultConfig() PluginConfig {
 	defaultRuncV2Opts := `
@@ -63,7 +80,6 @@ func DefaultConfig() PluginConfig {
 			NetworkPluginConfTemplate:  "",
 		},
 		ContainerdConfig: ContainerdConfig{
-			Snapshotter:        containerd.DefaultSnapshotter,
 			DefaultRuntimeName: "runc",
 			Runtimes: map[string]Runtime{
 				"runc": {
@@ -72,7 +88,6 @@ func DefaultConfig() PluginConfig {
 					Sandboxer: string(ModePodSandbox),
 				},
 			},
-			DisableSnapshotAnnotations: true,
 		},
 		DisableTCPService:    true,
 		StreamServerAddress:  "127.0.0.1",
@@ -85,23 +100,15 @@ func DefaultConfig() PluginConfig {
 			TLSKeyFile:  "",
 			TLSCertFile: "",
 		},
-		SandboxImage:                     "registry.k8s.io/pause:3.9",
-		StatsCollectPeriod:               10,
 		MaxContainerLogLineSize:          16 * 1024,
-		MaxConcurrentDownloads:           3,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
 		DisableHugetlbController:         true,
 		IgnoreImageDefinedVolumes:        false,
-		ImageDecryption: ImageDecryption{
-			KeyModel: KeyModelNode,
-		},
-		EnableCDI:                false,
-		CDISpecDirs:              []string{"/etc/cdi", "/var/run/cdi"},
-		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
-		DrainExecSyncIOTimeout:   "0s",
-		ImagePullWithSyncFs:      false,
-		EnableUnprivilegedPorts:  true,
-		EnableUnprivilegedICMP:   true,
+		EnableCDI:                        false,
+		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
+		DrainExecSyncIOTimeout:           "0s",
+		EnableUnprivilegedPorts:          true,
+		EnableUnprivilegedICMP:           true,
 	}
 }

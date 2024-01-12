@@ -32,6 +32,7 @@ import (
 	containerdio "github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
@@ -74,10 +75,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
+	sandboxImage := c.imageService.PinnedImage("sandbox")
+	if sandboxImage == "" {
+		sandboxImage = criconfig.DefaultSandboxImage
+	}
 	// Ensure sandbox container image snapshot.
-	image, err := c.ensureImageExists(ctx, c.config.SandboxImage, config)
+	image, err := c.ensureImageExists(ctx, sandboxImage, config)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", c.config.SandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
@@ -138,7 +143,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	snapshotterOpt = append(snapshotterOpt, extraSOpts...)
 
 	opts := []containerd.NewContainerOpts{
-		containerd.WithSnapshotter(c.runtimeSnapshotter(ctx, ociRuntime)),
+		containerd.WithSnapshotter(c.imageService.RuntimeSnapshotter(ctx, ociRuntime)),
 		customopts.WithNewSnapshot(id, containerdImage, snapshotterOpt...),
 		containerd.WithSpec(spec, specOpts...),
 		containerd.WithContainerLabels(sandboxLabels),
@@ -297,11 +302,11 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 		return &image, nil
 	}
 	// Pull image to ensure the image exists
-	resp, err := c.imageService.PullImage(ctx, &runtime.PullImageRequest{Image: &runtime.ImageSpec{Image: ref}, SandboxConfig: config})
+	// TODO: Cleaner interface
+	imageID, err := c.imageService.PullImage(ctx, ref, nil, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to pull image %q: %w", ref, err)
 	}
-	imageID := resp.GetImageRef()
 	newImage, err := c.imageService.GetImage(imageID)
 	if err != nil {
 		// It's still possible that someone removed the image right after it is pulled.

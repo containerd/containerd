@@ -33,7 +33,6 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -75,18 +74,17 @@ func init() {
 			criBase := criBasePlugin.(*base.CRIBase)
 
 			// Get image service.
-			criImagePlugin, err := ic.GetByID(plugins.CRIImagePlugin, "cri-image-service")
+			criImagePlugin, err := ic.GetSingle(plugins.CRIImagePlugin)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
-			imageService := criImagePlugin.(*images.CRIImageService)
 
 			c := Controller{
 				client:       client,
 				config:       criBase.Config,
 				os:           osinterface.RealOS{},
 				baseOCISpecs: criBase.BaseOCISpecs,
-				imageService: imageService,
+				imageService: criImagePlugin.(ImageService),
 				store:        NewStore(),
 			}
 			return &c, nil
@@ -103,10 +101,11 @@ type CRIService interface {
 
 // ImageService specifies dependencies to CRI image service.
 type ImageService interface {
-	runtime.ImageServiceServer
-
 	LocalResolve(refOrID string) (imagestore.Image, error)
 	GetImage(id string) (imagestore.Image, error)
+	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig) (string, error)
+	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
+	PinnedImage(string) string
 }
 
 type Controller struct {

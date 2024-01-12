@@ -14,29 +14,24 @@
    limitations under the License.
 */
 
-package server
+package util
 
-import criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+import reference "github.com/distribution/reference"
 
-const (
-	testRootDir  = "/test/root"
-	testStateDir = "/test/state"
-)
-
-var testConfig = criconfig.Config{
-	RootDir:  testRootDir,
-	StateDir: testStateDir,
-	PluginConfig: criconfig.PluginConfig{
-		TolerateMissingHugetlbController: true,
-		ContainerdConfig: criconfig.ContainerdConfig{
-			DefaultRuntimeName: "runc",
-			Runtimes: map[string]criconfig.Runtime{
-				"runc": {
-					Type:        "runc",
-					Snapshotter: "overlayfs",
-					Sandboxer:   "shim",
-				},
-			},
-		},
-	},
+// ParseImageReferences parses a list of arbitrary image references and returns
+// the repotags and repodigests
+func ParseImageReferences(refs []string) ([]string, []string) {
+	var tags, digests []string
+	for _, ref := range refs {
+		parsed, err := reference.ParseAnyReference(ref)
+		if err != nil {
+			continue
+		}
+		if _, ok := parsed.(reference.Canonical); ok {
+			digests = append(digests, parsed.String())
+		} else if _, ok := parsed.(reference.Tagged); ok {
+			tags = append(tags, parsed.String())
+		}
+	}
+	return tags, digests
 }

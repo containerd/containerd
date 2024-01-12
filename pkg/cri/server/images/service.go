@@ -18,74 +18,51 @@ package images
 
 import (
 	"context"
-	"fmt"
-	"path/filepath"
 	"time"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/events"
+	"github.com/containerd/containerd/v2/images"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
+	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
+	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/pkg/kmutex"
+	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
-	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
-	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
-	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/kmutex"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/plugins"
-	snapshot "github.com/containerd/containerd/v2/snapshots"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func init() {
-	registry.Register(&plugin.Registration{
-		Type: plugins.CRIImagePlugin,
-		ID:   "cri-image-service",
-		Requires: []plugin.Type{
-			plugins.LeasePlugin,
-			plugins.EventPlugin,
-			plugins.SandboxStorePlugin,
-			plugins.InternalPlugin,
-			plugins.ServicePlugin,
-		},
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			// Get base CRI dependencies.
-			criPlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
-			if err != nil {
-				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
-			}
-			cri := criPlugin.(*base.CRIBase)
+type imageClient interface {
+	ListImages(context.Context, ...string) ([]containerd.Image, error)
+	GetImage(context.Context, string) (containerd.Image, error)
+	Pull(context.Context, string, ...containerd.RemoteOpt) (containerd.Image, error)
+}
 
-			client, err := containerd.New(
-				"",
-				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
-				containerd.WithDefaultPlatform(platforms.Default()),
-				containerd.WithInMemoryServices(ic),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
-			}
-			service, err := NewService(cri.Config, client)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create image service: %w", err)
-			}
-
-			return service, nil
-		},
-	})
+type ImagePlatform struct {
+	Snapshotter string
+	Platform    platforms.Platform
 }
 
 type CRIImageService struct {
-	// config contains all configurations.
-	config criconfig.Config
-	// client is an instance of the containerd client
-	client *containerd.Client
+	// config contains all image configurations.
+	config criconfig.ImageConfig
+	// images is the lower level image store used for raw storage,
+	// no event publishing should currently be assumed
+	images images.Store
+	// publisher is the events publisher
+	publisher events.Publisher
+	// client is a subset of the containerd client
+	// and will be replaced by image store and transfer service
+	client imageClient
 	// imageFSPaths contains path to image filesystem for snapshotters.
 	imageFSPaths map[string]string
+	// runtimePlatforms are the platforms configured for a runtime.
+	runtimePlatforms map[string]ImagePlatform
 	// imageStore stores all resources associated with images.
 	imageStore *imagestore.Store
 	// snapshotStore stores information of all snapshots.
@@ -96,71 +73,57 @@ type CRIImageService struct {
 	unpackDuplicationSuppressor kmutex.KeyedLocker
 }
 
-func NewService(config criconfig.Config, client *containerd.Client) (*CRIImageService, error) {
-	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
-		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
-	}
+type GRPCCRIImageService struct {
+	*CRIImageService
+}
 
-	imageFSPaths := map[string]string{}
-	for _, ociRuntime := range config.ContainerdConfig.Runtimes {
-		// Can not use `c.RuntimeSnapshotter() yet, so hard-coding here.`
-		snapshotter := ociRuntime.Snapshotter
-		if snapshotter != "" {
-			imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
-		}
-	}
+type CRIImageServiceOptions struct {
+	Content content.Store
 
-	snapshotter := config.ContainerdConfig.Snapshotter
-	imageFSPaths[snapshotter] = imageFSPath(config.ContainerdRootDir, snapshotter)
-	log.L.Infof("Get image filesystem path %q for snapshotter %q", imageFSPaths[snapshotter], snapshotter)
+	Images images.Store
 
+	ImageFSPaths map[string]string
+
+	RuntimePlatforms map[string]ImagePlatform
+
+	Snapshotters map[string]snapshots.Snapshotter
+
+	Publisher events.Publisher
+
+	Client imageClient
+}
+
+// NewService creates a new CRI Image Service
+//
+// TODO:
+//  1. Generalize the image service and merge with a single higher level image service
+//  2. Update the options to remove client and imageFSPath
+//     - Platform configuration with Array/Map of snapshotter names + filesystem ID + platform matcher + runtime to snapshotter
+//     - Transfer service implementation
+//     - Image Service (from metadata)
+//     - Content store (from metadata)
+//  3. Separate image cache and snapshot cache to first class plugins, make the snapshot cache much more efficient and intelligent
+func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (*CRIImageService, error) {
 	svc := CRIImageService{
 		config:                      config,
-		client:                      client,
-		imageStore:                  imagestore.NewStore(client.ImageService(), client.ContentStore(), platforms.Default()),
-		imageFSPaths:                imageFSPaths,
+		images:                      options.Images,
+		client:                      options.Client,
+		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
+		imageFSPaths:                options.ImageFSPaths,
+		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
 		unpackDuplicationSuppressor: kmutex.New(),
 	}
 
-	snapshotters := map[string]snapshot.Snapshotter{}
-	ctx := ctrdutil.NamespacedContext()
-
-	// Add runtime specific snapshotters
-	for _, runtime := range config.ContainerdConfig.Runtimes {
-		snapshotterName := svc.RuntimeSnapshotter(ctx, runtime)
-		if snapshotter := svc.client.SnapshotService(snapshotterName); snapshotter != nil {
-			snapshotters[snapshotterName] = snapshotter
-		} else {
-			return nil, fmt.Errorf("failed to find snapshotter %q", snapshotterName)
-		}
-	}
-
-	// Add default snapshotter
-	snapshotterName := svc.config.ContainerdConfig.Snapshotter
-	if snapshotter := svc.client.SnapshotService(snapshotterName); snapshotter != nil {
-		snapshotters[snapshotterName] = snapshotter
-	} else {
-		return nil, fmt.Errorf("failed to find snapshotter %q", snapshotterName)
-	}
-
-	// Start snapshot stats syncer, it doesn't need to be stopped.
 	log.L.Info("Start snapshots syncer")
 	snapshotsSyncer := newSnapshotsSyncer(
 		svc.snapshotStore,
-		snapshotters,
+		options.Snapshotters,
 		time.Duration(svc.config.StatsCollectPeriod)*time.Second,
 	)
 	snapshotsSyncer.start()
 
 	return &svc, nil
-}
-
-// imageFSPath returns containerd image filesystem path.
-// Note that if containerd changes directory layout, we also needs to change this.
-func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, plugins.SnapshotPlugin.String()+"."+snapshotter)
 }
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
@@ -195,9 +158,10 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
 // See https://github.com/containerd/containerd/issues/6657
+// TODO: Pass in name and get back runtime platform
 func (c *CRIImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string {
 	if ociRuntime.Snapshotter == "" {
-		return c.config.ContainerdConfig.Snapshotter
+		return c.config.Snapshotter
 	}
 
 	log.G(ctx).Debugf("Set snapshotter for runtime %s to %s", ociRuntime.Type, ociRuntime.Snapshotter)
@@ -220,4 +184,15 @@ func (c *CRIImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Sn
 
 func (c *CRIImageService) ImageFSPaths() map[string]string {
 	return c.imageFSPaths
+}
+
+// PinnedImage is used to lookup a pinned image by name.
+// Most often used to get the "sandbox" image.
+func (c *CRIImageService) PinnedImage(name string) string {
+	return c.config.PinnedImages[name]
+}
+
+// GRPCService returns a new CRI Image Service grpc server.
+func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
+	return &GRPCCRIImageService{c}
 }
