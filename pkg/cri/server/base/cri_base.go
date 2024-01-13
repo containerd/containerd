@@ -69,6 +69,7 @@ func init() {
 			conf := c.(map[string]interface{})
 			migrateConfig(conf)
 			plugins["io.containerd.internal.v1.cri"] = conf
+			delete(plugins, "io.containerd.grpc.v1.cri")
 			return nil
 		},
 		InitFn: initCRIBase,
