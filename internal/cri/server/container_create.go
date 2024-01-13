@@ -1008,27 +1008,37 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 	}
 
 	if !isInCRIMounts(etcHosts, config.GetMounts()) {
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  etcHosts,
-			HostPath:       c.getSandboxHosts(sandboxID),
-			Readonly:       securityContext.GetReadonlyRootfs(),
-			SelinuxRelabel: true,
-			UidMappings:    uidMappings,
-			GidMappings:    gidMappings,
-		})
+		hostpath := c.getSandboxHosts(sandboxID)
+		// /etc/hosts could be delegated to remote sandbox controller. That file isn't required to be existed
+		// in host side for some sandbox runtimes. Skip it if we don't need it.
+		if _, err := c.os.Stat(hostpath); err == nil {
+			mounts = append(mounts, &runtime.Mount{
+				ContainerPath:  etcHosts,
+				HostPath:       hostpath,
+				Readonly:       securityContext.GetReadonlyRootfs(),
+				SelinuxRelabel: true,
+				UidMappings:    uidMappings,
+				GidMappings:    gidMappings,
+			})
+		}
 	}
 
 	// Mount sandbox resolv.config.
 	// TODO: Need to figure out whether we should always mount it as read-only
 	if !isInCRIMounts(resolvConfPath, config.GetMounts()) {
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  resolvConfPath,
-			HostPath:       c.getResolvPath(sandboxID),
-			Readonly:       securityContext.GetReadonlyRootfs(),
-			SelinuxRelabel: true,
-			UidMappings:    uidMappings,
-			GidMappings:    gidMappings,
-		})
+		hostpath := c.getResolvPath(sandboxID)
+		// The ownership of /etc/resolv.conf could be delegated to remote sandbox controller. That file isn't
+		// required to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
+		if _, err := c.os.Stat(hostpath); err == nil {
+			mounts = append(mounts, &runtime.Mount{
+				ContainerPath:  resolvConfPath,
+				HostPath:       hostpath,
+				Readonly:       securityContext.GetReadonlyRootfs(),
+				SelinuxRelabel: true,
+				UidMappings:    uidMappings,
+				GidMappings:    gidMappings,
+			})
+		}
 	}
 
 	if !isInCRIMounts(devShm, config.GetMounts()) {
@@ -1036,23 +1046,27 @@ func (c *criService) linuxContainerMounts(sandboxID string, config *runtime.Cont
 		if securityContext.GetNamespaceOptions().GetIpc() == runtime.NamespaceMode_NODE {
 			sandboxDevShm = devShm
 		}
-		mounts = append(mounts, &runtime.Mount{
-			ContainerPath:  devShm,
-			HostPath:       sandboxDevShm,
-			Readonly:       false,
-			SelinuxRelabel: sandboxDevShm != devShm,
-			// XXX: tmpfs support for idmap mounts got merged in
-			// Linux 6.3.
-			// Our Ubuntu 22.04 CI runs with 5.15 kernels, so
-			// disabling idmap mounts for this case makes the CI
-			// happy (the other fs used support idmap mounts in 5.15
-			// kernels).
-			// We can enable this at a later stage, but as this
-			// tmpfs mount is exposed empty to the container (no
-			// prepopulated files) and using the hostIPC with userns
-			// is blocked by k8s, we can just avoid using the
-			// mappings and it should work fine.
-		})
+		// The ownership of /dev/shm could be delegated to remote sandbox controller. That file isn't required
+		// to be existed in host side for some sandbox runtimes. Skip it if we don't need it.
+		if _, err := c.os.Stat(sandboxDevShm); err == nil {
+			mounts = append(mounts, &runtime.Mount{
+				ContainerPath:  devShm,
+				HostPath:       sandboxDevShm,
+				Readonly:       false,
+				SelinuxRelabel: sandboxDevShm != devShm,
+				// XXX: tmpfs support for idmap mounts got merged in
+				// Linux 6.3.
+				// Our Ubuntu 22.04 CI runs with 5.15 kernels, so
+				// disabling idmap mounts for this case makes the CI
+				// happy (the other fs used support idmap mounts in 5.15
+				// kernels).
+				// We can enable this at a later stage, but as this
+				// tmpfs mount is exposed empty to the container (no
+				// prepopulated files) and using the hostIPC with userns
+				// is blocked by k8s, we can just avoid using the
+				// mappings and it should work fine.
+			})
+		}
 	}
 	return mounts
 }
