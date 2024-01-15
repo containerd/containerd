@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package otlptrace contains abstractions for OTLP span exporters.
+See the official OTLP span exporter implementations:
+  - [go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc],
+  - [go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp].
+*/
 package otlptrace // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-
-// Version is the current release version of the OpenTelemetry OTLP trace exporter in use.
-func Version() string {
-	return "1.21.0"
-}
