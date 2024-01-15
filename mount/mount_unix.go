@@ -19,6 +19,7 @@
 package mount
 
 import (
+	"os"
 	"sort"
 
 	"github.com/moby/sys/mountinfo"
@@ -33,6 +34,9 @@ func UnmountRecursive(target string, flags int) error {
 
 	target, err := CanonicalizePath(target)
 	if err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+		}
 		return err
 	}
 
