@@ -569,7 +569,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
           path: |
             *-junit.xml
             *-gotest.json
