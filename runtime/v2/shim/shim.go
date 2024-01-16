@@ -319,7 +319,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
 		pID := p.URI()
-		log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type}).Info("loading plugin")
+		log.G(ctx).WithFields(log.Fields{"id": pID, "type": p.Type}).Debug("loading plugin")
 
 		initContext := plugin.NewContext(
 			ctx,
