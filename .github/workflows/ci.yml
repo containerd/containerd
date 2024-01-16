@@ -375,10 +375,10 @@ jobs:
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.os }}
+          name: TestResults ${{ matrix.os }} ${{ matrix.enable_cri_sandboxes }}
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/*-gotest.json
@@ -529,10 +529,10 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }} ${{ matrix.enable_cri_sandboxes }}
           path: |
             *-junit.xml
             *-gotest.json
@@ -563,7 +563,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults MacOS
