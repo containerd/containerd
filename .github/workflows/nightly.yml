@@ -104,31 +104,31 @@ jobs:
       #
 
       - name: Upload artifacts (linux_amd64)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_amd64
           path: src/github.com/containerd/containerd/bin_amd64
 
       - name: Upload artifacts (linux_arm64)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_arm64
           path: src/github.com/containerd/containerd/bin_arm64
 
       - name: Upload artifacts (linux_s390x)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_s390x
           path: src/github.com/containerd/containerd/bin_s390x
 
       - name: Upload artifacts (linux_ppc64le)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_ppc64le
           path: src/github.com/containerd/containerd/bin_ppc64le
 
       - name: Upload artifacts (linux_riscv64)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: linux_riscv64
           path: src/github.com/containerd/containerd/bin_riscv64
@@ -165,7 +165,7 @@ jobs:
           make binaries
 
       - name: Upload artifacts (windows_amd64)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows_amd64
           path: src/github.com/containerd/containerd/bin/
