@@ -34,6 +34,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/containerd/log"
+
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -42,7 +44,6 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/pkg/cri/labels"
@@ -51,6 +52,8 @@ import (
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/tracing"
+	containerdlog "github.com/containerd/log"
+	enchelpers "github.com/containers/ocicrypt/helpers"
 )
 
 // For image management:
@@ -137,7 +140,8 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		})
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
+			desc imagespec.Descriptor,
+		) ([]imagespec.Descriptor, error) {
 			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
 				isSchema1 = true
 			}
@@ -171,7 +175,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		}),
 	}
 
-	pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+	pullOpts = append(pullOpts, c.encryptedImagesPullOpts(r.GetSandboxConfig().GetAnnotations())...)
 	if !c.config.ContainerdConfig.DisableSnapshotAnnotations {
 		pullOpts = append(pullOpts,
 			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
@@ -565,14 +569,42 @@ func newTransport() *http.Transport {
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
-func (c *criService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
-		ltdd := imgcrypt.Payload{}
-		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
-		return []containerd.RemoteOpt{opt}
+func (c *criService) encryptedImagesPullOpts(podAnnotations map[string]string) []containerd.RemoteOpt {
+	ltdd := c.createImgcryptPayload(podAnnotations)
+	if ltdd == nil {
+		return nil
 	}
-	return nil
+	decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(ltdd))
+	opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
+	return []containerd.RemoteOpt{opt}
+}
+
+func (c *criService) createImgcryptPayload(podAnnotations map[string]string) *imgcrypt.Payload {
+	var ltdd *imgcrypt.Payload
+	switch c.config.ImageDecryption.KeyModel {
+	case criconfig.KeyModelNode:
+		{
+			ltdd = &imgcrypt.Payload{}
+		}
+	case criconfig.KeyModelPod:
+		{
+			decryptKey, ok := podAnnotations[annotations.PodImageDecryptionConfig]
+			if !ok {
+				containerdlog.L.Debugf("pod does not contain image decryption config")
+				return nil
+			}
+			cryptoConfig, err := enchelpers.CreateDecryptCryptoConfig([]string{decryptKey}, []string{})
+			if err != nil {
+				containerdlog.L.Debugf("pod annotation containing decryption config is not valid: %v", err)
+				return nil
+			}
+
+			ltdd = &imgcrypt.Payload{
+				DecryptConfig: *cryptoConfig.DecryptConfig,
+			}
+		}
+	}
+	return ltdd
 }
 
 const (
@@ -625,7 +657,7 @@ func (reporter *pullProgressReporter) start(ctx context.Context) {
 			reportInterval = reporter.timeout / 2
 		}
 
-		var ticker = time.NewTicker(reportInterval)
+		ticker := time.NewTicker(reportInterval)
 		defer ticker.Stop()
 
 		for {
@@ -756,7 +788,8 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 // Once we know the runtime, try to override default snapshotter if it is set for this runtime.
 // See https://github.com/containerd/containerd/issues/6657
 func (c *criService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (string, error) {
+	s *runtime.PodSandboxConfig,
+) (string, error) {
 	snapshotter := c.config.ContainerdConfig.Snapshotter
 	if s == nil || s.Annotations == nil {
 		return snapshotter, nil

@@ -90,6 +90,10 @@ const (
 
 	// WindowsHostProcess is used by hcsshim to identify windows pods that are running HostProcesses
 	WindowsHostProcess = "microsoft.com/hostprocess-container"
+
+	// PodImageDecryptionConfig is used to specify the decryption config of image layers used in the pod.
+	// They are in format protocol:keyfile. For instance, jwe:/path/to/key.pem or pgp:admin@example.com or pkcs7:/path/to/x509-file.
+	PodImageDecryptionConfig = "io.containerd.cri.decryption-key"
 )
 
 // DefaultCRIAnnotations are the default set of CRI annotations to

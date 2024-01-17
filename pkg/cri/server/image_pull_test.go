@@ -22,10 +22,13 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/containerd/imgcrypt"
+
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/labels"
 
+	encconfig "github.com/containers/ocicrypt/config"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -313,29 +316,6 @@ func TestDefaultScheme(t *testing.T) {
 	}
 }
 
-func TestEncryptedImagePullOpts(t *testing.T) {
-	for desc, test := range map[string]struct {
-		keyModel     string
-		expectedOpts int
-	}{
-		"node key model should return one unpack opt": {
-			keyModel:     criconfig.KeyModelNode,
-			expectedOpts: 1,
-		},
-		"no key model selected should default to node key model": {
-			keyModel:     "",
-			expectedOpts: 0,
-		},
-	} {
-		t.Run(desc, func(t *testing.T) {
-			c := newTestCRIService()
-			c.config.ImageDecryption.KeyModel = test.keyModel
-			got := len(c.encryptedImagesPullOpts())
-			assert.Equal(t, test.expectedOpts, got)
-		})
-	}
-}
-
 func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	defaultSnashotter := "native"
 	runtimeSnapshotter := "devmapper"
@@ -446,6 +426,49 @@ func TestImageGetLabels(t *testing.T) {
 			labels := criService.getLabels(context.Background(), tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 
+		})
+	}
+}
+
+func TestCreateImgcryptPayload(t *testing.T) {
+	type args struct {
+		podAnnotations map[string]string
+	}
+	tests := []struct {
+		name     string
+		args     args
+		keyModel string
+		want     *imgcrypt.Payload
+	}{
+		{
+			name:     "node decryption model",
+			args:     args{podAnnotations: map[string]string{}},
+			keyModel: criconfig.KeyModelNode,
+			want:     &imgcrypt.Payload{},
+		},
+		{
+			name: "no key model",
+			want: nil,
+		},
+		{
+			name: "pod decryption model",
+			args: args{podAnnotations: map[string]string{
+				annotations.PodImageDecryptionConfig: "provider:test-crypt:12345",
+			}},
+			keyModel: criconfig.KeyModelPod,
+			want: &imgcrypt.Payload{
+				DecryptConfig: encconfig.DecryptConfig{Parameters: map[string][][]byte{
+					"test-crypt": {
+						[]byte("12345"),
+					}}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		criService := newTestCRIService()
+		t.Run(tt.name, func(t *testing.T) {
+			criService.config.ImageDecryption.KeyModel = tt.keyModel
+			assert.Equalf(t, tt.want, criService.createImgcryptPayload(tt.args.podAnnotations), "createImgcryptPayload(%v)", tt.args.podAnnotations)
 		})
 	}
 }
