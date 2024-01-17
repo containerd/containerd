@@ -62,7 +62,7 @@ import (
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/content/local"
-	"github.com/containerd/containerd/v2/services/warning"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	ssproxy "github.com/containerd/containerd/v2/snapshots/proxy"
 	"github.com/containerd/containerd/v2/sys"
 	"github.com/containerd/plugin"

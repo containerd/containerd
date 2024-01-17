@@ -14,30 +14,30 @@
    limitations under the License.
 */
 
-package snapshots
+package content
 
 import (
-	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/containerd/v2/plugins/services"
+	"github.com/containerd/containerd/v2/plugins/services/content/contentserver"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 )
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.ServicePlugin,
-		ID:   services.SnapshotsService,
+		Type: plugins.GRPCPlugin,
+		ID:   "content",
 		Requires: []plugin.Type{
-			plugins.MetadataPlugin,
+			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			m, err := ic.GetSingle(plugins.MetadataPlugin)
+			cs, err := ic.GetByID(plugins.ServicePlugin, services.ContentService)
 			if err != nil {
 				return nil, err
 			}
-
-			return m.(*metadata.DB).Snapshotters(), nil
+			return contentserver.New(cs.(content.Store)), nil
 		},
 	})
 }
