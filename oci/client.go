@@ -19,7 +19,7 @@ package oci
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/snapshots"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

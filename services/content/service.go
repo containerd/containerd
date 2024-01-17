@@ -17,7 +17,7 @@
 package content
 
 import (
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/containerd/v2/services/content/contentserver"

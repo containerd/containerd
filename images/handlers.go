@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

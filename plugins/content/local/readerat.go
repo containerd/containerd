@@ -21,7 +21,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/errdefs"
 )
 

@@ -27,7 +27,7 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/gc"
 	"github.com/containerd/containerd/v2/namespaces"

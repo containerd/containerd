@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/moby/sys/signal"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"

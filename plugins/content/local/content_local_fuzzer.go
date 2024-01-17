@@ -28,7 +28,7 @@ import (
 
 	"github.com/opencontainers/go-digest"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 )
 
 func FuzzContentStoreWriter(data []byte) int {

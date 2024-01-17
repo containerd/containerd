@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/log/logtest"
