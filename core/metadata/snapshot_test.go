@@ -32,8 +32,8 @@ import (
 	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/containerd/v2/snapshots/native"
 	"github.com/containerd/containerd/v2/snapshots/testsuite"
 	bolt "go.etcd.io/bbolt"
 )
