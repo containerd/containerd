@@ -34,10 +34,10 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/opencontainers/go-digest"
 
-	_ "github.com/containerd/containerd/v2/gc/scheduler"
 	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
 	_ "github.com/containerd/containerd/v2/plugins/services/containers"
