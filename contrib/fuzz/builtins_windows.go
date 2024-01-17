@@ -20,6 +20,6 @@ import (
 	// Windows specific imports
 	_ "github.com/containerd/containerd/v2/plugins/diff/lcow"
 	_ "github.com/containerd/containerd/v2/plugins/diff/windows"
-	_ "github.com/containerd/containerd/v2/snapshots/lcow"
+	_ "github.com/containerd/containerd/v2/plugins/snapshots/lcow"
 	_ "github.com/containerd/containerd/v2/snapshots/windows"
 )
