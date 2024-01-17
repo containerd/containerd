@@ -35,8 +35,8 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/internal/randutil"
+	"github.com/containerd/containerd/v2/internal/testutil"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
-	"github.com/containerd/containerd/v2/pkg/testutil"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
