@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
-	"github.com/containerd/containerd/v2/snapshots"
 	bolt "go.etcd.io/bbolt"
 )
 
