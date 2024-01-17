@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/pkg/cri/util"

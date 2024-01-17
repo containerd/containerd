@@ -30,10 +30,10 @@ import (
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	apitasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
-	containerdio "github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
+	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
