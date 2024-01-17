@@ -26,7 +26,7 @@ import (
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
 	"github.com/containerd/containerd/v2/archive"
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/mount"

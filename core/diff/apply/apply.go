@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
