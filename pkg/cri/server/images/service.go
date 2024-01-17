@@ -21,7 +21,7 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/images"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"

@@ -20,7 +20,7 @@ import (
 	"context"
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/plugins"

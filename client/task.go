@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/api/services/tasks/v1"
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/cio"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"

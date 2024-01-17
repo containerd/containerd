@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/remotes"
 	"github.com/containerd/log"

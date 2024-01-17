@@ -24,7 +24,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/archive/compression"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/log"
 )

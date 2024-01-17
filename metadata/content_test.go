@@ -25,8 +25,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/content/testsuite"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/content/testsuite"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/leases"

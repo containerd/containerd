@@ -50,7 +50,7 @@ import (
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
 	sbapi "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	ssapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
-	csproxy "github.com/containerd/containerd/v2/content/proxy"
+	csproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/diff"
 	diffproxy "github.com/containerd/containerd/v2/diff/proxy"

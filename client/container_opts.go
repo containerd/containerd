@@ -23,7 +23,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/namespaces"
