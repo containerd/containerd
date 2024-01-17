@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/app"
-	"github.com/containerd/containerd/v2/pkg/hasher"
+	"github.com/containerd/containerd/v2/internal/hasher"
 	"github.com/containerd/containerd/v2/pkg/seed" //nolint:staticcheck // Global math/rand seed is deprecated, but still used by external dependencies
 	"github.com/urfave/cli"
 )
