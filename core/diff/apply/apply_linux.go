@@ -23,9 +23,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/containerd/containerd/v2/archive"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/userns"
 
 	"golang.org/x/sys/unix"
