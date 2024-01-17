@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/opencontainers/image-spec/identity"

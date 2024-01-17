@@ -21,7 +21,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/platforms"
 )

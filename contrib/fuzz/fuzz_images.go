@@ -20,7 +20,7 @@ import (
 	"os"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

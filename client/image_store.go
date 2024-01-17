@@ -20,8 +20,8 @@ import (
 	"context"
 
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/protobuf"

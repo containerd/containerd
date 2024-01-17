@@ -30,7 +30,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 )
 

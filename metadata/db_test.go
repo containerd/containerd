@@ -31,9 +31,9 @@ import (
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/gc"
-	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"

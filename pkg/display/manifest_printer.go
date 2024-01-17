@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

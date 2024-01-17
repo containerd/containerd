@@ -23,7 +23,7 @@ import (
 	"os"
 
 	"github.com/containerd/containerd/v2/archive/compression"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

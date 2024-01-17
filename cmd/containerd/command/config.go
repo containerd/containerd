@@ -21,8 +21,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/services/server"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
