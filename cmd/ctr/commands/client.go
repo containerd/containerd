@@ -22,8 +22,11 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/epoch"
+	"github.com/containerd/containerd/v2/tracing"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
 )
 
 // AppContext returns the context for a command. Should only be called once per
@@ -55,12 +58,25 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 
 // NewClient returns a new containerd client
 func NewClient(context *cli.Context, opts ...containerd.Opt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
+	dialOpts := containerd.DefaultDialOptions()
+	if context.GlobalString("trace") != "" {
+		dialOpts = append(dialOpts,
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
+		)
+	}
+
 	timeoutOpt := containerd.WithTimeout(context.GlobalDuration("connect-timeout"))
-	opts = append(opts, timeoutOpt)
+	opts = append(opts, timeoutOpt, containerd.WithDialOpts(dialOpts))
 	client, err := containerd.New(context.GlobalString("address"), opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	ctx, cancel := AppContext(context)
+	ctx, appCancel := AppContext(context)
+	ctx, span := tracing.StartSpan(ctx, context.App.Name+" "+context.Command.Name)
+	cancel := func() {
+		span.End()
+		appCancel()
+	}
 	return client, ctx, cancel, nil
 }

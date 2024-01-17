@@ -17,11 +17,14 @@
 package app
 
 import (
+	gocontext "context"
 	"fmt"
 	"io"
 
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/containers"
@@ -110,6 +113,10 @@ containerd CLI
 			Value:  namespaces.Default,
 			EnvVar: namespaces.NamespaceEnvVar,
 		},
+		cli.StringFlag{
+			Name:  "trace",
+			Usage: "OpenTelemetry endpoint to use",
+		},
 	}
 	app.Commands = append([]cli.Command{
 		plugins.Command,
@@ -130,11 +137,31 @@ containerd CLI
 		info.Command,
 		deprecations.Command,
 	}, extraCmds...)
+	var traceProvider *trace.TracerProvider
 	app.Before = func(context *cli.Context) error {
 		if context.GlobalBool("debug") {
 			return log.SetLevel("debug")
 		}
+
+		traceEndpoint := context.GlobalString("trace")
+		if traceEndpoint == "" {
+			return nil
+		}
+
+		ctx := gocontext.Background()
+		tp, err := newTraceProvider(ctx, traceEndpoint)
+		if err != nil {
+			return err
+		}
+		otel.SetTracerProvider(tp)
 		return nil
+	}
+	app.After = func(cctx *cli.Context) error {
+		if traceProvider == nil {
+			return nil
+		}
+
+		return traceProvider.Shutdown(gocontext.Background())
 	}
 	return app
 }
