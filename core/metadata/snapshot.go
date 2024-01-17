@@ -25,10 +25,10 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/labels"
-	"github.com/containerd/containerd/v2/metadata/boltutil"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/snapshots"
