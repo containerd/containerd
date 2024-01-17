@@ -32,12 +32,10 @@ import (
 )
 
 func TestExchangeBasic(t *testing.T) {
-	ctx := namespaces.WithNamespace(context.Background(), t.Name())
-	testevents := []events.Event{
-		&eventstypes.ContainerCreate{ID: "asdf"},
-		&eventstypes.ContainerCreate{ID: "qwer"},
-		&eventstypes.ContainerCreate{ID: "zxcv"},
-	}
+	ctxa := namespaces.WithNamespace(context.Background(), t.Name()+"-a")
+	ctxb := namespaces.WithNamespace(context.Background(), t.Name()+"-b")
+	// ctxc without a namespace
+	ctxc := context.Background()
 	exchange := NewExchange()
 
 	t.Log("subscribe")
@@ -45,18 +43,38 @@ func TestExchangeBasic(t *testing.T) {
 
 	// Create two subscribers for same set of events and make sure they
 	// traverse the exchange.
-	ctx1, cancel1 := context.WithCancel(ctx)
+	ctx1, cancel1 := context.WithCancel(ctxa)
 	eventq1, errq1 := exchange.Subscribe(ctx1)
 
-	ctx2, cancel2 := context.WithCancel(ctx)
+	ctx2, cancel2 := context.WithCancel(ctxa)
 	eventq2, errq2 := exchange.Subscribe(ctx2)
+
+	ctx3, cancel3 := context.WithCancel(ctxb)
+	eventq3, errq3 := exchange.Subscribe(ctx3)
+
+	// eventq4 should receive all events.
+	ctx4, cancel4 := context.WithCancel(ctxc)
+	eventq4, errq4 := exchange.Subscribe(ctx4)
 
 	t.Log("publish")
 	errChan := make(chan error)
+	aevents := []events.Event{
+		&eventstypes.ContainerCreate{ID: "asdf"},
+		&eventstypes.ContainerCreate{ID: "qwer"},
+	}
+	bevents := []events.Event{
+		&eventstypes.ContainerCreate{ID: "zxcv"},
+	}
 	go func() {
 		defer close(errChan)
-		for _, event := range testevents {
-			if err := exchange.Publish(ctx, "/test", event); err != nil {
+		for _, event := range aevents {
+			if err := exchange.Publish(ctxa, "/test", event); err != nil {
+				errChan <- err
+				return
+			}
+		}
+		for _, event := range bevents {
+			if err := exchange.Publish(ctxb, "/test", event); err != nil {
 				errChan <- err
 				return
 			}
@@ -74,16 +92,31 @@ func TestExchangeBasic(t *testing.T) {
 		eventq <-chan *events.Envelope
 		errq   <-chan error
 		cancel func()
+		want   []events.Event
 	}{
 		{
 			eventq: eventq1,
 			errq:   errq1,
 			cancel: cancel1,
+			want:   aevents,
 		},
 		{
 			eventq: eventq2,
 			errq:   errq2,
 			cancel: cancel2,
+			want:   aevents,
+		},
+		{
+			eventq: eventq3,
+			errq:   errq3,
+			cancel: cancel3,
+			want:   bevents,
+		},
+		{
+			eventq: eventq4,
+			errq:   errq4,
+			cancel: cancel4,
+			want:   append(aevents, bevents...),
 		},
 	} {
 		var received []events.Event
@@ -103,7 +136,7 @@ func TestExchangeBasic(t *testing.T) {
 				break subscribercheck
 			}
 
-			if cmp.Equal(received, testevents, protobuf.Compare) {
+			if cmp.Equal(received, subscriber.want, protobuf.Compare) {
 				// when we do this, we expect the errs channel to be closed and
 				// this will return.
 				subscriber.cancel()
