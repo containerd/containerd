@@ -21,8 +21,8 @@ import (
 
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/protobuf"

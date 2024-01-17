@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	google_protobuf "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/fifo"

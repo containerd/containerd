@@ -34,8 +34,8 @@ import (
 
 	winfs "github.com/Microsoft/go-winio/pkg/fs"
 	"github.com/Microsoft/hcsshim/pkg/go-runhcs"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/storage"

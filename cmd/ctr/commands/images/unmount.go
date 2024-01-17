@@ -21,8 +21,8 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/urfave/cli"
 )
 

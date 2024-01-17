@@ -27,10 +27,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/errdefs"
 	_ "github.com/containerd/containerd/v2/metrics" // import containerd build info
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/services/server"
 	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/containerd/v2/sys"

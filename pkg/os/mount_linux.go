@@ -17,7 +17,7 @@
 package os
 
 import (
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"golang.org/x/sys/unix"
 )
 

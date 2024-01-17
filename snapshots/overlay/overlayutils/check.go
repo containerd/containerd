@@ -27,7 +27,7 @@ import (
 	"golang.org/x/sys/unix"
 
 	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"

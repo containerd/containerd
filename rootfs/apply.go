@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
