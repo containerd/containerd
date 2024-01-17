@@ -25,7 +25,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/contrib/seccomp"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

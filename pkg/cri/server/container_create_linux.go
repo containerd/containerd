@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/contrib/apparmor"
 	"github.com/containerd/containerd/v2/contrib/seccomp"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/oci"
 
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 )

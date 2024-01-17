@@ -24,11 +24,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 func FuzzCRIServer(data []byte) int {

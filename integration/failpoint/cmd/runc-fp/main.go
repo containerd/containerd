@@ -25,7 +25,7 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/sirupsen/logrus"
 )
 

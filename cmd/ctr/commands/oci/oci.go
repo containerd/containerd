@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/platforms"
 )
 

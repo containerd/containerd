@@ -25,7 +25,7 @@ import (
 
 	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
