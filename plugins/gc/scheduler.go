@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/gc"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
