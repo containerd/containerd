@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 type deferredPipeConnection struct {

@@ -22,7 +22,7 @@ import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func fuzzContext() (context.Context, context.CancelFunc) {

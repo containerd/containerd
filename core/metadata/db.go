@@ -29,10 +29,10 @@ import (
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/cleanup"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/gc"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
 )

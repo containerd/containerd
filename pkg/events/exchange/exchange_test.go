@@ -23,9 +23,9 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"

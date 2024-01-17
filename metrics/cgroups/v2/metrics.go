@@ -26,7 +26,7 @@ import (
 	cmetrics "github.com/containerd/containerd/v2/metrics"
 	"github.com/containerd/containerd/v2/metrics/cgroups/common"
 	v2 "github.com/containerd/containerd/v2/metrics/types/v2"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
