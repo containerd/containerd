@@ -35,8 +35,8 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper"
 	"github.com/containerd/containerd/v2/plugins/snapshots/native"
+	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
 	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/containerd/v2/snapshots/overlay"
 	"github.com/containerd/log"
 )
 
