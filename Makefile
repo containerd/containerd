@@ -28,8 +28,21 @@ BINDIR        ?= $(PREFIX)/bin
 DATADIR       ?= $(PREFIX)/share
 DOCDIR        ?= $(DATADIR)/doc
 MANDIR        ?= $(DATADIR)/man
+SYSCONFDIR    ?= /etc
+LOCALSTATEDIR ?= /var
+RUNSTATEDIR   ?= /run
 
 TEST_IMAGE_LIST ?=
+
+# buid-time customization of unix default settings (defaults_unix.go)
+# the variable names have been chosen according to the const names in the go code
+CONFIG_DEFAULT_ROOT_DIR         ?= $(LOCALSTATEDIR)/lib/containerd
+CONFIG_DEFAULT_STATE_DIR        ?= $(RUNSTATEDIR)/containerd
+CONFIG_DEFAULT_ADDRESS          ?= $(CONFIG_DEFAULT_STATE_DIR)/containerd.sock
+CONFIG_DEFAULT_DEBUG_ADDRESS    ?= $(CONFIG_DEFAULT_STATE_DIR)/debug.sock
+CONFIG_DEFAULT_FIFO_DIR         ?= $(CONFIG_DEFAULT_STATE_DIR)/fifo
+CONFIG_DEFAULT_RUNTIME          ?= io.containerd.runc.v2
+CONFIG_DEFAULT_CONFIG_DIR       ?= $(SYSCONFDIR)/containerd
 
 # Used to populate variables in version package.
 VERSION ?= $(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
@@ -98,13 +111,24 @@ ifneq ($(STATIC),)
 endif
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
 
-GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+GO_SYMS=-X $(PKG)/version.Version=$(VERSION) \
+        -X $(PKG)/version.Revision=$(REVISION) \
+        -X $(PKG)/version.Package=$(PACKAGE) \
+        -X $(PKG)/defaults.DefaultRootDir=$(CONFIG_DEFAULT_ROOT_DIR) \
+        -X $(PKG)/defaults.DefaultStateDir=$(CONFIG_DEFAULT_STATE_DIR) \
+        -X $(PKG)/defaults.DefaultAddress=$(CONFIG_DEFAULT_ADDRESS) \
+        -X $(PKG)/defaults.DefaultDebugAddress=$(CONFIG_DEFAULT_DEBUG_ADDRESS) \
+        -X $(PKG)/defaults.DefaultFIFODir=$(CONFIG_DEFAULT_FIFO_DIR) \
+        -X $(PKG)/defaults.DefaultRuntime=$(CONFIG_DEFAULT_RUNTIME) \
+        -X $(PKG)/defaults.DefaultConfigDir=$(CONFIG_DEFAULT_CONFIG_DIR)
+
+GO_LDFLAGS=-ldflags '$(GO_SYMS) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
 	GO_LDFLAGS += -extldflags "-static"
 endif
 GO_LDFLAGS+='
 
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
+SHIM_GO_LDFLAGS=-ldflags '$(GO_SYMS) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES=$(shell $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)

@@ -62,7 +62,7 @@ func AdjustOOMScore(pid int) error {
 	return nil
 }
 
-const socketRoot = defaults.DefaultStateDir
+var socketRoot = defaults.DefaultStateDir
 
 // SocketAddress returns a socket address
 func SocketAddress(ctx context.Context, socketPath, id string) (string, error) {
