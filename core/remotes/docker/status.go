@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/moby/locker"
 )
 

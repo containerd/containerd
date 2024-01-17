@@ -20,7 +20,7 @@ import (
 	"context"
 
 	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/typeurl/v2"

@@ -22,10 +22,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/identifiers"
 	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"

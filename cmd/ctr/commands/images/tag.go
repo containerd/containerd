@@ -22,7 +22,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
 	"github.com/distribution/reference"
 )

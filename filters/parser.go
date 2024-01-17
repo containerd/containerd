@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 )
 
 /*

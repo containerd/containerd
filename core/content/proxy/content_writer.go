@@ -23,7 +23,7 @@ import (
 
 	contentapi "github.com/containerd/containerd/v2/api/services/content/v1"
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
 	digest "github.com/opencontainers/go-digest"
 )

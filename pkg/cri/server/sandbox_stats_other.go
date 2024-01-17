@@ -22,8 +22,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/errdefs"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

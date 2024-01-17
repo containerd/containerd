@@ -22,7 +22,7 @@ import (
 
 	task "github.com/containerd/containerd/v2/api/runtime/task/v3"
 	tasktypes "github.com/containerd/containerd/v2/api/types/task"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/runtime"
 	"github.com/containerd/ttrpc"
