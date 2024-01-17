@@ -28,7 +28,6 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
 
-	"github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/tasks"
@@ -36,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	clabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
 )
 

@@ -24,7 +24,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

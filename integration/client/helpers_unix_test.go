@@ -22,9 +22,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/cio"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
