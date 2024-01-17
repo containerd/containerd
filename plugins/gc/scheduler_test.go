@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/gc"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/stretchr/testify/assert"
 )
 
