@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/plugin/registry"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
@@ -34,7 +35,6 @@ import (
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/sandbox"
 
 	"google.golang.org/grpc"
 

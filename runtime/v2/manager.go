@@ -28,6 +28,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events/exchange"
 	"github.com/containerd/containerd/v2/namespaces"
@@ -38,7 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/runtime"
 	shimbinary "github.com/containerd/containerd/v2/runtime/v2/shim"
-	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"

@@ -24,11 +24,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/identifiers"
 	"github.com/containerd/containerd/v2/namespaces"
-	api "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/typeurl/v2"
 	"go.etcd.io/bbolt"
 )

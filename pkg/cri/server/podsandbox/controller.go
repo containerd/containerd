@@ -28,6 +28,7 @@ import (
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
@@ -40,7 +41,6 @@ import (
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/sandbox"
 )
 
 func init() {

@@ -23,8 +23,8 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/filters"
-	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/containerd/v2/snapshots"
 )
 
