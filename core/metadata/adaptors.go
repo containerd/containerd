@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/filters"
-	"github.com/containerd/containerd/v2/snapshots"
 )
 
 func adaptImage(o interface{}) filters.Adaptor {

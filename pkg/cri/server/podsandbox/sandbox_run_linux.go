@@ -29,10 +29,10 @@ import (
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/pkg/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/userns"
-	"github.com/containerd/containerd/v2/snapshots"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,

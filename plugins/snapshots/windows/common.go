@@ -32,8 +32,8 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/containerd/v2/snapshots/storage"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )

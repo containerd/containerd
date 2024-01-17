@@ -31,9 +31,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/containerd/v2/snapshots/testsuite"
 	"github.com/containerd/continuity/testutil/loopback"
 	"github.com/containerd/plugin"
 	"golang.org/x/sys/unix"

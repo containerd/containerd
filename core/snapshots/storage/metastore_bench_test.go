@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots"
 )
 
 // Benchmarks returns a benchmark suite using the provided metadata store

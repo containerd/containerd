@@ -29,8 +29,8 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 )
 
