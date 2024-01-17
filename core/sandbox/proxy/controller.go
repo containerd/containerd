@@ -22,9 +22,9 @@ import (
 	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/sandbox"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

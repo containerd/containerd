@@ -26,11 +26,11 @@ import (
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"

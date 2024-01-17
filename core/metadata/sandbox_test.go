@@ -19,9 +19,9 @@ package metadata
 import (
 	"testing"
 
+	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	api "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 )

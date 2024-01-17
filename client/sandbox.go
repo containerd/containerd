@@ -23,10 +23,10 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
+	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	api "github.com/containerd/containerd/v2/sandbox"
 	"github.com/containerd/typeurl/v2"
 )
 
