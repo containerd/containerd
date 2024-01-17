@@ -26,12 +26,12 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/content/local"
 	"github.com/containerd/containerd/v2/content/testsuite"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"

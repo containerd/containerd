@@ -31,12 +31,12 @@ import (
 
 	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/content/local"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/gc"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/native"
