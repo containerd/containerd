@@ -19,10 +19,10 @@ package plugin
 import (
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/diff/apply"
-	"github.com/containerd/containerd/v2/diff/walking"
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/diff/walking"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 )
