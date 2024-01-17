@@ -25,10 +25,10 @@ import (
 
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	api "github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/identifiers"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/typeurl/v2"
 	"go.etcd.io/bbolt"
 )
