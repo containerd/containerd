@@ -34,10 +34,10 @@ import (
 
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/errdefs"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/platforms"

@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/sandbox"

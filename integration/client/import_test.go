@@ -38,7 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
-	"github.com/containerd/containerd/v2/leases"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/transfer"

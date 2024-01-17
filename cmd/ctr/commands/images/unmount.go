@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/urfave/cli"
 )
