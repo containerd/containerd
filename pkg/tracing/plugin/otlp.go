@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/tracing"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/sirupsen/logrus"
