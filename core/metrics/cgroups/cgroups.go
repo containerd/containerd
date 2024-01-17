@@ -20,8 +20,8 @@ package cgroups
 
 import (
 	"github.com/containerd/cgroups/v3"
-	v1 "github.com/containerd/containerd/v2/metrics/cgroups/v1"
-	v2 "github.com/containerd/containerd/v2/metrics/cgroups/v2"
+	v1 "github.com/containerd/containerd/v2/core/metrics/cgroups/v1"
+	v2 "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
