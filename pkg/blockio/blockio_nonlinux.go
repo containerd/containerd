@@ -24,7 +24,7 @@ import runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 func IsEnabled() bool { return false }
 
 // SetConfig always is no-op in non-linux platforms.
-func SetConfig(configFilePath string) error {
+func SetConfig(configFilePath string, alwaysReconfigure bool) error {
 	return nil
 }
 

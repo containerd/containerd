@@ -29,8 +29,9 @@ import (
 )
 
 var (
-	enabled   bool
-	enabledMu sync.RWMutex
+	enabled          bool
+	enabledMu        sync.RWMutex
+	reconfigFilePath string
 )
 
 // IsEnabled checks whether blockio is enabled.
@@ -42,7 +43,7 @@ func IsEnabled() bool {
 }
 
 // SetConfig updates blockio config with a given config path.
-func SetConfig(configFilePath string) error {
+func SetConfig(configFilePath string, alwaysReconfigure bool) error {
 	enabledMu.Lock()
 	defer enabledMu.Unlock()
 
@@ -56,12 +57,26 @@ func SetConfig(configFilePath string) error {
 		return fmt.Errorf("blockio not enabled: %w", err)
 	}
 	enabled = true
+	if alwaysReconfigure {
+		reconfigFilePath = configFilePath
+	} else {
+		reconfigFilePath = ""
+	}
 	return nil
 }
 
 // ClassNameToLinuxOCI converts blockio class name into the LinuxBlockIO
 // structure in the OCI runtime spec.
 func ClassNameToLinuxOCI(className string) (*runtimespec.LinuxBlockIO, error) {
+	enabledMu.Lock()
+	defer enabledMu.Unlock()
+
+	if !enabled {
+		return nil, nil
+	}
+	if err := reconfigure(); err != nil {
+		return nil, err
+	}
 	return blockio.OciLinuxBlockIO(className)
 }
 
@@ -69,4 +84,20 @@ func ClassNameToLinuxOCI(className string) (*runtimespec.LinuxBlockIO, error) {
 // container and returns its blockio class.
 func ContainerClassFromAnnotations(containerName string, containerAnnotations, podAnnotations map[string]string) (string, error) {
 	return blockio.ContainerClassFromAnnotations(containerName, containerAnnotations, podAnnotations)
+}
+
+// reconfigure re-reads and applies blockio configuration. This can
+// result in new blockio parameters even if the configuration file
+// contents have not changed: applying triggers rescanning block
+// devices in the system and rematching devices to wildcards in the
+// configuration.
+func reconfigure() error {
+	if reconfigFilePath == "" {
+		return nil
+	}
+	err := blockio.SetConfigFromFile(reconfigFilePath, true)
+	if err != nil {
+		log.L.Error("blockio reconfiguration error: %w", err)
+	}
+	return err
 }
