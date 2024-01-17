@@ -85,23 +85,26 @@ func TestMergeConfigs(t *testing.T) {
 func TestResolveImports(t *testing.T) {
 	tempDir := t.TempDir()
 
-	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml"} {
-		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0o600)
+	for _, filename := range []string{"config_1.toml", "config_2.toml", "test.toml", "config-1.toml", "config-2.toml"} {
+		err := os.WriteFile(filepath.Join(tempDir, filename), []byte(""), 0600)
 		assert.NoError(t, err)
 	}
 
 	imports, err := resolveImports(filepath.Join(tempDir, "root.toml"), []string{
 		filepath.Join(tempDir, "config_*.toml"), // Glob
 		filepath.Join(tempDir, "./test.toml"),   // Path clean up
-		"current.toml",                          // Resolve current working dir
+		"current.toml",                          // Resolve parent configuration file directory
+		"config-*.toml",                         // Glob non-absolute path
 	})
 	assert.NoError(t, err)
 
-	assert.Equal(t, imports, []string{
+	assert.ElementsMatch(t, imports, []string{
 		filepath.Join(tempDir, "config_1.toml"),
 		filepath.Join(tempDir, "config_2.toml"),
 		filepath.Join(tempDir, "test.toml"),
 		filepath.Join(tempDir, "current.toml"),
+		filepath.Join(tempDir, "config-1.toml"),
+		filepath.Join(tempDir, "config-2.toml"),
 	})
 }
 
