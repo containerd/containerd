@@ -18,6 +18,7 @@ package fuzz
 
 import (
 	// base containerd imports
+	_ "github.com/containerd/containerd/v2/core/runtime/v2"
 	_ "github.com/containerd/containerd/v2/pkg/cri"
 	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/pkg/nri/plugin"
@@ -47,5 +48,4 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/services/version"
 	_ "github.com/containerd/containerd/v2/plugins/streaming"
 	_ "github.com/containerd/containerd/v2/plugins/transfer"
-	_ "github.com/containerd/containerd/v2/runtime/v2"
 )

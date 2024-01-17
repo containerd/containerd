@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/manager"
 	_ "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/pause"
 	_ "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task/plugin"
-	"github.com/containerd/containerd/v2/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 )
 
 func main() {

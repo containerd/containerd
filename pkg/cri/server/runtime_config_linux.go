@@ -20,9 +20,9 @@ import (
 	"context"
 	"sort"
 
+	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/systemd"
-	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

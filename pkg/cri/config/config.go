@@ -28,11 +28,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
+	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/plugins"
-	runcoptions "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 )
 
 const (
