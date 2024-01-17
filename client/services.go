@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	srv "github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/containerd/v2/plugins/services/introspection"

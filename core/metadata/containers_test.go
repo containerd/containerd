@@ -26,9 +26,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/log/logtest"

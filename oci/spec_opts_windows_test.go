@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
