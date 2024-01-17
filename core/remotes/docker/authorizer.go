@@ -25,9 +25,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/remotes/docker/auth"
-	remoteerrors "github.com/containerd/containerd/v2/remotes/errors"
 	"github.com/containerd/log"
 )
 
