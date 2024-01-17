@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 const (

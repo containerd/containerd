@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	"github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 )
 

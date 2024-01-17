@@ -27,7 +27,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 // TODO: Support multiple mappings in future

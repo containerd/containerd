@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	_ "github.com/containerd/containerd/v2/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/pkg/errdefs"
-	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
