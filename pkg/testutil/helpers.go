@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -23,7 +23,7 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/v2/archive"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader, _sync bool) error {

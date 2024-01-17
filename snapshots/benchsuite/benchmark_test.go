@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/devmapper"
 	"github.com/containerd/containerd/v2/snapshots/native"

@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/contrib/apparmor"
 	"github.com/containerd/containerd/v2/contrib/seccomp"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"

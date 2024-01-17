@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/continuity/fs"

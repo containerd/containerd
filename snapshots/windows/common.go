@@ -31,7 +31,7 @@ import (
 	"strings"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/containerd/v2/snapshots/storage"
 	"github.com/containerd/continuity/fs"

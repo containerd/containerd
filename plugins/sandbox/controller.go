@@ -23,10 +23,10 @@ import (
 
 	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/runtime"

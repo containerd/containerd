@@ -20,7 +20,7 @@ import (
 	"os"
 	"sync"
 
-	containerdmount "github.com/containerd/containerd/v2/mount"
+	containerdmount "github.com/containerd/containerd/v2/core/mount"
 
 	osInterface "github.com/containerd/containerd/v2/pkg/os"
 )
