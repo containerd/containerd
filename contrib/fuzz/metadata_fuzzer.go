@@ -33,8 +33,8 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/containerd/v2/snapshots"
-	"github.com/containerd/containerd/v2/snapshots/native"
 )
 
 func testEnv() (context.Context, *bolt.DB, func(), error) {

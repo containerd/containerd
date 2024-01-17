@@ -21,7 +21,7 @@ import (
 
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/snapshots/native"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 )
