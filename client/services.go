@@ -32,8 +32,8 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
-	srv "github.com/containerd/containerd/v2/services"
-	"github.com/containerd/containerd/v2/services/introspection"
+	srv "github.com/containerd/containerd/v2/plugins/services"
+	"github.com/containerd/containerd/v2/plugins/services/introspection"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/plugin"
 )

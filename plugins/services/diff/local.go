@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/services"
+	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"

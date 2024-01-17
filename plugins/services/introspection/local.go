@@ -35,10 +35,10 @@ import (
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/containerd/v2/services"
-	"github.com/containerd/containerd/v2/services/warning"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 )

@@ -22,8 +22,8 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/containers/v1"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
