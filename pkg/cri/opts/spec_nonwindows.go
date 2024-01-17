@@ -21,7 +21,7 @@ package opts
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"

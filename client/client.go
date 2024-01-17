@@ -39,7 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/v2/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/defaults"

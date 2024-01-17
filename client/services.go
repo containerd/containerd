@@ -25,7 +25,7 @@ import (
 	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	namespacesapi "github.com/containerd/containerd/v2/api/services/namespaces/v1"
 	"github.com/containerd/containerd/v2/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/leases"

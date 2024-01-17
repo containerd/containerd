@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	tasktypes "github.com/containerd/containerd/v2/api/types/task"
 	"github.com/containerd/containerd/v2/cio"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/oci"

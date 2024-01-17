@@ -22,7 +22,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

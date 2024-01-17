@@ -19,7 +19,7 @@ package oci
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cap"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )

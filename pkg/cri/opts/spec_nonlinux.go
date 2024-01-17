@@ -21,7 +21,7 @@ package opts
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/oci"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
