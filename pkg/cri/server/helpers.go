@@ -33,11 +33,11 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	clabels "github.com/containerd/containerd/v2/labels"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/log"
 )
 

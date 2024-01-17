@@ -24,9 +24,9 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/converter"
-	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/labels"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
