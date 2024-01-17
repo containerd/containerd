@@ -23,8 +23,8 @@ import (
 
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/snapshots/overlay"
-	"github.com/containerd/containerd/v2/snapshots/overlay/overlayutils"
+	"github.com/containerd/containerd/v2/plugins/snapshots/overlay"
+	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 )
