@@ -17,7 +17,7 @@
 package snapshots
 
 import (
-	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/services"
 	"github.com/containerd/plugin"
