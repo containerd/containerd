@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/reference"
 	"github.com/containerd/log"

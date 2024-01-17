@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/archive"
 	"github.com/containerd/containerd/v2/archive/compression"
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 )
 
 // Install a binary image into the opt service.

@@ -25,7 +25,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
