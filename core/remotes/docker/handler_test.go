@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/labels"
-	"github.com/containerd/containerd/v2/reference"
+	"github.com/containerd/containerd/v2/pkg/reference"
 )
 
 func TestAppendDistributionLabel(t *testing.T) {
