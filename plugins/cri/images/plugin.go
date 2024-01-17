@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/events"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
@@ -29,7 +30,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"

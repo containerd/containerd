@@ -30,12 +30,12 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/oci"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/containerd/v2/services/warning"
 )
 
