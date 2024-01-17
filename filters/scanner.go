@@ -138,6 +138,10 @@ chomp:
 		return pos, tokenValue, s.input[pos:s.ppos]
 	case isFieldRune(ch):
 		s.scanField()
+		if ch == '-' || isDigitRune(ch) { // illegal token if it starts with '-' or any digit
+			s.error("illegal token field")
+			return pos, tokenIllegal, s.input[pos:s.ppos]
+		}
 		return pos, tokenField, s.input[pos:s.ppos]
 	}
 
@@ -249,7 +253,7 @@ func digitVal(ch rune) int {
 }
 
 func isFieldRune(r rune) bool {
-	return (r == '_' || isAlphaRune(r) || isDigitRune(r))
+	return (r == '-' || r == '_' || isAlphaRune(r) || isDigitRune(r))
 }
 
 func isAlphaRune(r rune) bool {
