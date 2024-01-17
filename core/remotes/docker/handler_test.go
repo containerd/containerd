@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/reference"
 )
 
