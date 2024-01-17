@@ -18,6 +18,7 @@ package filters
 
 import (
 	"errors"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -160,82 +161,57 @@ func unquoteChar(s string, quote byte) (value rune, multibyte bool, tail string,
 // This is modified from the standard library to support `|` and `/` as quote
 // characters for use with regular expressions.
 func unquote(s string) (string, error) {
-	n := len(s)
-	if n < 2 {
+	if n := len(s); n < 2 || s[0] != s[n-1] {
 		return "", errQuoteSyntax
 	}
+
 	quote := s[0]
-	if quote != s[n-1] {
-		return "", errQuoteSyntax
-	}
-	s = s[1 : n-1]
+	s = s[1 : len(s)-1]
 
-	if quote == '`' {
-		if contains(s, '`') {
+	switch quote {
+	case '`':
+		if strings.IndexByte(s, '`') != -1 {
 			return "", errQuoteSyntax
 		}
-		if contains(s, '\r') {
-			// -1 because we know there is at least one \r to remove.
-			buf := make([]byte, 0, len(s)-1)
-			for i := 0; i < len(s); i++ {
-				if s[i] != '\r' {
-					buf = append(buf, s[i])
-				}
-			}
-			return string(buf), nil
-		}
-		return s, nil
-	}
-	if quote != '"' && quote != '\'' && quote != '|' && quote != '/' {
-		return "", errQuoteSyntax
-	}
-	if contains(s, '\n') {
-		return "", errQuoteSyntax
-	}
 
-	// Is it trivial?  Avoid allocation.
-	if !contains(s, '\\') && !contains(s, quote) {
-		switch quote {
-		case '"', '/', '|': // pipe and slash are treated like double quote
+		return strings.Replace(s, "\r", "", -1), nil
+
+	case '"', '/', '|': // pipe and slash are treated like double quote
+		if strings.IndexByte(s, '\n') != -1 {
+			return "", errQuoteSyntax
+		}
+
+		var runeTmp [utf8.UTFMax]byte
+		buf := make([]byte, 0, 3*len(s)/2) // Try to avoid more allocations.
+		for len(s) > 0 {
+			c, multibyte, ss, err := unquoteChar(s, quote)
+			if err != nil {
+				return "", err
+			}
+			s = ss
+
+			if c < utf8.RuneSelf || !multibyte {
+				buf = append(buf, byte(c))
+				continue
+			}
+
+			if utf8.ValidRune(c) {
+				n := utf8.EncodeRune(runeTmp[:], c)
+				buf = append(buf, runeTmp[:n]...)
+			}
+		}
+		return string(buf), nil
+
+	case '\'':
+		r, size := utf8.DecodeRuneInString(s)
+		if len(s) == size && (r != utf8.RuneError || size != 1) {
 			return s, nil
-		case '\'':
-			r, size := utf8.DecodeRuneInString(s)
-			if size == len(s) && (r != utf8.RuneError || size != 1) {
-				return s, nil
-			}
 		}
-	}
+		return "", errQuoteSyntax
 
-	var runeTmp [utf8.UTFMax]byte
-	buf := make([]byte, 0, 3*len(s)/2) // Try to avoid more allocations.
-	for len(s) > 0 {
-		c, multibyte, ss, err := unquoteChar(s, quote)
-		if err != nil {
-			return "", err
-		}
-		s = ss
-		if c < utf8.RuneSelf || !multibyte {
-			buf = append(buf, byte(c))
-		} else {
-			n := utf8.EncodeRune(runeTmp[:], c)
-			buf = append(buf, runeTmp[:n]...)
-		}
-		if quote == '\'' && len(s) != 0 {
-			// single-quoted must be single character
-			return "", errQuoteSyntax
-		}
+	default:
+		return "", errQuoteSyntax
 	}
-	return string(buf), nil
-}
-
-// contains reports whether the string contains the byte c.
-func contains(s string, c byte) bool {
-	for i := 0; i < len(s); i++ {
-		if s[i] == c {
-			return true
-		}
-	}
-	return false
 }
 
 func unhex(b byte) (v rune, ok bool) {
