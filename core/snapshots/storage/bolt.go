@@ -27,8 +27,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/filters"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/filters"
 	bolt "go.etcd.io/bbolt"
 )
 
