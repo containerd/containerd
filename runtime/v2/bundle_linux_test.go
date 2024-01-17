@@ -26,8 +26,8 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"

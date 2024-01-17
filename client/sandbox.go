@@ -24,8 +24,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/containers"
 	api "github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/typeurl/v2"
 )

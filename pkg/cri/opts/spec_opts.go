@@ -30,8 +30,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/oci"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 // DefaultSandboxCPUshares is default cpu shares for sandbox container.
