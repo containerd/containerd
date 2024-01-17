@@ -365,6 +365,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				unavailableOnFail: false,
 			},
 			checkerFunc: func(writer *pushWriter) bool {
+				writer.Close()
 				select {
 				case resp := <-writer.respC:
 					// 201 should be the response code when uploading a new manifest
@@ -461,6 +462,7 @@ func Test_dockerPusher_push(t *testing.T) {
 				unavailableOnFail: false,
 			},
 			checkerFunc: func(writer *pushWriter) bool {
+				writer.Close()
 				select {
 				case resp := <-writer.respC:
 					// 201 should be the response code when uploading a new blob
