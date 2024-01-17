@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/leases"
 	"github.com/containerd/containerd/v2/metadata"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/pkg/transfer/local"
