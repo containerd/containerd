@@ -174,7 +174,7 @@ func (m *monitor) monitor(ctx context.Context) ([]change, error) {
 		switch desiredStatus {
 		case containerd.Running:
 			switch status.Status {
-			case containerd.Paused, containerd.Pausing:
+			case containerd.Paused, containerd.Pausing, containerd.Created:
 				continue
 			default:
 			}
