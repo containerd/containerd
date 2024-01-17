@@ -49,7 +49,7 @@ import (
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
-	"github.com/containerd/containerd/v2/tracing"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // For image management:

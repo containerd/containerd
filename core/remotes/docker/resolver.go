@@ -34,7 +34,7 @@ import (
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/reference"
-	"github.com/containerd/containerd/v2/tracing"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
