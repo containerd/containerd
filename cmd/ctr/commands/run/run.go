@@ -32,7 +32,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/tasks"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	clabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"

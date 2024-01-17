@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )

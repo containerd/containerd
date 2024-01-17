@@ -34,7 +34,7 @@ import (
 	apievents "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/cio"
 	. "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/namespaces"

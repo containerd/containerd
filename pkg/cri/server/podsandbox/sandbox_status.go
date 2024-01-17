@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"

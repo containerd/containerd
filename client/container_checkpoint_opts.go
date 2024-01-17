@@ -24,7 +24,7 @@ import (
 	"runtime"
 
 	tasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/diff"
 	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/platforms"

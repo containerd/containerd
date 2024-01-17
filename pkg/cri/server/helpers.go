@@ -32,7 +32,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	clabels "github.com/containerd/containerd/v2/labels"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"

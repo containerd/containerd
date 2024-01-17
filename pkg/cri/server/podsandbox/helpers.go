@@ -30,7 +30,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	clabels "github.com/containerd/containerd/v2/labels"
 	"github.com/containerd/containerd/v2/oci"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"

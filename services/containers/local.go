@@ -22,7 +22,7 @@ import (
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	api "github.com/containerd/containerd/v2/api/services/containers/v1"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/events"
 	"github.com/containerd/containerd/v2/metadata"

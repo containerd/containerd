@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/stretchr/testify/assert"
