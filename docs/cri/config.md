@@ -236,7 +236,13 @@ version = 2
   # enable_cdi enables support of the Container Device Interface (CDI)
   # For more details about CDI and the syntax of CDI Spec files please refer to
   # https://github.com/container-orchestrated-devices/container-device-interface.
-  enable_cdi = false
+  # TODO: Deprecate this option when either Dynamic Resource Allocation(DRA)
+  # or CDI support for the Device Plugins are graduated to GA.
+  # `Dynamic Resource Allocation` KEP:
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3063-dynamic-resource-allocation
+  # `Add CDI devices to device plugin API` KEP:
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4009-add-cdi-devices-to-device-plugin-api
+  enable_cdi = true
 
   # cdi_spec_dirs is the list of directories to scan for CDI spec files
   # For more details about CDI configuration please refer to
