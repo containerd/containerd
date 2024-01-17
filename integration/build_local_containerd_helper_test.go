@@ -36,10 +36,10 @@ import (
 
 	_ "github.com/containerd/containerd/v2/events/plugin"
 	_ "github.com/containerd/containerd/v2/gc/scheduler"
-	_ "github.com/containerd/containerd/v2/metadata/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
+	_ "github.com/containerd/containerd/v2/plugins/metadata"
 	_ "github.com/containerd/containerd/v2/runtime/v2"
 	_ "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/v2/services/containers"
