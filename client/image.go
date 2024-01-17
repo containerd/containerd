@@ -335,7 +335,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
 		if err != nil {
-			return err
+			return fmt.Errorf("apply layer error for %q: %w", i.Name(), err)
 		}
 
 		if unpacked {
