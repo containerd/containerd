@@ -29,7 +29,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/containerd/v2/snapshots/devmapper/dmsetup"
+	"github.com/containerd/containerd/v2/plugins/snapshots/devmapper/dmsetup"
 	"github.com/containerd/log"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
