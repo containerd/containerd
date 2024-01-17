@@ -33,7 +33,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/archive/tartest"
+	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"

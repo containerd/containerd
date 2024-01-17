@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/archive/compression"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 

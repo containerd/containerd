@@ -32,8 +32,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/archive/compression"
-	"github.com/containerd/containerd/v2/archive/tartest"
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -41,6 +39,8 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
+	"github.com/containerd/containerd/v2/pkg/archive/tartest"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"

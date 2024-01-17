@@ -32,12 +32,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/archive/compression"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/labels"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
