@@ -29,8 +29,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
-	"github.com/containerd/containerd/v2/pkg/tomlext"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
