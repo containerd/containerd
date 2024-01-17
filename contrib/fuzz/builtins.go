@@ -18,9 +18,9 @@ package fuzz
 
 import (
 	// base containerd imports
-	_ "github.com/containerd/containerd/v2/events/plugin"
 	_ "github.com/containerd/containerd/v2/gc/scheduler"
 	_ "github.com/containerd/containerd/v2/pkg/cri"
+	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/pkg/nri/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
