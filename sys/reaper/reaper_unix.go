@@ -71,10 +71,7 @@ func Reap() error {
 			Status:    e.Status,
 		})
 
-		select {
-		case <-done:
-		case <-time.After(1 * time.Second):
-		}
+		<-done
 	}
 	return err
 }
