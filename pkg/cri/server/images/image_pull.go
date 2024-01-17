@@ -40,7 +40,7 @@ import (
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/errdefs"
 	containerdimages "github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"

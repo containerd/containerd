@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/diff"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/pkg/cleanup"
 	"github.com/containerd/containerd/v2/snapshots"
