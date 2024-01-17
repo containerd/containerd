@@ -34,6 +34,8 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/opencontainers/go-digest"
 
+	_ "github.com/containerd/containerd/v2/core/runtime/v2"
+	_ "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
@@ -51,8 +53,6 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/services/snapshots"
 	_ "github.com/containerd/containerd/v2/plugins/services/tasks"
 	_ "github.com/containerd/containerd/v2/plugins/services/version"
-	_ "github.com/containerd/containerd/v2/runtime/v2"
-	_ "github.com/containerd/containerd/v2/runtime/v2/runc/options"
 
 	"github.com/stretchr/testify/require"
 )

@@ -26,12 +26,12 @@ import (
 	gruntime "runtime"
 
 	"github.com/containerd/containerd/v2/api/runtime/task/v2"
+	"github.com/containerd/containerd/v2/core/runtime"
+	client "github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/protobuf/proto"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/containerd/v2/runtime"
-	client "github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/log"
 )
 
