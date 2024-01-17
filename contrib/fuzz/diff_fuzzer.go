@@ -22,9 +22,9 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/containerd/containerd/v2/diff/apply"
-	"github.com/containerd/containerd/v2/diff/walking"
 	"github.com/containerd/containerd/v2/mount"
 	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd/v2/plugins/diff/walking"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
