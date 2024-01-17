@@ -24,10 +24,10 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/remotes"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

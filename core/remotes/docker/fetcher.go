@@ -29,8 +29,8 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/remotes"
 	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
