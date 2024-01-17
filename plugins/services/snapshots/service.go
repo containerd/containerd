@@ -22,7 +22,7 @@ import (
 	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"

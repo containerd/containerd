@@ -22,9 +22,9 @@ import (
 	"time"
 
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/errdefs"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/log"
 )
 

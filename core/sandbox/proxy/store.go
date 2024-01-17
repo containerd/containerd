@@ -21,7 +21,7 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 )
 
 // remoteSandboxStore is a low-level containerd client to manage sandbox environments metadata

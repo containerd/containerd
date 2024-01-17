@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 )
 
 // TODO(dcantah): Implement metrics to be used for SandboxStats rpc.

@@ -21,7 +21,7 @@ import (
 	"os"
 
 	taskAPI "github.com/containerd/containerd/v2/api/runtime/task/v2"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/plugins"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"

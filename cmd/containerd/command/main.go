@@ -31,8 +31,8 @@ import (
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/errdefs"
 	_ "github.com/containerd/containerd/v2/metrics" // import containerd build info
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/sys"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
