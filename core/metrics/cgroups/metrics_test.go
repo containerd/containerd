@@ -26,11 +26,11 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/containerd/v2/metrics/cgroups/common"
-	v1 "github.com/containerd/containerd/v2/metrics/cgroups/v1"
-	v2 "github.com/containerd/containerd/v2/metrics/cgroups/v2"
-	v1types "github.com/containerd/containerd/v2/metrics/types/v1"
-	v2types "github.com/containerd/containerd/v2/metrics/types/v2"
+	"github.com/containerd/containerd/v2/core/metrics/cgroups/common"
+	v1 "github.com/containerd/containerd/v2/core/metrics/cgroups/v1"
+	v2 "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
+	v1types "github.com/containerd/containerd/v2/core/metrics/types/v1"
+	v2types "github.com/containerd/containerd/v2/core/metrics/types/v2"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/prometheus/client_golang/prometheus"
 

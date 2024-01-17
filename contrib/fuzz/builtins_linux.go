@@ -18,8 +18,8 @@ package fuzz
 
 import (
 	// Linux specific imports
-	_ "github.com/containerd/containerd/v2/metrics/cgroups"
-	_ "github.com/containerd/containerd/v2/metrics/cgroups/v2"
+	_ "github.com/containerd/containerd/v2/core/metrics/cgroups"
+	_ "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
 	_ "github.com/containerd/containerd/v2/plugins/snapshots/blockfile/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/snapshots/native/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/snapshots/overlay/plugin"

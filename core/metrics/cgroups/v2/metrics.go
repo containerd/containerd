@@ -16,17 +16,16 @@
    limitations under the License.
 */
 
-package v1
+package v2
 
 import (
 	"context"
 	"fmt"
 	"sync"
 
-	cgroups "github.com/containerd/cgroups/v3/cgroup1"
-	cmetrics "github.com/containerd/containerd/v2/metrics"
-	"github.com/containerd/containerd/v2/metrics/cgroups/common"
-	v1 "github.com/containerd/containerd/v2/metrics/types/v1"
+	cmetrics "github.com/containerd/containerd/v2/core/metrics"
+	"github.com/containerd/containerd/v2/core/metrics/cgroups/common"
+	v2 "github.com/containerd/containerd/v2/core/metrics/types/v2"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/log"
@@ -35,17 +34,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Trigger will be called when an event happens and provides the cgroup
-// where the event originated from
-type Trigger func(string, string, cgroups.Cgroup)
-
 // NewCollector registers the collector with the provided namespace and returns it so
 // that cgroups can be added for collection
 func NewCollector(ns *metrics.Namespace) *Collector {
 	if ns == nil {
 		return &Collector{}
 	}
-	// add machine cpus and memory info
 	c := &Collector{
 		ns:    ns,
 		tasks: make(map[string]entry),
@@ -53,8 +47,7 @@ func NewCollector(ns *metrics.Namespace) *Collector {
 	c.metrics = append(c.metrics, pidMetrics...)
 	c.metrics = append(c.metrics, cpuMetrics...)
 	c.metrics = append(c.metrics, memoryMetrics...)
-	c.metrics = append(c.metrics, hugetlbMetrics...)
-	c.metrics = append(c.metrics, blkioMetrics...)
+	c.metrics = append(c.metrics, ioMetrics...)
 	c.storedMetrics = make(chan prometheus.Metric, 100*len(c.metrics))
 	ns.Add(c)
 	return c
@@ -153,7 +146,7 @@ func (c *Collector) collect(entry entry, ch chan<- prometheus.Metric, block bool
 		log.L.WithError(err).Errorf("unmarshal stats for %s", t.ID())
 		return
 	}
-	s, ok := data.(*v1.Metrics)
+	s, ok := data.(*v2.Metrics)
 	if !ok {
 		log.L.WithError(err).Errorf("invalid metric type for %s", t.ID())
 		return
@@ -179,12 +172,10 @@ func (c *Collector) Add(t common.Statable, labels map[string]string) error {
 	if ok {
 		return nil // requests to collect metrics should be idempotent
 	}
-
 	entry := entry{task: t}
 	if labels != nil {
 		entry.ns = c.ns.WithConstLabels(labels)
 	}
-
 	c.mu.Lock()
 	c.tasks[id] = entry
 	c.mu.Unlock()
@@ -197,8 +188,8 @@ func (c *Collector) Remove(t common.Statable) {
 		return
 	}
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	delete(c.tasks, taskID(t.ID(), t.Namespace()))
-	c.mu.Unlock()
 }
 
 // RemoveAll statable items from the collector
