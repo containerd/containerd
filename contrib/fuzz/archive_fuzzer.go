@@ -25,9 +25,9 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
-	"github.com/containerd/containerd/v2/archive"
-	"github.com/containerd/containerd/v2/content/local"
-	imageArchive "github.com/containerd/containerd/v2/images/archive"
+	imageArchive "github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/pkg/archive"
+	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )

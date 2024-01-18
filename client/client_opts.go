@@ -19,10 +19,10 @@ package client
 import (
 	"time"
 
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/remotes"
-	"github.com/containerd/containerd/v2/snapshots"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/grpc"

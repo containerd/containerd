@@ -20,7 +20,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 	"github.com/containerd/log"
 )

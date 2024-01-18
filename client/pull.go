@@ -24,14 +24,14 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/pkg/unpack"
 	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/remotes"
-	"github.com/containerd/containerd/v2/remotes/docker"
-	"github.com/containerd/containerd/v2/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-	"github.com/containerd/containerd/v2/tracing"
 )
 
 const (

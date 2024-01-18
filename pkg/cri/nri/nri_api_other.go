@@ -22,7 +22,7 @@ import (
 	"context"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
+	"github.com/containerd/containerd/v2/core/containers"
 	cstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	"github.com/opencontainers/runtime-spec/specs-go"

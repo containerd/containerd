@@ -20,6 +20,6 @@ package fuzz
 
 import (
 	// Unix specific imports
-	_ "github.com/containerd/containerd/v2/snapshots/blockfile/plugin"
-	_ "github.com/containerd/containerd/v2/snapshots/native/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/snapshots/blockfile/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/snapshots/native/plugin"
 )

@@ -22,7 +22,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots"
 )
 
 const (

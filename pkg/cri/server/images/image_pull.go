@@ -40,16 +40,16 @@ import (
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/diff"
-	"github.com/containerd/containerd/v2/errdefs"
-	containerdimages "github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/diff"
+	containerdimages "github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
-	"github.com/containerd/containerd/v2/remotes/docker"
-	"github.com/containerd/containerd/v2/remotes/docker/config"
-	"github.com/containerd/containerd/v2/tracing"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 // For image management:

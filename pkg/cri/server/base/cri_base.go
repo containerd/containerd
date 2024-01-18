@@ -30,13 +30,13 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/containerd/containerd/v2/oci"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
-	srvconfig "github.com/containerd/containerd/v2/services/server/config"
-	"github.com/containerd/containerd/v2/services/warning"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 )
 
 // CRIBase contains common dependencies for CRI's runtime, image, and podsandbox services.

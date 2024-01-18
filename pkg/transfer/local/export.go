@@ -19,7 +19,7 @@ package local
 import (
 	"context"
 
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 )
 

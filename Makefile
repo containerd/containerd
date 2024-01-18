@@ -182,7 +182,7 @@ protos: bin/protoc-gen-go-fieldpath
 	find v2 -name '*.pb.go' -exec sh -c 'f={}; mkdir -p $$(dirname "$${f#v2/}"); echo mv $$f $${f#v2/}; mv $$f $${f#v2/}' \;
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR} v2
-	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ runtime/ -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ core/runtime/ -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"

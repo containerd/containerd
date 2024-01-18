@@ -23,8 +23,8 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/errdefs"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

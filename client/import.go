@@ -20,9 +20,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

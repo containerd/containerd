@@ -32,6 +32,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/cri/bandwidth"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
@@ -39,7 +40,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/pkg/netns"
-	sb "github.com/containerd/containerd/v2/sandbox"
 )
 
 func init() {

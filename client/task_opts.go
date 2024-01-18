@@ -23,10 +23,10 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 

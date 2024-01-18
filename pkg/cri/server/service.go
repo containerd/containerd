@@ -31,7 +31,8 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/internal/registrar"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox"
@@ -41,9 +42,8 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
-	"github.com/containerd/containerd/v2/pkg/registrar"
-	"github.com/containerd/containerd/v2/sandbox"
 )
 
 // defaultNetworkPlugin is used for the default CNI configuration

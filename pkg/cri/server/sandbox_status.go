@@ -24,9 +24,9 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.

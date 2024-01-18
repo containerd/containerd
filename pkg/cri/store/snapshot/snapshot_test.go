@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	snapshot "github.com/containerd/containerd/v2/snapshots"
+	snapshot "github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 
 	assertlib "github.com/stretchr/testify/assert"
 )

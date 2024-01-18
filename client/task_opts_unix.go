@@ -22,7 +22,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 )
 
 // WithNoNewKeyring causes tasks not to be created with a new keyring for secret storage.

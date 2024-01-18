@@ -23,8 +23,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/windows"

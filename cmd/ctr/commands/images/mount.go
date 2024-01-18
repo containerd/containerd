@@ -22,10 +22,10 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/leases"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/urfave/cli"

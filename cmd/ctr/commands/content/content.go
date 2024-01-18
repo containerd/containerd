@@ -28,9 +28,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/log"
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"

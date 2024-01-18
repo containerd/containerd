@@ -22,9 +22,9 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cri/store"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/sandbox"
 )
 
 type PodSandbox struct {

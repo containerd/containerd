@@ -33,13 +33,13 @@ import (
 	"go.opentelemetry.io/otel"
 
 	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/leases"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/pkg/testutil"
+	"github.com/containerd/containerd/v2/internal/testutil"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
 )

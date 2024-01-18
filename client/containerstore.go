@@ -22,8 +22,8 @@ import (
 	"io"
 
 	containersapi "github.com/containerd/containerd/v2/api/services/containers/v1"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/typeurl/v2"

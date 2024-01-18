@@ -19,9 +19,9 @@
 package podsandbox
 
 import (
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

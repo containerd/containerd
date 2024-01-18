@@ -24,8 +24,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	transferapi "github.com/containerd/containerd/v2/api/types/transfer"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
 	"github.com/containerd/log"

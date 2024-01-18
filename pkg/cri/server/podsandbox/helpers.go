@@ -30,13 +30,13 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	clabels "github.com/containerd/containerd/v2/labels"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/containers"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
+	clabels "github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 const (

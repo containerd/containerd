@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/log/logtest"
 )
 

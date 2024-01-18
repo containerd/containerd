@@ -29,10 +29,10 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/mount"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/seccomp"
 	"github.com/containerd/containerd/v2/pkg/seutil"
-	"github.com/containerd/containerd/v2/snapshots"
 	"github.com/containerd/log"
 
 	"github.com/moby/sys/mountinfo"

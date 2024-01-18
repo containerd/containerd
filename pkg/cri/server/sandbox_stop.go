@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/v2/errdefs"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 )
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the

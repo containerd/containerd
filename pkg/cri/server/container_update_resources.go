@@ -28,8 +28,8 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/log"
 
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"

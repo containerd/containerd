@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/oci"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
