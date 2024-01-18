@@ -25,6 +25,7 @@ import (
 	goruntime "runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/typeurl/v2"
@@ -78,6 +79,30 @@ const (
 	// resolvConfPath is the abs path of resolv.conf on host or container.
 	resolvConfPath = "/etc/resolv.conf"
 )
+
+var eq eventQueue
+
+type eventQueue struct {
+	items []runtime.ContainerEventResponse
+	lock  sync.Mutex
+}
+
+func (eq *eventQueue) enqueue(event runtime.ContainerEventResponse) {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	eq.items = append(eq.items, event)
+}
+
+func (eq *eventQueue) dequeue() runtime.ContainerEventResponse {
+	eq.lock.Lock()
+	defer eq.lock.Unlock()
+	if len(eq.items) == 0 {
+		return runtime.ContainerEventResponse{}
+	}
+	event := eq.items[0]
+	eq.items = eq.items[1:]
+	return event
+}
 
 // getSandboxRootDir returns the root directory for managing sandbox files,
 // e.g. hosts files.
@@ -394,14 +419,10 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 		PodSandboxStatus:   podSandboxStatus,
 		ContainersStatuses: containerStatuses,
 	}
-
-	// TODO(ruiwen-zhao): write events to a cache, storage, or increase the size of the channel
-	select {
-	case c.containerEventsChan <- event:
-	default:
-		containerEventsDroppedCount.Inc()
-		log.G(ctx).Debugf("containerEventsChan is full, discarding event %+v", event)
-	}
+	eq.enqueue(event)
+	go func() {
+		c.containerEventsChan <- eq.dequeue()
+	}()
 }
 
 func (c *criService) getPodSandboxStatus(ctx context.Context, podSandboxID string) (*runtime.PodSandboxStatus, error) {
