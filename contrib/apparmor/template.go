@@ -27,7 +27,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -54,14 +53,12 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   capability,
   file,
   umount,
-{{if ge .Version 208096}}
   # Host (privileged) processes may send signals to container processes.
   signal (receive) peer=unconfined,
   # Manager may send signals to container processes.
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
   signal (send,receive) peer={{.Name}},
-{{end}}
 
   deny @{PROC}/* w,   # deny write for all files directly in /proc (not in a subdir)
   # deny write to files not in /proc/<number>/** or /proc/sys/**
@@ -84,9 +81,9 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   deny /sys/devices/virtual/powercap/** rwklx,
   deny /sys/kernel/security/** rwklx,
 
-{{if ge .Version 208095}}
-  ptrace (trace,read) peer={{.Name}},
-{{end}}
+  # allow processes within the container to trace each other,
+  # provided all other LSM and yama setting allow it.
+  ptrace (trace,tracedby,read,readby) peer={{.Name}},
 }
 `
 
@@ -95,7 +92,6 @@ type data struct {
 	Imports       []string
 	InnerImports  []string
 	DaemonProfile string
-	Version       int
 }
 
 func cleanProfileName(profile string) string {
@@ -123,11 +119,6 @@ func loadData(name string) (*data, error) {
 	if macroExists("abstractions/base") {
 		p.InnerImports = append(p.InnerImports, "#include <abstractions/base>")
 	}
-	ver, err := getVersion()
-	if err != nil {
-		return nil, fmt.Errorf("get apparmor_parser version: %w", err)
-	}
-	p.Version = ver
 
 	// Figure out the daemon profile.
 	currentProfile, err := os.ReadFile("/proc/self/attr/current")
@@ -166,64 +157,6 @@ func macroExists(m string) bool {
 func aaParser(args ...string) (string, error) {
 	out, err := exec.Command("apparmor_parser", args...).CombinedOutput()
 	return string(out), err
-}
-
-func getVersion() (int, error) {
-	out, err := aaParser("--version")
-	if err != nil {
-		return -1, err
-	}
-	return parseVersion(out)
-}
-
-// parseVersion takes the output from `apparmor_parser --version` and returns
-// a representation of the {major, minor, patch} version as a single number of
-// the form MMmmPPP {major, minor, patch}.
-func parseVersion(output string) (int, error) {
-	// output is in the form of the following:
-	// AppArmor parser version 2.9.1
-	// Copyright (C) 1999-2008 Novell Inc.
-	// Copyright 2009-2012 Canonical Ltd.
-
-	lines := strings.SplitN(output, "\n", 2)
-	words := strings.Split(lines[0], " ")
-	version := words[len(words)-1]
-
-	// trim "-beta1" suffix from version="3.0.0-beta1" if exists
-	version = strings.SplitN(version, "-", 2)[0]
-	// also trim tilde
-	version = strings.SplitN(version, "~", 2)[0]
-
-	// split by major minor version
-	v := strings.Split(version, ".")
-	if len(v) == 0 || len(v) > 3 {
-		return -1, fmt.Errorf("parsing version failed for output: `%s`", output)
-	}
-
-	// Default the versions to 0.
-	var majorVersion, minorVersion, patchLevel int
-
-	majorVersion, err := strconv.Atoi(v[0])
-	if err != nil {
-		return -1, err
-	}
-
-	if len(v) > 1 {
-		minorVersion, err = strconv.Atoi(v[1])
-		if err != nil {
-			return -1, err
-		}
-	}
-	if len(v) > 2 {
-		patchLevel, err = strconv.Atoi(v[2])
-		if err != nil {
-			return -1, err
-		}
-	}
-
-	// major*10^5 + minor*10^3 + patch*10^0
-	numericVersion := majorVersion*1e5 + minorVersion*1e3 + patchLevel
-	return numericVersion, nil
 }
 
 func isLoaded(name string) (bool, error) {
