@@ -578,9 +578,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    # "Larger" runner is needed for nested virtualization
-    # https://github.com/organizations/containerd/settings/actions/runners
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
