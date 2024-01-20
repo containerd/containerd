@@ -30,10 +30,11 @@ import (
 
 func TestDefault(t *testing.T) {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
+	ubr := getHostWindowsUpdateBuildRevision()
 	expected := imagespec.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
-		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
+		OSVersion:    fmt.Sprintf("%d.%d.%d.%d", major, minor, build, ubr),
 		Variant:      cpuVariant(),
 	}
 	p := DefaultSpec()
@@ -77,6 +78,7 @@ func TestMatchComparerMatch_WCOW(t *testing.T) {
 	m := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: buildStr,
+		osUBR:           getHostWindowsUpdateBuildRevision(),
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
@@ -311,6 +313,7 @@ func TestMatchComparerLess(t *testing.T) {
 	m := windowsmatcher{
 		Platform:        DefaultSpec(),
 		osVersionPrefix: "10.0.17763",
+		osUBR:           1000,
 		defaultMatcher: &matcher{
 			Platform: Normalize(DefaultSpec()),
 		},
@@ -328,12 +331,17 @@ func TestMatchComparerLess(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.1",
+			OSVersion:    "10.0.17763.999",
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.2",
+			OSVersion:    "10.0.17763.1001",
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.17763.1000",
 		},
 		{
 			Architecture: "amd64",
@@ -345,12 +353,17 @@ func TestMatchComparerLess(t *testing.T) {
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.2",
+			OSVersion:    "10.0.17763.1000", // version with same UBR as host is best match
 		},
 		{
 			Architecture: "amd64",
 			OS:           "windows",
-			OSVersion:    "10.0.17763.1",
+			OSVersion:    "10.0.17763.1001",
+		},
+		{
+			Architecture: "amd64",
+			OS:           "windows",
+			OSVersion:    "10.0.17763.999",
 		},
 		{
 			Architecture: "amd64",

@@ -18,22 +18,26 @@ package platforms
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Microsoft/hcsshim/osversion"
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 // DefaultSpec returns the current platform's default platform specification.
 func DefaultSpec() specs.Platform {
 	major, minor, build := windows.RtlGetNtVersionNumbers()
+	ubr := getHostWindowsUpdateBuildRevision()
 	return specs.Platform{
 		OS:           runtime.GOOS,
 		Architecture: runtime.GOARCH,
-		OSVersion:    fmt.Sprintf("%d.%d.%d", major, minor, build),
+		OSVersion:    fmt.Sprintf("%d.%d.%d.%d", major, minor, build, ubr),
 		// The Variant field will be empty if arch != ARM.
 		Variant: cpuVariant(),
 	}
@@ -42,6 +46,7 @@ func DefaultSpec() specs.Platform {
 type windowsmatcher struct {
 	specs.Platform
 	osVersionPrefix string
+	osUBR           int
 	defaultMatcher  Matcher
 }
 
@@ -82,12 +87,16 @@ func GetOsVersion(osVersionPrefix string) osversion.OSVersion {
 }
 
 // Less sorts matched platforms in front of other platforms.
-// For matched platforms, it puts platforms with larger revision
-// number in front.
+// For matched platforms, it puts platforms with matching revision (UBR)
+// number in front, followed by larger revision.
 func (m windowsmatcher) Less(p1, p2 specs.Platform) bool {
 	m1, m2 := m.Match(p1), m.Match(p2)
 	if m1 && m2 {
 		r1, r2 := revision(p1.OSVersion), revision(p2.OSVersion)
+		mubr1, mubr2 := r1 == m.osUBR, r2 == m.osUBR
+		if mubr1 || mubr2 {
+			return mubr1 && !mubr2
+		}
 		return r1 > r2
 	}
 	return m1 && !m2
@@ -116,4 +125,29 @@ func prefix(v string) string {
 // Default returns the current platform's default platform specification.
 func Default() MatchComparer {
 	return Only(DefaultSpec())
+}
+
+var (
+	ubr  int
+	once sync.Once
+)
+
+// there is no windows system call in golang yet to get host UBR, so we do our own.
+func getHostWindowsUpdateBuildRevision() int {
+	once.Do(func() {
+		ubr = 0
+		k, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
+		if err != nil {
+			log.Printf("can't open windows host UBR registry path: %v", err)
+			return
+		}
+		defer k.Close()
+		d, _, err := k.GetIntegerValue("UBR")
+		if err != nil {
+			log.Printf("can't read windows host UBR: %v", err)
+			return
+		}
+		ubr = int(d)
+	})
+	return ubr
 }
