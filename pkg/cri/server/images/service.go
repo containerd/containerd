@@ -29,8 +29,8 @@ import (
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/pkg/events"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 

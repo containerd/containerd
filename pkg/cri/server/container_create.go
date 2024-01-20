@@ -45,7 +45,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 )
 
 func init() {

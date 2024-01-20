@@ -23,7 +23,7 @@ import (
 
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 )
 

@@ -33,8 +33,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/platforms"
 
 	"google.golang.org/grpc"
 

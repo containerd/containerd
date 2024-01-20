@@ -25,7 +25,7 @@ import (
 
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"

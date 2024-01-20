@@ -28,9 +28,9 @@ import (
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log/logtest"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/opencontainers/go-digest"
 
