@@ -28,8 +28,8 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/urfave/cli"
 )
 

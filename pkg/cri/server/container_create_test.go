@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

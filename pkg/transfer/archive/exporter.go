@@ -31,8 +31,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 func init() {

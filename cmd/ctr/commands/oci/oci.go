@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 )
 
 // Command is the parent for all OCI related tools under 'oci'

@@ -40,8 +40,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/testutil"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 var (

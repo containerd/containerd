@@ -34,9 +34,9 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/platforms"
 )
 
 // CRIBase contains common dependencies for CRI's runtime, image, and podsandbox services.

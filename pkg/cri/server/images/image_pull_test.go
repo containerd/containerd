@@ -29,7 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/labels"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 )
 
 func TestParseAuth(t *testing.T) {
