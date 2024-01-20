@@ -16,12 +16,27 @@
 
 package platforms
 
+import (
+	"github.com/containerd/platforms"
+	specs "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
 // DefaultString returns the default string specifier for the platform.
 func DefaultString() string {
-	return Format(DefaultSpec())
+	return platforms.DefaultString()
 }
 
 // DefaultStrict returns strict form of Default.
 func DefaultStrict() MatchComparer {
-	return OnlyStrict(DefaultSpec())
+	return platforms.DefaultStrict()
+}
+
+// DefaultSpec returns the current platform's default platform specification.
+func DefaultSpec() specs.Platform {
+	return platforms.DefaultSpec()
+}
+
+// Default returns the default matcher for the platform.
+func Default() MatchComparer {
+	return platforms.Default()
 }
