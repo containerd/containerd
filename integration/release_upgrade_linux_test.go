@@ -40,7 +40,7 @@ import (
 )
 
 // upgradeVerifyCaseFunc is used to verify the behavior after upgrade.
-type upgradeVerifyCaseFunc func(t *testing.T, criRuntimeService cri.RuntimeService)
+type upgradeVerifyCaseFunc func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService)
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
@@ -50,6 +50,7 @@ func TestUpgrade(t *testing.T) {
 	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
 	t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
+	t.Run("recover-images", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverExistingImages))
 	// TODO:
 	// Add stats/stop-existing-running-pods/...
 }
@@ -107,7 +108,7 @@ func runUpgradeTestCase(
 		})
 
 		t.Log("Verifing")
-		upgradeCaseFunc(t, currentProc.criRuntimeService(t))
+		upgradeCaseFunc(t, currentProc.criRuntimeService(t), currentProc.criImageService(t))
 	}
 }
 
@@ -148,7 +149,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, criRuntimeService cri.Run
 	t.Log("Stop second sandbox")
 	require.NoError(t, criRuntimeService.StopPodSandbox(secondSB))
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService) {
+	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
 		t.Log("List Pods")
 
 		pods, err := criRuntimeService.ListPodSandbox(nil)
@@ -212,7 +213,7 @@ func execToExistingContainer(t *testing.T, criRuntimeService cri.RuntimeService,
 	// NOTE: Wait for containerd to flush data into log
 	time.Sleep(2 * time.Second)
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService) {
+	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
 		pods, err := criRuntimeService.ListPodSandbox(nil)
 		require.NoError(t, err)
 		require.Len(t, pods, 1)
@@ -288,7 +289,7 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService
 	require.NoError(t, criRuntimeService.StartContainer(cn3))
 	require.NoError(t, criRuntimeService.StopContainer(cn3, 0))
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService) {
+	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
 		t.Log("Manipulating containers in the previous pod")
 		// For the running container, we get status and stats of it,
 		// exec and execsync in it, stop and remove it
@@ -343,6 +344,32 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService
 		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
 		require.NoError(t, criRuntimeService.StopContainer(cn4, 0))
 		require.NoError(t, criRuntimeService.RemoveContainer(cn4))
+	}
+}
+
+func shouldRecoverExistingImages(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+	images := []string{images.Get(images.BusyBox), images.Get(images.Alpine)}
+
+	expectedRefs := []string{}
+	for _, img := range images {
+		t.Logf("Pulling image %q", img)
+		imgRef, err := criImageService.PullImage(&criruntime.ImageSpec{Image: img}, nil, nil)
+		require.NoError(t, err)
+		expectedRefs = append(expectedRefs, imgRef)
+	}
+
+	return func(t *testing.T, _ cri.RuntimeService, criImageService cri.ImageManagerService) {
+		t.Log("List all images")
+		res, err := criImageService.ListImages(nil)
+		require.NoError(t, err)
+		require.Len(t, res, 2)
+
+		for idx, img := range images {
+			t.Logf("Check image %s status", img)
+			gotImg, err := criImageService.ImageStatus(&criruntime.ImageSpec{Image: img})
+			require.NoError(t, err)
+			require.Equal(t, expectedRefs[idx], gotImg.Id)
+		}
 	}
 }
 
