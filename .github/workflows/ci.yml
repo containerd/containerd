@@ -538,7 +538,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
@@ -602,7 +602,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /root/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
