@@ -600,7 +600,7 @@ jobs:
           cat /proc/cpuinfo
           free -mt
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
