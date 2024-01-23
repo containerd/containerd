@@ -118,6 +118,8 @@ type FetchConfig struct {
 	RemoteOpts []containerd.RemoteOpt
 	// TraceHTTP writes DNS and connection information to the log when dealing with a container registry
 	TraceHTTP bool
+	//Sets whether to display redundant data during pull process
+	Verbase bool
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
@@ -177,7 +179,9 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	go func() {
 		if config.ProgressOutput != nil {
 			// no progress bar, because it hides some debug logs
-			ShowProgress(pctx, ongoing, client.ContentStore(), config.ProgressOutput)
+			if config.Verbase {
+				ShowProgress(pctx, ongoing, client.ContentStore(), config.ProgressOutput)
+			}
 		}
 		close(progress)
 	}()

@@ -83,6 +83,10 @@ command. As part of this process, we do the following:
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
+		cli.BoolFlag{
+			Name:  "verbase",
+			Usage: "Sets whether to display redundant data during pull process",
+		},
 	),
 	Action: func(context *cli.Context) error {
 		var (
@@ -152,7 +156,7 @@ command. As part of this process, we do the following:
 		if err != nil {
 			return err
 		}
-
+		config.Verbase = context.Bool("verbase")
 		img, err := content.Fetch(ctx, client, ref, config)
 		if err != nil {
 			return err
