@@ -8,7 +8,6 @@ require (
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
 	github.com/Microsoft/go-winio v0.6.1
 	github.com/Microsoft/hcsshim v0.12.0-rc.2
-	github.com/container-orchestrated-devices/container-device-interface v0.6.1
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.3
 	github.com/containerd/console v1.0.3
@@ -77,6 +76,7 @@ require (
 	k8s.io/klog/v2 v2.100.1
 	k8s.io/kubelet v0.28.2
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	tags.cncf.io/container-device-interface v0.6.2
 )
 
 require (
@@ -131,4 +131,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
+	tags.cncf.io/container-device-interface/specs-go v0.6.0 // indirect
 )
