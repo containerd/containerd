@@ -392,11 +392,11 @@ type PluginConfig struct {
 	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
 	// into the OCI config
 	// For more details about CDI and the syntax of CDI Spec files please refer to
-	// https://github.com/container-orchestrated-devices/container-device-interface.
+	// https://tags.cncf.io/container-device-interface.
 	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
-	// https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+	// https://tags.cncf.io/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
 
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
