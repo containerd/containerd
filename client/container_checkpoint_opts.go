@@ -29,9 +29,9 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/protobuf/proto"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 )

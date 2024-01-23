@@ -31,8 +31,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 var importCommand = cli.Command{

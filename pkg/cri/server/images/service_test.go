@@ -24,7 +24,7 @@ import (
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 )
 

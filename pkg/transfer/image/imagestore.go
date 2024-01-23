@@ -33,7 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/transfer/plugins"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 )
 
 func init() {

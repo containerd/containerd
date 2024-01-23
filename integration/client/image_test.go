@@ -29,7 +29,7 @@ import (
 	imagelist "github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/labels"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
