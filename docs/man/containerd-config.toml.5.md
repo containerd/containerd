@@ -228,8 +228,8 @@ The following is an example partial configuraton with two runtimes:
           privileged_without_host_devices = false
           runtime_type = "io.containerd.runc.v2"
 
-        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
-           BinaryName = "/usr/bin/runc"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+            BinaryName = "/usr/bin/runc"
 
         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.other]
           privileged_without_host_devices = false
