@@ -619,7 +619,7 @@ func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
 // getRuntimeOptionsType gets empty runtime options by the runtime type name.
 func getRuntimeOptionsType(t string) interface{} {
 	switch t {
-	case plugins.RuntimeRuncV2:
+	case plugins.RuntimeRuncV2, plugins.RuntimeRuncV2Rs:
 		return &runcoptions.Options{}
 	case plugins.RuntimeRunhcsV1:
 		return &runhcsoptions.Options{}
