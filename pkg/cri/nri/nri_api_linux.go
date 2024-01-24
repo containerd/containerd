@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-tools/generate"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -117,7 +116,7 @@ func (a *API) RemovePodSandbox(ctx context.Context, criPod *sstore.Sandbox) erro
 	return err
 }
 
-func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *specs.Spec) (*api.ContainerAdjustment, error) {
+func (a *API) CreateContainer(ctx context.Context, ctrs *containers.Container, spec *runtimespec.Spec) (*api.ContainerAdjustment, error) {
 	ctr := a.nriContainer(ctrs, spec)
 
 	criPod, err := a.cri.SandboxStore().Get(ctr.GetPodSandboxID())
@@ -256,7 +255,7 @@ func (a *API) RemoveContainer(ctx context.Context, criPod *sstore.Sandbox, criCt
 	return err
 }
 
-func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, id string, spec *specs.Spec) {
+func (a *API) UndoCreateContainer(ctx context.Context, criPod *sstore.Sandbox, id string, spec *runtimespec.Spec) {
 	if a.IsDisabled() {
 		return
 	}
@@ -318,7 +317,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 	)
 
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
-		spec := &specs.Spec{}
+		spec := &runtimespec.Spec{}
 		if err := json.Unmarshal(c.Spec.GetValue(), spec); err != nil {
 			return fmt.Errorf("failed to unmarshal container OCI Spec for NRI: %w", err)
 		}
@@ -463,14 +462,14 @@ func (a *API) EvictContainer(ctx context.Context, e *api.ContainerEviction) erro
 
 type criPodSandbox struct {
 	*sstore.Sandbox
-	spec *specs.Spec
+	spec *runtimespec.Spec
 	pid  uint32
 }
 
 func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 	criPod := &criPodSandbox{
 		Sandbox: pod,
-		spec:    &specs.Spec{},
+		spec:    &runtimespec.Spec{},
 	}
 
 	if pod == nil || pod.Container == nil {
@@ -490,13 +489,10 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 	criPod.pid = task.Pid()
 	spec, err := task.Spec(ctx)
 	if err != nil {
-		if err != nil {
-			log.L.WithError(err).Errorf("failed to get spec for sandbox container %s",
-				pod.Container.ID())
-		}
+		log.L.WithError(err).Errorf("failed to get spec for sandbox container %s",
+			pod.Container.ID())
 		return criPod
 	}
-
 	criPod.spec = spec
 
 	return criPod
@@ -644,12 +640,12 @@ func (p *criPodSandbox) GetPid() uint32 {
 type criContainer struct {
 	api  *API
 	ctrs *containers.Container
-	spec *specs.Spec
+	spec *runtimespec.Spec
 	meta *cstore.Metadata
 	pid  uint32
 }
 
-func (a *API) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
+func (a *API) nriContainer(ctr interface{}, spec *runtimespec.Spec) *criContainer {
 	switch c := ctr.(type) {
 	case *cstore.Container:
 		ctx := ctrdutil.NamespacedContext()
@@ -662,7 +658,7 @@ func (a *API) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
 		spec, err := ctrd.Spec(ctx)
 		if err != nil {
 			log.L.WithError(err).Errorf("failed to get OCI Spec for container %s", ctrd.ID())
-			spec = &specs.Spec{}
+			spec = &runtimespec.Spec{}
 		}
 		task, err := ctrd.Task(ctx, nil)
 		if err != nil {
@@ -703,7 +699,7 @@ func (a *API) nriContainer(ctr interface{}, spec *specs.Spec) *criContainer {
 	return &criContainer{
 		api:  a,
 		meta: &cstore.Metadata{},
-		spec: &specs.Spec{},
+		spec: &runtimespec.Spec{},
 	}
 }
 
