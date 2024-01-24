@@ -26,8 +26,8 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
+	critypes "github.com/containerd/containerd/v2/pkg/cri/types"
 	"github.com/containerd/errdefs"
 )
 
@@ -63,7 +63,7 @@ func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool)
 
 // toCRISandboxInfo converts internal container object information to CRI sandbox status response info map.
 func toCRISandboxInfo(ctx context.Context, sb *types.PodSandbox) (map[string]string, error) {
-	si := &base.SandboxInfo{
+	si := &critypes.SandboxInfo{
 		Pid:            sb.Pid,
 		Config:         sb.Metadata.Config,
 		RuntimeHandler: sb.Metadata.RuntimeHandler,

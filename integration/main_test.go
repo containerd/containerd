@@ -51,7 +51,7 @@ import (
 	dialer "github.com/containerd/containerd/v2/integration/remote/util"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
+	"github.com/containerd/containerd/v2/pkg/cri/types"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
 )
 
@@ -686,7 +686,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *base.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -699,7 +699,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *base.SandboxInfo, error
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info base.SandboxInfo
+	var info types.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}
