@@ -29,8 +29,8 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
-  package: "containerd.plugin"
+  name: "github.com/containerd/containerd/api/types/fieldpath.proto"
+  package: "containerd.types"
   dependency: "google/protobuf/descriptor.proto"
   extension {
     name: "fieldpath_all"
@@ -39,6 +39,7 @@ file {
     label: LABEL_OPTIONAL
     type: TYPE_BOOL
     json_name: "fieldpathAll"
+    proto3_optional: true
   }
   extension {
     name: "fieldpath"
@@ -47,16 +48,18 @@ file {
     label: LABEL_OPTIONAL
     type: TYPE_BOOL
     json_name: "fieldpath"
+    proto3_optional: true
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/protobuf/plugin"
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
+  syntax: "proto3"
 }
 file {
   name: "github.com/containerd/containerd/api/events/container.proto"
   package: "containerd.events"
   dependency: "google/protobuf/any.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "ContainerCreate"
     field {
@@ -171,7 +174,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/content.proto"
   package: "containerd.events"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "ContentDelete"
     field {
@@ -191,7 +194,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/image.proto"
   package: "containerd.services.images.v1"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "ImageCreate"
     field {
@@ -287,7 +290,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/namespace.proto"
   package: "containerd.events"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "NamespaceCreate"
     field {
@@ -468,7 +471,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/events/snapshot.proto"
   package: "containerd.events"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "SnapshotPrepare"
     field {
@@ -584,7 +587,7 @@ file {
   package: "containerd.events"
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
     name: "TaskCreate"
     field {
@@ -3962,7 +3965,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/events/v1/events.proto"
   package: "containerd.services.events.v1"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
@@ -7067,7 +7070,7 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/ttrpc/events/v1/events.proto"
   package: "containerd.services.events.ttrpc.v1"
-  dependency: "github.com/containerd/containerd/protobuf/plugin/fieldpath.proto"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
