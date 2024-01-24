@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"testing"
 
-	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
