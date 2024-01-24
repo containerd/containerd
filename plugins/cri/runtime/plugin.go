@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package base
+package runtime
 
 import (
 	"context"
@@ -36,47 +36,39 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
-
-// CRIBase contains common dependencies for CRI's runtime, image, and podsandbox services.
-type CRIBase struct {
-	// Config contains all configurations.
-	Config criconfig.Config
-	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	BaseOCISpecs map[string]*oci.Spec
-}
 
 func init() {
 	config := criconfig.DefaultConfig()
 
 	// Base plugin that other CRI services depend on.
 	registry.Register(&plugin.Registration{
-		Type:   plugins.InternalPlugin,
-		ID:     "cri",
+		Type:   plugins.CRIServicePlugin,
+		ID:     "runtime",
 		Config: &config,
 		Requires: []plugin.Type{
 			plugins.WarningPlugin,
 		},
-		ConfigMigration: func(ctx context.Context, version int, plugins map[string]interface{}) error {
+		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
 			if version >= srvconfig.CurrentConfigVersion {
 				return nil
 			}
-			c, ok := plugins["io.containerd.grpc.v1.cri"]
+			c, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"]
 			if !ok {
 				return nil
 			}
 			conf := c.(map[string]interface{})
 			migrateConfig(conf)
-			plugins["io.containerd.internal.v1.cri"] = conf
-			delete(plugins, "io.containerd.grpc.v1.cri")
+			pluginConfigs[string(plugins.CRIServicePlugin)+".runtime"] = conf
 			return nil
 		},
-		InitFn: initCRIBase,
+		InitFn: initCRIRuntime,
 	})
 }
 
-func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
+func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
@@ -118,10 +110,31 @@ func initCRIBase(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create load basic oci spec: %w", err)
 	}
 
-	return &CRIBase{
-		Config:       c,
-		BaseOCISpecs: ociSpec,
+	return &runtime{
+		config:       c,
+		baseOCISpecs: ociSpec,
 	}, nil
+}
+
+// runtime contains common dependencies for CRI's runtime, image, and podsandbox services.
+type runtime struct {
+	// Config contains all configurations.
+	config criconfig.Config
+	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
+	baseOCISpecs map[string]*oci.Spec
+}
+
+func (r *runtime) Config() criconfig.Config {
+	return r.config
+}
+
+func (r *runtime) LoadOCISpec(filename string) (*oci.Spec, error) {
+	spec, ok := r.baseOCISpecs[filename]
+	if !ok {
+		// TODO: Load here or only allow preloading...
+		return nil, errdefs.ErrNotFound
+	}
+	return spec, nil
 }
 
 func loadBaseOCISpecs(config *criconfig.Config) (map[string]*oci.Spec, error) {

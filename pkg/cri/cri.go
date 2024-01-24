@@ -17,6 +17,7 @@
 package cri
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -25,13 +26,13 @@ import (
 	"github.com/containerd/plugin/registry"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/cri/instrument"
 	"github.com/containerd/containerd/v2/pkg/cri/nri"
 	"github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/platforms"
@@ -43,13 +44,11 @@ import (
 
 // Register CRI service plugin
 func init() {
-
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "cri",
 		Requires: []plugin.Type{
-			plugins.CRIImagePlugin,
-			plugins.InternalPlugin,
+			plugins.CRIServicePlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
@@ -58,23 +57,46 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.TransferPlugin,
 		},
+		Config: &criconfig.ServiceConfig{
+			DisableTCPService: true,
+		},
+		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
+			if version >= srvconfig.CurrentConfigVersion {
+				return nil
+			}
+			const pluginName = string(plugins.GRPCPlugin) + ".cri"
+			original, ok := pluginConfigs[pluginName]
+			if !ok {
+				return nil
+			}
+			src := original.(map[string]interface{})
+
+			// Currently only a single key migrated
+			if val, ok := src["disable_tcp_service"]; ok {
+				pluginConfigs[pluginName] = map[string]interface{}{
+					"disable_tcp_service": val,
+				}
+			} else {
+				delete(pluginConfigs, pluginName)
+			}
+			return nil
+		},
 		InitFn: initCRIService,
 	})
 }
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
+	config := ic.Config.(*criconfig.ServiceConfig)
 
-	// Get base CRI dependencies.
-	criBasePlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
+	// Get runtime service.
+	criRuntimePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "runtime")
 	if err != nil {
-		return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+		return nil, fmt.Errorf("unable to load CRI runtime service plugin dependency: %w", err)
 	}
-	criBase := criBasePlugin.(*base.CRIBase)
-	c := criBase.Config
 
 	// Get image service.
-	criImagePlugin, err := ic.GetSingle(plugins.CRIImagePlugin)
+	criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
 	if err != nil {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 	}
@@ -98,15 +120,16 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	}
 
 	options := &server.CRIServiceOptions{
+		RuntimeService:     criRuntimePlugin.(server.RuntimeService),
 		ImageService:       criImagePlugin.(server.ImageService),
 		NRI:                getNRIAPI(ic),
 		Client:             client,
 		SandboxControllers: sbControllers,
-		BaseOCISpecs:       criBase.BaseOCISpecs,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 
-	s, rs, err := server.NewCRIService(criBase.Config, options)
+	// TODO: More options specifically for grpc service?
+	s, rs, err := server.NewCRIService(options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)
 	}
@@ -127,7 +150,7 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		initializer:          s,
 	}
 
-	if c.DisableTCPService {
+	if config.DisableTCPService {
 		return service, nil
 	}
 

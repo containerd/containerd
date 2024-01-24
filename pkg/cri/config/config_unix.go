@@ -89,7 +89,6 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
-		DisableTCPService:    true,
 		StreamServerAddress:  "127.0.0.1",
 		StreamServerPort:     "0",
 		StreamIdleTimeout:    streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour

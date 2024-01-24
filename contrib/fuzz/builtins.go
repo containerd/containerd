@@ -23,6 +23,7 @@ import (
 	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/pkg/nri/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
+	_ "github.com/containerd/containerd/v2/plugins/cri/runtime"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/imageverifier"

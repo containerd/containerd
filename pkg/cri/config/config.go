@@ -319,8 +319,6 @@ type PluginConfig struct {
 	ContainerdConfig `toml:"containerd" json:"containerd"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni"`
-	// DisableTCPService disables serving CRI on the TCP server.
-	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 	// StreamServerAddress is the ip address streaming server is listening on.
 	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
 	// StreamServerPort is the port streaming server is listening on.
@@ -431,6 +429,12 @@ type Config struct {
 	RootDir string `json:"rootDir"`
 	// StateDir is the root directory path for managing volatile pod/container data
 	StateDir string `json:"stateDir"`
+}
+
+// ServiceConfig contains all the configuration for the CRI API server.
+type ServiceConfig struct {
+	// DisableTCPService disables serving CRI on the TCP server.
+	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
 }
 
 const (

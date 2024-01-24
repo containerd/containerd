@@ -40,15 +40,14 @@ func init() {
 	config := criconfig.DefaultImageConfig()
 
 	registry.Register(&plugin.Registration{
-		Type:   plugins.CRIImagePlugin,
-		ID:     "local",
+		Type:   plugins.CRIServicePlugin,
+		ID:     "images",
 		Config: &config,
 		Requires: []plugin.Type{
 			plugins.LeasePlugin,
 			plugins.EventPlugin,
 			plugins.MetadataPlugin,
 			plugins.SandboxStorePlugin,
-			plugins.InternalPlugin, // For config migration ordering
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
 		},
@@ -152,12 +151,12 @@ func configMigration(ctx context.Context, version int, pluginConfigs map[string]
 	if version >= srvconfig.CurrentConfigVersion {
 		return nil
 	}
-	original, ok := pluginConfigs[string(plugins.InternalPlugin)+".cri"]
+	original, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"]
 	if !ok {
 		return nil
 	}
 	src := original.(map[string]interface{})
-	updated, ok := pluginConfigs[string(plugins.CRIImagePlugin)+".local"]
+	updated, ok := pluginConfigs[string(plugins.CRIServicePlugin)+".images"]
 	var dst map[string]interface{}
 	if ok {
 		dst = updated.(map[string]interface{})
@@ -166,7 +165,7 @@ func configMigration(ctx context.Context, version int, pluginConfigs map[string]
 	}
 
 	migrateConfig(dst, src)
-	pluginConfigs[string(plugins.CRIImagePlugin)+".local"] = dst
+	pluginConfigs[string(plugins.CRIServicePlugin)+".images"] = dst
 	return nil
 }
 func migrateConfig(dst, src map[string]interface{}) {

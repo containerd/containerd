@@ -1680,23 +1680,24 @@ func TestPrivilegedDevices(t *testing.T) {
 }
 
 func TestBaseOCISpec(t *testing.T) {
-	c := newTestCRIService()
 	baseLimit := int64(100)
-	c.baseOCISpecs = map[string]*oci.Spec{
-		"/etc/containerd/cri-base.json": {
-			Process: &runtimespec.Process{
-				User: runtimespec.User{AdditionalGids: []uint32{9999}},
-				Capabilities: &runtimespec.LinuxCapabilities{
-					Permitted: []string{"CAP_SETUID"},
+	c := newTestCRIService(withRuntimeService(&fakeRuntimeService{
+		ocispecs: map[string]*oci.Spec{
+			"/etc/containerd/cri-base.json": {
+				Process: &runtimespec.Process{
+					User: runtimespec.User{AdditionalGids: []uint32{9999}},
+					Capabilities: &runtimespec.LinuxCapabilities{
+						Permitted: []string{"CAP_SETUID"},
+					},
 				},
-			},
-			Linux: &runtimespec.Linux{
-				Resources: &runtimespec.LinuxResources{
-					Memory: &runtimespec.LinuxMemory{Limit: &baseLimit}, // Will be overwritten by `getCreateContainerTestData`
+				Linux: &runtimespec.Linux{
+					Resources: &runtimespec.LinuxResources{
+						Memory: &runtimespec.LinuxMemory{Limit: &baseLimit}, // Will be overwritten by `getCreateContainerTestData`
+					},
 				},
 			},
 		},
-	}
+	}))
 
 	ociRuntime := config.Runtime{}
 	ociRuntime.BaseRuntimeSpec = "/etc/containerd/cri-base.json"

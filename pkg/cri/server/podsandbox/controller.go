@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
@@ -51,8 +50,7 @@ func init() {
 			plugins.EventPlugin,
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
-			plugins.InternalPlugin,
-			plugins.CRIImagePlugin,
+			plugins.CRIServicePlugin,
 			plugins.ServicePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -66,26 +64,26 @@ func init() {
 				return nil, fmt.Errorf("unable to init client for podsandbox: %w", err)
 			}
 
-			// Get base CRI dependencies.
-			criBasePlugin, err := ic.GetByID(plugins.InternalPlugin, "cri")
+			// Get runtime service.
+			criRuntimePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "runtime")
 			if err != nil {
-				return nil, fmt.Errorf("unable to load CRI service base dependencies: %w", err)
+				return nil, fmt.Errorf("unable to load CRI runtime service plugin dependency: %w", err)
 			}
-			criBase := criBasePlugin.(*base.CRIBase)
+			runtimeService := criRuntimePlugin.(RuntimeService)
 
 			// Get image service.
-			criImagePlugin, err := ic.GetSingle(plugins.CRIImagePlugin)
+			criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
 			if err != nil {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
 			c := Controller{
-				client:       client,
-				config:       criBase.Config,
-				os:           osinterface.RealOS{},
-				baseOCISpecs: criBase.BaseOCISpecs,
-				imageService: criImagePlugin.(ImageService),
-				store:        NewStore(),
+				client:         client,
+				config:         runtimeService.Config(),
+				os:             osinterface.RealOS{},
+				runtimeService: runtimeService,
+				imageService:   criImagePlugin.(ImageService),
+				store:          NewStore(),
 			}
 			return &c, nil
 		},
@@ -97,6 +95,12 @@ func init() {
 type CRIService interface {
 	// TODO: we should implement Event backoff in Controller.
 	BackOffEvent(id string, event interface{})
+}
+
+// RuntimeService specifies dependencies to CRI runtime service.
+type RuntimeService interface {
+	Config() criconfig.Config
+	LoadOCISpec(string) (*oci.Spec, error)
 }
 
 // ImageService specifies dependencies to CRI image service.
@@ -113,14 +117,14 @@ type Controller struct {
 	config criconfig.Config
 	// client is an instance of the containerd client
 	client *containerd.Client
+	// runtimeService is a dependency to CRI runtime service.
+	runtimeService RuntimeService
 	// imageService is a dependency to CRI image service.
 	imageService ImageService
 	// os is an interface for all required os operations.
 	os osinterface.OS
 	// cri is CRI service that provides missing gaps needed by controller.
 	cri CRIService
-	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	baseOCISpecs map[string]*oci.Spec
 
 	store *Store
 }

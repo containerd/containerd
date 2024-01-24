@@ -524,13 +524,14 @@ func TestContainerAnnotationPassthroughContainerSpec(t *testing.T) {
 }
 
 func TestBaseRuntimeSpec(t *testing.T) {
-	c := newTestCRIService()
-	c.baseOCISpecs = map[string]*oci.Spec{
-		"/etc/containerd/cri-base.json": {
-			Version:  "1.0.2",
-			Hostname: "old",
+	c := newTestCRIService(withRuntimeService(&fakeRuntimeService{
+		ocispecs: map[string]*oci.Spec{
+			"/etc/containerd/cri-base.json": {
+				Version:  "1.0.2",
+				Hostname: "old",
+			},
 		},
-	}
+	}))
 
 	out, err := c.runtimeSpec(
 		"id1",
@@ -546,8 +547,10 @@ func TestBaseRuntimeSpec(t *testing.T) {
 	assert.Equal(t, "new-domain", out.Domainname)
 
 	// Make sure original base spec not changed
-	assert.NotEqual(t, out, c.baseOCISpecs["/etc/containerd/cri-base.json"])
-	assert.Equal(t, c.baseOCISpecs["/etc/containerd/cri-base.json"].Hostname, "old")
+	spec, err := c.LoadOCISpec("/etc/containerd/cri-base.json")
+	assert.NoError(t, err)
+	assert.NotEqual(t, out, spec)
+	assert.Equal(t, spec.Hostname, "old")
 
 	assert.Equal(t, filepath.Join("/", constants.K8sContainerdNamespace, "id1"), out.Linux.CgroupsPath)
 }
