@@ -24,11 +24,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 	"time"
 
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel"
 
@@ -544,5 +546,48 @@ func TestDefaultRuntimeWithNamespaceLabels(t *testing.T) {
 	defer testClient.Close()
 	if testClient.Runtime() != testRuntime {
 		t.Error("failed to set default runtime from namespace labels")
+	}
+}
+
+func TestRuntimeInfo(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("io.containerd.runhcs.v1 does not implement `containerd-shim-runhcs-v1.exe -info` yet")
+	}
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx, cancel := testContext(t)
+	defer cancel()
+
+	rti, err := client.RuntimeInfo(ctx, "", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if rti.Name == "" {
+		t.Fatal("got empty RuntimeInfo.Name")
+	}
+
+	feat, ok := rti.Features.(*features.Features)
+	if !ok {
+		t.Fatalf("expected RuntimeInfo.Features to be *features.Features, got %T", rti.Features)
+	}
+
+	var rroRecognized bool
+	for _, f := range feat.MountOptions {
+		// "rro" is recognized since runc v1.1.
+		// The functionality needs kernel >= 5.12, but `runc features` consistently include "rro" in feat.MountOptions.
+		if f == "rro" {
+			rroRecognized = true
+		}
+	}
+	if !rroRecognized {
+		t.Fatalf("expected feat.MountOptions to contain \"rro\", only got %v", feat.MountOptions)
 	}
 }
