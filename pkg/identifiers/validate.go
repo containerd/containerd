@@ -28,7 +28,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 const (

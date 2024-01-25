@@ -34,8 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/errdefs"
 )
 
 // ListContainerStats returns stats of all running containers.

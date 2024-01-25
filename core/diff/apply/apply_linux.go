@@ -25,8 +25,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/archive"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/userns"
+	"github.com/containerd/errdefs"
 
 	"golang.org/x/sys/unix"
 )

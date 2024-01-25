@@ -25,8 +25,8 @@ import (
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 )
 
 func newContentStore(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {

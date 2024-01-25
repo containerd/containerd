@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 

@@ -21,7 +21,7 @@ import (
 	"time"
 
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 
 	assertlib "github.com/stretchr/testify/assert"
 )

@@ -24,7 +24,7 @@ import (
 	cio "github.com/containerd/containerd/v2/pkg/cri/io"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/selinux/go-selinux"
 	assertlib "github.com/stretchr/testify/assert"
