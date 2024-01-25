@@ -33,10 +33,10 @@ import (
 	"github.com/containerd/typeurl/v2"
 
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf/proto"
 	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 )
 
 type CommandConfig struct {

@@ -20,7 +20,7 @@ import (
 	"sync"
 
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 type Key struct {

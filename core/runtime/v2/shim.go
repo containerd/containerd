@@ -40,12 +40,12 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/runtime"
 	client "github.com/containerd/containerd/v2/core/runtime/v2/shim"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events/exchange"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 

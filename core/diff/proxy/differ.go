@@ -23,10 +23,10 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/epoch"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"google.golang.org/protobuf/types/known/timestamppb"

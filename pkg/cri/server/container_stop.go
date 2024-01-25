@@ -26,8 +26,8 @@ import (
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	"github.com/moby/sys/signal"

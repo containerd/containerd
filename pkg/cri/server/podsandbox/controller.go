@@ -35,11 +35,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
 

@@ -22,12 +22,12 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/events/exchange"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"

@@ -26,8 +26,8 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

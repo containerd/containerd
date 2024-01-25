@@ -24,9 +24,9 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/cleanup"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 

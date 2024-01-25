@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
 )

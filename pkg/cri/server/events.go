@@ -36,9 +36,9 @@ import (
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/errdefs"
 )
 
 const (

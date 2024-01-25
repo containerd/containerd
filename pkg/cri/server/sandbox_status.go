@@ -26,7 +26,7 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 // PodSandboxStatus returns the status of the PodSandbox.

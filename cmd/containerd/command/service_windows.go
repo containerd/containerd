@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"golang.org/x/sys/windows"

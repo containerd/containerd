@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images/usage"
 	"github.com/containerd/containerd/v2/pkg/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
 	"k8s.io/apimachinery/pkg/util/sets"

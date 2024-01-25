@@ -12,6 +12,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.0.3
 	github.com/containerd/console v1.0.3
 	github.com/containerd/continuity v0.4.3
+	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.1.0

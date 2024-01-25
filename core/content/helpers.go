@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/internal/randutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

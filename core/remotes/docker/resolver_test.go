@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

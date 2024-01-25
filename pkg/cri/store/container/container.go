@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/store"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	"github.com/containerd/containerd/v2/pkg/cri/store/stats"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

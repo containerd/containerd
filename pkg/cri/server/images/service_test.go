@@ -23,7 +23,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 )

@@ -115,6 +115,9 @@ github.com/containerd/continuity/proto
 github.com/containerd/continuity/sysx
 github.com/containerd/continuity/testutil
 github.com/containerd/continuity/testutil/loopback
+# github.com/containerd/errdefs v0.1.0
+## explicit; go 1.20
+github.com/containerd/errdefs
 # github.com/containerd/fifo v1.1.0
 ## explicit; go 1.18
 github.com/containerd/fifo

@@ -47,9 +47,9 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/v2/pkg/cri/labels"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/errdefs"
 )
 
 // For image management:

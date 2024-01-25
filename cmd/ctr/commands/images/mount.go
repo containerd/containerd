@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/urfave/cli"

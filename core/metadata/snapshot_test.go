@@ -31,10 +31,10 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
 	"github.com/containerd/containerd/v2/internal/testutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins/snapshots/native"
+	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
 

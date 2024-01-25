@@ -24,9 +24,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/sirupsen/logrus"

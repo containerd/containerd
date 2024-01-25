@@ -38,10 +38,10 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"

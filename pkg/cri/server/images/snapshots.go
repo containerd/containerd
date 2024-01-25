@@ -24,7 +24,7 @@ import (
 	snapshot "github.com/containerd/containerd/v2/core/snapshots"
 	snapshotstore "github.com/containerd/containerd/v2/pkg/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 

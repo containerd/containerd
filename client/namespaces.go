@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	api "github.com/containerd/containerd/v2/api/services/namespaces/v1"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 )
 
 // NewNamespaceStoreFromClient returns a new namespace store

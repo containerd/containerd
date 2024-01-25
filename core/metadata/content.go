@@ -27,10 +27,10 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

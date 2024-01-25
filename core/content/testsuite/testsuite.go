@@ -30,7 +30,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/internal/testutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

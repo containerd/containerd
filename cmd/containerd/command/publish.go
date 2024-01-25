@@ -26,10 +26,10 @@ import (
 
 	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
 	"github.com/containerd/containerd/v2/pkg/dialer"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf/proto"
 	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"

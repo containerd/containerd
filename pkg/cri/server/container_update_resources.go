@@ -29,7 +29,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
