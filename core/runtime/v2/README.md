@@ -67,7 +67,7 @@ the runtime engine, via `fork`/`exec` to run the container. For example, the `io
 an OCI compliant runtime engine such as `runc`.
 
 containerd passes options to the shim over the ttRPC connection, which may include the runtime engine binary
-to invoke. These are the `options` for the [`CreateTaskRequest`](https://github.com/containerd/containerd/blob/main/runtime/v2/README.md#container-level-shim-configuration).
+to invoke. These are the `options` for the [`CreateTaskRequest`](#container-level-shim-configuration).
 
 For example, the `io.containerd.runc.v2` shim supports including the path to the runtime engine binary.
 
@@ -173,7 +173,7 @@ section:
       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
 ```
 
-See [config.toml man page](../../docs/man/containerd-config.toml.5.md) for more details and an example.
+See [config.toml man page](../../../docs/man/containerd-config.toml.5.md) for more details and an example.
 
 These "named runtimes" in the configuration file are used solely when invoked via CRI, which has a
 [`runtime_handler` field](https://github.com/kubernetes/cri-api/blob/de5f1318aede866435308f39cb432618a15f104e/pkg/apis/runtime/v1/api.proto#L476).
@@ -481,7 +481,7 @@ import (
 	"io"
 	"sync"
 
-	"github.com/containerd/containerd/runtime/v2/logging"
+	"github.com/containerd/containerd/v2/core/runtime/v2/logging"
 	"github.com/coreos/go-systemd/journal"
 )
 

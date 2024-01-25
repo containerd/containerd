@@ -253,7 +253,7 @@ import (
         "log"
 
         containerd "github.com/containerd/containerd/v2/client"
-        "github.com/containerd/containerd/v2/namespaces"
+        "github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func main() {
@@ -328,8 +328,8 @@ import (
         "log"
 
         containerd "github.com/containerd/containerd/v2/client"
-        "github.com/containerd/containerd/v2/namespaces"
-        "github.com/containerd/containerd/v2/oci"
+        "github.com/containerd/containerd/v2/pkg/namespaces"
+        "github.com/containerd/containerd/v2/pkg/oci"
 )
 
 func main() {
@@ -474,10 +474,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/cio"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func main() {
