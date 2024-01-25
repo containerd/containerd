@@ -23,7 +23,7 @@ import (
 	"errors"
 	"fmt"
 
-	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 )
 
 var kernelGreaterEqualThan = kernel.GreaterEqualThan

@@ -12,7 +12,9 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+*/
 
+/*
    File copied and customized based on
    https://github.com/moby/moby/tree/v20.10.14/profiles/seccomp/kernel_linux_test.go
 */

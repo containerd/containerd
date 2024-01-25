@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	kernel "github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/stretchr/testify/assert"
 )
 
