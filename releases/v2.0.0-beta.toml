@@ -33,3 +33,5 @@ See also the [Getting Started](https://github.com/containerd/containerd/blob/mai
 
 override_deps."github.com/containerd/log".previous = "cf9777876edf6a4aa230c739bc7eec5ab8349e9c"
 override_deps."github.com/containerd/plugin".previous = "497c49344a4b9894a7e26497420cb7fa817facba"
+override_deps."github.com/containerd/platforms".previous = "f18f3c661f7de73d5569f61ff72d98dae1c1700a"
+override_deps."github.com/containerd/errdefs".previous = "f18f3c661f7de73d5569f61ff72d98dae1c1700a"
