@@ -29,8 +29,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	servertesting "github.com/containerd/containerd/v2/pkg/cri/testing"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
 

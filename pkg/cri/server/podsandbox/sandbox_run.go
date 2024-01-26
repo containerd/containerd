@@ -40,7 +40,7 @@ import (
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 func init() {

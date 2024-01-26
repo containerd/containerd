@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/run"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/urfave/cli"

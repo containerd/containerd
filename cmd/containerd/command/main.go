@@ -32,9 +32,9 @@ import (
 	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"

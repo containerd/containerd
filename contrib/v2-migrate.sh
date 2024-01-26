@@ -58,4 +58,10 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/truncindex/$1$2"github.com\/containerd\/containerd\/v2\/internal\/truncindex/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/metrics/$1$2"github.com\/containerd\/containerd\/v2\/core\/metrics/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/runtime/$1$2"github.com\/containerd\/containerd\/v2\/core\/runtime/g' $GOFILE
+
+  # Migrate packages split out to their own repository
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/platforms/$1$2"github.com\/containerd\/platforms/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/errdefs/$1$2"github.com\/containerd\/errdefs/g' $GOFILE
+
+  gofmt -s -w $GOFILE
 done

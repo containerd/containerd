@@ -25,13 +25,13 @@ import (
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf/proto"
 	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
 )

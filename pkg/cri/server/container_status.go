@@ -23,7 +23,7 @@ import (
 
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

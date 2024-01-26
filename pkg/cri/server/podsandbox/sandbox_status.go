@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/cri/server/base"
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 func (c *Controller) Status(ctx context.Context, sandboxID string, verbose bool) (sandbox.ControllerStatus, error) {

@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/containerd/containerd/v2/pkg/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 // portForward uses netns to enter the sandbox namespace, and forwards a stream inside the

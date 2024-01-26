@@ -25,8 +25,8 @@ import (
 
 	imagestore "github.com/containerd/containerd/v2/pkg/cri/store/image"
 	"github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"

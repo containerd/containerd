@@ -22,8 +22,8 @@ import (
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/errdefs"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

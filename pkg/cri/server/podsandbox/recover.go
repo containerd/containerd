@@ -30,8 +30,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/netns"
+	"github.com/containerd/errdefs"
 )
 
 // loadContainerTimeout is the default timeout for loading a container/sandbox.

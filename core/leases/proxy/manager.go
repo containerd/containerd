@@ -21,8 +21,8 @@ import (
 
 	leasesapi "github.com/containerd/containerd/v2/api/services/leases/v1"
 	"github.com/containerd/containerd/v2/core/leases"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/errdefs"
 )
 
 type proxyManager struct {

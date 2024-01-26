@@ -32,9 +32,9 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/containerd/containerd/v2/internal/testutil"
-	"github.com/containerd/containerd/v2/pkg/errdefs"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/continuity/fs/fstest"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/stretchr/testify/assert"
 )
