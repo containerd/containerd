@@ -24,8 +24,10 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -48,6 +50,9 @@ func init() {
 		Type:   plugins.TracingProcessorPlugin,
 		Config: &OTLPConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			if err := warnOTLPConfig(ic); err != nil {
+				return nil, err
+			}
 			cfg := ic.Config.(*OTLPConfig)
 			exp, err := newExporter(ic.Context, cfg)
 			if err != nil {
@@ -67,6 +72,9 @@ func init() {
 			TraceSamplingRatio: 1.0,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			if err := warnTraceConfig(ic); err != nil {
+				return nil, err
+			}
 			// get TracingProcessorPlugin which is a dependency
 			plugins, err := ic.GetByType(plugins.TracingProcessorPlugin)
 			if err != nil {
@@ -190,4 +198,55 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProce
 // Returns a composite TestMap propagator
 func propagators() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+}
+
+func warnTraceConfig(ic *plugin.InitContext) error {
+	ctx := ic.Context
+	cfg := ic.Config.(*TraceConfig)
+	var warn bool
+	if cfg.ServiceName != "" {
+		warn = true
+	}
+	if cfg.TraceSamplingRatio != 0 {
+		warn = true
+	}
+
+	if !warn {
+		return nil
+	}
+
+	wp, err := ic.GetSingle(plugins.WarningPlugin)
+	if err != nil {
+		return err
+	}
+	ws := wp.(warning.Service)
+	ws.Emit(ctx, deprecation.TracingServiceConfig)
+	return nil
+}
+
+func warnOTLPConfig(ic *plugin.InitContext) error {
+	ctx := ic.Context
+	cfg := ic.Config.(*OTLPConfig)
+	var warn bool
+	if cfg.Endpoint != "" {
+		warn = true
+	}
+	if cfg.Protocol != "" {
+		warn = true
+	}
+	if cfg.Insecure {
+		warn = true
+	}
+
+	if !warn {
+		return nil
+	}
+
+	wp, err := ic.GetSingle(plugins.WarningPlugin)
+	if err != nil {
+		return err
+	}
+	ws := wp.(warning.Service)
+	ws.Emit(ctx, deprecation.TracingOTLPConfig)
+	return nil
 }
