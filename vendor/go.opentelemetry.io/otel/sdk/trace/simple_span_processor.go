@@ -19,12 +19,13 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/internal/global"
 )
 
 // simpleSpanProcessor is a SpanProcessor that synchronously sends all
 // completed Spans to a trace.Exporter immediately.
 type simpleSpanProcessor struct {
-	exporterMu sync.RWMutex
+	exporterMu sync.Mutex
 	exporter   SpanExporter
 	stopOnce   sync.Once
 }
@@ -43,6 +44,8 @@ func NewSimpleSpanProcessor(exporter SpanExporter) SpanProcessor {
 	ssp := &simpleSpanProcessor{
 		exporter: exporter,
 	}
+	global.Warn("SimpleSpanProcessor is not recommended for production use, consider using BatchSpanProcessor instead.")
+
 	return ssp
 }
 
@@ -51,8 +54,8 @@ func (ssp *simpleSpanProcessor) OnStart(context.Context, ReadWriteSpan) {}
 
 // OnEnd immediately exports a ReadOnlySpan.
 func (ssp *simpleSpanProcessor) OnEnd(s ReadOnlySpan) {
-	ssp.exporterMu.RLock()
-	defer ssp.exporterMu.RUnlock()
+	ssp.exporterMu.Lock()
+	defer ssp.exporterMu.Unlock()
 
 	if ssp.exporter != nil && s.SpanContext().TraceFlags().IsSampled() {
 		if err := ssp.exporter.ExportSpans(context.Background(), []ReadOnlySpan{s}); err != nil {
@@ -114,4 +117,15 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 // ForceFlush does nothing as there is no data to flush.
 func (ssp *simpleSpanProcessor) ForceFlush(context.Context) error {
 	return nil
+}
+
+// MarshalLog is the marshaling function used by the logging system to represent this Span Processor.
+func (ssp *simpleSpanProcessor) MarshalLog() interface{} {
+	return struct {
+		Type     string
+		Exporter SpanExporter
+	}{
+		Type:     "SimpleSpanProcessor",
+		Exporter: ssp.exporter,
+	}
 }
