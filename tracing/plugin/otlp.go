@@ -25,7 +25,9 @@ import (
 
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/tracing"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
@@ -46,6 +48,9 @@ func init() {
 		Type:   plugin.TracingProcessorPlugin,
 		Config: &OTLPConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			if err := warnOTLPConfig(ic); err != nil {
+				return nil, err
+			}
 			cfg := ic.Config.(*OTLPConfig)
 			if cfg.Endpoint == "" {
 				return nil, fmt.Errorf("no OpenTelemetry endpoint: %w", plugin.ErrSkipPlugin)
@@ -64,6 +69,9 @@ func init() {
 		Config:   &TraceConfig{ServiceName: "containerd", TraceSamplingRatio: 1.0},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			//get TracingProcessorPlugin which is a dependency
+			if err := warnTraceConfig(ic); err != nil {
+				return nil, err
+			}
 			plugins, err := ic.GetByType(plugin.TracingProcessorPlugin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
@@ -194,4 +202,55 @@ func newTracer(ctx context.Context, config *TraceConfig, procs []trace.SpanProce
 // Returns a composite TestMap propagator
 func propagators() propagation.TextMapPropagator {
 	return propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})
+}
+
+func warnTraceConfig(ic *plugin.InitContext) error {
+	ctx := ic.Context
+	cfg := ic.Config.(*TraceConfig)
+	var warn bool
+	if cfg.ServiceName != "" {
+		warn = true
+	}
+	if cfg.TraceSamplingRatio != 0 {
+		warn = true
+	}
+
+	if !warn {
+		return nil
+	}
+
+	wp, err := ic.Get(plugin.WarningPlugin)
+	if err != nil {
+		return err
+	}
+	ws := wp.(warning.Service)
+	ws.Emit(ctx, deprecation.TracingServiceConfig)
+	return nil
+}
+
+func warnOTLPConfig(ic *plugin.InitContext) error {
+	ctx := ic.Context
+	cfg := ic.Config.(*OTLPConfig)
+	var warn bool
+	if cfg.Endpoint != "" {
+		warn = true
+	}
+	if cfg.Protocol != "" {
+		warn = true
+	}
+	if cfg.Insecure {
+		warn = true
+	}
+
+	if !warn {
+		return nil
+	}
+
+	wp, err := ic.Get(plugin.WarningPlugin)
+	if err != nil {
+		return err
+	}
+	ws := wp.(warning.Service)
+	ws.Emit(ctx, deprecation.TracingOTLPConfig)
+	return nil
 }
