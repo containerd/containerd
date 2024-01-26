@@ -190,6 +190,31 @@ $ cat /etc/containerd/certs.d/_default/hosts.toml
 server = "https://registry.example.com"
 ```
 
+### Setup Wildcard Mirror for Registries
+
+This is an example of using a mirror for registries using a wildcard prefix pattern.
+
+Multiple wildcard patterns can be used to match. Given the following:
+
+```
+$ tree /etc/containerd/certs.d
+/etc/containerd/certs.d
+└── _.registry.io
+    └── hosts.toml
+└── _.io
+    └── hosts.toml
+└── _default
+    └── hosts.toml
+```
+
+A host such as `test.regsitry.io` would try the hosts configs in the following order `_.registry.io` -> `_.io` -> `_default`.
+
+Where-as, a host such as `test.docker.io` would try the hosts configs `_.io`, and `_default`.
+
+The directories are sorted in descending order based on path length, meaning that `_.registry.io` should always take
+precedence over `_.io`.
+
+
 ### Bypass TLS Verification Example
 
 To bypass the TLS verification for a private registry at `192.168.31.250:5000`

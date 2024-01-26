@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker"
@@ -479,6 +480,51 @@ func TestHTTPFallback(t *testing.T) {
 				t.Fatal("expected no http fallback configured for defaulted localhost endpoint")
 			}
 		})
+	}
+}
+
+func TestWildcardHostDirMatch(t *testing.T) {
+	dir, err := os.MkdirTemp("", "wildcard-")
+	if err != nil {
+		t.Fatalf("Could not make temp dir %s", err)
+	}
+
+	defer os.RemoveAll(dir)
+
+	paths := []string{
+		filepath.Join(dir, "_.registry.io"),
+		filepath.Join(dir, "_.io"),
+		filepath.Join(dir, "exact.registry.io"),
+	}
+
+	for _, p := range paths {
+		err = os.Mkdir(p, os.ModeDir)
+		if err != nil {
+			t.Fatalf("Could not make dir %s", err)
+		}
+	}
+
+	case1 := hostDirectoryScanWildcards(dir, "notexact.registry.io")
+	case2 := hostDirectoryScanWildcards(dir, "registry.io")
+	case3 := hostDirectoryScanWildcards(dir, "alt.differentregistry.io")
+	case4 := hostDirectoryScanWildcards(dir, "registry.com")
+
+	expect1 := []string{filepath.Join(dir, "_.registry.io"), filepath.Join(dir, "_.io")}
+	if !slices.Equal(case1, expect1) {
+		t.Fatalf("Expected %v got %v", expect1, case1)
+	}
+
+	expect2 := []string{filepath.Join(dir, "_.io")}
+	if !slices.Equal(case2, expect2) {
+		t.Fatalf("Expected slice to be empty, got %v", case2)
+	}
+
+	if !slices.Equal(case3, expect2) {
+		t.Fatalf("Expected %v got %v", expect2, case3)
+	}
+
+	if len(case4) > 0 {
+		t.Fatalf("Expected slice to be empty, got %v", case4)
 	}
 }
 

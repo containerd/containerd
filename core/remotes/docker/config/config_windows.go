@@ -30,8 +30,14 @@ func hostPaths(root, host string) (hosts []string) {
 
 	hosts = append(hosts,
 		filepath.Join(root, strings.Replace(host, ":", "", -1)),
-		filepath.Join(root, "_default"),
 	)
+
+	wildcards := hostDirectoryScanWildcards(root, host)
+	for _, w := range wildcards {
+		hosts = append(hosts, strings.Replace(w, ":", "", -1))
+	}
+
+	hosts = append(hosts, filepath.Join(root, "_default"))
 
 	return
 }
