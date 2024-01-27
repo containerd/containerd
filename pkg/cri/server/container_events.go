@@ -21,10 +21,10 @@ import (
 )
 
 func (c *criService) GetContainerEvents(r *runtime.GetEventsRequest, s runtime.RuntimeService_GetContainerEventsServer) error {
-	// TODO (https://github.com/containerd/containerd/issues/7318):
-	// replace with a real implementation that broadcasts containerEventsChan
-	// to all subscribers.
-	for event := range c.containerEventsChan {
+	eventC, closer := c.containerEventsQ.Subscribe()
+	defer closer.Close()
+
+	for event := range eventC {
 		if err := s.Send(&event); err != nil {
 			return err
 		}
