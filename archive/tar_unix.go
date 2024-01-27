@@ -29,7 +29,7 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/pkg/userns"
-	"github.com/containerd/continuity/fs"
+	"continuity/fs"
 	"github.com/containerd/continuity/sysx"
 	"golang.org/x/sys/unix"
 )

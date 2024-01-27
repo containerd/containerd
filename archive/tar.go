@@ -32,7 +32,7 @@ import (
 
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/userns"
-	"github.com/containerd/continuity/fs"
+	"continuity/fs"
 )
 
 var bufPool = &sync.Pool{
