@@ -286,7 +286,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 		Name: m.name,
 		Version: &types.RuntimeVersion{
 			Version:  version.Version,
-			Revision: version.Version,
+			Revision: version.Revision,
 		},
 		Annotations: nil,
 	}
