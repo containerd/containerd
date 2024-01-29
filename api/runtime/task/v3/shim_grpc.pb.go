@@ -45,6 +45,9 @@ type TaskClient interface {
 	// This required a separate connection from shim back to containerd daemon.
 	// Since both TTRPC and GRPC backends now support streaming, this endpoint
 	// allows to optimzie resources and utilize just one bidirectional connection.
+	//
+	// This feature is optional and not enabled by default. A shim that supports this
+	// must return `shim.EventStreaming` feature in bootstrap params.
 	Events(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Task_EventsClient, error)
 }
 
@@ -267,6 +270,9 @@ type TaskServer interface {
 	// This required a separate connection from shim back to containerd daemon.
 	// Since both TTRPC and GRPC backends now support streaming, this endpoint
 	// allows to optimzie resources and utilize just one bidirectional connection.
+	//
+	// This feature is optional and not enabled by default. A shim that supports this
+	// must return `shim.EventStreaming` feature in bootstrap params.
 	Events(*emptypb.Empty, Task_EventsServer) error
 	mustEmbedUnimplementedTaskServer()
 }
