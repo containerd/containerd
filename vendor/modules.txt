@@ -486,7 +486,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.13.0
+# golang.org/x/oauth2 v0.14.0
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
@@ -545,7 +545,7 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
-# google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97
+# google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/api/httpbody
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0
@@ -553,7 +553,7 @@ google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.60.1
+# google.golang.org/grpc v1.61.0
 ## explicit; go 1.19
 google.golang.org/grpc
 google.golang.org/grpc/attributes
