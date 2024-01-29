@@ -21,7 +21,6 @@ import (
 	"path/filepath"
 
 	"github.com/containerd/containerd/v2/defaults"
-	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 func DefaultImageConfig() ImageConfig {
@@ -39,9 +38,9 @@ func DefaultImageConfig() ImageConfig {
 	}
 }
 
-// DefaultConfig returns default configurations of cri plugin.
-func DefaultConfig() PluginConfig {
-	return PluginConfig{
+// DefaultRuntimeConfig returns default configurations of cri plugin.
+func DefaultRuntimeConfig() RuntimeConfig {
+	return RuntimeConfig{
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:        filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
 			NetworkPluginConfDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
@@ -77,15 +76,6 @@ func DefaultConfig() PluginConfig {
 					},
 				},
 			},
-		},
-		DisableTCPService:   true,
-		StreamServerAddress: "127.0.0.1",
-		StreamServerPort:    "0",
-		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
-		EnableTLSStreaming:  false,
-		X509KeyPairStreaming: X509KeyPairStreaming{
-			TLSKeyFile:  "",
-			TLSCertFile: "",
 		},
 		MaxContainerLogLineSize:   16 * 1024,
 		IgnoreImageDefinedVolumes: false,

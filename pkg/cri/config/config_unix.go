@@ -21,7 +21,6 @@ package config
 import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/pelletier/go-toml/v2"
-	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 func DefaultImageConfig() ImageConfig {
@@ -41,8 +40,8 @@ func DefaultImageConfig() ImageConfig {
 	}
 }
 
-// DefaultConfig returns default configurations of cri plugin.
-func DefaultConfig() PluginConfig {
+// DefaultRuntimeConfig returns default configurations of cri plugin.
+func DefaultRuntimeConfig() RuntimeConfig {
 	defaultRuncV2Opts := `
 	# NoNewKeyring disables new keyring for the container.
 	NoNewKeyring = false
@@ -71,7 +70,7 @@ func DefaultConfig() PluginConfig {
 	var m map[string]interface{}
 	toml.Unmarshal([]byte(defaultRuncV2Opts), &m)
 
-	return PluginConfig{
+	return RuntimeConfig{
 		CniConfig: CniConfig{
 			NetworkPluginBinDir:        "/opt/cni/bin",
 			NetworkPluginConfDir:       "/etc/cni/net.d",
@@ -89,17 +88,8 @@ func DefaultConfig() PluginConfig {
 				},
 			},
 		},
-		DisableTCPService:    true,
-		StreamServerAddress:  "127.0.0.1",
-		StreamServerPort:     "0",
-		StreamIdleTimeout:    streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
-		EnableSelinux:        false,
-		SelinuxCategoryRange: 1024,
-		EnableTLSStreaming:   false,
-		X509KeyPairStreaming: X509KeyPairStreaming{
-			TLSKeyFile:  "",
-			TLSCertFile: "",
-		},
+		EnableSelinux:                    false,
+		SelinuxCategoryRange:             1024,
 		MaxContainerLogLineSize:          16 * 1024,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,

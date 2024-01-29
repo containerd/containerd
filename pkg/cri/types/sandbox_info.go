@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package base
+package types
 
 import (
 	"github.com/containerd/go-cni"

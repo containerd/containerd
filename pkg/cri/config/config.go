@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/kubelet/pkg/cri/streaming"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
@@ -312,33 +313,18 @@ type ImageConfig struct {
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
 }
 
-// PluginConfig contains toml config related to CRI plugin,
+// RuntimeConfig contains toml config related to CRI plugin,
 // it is a subset of Config.
-type PluginConfig struct {
+type RuntimeConfig struct {
 	// ContainerdConfig contains config related to containerd
 	ContainerdConfig `toml:"containerd" json:"containerd"`
 	// CniConfig contains config related to cni
 	CniConfig `toml:"cni" json:"cni"`
-	// DisableTCPService disables serving CRI on the TCP server.
-	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
-	// StreamServerAddress is the ip address streaming server is listening on.
-	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
-	// StreamServerPort is the port streaming server is listening on.
-	StreamServerPort string `toml:"stream_server_port" json:"streamServerPort"`
-	// StreamIdleTimeout is the maximum time a streaming connection
-	// can be idle before the connection is automatically closed.
-	// The string is in the golang duration format, see:
-	//   https://golang.org/pkg/time/#ParseDuration
-	StreamIdleTimeout string `toml:"stream_idle_timeout" json:"streamIdleTimeout"`
 	// EnableSelinux indicates to enable the selinux support.
 	EnableSelinux bool `toml:"enable_selinux" json:"enableSelinux"`
 	// SelinuxCategoryRange allows the upper bound on the category range to be set.
 	// If not specified or set to 0, defaults to 1024 from the selinux package.
 	SelinuxCategoryRange int `toml:"selinux_category_range" json:"selinuxCategoryRange"`
-	// EnableTLSStreaming indicates to enable the TLS streaming support.
-	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
-	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
-	X509KeyPairStreaming `toml:"x509_key_pair_streaming" json:"x509KeyPairStreaming"`
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
@@ -418,10 +404,10 @@ type X509KeyPairStreaming struct {
 	TLSKeyFile string `toml:"tls_key_file" json:"tlsKeyFile"`
 }
 
-// Config contains all configurations for cri server.
+// Config contains all configurations for CRI runtime plugin.
 type Config struct {
-	// PluginConfig is the config for CRI plugin.
-	PluginConfig
+	// RuntimeConfig is the config for CRI runtime.
+	RuntimeConfig
 	// ContainerdRootDir is the root directory path for containerd.
 	ContainerdRootDir string `json:"containerdRootDir"`
 	// ContainerdEndpoint is the containerd endpoint path.
@@ -431,6 +417,25 @@ type Config struct {
 	RootDir string `json:"rootDir"`
 	// StateDir is the root directory path for managing volatile pod/container data
 	StateDir string `json:"stateDir"`
+}
+
+// ServerConfig contains all the configuration for the CRI API server.
+type ServerConfig struct {
+	// DisableTCPService disables serving CRI on the TCP server.
+	DisableTCPService bool `toml:"disable_tcp_service" json:"disableTCPService"`
+	// StreamServerAddress is the ip address streaming server is listening on.
+	StreamServerAddress string `toml:"stream_server_address" json:"streamServerAddress"`
+	// StreamServerPort is the port streaming server is listening on.
+	StreamServerPort string `toml:"stream_server_port" json:"streamServerPort"`
+	// StreamIdleTimeout is the maximum time a streaming connection
+	// can be idle before the connection is automatically closed.
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	StreamIdleTimeout string `toml:"stream_idle_timeout" json:"streamIdleTimeout"`
+	// EnableTLSStreaming indicates to enable the TLS streaming support.
+	EnableTLSStreaming bool `toml:"enable_tls_streaming" json:"enableTLSStreaming"`
+	// X509KeyPairStreaming is a x509 key pair used for TLS streaming
+	X509KeyPairStreaming `toml:"x509_key_pair_streaming" json:"x509KeyPairStreaming"`
 }
 
 const (
@@ -494,8 +499,8 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	return warnings, nil
 }
 
-// ValidatePluginConfig validates the given plugin configuration.
-func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.Warning, error) {
+// ValidateRuntimeConfig validates the given runtime configuration.
+func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
 	if c.ContainerdConfig.Runtimes == nil {
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
@@ -520,13 +525,6 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 		}
 	}
 
-	// Validation for stream_idle_timeout
-	if c.StreamIdleTimeout != "" {
-		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
-			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
-		}
-	}
-
 	// Validation for drain_exec_sync_io_timeout
 	if c.DrainExecSyncIOTimeout != "" {
 		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
@@ -535,6 +533,18 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 	}
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
+	}
+	return warnings, nil
+}
+
+// ValidateServerConfig validates the given server configuration.
+func ValidateServerConfig(ctx context.Context, c *ServerConfig) ([]deprecation.Warning, error) {
+	var warnings []deprecation.Warning
+	// Validation for stream_idle_timeout
+	if c.StreamIdleTimeout != "" {
+		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
+			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
+		}
 	}
 	return warnings, nil
 }
@@ -625,5 +635,19 @@ func getRuntimeOptionsType(t string) interface{} {
 		return &runhcsoptions.Options{}
 	default:
 		return &runtimeoptions.Options{}
+	}
+}
+
+func DefaultServerConfig() ServerConfig {
+	return ServerConfig{
+		DisableTCPService:   true,
+		StreamServerAddress: "127.0.0.1",
+		StreamServerPort:    "0",
+		StreamIdleTimeout:   streaming.DefaultConfig.StreamIdleTimeout.String(), // 4 hour
+		EnableTLSStreaming:  false,
+		X509KeyPairStreaming: X509KeyPairStreaming{
+			TLSKeyFile:  "",
+			TLSCertFile: "",
+		},
 	}
 }

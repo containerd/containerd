@@ -65,6 +65,15 @@ type sandboxService interface {
 	SandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error)
 }
 
+// RuntimeService specifies dependencies to runtime service which provides
+// the runtime configuration and OCI spec loading.
+type RuntimeService interface {
+	Config() criconfig.Config
+
+	// LoadCISpec loads cached OCI specs via `Runtime.BaseRuntimeSpec`
+	LoadOCISpec(string) (*oci.Spec, error)
+}
+
 // ImageService specifies dependencies to image service.
 type ImageService interface {
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
@@ -84,6 +93,7 @@ type ImageService interface {
 
 // criService implements CRIService.
 type criService struct {
+	RuntimeService
 	ImageService
 	// config contains all configurations.
 	config criconfig.Config
@@ -115,8 +125,6 @@ type criService struct {
 	// cniNetConfMonitor is used to reload cni network conf if there is
 	// any valid fs change events from cni network conf dir.
 	cniNetConfMonitor map[string]*cniNetConfSyncer
-	// baseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	baseOCISpecs map[string]*oci.Spec
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
@@ -130,15 +138,16 @@ type criService struct {
 }
 
 type CRIServiceOptions struct {
+	RuntimeService RuntimeService
+
 	ImageService ImageService
+
+	StreamingConfig streaming.Config
 
 	NRI *nri.API
 
 	// SandboxControllers is a map of all the loaded sandbox controllers
 	SandboxControllers map[string]sandbox.Controller
-
-	// BaseOCISpecs contains cached OCI specs loaded via `Runtime.BaseRuntimeSpec`
-	BaseOCISpecs map[string]*oci.Spec
 
 	// Client is the base containerd client used for accessing services,
 	//
@@ -147,18 +156,18 @@ type CRIServiceOptions struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-// TODO: Add criBase.BaseOCISpecs to options
-func NewCRIService(config criconfig.Config, options *CRIServiceOptions) (CRIService, runtime.RuntimeServiceServer, error) {
+func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServiceServer, error) {
 	var err error
 	labels := label.NewStore()
+	config := options.RuntimeService.Config()
 
 	c := &criService{
+		RuntimeService:     options.RuntimeService,
 		ImageService:       options.ImageService,
 		config:             config,
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
 		os:                 osinterface.RealOS{},
-		baseOCISpecs:       options.BaseOCISpecs,
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
@@ -182,7 +191,7 @@ func NewCRIService(config criconfig.Config, options *CRIServiceOptions) (CRIServ
 	}
 
 	// prepare streaming server
-	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort, config.StreamIdleTimeout)
+	c.streamServer, err = streaming.NewServer(options.StreamingConfig, newStreamRuntime(c))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create stream server: %w", err)
 	}

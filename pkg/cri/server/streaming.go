@@ -18,103 +18,17 @@ package server
 
 import (
 	"context"
-	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"math"
-	"net"
-	"os"
-	"time"
 
-	k8snet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
-	k8scert "k8s.io/client-go/util/cert"
 	"k8s.io/utils/exec"
 
 	ctrdutil "github.com/containerd/containerd/v2/pkg/cri/util"
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
-
-type streamListenerMode int
-
-const (
-	x509KeyPairTLS streamListenerMode = iota
-	selfSignTLS
-	withoutTLS
-)
-
-func getStreamListenerMode(c *criService) (streamListenerMode, error) {
-	if c.config.EnableTLSStreaming {
-		if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
-			return x509KeyPairTLS, nil
-		}
-		if c.config.X509KeyPairStreaming.TLSCertFile != "" && c.config.X509KeyPairStreaming.TLSKeyFile == "" {
-			return -1, errors.New("must set X509KeyPairStreaming.TLSKeyFile")
-		}
-		if c.config.X509KeyPairStreaming.TLSCertFile == "" && c.config.X509KeyPairStreaming.TLSKeyFile != "" {
-			return -1, errors.New("must set X509KeyPairStreaming.TLSCertFile")
-		}
-		return selfSignTLS, nil
-	}
-	if c.config.X509KeyPairStreaming.TLSCertFile != "" {
-		return -1, errors.New("X509KeyPairStreaming.TLSCertFile is set but EnableTLSStreaming is not set")
-	}
-	if c.config.X509KeyPairStreaming.TLSKeyFile != "" {
-		return -1, errors.New("X509KeyPairStreaming.TLSKeyFile is set but EnableTLSStreaming is not set")
-	}
-	return withoutTLS, nil
-}
-
-func newStreamServer(c *criService, addr, port, streamIdleTimeout string) (streaming.Server, error) {
-	if addr == "" {
-		a, err := k8snet.ResolveBindAddress(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stream server address: %w", err)
-		}
-		addr = a.String()
-	}
-	config := streaming.DefaultConfig
-	if streamIdleTimeout != "" {
-		var err error
-		config.StreamIdleTimeout, err = time.ParseDuration(streamIdleTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("invalid stream idle timeout: %w", err)
-		}
-	}
-	config.Addr = net.JoinHostPort(addr, port)
-	run := newStreamRuntime(c)
-	tlsMode, err := getStreamListenerMode(c)
-	if err != nil {
-		return nil, fmt.Errorf("invalid stream server configuration: %w", err)
-	}
-	switch tlsMode {
-	case x509KeyPairTLS:
-		tlsCert, err := tls.LoadX509KeyPair(c.config.X509KeyPairStreaming.TLSCertFile, c.config.X509KeyPairStreaming.TLSKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
-		}
-		config.TLSConfig = &tls.Config{
-			Certificates: []tls.Certificate{tlsCert},
-		}
-		return streaming.NewServer(config, run)
-	case selfSignTLS:
-		tlsCert, err := newTLSCert()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate tls certificate for stream server: %w", err)
-		}
-		config.TLSConfig = &tls.Config{
-			Certificates:       []tls.Certificate{tlsCert},
-			InsecureSkipVerify: true,
-		}
-		return streaming.NewServer(config, run)
-	case withoutTLS:
-		return streaming.NewServer(config, run)
-	default:
-		return nil, errors.New("invalid configuration for the stream listener")
-	}
-}
 
 type streamRuntime struct {
 	c *criService
@@ -186,55 +100,4 @@ func handleResizing(ctx context.Context, resize <-chan remotecommand.TerminalSiz
 			}
 		}
 	}()
-}
-
-// newTLSCert returns a self CA signed tls.certificate.
-// TODO (mikebrow): replace / rewrite this function to support using CA
-// signing of the certificate. Requires a security plan for kubernetes regarding
-// CRI connections / streaming, etc. For example, kubernetes could configure or
-// require a CA service and pass a configuration down through CRI.
-func newTLSCert() (tls.Certificate, error) {
-	fail := func(err error) (tls.Certificate, error) { return tls.Certificate{}, err }
-
-	hostName, err := os.Hostname()
-	if err != nil {
-		return fail(fmt.Errorf("failed to get hostname: %w", err))
-	}
-
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return fail(fmt.Errorf("failed to get host IP addresses: %w", err))
-	}
-
-	var alternateIPs []net.IP
-	var alternateDNS []string
-	for _, addr := range addrs {
-		var ip net.IP
-
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
-		default:
-			continue
-		}
-
-		alternateIPs = append(alternateIPs, ip)
-		alternateDNS = append(alternateDNS, ip.String())
-	}
-
-	// Generate a self signed certificate key (CA is self)
-	certPem, keyPem, err := k8scert.GenerateSelfSignedCertKey(hostName, alternateIPs, alternateDNS)
-	if err != nil {
-		return fail(fmt.Errorf("certificate key could not be created: %w", err))
-	}
-
-	// Load the tls certificate
-	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
-	if err != nil {
-		return fail(fmt.Errorf("certificate could not be loaded: %w", err))
-	}
-
-	return tlsCert, nil
 }

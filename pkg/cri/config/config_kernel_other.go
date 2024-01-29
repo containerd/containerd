@@ -22,6 +22,6 @@ import (
 	"context"
 )
 
-func ValidateEnableUnprivileged(ctx context.Context, c *PluginConfig) error {
+func ValidateEnableUnprivileged(ctx context.Context, c *RuntimeConfig) error {
 	return nil
 }

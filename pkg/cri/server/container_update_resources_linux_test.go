@@ -239,7 +239,7 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			config := criconfig.Config{
-				PluginConfig: criconfig.PluginConfig{
+				RuntimeConfig: criconfig.RuntimeConfig{
 					TolerateMissingHugetlbController: true,
 					DisableHugetlbController:         false,
 				},

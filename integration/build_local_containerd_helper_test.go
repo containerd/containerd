@@ -38,6 +38,7 @@ import (
 	_ "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
+	_ "github.com/containerd/containerd/v2/plugins/cri/runtime"
 	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/leases"

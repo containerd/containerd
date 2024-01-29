@@ -28,29 +28,32 @@ import (
 
 func TestValidateConfig(t *testing.T) {
 	for desc, test := range map[string]struct {
-		config           *PluginConfig
-		expectedErr      string
-		expected         *PluginConfig
-		imageConfig      *ImageConfig
-		imageExpectedErr string
-		imageExpected    *ImageConfig
-		warnings         []deprecation.Warning
+		runtimeConfig      *RuntimeConfig
+		runtimeExpectedErr string
+		runtimeExpected    *RuntimeConfig
+		imageConfig        *ImageConfig
+		imageExpectedErr   string
+		imageExpected      *ImageConfig
+		serverConfig       *ServerConfig
+		serverExpectedErr  string
+		serverExpected     *ServerConfig
+		warnings           []deprecation.Warning
 	}{
 		"no default_runtime_name": {
-			config:      &PluginConfig{},
-			expectedErr: "`default_runtime_name` is empty",
+			runtimeConfig:      &RuntimeConfig{},
+			runtimeExpectedErr: "`default_runtime_name` is empty",
 		},
 		"no runtime[default_runtime_name]": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 				},
 			},
-			expectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
+			runtimeExpectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
 
 		"deprecated auths": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -58,7 +61,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: &PluginConfig{
+			runtimeExpected: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -92,18 +95,10 @@ func TestValidateConfig(t *testing.T) {
 			warnings: []deprecation.Warning{deprecation.CRIRegistryAuths},
 		},
 		"invalid stream_idle_timeout": {
-			config: &PluginConfig{
+			serverConfig: &ServerConfig{
 				StreamIdleTimeout: "invalid",
-				ContainerdConfig: ContainerdConfig{
-					DefaultRuntimeName: RuntimeDefault,
-					Runtimes: map[string]Runtime{
-						RuntimeDefault: {
-							Type: "default",
-						},
-					},
-				},
 			},
-			expectedErr: "invalid stream idle timeout",
+			serverExpectedErr: "invalid stream idle timeout",
 		},
 		"conflicting mirror registry config": {
 			imageConfig: &ImageConfig{
@@ -117,7 +112,7 @@ func TestValidateConfig(t *testing.T) {
 			imageExpectedErr: "`mirrors` cannot be set when `config_path` is provided",
 		},
 		"deprecated mirrors": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -132,7 +127,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: &PluginConfig{
+			runtimeExpected: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -152,7 +147,7 @@ func TestValidateConfig(t *testing.T) {
 			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
 		},
 		"deprecated configs": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -171,7 +166,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			expected: &PluginConfig{
+			runtimeExpected: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -195,7 +190,7 @@ func TestValidateConfig(t *testing.T) {
 			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
 		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -207,10 +202,10 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled",
+			runtimeExpectedErr: "`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled",
 		},
 		"invalid drain_exec_sync_io_timeout input": {
-			config: &PluginConfig{
+			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -221,18 +216,18 @@ func TestValidateConfig(t *testing.T) {
 				},
 				DrainExecSyncIOTimeout: "10",
 			},
-			expectedErr: "invalid `drain_exec_sync_io_timeout`",
+			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning
-			if test.config != nil {
-				w, err := ValidatePluginConfig(context.Background(), test.config)
-				if test.expectedErr != "" {
-					assert.Contains(t, err.Error(), test.expectedErr)
+			if test.runtimeConfig != nil {
+				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
+				if test.runtimeExpectedErr != "" {
+					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {
 					assert.NoError(t, err)
-					assert.Equal(t, test.expected, test.config)
+					assert.Equal(t, test.runtimeExpected, test.runtimeConfig)
 				}
 				warnings = append(warnings, w...)
 			}
@@ -243,6 +238,16 @@ func TestValidateConfig(t *testing.T) {
 				} else {
 					assert.NoError(t, err)
 					assert.Equal(t, test.imageExpected, test.imageConfig)
+				}
+				warnings = append(warnings, w...)
+			}
+			if test.serverConfig != nil {
+				w, err := ValidateServerConfig(context.Background(), test.serverConfig)
+				if test.serverExpectedErr != "" {
+					assert.Contains(t, err.Error(), test.serverExpectedErr)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, test.serverExpected, test.serverConfig)
 				}
 				warnings = append(warnings, w...)
 			}

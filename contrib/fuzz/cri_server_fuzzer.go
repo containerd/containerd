@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 )
 
 func FuzzCRIServer(data []byte) int {
@@ -42,7 +43,6 @@ func FuzzCRIServer(data []byte) int {
 	}
 	defer client.Close()
 
-	config := criconfig.Config{}
 	imageConfig := criconfig.ImageConfig{}
 
 	imageService, err := images.NewService(imageConfig, &images.CRIImageServiceOptions{
@@ -52,10 +52,10 @@ func FuzzCRIServer(data []byte) int {
 		panic(err)
 	}
 
-	c, rs, err := server.NewCRIService(config, &server.CRIServiceOptions{
-		ImageService: imageService,
-		Client:       client,
-		BaseOCISpecs: map[string]*oci.Spec{},
+	c, rs, err := server.NewCRIService(&server.CRIServiceOptions{
+		RuntimeService: &fakeRuntimeService{},
+		ImageService:   imageService,
+		Client:         client,
 	})
 	if err != nil {
 		panic(err)
@@ -66,6 +66,16 @@ func FuzzCRIServer(data []byte) int {
 		RuntimeServiceServer: rs,
 		ImageServiceServer:   imageService.GRPCService(),
 	})
+}
+
+type fakeRuntimeService struct{}
+
+func (fakeRuntimeService) Config() criconfig.Config {
+	return criconfig.Config{}
+}
+
+func (fakeRuntimeService) LoadOCISpec(string) (*oci.Spec, error) {
+	return nil, errdefs.ErrNotFound
 }
 
 type service struct {

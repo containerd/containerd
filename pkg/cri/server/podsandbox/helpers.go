@@ -159,9 +159,9 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 	container := &containers.Container{ID: id}
 
 	if baseSpecFile != "" {
-		baseSpec, ok := c.baseOCISpecs[baseSpecFile]
-		if !ok {
-			return nil, fmt.Errorf("can't find base OCI spec %q", baseSpecFile)
+		baseSpec, err := c.runtimeService.LoadOCISpec(baseSpecFile)
+		if err != nil {
+			return nil, fmt.Errorf("can't load base OCI spec %q: %w", baseSpecFile, err)
 		}
 
 		spec := oci.Spec{}

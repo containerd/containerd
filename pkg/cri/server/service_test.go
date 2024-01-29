@@ -25,10 +25,12 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/registrar"
+	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/v2/pkg/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/pkg/cri/store/sandbox"
 	servertesting "github.com/containerd/containerd/v2/pkg/cri/testing"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -74,11 +76,34 @@ func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*
 	return &types.Metric{}, errdefs.ErrNotImplemented
 }
 
+type fakeRuntimeService struct {
+	ocispecs map[string]*oci.Spec
+}
+
+func (f fakeRuntimeService) Config() criconfig.Config {
+	return testConfig
+}
+
+func (f fakeRuntimeService) LoadOCISpec(filename string) (*oci.Spec, error) {
+	spec, ok := f.ocispecs[filename]
+	if !ok {
+		return nil, errdefs.ErrNotFound
+	}
+	return spec, nil
+}
+
+type testOpt func(*criService)
+
+func withRuntimeService(rs RuntimeService) testOpt {
+	return func(service *criService) {
+		service.RuntimeService = rs
+	}
+}
+
 // newTestCRIService creates a fake criService for test.
-func newTestCRIService() *criService {
+func newTestCRIService(opts ...testOpt) *criService {
 	labels := label.NewStore()
-	return &criService{
-		ImageService:       &fakeImageService{},
+	service := &criService{
 		config:             testConfig,
 		os:                 ostesting.NewFakeOS(),
 		sandboxStore:       sandboxstore.NewStore(labels),
@@ -90,4 +115,15 @@ func newTestCRIService() *criService {
 		},
 		sandboxService: &fakeSandboxService{},
 	}
+	for _, opt := range opts {
+		opt(service)
+	}
+	if service.RuntimeService == nil {
+		service.RuntimeService = &fakeRuntimeService{}
+	}
+	if service.ImageService == nil {
+		service.ImageService = &fakeImageService{}
+	}
+
+	return service
 }

@@ -38,7 +38,7 @@ const (
 var testConfig = criconfig.Config{
 	RootDir:  testRootDir,
 	StateDir: testStateDir,
-	PluginConfig: criconfig.PluginConfig{
+	RuntimeConfig: criconfig.RuntimeConfig{
 		TolerateMissingHugetlbController: true,
 	},
 }
