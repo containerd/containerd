@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -457,14 +458,18 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, err
 	}
 
-	stream, err := shimTask.task.Events(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to obtain events streamer from shim: %w", err)
-	}
+	if slices.Contains(shim.Features(), shimbinary.EventStreaming) {
+		log.G(ctx).Info("using shim events streaming")
 
-	go func() {
-		m.handleShimEvents(context.Background(), stream)
-	}()
+		stream, err := shimTask.task.Events(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to obtain events streamer from shim: %w", err)
+		}
+
+		go func() {
+			m.handleShimEvents(context.Background(), stream)
+		}()
+	}
 
 	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
