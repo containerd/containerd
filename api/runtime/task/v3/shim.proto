@@ -48,6 +48,13 @@ service Task {
 	rpc Stats(StatsRequest) returns (StatsResponse);
 	rpc Connect(ConnectRequest) returns (ConnectResponse);
 	rpc Shutdown(ShutdownRequest) returns (google.protobuf.Empty);
+
+	// Events allows containerd subscribe to a stream of shim events.
+	// Up to 2.0, containerd offered a separate daemon's endpoint to submit events from shim.
+	// This required a separate connection from shim back to containerd daemon.
+	// Since both TTRPC and GRPC backends now support streaming, this endpoint
+	// allows to optimzie resources and utilize just one bidirectional connection.
+	rpc Events(google.protobuf.Empty) returns (stream Event);
 }
 
 message CreateTaskRequest {
@@ -198,4 +205,9 @@ message PauseRequest {
 
 message ResumeRequest {
 	string id = 1;
+}
+
+message Event {
+	string topic = 1;
+	google.protobuf.Any event = 2;
 }

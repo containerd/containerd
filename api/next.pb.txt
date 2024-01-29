@@ -2832,6 +2832,24 @@ file {
       json_name: "id"
     }
   }
+  message_type {
+    name: "Event"
+    field {
+      name: "topic"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "topic"
+    }
+    field {
+      name: "event"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "event"
+    }
+  }
   service {
     name: "Task"
     method {
@@ -2918,6 +2936,12 @@ file {
       name: "Shutdown"
       input_type: ".containerd.task.v3.ShutdownRequest"
       output_type: ".google.protobuf.Empty"
+    }
+    method {
+      name: "Events"
+      input_type: ".google.protobuf.Empty"
+      output_type: ".containerd.task.v3.Event"
+      server_streaming: true
     }
   }
   options {

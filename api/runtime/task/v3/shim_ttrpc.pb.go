@@ -26,6 +26,20 @@ type TTRPCTaskService interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
+	Events(context.Context, *emptypb.Empty, TTRPCTask_EventsServer) error
+}
+
+type TTRPCTask_EventsServer interface {
+	Send(*Event) error
+	ttrpc.StreamServer
+}
+
+type ttrpctaskEventsServer struct {
+	ttrpc.StreamServer
+}
+
+func (x *ttrpctaskEventsServer) Send(m *Event) error {
+	return x.StreamServer.SendMsg(m)
 }
 
 func RegisterTTRPCTaskService(srv *ttrpc.Server, svc TTRPCTaskService) {
@@ -151,14 +165,48 @@ func RegisterTTRPCTaskService(srv *ttrpc.Server, svc TTRPCTaskService) {
 				return svc.Shutdown(ctx, &req)
 			},
 		},
+		Streams: map[string]ttrpc.Stream{
+			"Events": {
+				Handler: func(ctx context.Context, stream ttrpc.StreamServer) (interface{}, error) {
+					m := new(emptypb.Empty)
+					if err := stream.RecvMsg(m); err != nil {
+						return nil, err
+					}
+					return nil, svc.Events(ctx, m, &ttrpctaskEventsServer{stream})
+				},
+				StreamingClient: false,
+				StreamingServer: true,
+			},
+		},
 	})
+}
+
+type TTRPCTaskClient interface {
+	State(context.Context, *StateRequest) (*StateResponse, error)
+	Create(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	Start(context.Context, *StartRequest) (*StartResponse, error)
+	Delete(context.Context, *DeleteRequest) (*DeleteResponse, error)
+	Pids(context.Context, *PidsRequest) (*PidsResponse, error)
+	Pause(context.Context, *PauseRequest) (*emptypb.Empty, error)
+	Resume(context.Context, *ResumeRequest) (*emptypb.Empty, error)
+	Checkpoint(context.Context, *CheckpointTaskRequest) (*emptypb.Empty, error)
+	Kill(context.Context, *KillRequest) (*emptypb.Empty, error)
+	Exec(context.Context, *ExecProcessRequest) (*emptypb.Empty, error)
+	ResizePty(context.Context, *ResizePtyRequest) (*emptypb.Empty, error)
+	CloseIO(context.Context, *CloseIORequest) (*emptypb.Empty, error)
+	Update(context.Context, *UpdateTaskRequest) (*emptypb.Empty, error)
+	Wait(context.Context, *WaitRequest) (*WaitResponse, error)
+	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
+	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
+	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
+	Events(context.Context, *emptypb.Empty) (TTRPCTask_EventsClient, error)
 }
 
 type ttrpctaskClient struct {
 	client *ttrpc.Client
 }
 
-func NewTTRPCTaskClient(client *ttrpc.Client) TTRPCTaskService {
+func NewTTRPCTaskClient(client *ttrpc.Client) TTRPCTaskClient {
 	return &ttrpctaskClient{
 		client: client,
 	}
@@ -298,4 +346,33 @@ func (c *ttrpctaskClient) Shutdown(ctx context.Context, req *ShutdownRequest) (*
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func (c *ttrpctaskClient) Events(ctx context.Context, req *emptypb.Empty) (TTRPCTask_EventsClient, error) {
+	stream, err := c.client.NewStream(ctx, &ttrpc.StreamDesc{
+		StreamingClient: false,
+		StreamingServer: true,
+	}, "containerd.task.v3.Task", "Events", req)
+	if err != nil {
+		return nil, err
+	}
+	x := &ttrpctaskEventsClient{stream}
+	return x, nil
+}
+
+type TTRPCTask_EventsClient interface {
+	Recv() (*Event, error)
+	ttrpc.ClientStream
+}
+
+type ttrpctaskEventsClient struct {
+	ttrpc.ClientStream
+}
+
+func (x *ttrpctaskEventsClient) Recv() (*Event, error) {
+	m := new(Event)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
