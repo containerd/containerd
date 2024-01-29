@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server"
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/platforms"
 
 	"google.golang.org/grpc"
@@ -44,6 +45,7 @@ import (
 
 // Register CRI service plugin
 func init() {
+	defaultConfig := criconfig.DefaultServerConfig()
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
 		ID:   "cri",
@@ -56,10 +58,9 @@ func init() {
 			plugins.LeasePlugin,
 			plugins.SandboxStorePlugin,
 			plugins.TransferPlugin,
+			plugins.WarningPlugin,
 		},
-		Config: &criconfig.ServiceConfig{
-			DisableTCPService: true,
-		},
+		Config: &defaultConfig,
 		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
 			if version >= srvconfig.CurrentConfigVersion {
 				return nil
@@ -87,7 +88,7 @@ func init() {
 
 func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	ctx := ic.Context
-	config := ic.Config.(*criconfig.ServiceConfig)
+	config := ic.Config.(*criconfig.ServerConfig)
 
 	// Get runtime service.
 	criRuntimePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "runtime")
@@ -99,6 +100,19 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 	criImagePlugin, err := ic.GetByID(plugins.CRIServicePlugin, "images")
 	if err != nil {
 		return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
+	}
+
+	if warnings, err := criconfig.ValidateServerConfig(ic.Context, config); err != nil {
+		return nil, fmt.Errorf("invalid cri image config: %w", err)
+	} else if len(warnings) > 0 {
+		ws, err := ic.GetSingle(plugins.WarningPlugin)
+		if err != nil {
+			return nil, err
+		}
+		warn := ws.(warning.Service)
+		for _, w := range warnings {
+			warn.Emit(ic.Context, w)
+		}
 	}
 
 	log.G(ctx).Info("Connect containerd service")
@@ -119,16 +133,21 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		string(criconfig.ModeShim):       client.SandboxController(string(criconfig.ModeShim)),
 	}
 
+	streamingConfig, err := config.StreamingConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get streaming config: %w", err)
+	}
+
 	options := &server.CRIServiceOptions{
 		RuntimeService:     criRuntimePlugin.(server.RuntimeService),
 		ImageService:       criImagePlugin.(server.ImageService),
+		StreamingConfig:    streamingConfig,
 		NRI:                getNRIAPI(ic),
 		Client:             client,
 		SandboxControllers: sbControllers,
 	}
 	is := criImagePlugin.(imageService).GRPCService()
 
-	// TODO: More options specifically for grpc service?
 	s, rs, err := server.NewCRIService(options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create CRI service: %w", err)

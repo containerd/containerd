@@ -142,6 +142,8 @@ type CRIServiceOptions struct {
 
 	ImageService ImageService
 
+	StreamingConfig streaming.Config
+
 	NRI *nri.API
 
 	// SandboxControllers is a map of all the loaded sandbox controllers
@@ -189,7 +191,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	// prepare streaming server
-	c.streamServer, err = newStreamServer(c, config.StreamServerAddress, config.StreamServerPort, config.StreamIdleTimeout)
+	c.streamServer, err = streaming.NewServer(options.StreamingConfig, newStreamRuntime(c))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create stream server: %w", err)
 	}

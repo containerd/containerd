@@ -41,7 +41,7 @@ import (
 )
 
 func init() {
-	config := criconfig.DefaultConfig()
+	config := criconfig.DefaultRuntimeConfig()
 
 	// Base plugin that other CRI services depend on.
 	registry.Register(&plugin.Registration{
@@ -72,8 +72,8 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Platforms = []imagespec.Platform{platforms.DefaultSpec()}
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
-	pluginConfig := ic.Config.(*criconfig.PluginConfig)
-	if warnings, err := criconfig.ValidatePluginConfig(ctx, pluginConfig); err != nil {
+	pluginConfig := ic.Config.(*criconfig.RuntimeConfig)
+	if warnings, err := criconfig.ValidateRuntimeConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
 	} else if len(warnings) > 0 {
 		ws, err := ic.GetSingle(plugins.WarningPlugin)
@@ -92,7 +92,7 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	containerdStateDir := filepath.Dir(ic.Properties[plugins.PropertyStateDir])
 	stateDir := filepath.Join(containerdStateDir, "io.containerd.grpc.v1.cri")
 	c := criconfig.Config{
-		PluginConfig:       *pluginConfig,
+		RuntimeConfig:      *pluginConfig,
 		ContainerdRootDir:  containerdRootDir,
 		ContainerdEndpoint: ic.Properties[plugins.PropertyGRPCAddress],
 		RootDir:            rootDir,

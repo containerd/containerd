@@ -32,13 +32,13 @@ func TestValidateEnableUnprivileged(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		config        *PluginConfig
+		config        *RuntimeConfig
 		kernelGreater bool
 		expectedErr   string
 	}{
 		{
 			name: "disable unprivileged_icmp and unprivileged_port",
-			config: &PluginConfig{
+			config: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -54,7 +54,7 @@ func TestValidateEnableUnprivileged(t *testing.T) {
 		},
 		{
 			name: "enable unprivileged_icmp or unprivileged_port, but kernel version is smaller than 4.11",
-			config: &PluginConfig{
+			config: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{
@@ -71,7 +71,7 @@ func TestValidateEnableUnprivileged(t *testing.T) {
 		},
 		{
 			name: "enable unprivileged_icmp or unprivileged_port, but kernel version is greater than or equal 4.11",
-			config: &PluginConfig{
+			config: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
 					DefaultRuntimeName: RuntimeDefault,
 					Runtimes: map[string]Runtime{

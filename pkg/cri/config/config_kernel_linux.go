@@ -28,7 +28,7 @@ import (
 
 var kernelGreaterEqualThan = kernel.GreaterEqualThan
 
-func ValidateEnableUnprivileged(ctx context.Context, c *PluginConfig) error {
+func ValidateEnableUnprivileged(ctx context.Context, c *RuntimeConfig) error {
 	if c.EnableUnprivilegedICMP || c.EnableUnprivilegedPorts {
 		fourDotEleven := kernel.KernelVersion{Kernel: 4, Major: 11}
 		ok, err := kernelGreaterEqualThan(fourDotEleven)
