@@ -130,6 +130,7 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	var params shim.BootstrapParams
 	params.Version = 3
 	params.Protocol = "ttrpc"
+	params.Features = []string{shim.EventStreaming}
 
 	cmd, err := newCommand(ctx, id, opts.Address, opts.TTRPCAddress, opts.Debug)
 	if err != nil {
