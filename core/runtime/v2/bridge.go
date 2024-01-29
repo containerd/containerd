@@ -18,6 +18,7 @@ package v2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/containerd/ttrpc"
@@ -28,6 +29,11 @@ import (
 	v3 "github.com/containerd/containerd/v2/api/runtime/task/v3"
 
 	api "github.com/containerd/containerd/v2/api/runtime/task/v3" // Current version used by TaskServiceClient
+)
+
+var (
+	// ErrNotSupported is returned in case of partucular feature not supported by the target shim instance.
+	ErrNotSupported = errors.New("not supported")
 )
 
 // TaskServiceClient exposes a client interface to shims, which aims to hide
@@ -50,6 +56,7 @@ type TaskServiceClient interface {
 	Stats(context.Context, *api.StatsRequest) (*api.StatsResponse, error)
 	Connect(context.Context, *api.ConnectRequest) (*api.ConnectResponse, error)
 	Shutdown(context.Context, *api.ShutdownRequest) (*emptypb.Empty, error)
+	Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error)
 }
 
 // NewTaskClient returns a new task client interface which handles both GRPC and TTRPC servers depending on the
@@ -254,6 +261,11 @@ func (b *ttrpcV2Bridge) Shutdown(ctx context.Context, request *api.ShutdownReque
 	})
 }
 
+func (b *ttrpcV2Bridge) Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error) {
+	// v2 shims don't support event streaming.
+	return nil, ErrNotSupported
+}
+
 // grpcV3Bridge implements task service client for v3 GRPC server.
 // GRPC uses same request/response structures as TTRPC, so it just wraps GRPC calls.
 type grpcV3Bridge struct {
@@ -328,4 +340,8 @@ func (g *grpcV3Bridge) Connect(ctx context.Context, request *api.ConnectRequest)
 
 func (g *grpcV3Bridge) Shutdown(ctx context.Context, request *api.ShutdownRequest) (*emptypb.Empty, error) {
 	return g.client.Shutdown(ctx, request)
+}
+
+func (g *grpcV3Bridge) Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error) {
+	return g.client.Events(ctx, empty)
 }
