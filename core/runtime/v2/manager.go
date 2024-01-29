@@ -21,12 +21,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 
+	"github.com/containerd/containerd/v2/api/runtime/task/v3"
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
@@ -455,6 +457,15 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, err
 	}
 
+	stream, err := shimTask.task.Events(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to obtain events streamer from shim: %w", err)
+	}
+
+	go func() {
+		m.handleShimEvents(context.Background(), stream)
+	}()
+
 	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
@@ -479,6 +490,29 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	}
 
 	return t, nil
+}
+
+// handleShimEvents handles a stream of events received from shim.
+func (m *TaskManager) handleShimEvents(ctx context.Context, stream task.TTRPCTask_EventsClient) {
+	for {
+		evt, err := stream.Recv()
+		if err == io.EOF {
+			log.G(ctx).Debug("got eof, closing shim events stream")
+			break
+		}
+
+		if err != nil {
+			log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
+			continue
+		}
+
+		log.G(ctx).Debugf("got shim event %q from stream: %+v", evt.Topic, evt.Event.GetTypeUrl())
+
+		if err := m.manager.events.Publish(context.Background(), evt.Topic, evt.Event); err != nil {
+			log.G(ctx).WithError(err).Error("failed to publish event from shim stream: %w", evt)
+			continue
+		}
+	}
 }
 
 // Get a specific task
