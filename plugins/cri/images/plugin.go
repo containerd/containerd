@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cri/server/images"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -50,6 +51,7 @@ func init() {
 			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,  // For client
 			plugins.SnapshotPlugin, // For root directory properties
+			plugins.WarningPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -61,6 +63,19 @@ func init() {
 			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
+			}
+
+			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
+				return nil, fmt.Errorf("invalid cri image config: %w", err)
+			} else if len(warnings) > 0 {
+				ws, err := ic.GetSingle(plugins.WarningPlugin)
+				if err != nil {
+					return nil, err
+				}
+				warn := ws.(warning.Service)
+				for _, w := range warnings {
+					warn.Emit(ic.Context, w)
+				}
 			}
 
 			options := &images.CRIImageServiceOptions{
