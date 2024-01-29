@@ -54,6 +54,9 @@ service Task {
 	// This required a separate connection from shim back to containerd daemon.
 	// Since both TTRPC and GRPC backends now support streaming, this endpoint
 	// allows to optimzie resources and utilize just one bidirectional connection.
+	//
+	// This feature is optional and not enabled by default. A shim that supports this
+	// must return `shim.EventStreaming` feature in bootstrap params.
 	rpc Events(google.protobuf.Empty) returns (stream Event);
 }
 

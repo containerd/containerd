@@ -24,6 +24,8 @@ import (
 	"os"
 	"sync"
 
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -82,13 +84,14 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		running:         make(map[int][]containerProcess),
 		pendingExecs:    make(map[*runc.Container]int),
 		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
+		publisher:       publisher,
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
 	if err := s.initPlatform(); err != nil {
 		return nil, fmt.Errorf("failed to initialized platform behavior: %w", err)
 	}
-	go s.forward(ctx, publisher)
+
 	sd.RegisterCallback(func(context.Context) error {
 		close(s.events)
 		return nil
@@ -123,6 +126,8 @@ type service struct {
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
 	shutdown shutdown.Service
+
+	publisher shim.Publisher
 }
 
 type containerProcess struct {
@@ -743,16 +748,25 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 	return pids, nil
 }
 
-func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
+func (s *service) Events(ctx context.Context, _ *emptypb.Empty, streamer taskAPI.TTRPCTask_EventsServer) error {
 	ns, _ := namespaces.Namespace(ctx)
 	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
-		err := publisher.Publish(ctx, runtime.GetTopic(e), e)
+		evt, err := protobuf.MarshalAnyToProto(e)
 		if err != nil {
+			return fmt.Errorf("failed to marshal shim event to any: %w", err)
+		}
+
+		if err := streamer.Send(&taskAPI.Event{
+			Topic: runtime.GetTopic(e),
+			Event: evt,
+		}); err != nil {
 			log.G(ctx).WithError(err).Error("post event")
 		}
 	}
-	publisher.Close()
+
+	// TODO: publisher is currently involved in shim's lifecycle. Remove it.
+	return s.publisher.Close()
 }
 
 func (s *service) getContainer(id string) (*runc.Container, error) {
