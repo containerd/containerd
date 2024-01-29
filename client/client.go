@@ -196,6 +196,14 @@ func NewWithConn(conn *grpc.ClientConn, opts ...Opt) (*Client, error) {
 		c.platform = platforms.Default()
 	}
 
+	if copts.defaultRuntime != "" {
+		c.runtime = copts.defaultRuntime
+	}
+
+	if copts.services != nil {
+		c.services = *copts.services
+	}
+
 	// check namespace labels for default runtime
 	if copts.defaultRuntime == "" && c.defaultns != "" {
 		if label, err := c.GetLabel(context.Background(), defaults.DefaultRuntimeNSLabel); err != nil {
