@@ -21,15 +21,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/v2/api/runtime/task/v3"
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
@@ -104,7 +101,7 @@ func init() {
 				return nil, err
 			}
 
-			return NewTaskManager(shimManager), nil
+			return NewTaskManager(ic.Context, shimManager)
 		},
 	})
 
@@ -433,10 +430,36 @@ type TaskManager struct {
 }
 
 // NewTaskManager creates a new task manager instance.
-func NewTaskManager(shims *ShimManager) *TaskManager {
-	return &TaskManager{
-		manager: shims,
+func NewTaskManager(ctx context.Context, shims *ShimManager) (*TaskManager, error) {
+	manager := &TaskManager{manager: shims}
+	if err := manager.restoreTasks(ctx); err != nil {
+		return nil, err
 	}
+	return manager, nil
+}
+
+func (m *TaskManager) restoreTasks(ctx context.Context) error {
+	log.G(ctx).Info("restoring task event streamers")
+	instances, err := m.manager.shims.GetAll(ctx, true)
+	if err != nil {
+		return err
+	}
+
+	// See if any of restored shims supports event streaming
+	for _, instance := range instances {
+		shimTask, err := newShimTask(instance)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("unable to get shim task")
+			continue
+		}
+
+		if err := m.tryStreamEvents(context.Background(), shimTask); err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to resetore event stream for task %q: %v", instance.ID(), err)
+			continue
+		}
+	}
+
+	return nil
 }
 
 // ID of the task manager
@@ -458,17 +481,8 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, err
 	}
 
-	if slices.Contains(shim.Features(), shimbinary.EventStreaming) {
-		log.G(ctx).Info("using shim events streaming")
-
-		stream, err := shimTask.task.Events(ctx, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to obtain events streamer from shim: %w", err)
-		}
-
-		go func() {
-			m.handleShimEvents(context.Background(), stream)
-		}()
+	if err := m.tryStreamEvents(ctx, shimTask); err != nil {
+		return nil, err
 	}
 
 	t, err := shimTask.Create(ctx, opts)
@@ -497,27 +511,47 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	return t, nil
 }
 
-// handleShimEvents handles a stream of events received from shim.
-func (m *TaskManager) handleShimEvents(ctx context.Context, stream task.TTRPCTask_EventsClient) {
-	for {
-		evt, err := stream.Recv()
-		if err == io.EOF {
-			log.G(ctx).Debug("got eof, closing shim events stream")
+// tryStreamEvents streams evetns from shim (if its supported by the shim implementation).
+func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error {
+	// TODO: Use slices.Contains once on Go 1.21
+	supportsStreaming := false
+	for _, f := range shim.Features() {
+		if f == shimbinary.EventStreaming {
+			supportsStreaming = true
 			break
 		}
-
-		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
-			continue
-		}
-
-		log.G(ctx).Debugf("got shim event %q from stream: %+v", evt.Topic, evt.Event.GetTypeUrl())
-
-		if err := m.manager.events.Publish(context.Background(), evt.Topic, evt.Event); err != nil {
-			log.G(ctx).WithError(err).Error("failed to publish event from shim stream: %w", evt)
-			continue
-		}
 	}
+
+	// Shims will use legacy events reporting.
+	if !supportsStreaming {
+		return nil
+	}
+
+	log.G(ctx).Info("using shim events streaming")
+
+	stream, err := shim.task.Events(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain events streamer from shim: %w", err)
+	}
+
+	go func() {
+		for {
+			evt, err := stream.Recv()
+			if err != nil {
+				log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
+				break
+			}
+
+			log.G(ctx).Debugf("got shim event %q from stream: %+v", evt.Topic, evt.Event.GetTypeUrl())
+
+			if err := m.manager.events.Publish(context.Background(), evt.Topic, evt.Event); err != nil {
+				log.G(ctx).WithError(err).Error("failed to publish event from shim stream: %w", evt)
+				continue
+			}
+		}
+	}()
+
+	return nil
 }
 
 // Get a specific task
