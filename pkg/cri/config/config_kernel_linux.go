@@ -41,3 +41,13 @@ func ValidateEnableUnprivileged(ctx context.Context, c *RuntimeConfig) error {
 	}
 	return nil
 }
+
+var kernelSupportsRro bool
+
+func init() {
+	var err error
+	kernelSupportsRro, err = kernelGreaterEqualThan(kernel.KernelVersion{Kernel: 5, Major: 12})
+	if err != nil {
+		panic(fmt.Errorf("check current system kernel version error: %w", err))
+	}
+}
