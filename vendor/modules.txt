@@ -145,7 +145,7 @@ github.com/containerd/nri/types/v1
 # github.com/containerd/platforms v0.1.1
 ## explicit; go 1.20
 github.com/containerd/platforms
-# github.com/containerd/plugin v0.0.0-20231101173250-7ec69893e1e7
+# github.com/containerd/plugin v0.1.0
 ## explicit; go 1.20
 github.com/containerd/plugin
 github.com/containerd/plugin/dynamic
