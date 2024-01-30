@@ -37,6 +37,8 @@ etc/cni/
 etc/cni/net.d/
 etc/cni/net.d/10-containerd-net.conflist
 etc/crictl.yaml
+etc/modules-load.d
+etc/modules-load.d/containerd.conf
 etc/systemd/
 etc/systemd/system/
 etc/systemd/system/containerd.service

@@ -8,6 +8,8 @@ The official binary releases of containerd are available for the `amd64` (also k
 
 Typically, you will have to install [runc](https://github.com/opencontainers/runc/releases) and [CNI plugins](https://github.com/containernetworking/plugins/releases)
 from their official sites too.
+If you are using systemd, we have a `containerd.service` file at the root of the repository that you can use.
+Furthermore there is also the file `conainerd-modules-load.conf` which causes the loading of the needed Linux kernel module `overlay`.
 
 #### Step 1: Installing containerd
 
@@ -39,8 +41,8 @@ Users of such distributions may have to install containerd from the source or a 
 > The `cri-containerd-...` archives are [deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features),
 > do not work on old Linux distributions, and will be removed in containerd 2.0.
 
-
 ##### systemd
+
 If you intend to start containerd via systemd, you should also download the `containerd.service` unit file from
 https://raw.githubusercontent.com/containerd/containerd/main/containerd.service into `/usr/local/lib/systemd/system/containerd.service`,
 and run the following commands:
@@ -56,7 +58,7 @@ Download the `runc.<ARCH>` binary from https://github.com/opencontainers/runc/re
 verify its sha256sum, and install it as `/usr/local/sbin/runc`.
 
 ```console
-$ install -m 755 runc.amd64 /usr/local/sbin/runc
+install -m 755 runc.amd64 /usr/local/sbin/runc
 ```
 
 The binary is built statically and should work on any Linux distribution.
@@ -94,6 +96,7 @@ The binaries are built statically and should work on any Linux distribution.
 
 The `containerd.io` packages in DEB and RPM formats are distributed by Docker (not by the containerd project).
 See the Docker documentation for how to set up `apt-get` or `dnf` to install `containerd.io` packages:
+
 - [CentOS](https://docs.docker.com/engine/install/centos/)
 - [Debian](https://docs.docker.com/engine/install/debian/)
 - [Fedora](https://docs.docker.com/engine/install/fedora/)
@@ -144,12 +147,14 @@ While the `ctr` tool is bundled together with containerd, it should be noted the
 The [`nerdctl`](https://github.com/containerd/nerdctl) tool provides stable and human-friendly user experience.
 
 Example (`ctr`):
+
 ```bash
 ctr images pull docker.io/library/redis:alpine
 ctr run docker.io/library/redis:alpine redis
 ```
 
 Example (`nerdctl`):
+
 ```bash
 nerdctl run --name redis redis:alpine
 ```
@@ -159,11 +164,13 @@ nerdctl run --name redis redis:alpine
 containerd has built-in support for Kubernetes Container Runtime Interface (CRI).
 
 To set up containerd nodes for managed Kubernetes services, see the service providers' documentations:
+
 - [Amazon Elastic Kubernetes Service](https://docs.aws.amazon.com/eks/latest/userguide/dockershim-deprecation.html)
 - [Azure Kubernetes Service](https://docs.microsoft.com/en-us/azure/aks/cluster-configuration)
 - [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/docs/concepts/using-containerd)
 
 For non-managed environments, see the following Kubernetes documentations:
+
 - [Getting started / Production environment / Container runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)
 - [Getting started / Production environment / Installing Kubernetes with deployment tools](https://kubernetes.io/docs/setup/production-environment/tools/)
 
@@ -179,6 +186,7 @@ A sample configuration file can be found [here](/docs/man/containerd-config.toml
 The default configuration can be generated via `containerd config default > /etc/containerd/config.toml`.
 
 ## Implementing your own containerd client
+
 There are many different ways to use containerd.
 If you are a developer working on containerd you can use the `ctr` tool or the `nerdctl` tool to quickly test features and functionality without writing extra code.
 However, if you want to integrate containerd into your project we have an easy to use client package that allows you to work with containerd.
@@ -191,29 +199,28 @@ See the header of [`go.mod`](https://github.com/containerd/containerd/blob/main/
 
 We will start a new `main.go` file and import the containerd client package.
 
-
 ```go
 package main
 
 import (
-	"log"
+ "log"
 
-	containerd "github.com/containerd/containerd/v2/client"
+ containerd "github.com/containerd/containerd/v2/client"
 )
 
 func main() {
-	if err := redisExample(); err != nil {
-		log.Fatal(err)
-	}
+ if err := redisExample(); err != nil {
+  log.Fatal(err)
+ }
 }
 
 func redisExample() error {
-	client, err := containerd.New("/run/containerd/containerd.sock")
-	if err != nil {
-		return err
-	}
-	defer client.Close()
-	return nil
+ client, err := containerd.New("/run/containerd/containerd.sock")
+ if err != nil {
+  return err
+ }
+ defer client.Close()
+ return nil
 }
 ```
 
@@ -223,7 +230,7 @@ containerd is also namespaced for callers of the API.
 We should also set a namespace for our guide after creating the context.
 
 ```go
-	ctx := namespaces.WithNamespace(context.Background(), "example")
+ ctx := namespaces.WithNamespace(context.Background(), "example")
 ```
 
 Having a namespace for our usage ensures that containers, images, and other resources without containerd do not conflict with other users of a single daemon.
@@ -234,10 +241,10 @@ Now that we have a client to work with we need to pull an image.
 We can use the redis image based on Alpine Linux from the DockerHub.
 
 ```go
-	image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
-	if err != nil {
-		return err
-	}
+ image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+ if err != nil {
+  return err
+ }
 ```
 
 The containerd client uses the `Opts` pattern for many of the method calls.
@@ -295,21 +302,21 @@ containerd provides reasonable defaults for generating OCI runtime specs.
 There is also an `Opt` for modifying the default config based on the image that we pulled.
 
 The container will be based off of the image, and we will:
+
 1. allocate a new read-write snapshot so the container can store any persistent information.
 2. create a new spec for the container.
 
-
 ```go
-	container, err := client.NewContainer(
-		ctx,
-		"redis-server",
-		containerd.WithNewSnapshot("redis-server-snapshot", image),
-		containerd.WithNewSpec(oci.WithImageConfig(image)),
-	)
-	if err != nil {
-		return err
-	}
-	defer container.Delete(ctx, containerd.WithSnapshotCleanup)
+ container, err := client.NewContainer(
+  ctx,
+  "redis-server",
+  containerd.WithNewSnapshot("redis-server-snapshot", image),
+  containerd.WithNewSpec(oci.WithImageConfig(image)),
+ )
+ if err != nil {
+  return err
+ }
+ defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 ```
 
 If you have an existing OCI specification created you can use `containerd.WithSpec(spec)` to set it on the container.
@@ -320,6 +327,7 @@ By providing a separate snapshot ID than the container ID we can easily reuse, e
 We also add a line to delete the container along with its snapshot after we are done with this example.
 
 Here is example code to pull the redis image based on alpine linux from Dockerhub, create an OCI spec, create a container based on the spec and finally delete the container.
+
 ```go
 package main
 
@@ -386,11 +394,11 @@ A task is a live, running process on the system.
 Tasks should be deleted after each run while a container can be used, updated, and queried multiple times.
 
 ```go
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
-	if err != nil {
-		return err
-	}
-	defer task.Delete(ctx)
+ task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
+ if err != nil {
+  return err
+ }
+ defer task.Delete(ctx)
 ```
 
 The new task that we just created is actually a running process on your system.
@@ -420,14 +428,14 @@ You always want to make sure you `Wait` before calling `Start` on a task.
 This makes sure that you do not encounter any races if the task has a simple program like `/bin/true` that exits promptly after calling start.
 
 ```go
-	exitStatusC, err := task.Wait(ctx)
-	if err != nil {
-		return err
-	}
+ exitStatusC, err := task.Wait(ctx)
+ if err != nil {
+  return err
+ }
 
-	if err := task.Start(ctx); err != nil {
-		return err
-	}
+ if err := task.Start(ctx); err != nil {
+  return err
+ }
 ```
 
 Now we should see the `redis-server` logs in our terminal when we run the `main.go` file.
@@ -438,18 +446,18 @@ Since we are running a long running server we will need to kill the task in orde
 To do this we will simply call `Kill` on the task after waiting a couple of seconds so we have a chance to see the redis-server logs.
 
 ```go
-	time.Sleep(3 * time.Second)
+ time.Sleep(3 * time.Second)
 
-	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
-		return err
-	}
+ if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
+  return err
+ }
 
-	status := <-exitStatusC
-	code, exitedAt, err := status.Result()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("redis-server exited with status: %d\n", code)
+ status := <-exitStatusC
+ code, exitedAt, err := status.Result()
+ if err != nil {
+  return err
+ }
+ fmt.Printf("redis-server exited with status: %d\n", code)
 ```
 
 We wait on our exit status channel that we setup to ensure the task has fully exited and we get the exit status.
@@ -468,90 +476,90 @@ Here is the full example that we just put together.
 package main
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"syscall"
-	"time"
+ "context"
+ "fmt"
+ "log"
+ "syscall"
+ "time"
 
-	"github.com/containerd/containerd/v2/pkg/cio"
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
+ "github.com/containerd/containerd/v2/pkg/cio"
+ containerd "github.com/containerd/containerd/v2/client"
+ "github.com/containerd/containerd/v2/pkg/oci"
+ "github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func main() {
-	if err := redisExample(); err != nil {
-		log.Fatal(err)
-	}
+ if err := redisExample(); err != nil {
+  log.Fatal(err)
+ }
 }
 
 func redisExample() error {
-	// create a new client connected to the default socket path for containerd
-	client, err := containerd.New("/run/containerd/containerd.sock")
-	if err != nil {
-		return err
-	}
-	defer client.Close()
+ // create a new client connected to the default socket path for containerd
+ client, err := containerd.New("/run/containerd/containerd.sock")
+ if err != nil {
+  return err
+ }
+ defer client.Close()
 
-	// create a new context with an "example" namespace
-	ctx := namespaces.WithNamespace(context.Background(), "example")
+ // create a new context with an "example" namespace
+ ctx := namespaces.WithNamespace(context.Background(), "example")
 
-	// pull the redis image from DockerHub
-	image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
-	if err != nil {
-		return err
-	}
+ // pull the redis image from DockerHub
+ image, err := client.Pull(ctx, "docker.io/library/redis:alpine", containerd.WithPullUnpack)
+ if err != nil {
+  return err
+ }
 
-	// create a container
-	container, err := client.NewContainer(
-		ctx,
-		"redis-server",
-		containerd.WithImage(image),
-		containerd.WithNewSnapshot("redis-server-snapshot", image),
-		containerd.WithNewSpec(oci.WithImageConfig(image)),
-	)
-	if err != nil {
-		return err
-	}
-	defer container.Delete(ctx, containerd.WithSnapshotCleanup)
+ // create a container
+ container, err := client.NewContainer(
+  ctx,
+  "redis-server",
+  containerd.WithImage(image),
+  containerd.WithNewSnapshot("redis-server-snapshot", image),
+  containerd.WithNewSpec(oci.WithImageConfig(image)),
+ )
+ if err != nil {
+  return err
+ }
+ defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 
-	// create a task from the container
-	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
-	if err != nil {
-		return err
-	}
-	defer task.Delete(ctx)
+ // create a task from the container
+ task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio))
+ if err != nil {
+  return err
+ }
+ defer task.Delete(ctx)
 
-	// make sure we wait before calling start
-	exitStatusC, err := task.Wait(ctx)
-	if err != nil {
-		return err
-	}
+ // make sure we wait before calling start
+ exitStatusC, err := task.Wait(ctx)
+ if err != nil {
+  return err
+ }
 
-	// call start on the task to execute the redis server
-	if err := task.Start(ctx); err != nil {
-		return err
-	}
+ // call start on the task to execute the redis server
+ if err := task.Start(ctx); err != nil {
+  return err
+ }
 
-	// sleep for a lil bit to see the logs
-	time.Sleep(3 * time.Second)
+ // sleep for a lil bit to see the logs
+ time.Sleep(3 * time.Second)
 
-	// kill the process and get the exit status
-	if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
-		return err
-	}
+ // kill the process and get the exit status
+ if err := task.Kill(ctx, syscall.SIGTERM); err != nil {
+  return err
+ }
 
-	// wait for the process to fully exit and print out the exit status
+ // wait for the process to fully exit and print out the exit status
 
-	status := <-exitStatusC
-	code, _, err := status.Result()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("redis-server exited with status: %d\n", code)
+ status := <-exitStatusC
+ code, _, err := status.Result()
+ if err != nil {
+  return err
+ }
+ fmt.Printf("redis-server exited with status: %d\n", code)
 
-	return nil
+ return nil
 }
 ```
 
