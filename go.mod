@@ -32,8 +32,8 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
-	github.com/google/go-cmp v0.5.9
-	github.com/google/uuid v1.3.0
+	github.com/google/go-cmp v0.6.0
+	github.com/google/uuid v1.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/go-multierror v1.1.1
@@ -56,17 +56,17 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
 	go.etcd.io/bbolt v1.3.7
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.28.0
-	go.opentelemetry.io/otel v1.3.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.46.0
+	go.opentelemetry.io/otel v1.21.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.3.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.3.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.3.0
-	go.opentelemetry.io/otel/sdk v1.3.0
-	go.opentelemetry.io/otel/trace v1.3.0
-	golang.org/x/net v0.17.0
+	go.opentelemetry.io/otel/sdk v1.21.0
+	go.opentelemetry.io/otel/trace v1.21.0
+	golang.org/x/net v0.18.0
 	golang.org/x/sync v0.3.0
-	golang.org/x/sys v0.13.0
-	google.golang.org/grpc v1.58.3
+	golang.org/x/sys v0.16.0
+	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 	gotest.tools/v3 v3.5.0
 	k8s.io/api v0.22.5
@@ -89,7 +89,7 @@ require (
 	github.com/containers/ocicrypt v1.1.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/emicklei/go-restful v2.16.0+incompatible // indirect
-	github.com/go-logr/logr v1.2.2 // indirect
+	github.com/go-logr/logr v1.3.0 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -117,14 +117,15 @@ require (
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.3.0 // indirect
+	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/proto/otlp v0.11.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/oauth2 v0.10.0 // indirect
-	golang.org/x/term v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/crypto v0.18.0 // indirect
+	golang.org/x/oauth2 v0.11.0 // indirect
+	golang.org/x/term v0.16.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
