@@ -58,8 +58,10 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list sandbox containers: %w", err)
 	}
 
-	podSandboxController := c.client.SandboxController(string(criconfig.ModePodSandbox))
-
+	podSandboxController, err := c.sandboxService.SandboxController(string(criconfig.ModePodSandbox))
+	if err != nil {
+		return fmt.Errorf("failed to get podsanbox controller %v", err)
+	}
 	podSandboxLoader, ok := podSandboxController.(podSandboxRecover)
 	if !ok {
 		log.G(ctx).Fatal("pod sandbox controller doesn't support recovery")
@@ -134,6 +136,7 @@ func (c *criService) recover(ctx context.Context) error {
 		}
 
 		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
+		sb.Sandboxer = sbx.Sandboxer
 
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
@@ -149,20 +152,11 @@ func (c *criService) recover(ctx context.Context) error {
 		if status.State == sandboxstore.StateNotReady {
 			continue
 		}
-		controller, err := c.sandboxService.SandboxController(sb.Config, sb.RuntimeHandler)
+		exitCh, err := c.sandboxService.WaitSandbox(ctrdutil.NamespacedContext(), sb.Sandboxer, sb.ID)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to get sandbox controller while waiting sandbox")
+			log.G(ctx).WithError(err).Error("failed to wait sandbox")
 			continue
 		}
-		exitCh := make(chan containerd.ExitStatus, 1)
-		go func() {
-			exit, err := controller.Wait(ctrdutil.NamespacedContext(), sb.ID)
-			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
-				exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
-			}
-			exitCh <- *containerd.NewExitStatus(exit.ExitStatus, exit.ExitedAt, nil)
-		}()
 		c.eventMonitor.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
 	}
 	// Recover all containers.

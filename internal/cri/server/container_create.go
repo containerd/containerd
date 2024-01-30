@@ -63,12 +63,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", r.GetPodSandboxId(), err)
 	}
 
-	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
-
-	cstatus, err := controller.Status(ctx, sandbox.ID, false)
+	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get controller status: %w", err)
 	}
@@ -150,7 +145,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 
-	platform, err := controller.Platform(ctx, sandboxID)
+	platform, err := c.sandboxService.SandboxPlatform(ctx, sandbox.Sandboxer, sandboxID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query sandbox platform: %w", err)
 	}

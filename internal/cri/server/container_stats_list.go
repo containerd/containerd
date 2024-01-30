@@ -68,15 +68,12 @@ func (c *criService) getMetricsHandler(ctx context.Context, sandboxID string) (m
 	if err != nil {
 		return nil, fmt.Errorf("failed to find sandbox id %q: %w", sandboxID, err)
 	}
-	controller, err := c.sandboxService.SandboxController(sandbox.Config, sandbox.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
+
 	// Grab the platform that this containers sandbox advertises. Reason being, even if
 	// the host may be {insert platform}, if it virtualizes or emulates a different platform
 	// it will return stats in that format, and we need to handle the conversion logic based
 	// off of this info.
-	p, err := controller.Platform(ctx, sandboxID)
+	p, err := c.sandboxService.SandboxPlatform(ctx, sandbox.Sandboxer, sandboxID)
 	if err != nil {
 		return nil, err
 	}
