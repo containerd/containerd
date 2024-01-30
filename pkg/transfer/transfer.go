@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/events"
 )
 
 type Transferrer interface {
@@ -61,7 +62,7 @@ type ImageFilterer interface {
 // the provided descriptor. The descriptor may be any type of manifest
 // including an index with multiple image references.
 type ImageStorer interface {
-	Store(context.Context, ocispec.Descriptor, images.Store) ([]images.Image, error)
+	Store(context.Context, ocispec.Descriptor, images.Store, events.Publisher) ([]images.Image, error)
 }
 
 // ImageGetter is type which returns an image from an image store

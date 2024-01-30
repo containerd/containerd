@@ -224,7 +224,7 @@ func TestStore(t *testing.T) {
 				desc.Annotations["io.containerd.import.ref-source"] = "annotation"
 			}
 			t.Run(name, func(t *testing.T) {
-				imgs, err := testCase.ImageStore.Store(context.Background(), desc, newSimpleImageStore())
+				imgs, err := testCase.ImageStore.Store(context.Background(), desc, newSimpleImageStore(), nil)
 				if err != nil {
 					if testCase.Err == nil {
 						t.Fatal(err)

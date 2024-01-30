@@ -23,12 +23,14 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	eventstypes "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/api/types"
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/transfer/plugins"
@@ -212,7 +214,7 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 	return h
 }
 
-func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store) ([]images.Image, error) {
+func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store images.Store, publisher events.Publisher) ([]images.Image, error) {
 	var imgs []images.Image
 
 	// If import ref type, store references from annotation or prefix
@@ -309,10 +311,27 @@ func (is *Store) Store(ctx context.Context, desc ocispec.Descriptor, store image
 					continue
 				}
 				return nil, err
+			} else if publisher != nil {
+				if err := publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
+					Name:   imgs[i].Name,
+					Labels: imgs[i].Labels,
+				}); err != nil {
+					return nil, fmt.Errorf("failed to publish event for image update %v: %w", imgs[i].Name, err)
+				}
 			}
 
 			imgs[i] = updated
 		} else {
+			// publish event to update CRI image store
+			if publisher != nil {
+				if err := publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
+					Name:   imgs[i].Name,
+					Labels: imgs[i].Labels,
+				}); err != nil {
+					return nil, fmt.Errorf("failed to publish event for image create %v: %w", imgs[i].Name, err)
+				}
+			}
+
 			imgs[i] = created
 		}
 

@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/pkg/transfer/local"
 	"github.com/containerd/containerd/v2/pkg/unpack"
@@ -44,6 +45,7 @@ func init() {
 		Type: plugins.TransferPlugin,
 		ID:   "local",
 		Requires: []plugin.Type{
+			plugins.EventPlugin,
 			plugins.LeasePlugin,
 			plugins.MetadataPlugin,
 			plugins.DiffPlugin,
@@ -53,6 +55,10 @@ func init() {
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			config := ic.Config.(*transferConfig)
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
+			if err != nil {
+				return nil, err
+			}
+			ep, err := ic.GetSingle(plugins.EventPlugin)
 			if err != nil {
 				return nil, err
 			}
@@ -140,7 +146,7 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc), nil
+			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc, ep.(events.Publisher)), nil
 		},
 	})
 }
