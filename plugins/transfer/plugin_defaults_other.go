@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
    Copyright The containerd Authors.
 
@@ -14,12 +16,18 @@
    limitations under the License.
 */
 
-package defaults
+package transfer
 
-const (
-	// DefaultSnapshotter will set the default snapshotter for the platform.
-	// This will be based on the client compilation target, so take that into
-	// account when choosing this value.
-	DefaultSnapshotter = "windows"
-	DefaultDiffer      = "windows"
+import (
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/platforms"
 )
+
+func defaultUnpackConfig() []unpackConfiguration {
+	return []unpackConfiguration{
+		{
+			Platform:    platforms.Format(platforms.DefaultSpec()),
+			Snapshotter: defaults.DefaultSnapshotter,
+		},
+	}
+}
