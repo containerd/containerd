@@ -587,7 +587,7 @@ jobs:
       matrix:
         box:
           - fedora/39-cloud-base
-          - rockylinux/8@8.0.0
+          - rockylinux/8@9.0.0
     env:
       BOX: ${{ matrix.box }}
 
