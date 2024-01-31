@@ -17,8 +17,7 @@
 package defaults
 
 const (
-	// DefaultSnapshotter will set the default snapshotter for the platform.
-	// This will be based on the client compilation target, so take that into
-	// account when choosing this value.
-	DefaultSnapshotter = "windows"
+	// DefaultDiffer will set the default differ for the platform.
+	// This differ should be compatible with the windows snapshotter.
+	DefaultDiffer = "windows"
 )
