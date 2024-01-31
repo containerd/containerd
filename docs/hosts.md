@@ -333,7 +333,7 @@ override_path = true
 
 ## host field(s) (in the toml table format)
 
-`[host]."https://namespace"` and `[host].http://namespace` entries in the
+`[host]."https://namespace"` and `[host]."http://namespace"` entries in the
 `hosts.toml` configuration are registry namespaces used in lieu of the default
 registry host namespace. These hosts are sometimes called mirrors because they
 may contain a copy of the container images and artifacts you are attempting to
