@@ -253,25 +253,21 @@ func (c *Controller) setupSandboxFiles(id string, config *runtime.PodSandboxConf
 	}
 
 	// Set DNS options. Maintain a resolv.conf for the sandbox.
-	var err error
-	resolvContent := ""
+	resolvPath := c.getResolvPath(id)
+
 	if dnsConfig := config.GetDnsConfig(); dnsConfig != nil {
-		resolvContent, err = parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
+		resolvContent, err := parseDNSOptions(dnsConfig.Servers, dnsConfig.Searches, dnsConfig.Options)
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox DNSConfig %+v: %w", dnsConfig, err)
 		}
-	}
-	resolvPath := c.getResolvPath(id)
-	if resolvContent == "" {
-		// copy host's resolv.conf to resolvPath
-		err = c.os.CopyFile(resolvConfPath, resolvPath, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to copy host's resolv.conf to %q: %w", resolvPath, err)
+		if err := c.os.WriteFile(resolvPath, []byte(resolvContent), 0644); err != nil {
+			return fmt.Errorf("failed to write resolv content to %q: %w", resolvPath, err)
 		}
 	} else {
-		err = c.os.WriteFile(resolvPath, []byte(resolvContent), 0644)
-		if err != nil {
-			return fmt.Errorf("failed to write resolv content to %q: %w", resolvPath, err)
+		// The DnsConfig was nil - we interpret that to mean "use the global
+		// default", which is dubious but backwards-compatible.
+		if err := c.os.CopyFile(resolvConfPath, resolvPath, 0644); err != nil {
+			return fmt.Errorf("failed to copy host's resolv.conf to %q: %w", resolvPath, err)
 		}
 	}
 
