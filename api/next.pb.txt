@@ -2842,8 +2842,23 @@ file {
       json_name: "topic"
     }
     field {
-      name: "event"
+      name: "namespace"
       number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "namespace"
+    }
+    field {
+      name: "timestamp"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "timestamp"
+    }
+    field {
+      name: "event"
+      number: 4
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"

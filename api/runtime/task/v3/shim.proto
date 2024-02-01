@@ -210,7 +210,10 @@ message ResumeRequest {
 	string id = 1;
 }
 
+// TODO: reuse existing Proto message.
 message Event {
 	string topic = 1;
-	google.protobuf.Any event = 2;
+	string namespace = 2;
+	google.protobuf.Timestamp timestamp = 3;
+	google.protobuf.Any event = 4;
 }
