@@ -120,6 +120,9 @@ message ControllerStartResponse {
 	uint32 pid = 2;
 	google.protobuf.Timestamp created_at = 3;
 	map<string, string> labels = 4;
+	string address = 5;
+	uint32 version = 6;
+	string protocol = 7;
 }
 
 message ControllerPlatformRequest {
@@ -163,6 +166,9 @@ message ControllerStatusResponse {
 	google.protobuf.Timestamp created_at = 5;
 	google.protobuf.Timestamp exited_at = 6;
 	google.protobuf.Any extra = 7;
+	string address = 8;
+	uint32 version = 9;
+	string protocol = 10;
 }
 
 message ControllerShutdownRequest {
