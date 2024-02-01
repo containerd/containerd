@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -760,8 +761,10 @@ func (s *service) Events(ctx context.Context, _ *emptypb.Empty, streamer taskAPI
 		}
 
 		if err := streamer.Send(&taskAPI.Event{
-			Topic: runtime.GetTopic(e),
-			Event: evt,
+			Topic:     runtime.GetTopic(e),
+			Namespace: ns,
+			Event:     evt,
+			Timestamp: timestamppb.Now(),
 		}); err != nil {
 			log.G(ctx).WithError(err).Error("post event")
 		}
