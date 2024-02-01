@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
@@ -70,7 +71,7 @@ type config struct {
 	// schedule. Use suffix "ms" for millisecond and "s" for second.
 	//
 	// Default is "0ms"
-	ScheduleDelay duration `toml:"schedule_delay"`
+	ScheduleDelay tomlext.Duration `toml:"schedule_delay"`
 
 	// StartupDelay is the delay duration to do an initial garbage
 	// collection after startup. The initial garbage collection is used to
@@ -79,22 +80,7 @@ type config struct {
 	// "ms" for millisecond and "s" for second.
 	//
 	// Default is "100ms"
-	StartupDelay duration `toml:"startup_delay"`
-}
-
-type duration time.Duration
-
-func (d *duration) UnmarshalText(text []byte) error {
-	ed, err := time.ParseDuration(string(text))
-	if err != nil {
-		return err
-	}
-	*d = duration(ed)
-	return nil
-}
-
-func (d duration) MarshalText() (text []byte, err error) {
-	return []byte(time.Duration(d).String()), nil
+	StartupDelay tomlext.Duration `toml:"startup_delay"`
 }
 
 func init() {
@@ -108,8 +94,8 @@ func init() {
 			PauseThreshold:    0.02,
 			DeletionThreshold: 0,
 			MutationThreshold: 100,
-			ScheduleDelay:     duration(0),
-			StartupDelay:      duration(100 * time.Millisecond),
+			ScheduleDelay:     tomlext.FromStdTime(0),
+			StartupDelay:      tomlext.FromStdTime(100 * time.Millisecond),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
