@@ -60,15 +60,16 @@ var (
 )
 
 // NewTaskService creates a new instance of a task service
-func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.Service) (taskAPI.TTRPCTaskService, error) {
+func NewTaskService(ctx context.Context, sd shutdown.Service) (taskAPI.TTRPCTaskService, error) {
 	var (
-		ep  oom.Watcher
-		err error
+		ep     oom.Watcher
+		err    error
+		events = make(chan interface{}, 1024)
 	)
 	if cgroups.Mode() == cgroups.Unified {
-		ep, err = oomv2.New(publisher)
+		ep, err = oomv2.New(events)
 	} else {
-		ep, err = oomv1.New(publisher)
+		ep, err = oomv1.New(events)
 	}
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	go ep.Run(ctx)
 	s := &service{
 		context:         ctx,
-		events:          make(chan interface{}, 128),
+		events:          events,
 		ec:              reaper.Default.Subscribe(),
 		ep:              ep,
 		shutdown:        sd,
@@ -84,7 +85,6 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		running:         make(map[int][]containerProcess),
 		pendingExecs:    make(map[*runc.Container]int),
 		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
-		publisher:       publisher,
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -93,8 +93,11 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 
 	sd.RegisterCallback(func(context.Context) error {
+		// Close OOM watcher to prevent it from writing events to closed events channel below.
+		err := ep.Close()
+
 		close(s.events)
-		return nil
+		return err
 	})
 
 	if address, err := shim.ReadAddress("address"); err == nil {
@@ -126,8 +129,6 @@ type service struct {
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
 	shutdown shutdown.Service
-
-	publisher shim.Publisher
 }
 
 type containerProcess struct {
@@ -766,8 +767,7 @@ func (s *service) Events(ctx context.Context, _ *emptypb.Empty, streamer taskAPI
 		}
 	}
 
-	// TODO: publisher is currently involved in shim's lifecycle. Remove it.
-	return s.publisher.Close()
+	return nil
 }
 
 func (s *service) getContainer(id string) (*runc.Container, error) {

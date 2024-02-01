@@ -24,15 +24,13 @@ import (
 
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/oom"
-	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/log"
 )
 
 // New returns an implementation that listens to OOM events
 // from a container's cgroups.
-func New(publisher shim.Publisher) (oom.Watcher, error) {
+func New(publisher chan<- interface{}) (oom.Watcher, error) {
 	return &watcher{
 		itemCh:    make(chan item),
 		publisher: publisher,
@@ -42,7 +40,7 @@ func New(publisher shim.Publisher) (oom.Watcher, error) {
 // watcher implementation for handling OOM events from a container's cgroup
 type watcher struct {
 	itemCh    chan item
-	publisher shim.Publisher
+	publisher chan<- interface{}
 }
 
 type item struct {
@@ -71,10 +69,8 @@ func (w *watcher) Run(ctx context.Context) {
 			}
 			lastOOM := lastOOMMap[i.id]
 			if i.ev.OOMKill > lastOOM {
-				if err := w.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+				w.publisher <- &eventstypes.TaskOOM{
 					ContainerID: i.id,
-				}); err != nil {
-					log.G(ctx).WithError(err).Error("publish OOM event")
 				}
 			}
 			if i.ev.OOMKill > 0 {

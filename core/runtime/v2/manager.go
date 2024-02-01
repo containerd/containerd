@@ -511,7 +511,7 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	return t, nil
 }
 
-// tryStreamEvents streams evetns from shim (if its supported by the shim implementation).
+// tryStreamEvents attempts to stream shim events using bidirectional TTRPC/GRPC channel.
 func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error {
 	// TODO: Use slices.Contains once on Go 1.21
 	supportsStreaming := false
@@ -522,7 +522,7 @@ func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error
 		}
 	}
 
-	// Shims will use legacy events reporting.
+	// Not supported, shim will use legacy events reporting.
 	if !supportsStreaming {
 		return nil
 	}

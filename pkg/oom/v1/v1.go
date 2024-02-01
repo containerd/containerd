@@ -25,9 +25,7 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/oom"
-	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
@@ -35,7 +33,7 @@ import (
 
 // New returns an epoll implementation that listens to OOM events
 // from a container's cgroups.
-func New(publisher shim.Publisher) (oom.Watcher, error) {
+func New(publisher chan<- interface{}) (oom.Watcher, error) {
 	fd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
@@ -52,7 +50,7 @@ type epoller struct {
 	mu sync.Mutex
 
 	fd        int
-	publisher shim.Publisher
+	publisher chan<- interface{}
 	set       map[uintptr]*item
 }
 
@@ -136,10 +134,8 @@ func (e *epoller) process(ctx context.Context, fd uintptr) {
 		unix.Close(int(fd))
 		return
 	}
-	if err := e.publisher.Publish(ctx, runtime.TaskOOMEventTopic, &eventstypes.TaskOOM{
+	e.publisher <- &eventstypes.TaskOOM{
 		ContainerID: i.id,
-	}); err != nil {
-		log.G(ctx).WithError(err).Error("publish OOM event")
 	}
 }
 
