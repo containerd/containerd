@@ -21,9 +21,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	goruntime "runtime"
+	"strconv"
 	"time"
 
+	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	apitypes "github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 	"github.com/pelletier/go-toml/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -34,7 +40,15 @@ import (
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/opencontainers/image-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 )
+
+func init() {
+	const prefix = "types.containerd.io"
+	major := strconv.Itoa(specs.VersionMajor)
+	typeurl.Register(&features.Features{}, prefix, "opencontainers/runtime-spec", major, "features", "Features")
+}
 
 const (
 	// defaultImagePullProgressTimeoutDuration is the default value of imagePullProgressTimeout.
@@ -71,6 +85,17 @@ const (
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
 	DefaultSandboxImage = "registry.k8s.io/pause:3.9"
+)
+
+// Ternary represents a ternary value.
+// Ternary is needed because TOML does not accept "null" for boolean values.
+type Ternary = string
+
+const (
+	TernaryEmpty      Ternary = "" // alias for IfPossible
+	TernaryEnabled    Ternary = "Enabled"
+	TernaryIfPossible Ternary = "IfPossible"
+	TernaryDisabled   Ternary = "Disabled"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -116,6 +141,15 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+
+	// TreatRoMountsAsRro ("Enabled"|"IfPossible"|"Disabled")
+	// treats read-only mounts as recursive read-only mounts.
+	// An empty string means "IfPossible".
+	// "Enabled" requires Linux kernel v5.12 or later.
+	// Introduced in containerd v2.0.
+	// This configuration does not apply to non-volume mounts such as "/sys/fs/cgroup".
+	TreatRoMountsAsRro         Ternary `toml:"treat_ro_mount_as_rro" json:"treatRoMountsAsRro"`
+	TreatRoMountsAsRroResolved bool    `toml:"-" json:"-"` // Do not set manually
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -499,8 +533,120 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	return warnings, nil
 }
 
+func introspectRuntimeFeatures(ctx context.Context, introspectionClient introspectionapi.IntrospectionClient, r Runtime) (*features.Features, error) {
+	if introspectionClient == nil { // happens for unit tests
+		return nil, errors.New("introspectionClient is nil")
+	}
+	infoReq := &introspectionapi.PluginInfoRequest{
+		Type: string(plugins.RuntimePluginV2),
+		ID:   "task",
+	}
+	rr := &apitypes.RuntimeRequest{
+		RuntimePath: r.Type,
+	}
+	if r.Path != "" {
+		rr.RuntimePath = r.Path
+	}
+	options, err := GenerateRuntimeOptions(r)
+	if err != nil {
+		return nil, err
+	}
+	rr.Options, err = protobuf.MarshalAnyToProto(options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
+	}
+	infoReq.Options, err = protobuf.MarshalAnyToProto(rr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %w", rr, err)
+	}
+	infoResp, err := introspectionClient.PluginInfo(ctx, infoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
+	}
+	var info apitypes.RuntimeInfo
+	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
+		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+	featuresX, err := typeurl.UnmarshalAny(info.Features)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Features (%T): %w", info.Features, err)
+	}
+	features, ok := featuresX.(*features.Features)
+	if !ok {
+		return nil, fmt.Errorf("unknown features type %T", featuresX)
+	}
+	return features, nil
+}
+
+// resolveTreatRoMountsAsRro resolves r.TreatRoMountsAsRro string into a boolean.
+func resolveTreatRoMountsAsRro(ctx context.Context, introspectionClient introspectionapi.IntrospectionClient, r Runtime) (bool, error) {
+	debugPrefix := "treat_ro_mounts_as_rro"
+	if r.Type != "" {
+		debugPrefix += fmt.Sprintf("[%s]", r.Type)
+	}
+	if binaryName := r.Options["BinaryName"]; binaryName != "" {
+		debugPrefix += fmt.Sprintf("[%v]", binaryName)
+	}
+	debugPrefix += ": "
+
+	var runtimeSupportsRro bool
+	if r.Type == plugins.RuntimeRuncV2 {
+		features, err := introspectRuntimeFeatures(ctx, introspectionClient, r)
+		if err != nil {
+			log.G(ctx).WithError(err).Warnf(debugPrefix + "failed to introspect runtime features (binary is not compatible with runc v1.1?)")
+		} else {
+			log.G(ctx).Debugf(debugPrefix+"Features: %+v", features)
+			for _, s := range features.MountOptions {
+				if s == "rro" {
+					runtimeSupportsRro = true
+					break
+				}
+			}
+		}
+	}
+
+	switch r.TreatRoMountsAsRro {
+	case TernaryDisabled:
+		log.G(ctx).Debug(debugPrefix + "rro mounts are explicitly disabled")
+		return false, nil
+	case TernaryEnabled:
+		log.G(ctx).Debug(debugPrefix + "rro mounts are explicitly enabled")
+		if !kernelSupportsRro {
+			return true, fmt.Errorf("invalid `treat_ro_mounts_as_rro`: %q: needs Linux kernel v5.12 or later", TernaryEnabled)
+		}
+		if !runtimeSupportsRro {
+			return true, fmt.Errorf("invalid `treat_ro_mounts_as_rro`: %q: needs a runtime that is compatible with runc v1.1", TernaryEnabled)
+		}
+		return true, nil
+	case TernaryEmpty, TernaryIfPossible:
+		if r.Type != plugins.RuntimeRuncV2 {
+			log.G(ctx).Debugf(debugPrefix+"rro mounts are not supported by runtime %q, disabling rro mounts", r.Type)
+			return false, nil
+		}
+		if !kernelSupportsRro {
+			msg := debugPrefix + "rro mounts are not supported by kernel, disabling rro mounts"
+			if goruntime.GOOS == "linux" {
+				msg += " (Hint: upgrade the kernel to v5.12 or later)"
+				log.G(ctx).Warn(msg)
+			} else {
+				log.G(ctx).Debug(msg)
+			}
+			return false, nil
+		}
+		if !runtimeSupportsRro {
+			log.G(ctx).Warn(debugPrefix + "rro mounts are not supported by runtime, disabling rro mounts (Hint: use a runtime that is compatible with runc v1.1)")
+			return false, nil
+		}
+		log.G(ctx).Debug(debugPrefix + "rro mounts are implicitly enabled")
+		return true, nil
+	default:
+		return false, fmt.Errorf("invalid `treat_ro_mounts_as_rro`: %q (must be %q, %q, or %q)",
+			r.TreatRoMountsAsRro, TernaryDisabled, TernaryEnabled, TernaryIfPossible)
+	}
+}
+
 // ValidateRuntimeConfig validates the given runtime configuration.
-func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
+func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig, introspectionClient introspectionapi.IntrospectionClient) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
 	if c.ContainerdConfig.Runtimes == nil {
 		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
@@ -521,8 +667,15 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		// If empty, use default podSandbox mode
 		if len(r.Sandboxer) == 0 {
 			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
 		}
+
+		// Resolve r.TreatRoMountsAsRro (string; empty value must not be ignored) into r.TreatRoMountsAsRroResolved (bool)
+		var err error
+		r.TreatRoMountsAsRroResolved, err = resolveTreatRoMountsAsRro(ctx, introspectionClient, r)
+		if err != nil {
+			return warnings, err
+		}
+		c.ContainerdConfig.Runtimes[k] = r
 	}
 
 	// Validation for drain_exec_sync_io_timeout

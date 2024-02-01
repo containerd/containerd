@@ -25,3 +25,5 @@ import (
 func ValidateEnableUnprivileged(ctx context.Context, c *RuntimeConfig) error {
 	return nil
 }
+
+var kernelSupportsRro bool
