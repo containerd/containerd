@@ -75,6 +75,10 @@ const (
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
 	RuntimeRuncV2 = "io.containerd.runc.v2"
 
+	// RuntimeRuncV2Rs is the runc runtime that supports multiple containers per shim which
+	// written by rust.
+	RuntimeRuncV2Rs = "io.containerd.runc.v2-rs"
+
 	// RuntimeRunhcsV1 is the runtime type for runhcs.
 	RuntimeRunhcsV1 = "io.containerd.runhcs.v1"
 
