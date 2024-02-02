@@ -81,6 +81,8 @@ require (
 	tags.cncf.io/container-device-interface v0.6.2
 )
 
+replace k8s.io/cri-api => github.com/everpeace/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20240202034630-398ba8740f70
+
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
