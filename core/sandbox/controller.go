@@ -117,6 +117,9 @@ type ControllerInstance struct {
 	SandboxID string
 	Pid       uint32
 	CreatedAt time.Time
+	Address   string
+	Protocol  string
+	Version   int
 	Labels    map[string]string
 }
 

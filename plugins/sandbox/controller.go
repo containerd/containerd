@@ -161,10 +161,13 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		c.cleanupShim(ctx, sandboxID, svc)
 		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
-
+	address, protocol, version := shim.Endpoint()
 	return sandbox.ControllerInstance{
 		SandboxID: sandboxID,
 		Pid:       resp.GetPid(),
+		Address:   address,
+		Protocol:  protocol,
+		Version:   version,
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 	}, nil
 }
