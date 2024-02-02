@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/v2/api/runtime/task/v2"
+	"github.com/containerd/containerd/v2/api/runtime/task/v3"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/shim"
@@ -232,7 +232,7 @@ var execCommand = &cli.Command{
 	},
 }
 
-func getTaskService(context *cli.Context) (task.TaskService, error) {
+func getTaskService(context *cli.Context) (task.TTRPCTaskClient, error) {
 	id := context.String("id")
 	if id == "" {
 		return nil, fmt.Errorf("container id must be specified")
@@ -255,7 +255,7 @@ func getTaskService(context *cli.Context) (task.TaskService, error) {
 			// TODO(stevvooe): This actually leaks the connection. We were leaking it
 			// before, so may not be a huge deal.
 
-			return task.NewTaskClient(client), nil
+			return task.NewTTRPCTaskClient(client), nil
 		}
 	}
 
