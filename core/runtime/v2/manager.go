@@ -199,18 +199,20 @@ func (m *ShimManager) Start(ctx context.Context, id string, opts runtime.CreateO
 
 	// This container belongs to sandbox which supposed to be already started via sandbox API.
 	if opts.SandboxID != "" {
-		process, err := m.Get(ctx, opts.SandboxID)
+		params, err := m.sandboxBootstrapParams(ctx, opts.SandboxID)
 		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+			// For those sandbox we can not get endpoint,
+			// fallback to legacy implementation
+			p, restoreErr := m.restoreBootstrapParams(ctx, opts.SandboxID)
+			if restoreErr != nil {
+				return nil, fmt.Errorf("failed to get bootstrap "+
+					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
+			}
+			params = p
 		}
 
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), opts.SandboxID))
-		if err != nil {
 			return nil, err
 		}
 
@@ -285,6 +287,36 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	return shim, nil
+}
+
+func (m *ShimManager) sandboxBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
+	sb, err := m.sandboxStore.Get(ctx, sandboxID)
+	if err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox in store %s, %v", sandboxID, err)
+	}
+
+	endpoint, err := sb.GetEndpoint()
+	if err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("can't get endpoint in sandbox %s, %v", sandboxID, err)
+	}
+
+	return shimbinary.BootstrapParams{
+		Version:  endpoint.Version,
+		Address:  endpoint.Address,
+		Protocol: endpoint.Protocol,
+	}, nil
+}
+
+func (m *ShimManager) restoreBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
+	process, err := m.Get(ctx, sandboxID)
+	if err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox %s", sandboxID)
+	}
+	params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), sandboxID))
+	if err != nil {
+		return shimbinary.BootstrapParams{}, err
+	}
+	return params, nil
 }
 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.

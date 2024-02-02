@@ -25,6 +25,14 @@ import (
 	"github.com/containerd/typeurl/v2"
 )
 
+// EndpointKey is the key used for storing metadata in the sandbox extensions
+const EndpointKey = "endpoint"
+
+func init() {
+	typeurl.Register(&Endpoint{},
+		"github.com/containerd/containerd/core/sandbox", "Endpoint")
+}
+
 // Sandbox is an object stored in metadata database
 type Sandbox struct {
 	// ID uniquely identifies the sandbox in a namespace
@@ -43,6 +51,12 @@ type Sandbox struct {
 	UpdatedAt time.Time
 	// Extensions stores client-specified metadata
 	Extensions map[string]typeurl.Any
+}
+
+type Endpoint struct {
+	Address  string
+	Protocol string
+	Version  int
 }
 
 // RuntimeOpts holds runtime specific information
@@ -105,6 +119,21 @@ func (s *Sandbox) GetExtension(name string, obj interface{}) error {
 	}
 
 	return nil
+}
+
+// GetEndpoint retrieves a sandbox endpoint.
+func (s *Sandbox) GetEndpoint() (Endpoint, error) {
+	var endpoint Endpoint
+	out, ok := s.Extensions[EndpointKey]
+	if !ok {
+		return endpoint, errdefs.ErrNotFound
+	}
+
+	if err := typeurl.UnmarshalTo(out, &endpoint); err != nil {
+		return endpoint, fmt.Errorf("failed to unmarshal sandbox endpoint: %w", err)
+	}
+
+	return endpoint, nil
 }
 
 // GetLabel retrieves a sandbox label by name.

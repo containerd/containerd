@@ -265,6 +265,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
+	if ctrl.Protocol != "" && ctrl.Address != "" {
+		// Save sandbox endpoint to store
+		if err := sandboxInfo.AddExtension(sb.EndpointKey,
+			&sb.Endpoint{
+				Protocol: ctrl.Protocol,
+				Version:  ctrl.Version,
+				Address:  ctrl.Address,
+			}); err != nil {
+			return nil, fmt.Errorf("unable to add extension %s to sandbox %s: %v", sb.EndpointKey, id, err)
+		}
+	}
+
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+	}
+
 	if !hostNetwork(config) && userNsEnabled {
 		// If userns is enabled, then the netns was created by the OCI runtime
 		// on controller.Start(). The OCI runtime needs to create the netns
