@@ -117,6 +117,9 @@ type ControllerInstance struct {
 	SandboxID string
 	Pid       uint32
 	CreatedAt time.Time
+	Address   string
+	Protocol  string
+	Version   uint32
 	Labels    map[string]string
 }
 
@@ -133,4 +136,7 @@ type ControllerStatus struct {
 	CreatedAt time.Time
 	ExitedAt  time.Time
 	Extra     typeurl.Any
+	Address   string
+	Protocol  string
+	Version   uint32
 }

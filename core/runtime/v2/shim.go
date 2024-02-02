@@ -185,8 +185,9 @@ type ShimInstance interface {
 	Client() any
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
-	// Version returns shim's features compatibility version.
-	Version() int
+	// Endpoint returns shim's endpoint information,
+	// including address, protocol and version.
+	Endpoint() (string, string, int)
 }
 
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
@@ -359,9 +360,11 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 }
 
 type shim struct {
-	bundle  *Bundle
-	client  any
-	version int
+	bundle   *Bundle
+	client   any
+	address  string
+	protocol string
+	version  int
 }
 
 var _ ShimInstance = (*shim)(nil)
@@ -371,8 +374,8 @@ func (s *shim) ID() string {
 	return s.bundle.ID
 }
 
-func (s *shim) Version() int {
-	return s.version
+func (s *shim) Endpoint() (string, string, int) {
+	return s.address, s.protocol, s.version
 }
 
 func (s *shim) Namespace() string {
@@ -440,7 +443,8 @@ type shimTask struct {
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
-	taskClient, err := NewTaskClient(shim.Client(), shim.Version())
+	_, _, version := shim.Endpoint()
+	taskClient, err := NewTaskClient(shim.Client(), version)
 	if err != nil {
 		return nil, err
 	}
