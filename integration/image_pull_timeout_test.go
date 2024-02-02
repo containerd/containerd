@@ -42,9 +42,9 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	criserver "github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	criserver "github.com/containerd/containerd/v2/internal/cri/server"
+	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
