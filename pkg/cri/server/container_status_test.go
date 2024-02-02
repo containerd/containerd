@@ -158,9 +158,11 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expected.ExitCode = test.exitCode
 			expected.Message = test.message
 			patchExceptedWithState(expected, test.expectedState)
-			containerStatus := toCRIContainerStatus(container,
+			containerStatus, err := toCRIContainerStatus(context.Background(),
+				container,
 				expected.Image,
 				expected.ImageRef)
+			assert.Nil(t, err)
 			assert.Equal(t, expected, containerStatus, test.desc)
 		})
 	}
