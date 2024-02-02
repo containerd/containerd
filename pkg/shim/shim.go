@@ -255,11 +255,6 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-	publisher, err := NewPublisher(ttrpcAddress)
-	if err != nil {
-		return err
-	}
-	defer publisher.Close()
 
 	ctx = namespaces.WithNamespace(ctx, namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
@@ -329,15 +324,6 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		ID:   "shutdown",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			return sd, nil
-		},
-	})
-
-	// Register event plugin
-	registry.Register(&plugin.Registration{
-		Type: plugins.EventPlugin,
-		ID:   "publisher",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return publisher, nil
 		},
 	})
 
