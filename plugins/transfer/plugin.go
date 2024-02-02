@@ -22,7 +22,6 @@ import (
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
-	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/pkg/transfer/local"
 	"github.com/containerd/containerd/v2/pkg/unpack"
@@ -81,12 +80,7 @@ func init() {
 			// If UnpackConfiguration is not defined, set the default.
 			// If UnpackConfiguration is defined and empty, ignore.
 			if config.UnpackConfiguration == nil {
-				config.UnpackConfiguration = []unpackConfiguration{
-					{
-						Platform:    platforms.Format(platforms.DefaultSpec()),
-						Snapshotter: defaults.DefaultSnapshotter,
-					},
-				}
+				config.UnpackConfiguration = defaultUnpackConfig()
 			}
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
@@ -122,7 +116,7 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", name)
+							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", plugin.Registration.ID)
 							continue
 						}
 						inst, err := plugin.Instance()
