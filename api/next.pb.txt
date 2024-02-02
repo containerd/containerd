@@ -3963,51 +3963,11 @@ file {
   syntax: "proto3"
 }
 file {
-  name: "github.com/containerd/containerd/api/services/events/v1/events.proto"
-  package: "containerd.services.events.v1"
+  name: "github.com/containerd/containerd/api/types/event.proto"
+  package: "containerd.types"
   dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   dependency: "google/protobuf/any.proto"
-  dependency: "google/protobuf/empty.proto"
   dependency: "google/protobuf/timestamp.proto"
-  message_type {
-    name: "PublishRequest"
-    field {
-      name: "topic"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "topic"
-    }
-    field {
-      name: "event"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "event"
-    }
-  }
-  message_type {
-    name: "ForwardRequest"
-    field {
-      name: "envelope"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".containerd.services.events.v1.Envelope"
-      json_name: "envelope"
-    }
-  }
-  message_type {
-    name: "SubscribeRequest"
-    field {
-      name: "filters"
-      number: 1
-      label: LABEL_REPEATED
-      type: TYPE_STRING
-      json_name: "filters"
-    }
-  }
   message_type {
     name: "Envelope"
     field {
@@ -4044,6 +4004,56 @@ file {
       64400: 1
     }
   }
+  options {
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/services/events/v1/events.proto"
+  package: "containerd.services.events.v1"
+  dependency: "github.com/containerd/containerd/api/types/event.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/empty.proto"
+  message_type {
+    name: "PublishRequest"
+    field {
+      name: "topic"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "topic"
+    }
+    field {
+      name: "event"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "event"
+    }
+  }
+  message_type {
+    name: "ForwardRequest"
+    field {
+      name: "envelope"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Envelope"
+      json_name: "envelope"
+    }
+  }
+  message_type {
+    name: "SubscribeRequest"
+    field {
+      name: "filters"
+      number: 1
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "filters"
+    }
+  }
   service {
     name: "Events"
     method {
@@ -4059,7 +4069,7 @@ file {
     method {
       name: "Subscribe"
       input_type: ".containerd.services.events.v1.SubscribeRequest"
-      output_type: ".containerd.services.events.v1.Envelope"
+      output_type: ".containerd.types.Envelope"
       server_streaming: true
     }
   }
@@ -7070,10 +7080,8 @@ file {
 file {
   name: "github.com/containerd/containerd/api/services/ttrpc/events/v1/events.proto"
   package: "containerd.services.events.ttrpc.v1"
-  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
-  dependency: "google/protobuf/any.proto"
+  dependency: "github.com/containerd/containerd/api/types/event.proto"
   dependency: "google/protobuf/empty.proto"
-  dependency: "google/protobuf/timestamp.proto"
   message_type {
     name: "ForwardRequest"
     field {
@@ -7081,44 +7089,8 @@ file {
       number: 1
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
-      type_name: ".containerd.services.events.ttrpc.v1.Envelope"
+      type_name: ".containerd.types.Envelope"
       json_name: "envelope"
-    }
-  }
-  message_type {
-    name: "Envelope"
-    field {
-      name: "timestamp"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "timestamp"
-    }
-    field {
-      name: "namespace"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "namespace"
-    }
-    field {
-      name: "topic"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "topic"
-    }
-    field {
-      name: "event"
-      number: 4
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "event"
-    }
-    options {
-      64400: 1
     }
   }
   service {

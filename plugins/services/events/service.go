@@ -22,6 +22,7 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
+	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/events/exchange"
 	"github.com/containerd/containerd/v2/plugins"
@@ -114,8 +115,8 @@ func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeS
 	}
 }
 
-func toProto(env *events.Envelope) *api.Envelope {
-	return &api.Envelope{
+func toProto(env *events.Envelope) *types.Envelope {
+	return &types.Envelope{
 		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
@@ -123,7 +124,7 @@ func toProto(env *events.Envelope) *api.Envelope {
 	}
 }
 
-func fromProto(env *api.Envelope) *events.Envelope {
+func fromProto(env *types.Envelope) *events.Envelope {
 	return &events.Envelope{
 		Timestamp: protobuf.FromTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
