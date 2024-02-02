@@ -2865,6 +2865,16 @@ file {
       json_name: "event"
     }
   }
+  message_type {
+    name: "Dummy"
+    field {
+      name: "dummy"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "dummy"
+    }
+  }
   service {
     name: "Task"
     method {
@@ -2954,7 +2964,7 @@ file {
     }
     method {
       name: "Events"
-      input_type: ".google.protobuf.Empty"
+      input_type: ".containerd.task.v3.Dummy"
       output_type: ".containerd.task.v3.Event"
       server_streaming: true
     }

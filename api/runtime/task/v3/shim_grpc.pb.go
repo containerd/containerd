@@ -48,7 +48,7 @@ type TaskClient interface {
 	//
 	// This feature is optional and not enabled by default. A shim that supports this
 	// must return `shim.EventStreaming` feature in bootstrap params.
-	Events(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Task_EventsClient, error)
+	Events(ctx context.Context, in *Dummy, opts ...grpc.CallOption) (Task_EventsClient, error)
 }
 
 type taskClient struct {
@@ -212,7 +212,7 @@ func (c *taskClient) Shutdown(ctx context.Context, in *ShutdownRequest, opts ...
 	return out, nil
 }
 
-func (c *taskClient) Events(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Task_EventsClient, error) {
+func (c *taskClient) Events(ctx context.Context, in *Dummy, opts ...grpc.CallOption) (Task_EventsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &Task_ServiceDesc.Streams[0], "/containerd.task.v3.Task/Events", opts...)
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ type TaskServer interface {
 	//
 	// This feature is optional and not enabled by default. A shim that supports this
 	// must return `shim.EventStreaming` feature in bootstrap params.
-	Events(*emptypb.Empty, Task_EventsServer) error
+	Events(*Dummy, Task_EventsServer) error
 	mustEmbedUnimplementedTaskServer()
 }
 
@@ -332,7 +332,7 @@ func (UnimplementedTaskServer) Connect(context.Context, *ConnectRequest) (*Conne
 func (UnimplementedTaskServer) Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
-func (UnimplementedTaskServer) Events(*emptypb.Empty, Task_EventsServer) error {
+func (UnimplementedTaskServer) Events(*Dummy, Task_EventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method Events not implemented")
 }
 func (UnimplementedTaskServer) mustEmbedUnimplementedTaskServer() {}
@@ -655,7 +655,7 @@ func _Task_Shutdown_Handler(srv interface{}, ctx context.Context, dec func(inter
 }
 
 func _Task_Events_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(emptypb.Empty)
+	m := new(Dummy)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

@@ -24,7 +24,6 @@ import (
 	"os"
 	"sync"
 
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/containerd/cgroups/v3"
@@ -751,7 +750,7 @@ func (s *service) getContainerPids(ctx context.Context, container *runc.Containe
 	return pids, nil
 }
 
-func (s *service) Events(ctx context.Context, _ *emptypb.Empty, streamer taskAPI.TTRPCTask_EventsServer) error {
+func (s *service) Events(ctx context.Context, _ *taskAPI.Dummy, streamer taskAPI.TTRPCTask_EventsServer) error {
 	ns, _ := namespaces.Namespace(ctx)
 	ctx = namespaces.WithNamespace(context.Background(), ns)
 	for e := range s.events {
