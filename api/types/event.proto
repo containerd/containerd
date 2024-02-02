@@ -25,9 +25,9 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/containerd/containerd/v2/api/types;types";
 
 message Envelope {
-  option (containerd.types.fieldpath) = true;
-  google.protobuf.Timestamp timestamp = 1;
-  string namespace = 2;
-  string topic = 3;
-  google.protobuf.Any event = 4;
+	option (containerd.types.fieldpath) = true;
+	google.protobuf.Timestamp timestamp = 1;
+	string namespace = 2;
+	string topic = 3;
+	google.protobuf.Any event = 4;
 }
