@@ -22,8 +22,13 @@ import (
 	"testing"
 	"time"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/typeurl/v2"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -31,7 +36,7 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 )
 
-func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Status,
+func getContainerStatusTestData(t *testing.T) (*containerstore.Metadata, containerd.Container, *containerstore.Status,
 	*imagestore.Image, *runtime.ContainerStatus) {
 	imageID := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	testID := "test-id"
@@ -70,6 +75,9 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 		},
 	}
+
+	container := &fakeSpecOnlyContainer{t: t, spec: &specs.Spec{}}
+
 	expected := &runtime.ContainerStatus{
 		Id:          testID,
 		Metadata:    config.GetMetadata(),
@@ -82,9 +90,10 @@ func getContainerStatusTestData() (*containerstore.Metadata, *containerstore.Sta
 		Annotations: config.GetAnnotations(),
 		Mounts:      config.GetMounts(),
 		LogPath:     "test-log-path",
+		User:        &runtime.ContainerUser{},
 	}
 
-	return metadata, status, image, expected
+	return metadata, container, status, image, expected
 }
 
 func TestToCRIContainerStatus(t *testing.T) {
@@ -139,7 +148,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 
-			metadata, status, _, expected := getContainerStatusTestData()
+			metadata, ctnr, status, _, expected := getContainerStatusTestData(t)
 			// Update status with test case.
 			status.StartedAt = test.startedAt
 			status.FinishedAt = test.finishedAt
@@ -149,6 +158,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				*metadata,
 				containerstore.WithFakeStatus(*status),
+				containerstore.WithContainer(ctnr),
 			)
 			assert.NoError(t, err)
 			// Set expectation based on test case.
@@ -158,9 +168,11 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expected.ExitCode = test.exitCode
 			expected.Message = test.message
 			patchExceptedWithState(expected, test.expectedState)
-			containerStatus := toCRIContainerStatus(container,
+			containerStatus, err := toCRIContainerStatus(context.Background(),
+				container,
 				expected.Image,
 				expected.ImageRef)
+			assert.Nil(t, err)
 			assert.Equal(t, expected, containerStatus, test.desc)
 		})
 	}
@@ -168,7 +180,7 @@ func TestToCRIContainerStatus(t *testing.T) {
 
 // TODO(mikebrow): add a fake containerd container.Container.Spec client api so we can test verbose is true option
 func TestToCRIContainerInfo(t *testing.T) {
-	metadata, status, _, _ := getContainerStatusTestData()
+	metadata, _, status, _, _ := getContainerStatusTestData(t)
 	container, err := containerstore.NewContainer(
 		*metadata,
 		containerstore.WithFakeStatus(*status),
@@ -231,7 +243,7 @@ func TestContainerStatus(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
-			metadata, status, image, expected := getContainerStatusTestData()
+			metadata, ctnr, status, image, expected := getContainerStatusTestData(t)
 			// Update status with test case.
 			status.StartedAt = test.startedAt
 			status.FinishedAt = test.finishedAt
@@ -239,6 +251,7 @@ func TestContainerStatus(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				*metadata,
 				containerstore.WithFakeStatus(*status),
+				containerstore.WithContainer(ctnr),
 			)
 			assert.NoError(t, err)
 			if test.exist {
@@ -301,4 +314,86 @@ func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.Con
 	case runtime.ContainerState_CONTAINER_RUNNING:
 		expected.FinishedAt = 0
 	}
+}
+
+var _ containerd.Container = &fakeSpecOnlyContainer{}
+
+type fakeSpecOnlyContainer struct {
+	t         *testing.T
+	spec      *specs.Spec
+	errOnSpec error
+}
+
+// Spec implements client.Container.
+func (c *fakeSpecOnlyContainer) Spec(context.Context) (*specs.Spec, error) {
+	if c.errOnSpec != nil {
+		return nil, c.errOnSpec
+	}
+	return c.spec, nil
+}
+
+// Checkpoint implements client.Container.
+func (c *fakeSpecOnlyContainer) Checkpoint(context.Context, string, ...containerd.CheckpointOpts) (containerd.Image, error) {
+	c.t.Error("fakeSpecOnlyContainer.Checkpoint: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// Delete implements client.Container.
+func (c *fakeSpecOnlyContainer) Delete(context.Context, ...containerd.DeleteOpts) error {
+	c.t.Error("fakeSpecOnlyContainer.Delete: not implemented")
+	return errors.New("not implemented")
+}
+
+// Extensions implements client.Container.
+func (c *fakeSpecOnlyContainer) Extensions(context.Context) (map[string]typeurl.Any, error) {
+	c.t.Error("fakeSpecOnlyContainer.Extensions: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// ID implements client.Container.
+func (c *fakeSpecOnlyContainer) ID() string {
+	c.t.Error("fakeSpecOnlyContainer.ID: not implemented")
+	return "" // not implemented
+}
+
+// Image implements client.Container.
+func (c *fakeSpecOnlyContainer) Image(context.Context) (containerd.Image, error) {
+	c.t.Error("fakeSpecOnlyContainer.Image: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// Info implements client.Container.
+func (c *fakeSpecOnlyContainer) Info(context.Context, ...containerd.InfoOpts) (containers.Container, error) {
+	c.t.Error("fakeSpecOnlyContainer.Info: not implemented")
+	return containers.Container{}, errors.New("not implemented")
+}
+
+// Labels implements client.Container.
+func (c *fakeSpecOnlyContainer) Labels(context.Context) (map[string]string, error) {
+	c.t.Error("fakeSpecOnlyContainer.Labels: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// NewTask implements client.Container.
+func (c *fakeSpecOnlyContainer) NewTask(context.Context, cio.Creator, ...containerd.NewTaskOpts) (containerd.Task, error) {
+	c.t.Error("fakeSpecOnlyContainer.NewTask: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// SetLabels implements client.Container.
+func (c *fakeSpecOnlyContainer) SetLabels(context.Context, map[string]string) (map[string]string, error) {
+	c.t.Error("fakeSpecOnlyContainer.SetLabels: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// Task implements client.Container.
+func (c *fakeSpecOnlyContainer) Task(context.Context, cio.Attach) (containerd.Task, error) {
+	c.t.Error("fakeSpecOnlyContainer.Task: not implemented")
+	return nil, errors.New("not implemented")
+}
+
+// Update implements client.Container.
+func (c *fakeSpecOnlyContainer) Update(context.Context, ...containerd.UpdateContainerOpts) error {
+	c.t.Error("fakeSpecOnlyContainer.Update: not implemented")
+	return errors.New("not implemented")
 }

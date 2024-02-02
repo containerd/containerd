@@ -65,8 +65,23 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	} else if imageConfig.User != "" {
 		userstr, _, _ = strings.Cut(imageConfig.User, ":")
 	}
-	specOpts = append(specOpts, customopts.WithAdditionalGIDs(userstr),
-		customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()))
+
+	switch securityContext.GetSupplementalGroupsPolicy() {
+	case runtime.SupplementalGroupsPolicy_Merge:
+		// merging group defined in /etc/passwd
+		// and SupplementalGroups defined in security context
+		specOpts = append(specOpts,
+			customopts.WithAdditionalGIDs(userstr),
+			customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()),
+		)
+	case runtime.SupplementalGroupsPolicy_Strict:
+		// no merging group defined in /etc/passwd
+		specOpts = append(specOpts,
+			customopts.WithSupplementalGroups(securityContext.GetSupplementalGroups()),
+		)
+	default:
+		return nil, fmt.Errorf("not implemented in this containerd release: SupplementalGroupsPolicy=%d", securityContext.GetSupplementalGroupsPolicy())
+	}
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {

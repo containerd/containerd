@@ -1468,7 +1468,7 @@ additional-group-for-root:x:22222:root
 		expected        runtimespec.User
 	}{
 		{
-			desc: "Only SecurityContext was set, SecurityContext defines User",
+			desc: "[SupplementalGroupsPolicy=Merge(default)] Only SecurityContext was set, SecurityContext defines User",
 			securityContext: &runtime.LinuxContainerSecurityContext{
 				RunAsUser:          &runtime.Int64Value{Value: 1000},
 				RunAsGroup:         &runtime.Int64Value{Value: 2000},
@@ -1477,13 +1477,13 @@ additional-group-for-root:x:22222:root
 			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333, 11111}},
 		},
 		{
-			desc:            "Only imageConfig.User was set, imageConfig.User defines User",
+			desc:            "[SupplementalGroupsPolicy=Merge(default)] Only imageConfig.User was set, imageConfig.User defines User",
 			imageConfigUser: "1000",
 			securityContext: nil,
 			expected:        runtimespec.User{UID: 1000, GID: 1000, AdditionalGids: []uint32{1000, 11111}},
 		},
 		{
-			desc:            "Both SecurityContext and ImageConfig.User was set, SecurityContext defines User",
+			desc:            "[SupplementalGroupsPolicy=Merge(default)] Both SecurityContext and ImageConfig.User were set, SecurityContext defines User",
 			imageConfigUser: "0",
 			securityContext: &runtime.LinuxContainerSecurityContext{
 				RunAsUser:          &runtime.Int64Value{Value: 1000},
@@ -1493,8 +1493,37 @@ additional-group-for-root:x:22222:root
 			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333, 11111}},
 		},
 		{
-			desc:     "No SecurityContext nor ImageConfig.User were set, runtime default defines User",
+			desc:     "[SupplementalGroupsPolicy=Merge(default)] No SecurityContext nor ImageConfig.User were set, runtime default defines User",
 			expected: runtimespec.User{UID: 0, GID: 0, AdditionalGids: []uint32{0, 22222}},
+		},
+		{
+			desc: "[SupplementalGroupsPolicy=Strict] Only SecurityContext was set, SecurityContext defines User",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				RunAsUser:                &runtime.Int64Value{Value: 1000},
+				RunAsGroup:               &runtime.Int64Value{Value: 2000},
+				SupplementalGroups:       []int64{3333},
+				SupplementalGroupsPolicy: runtime.SupplementalGroupsPolicy_Strict,
+			},
+			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333}},
+		},
+		{
+			desc:            "[SupplementalGroupsPolicy=Strict] Only imageConfig.User was set, imageConfig.User defines User",
+			imageConfigUser: "1000",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				SupplementalGroupsPolicy: runtime.SupplementalGroupsPolicy_Strict,
+			},
+			expected: runtimespec.User{UID: 1000, GID: 1000, AdditionalGids: []uint32{1000}},
+		},
+		{
+			desc:            "[SupplementalGroupsPolicy=Strict] Both SecurityContext and ImageConfig.User were set, SecurityContext defines User",
+			imageConfigUser: "0",
+			securityContext: &runtime.LinuxContainerSecurityContext{
+				RunAsUser:                &runtime.Int64Value{Value: 1000},
+				RunAsGroup:               &runtime.Int64Value{Value: 2000},
+				SupplementalGroups:       []int64{3333},
+				SupplementalGroupsPolicy: runtime.SupplementalGroupsPolicy_Strict,
+			},
+			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333}},
 		},
 	} {
 		test := test
