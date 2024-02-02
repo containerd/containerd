@@ -64,6 +64,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			// Set container to exited if fail to start.
 			if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 				status.Pid = 0
+				if status.StartedAt == int64(0) {
+					status.StartedAt = time.Now().UnixNano()
+				}
 				status.FinishedAt = time.Now().UnixNano()
 				status.ExitCode = errorStartExitCode
 				status.Reason = errorStartReason
