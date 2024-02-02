@@ -30,7 +30,7 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
-	criopts "github.com/containerd/containerd/v2/pkg/cri/opts"
+	criopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

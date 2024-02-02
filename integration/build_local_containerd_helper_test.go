@@ -27,7 +27,7 @@ import (
 	ctrdsrv "github.com/containerd/containerd/v2/cmd/containerd/server"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
+	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/platforms"

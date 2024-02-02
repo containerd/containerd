@@ -27,7 +27,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"

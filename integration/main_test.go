@@ -49,10 +49,10 @@ import (
 	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
 	"github.com/containerd/containerd/v2/integration/remote"
 	dialer "github.com/containerd/containerd/v2/integration/remote/util"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/types"
-	"github.com/containerd/containerd/v2/pkg/cri/util"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/constants"
+	"github.com/containerd/containerd/v2/internal/cri/types"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 const (
