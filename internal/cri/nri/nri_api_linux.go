@@ -23,12 +23,12 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	cstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
