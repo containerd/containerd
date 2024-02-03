@@ -24,7 +24,7 @@ generators = ["go", "go-ttrpc", "go-fieldpath"]
 
 [[overrides]]
 prefixes = ["github.com/containerd/containerd/api/services/ttrpc/events/v1"]
-generators = ["go", "go-ttrpc", "go-fieldpath"]
+generators = ["go", "go-ttrpc"]
 
 [[overrides]]
 # enable ttrpc and disable fieldpath and grpc for the shim

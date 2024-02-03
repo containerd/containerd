@@ -20,6 +20,7 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
+	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/events/exchange"
 	"github.com/containerd/containerd/v2/protobuf"
@@ -39,7 +40,7 @@ func (s *ttrpcService) Forward(ctx context.Context, r *api.ForwardRequest) (*pty
 	return &ptypes.Empty{}, nil
 }
 
-func fromTProto(env *api.Envelope) *events.Envelope {
+func fromTProto(env *types.Envelope) *events.Envelope {
 	return &events.Envelope{
 		Timestamp: protobuf.FromTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
