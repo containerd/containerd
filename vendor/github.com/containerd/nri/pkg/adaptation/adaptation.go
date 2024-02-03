@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/nri/pkg/api"
 	"github.com/containerd/nri/pkg/log"
+	"github.com/containerd/ttrpc"
 )
 
 const (
@@ -60,6 +61,8 @@ type Adaptation struct {
 	dontListen bool
 	syncFn     SyncFn
 	updateFn   UpdateFn
+	clientOpts []ttrpc.ClientOpts
+	serverOpts []ttrpc.ServerOpt
 	listener   net.Listener
 	plugins    []*plugin
 }
@@ -100,6 +103,15 @@ func WithSocketPath(path string) Option {
 func WithDisabledExternalConnections() Option {
 	return func(r *Adaptation) error {
 		r.dontListen = true
+		return nil
+	}
+}
+
+// WithTTRPCOptions sets extra client and server options to use for ttrpc.
+func WithTTRPCOptions(clientOpts []ttrpc.ClientOpts, serverOpts []ttrpc.ServerOpt) Option {
+	return func(r *Adaptation) error {
+		r.clientOpts = append(r.clientOpts, clientOpts...)
+		r.serverOpts = append(r.serverOpts, serverOpts...)
 		return nil
 	}
 }

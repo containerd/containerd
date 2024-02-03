@@ -198,12 +198,16 @@ func (p *plugin) connect(conn stdnet.Conn) (retErr error) {
 	if err != nil {
 		return fmt.Errorf("failed to mux plugin connection for plugin %q: %w", p.name(), err)
 	}
-	rpcc := ttrpc.NewClient(pconn, ttrpc.WithOnClose(
-		func() {
-			log.Infof(noCtx, "connection to plugin %q closed", p.name())
-			close(p.closeC)
-			p.close()
-		}))
+
+	clientOpts := []ttrpc.ClientOpts{
+		ttrpc.WithOnClose(
+			func() {
+				log.Infof(noCtx, "connection to plugin %q closed", p.name())
+				close(p.closeC)
+				p.close()
+			}),
+	}
+	rpcc := ttrpc.NewClient(pconn, append(clientOpts, p.r.clientOpts...)...)
 	defer func() {
 		if retErr != nil {
 			rpcc.Close()
@@ -211,7 +215,7 @@ func (p *plugin) connect(conn stdnet.Conn) (retErr error) {
 	}()
 	stub := api.NewPluginClient(rpcc)
 
-	rpcs, err := ttrpc.NewServer()
+	rpcs, err := ttrpc.NewServer(p.r.serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to create ttrpc server for plugin %q: %w", p.name(), err)
 	}
