@@ -42,7 +42,7 @@ type Config struct {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Disable:          true,
+		Disable:          false,
 		SocketPath:       nri.DefaultSocketPath,
 		PluginPath:       nri.DefaultPluginPath,
 		PluginConfigPath: nri.DefaultPluginConfigPath,
