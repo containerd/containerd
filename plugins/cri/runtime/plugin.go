@@ -24,7 +24,6 @@ import (
 	"os"
 	"path/filepath"
 
-	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -36,7 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -52,7 +50,6 @@ func init() {
 		Config: &config,
 		Requires: []plugin.Type{
 			plugins.WarningPlugin,
-			plugins.ServicePlugin,
 		},
 		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
 			if version >= srvconfig.CurrentConfigVersion {
@@ -76,18 +73,7 @@ func initCRIRuntime(ic *plugin.InitContext) (interface{}, error) {
 	ic.Meta.Exports = map[string]string{"CRIVersion": constants.CRIVersion}
 	ctx := ic.Context
 	pluginConfig := ic.Config.(*criconfig.RuntimeConfig)
-
-	introspectionService, err := ic.GetByID(plugins.ServicePlugin, services.IntrospectionService)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get plugin (%q, %q): %w",
-			plugins.ServicePlugin, services.IntrospectionService, err)
-	}
-	introspectionClient, ok := introspectionService.(introspectionapi.IntrospectionClient)
-	if !ok {
-		return nil, fmt.Errorf("%+v does not implement IntrospectionClient interfae", introspectionService)
-	}
-
-	if warnings, err := criconfig.ValidateRuntimeConfig(ctx, pluginConfig, introspectionClient); err != nil {
+	if warnings, err := criconfig.ValidateRuntimeConfig(ctx, pluginConfig); err != nil {
 		return nil, fmt.Errorf("invalid plugin config: %w", err)
 	} else if len(warnings) > 0 {
 		ws, err := ic.GetSingle(plugins.WarningPlugin)

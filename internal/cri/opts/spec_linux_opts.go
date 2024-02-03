@@ -38,14 +38,8 @@ import (
 	"github.com/containerd/log"
 )
 
-// RuntimeConfig is a subset of [github.com/containerd/containerd/v2/internal/cri/config].
-// Needed for avoiding circular imports.
-type RuntimeConfig struct {
-	TreatRoMountsAsRro bool // only applies to volumes
-}
-
 // WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, rtConfig *RuntimeConfig) oci.SpecOpts {
+func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -73,7 +67,6 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 		sort.Sort(orderedMounts(mounts))
 
 		// Mount cgroup into the container as readonly, which inherits docker's behavior.
-		// TreatRoMountsAsRro does not apply here, as /sys/fs/cgroup is not a volume.
 		s.Mounts = append(s.Mounts, runtimespec.Mount{
 			Source:      "cgroup",
 			Destination: "/sys/fs/cgroup",
@@ -155,25 +148,10 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				options = append(options, "rprivate")
 			}
 
-			var srcIsDir bool
-			if srcSt, err := osi.Stat(src); err != nil {
-				if errors.Is(err, os.ErrNotExist) { // happens when osi is FakeOS
-					srcIsDir = true // assume src to be dir
-				} else {
-					return fmt.Errorf("failed to stat mount source %q: %w", src, err)
-				}
-			} else if srcSt != nil { // srcSt can be nil when osi is FakeOS
-				srcIsDir = srcSt.IsDir()
-			}
-
 			// NOTE(random-liu): we don't change all mounts to `ro` when root filesystem
 			// is readonly. This is different from docker's behavior, but make more sense.
 			if mount.GetReadonly() {
-				if rtConfig != nil && rtConfig.TreatRoMountsAsRro && srcIsDir {
-					options = append(options, "rro")
-				} else {
-					options = append(options, "ro")
-				}
+				options = append(options, "ro")
 			} else {
 				options = append(options, "rw")
 			}
