@@ -19,6 +19,7 @@ package integration
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -60,6 +61,8 @@ func runUpgradeTestCase(
 	setupUpgradeVerifyCase func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc,
 ) func(t *testing.T) {
 	return func(t *testing.T) {
+		// NOTE: Using t.TempDir() here is to ensure there are no leaky
+		// mountpoint after test completed.
 		workDir := t.TempDir()
 
 		t.Log("Install config for previous release")
@@ -132,7 +135,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, rSvc cri.RuntimeService, 
 	)
 
 	secondPodCtx := newPodTCtx(t, rSvc, "stopped-pod", "sandbox")
-	secondPodCtx.stop()
+	secondPodCtx.stop(false)
 
 	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
 		t.Log("List Pods")
@@ -164,7 +167,6 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, rSvc cri.RuntimeService, 
 					default:
 						t.Errorf("unexpected container %s in %s", cntr.Id, pod.Id)
 					}
-
 				}
 
 			case secondPodCtx.id:
@@ -259,6 +261,9 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, rSvc cri.RuntimeS
 		WithCommand("sleep", "1d"))
 
 	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
+		// TODO(fuweid): make svc re-connect to new socket
+		podCtx.rSvc = rSvc
+
 		t.Log("Manipulating containers in the previous pod")
 
 		// For the running container, we get status and stats of it,
@@ -285,6 +290,11 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, rSvc cri.RuntimeS
 		require.NoError(t, rSvc.StopContainer(cntr1, 0))
 		checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_EXITED)
 
+		cntr1DataDir := podCtx.containerDataDir(cntr1)
+		t.Logf("Container %s's data dir %s should be remained until RemoveContainer", cntr1, cntr1DataDir)
+		_, err = os.Stat(cntr1DataDir)
+		require.NoError(t, err)
+
 		t.Logf("Starting created container %s", cntr2)
 		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_CREATED)
 
@@ -297,14 +307,34 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, rSvc cri.RuntimeS
 
 		t.Logf("Removing exited container %s", cntr3)
 		checkContainerState(t, rSvc, cntr3, criruntime.ContainerState_CONTAINER_EXITED)
+
+		cntr3DataDir := podCtx.containerDataDir(cntr3)
+		_, err = os.Stat(cntr3DataDir)
+		require.NoError(t, err)
+
 		require.NoError(t, rSvc.RemoveContainer(cntr3))
 
+		t.Logf("Container %s's data dir %s should be deleted after RemoveContainer", cntr3, cntr3DataDir)
+		_, err = os.Stat(cntr3DataDir)
+		require.True(t, os.IsNotExist(err))
+
 		// Create a new container in the previous pod, start, stop, and remove it
-		// TODO(fuweid): make svc re-connect to new socket
-		podCtx.rSvc = rSvc
 		podCtx.createContainer("runinpreviouspod", busyboxImage,
 			criruntime.ContainerState_CONTAINER_EXITED,
 			WithCommand("sleep", "1d"))
+
+		podCtx.stop(true)
+		podDataDir := podCtx.dataDir()
+
+		t.Logf("Pod %s's data dir %s should be deleted", podCtx.id, podDataDir)
+		_, err = os.Stat(podDataDir)
+		require.True(t, os.IsNotExist(err))
+
+		cntrDataDir := filepath.Dir(cntr3DataDir)
+		t.Logf("Containers data dir %s should be empty", cntrDataDir)
+		ents, err := os.ReadDir(cntrDataDir)
+		require.NoError(t, err)
+		require.Len(t, ents, 0, cntrDataDir)
 	}
 }
 
@@ -378,9 +408,51 @@ func (pCtx *podTCtx) createContainer(name, imageRef string, wantedState crirunti
 	return cnID
 }
 
+// containerDataDir returns container metadata dir maintained by CRI plugin.
+func (pCtx *podTCtx) containerDataDir(cntrID string) string {
+	t := pCtx.t
+
+	// check if container exists
+	status, err := pCtx.rSvc.ContainerStatus(cntrID)
+	require.NoError(t, err)
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+
+	rootDir := cfg["rootDir"].(string)
+	return filepath.Join(rootDir, "containers", status.Id)
+}
+
+// dataDir returns pod metadata dir maintained by CRI plugin.
+func (pCtx *podTCtx) dataDir() string {
+	t := pCtx.t
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+	rootDir := cfg["rootDir"].(string)
+	return filepath.Join(rootDir, "sandboxes", pCtx.id)
+}
+
 // stop stops that pod.
-func (pCtx *podTCtx) stop() {
-	require.NoError(pCtx.t, pCtx.rSvc.StopPodSandbox(pCtx.id))
+func (pCtx *podTCtx) stop(remove bool) {
+	t := pCtx.t
+
+	t.Logf("Stopping pod %s", pCtx.id)
+	require.NoError(t, pCtx.rSvc.StopPodSandbox(pCtx.id))
+	if remove {
+		t.Logf("Removing pod %s", pCtx.id)
+		require.NoError(t, pCtx.rSvc.RemovePodSandbox(pCtx.id))
+	}
+}
+
+// criRuntimeInfo dumps CRI config.
+func criRuntimeInfo(t *testing.T, svc cri.RuntimeService) map[string]interface{} {
+	resp, err := svc.Status()
+	require.NoError(t, err)
+
+	cfg := map[string]interface{}{}
+	err = json.Unmarshal([]byte(resp.GetInfo()["config"]), &cfg)
+	require.NoError(t, err)
+
+	return cfg
 }
 
 // checkContainerState checks container's state.
