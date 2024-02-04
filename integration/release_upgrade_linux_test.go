@@ -41,7 +41,10 @@ import (
 )
 
 // upgradeVerifyCaseFunc is used to verify the behavior after upgrade.
-type upgradeVerifyCaseFunc func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService)
+type upgradeVerifyCaseFunc func(*testing.T, cri.RuntimeService, cri.ImageManagerService)
+
+// beforeUpgradeHookFunc is a hook before upgrade.
+type beforeUpgradeHookFunc func(*testing.T)
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
@@ -58,7 +61,7 @@ func TestUpgrade(t *testing.T) {
 
 func runUpgradeTestCase(
 	previousReleaseBinDir string,
-	setupUpgradeVerifyCase func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc,
+	setupUpgradeVerifyCase func(*testing.T, cri.RuntimeService, cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		// NOTE: Using t.TempDir() here is to ensure there are no leaky
@@ -88,12 +91,17 @@ func runUpgradeTestCase(
 		})
 
 		t.Log("Prepare pods for current release")
-		upgradeCaseFunc := setupUpgradeVerifyCase(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+		upgradeCaseFunc, hookFunc := setupUpgradeVerifyCase(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
 		needToCleanup = false
 
 		t.Log("Gracefully stop previous release's containerd process")
 		require.NoError(t, previousProc.kill(syscall.SIGTERM))
 		require.NoError(t, previousProc.wait(5*time.Minute))
+
+		if hookFunc != nil {
+			t.Log("Run hook before upgrade")
+			hookFunc(t)
+		}
 
 		t.Log("Install default config for current release")
 		currentReleaseCtrdDefaultConfig(t, workDir)
@@ -115,7 +123,9 @@ func runUpgradeTestCase(
 	}
 }
 
-func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, rSvc cri.RuntimeService, iSvc cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
 	pullImagesByCRI(t, iSvc, busyboxImage)
@@ -175,10 +185,12 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, rSvc cri.RuntimeService, 
 				t.Errorf("unexpected pod %s", pod.Id)
 			}
 		}
-	}
+	}, nil
 }
 
-func execToExistingContainer(t *testing.T, rSvc cri.RuntimeService, iSvc cri.ImageManagerService) upgradeVerifyCaseFunc {
+func execToExistingContainer(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
 	pullImagesByCRI(t, iSvc, busyboxImage)
@@ -231,7 +243,7 @@ func execToExistingContainer(t *testing.T, rSvc cri.RuntimeService, iSvc cri.Ima
 		require.NoError(t, err)
 		require.Len(t, stderr, 0)
 		require.Equal(t, "true", string(stdout))
-	}
+	}, nil
 }
 
 // getFileSize returns file's size.
@@ -241,7 +253,9 @@ func getFileSize(t *testing.T, filePath string) int64 {
 	return st.Size()
 }
 
-func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, rSvc cri.RuntimeService, iSvc cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldManipulateContainersInPodAfterUpgrade(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
 	pullImagesByCRI(t, iSvc, busyboxImage)
@@ -335,10 +349,12 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, rSvc cri.RuntimeS
 		ents, err := os.ReadDir(cntrDataDir)
 		require.NoError(t, err)
 		require.Len(t, ents, 0, cntrDataDir)
-	}
+	}, nil
 }
 
-func shouldRecoverExistingImages(t *testing.T, _ cri.RuntimeService, iSvc cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldRecoverExistingImages(t *testing.T,
+	_ cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	images := []string{images.Get(images.BusyBox), images.Get(images.Alpine)}
 	expectedRefs := pullImagesByCRI(t, iSvc, images...)
 
@@ -354,7 +370,7 @@ func shouldRecoverExistingImages(t *testing.T, _ cri.RuntimeService, iSvc cri.Im
 			require.NoError(t, err)
 			require.Equal(t, expectedRefs[idx], gotImg.Id)
 		}
-	}
+	}, nil
 }
 
 func newPodTCtx(t *testing.T, rSvc cri.RuntimeService,
