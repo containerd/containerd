@@ -120,7 +120,7 @@ type RuntimeService interface {
 	// UpdateRuntimeConfig updates runtime configuration if specified
 	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig, opts ...grpc.CallOption) error
 	// Status returns the status of the runtime.
-	Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeStatus, error)
+	Status(opts ...grpc.CallOption) (*runtimeapi.StatusResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
