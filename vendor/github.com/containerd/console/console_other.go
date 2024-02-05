@@ -1,5 +1,5 @@
-//go:build freebsd && cgo
-// +build freebsd,cgo
+//go:build !darwin && !freebsd && !linux && !netbsd && !openbsd && !solaris && !windows && !zos
+// +build !darwin,!freebsd,!linux,!netbsd,!openbsd,!solaris,!windows,!zos
 
 /*
    Copyright The containerd Authors.
@@ -19,28 +19,18 @@
 
 package console
 
-import (
-	"fmt"
-	"os"
-)
+// NewPty creates a new pty pair
+// The master is returned as the first console and a string
+// with the path to the pty slave is returned as the second
+func NewPty() (Console, string, error) {
+	return nil, "", ErrNotImplemented
+}
 
-/*
-#include <fcntl.h>
-#include <stdlib.h>
-#include <unistd.h>
-*/
-import "C"
+// checkConsole checks if the provided file is a console
+func checkConsole(f File) error {
+	return ErrNotAConsole
+}
 
-// openpt allocates a new pseudo-terminal and establishes a connection with its
-// control device.
-func openpt() (*os.File, error) {
-	fd, err := C.posix_openpt(C.O_RDWR)
-	if err != nil {
-		return nil, fmt.Errorf("posix_openpt: %w", err)
-	}
-	if _, err := C.grantpt(fd); err != nil {
-		C.close(fd)
-		return nil, fmt.Errorf("grantpt: %w", err)
-	}
-	return os.NewFile(uintptr(fd), ""), nil
+func newMaster(f File) (Console, error) {
+	return nil, ErrNotImplemented
 }
