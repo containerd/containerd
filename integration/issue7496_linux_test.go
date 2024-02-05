@@ -30,6 +30,7 @@ import (
 	"time"
 
 	apitask "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	shimcore "github.com/containerd/containerd/v2/core/runtime/v2"
 	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -49,7 +50,7 @@ func TestIssue7496(t *testing.T) {
 	sbID, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 
-	shimCli := connectToShim(ctx, t, sbID)
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 
 	delayInSec := 12
 	t.Logf("[shim pid: %d]: Injecting %d seconds delay to umount2 syscall",
@@ -155,8 +156,8 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 	return doneCh
 }
 
-func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TTRPCTaskService {
-	addr, err := shim.SocketAddress(ctx, containerdEndpoint, id)
+func connectToShim(ctx context.Context, t *testing.T, ctrdEndpoint string, version int, id string) shimcore.TaskServiceClient {
+	addr, err := shim.SocketAddress(ctx, ctrdEndpoint, id)
 	require.NoError(t, err)
 	addr = strings.TrimPrefix(addr, "unix://")
 
@@ -164,10 +165,12 @@ func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TTRPCTa
 	require.NoError(t, err)
 
 	client := ttrpc.NewClient(conn)
-	return apitask.NewTTRPCTaskClient(client)
+	cli, err := shimcore.NewTaskClient(client, version)
+	require.NoError(t, err)
+	return cli
 }
 
-func shimPid(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskService) uint32 {
+func shimPid(ctx context.Context, t *testing.T, shimCli shimcore.TaskServiceClient) uint32 {
 	resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
 	require.NoError(t, err)
 	return resp.GetShimPid()

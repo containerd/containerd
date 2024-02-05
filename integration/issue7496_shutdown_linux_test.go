@@ -51,7 +51,7 @@ func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Connect to the shim %s", sbID)
-	shimCli := connectToShim(ctx, t, sbID)
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 
 	t.Logf("Log shim %s's pid: %d", sbID, shimPid(ctx, t, shimCli))
 
