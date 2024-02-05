@@ -227,6 +227,15 @@ func WithDialer(d func(string) (stdnet.Conn, error)) Option {
 	}
 }
 
+// WithTTRPCOptions sets extra client and server options to use for ttrpc .
+func WithTTRPCOptions(clientOpts []ttrpc.ClientOpts, serverOpts []ttrpc.ServerOpt) Option {
+	return func(s *stub) error {
+		s.clientOpts = append(s.clientOpts, clientOpts...)
+		s.serverOpts = append(s.serverOpts, serverOpts...)
+		return nil
+	}
+}
+
 // stub implements Stub.
 type stub struct {
 	sync.Mutex
@@ -239,6 +248,8 @@ type stub struct {
 	dialer     func(string) (stdnet.Conn, error)
 	conn       stdnet.Conn
 	onClose    func()
+	serverOpts []ttrpc.ServerOpt
+	clientOpts []ttrpc.ClientOpts
 	rpcm       multiplex.Mux
 	rpcl       stdnet.Listener
 	rpcs       *ttrpc.Server
@@ -334,7 +345,7 @@ func (stub *stub) Start(ctx context.Context) (retErr error) {
 		}
 	}()
 
-	rpcs, err := ttrpc.NewServer()
+	rpcs, err := ttrpc.NewServer(stub.serverOpts...)
 	if err != nil {
 		return fmt.Errorf("failed to create ttrpc server: %w", err)
 	}
@@ -351,11 +362,13 @@ func (stub *stub) Start(ctx context.Context) (retErr error) {
 	if err != nil {
 		return fmt.Errorf("failed to multiplex ttrpc client connection: %w", err)
 	}
-	rpcc := ttrpc.NewClient(conn,
+
+	clientOpts := []ttrpc.ClientOpts{
 		ttrpc.WithOnClose(func() {
 			stub.connClosed()
 		}),
-	)
+	}
+	rpcc := ttrpc.NewClient(conn, append(clientOpts, stub.clientOpts...)...)
 	defer func() {
 		if retErr != nil {
 			rpcc.Close()
