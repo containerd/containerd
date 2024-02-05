@@ -72,7 +72,7 @@ func TestFixPlegNotready(t *testing.T) {
 		MemoryLimitInBytes: int64(64 * 1024 * 1024),
 	}, nil)
 
-	// waiting for the dead-lock happend
+	// waiting for the dead-lock happened
 	time.Sleep(5 * time.Second)
 
 	// list containers after update resource
@@ -94,6 +94,4 @@ func listContainers(t *testing.T, timeout int) error {
 	case <-doneCh:
 		return err
 	}
-
-	return nil
 }

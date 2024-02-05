@@ -379,6 +379,12 @@ func (em *eventMonitor) handleEvent(any interface{}) error {
 
 // handleContainerExit handles TaskExit event for container.
 func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container, sandboxID string, c *criService) error {
+	// First we need to update the status of container to Exiting
+	// to avoid container updating from UpdateContainerResources
+	_ = cntr.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
+		status.Exiting = true
+		return status, nil
+	})
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
@@ -458,6 +464,9 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 			status.FinishedAt = protobuf.FromTimestamp(e.ExitedAt).UnixNano()
 			status.ExitCode = int32(e.ExitStatus)
 		}
+
+		// Reset the exiting state
+		status.Exiting = false
 
 		// Unknown state can only transit to EXITED state, so we need
 		// to handle unknown state here.
