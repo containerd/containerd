@@ -96,13 +96,17 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 			status.State = sandboxstore.StateNotReady
 		} else {
 			if taskStatus.Status == containerd.Running {
-				status.State = sandboxstore.StateReady
-				status.Pid = t.Pid()
 				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
-					return status, channel, fmt.Errorf("failed to wait for sandbox container task: %w", err)
+					if !errdefs.IsNotFound(err) {
+						return status, channel, fmt.Errorf("failed to wait for sandbox container task: %w", err)
+					}
+					status.State = sandboxstore.StateNotReady
+				} else {
+					status.State = sandboxstore.StateReady
+					status.Pid = t.Pid()
+					channel = exitCh
 				}
-				channel = exitCh
 			} else {
 				// Task is not running. Delete the task and set sandbox state as NOTREADY.
 				if _, err := t.Delete(ctx, containerd.WithProcessKill); err != nil && !errdefs.IsNotFound(err) {
