@@ -18,11 +18,12 @@ import (
 )
 
 type params struct {
-	convertWhiteout  bool
-	convertBackslash bool
-	appendVhdFooter  bool
-	appendDMVerity   bool
-	ext4opts         []compactext4.Option
+	convertWhiteout     bool
+	convertBackslash    bool
+	appendVhdFooter     bool
+	onlyAppendVhdFooter bool
+	appendDMVerity      bool
+	ext4opts            []compactext4.Option
 }
 
 // Option is the type for optional parameters to Convert.
@@ -44,6 +45,12 @@ func ConvertBackslash(p *params) {
 // file.
 func AppendVhdFooter(p *params) {
 	p.appendVhdFooter = true
+}
+
+// OnlyAppendVhdFooter instructs the converter not to convert but still to add a fixed VHD footer to the
+// file.
+func OnlyAppendVhdFooter(p *params) {
+	p.onlyAppendVhdFooter = true
 }
 
 // AppendDMVerity instructs the converter to add a dmverity Merkle tree for
@@ -199,6 +206,14 @@ func Convert(r io.Reader, w io.ReadWriteSeeker, options ...Option) error {
 	var p params
 	for _, opt := range options {
 		opt(&p)
+	}
+
+	if p.onlyAppendVhdFooter {
+		_, err := io.Copy(w, r)
+		if err != nil {
+			return err
+		}
+		return ConvertToVhd(w)
 	}
 
 	if err := ConvertTarToExt4(r, w, options...); err != nil {
