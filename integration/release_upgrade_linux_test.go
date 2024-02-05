@@ -38,6 +38,7 @@ import (
 	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/integration/remote"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // upgradeVerifyCaseFunc is used to verify the behavior after upgrade.
@@ -147,12 +148,24 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
 	secondPodCtx := newPodTCtx(t, rSvc, "stopped-pod", "sandbox")
 	secondPodCtx.stop(false)
 
+	thirdPodCtx := newPodTCtx(t, rSvc, "kill-before-upgrade", "failpoint")
+	thirdPodCtx.createContainer("sorry", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "3d"))
+
+	thirdPodShimPid := int(thirdPodCtx.shimPid())
+
+	hookFunc := func(t *testing.T) {
+		// Kill the shim after stop previous containerd process
+		syscall.Kill(thirdPodShimPid, syscall.SIGKILL)
+	}
+
 	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
 		t.Log("List Pods")
 
 		pods, err := rSvc.ListPodSandbox(nil)
 		require.NoError(t, err)
-		require.Len(t, pods, 2)
+		require.Len(t, pods, 3)
 
 		for _, pod := range pods {
 			t.Logf("Checking pod %s", pod.Id)
@@ -181,11 +194,22 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
 
 			case secondPodCtx.id:
 				assert.Equal(t, criruntime.PodSandboxState_SANDBOX_NOTREADY, pod.State)
+
+			case thirdPodCtx.id:
+				assert.Equal(t, criruntime.PodSandboxState_SANDBOX_NOTREADY, pod.State)
+
+				cntrs, err := rSvc.ListContainers(&criruntime.ContainerFilter{
+					PodSandboxId: pod.Id,
+				})
+				require.NoError(t, err)
+				require.Equal(t, 1, len(cntrs))
+				assert.Equal(t, criruntime.ContainerState_CONTAINER_EXITED, cntrs[0].State)
+
 			default:
 				t.Errorf("unexpected pod %s", pod.Id)
 			}
 		}
-	}, nil
+	}, hookFunc
 }
 
 func execToExistingContainer(t *testing.T,
@@ -436,6 +460,21 @@ func (pCtx *podTCtx) containerDataDir(cntrID string) string {
 
 	rootDir := cfg["rootDir"].(string)
 	return filepath.Join(rootDir, "containers", status.Id)
+}
+
+// shimPid returns shim's pid.
+func (pCtx *podTCtx) shimPid() uint32 {
+	t := pCtx.t
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// NOTE: use version 2 to be compatible with previous release
+	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 2, pCtx.id)
+	return shimPid(ctx, t, shimCli)
 }
 
 // dataDir returns pod metadata dir maintained by CRI plugin.
