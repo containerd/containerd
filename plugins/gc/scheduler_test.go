@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/stretchr/testify/assert"
 )
@@ -152,7 +153,7 @@ func TestStartupDelay(t *testing.T) {
 		cfg          = &config{
 			// Prevent GC from scheduling again before check
 			PauseThreshold: 0.001,
-			StartupDelay:   duration(startupDelay),
+			StartupDelay:   tomlext.Duration(startupDelay),
 		}
 		tc = &testCollector{
 			d: time.Second,

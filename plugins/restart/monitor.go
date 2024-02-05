@@ -25,6 +25,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/runtime/restart"
+	"github.com/containerd/containerd/v2/internal/tomlext"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
@@ -32,24 +33,10 @@ import (
 	"github.com/containerd/plugin/registry"
 )
 
-type duration struct {
-	time.Duration
-}
-
-func (d *duration) UnmarshalText(text []byte) error {
-	var err error
-	d.Duration, err = time.ParseDuration(string(text))
-	return err
-}
-
-func (d duration) MarshalText() ([]byte, error) {
-	return []byte(d.Duration.String()), nil
-}
-
 // Config for the restart monitor
 type Config struct {
 	// Interval for how long to wait to check for state changes
-	Interval duration `toml:"interval"`
+	Interval tomlext.Duration `toml:"interval"`
 }
 
 func init() {
@@ -61,9 +48,7 @@ func init() {
 		},
 		ID: "restart",
 		Config: &Config{
-			Interval: duration{
-				Duration: 10 * time.Second,
-			},
+			Interval: tomlext.FromStdTime(10 * time.Second),
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			ic.Meta.Capabilities = []string{"no", "always", "on-failure", "unless-stopped"}
@@ -74,7 +59,7 @@ func init() {
 			m := &monitor{
 				client: client,
 			}
-			go m.run(ic.Config.(*Config).Interval.Duration)
+			go m.run(tomlext.ToStdTime(ic.Config.(*Config).Interval))
 			return m, nil
 		},
 	})
