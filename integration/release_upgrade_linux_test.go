@@ -56,8 +56,7 @@ func TestUpgrade(t *testing.T) {
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
 	t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
 	t.Run("recover-images", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverExistingImages))
-	// TODO:
-	// Add stats/stop-existing-running-pods/...
+	t.Run("metrics", runUpgradeTestCase(previousReleaseBinDir, shouldParseMetricDataCorrectly))
 }
 
 func runUpgradeTestCase(
@@ -394,6 +393,81 @@ func shouldRecoverExistingImages(t *testing.T,
 			require.NoError(t, err)
 			require.Equal(t, expectedRefs[idx], gotImg.Id)
 		}
+	}, nil
+}
+
+// shouldParseMetricDataCorrectly is to check new release containerd can parse
+// metric data from existing shim created by previous release.
+func shouldParseMetricDataCorrectly(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
+	imageName := images.Get(images.BusyBox)
+	pullImagesByCRI(t, iSvc, imageName)
+
+	scriptVolume := t.TempDir()
+	scriptInHost := filepath.Join(scriptVolume, "run.sh")
+
+	fileSize := 1024 * 1024 * 96 // 96 MiB
+	require.NoError(t, os.WriteFile(scriptInHost, []byte(fmt.Sprintf(`#!/bin/sh
+set -euo pipefail
+
+head -c %d </dev/urandom >/tmp/log
+
+# increase page cache usage
+for i in {1..10}; do
+  cat /tmp/log > /dev/null
+done
+
+echo "ready"
+
+while true; do
+  cat /tmp/log > /dev/null
+  sleep 1
+done
+`, fileSize,
+	),
+	), 0600))
+
+	podLogDir := t.TempDir()
+	podCtx := newPodTCtx(t, rSvc, "running", "sandbox", WithPodLogDirectory(podLogDir))
+
+	scriptInContainer := "/run.sh"
+	cntrLogName := "running#0.log"
+
+	cntr := podCtx.createContainer("app", imageName,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sh", scriptInContainer),
+		WithVolumeMount(scriptInHost, scriptInContainer),
+		WithLogPath(cntrLogName),
+	)
+
+	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
+		checkContainerState(t, rSvc, cntr, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		logPath := filepath.Join(podLogDir, cntrLogName)
+
+		t.Log("Warm-up page cache")
+		isReady := false
+		for i := 0; i < 30 && !isReady; i++ {
+			data, err := os.ReadFile(logPath)
+			require.NoError(t, err)
+
+			isReady = strings.Contains(string(data), "ready")
+
+			time.Sleep(1 * time.Second)
+		}
+		require.True(t, isReady, "warm-up page cache")
+
+		stats, err := rSvc.ContainerStats(cntr)
+		require.NoError(t, err)
+
+		data, err := json.MarshalIndent(stats, "", "  ")
+		require.NoError(t, err)
+		t.Logf("Dump container %s's metric: \n%s", cntr, string(data))
+
+		// NOTE: Just in case that part of inactive cache has been reclaimed.
+		expectedBytes := uint64(fileSize * 2 / 3)
+		require.True(t, stats.GetMemory().GetUsageBytes().GetValue() > expectedBytes)
 	}, nil
 }
 
