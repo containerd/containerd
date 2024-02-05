@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package semconv implements OpenTelemetry semantic conventions.
-//
-// OpenTelemetry semantic conventions are agreed standardized naming
-// patterns for OpenTelemetry things. This package represents the v1.21.0
-// version of the OpenTelemetry semantic conventions.
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.21.0"
+/*
+Package otlptrace contains abstractions for OTLP span exporters.
+See the official OTLP span exporter implementations:
+  - [go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc],
+  - [go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp].
+*/
+package otlptrace // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace"
