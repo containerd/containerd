@@ -394,6 +394,10 @@ type RuntimeConfig struct {
 	//
 	// For example, the value can be '5h', '2h30m', '10s'.
 	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
+
+	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
+	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
+	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
