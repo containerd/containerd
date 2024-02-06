@@ -231,7 +231,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	imgs, err := is.Store(ctx, desc, ts.images)
+	imgs, err := is.Store(ctx, desc, ts.images, ts.content)
 	if err != nil {
 		return err
 	}

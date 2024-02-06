@@ -129,7 +129,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 
 	for _, desc := range descriptors {
 		desc := desc
-		imgs, err := is.Store(ctx, desc, ts.images)
+		imgs, err := is.Store(ctx, desc, ts.images, ts.content)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
 				log.G(ctx).Infof("No images store for %s", desc.Digest)

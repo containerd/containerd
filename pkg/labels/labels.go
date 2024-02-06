@@ -18,12 +18,21 @@ package labels
 
 // LabelUncompressed is added to compressed layer contents.
 // The value is digest of the uncompressed content.
-const LabelUncompressed = "containerd.io/uncompressed"
+const (
+	LabelUncompressed = "containerd.io/uncompressed"
 
-// LabelSharedNamespace is added to a namespace to allow that namespaces
-// contents to be shared.
-const LabelSharedNamespace = "containerd.io/namespace.shareable"
+	// LabelSharedNamespace is added to a namespace to allow that namespaces
+	// contents to be shared.
+	LabelSharedNamespace = "containerd.io/namespace.shareable"
 
-// LabelDistributionSource is added to content to indicate its origin.
-// e.g., "containerd.io/distribution.source.docker.io=library/redis"
-const LabelDistributionSource = "containerd.io/distribution.source"
+	// LabelDistributionSource is added to content to indicate its origin.
+	// e.g., "containerd.io/distribution.source.docker.io=library/redis"
+	LabelDistributionSource = "containerd.io/distribution.source"
+
+	// PlatformLabelPrefix is common prefix for indicating what platforms
+	// an image has been pulled for
+	PlatformLabelPrefix = "containerd.io/imagePulledForPlatform"
+
+	// PlatformLabelFormat is the format for the platform image label
+	PlatformLabelFormat = "%s.%s"
+)

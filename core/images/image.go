@@ -27,7 +27,9 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	distribution "github.com/distribution/reference"
 	digest "github.com/opencontainers/go-digest"
+	imagedigest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -434,4 +436,19 @@ func ConfigPlatform(ctx context.Context, provider content.Provider, configDesc o
 		return ocispec.Platform{}, err
 	}
 	return platforms.Normalize(imagePlatform), nil
+}
+
+// GetRepoDigestAndTag returns image repoDigest and repoTag of the named image reference.
+func GetRepoDigestAndTag(namedRef distribution.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
+	var repoTag, repoDigest string
+	if _, ok := namedRef.(distribution.NamedTagged); ok {
+		repoTag = namedRef.String()
+	}
+	if _, ok := namedRef.(distribution.Canonical); ok {
+		repoDigest = namedRef.String()
+	} else if !schema1 {
+		// digest is not actual repo digest for schema1 image.
+		repoDigest = namedRef.Name() + "@" + digest.String()
+	}
+	return repoDigest, repoTag
 }

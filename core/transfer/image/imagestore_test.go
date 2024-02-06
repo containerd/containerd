@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/imagetest"
 	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -224,7 +225,8 @@ func TestStore(t *testing.T) {
 				desc.Annotations["io.containerd.import.ref-source"] = "annotation"
 			}
 			t.Run(name, func(t *testing.T) {
-				imgs, err := testCase.ImageStore.Store(context.Background(), desc, newSimpleImageStore())
+				ctx := context.Background()
+				imgs, err := testCase.ImageStore.Store(ctx, desc, newSimpleImageStore(), imagetest.NewContentStore(ctx, t))
 				if err != nil {
 					if testCase.Err == nil {
 						t.Fatal(err)
