@@ -33,19 +33,22 @@ import (
 	"time"
 
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/pkg/errors"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/images"
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	ctrdlabels "github.com/containerd/containerd/v2/pkg/labels"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -169,13 +172,25 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", err
 	}
+
+	platformForImagePull, err := c.platformForImagePullFromPodSandboxConfig(ctx, ref, sandboxConfig)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get platform information for pulling %v", ref)
+	}
+
 	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
+		tracing.Attribute("platformForImagePull", platformForImagePull),
 	)
 
 	labels := c.getLabels(ctx, ref)
+
+	// Add label to indicate the platform the image is being pulled for.
+	platform := platforms.Format(platformForImagePull)
+	platformImageLabelKey := fmt.Sprintf(ctrdlabels.PlatformLabelFormat, ctrdlabels.PlatformLabelPrefix, platform)
+	labels[platformImageLabelKey] = platform
 
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
@@ -189,6 +204,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
 		}),
+		containerd.WithPlatformMatcher(platforms.Only(platformForImagePull)),
 	}
 
 	// Temporarily removed for v2 upgrade
@@ -218,7 +234,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	imageID := configDesc.Digest.String()
 
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	repoDigest, repoTag := images.GetRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
@@ -248,21 +264,6 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
 	return imageID, nil
-}
-
-// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef distribution.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
-	var repoTag, repoDigest string
-	if _, ok := namedRef.(distribution.NamedTagged); ok {
-		repoTag = namedRef.String()
-	}
-	if _, ok := namedRef.(distribution.Canonical); ok {
-		repoDigest = namedRef.String()
-	} else if !schema1 {
-		// digest is not actual repo digest for schema1 image.
-		repoDigest = namedRef.Name() + "@" + digest.String()
-	}
-	return repoDigest, repoTag
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -785,4 +786,30 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	return snapshotter, nil
+}
+
+// Get which platform to use for pulling the requested image. Currently, we are basing this off of
+// annotations.RuntimeHandler being set in the pod config. But once containerd moves to using k8s
+// cri-api v1.29, we can deprecate reading the annotation since runtimehandler information can be
+// passed through CRI itself.
+func (c *CRIImageService) platformForImagePullFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig) (imagespec.Platform, error) {
+	platform := platforms.DefaultSpec()
+	// TODO(kiashok): Once cri-api is updated to v1.29, we can deprecate reading runtime handler
+	// from pod annotations as CRI supports passing runtime handler name starting v1.29 (KEP 4216)
+	if s == nil || s.Annotations == nil {
+		return platform, nil
+	}
+
+	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
+	if !ok {
+		return platform, nil
+	}
+
+	if c.runtimePlatforms != nil {
+		if p, ok := c.runtimePlatforms[runtimeHandler]; ok {
+			return p.Platform, nil
+		}
+	}
+	return platform, nil
 }

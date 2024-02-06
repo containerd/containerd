@@ -43,4 +43,6 @@ const (
 	DefaultFIFODir = ""
 	// DefaultRuntime is the default windows runtime
 	DefaultRuntime = "io.containerd.runhcs.v1"
+	// DefaultRuntimeHandlerName is the default runtime handler on windows
+	DefaultRuntimeHandlerName = "runhcs-wcow-process"
 )
