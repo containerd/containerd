@@ -303,6 +303,9 @@ type PluginConfig struct {
 	// and if it is not overwritten by PodSandboxConfig
 	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
+	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
+	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
+	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
