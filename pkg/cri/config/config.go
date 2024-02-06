@@ -388,6 +388,9 @@ type PluginConfig struct {
 	// ImagePullWithSyncFs is an experimental setting. It's to force sync
 	// filesystem during unpacking to ensure that data integrity.
 	ImagePullWithSyncFs bool `toml:"image_pull_with_sync_fs" json:"imagePullWithSyncFs"`
+	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
+	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
+	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
