@@ -61,7 +61,7 @@ type ImageFilterer interface {
 // the provided descriptor. The descriptor may be any type of manifest
 // including an index with multiple image references.
 type ImageStorer interface {
-	Store(context.Context, ocispec.Descriptor, images.Store) ([]images.Image, error)
+	Store(context.Context, ocispec.Descriptor, images.Store, content.Provider) ([]images.Image, error)
 }
 
 // ImageGetter is type which returns an image from an image store
