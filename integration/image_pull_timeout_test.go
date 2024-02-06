@@ -276,17 +276,6 @@ func testCRIImagePullTimeoutByNoDataTransferred(t *testing.T) {
 		{
 			ConfigPath: filepath.Dir(hostCfgDir),
 		},
-		// TODO(fuweid):
-		//
-		// Both Mirrors and Configs are deprecated in the future. And
-		// this registryCfg should also be removed at that time.
-		{
-			Mirrors: map[string]criconfig.Mirror{
-				mirrorURL.Host: {
-					Endpoints: []string{mirrorURL.String()},
-				},
-			},
-		},
 	} {
 		criService, err := initLocalCRIImageService(cli, tmpDir, registryCfg)
 		assert.NoError(t, err)

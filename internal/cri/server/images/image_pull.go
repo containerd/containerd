@@ -45,7 +45,6 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
-	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -100,12 +99,6 @@ func (c *GRPCCRIImageService) PullImage(ctx context.Context, r *runtime.PullImag
 
 	credentials := func(host string) (string, string, error) {
 		hostauth := r.GetAuth()
-		if hostauth == nil {
-			config := c.config.Registry.Configs[host]
-			if config.Auth != nil {
-				hostauth = toRuntimeAuthConfig(*config.Auth)
-			}
-		}
 		return ParseAuth(hostauth, host)
 	}
 
@@ -444,7 +437,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			var (
 				transport = newTransport()
 				client    = &http.Client{Transport: transport}
-				config    = c.config.Registry.Configs[u.Host]
 			)
 
 			if docker.IsLocalhost(host) && u.Scheme == "http" {
@@ -457,13 +449,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			// Make a copy of `credentials`, so that different authorizers would not reference
 			// the same credentials variable.
 			credentials := credentials
-			if credentials == nil && config.Auth != nil {
-				auth := toRuntimeAuthConfig(*config.Auth)
-				credentials = func(host string) (string, string, error) {
-					return ParseAuth(auth, host)
-				}
-
-			}
 
 			if updateClientFn != nil {
 				if err := updateClientFn(client); err != nil {
@@ -492,16 +477,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 	}
 }
 
-// toRuntimeAuthConfig converts cri plugin auth config to runtime auth config.
-func toRuntimeAuthConfig(a criconfig.AuthConfig) *runtime.AuthConfig {
-	return &runtime.AuthConfig{
-		Username:      a.Username,
-		Password:      a.Password,
-		Auth:          a.Auth,
-		IdentityToken: a.IdentityToken,
-	}
-}
-
 // defaultScheme returns the default scheme for a registry host.
 func defaultScheme(host string) string {
 	if docker.IsLocalhost(host) {
@@ -510,50 +485,12 @@ func defaultScheme(host string) string {
 	return "https"
 }
 
-// addDefaultScheme returns the endpoint with default scheme
-func addDefaultScheme(endpoint string) (string, error) {
-	if strings.Contains(endpoint, "://") {
-		return endpoint, nil
-	}
-	ue := "dummy://" + endpoint
-	u, err := url.Parse(ue)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s://%s", defaultScheme(u.Host), endpoint), nil
-}
-
 // registryEndpoints returns endpoints for a given host.
-// It adds default registry endpoint if it does not exist in the passed-in endpoint list.
-// It also supports wildcard host matching with `*`.
 func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 	var endpoints []string
-	_, ok := c.config.Registry.Mirrors[host]
-	if ok {
-		endpoints = c.config.Registry.Mirrors[host].Endpoints
-	} else {
-		endpoints = c.config.Registry.Mirrors["*"].Endpoints
-	}
 	defaultHost, err := docker.DefaultHost(host)
 	if err != nil {
 		return nil, fmt.Errorf("get default host: %w", err)
-	}
-	for i := range endpoints {
-		en, err := addDefaultScheme(endpoints[i])
-		if err != nil {
-			return nil, fmt.Errorf("parse endpoint url: %w", err)
-		}
-		endpoints[i] = en
-	}
-	for _, e := range endpoints {
-		u, err := url.Parse(e)
-		if err != nil {
-			return nil, fmt.Errorf("parse endpoint url: %w", err)
-		}
-		if u.Host == host {
-			// Do not add default if the endpoint already exists.
-			return endpoints, nil
-		}
 	}
 	return append(endpoints, defaultScheme(defaultHost)+"://"+defaultHost), nil
 }

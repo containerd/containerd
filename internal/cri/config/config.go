@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	goruntime "runtime"
 	"strconv"
 	"time"
@@ -212,55 +211,23 @@ type CniConfig struct {
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
 }
 
-// Mirror contains the config related to the registry mirror
-type Mirror struct {
-	// Endpoints are endpoints for a namespace. CRI plugin will try the endpoints
-	// one by one until a working one is found. The endpoint must be a valid url
-	// with host specified.
-	// The scheme, host and path from the endpoint URL will be used.
-	Endpoints []string `toml:"endpoint" json:"endpoint"`
-}
-
-// AuthConfig contains the config related to authentication to a specific registry
-type AuthConfig struct {
-	// Username is the username to login the registry.
-	Username string `toml:"username" json:"username"`
-	// Password is the password to login the registry.
-	Password string `toml:"password" json:"password"`
-	// Auth is a base64 encoded string from the concatenation of the username,
-	// a colon, and the password.
-	Auth string `toml:"auth" json:"auth"`
-	// IdentityToken is used to authenticate the user and get
-	// an access token for the registry.
-	IdentityToken string `toml:"identitytoken" json:"identitytoken"`
-}
-
 // Registry is registry settings configured
 type Registry struct {
 	// ConfigPath is a path to the root directory containing registry-specific
 	// configurations.
 	// If ConfigPath is set, the rest of the registry specific options are ignored.
 	ConfigPath string `toml:"config_path" json:"configPath"`
-	// Mirrors are namespace to mirror mapping for all namespaces.
-	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0.
-	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
-	// Configs are configs for each registry.
-	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead.
-	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
-	// Auths are registry endpoint to auth config mapping. The registry endpoint must
-	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0, supported in 1.x releases.
-	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
+	// MirrorsNoLongerSupported (Mirrors) was deprecated in containerd v1.5 and removed in v2.0.
+	// TODO: completely stop parsing this in v2.1.
+	MirrorsNoLongerSupported map[string]any `toml:"mirrors" json:"mirrors"`
+	// ConfigsNoLongerSupported (Configs) was deprecated in containerd v1.5 and removed in v2.0.
+	// TODO: completely stop parsing this in v2.1.
+	ConfigsNoLongerSupported map[string]any `toml:"configs" json:"configs"`
+	// AuthsNoLongerSupported (Auths) was deprecated in containerd v1.3 and removed in v2.0.
+	// TODO: completely stop parsing this in v2.1.
+	AuthsNoLongerSupported map[string]any `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
-}
-
-// RegistryConfig contains configuration used to communicate with the registry.
-type RegistryConfig struct {
-	// Auth contains information to authenticate to the registry.
-	Auth *AuthConfig `toml:"auth" json:"auth"`
 }
 
 // ImageDecryption contains configuration to handling decryption of encrypted container images.
@@ -486,41 +453,17 @@ const (
 func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
 
-	useConfigPath := c.Registry.ConfigPath != ""
-	if len(c.Registry.Mirrors) > 0 {
-		if useConfigPath {
-			return warnings, errors.New("`mirrors` cannot be set when `config_path` is provided")
-		}
-		warnings = append(warnings, deprecation.CRIRegistryMirrors)
-		log.G(ctx).Warning("`mirrors` is deprecated, please use `config_path` instead")
+	if len(c.Registry.MirrorsNoLongerSupported) > 0 {
+		return warnings, errors.New("`mirrors` is no longer supported since containerd v2.0, please use `config_path` instead")
 	}
 
-	if len(c.Registry.Configs) != 0 {
-		warnings = append(warnings, deprecation.CRIRegistryConfigs)
-		log.G(ctx).Warning("`configs` is deprecated, please use `config_path` instead")
+	if len(c.Registry.ConfigsNoLongerSupported) != 0 {
+		return warnings, errors.New("`configs` is no longer supported since containerd v2.0, please use `config_path` instead")
 	}
 
 	// Validation for deprecated auths options and mapping it to configs.
-	if len(c.Registry.Auths) != 0 {
-		if c.Registry.Configs == nil {
-			c.Registry.Configs = make(map[string]RegistryConfig)
-		}
-		for endpoint, auth := range c.Registry.Auths {
-			auth := auth
-			u, err := url.Parse(endpoint)
-			if err != nil {
-				return warnings, fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
-			}
-			if u.Scheme != "" {
-				// Do not include the scheme in the new registry config.
-				endpoint = u.Host
-			}
-			config := c.Registry.Configs[endpoint]
-			config.Auth = &auth
-			c.Registry.Configs[endpoint] = config
-		}
-		warnings = append(warnings, deprecation.CRIRegistryAuths)
-		log.G(ctx).Warning("`auths` is deprecated, please use `ImagePullSecrets` instead")
+	if len(c.Registry.AuthsNoLongerSupported) != 0 {
+		return warnings, errors.New("`auths` is no longer supported since containerd v2.0, please use `ImagePullSecrets` instead")
 	}
 
 	// Validation for image_pull_progress_timeout
