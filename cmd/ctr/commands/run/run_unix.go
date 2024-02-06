@@ -19,7 +19,6 @@
 package run
 
 import (
-	"context"
 	gocontext "context"
 	"errors"
 	"fmt"
@@ -465,7 +464,7 @@ func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
 // This is used from the `run` command to avoid creating a registry with auto-refresh enabled.
 // It also provides a way to override the CDI spec file paths if required.
 func withStaticCDIRegistry() oci.SpecOpts {
-	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+	return func(ctx gocontext.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 		registry := cdi.GetRegistry(cdi.WithAutoRefresh(false))
 		if err := registry.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
