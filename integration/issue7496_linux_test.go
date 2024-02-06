@@ -116,11 +116,13 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 
 	doneCh := make(chan struct{})
 
+	// use strace command to mock the delay of umount2
+	// this require strace version >= 4.22
 	cmd := exec.CommandContext(ctx, "strace",
 		"-p", strconv.Itoa(int(pid)), "-f", // attach to all the threads
-		"--detach-on=execve", // stop to attach runc child-processes
-		"--trace=umount2",    // only trace umount2 syscall
-		"-e", "inject=umount2:delay_enter="+strconv.Itoa(delayInSec)+"s",
+		"-b", "execve", // stop to attach runc child-processes
+		"-e", "trace=umount2", // only trace umount2 syscall
+		"-e", "inject=umount2:delay_enter="+strconv.Itoa(delayInSec)+"000000",
 	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 
