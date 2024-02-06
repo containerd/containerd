@@ -23,6 +23,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/task/task.proto";
+import "github.com/containerd/containerd/api/types/event.proto";
 
 option go_package = "github.com/containerd/containerd/v2/api/runtime/task/v3;task";
 
@@ -57,7 +58,7 @@ service Task {
 	//
 	// This feature is optional and not enabled by default. A shim that supports this
 	// must return `shim.EventStreaming` feature in bootstrap params.
-	rpc Events(google.protobuf.Empty) returns (stream Event);
+	rpc Events(google.protobuf.Empty) returns (stream containerd.types.Envelope);
 }
 
 message CreateTaskRequest {
@@ -208,12 +209,4 @@ message PauseRequest {
 
 message ResumeRequest {
 	string id = 1;
-}
-
-// TODO: reuse existing Proto message.
-message Event {
-	string topic = 1;
-	string namespace = 2;
-	google.protobuf.Timestamp timestamp = 3;
-	google.protobuf.Any event = 4;
 }

@@ -4,6 +4,7 @@ package task
 
 import (
 	context "context"
+	types "github.com/containerd/containerd/v2/api/types"
 	ttrpc "github.com/containerd/ttrpc"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
@@ -30,7 +31,7 @@ type TTRPCTaskService interface {
 }
 
 type TTRPCTask_EventsServer interface {
-	Send(*Event) error
+	Send(*types.Envelope) error
 	ttrpc.StreamServer
 }
 
@@ -38,7 +39,7 @@ type ttrpctaskEventsServer struct {
 	ttrpc.StreamServer
 }
 
-func (x *ttrpctaskEventsServer) Send(m *Event) error {
+func (x *ttrpctaskEventsServer) Send(m *types.Envelope) error {
 	return x.StreamServer.SendMsg(m)
 }
 
@@ -361,7 +362,7 @@ func (c *ttrpctaskClient) Events(ctx context.Context, req *emptypb.Empty) (TTRPC
 }
 
 type TTRPCTask_EventsClient interface {
-	Recv() (*Event, error)
+	Recv() (*types.Envelope, error)
 	ttrpc.ClientStream
 }
 
@@ -369,8 +370,8 @@ type ttrpctaskEventsClient struct {
 	ttrpc.ClientStream
 }
 
-func (x *ttrpctaskEventsClient) Recv() (*Event, error) {
-	m := new(Event)
+func (x *ttrpctaskEventsClient) Recv() (*types.Envelope, error) {
+	m := new(types.Envelope)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}

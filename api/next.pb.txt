@@ -2211,6 +2211,53 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/event.proto"
+  package: "containerd.types"
+  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
+  dependency: "google/protobuf/any.proto"
+  dependency: "google/protobuf/timestamp.proto"
+  message_type {
+    name: "Envelope"
+    field {
+      name: "timestamp"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Timestamp"
+      json_name: "timestamp"
+    }
+    field {
+      name: "namespace"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "namespace"
+    }
+    field {
+      name: "topic"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "topic"
+    }
+    field {
+      name: "event"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "event"
+    }
+    options {
+      64400: 1
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/v2/api/types;types"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/runtime/task/v3/shim.proto"
   package: "containerd.task.v3"
   dependency: "google/protobuf/any.proto"
@@ -2218,6 +2265,7 @@ file {
   dependency: "google/protobuf/timestamp.proto"
   dependency: "github.com/containerd/containerd/api/types/mount.proto"
   dependency: "github.com/containerd/containerd/api/types/task/task.proto"
+  dependency: "github.com/containerd/containerd/api/types/event.proto"
   message_type {
     name: "CreateTaskRequest"
     field {
@@ -2832,39 +2880,6 @@ file {
       json_name: "id"
     }
   }
-  message_type {
-    name: "Event"
-    field {
-      name: "topic"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "topic"
-    }
-    field {
-      name: "namespace"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "namespace"
-    }
-    field {
-      name: "timestamp"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "timestamp"
-    }
-    field {
-      name: "event"
-      number: 4
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "event"
-    }
-  }
   service {
     name: "Task"
     method {
@@ -2955,7 +2970,7 @@ file {
     method {
       name: "Events"
       input_type: ".google.protobuf.Empty"
-      output_type: ".containerd.task.v3.Event"
+      output_type: ".containerd.types.Envelope"
       server_streaming: true
     }
   }
@@ -4005,53 +4020,6 @@ file {
   }
   options {
     go_package: "github.com/containerd/containerd/v2/api/services/diff/v1;diff"
-  }
-  syntax: "proto3"
-}
-file {
-  name: "github.com/containerd/containerd/api/types/event.proto"
-  package: "containerd.types"
-  dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
-  dependency: "google/protobuf/any.proto"
-  dependency: "google/protobuf/timestamp.proto"
-  message_type {
-    name: "Envelope"
-    field {
-      name: "timestamp"
-      number: 1
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Timestamp"
-      json_name: "timestamp"
-    }
-    field {
-      name: "namespace"
-      number: 2
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "namespace"
-    }
-    field {
-      name: "topic"
-      number: 3
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "topic"
-    }
-    field {
-      name: "event"
-      number: 4
-      label: LABEL_OPTIONAL
-      type: TYPE_MESSAGE
-      type_name: ".google.protobuf.Any"
-      json_name: "event"
-    }
-    options {
-      64400: 1
-    }
-  }
-  options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
   }
   syntax: "proto3"
 }

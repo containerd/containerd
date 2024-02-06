@@ -24,6 +24,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/containerd/containerd/v2/api/types"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -760,7 +761,7 @@ func (s *service) Events(ctx context.Context, _ *emptypb.Empty, streamer taskAPI
 			return fmt.Errorf("failed to marshal shim event to any: %w", err)
 		}
 
-		if err := streamer.Send(&taskAPI.Event{
+		if err := streamer.Send(&types.Envelope{
 			Topic:     runtime.GetTopic(e),
 			Namespace: ns,
 			Event:     evt,
