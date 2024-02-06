@@ -22,7 +22,7 @@ jobs:
           # Idle number of days before closing stale issues/PRs
           days-before-close: 7
           # Only issues/PRs with ANY of these labels are checked
-          any-of-labels: 'status/more-info-needed,status/needs-update'
+          any-of-labels: 'status/more-info-needed,status/needs-update,needs-rebase'
           # Comment on the staled issues
           stale-issue-message: 'This issue is stale because it has been open 90 days with no activity. This issue will be closed in 7 days unless new comments are made or the stale label is removed.'
           # Comment on the staled PRs
