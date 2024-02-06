@@ -27,7 +27,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/v2/api/runtime/task/v3"
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events"
@@ -531,10 +530,7 @@ func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error
 
 	log.G(ctx).Info("using shim events streaming")
 
-	// Streaming server doesn't work with default messages (like Empty) as it wants non zero payload.
-	// Using dummy workaround to move forward.
-	// Remove this after https://github.com/containerd/ttrpc/issues/126
-	stream, err := shim.task.Events(context.Background(), &task.Dummy{Dummy: 9999})
+	stream, err := shim.task.Events(context.Background(), nil)
 	if err != nil {
 		return fmt.Errorf("failed to obtain events streamer from shim: %w", err)
 	}

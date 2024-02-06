@@ -26,7 +26,7 @@ type TTRPCTaskService interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
-	Events(context.Context, *Dummy, TTRPCTask_EventsServer) error
+	Events(context.Context, *emptypb.Empty, TTRPCTask_EventsServer) error
 }
 
 type TTRPCTask_EventsServer interface {
@@ -168,7 +168,7 @@ func RegisterTTRPCTaskService(srv *ttrpc.Server, svc TTRPCTaskService) {
 		Streams: map[string]ttrpc.Stream{
 			"Events": {
 				Handler: func(ctx context.Context, stream ttrpc.StreamServer) (interface{}, error) {
-					m := new(Dummy)
+					m := new(emptypb.Empty)
 					if err := stream.RecvMsg(m); err != nil {
 						return nil, err
 					}
@@ -199,7 +199,7 @@ type TTRPCTaskClient interface {
 	Stats(context.Context, *StatsRequest) (*StatsResponse, error)
 	Connect(context.Context, *ConnectRequest) (*ConnectResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*emptypb.Empty, error)
-	Events(context.Context, *Dummy) (TTRPCTask_EventsClient, error)
+	Events(context.Context, *emptypb.Empty) (TTRPCTask_EventsClient, error)
 }
 
 type ttrpctaskClient struct {
@@ -348,7 +348,7 @@ func (c *ttrpctaskClient) Shutdown(ctx context.Context, req *ShutdownRequest) (*
 	return &resp, nil
 }
 
-func (c *ttrpctaskClient) Events(ctx context.Context, req *Dummy) (TTRPCTask_EventsClient, error) {
+func (c *ttrpctaskClient) Events(ctx context.Context, req *emptypb.Empty) (TTRPCTask_EventsClient, error) {
 	stream, err := c.client.NewStream(ctx, &ttrpc.StreamDesc{
 		StreamingClient: false,
 		StreamingServer: true,

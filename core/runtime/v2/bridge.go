@@ -56,7 +56,7 @@ type TaskServiceClient interface {
 	Stats(context.Context, *api.StatsRequest) (*api.StatsResponse, error)
 	Connect(context.Context, *api.ConnectRequest) (*api.ConnectResponse, error)
 	Shutdown(context.Context, *api.ShutdownRequest) (*emptypb.Empty, error)
-	Events(ctx context.Context, empty *api.Dummy) (api.TTRPCTask_EventsClient, error)
+	Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error)
 }
 
 // NewTaskClient returns a new task client interface which handles both GRPC and TTRPC servers depending on the
@@ -261,7 +261,7 @@ func (b *ttrpcV2Bridge) Shutdown(ctx context.Context, request *api.ShutdownReque
 	})
 }
 
-func (b *ttrpcV2Bridge) Events(_ctx context.Context, _empty *api.Dummy) (api.TTRPCTask_EventsClient, error) {
+func (b *ttrpcV2Bridge) Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error) {
 	// v2 shims don't support event streaming.
 	return nil, ErrNotSupported
 }
@@ -342,6 +342,6 @@ func (g *grpcV3Bridge) Shutdown(ctx context.Context, request *api.ShutdownReques
 	return g.client.Shutdown(ctx, request)
 }
 
-func (g *grpcV3Bridge) Events(ctx context.Context, empty *api.Dummy) (api.TTRPCTask_EventsClient, error) {
+func (g *grpcV3Bridge) Events(ctx context.Context, empty *emptypb.Empty) (api.TTRPCTask_EventsClient, error) {
 	return g.client.Events(ctx, empty)
 }
