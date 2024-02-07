@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -62,14 +61,6 @@ func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.Remove
 			// Update image store to reflect the newest state in containerd.
 			if err := c.imageStore.Update(ctx, ref); err != nil {
 				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
-			}
-
-			if c.publisher != nil {
-				if err := c.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
-					Name: ref,
-				}); err != nil {
-					return nil, err
-				}
 			}
 			continue
 		}

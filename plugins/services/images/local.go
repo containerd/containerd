@@ -24,13 +24,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/epoch"
-	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
@@ -46,7 +44,6 @@ func init() {
 		Type: plugins.ServicePlugin,
 		ID:   services.ImagesService,
 		Requires: []plugin.Type{
-			plugins.EventPlugin,
 			plugins.MetadataPlugin,
 			plugins.GCPlugin,
 			plugins.WarningPlugin,
@@ -60,20 +57,15 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			ep, err := ic.GetSingle(plugins.EventPlugin)
-			if err != nil {
-				return nil, err
-			}
 			w, err := ic.GetSingle(plugins.WarningPlugin)
 			if err != nil {
 				return nil, err
 			}
 
 			return &local{
-				store:     metadata.NewImageStore(m.(*metadata.DB)),
-				publisher: ep.(events.Publisher),
-				gc:        g.(gcScheduler),
-				warnings:  w.(warning.Service),
+				store:    metadata.NewImageStore(m.(*metadata.DB)),
+				gc:       g.(gcScheduler),
+				warnings: w.(warning.Service),
 			}, nil
 		},
 	})
@@ -84,10 +76,9 @@ type gcScheduler interface {
 }
 
 type local struct {
-	store     images.Store
-	gc        gcScheduler
-	publisher events.Publisher
-	warnings  warning.Service
+	store    images.Store
+	gc       gcScheduler
+	warnings warning.Service
 }
 
 var _ imagesapi.ImagesClient = &local{}
@@ -136,13 +127,6 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 
 	resp.Image = imageToProto(&created)
 
-	if err := l.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
-	}); err != nil {
-		return nil, err
-	}
-
 	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 
@@ -175,13 +159,6 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 
 	resp.Image = imageToProto(&updated)
 
-	if err := l.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
-		Name:   resp.Image.Name,
-		Labels: resp.Image.Labels,
-	}); err != nil {
-		return nil, err
-	}
-
 	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 }
@@ -198,12 +175,6 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 	// Sync option handled here after event is published
 	if err := l.store.Delete(ctx, req.Name, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
-	}
-
-	if err := l.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
-		Name: req.Name,
-	}); err != nil {
-		return nil, err
 	}
 
 	if req.Sync {
