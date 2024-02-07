@@ -23,10 +23,19 @@ import (
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
 	"github.com/containerd/containerd/v2/pkg/cap"
+	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
 )
+
+func init() {
+	var err error
+	kernelSupportsRRO, err = kernelversion.GreaterEqualThan(kernelversion.KernelVersion{Kernel: 5, Major: 12})
+	if err != nil {
+		panic(fmt.Errorf("failed to check kernel version: %w", err))
+	}
+}
 
 // networkAttachCount is the minimum number of networks the PodSandbox
 // attaches to

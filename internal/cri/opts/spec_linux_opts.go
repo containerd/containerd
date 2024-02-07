@@ -30,6 +30,7 @@ import (
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/mount"
@@ -39,7 +40,7 @@ import (
 )
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string) oci.SpecOpts {
+func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -151,8 +152,24 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			// NOTE(random-liu): we don't change all mounts to `ro` when root filesystem
 			// is readonly. This is different from docker's behavior, but make more sense.
 			if mount.GetReadonly() {
-				options = append(options, "ro")
+				if mount.GetRecursiveReadOnly() {
+					if handler == nil || !handler.Features.RecursiveReadOnlyMounts {
+						return fmt.Errorf("%w: runtime handler does not support recursive read-only mounts (hostPath=%q)",
+							crierrors.ErrRROUnsupported, mount.HostPath)
+					}
+					if mount.Propagation != runtime.MountPropagation_PROPAGATION_PRIVATE {
+						return fmt.Errorf("recursive read-only mount needs private propagation, got %q (hostPath=%q)",
+							mount.Propagation.String(), mount.HostPath)
+					}
+					options = append(options, "rro")
+				} else {
+					options = append(options, "ro")
+				}
 			} else {
+				if mount.GetRecursiveReadOnly() {
+					return fmt.Errorf("recursive read-only mount conflicts with RW mount (hostPath=%q)",
+						mount.HostPath)
+				}
 				options = append(options, "rw")
 			}
 
