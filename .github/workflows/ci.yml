@@ -227,7 +227,7 @@ jobs:
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: ./.github/actions/install-go
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: actions/checkout@v4
         with:
