@@ -28,7 +28,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/containerd/v2/internal/kmutex"
-	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
@@ -54,8 +53,6 @@ type CRIImageService struct {
 	// images is the lower level image store used for raw storage,
 	// no event publishing should currently be assumed
 	images images.Store
-	// publisher is the events publisher
-	publisher events.Publisher
 	// client is a subset of the containerd client
 	// and will be replaced by image store and transfer service
 	client imageClient
@@ -87,8 +84,6 @@ type CRIImageServiceOptions struct {
 	RuntimePlatforms map[string]ImagePlatform
 
 	Snapshotters map[string]snapshots.Snapshotter
-
-	Publisher events.Publisher
 
 	Client imageClient
 }

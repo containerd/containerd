@@ -38,7 +38,6 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/diff"
 	containerdimages "github.com/containerd/containerd/v2/core/images"
@@ -322,14 +321,6 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 	// TODO: Call CRIImageService directly
 	oldImg, err := c.images.Create(ctx, img)
 	if err == nil {
-		if c.publisher != nil {
-			if err := c.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
-				Name:   img.Name,
-				Labels: img.Labels,
-			}); err != nil {
-				return err
-			}
-		}
 		return nil
 	} else if !errdefs.IsAlreadyExists(err) {
 		return err
@@ -338,16 +329,6 @@ func (c *CRIImageService) createImageReference(ctx context.Context, name string,
 		return nil
 	}
 	_, err = c.images.Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
-	if err == nil && c.publisher != nil {
-		if c.publisher != nil {
-			if err := c.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
-				Name:   img.Name,
-				Labels: img.Labels,
-			}); err != nil {
-				return err
-			}
-		}
-	}
 	return err
 }
 

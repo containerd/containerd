@@ -279,8 +279,8 @@ func (s *snapshotter) Prepare(ctx context.Context, key, parent string, opts ...s
 		return nil, err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		if err := s.db.dbopts.publisher.Publish(ctx, "/snapshot/prepare", &eventstypes.SnapshotPrepare{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/snapshot/prepare", &eventstypes.SnapshotPrepare{
 			Key:         key,
 			Parent:      parent,
 			Snapshotter: s.name,
@@ -634,8 +634,8 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 		return err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		if err := s.db.dbopts.publisher.Publish(ctx, "/snapshot/commit", &eventstypes.SnapshotCommit{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/snapshot/commit", &eventstypes.SnapshotCommit{
 			Key:         key,
 			Name:        name,
 			Snapshotter: s.name,
@@ -704,8 +704,8 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		return err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		return s.db.dbopts.publisher.Publish(ctx, "/snapshot/remove", &eventstypes.SnapshotRemove{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		return publisher.Publish(ctx, "/snapshot/remove", &eventstypes.SnapshotRemove{
 			Key:         key,
 			Snapshotter: s.name,
 		})
