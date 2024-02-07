@@ -881,6 +881,13 @@ file {
       type: TYPE_STRING
       json_name: "variant"
     }
+    field {
+      name: "os_version"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "osVersion"
+    }
   }
   options {
     go_package: "github.com/containerd/containerd/v2/api/types;types"
