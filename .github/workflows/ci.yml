@@ -9,11 +9,6 @@ on:
       - main
       - "release/**"
 
-env:
-  # Go version we currently use to build containerd across all CI.
-  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.20.13"
-
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -34,11 +29,8 @@ jobs:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - uses: golangci/golangci-lint-action@v4
         with:
           version: v1.56.1
@@ -55,14 +47,12 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: containerd/project-checks@v1.1.0
         with:
@@ -88,13 +78,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - name: Set env
         shell: bash
@@ -120,10 +108,8 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -153,10 +139,8 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: |
           set -e -x
 
@@ -209,12 +193,8 @@ jobs:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.20.13", "1.21.6"]
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - uses: actions/checkout@v4
-
+      - uses: ./.github/actions/install-go
       - name: Make
         run: |
           make build
@@ -243,13 +223,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./.github/actions/install-go
 
       - uses: actions/checkout@v4
         with:
@@ -413,11 +391,8 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
 
       - name: Install containerd dependencies
         env:
@@ -548,10 +523,8 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
