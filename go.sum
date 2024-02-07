@@ -56,8 +56,8 @@ github.com/containerd/go-runc v1.1.0 h1:OX4f+/i2y5sUT7LhmcJH7GYrjjhHa1QI4e8yO0gG
 github.com/containerd/go-runc v1.1.0/go.mod h1:xJv2hFF7GvHtTJd9JqTS2UVxMkULUYw4JN5XAUZqH5U=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
-github.com/containerd/nri v0.5.0 h1:bwCtKpi8i5FCA8g8WjIZNod91CEfIloYpV0+TH2prnQ=
-github.com/containerd/nri v0.5.0/go.mod h1:qIu2NlP3r/qK4YGnNuQf0De4VPqQWP2i2CVBfAZbGzg=
+github.com/containerd/nri v0.6.0 h1:hdztxwL0gCS1CrCa9bvD1SoJiFN4jBuRQhplCvCPMj8=
+github.com/containerd/nri v0.6.0/go.mod h1:F7OZfO4QTPqw5r87aq+syZJwiVvRYLIlHZiZDBV1W3A=
 github.com/containerd/platforms v0.1.1 h1:gp0xXBoY+1CjH54gJDon0kBjIbK2C4XSX1BGwP5ptG0=
 github.com/containerd/platforms v0.1.1/go.mod h1:XOM2BS6kN6gXafPLg80V6y/QUib+xoLyC3qVmHzibko=
 github.com/containerd/plugin v0.1.0 h1:CYMyZk9beRAIe1FEKItbMLLAz/z16aXrGc+B+nv0fU4=
