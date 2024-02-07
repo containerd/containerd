@@ -96,7 +96,7 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 }
 
 // Update updates cache for a reference.
-func (s *Store) Update(ctx context.Context, ref string) error {
+func (s *Store) Update(ctx context.Context, ref string, platform string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -189,7 +189,7 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 }
 
 // Resolve resolves a image reference to image id.
-func (s *Store) Resolve(ref string) (string, error) {
+func (s *Store) Resolve(ref string, platform string) (string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	id, ok := s.refCache[ref]
@@ -202,7 +202,7 @@ func (s *Store) Resolve(ref string) (string, error) {
 // Get gets image metadata by image id. The id can be truncated.
 // Returns various validation errors if the image id is invalid.
 // Returns errdefs.ErrNotFound if the image doesn't exist.
-func (s *Store) Get(id string) (Image, error) {
+func (s *Store) Get(id string, platform string) (Image, error) {
 	return s.store.get(id)
 }
 
