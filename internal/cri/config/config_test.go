@@ -73,26 +73,12 @@ func TestValidateConfig(t *testing.T) {
 			},
 			imageConfig: &ImageConfig{
 				Registry: Registry{
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
+					AuthsNoLongerSupported: map[string]any{
+						"https://gcr.io": map[string]any{"username": "test"},
 					},
 				},
 			},
-			imageExpected: &ImageConfig{
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
-							},
-						},
-					},
-					Auths: map[string]AuthConfig{
-						"https://gcr.io": {Username: "test"},
-					},
-				},
-			},
-			warnings: []deprecation.Warning{deprecation.CRIRegistryAuths},
+			imageExpectedErr: "`auths` is no longer supported since containerd v2.0",
 		},
 		"invalid stream_idle_timeout": {
 			serverConfig: &ServerConfig{
@@ -104,12 +90,12 @@ func TestValidateConfig(t *testing.T) {
 			imageConfig: &ImageConfig{
 				Registry: Registry{
 					ConfigPath: "/etc/containerd/conf.d",
-					Mirrors: map[string]Mirror{
-						"something.io": {},
+					MirrorsNoLongerSupported: map[string]any{
+						"something.io": map[string]any{},
 					},
 				},
 			},
-			imageExpectedErr: "`mirrors` cannot be set when `config_path` is provided",
+			imageExpectedErr: "`mirrors` is no longer supported since containerd v2.0",
 		},
 		"deprecated mirrors": {
 			runtimeConfig: &RuntimeConfig{
@@ -122,8 +108,8 @@ func TestValidateConfig(t *testing.T) {
 			},
 			imageConfig: &ImageConfig{
 				Registry: Registry{
-					Mirrors: map[string]Mirror{
-						"example.com": {},
+					MirrorsNoLongerSupported: map[string]any{
+						"example.com": map[string]any{},
 					},
 				},
 			},
@@ -137,14 +123,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			imageExpected: &ImageConfig{
-				Registry: Registry{
-					Mirrors: map[string]Mirror{
-						"example.com": {},
-					},
-				},
-			},
-			warnings: []deprecation.Warning{deprecation.CRIRegistryMirrors},
+			imageExpectedErr: "`mirrors` is no longer supported since containerd v2.0",
 		},
 		"deprecated configs": {
 			runtimeConfig: &RuntimeConfig{
@@ -157,10 +136,10 @@ func TestValidateConfig(t *testing.T) {
 			},
 			imageConfig: &ImageConfig{
 				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
+					ConfigsNoLongerSupported: map[string]any{
+						"gcr.io": map[string]any{
+							"auth": map[string]any{
+								"username": "test",
 							},
 						},
 					},
@@ -176,18 +155,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 			},
-			imageExpected: &ImageConfig{
-				Registry: Registry{
-					Configs: map[string]RegistryConfig{
-						"gcr.io": {
-							Auth: &AuthConfig{
-								Username: "test",
-							},
-						},
-					},
-				},
-			},
-			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
+			imageExpectedErr: "`configs` is no longer supported since containerd v2.0",
 		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			runtimeConfig: &RuntimeConfig{
