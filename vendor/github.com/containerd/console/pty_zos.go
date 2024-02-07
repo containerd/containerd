@@ -1,5 +1,5 @@
-//go:build freebsd && cgo
-// +build freebsd,cgo
+//go:build zos
+// +build zos
 
 /*
    Copyright The containerd Authors.
@@ -24,23 +24,20 @@ import (
 	"os"
 )
 
-/*
-#include <fcntl.h>
-#include <stdlib.h>
-#include <unistd.h>
-*/
-import "C"
-
-// openpt allocates a new pseudo-terminal and establishes a connection with its
-// control device.
+// openpt allocates a new pseudo-terminal by opening the first available /dev/ptypXX device
 func openpt() (*os.File, error) {
-	fd, err := C.posix_openpt(C.O_RDWR)
-	if err != nil {
-		return nil, fmt.Errorf("posix_openpt: %w", err)
+	var f *os.File
+	var err error
+	for i := 0; ; i++ {
+		ptyp := fmt.Sprintf("/dev/ptyp%04d", i)
+		f, err = os.OpenFile(ptyp, os.O_RDWR, 0600)
+		if err == nil {
+			break
+		}
+		if os.IsNotExist(err) {
+			return nil, err
+		}
+		// else probably Resource Busy
 	}
-	if _, err := C.grantpt(fd); err != nil {
-		C.close(fd)
-		return nil, fmt.Errorf("grantpt: %w", err)
-	}
-	return os.NewFile(uintptr(fd), ""), nil
+	return f, nil
 }
