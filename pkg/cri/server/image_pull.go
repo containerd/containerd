@@ -40,6 +40,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	containerdimages "github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
@@ -168,6 +169,7 @@ func (c *criService) PullImage(ctx context.Context, r *runtime.PullImageRequest)
 		containerd.WithImageHandler(imageHandler),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
 		}),
 	}
 
