@@ -1,0 +1,16 @@
+name: "Setup Go"
+description: "Reusable action to install Go, so there is one place to bump Go versions"
+inputs:
+  go-version:
+    required: true
+    default: "1.21.6"
+    description: "Go version to install"
+
+runs:
+  using: composite
+  steps:
+    - name: "Setup Go"
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: false # see actions/setup-go#368
