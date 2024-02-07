@@ -270,6 +270,20 @@ func (m *DB) Update(fn func(*bolt.Tx) error) error {
 	return err
 }
 
+// Publisher returns an event publisher if one is configured
+// and the current context is not inside a transaction.
+func (m *DB) Publisher(ctx context.Context) events.Publisher {
+	_, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
+	if ok {
+		// Do no publish events within a transaction
+		return nil
+	}
+	if m.dbopts.publisher != nil {
+		return m.dbopts.publisher
+	}
+	return nil
+}
+
 // RegisterMutationCallback registers a function to be called after a metadata
 // mutations has been performed.
 //

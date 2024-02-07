@@ -165,8 +165,8 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 		return images.Image{}, err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		if err := s.db.dbopts.publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/images/create", &eventstypes.ImageCreate{
 			Name:   image.Name,
 			Labels: image.Labels,
 		}); err != nil {
@@ -266,8 +266,8 @@ func (s *imageStore) Update(ctx context.Context, image images.Image, fieldpaths 
 		return images.Image{}, err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		if err := s.db.dbopts.publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/images/update", &eventstypes.ImageUpdate{
 			Name:   updated.Name,
 			Labels: updated.Labels,
 		}); err != nil {
@@ -333,8 +333,8 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 		return err
 	}
 
-	if s.db.dbopts.publisher != nil {
-		if err := s.db.dbopts.publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
+	if publisher := s.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/images/delete", &eventstypes.ImageDelete{
 			Name: name,
 		}); err != nil {
 			return err
