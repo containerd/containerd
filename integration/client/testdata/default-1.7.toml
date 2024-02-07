@@ -196,7 +196,9 @@ version = 2
     no_prometheus = false
 
   [plugins."io.containerd.nri.v1.nri"]
-    disable = true
+    # Updated in latest
+    #disable = true
+    disable = false
     disable_connections = false
     plugin_config_path = "/etc/nri/conf.d"
     plugin_path = "/opt/nri/plugins"

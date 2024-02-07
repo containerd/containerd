@@ -52,20 +52,21 @@ the TODO list.
 The main reason for this split of functionality is to allow
  NRI plugins for other types of sandboxes and for other container clients other than just for CRI containers in the "k8s.io" namespace.
 
-## Enabling NRI Support in Containerd
+## Disabling NRI Support in Containerd
 
 Enabling and disabling NRI support in containerd happens by enabling or
-disabling the common containerd NRI plugin. The plugin, and consequently
-NRI functionality, is disabled by default. It can be enabled by editing
-the `[plugins."io.containerd.nri.v1.nri"]` section in the containerd
-configuration file, which by default is `/etc/containerd/config.toml`,
-and changing `disable = true` to `disable = false`. Once enabled, the
-NRI section should look something like this:
+disabling the common containerd NRI plugin. Starting with containerd 2.0
+The plugin, and consequently NRI functionality, is enabled by default.
+It can be disabled by editing the `[plugins."io.containerd.nri.v1.nri"]`
+section in the containerd configuration file, which by default is
+`/etc/containerd/config.toml`, and changing `disable = false` to
+`disable = true`. The NRI section to disable NRI functionality should
+look something like this:
 
 ```toml
   [plugins."io.containerd.nri.v1.nri"]
-    # Enable NRI support in containerd.
-    disable = false
+    # Disable NRI support in containerd.
+    disable = true
     # Allow connections from externally launched NRI plugins.
     disable_connections = false
     # plugin_config_path is the directory to search for plugin-specific configuration.
