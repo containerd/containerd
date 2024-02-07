@@ -96,13 +96,19 @@ func NewStore(img Getter, provider content.InfoReaderProvider, platform platform
 }
 
 // Update updates cache for a reference.
-func (s *Store) Update(ctx context.Context, ref string) error {
+func (s *Store) Update(ctx context.Context, ref string, platform string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	i, err := s.images.Get(ctx, ref)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("get image from containerd: %w", err)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image from containerd: %w", err)
+		} else {
+			// if image was not found in the local image store,
+			// make sure to remove all the references of 'ref' from CRI's image store cache.
+			return s.removeAllReferences(ctx, ref)
+		}
 	}
 
 	var img *Image
@@ -113,6 +119,19 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 		}
 	}
 	return s.update(ref, img)
+}
+
+// Remove all references from CRI image store cache, if the image was not
+// found in containerd image store.
+func (s *Store) removeAllReferences(ctx context.Context, ref string) error {
+	for refKey, imageIDKey := range s.refCache {
+		if refKey.Ref == ref {
+			// Remove the reference from the store.
+			s.store.delete(imageIDKey.ID, refKey)
+			delete(s.refCache, refKey)
+		}
+	}
+	return nil
 }
 
 // update updates the internal cache. img == nil means that
@@ -189,7 +208,7 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 }
 
 // Resolve resolves a image reference to image id.
-func (s *Store) Resolve(ref string) (string, error) {
+func (s *Store) Resolve(ref string, platform string) (string, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 	id, ok := s.refCache[ref]
@@ -202,7 +221,7 @@ func (s *Store) Resolve(ref string) (string, error) {
 // Get gets image metadata by image id. The id can be truncated.
 // Returns various validation errors if the image id is invalid.
 // Returns errdefs.ErrNotFound if the image doesn't exist.
-func (s *Store) Get(id string) (Image, error) {
+func (s *Store) Get(id string, platform string) (Image, error) {
 	return s.store.get(id)
 }
 

@@ -277,13 +277,15 @@ func (s *fakeImageService) UpdateImage(ctx context.Context, r string) error { re
 
 func (s *fakeImageService) CheckImages(ctx context.Context) error { return nil }
 
-func (s *fakeImageService) GetImage(id string) (imagestore.Image, error) { return s.imageStore.Get(id) }
+func (s *fakeImageService) GetImage(id string, runtimeHandler string) (imagestore.Image, error) {
+	return s.imageStore.Get(id, runtimeHandler)
+}
 
 func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.Snapshot, error) {
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 
-func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
+func (s *fakeImageService) LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")
 }
 

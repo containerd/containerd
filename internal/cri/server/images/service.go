@@ -53,6 +53,8 @@ type CRIImageService struct {
 	// images is the lower level image store used for raw storage,
 	// no event publishing should currently be assumed
 	images images.Store
+	// contentStore stores content information
+	content content.Store
 	// client is a subset of the containerd client
 	// and will be replaced by image store and transfer service
 	client imageClient
@@ -102,6 +104,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
+		content:                     options.Content,
 		client:                      options.Client,
 		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
 		imageFSPaths:                options.ImageFSPaths,
@@ -123,8 +126,20 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
-func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
+func (c *CRIImageService) LocalResolve(refOrID string, runtimeHandler string) (imagestore.Image, error) {
+	// get platform that this image needs to be resolved for
+	platformSpec := platforms.DefaultSpec()
+	if runtimeHandler != "" {
+		// if valid runtime handler, use its platform
+		if c.runtimePlatforms != nil {
+			if runtimePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
+				platformSpec = runtimePlatform.Platform
+			}
+		}
+	}
+	platform := platforms.Format(platformSpec)
+
+	getImageID := func(refOrId string, platform string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
 		}
@@ -135,7 +150,7 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 			if err != nil {
 				return ""
 			}
-			id, err := c.imageStore.Resolve(normalized.String())
+			id, err := c.imageStore.Resolve(normalized.String(), platform)
 			if err != nil {
 				return ""
 			}
@@ -143,12 +158,12 @@ func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error)
 		}(refOrID)
 	}
 
-	imageID := getImageID(refOrID)
+	imageID := getImageID(refOrID, platform)
 	if imageID == "" {
 		// Try to treat ref as imageID
 		imageID = refOrID
 	}
-	return c.imageStore.Get(imageID)
+	return c.imageStore.Get(imageID, platform)
 }
 
 // RuntimeSnapshotter overrides the default snapshotter if Snapshotter is set for this runtime.
@@ -164,8 +179,18 @@ func (c *CRIImageService) RuntimeSnapshotter(ctx context.Context, ociRuntime cri
 }
 
 // GetImage gets image metadata by image id.
-func (c *CRIImageService) GetImage(id string) (imagestore.Image, error) {
-	return c.imageStore.Get(id)
+func (c *CRIImageService) GetImage(id string, runtimeHandler string) (imagestore.Image, error) {
+	// get platform that this image is wanted for
+	platformSpec := platforms.DefaultSpec()
+	if runtimeHandler != "" {
+		// if valid runtime handler, use its platform
+		if c.runtimePlatforms != nil {
+			if runtimePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
+				platformSpec = runtimePlatform.Platform
+			}
+		}
+	}
+	return c.imageStore.Get(id, platforms.Format(platformSpec))
 }
 
 // GetSnapshot returns the snapshot with specified key.

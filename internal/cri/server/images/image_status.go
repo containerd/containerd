@@ -38,7 +38,9 @@ import (
 // kubernetes/kubernetes#46255)
 func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
 	span := tracing.SpanFromContext(ctx)
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+
+	runtimeHandler := r.Image.GetRuntimeHandler()
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHandler)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())

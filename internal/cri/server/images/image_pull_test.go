@@ -431,7 +431,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, "")
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
 			if tt.expectErr {
 				assert.Error(t, err)

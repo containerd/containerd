@@ -168,12 +168,13 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	)
 
 	defer pcancel()
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig)
+	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
 
-	platformForImagePull, err := c.platformForImagePullFromPodSandboxConfig(ctx, ref, sandboxConfig)
+	// Get which platform the image needs to be pulled for
+	platformForImagePull, err := c.platformForImagePullFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to get platform information for pulling %v", ref)
 	}
@@ -187,9 +188,10 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 
 	labels := c.getLabels(ctx, ref)
 
-	// Add label to indicate the platform the image is being pulled for.
-	platformImageLabel := fmt.Sprintf(ctrdlabels.PlatformLabelFormat, ctrdlabels.PlatformLabelPrefix, platforms.Format(platformForImagePull))
-	labels[platformImageLabel] = platformImageLabel
+	// Add label to indicate which platform the image is being pulled for.
+	platform := platforms.Format(platformForImagePull)
+	platformImageLabelKey := fmt.Sprintf(ctrdlabels.PlatformLabelFormat, ctrdlabels.PlatformLabelPrefix, platform)
+	labels[platformImageLabelKey] = platform
 
 	pullOpts := []containerd.RemoteOpt{
 		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
@@ -238,14 +240,14 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		if r == "" {
 			continue
 		}
-		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
+		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels, platform); err != nil {
 			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
 		// No need to use `updateImage`, because the image reference must
 		// have been managed by the cri plugin.
 		// TODO: Use image service directly
-		if err := c.imageStore.Update(ctx, r); err != nil {
+		if err := c.imageStore.Update(ctx, r, platform); err != nil {
 			return "", fmt.Errorf("failed to update image store %q: %w", r, err)
 		}
 	}
@@ -308,7 +310,7 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) error {
+func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string, platform string) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -338,6 +340,12 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 		labels[crilabels.PinnedImageLabelKey] == crilabels.PinnedImageLabelValue {
 		fieldpaths = append(fieldpaths, "labels."+crilabels.PinnedImageLabelKey)
 	}
+	// Update image with new platform label to indicate what platform this image is being
+	platformLabelKey := fmt.Sprintf(ctrdlabels.PlatformLabelFormat, ctrdlabels.PlatformLabelPrefix, platform)
+	if oldImg.Labels[platformLabelKey] != labels[platformLabelKey] {
+		fieldpaths = append(fieldpaths, "labels."+platformLabelKey)
+	}
+
 	if oldImg.Target.Digest == img.Target.Digest && len(fieldpaths) < 2 {
 		return nil
 	}
@@ -356,49 +364,72 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 	return labels
 }
 
+// Get the new platform label being updated for this image by parsing the labels and checking
+// if an entry for the (image, platform) already exists in CRI's image cache.
+func (c *CRIImageService) getNewPlatformLabelForImage(ctx context.Context, img containerdimages.Image) platforms.Platform {
+	for key, _ := range img.Labels {
+		if strings.HasPrefix(key, ctrdlabels.PlatformLabelPrefix) {
+			platform := img.Labels[key]
+			// if (image, platform) does not exist for this image in
+			// CRI image store, it is new. So break and return this platform
+			if _, err := c.imageStore.Get(img.Name, platform); err != nil {
+				return platforms.MustParse(platform)
+			}
+		}
+	}
+
+	// If no new platform label is found, just return the default
+	// platform matcher
+	return platforms.DefaultSpec()
+}
+
 // updateImage updates image store to reflect the newest state of an image reference
 // in containerd. If the reference is not managed by the cri plugin, the function also
 // generates necessary metadata for the image and make it managed.
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	// TODO: Use image service
-	img, err := c.client.GetImage(ctx, r)
+	img, err := c.images.Get(ctx, r)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return fmt.Errorf("get image by reference: %w", err)
 		}
 		// If the image is not found, we should continue updating the cache,
-		// so that the image can be removed from the cache.
-		if err := c.imageStore.Update(ctx, r); err != nil {
+		// and remove all references.
+		if err := c.imageStore.Update(ctx, r, ""); err != nil {
 			return fmt.Errorf("update image store for %q: %w", r, err)
 		}
 		return nil
 	}
 
-	labels := img.Labels()
+	// Find new platform label that this image needs to be updated for.
+	newPlatformSpecForImage := c.getNewPlatformLabelForImage(ctx, img)
+	platform := platforms.Format(newPlatformSpecForImage)
+
+	labels := img.Labels
 	criLabels := c.getLabels(ctx, r)
 	for key, value := range criLabels {
 		if labels[key] != value {
 			// Make sure the image has the image id as its unique
 			// identifier that references the image in its lifetime.
-			configDesc, err := img.Config(ctx)
+			configDesc, err := img.Config(ctx, c.content, platforms.Only(newPlatformSpecForImage))
 			if err != nil {
 				return fmt.Errorf("get image id: %w", err)
 			}
 			id := configDesc.Digest.String()
-			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+			if err := c.createOrUpdateImageReference(ctx, id, img.Target, criLabels, platform); err != nil {
 				return fmt.Errorf("create image id reference %q: %w", id, err)
 			}
-			if err := c.imageStore.Update(ctx, id); err != nil {
+			if err := c.imageStore.Update(ctx, id, platform); err != nil {
 				return fmt.Errorf("update image store for %q: %w", id, err)
 			}
 			// The image id is ready, add the label to mark the image as managed.
-			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+			if err := c.createOrUpdateImageReference(ctx, r, img.Target, criLabels, platform); err != nil {
 				return fmt.Errorf("create managed label: %w", err)
 			}
 			break
 		}
 	}
-	if err := c.imageStore.Update(ctx, r); err != nil {
+	if err := c.imageStore.Update(ctx, r, platform); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
 	return nil
@@ -769,12 +800,10 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
-// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
-// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
-// See https://github.com/containerd/containerd/issues/6657
+// Use the runtimeHandler passed from CRI. If CRI runtime handler is empty, attempt to check
+// if annotations.RuntimeHandler annotation was set for the pod.
 func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (string, error) {
+	s *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
 	snapshotter := c.config.Snapshotter
 	if s == nil || s.Annotations == nil {
 		return snapshotter, nil
@@ -782,6 +811,15 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 
 	// TODO(kiashok): honor the new CRI runtime handler field added to v0.29.0
 	// for image pull per runtime class support.
+	if runtimeHandler != "" {
+		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok && imagePlatform.Snapshotter != snapshotter {
+			return imagePlatform.Snapshotter, nil
+		} else {
+			return "", fmt.Errorf("invalid runtime handler %v", runtimeHandler)
+		}
+	}
+
+	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
 	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
 	if !ok {
 		return snapshotter, nil
@@ -798,15 +836,22 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	return snapshotter, nil
 }
 
-// Get which platform to use for pulling the requested image. Currently, we are basing this off of
-// annotations.RuntimeHandler being set in the pod config. But once containerd moves to using k8s
-// cri-api v1.29, we can deprecate reading the annotation since runtimehandler information can be
-// passed through CRI itself.
+// Gets the platform to use for image pull based on runtimeHandler passed from CRI.
+// If CRI runtime handler is empty, we attempt to check if annotations.RuntimeHandler
+// annotation was set for the pod. Else, the default platform for the host is returned.
 func (c *CRIImageService) platformForImagePullFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig) (imagespec.Platform, error) {
+	s *runtime.PodSandboxConfig, runtimeHandler string) (imagespec.Platform, error) {
 	platform := platforms.DefaultSpec()
-	// TODO(kiashok): Once cri-api is updated to v1.29, we can deprecate reading runtime handler
-	// from pod annotations as CRI supports passing runtime handler name starting v1.29 (KEP 4216)
+
+	if runtimeHandler != "" {
+		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
+			return imagePlatform.Platform, nil
+		} else {
+			return imagespec.Platform{}, fmt.Errorf("invalid runtime handler %v", runtimeHandler)
+		}
+	}
+
+	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
 	if s == nil || s.Annotations == nil {
 		return platform, nil
 	}
@@ -817,8 +862,8 @@ func (c *CRIImageService) platformForImagePullFromPodSandboxConfig(ctx context.C
 	}
 
 	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok {
-			return p.Platform, nil
+		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
+			return imagePlatform.Platform, nil
 		}
 	}
 	return platform, nil

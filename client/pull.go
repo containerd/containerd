@@ -301,7 +301,22 @@ func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.I
 				return images.Image{}, err
 			}
 
-			updated, err := is.Update(ctx, img)
+			// if the image already exists, we want to ensure that we do not replace
+			// any exisitng platform image labels. Combine the old and new labels
+			// before update.
+			oldImg, err := is.Get(ctx, img.Name)
+			if err != nil {
+				continue
+			}
+
+			var fieldpaths []string
+			// Find the new labels added to the image in img.Label and ensure that we update them.
+			for key, value := range img.Labels {
+				if oldImg.Labels[key] != value {
+					fieldpaths = append(fieldpaths, "labels."+key)
+				}
+			}
+			updated, err := is.Update(ctx, img, fieldpaths...)
 			if err != nil {
 				// if image was removed, try create again
 				if errdefs.IsNotFound(err) {

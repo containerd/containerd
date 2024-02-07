@@ -23,6 +23,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -44,7 +45,15 @@ func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.Remove
 func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.ImageSpec) error {
 	span := tracing.SpanFromContext(ctx)
 
-	image, err := c.LocalResolve(imageSpec.GetImage())
+	runtimeHandler := imageSpec.GetRuntimeHandler()
+	platformSpec := platforms.DefaultSpec()
+	if runtimeHandler != "" {
+		if runtimePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
+			platformSpec = runtimePlatform.Platform
+		}
+	}
+
+	image, err := c.LocalResolve(imageSpec.GetImage(), runtimeHandler)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
@@ -66,7 +75,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		err = c.images.Delete(ctx, ref, opts...)
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref); err != nil {
+			if err := c.imageStore.Update(ctx, ref, platforms.Format(platformSpec)); err != nil {
 				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue
