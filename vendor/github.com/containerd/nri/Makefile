@@ -42,6 +42,7 @@ PLUGINS := \
 	$(BIN_PATH)/device-injector \
 	$(BIN_PATH)/hook-injector \
 	$(BIN_PATH)/differ \
+	$(BIN_PATH)/ulimit-adjuster \
 	$(BIN_PATH)/v010-adapter \
 	$(BIN_PATH)/template
 
@@ -105,6 +106,10 @@ $(BIN_PATH)/differ: $(wildcard plugins/differ/*.go)
 	$(Q)echo "Building $@..."; \
 	cd $(dir $<) && $(GO_BUILD) -o $@ .
 
+$(BIN_PATH)/ulimit-adjuster: $(wildcard plugins/ulimit-adjuster/*.go)
+	$(Q)echo "Building $@..."; \
+	cd $(dir $<) && $(GO_BUILD) -o $@ .
+
 $(BIN_PATH)/v010-adapter: $(wildcard plugins/v010-adapter/*.go)
 	$(Q)echo "Building $@..."; \
 	cd $(dir $<) && $(GO_BUILD) -o $@ .
@@ -136,7 +141,7 @@ ginkgo-tests:
 	$(GO_CMD) tool cover -html=$(COVERAGE_PATH)/coverprofile -o $(COVERAGE_PATH)/coverage.html
 
 test-ulimits:
-	$(Q)$(GO_TEST) -v ./plugins/ulimit-adjuster
+	$(Q)cd ./plugins/ulimit-adjuster && $(GO_TEST) -v
 
 codecov: SHELL := $(shell which bash)
 codecov:
