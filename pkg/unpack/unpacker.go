@@ -285,6 +285,18 @@ func (u *Unpacker) unpack(
 	defer cancel()
 
 	doUnpackFn := func(i int, desc ocispec.Descriptor) error {
+
+		parent := identity.ChainID(chain)
+		chain = append(chain, diffIDs[i])
+		chainID := identity.ChainID(chain).String()
+
+		// lock on the chainID before we do the content check to prevent parallel fetch and extracts for the same content
+		unlock, err := u.lockSnChainID(ctx, chainID, unpack.SnapshotterKey)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+
 		// always perform content check and fetch if not present
 		// this prevents the sn.Stat chain id check from returning without downloading the content
 		if _, err := cs.Info(ctx, desc.Digest); err != nil {
@@ -319,16 +331,6 @@ func (u *Unpacker) unpack(
 			case <-fetchC[i-fetchOffset]:
 			}
 		}
-
-		parent := identity.ChainID(chain)
-		chain = append(chain, diffIDs[i])
-		chainID := identity.ChainID(chain).String()
-
-		unlock, err := u.lockSnChainID(ctx, chainID, unpack.SnapshotterKey)
-		if err != nil {
-			return err
-		}
-		defer unlock()
 
 		if _, err := sn.Stat(ctx, chainID); err == nil {
 			// no need to handle
