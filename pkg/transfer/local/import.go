@@ -23,11 +23,11 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/unpack"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 
@@ -128,6 +128,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 	}
 
 	for _, desc := range descriptors {
+		desc := desc
 		imgs, err := is.Store(ctx, desc, ts.images)
 		if err != nil {
 			if errdefs.IsNotFound(err) {
@@ -142,6 +143,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 				tops.Progress(transfer.Progress{
 					Event: "saved",
 					Name:  img.Name,
+					Desc:  &desc,
 				})
 			}
 		}

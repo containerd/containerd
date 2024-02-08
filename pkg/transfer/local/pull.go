@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/unpack"
-	"github.com/containerd/containerd/v2/remotes"
-	"github.com/containerd/containerd/v2/remotes/docker"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
@@ -286,7 +286,7 @@ func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []
 			// Assume sp.SnapshotterKey is not empty
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
-			} else if uc.Snapshotter == "" && sp.SnapshotterKey == containerd.DefaultSnapshotter {
+			} else if uc.Snapshotter == "" && sp.SnapshotterKey == defaults.DefaultSnapshotter {
 				return true, sp
 			}
 		}

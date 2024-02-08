@@ -27,13 +27,13 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
 	"github.com/containerd/containerd/v2/pkg/transfer/registry"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
@@ -79,7 +79,7 @@ command. As part of this process, we do the following:
 			Name:  "max-concurrent-downloads",
 			Usage: "Set the max concurrent downloads for each pull",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
@@ -98,7 +98,7 @@ command. As part of this process, we do the following:
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
 			if err != nil {
 				return err
@@ -204,6 +204,18 @@ type progressNode struct {
 	transfer.Progress
 	children []*progressNode
 	root     bool
+}
+
+func (n *progressNode) mainDesc() *ocispec.Descriptor {
+	if n.Desc != nil {
+		return n.Desc
+	}
+	for _, c := range n.children {
+		if desc := c.mainDesc(); desc != nil {
+			return desc
+		}
+	}
+	return nil
 }
 
 // ProgressHandler continuously updates the output with job progress
@@ -329,6 +341,11 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 
 func DisplayHierarchy(w io.Writer, status string, roots []*progressNode, start time.Time) {
 	total := displayNode(w, "", roots)
+	for _, r := range roots {
+		if desc := r.mainDesc(); desc != nil {
+			fmt.Fprintf(w, "%s %s\n", desc.MediaType, desc.Digest)
+		}
+	}
 	// Print the Status line
 	fmt.Fprintf(w, "%s\telapsed: %-4.1fs\ttotal: %7.6v\t(%v)\t\n",
 		status,

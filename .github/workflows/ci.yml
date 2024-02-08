@@ -9,7 +9,7 @@ on:
 env:
   # Go version we currently use to build containerd across all CI.
   # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.21.3"
+  GO_VERSION: "1.21.6"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -28,15 +28,15 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2019]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: golangci/golangci-lint-action@v3
         with:
           version: v1.55.2
@@ -53,12 +53,12 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -87,12 +87,12 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
@@ -120,11 +120,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -154,11 +154,11 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: |
           set -e -x
 
@@ -208,22 +208,15 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2019, windows-2022]
-        go-version: ["1.20.10", "1.21.3"]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
+        go-version: ["1.20.13", "1.21.6"]
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
-
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        run: |
-          choco upgrade mingw --version=12.2.0.3042023
+      - uses: actions/checkout@v4
 
       - name: Make
         run: |
@@ -244,7 +237,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022] # windows-2019 is temporarily removed until mingw issue fixed
+        os: [windows-2022, windows-2019]
 
     defaults:
       run:
@@ -252,16 +245,16 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
@@ -275,14 +268,19 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
+      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
+      - name: Upgrade Chocolaty on Windows 2019
+        if: matrix.os == 'windows-2019'
+        shell: powershell
+        run: .\script\setup\upgrade_chocolaty_windows_2019.ps1
+
       - name: Upgrade MinGW on Windows 2019
         if: matrix.os == 'windows-2019'
-        run: |
-          choco upgrade mingw --version=12.2.0.3042023
+        shell: powershell
+        run: .\script\setup\upgrade_mingw_windows_2019.ps1
 
       - name: Binaries
+        shell: bash
         env:
           CGO_ENABLED: 1
         run: |
@@ -385,7 +383,7 @@ jobs:
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults ${{ matrix.os }}
@@ -396,7 +394,7 @@ jobs:
 
   integration-linux:
     name: Linux Integration
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -406,23 +404,24 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc, crun]
+        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb]
 
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install containerd dependencies
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y gperf
+          sudo apt-get install -y gperf dmsetup strace xfsprogs
           script/setup/install-seccomp
           script/setup/install-runc
           script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
@@ -430,6 +429,10 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
+        # NOTE: Required actuated enable CONFIG_CHECKPOINT_RESTORE
+        #
+        # REF: https://criu.org/Linux_kernel
+        if: matrix.os != 'actuated-arm64-4cpu-16gb'
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
@@ -514,12 +517,14 @@ jobs:
           losetup -l
       - name: Kernel Message
         if: failure()
-        run: sudo dmesg -T -f kern
+        run: |
+          sudo lsmod
+          sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
           path: |
             *-junit.xml
             *-gotest.json
@@ -528,9 +533,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    # "Larger" runner is needed for nested virtualization
-    # https://github.com/organizations/containerd/settings/actions/runners
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -539,7 +542,7 @@ jobs:
       matrix:
         box:
           - fedora/39-cloud-base
-          - rockylinux/8@8.0.0
+          - rockylinux/8@9.0.0
     env:
       BOX: ${{ matrix.box }}
 
@@ -551,8 +554,8 @@ jobs:
           cat /etc/os-release
           cat /proc/cpuinfo
           free -mt
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
@@ -586,7 +589,7 @@ jobs:
     needs: [project, linters, protos, man]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up cgroup v2 delegation
         run: |
           sudo mkdir -p /etc/systemd/system/user@.service.d
@@ -611,11 +614,11 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: false # see actions/setup-go#368
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
@@ -627,7 +630,7 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults MacOS

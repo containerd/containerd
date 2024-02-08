@@ -41,13 +41,12 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/klog/v2"
-
-	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"k8s.io/component-base/logs/logreduction"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/v2/integration/remote/util"
 )
 
@@ -536,6 +535,15 @@ func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeSta
 	return resp.Status, nil
 }
 
+// RuntimeConfig returns the CgroupDriver of the runtime.
+func (r *RuntimeService) RuntimeConfig(in *runtimeapi.RuntimeConfigRequest, opts ...grpc.CallOption) (*runtimeapi.RuntimeConfigResponse, error) {
+	klog.V(10).Infof("[RuntimeService] RuntimeConfig (timeout=%v)", r.timeout)
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+	runtimeConfig, err := r.runtimeClient.RuntimeConfig(ctx, in)
+	return runtimeConfig, err
+}
+
 // ContainerStats returns the stats of the container.
 func (r *RuntimeService) ContainerStats(containerID string, opts ...grpc.CallOption) (*runtimeapi.ContainerStats, error) {
 	klog.V(10).Infof("[RuntimeService] ContainerStats (containerID=%v, timeout=%v)", containerID, r.timeout)
@@ -597,7 +605,7 @@ func (r *RuntimeService) ReopenContainerLog(containerID string, opts ...grpc.Cal
 
 // GetContainerEvents returns a GRPC client to stream container events
 func (r *RuntimeService) GetContainerEvents(ctx context.Context, request *runtimeapi.GetEventsRequest, opts ...grpc.CallOption) (runtimeapi.RuntimeService_GetContainerEventsClient, error) {
-	klog.V(10).Infof("[RuntimeService] GetContainerEvents", r.timeout)
+	klog.V(10).Infof("[RuntimeService] GetContainerEvents (timeout=%v)", r.timeout)
 
 	client, err := r.runtimeClient.GetContainerEvents(ctx, request, opts...)
 	if err != nil {

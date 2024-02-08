@@ -23,7 +23,7 @@ Containerd is one potential alternative to Docker as the runtime for Kubernetes 
 ### Cons
 * **User Adoption**:
   * Ideally, Kubernetes users don't interact with the underlying container runtime directly. However, for the lack of debug toolkits, sometimes users still need to login the node to debug with Docker CLI directly.
-  * Containerd provides barebone CLIs [ctr](https://github.com/containerd/containerd/tree/main/cmd/ctr) and [dist](https://github.com/containerd/containerd/tree/main/cmd/dist) for development and debugging purpose, but they may not be sufficient and necessary. Additionally, presuming these are sufficient and necessary tools, a plan and time would be needed to sufficiently document these CLIs and educate users in their use.
+  * Containerd provides barebone CLI [ctr](https://github.com/containerd/containerd/tree/main/cmd/ctr) for development and debugging purpose, but it may not be sufficient and necessary. Additionally, presuming these are sufficient and necessary tools, a plan and time would be needed to sufficiently document these CLIs and educate users in their use.
 * **Maturity**: The rescoped containerd is pretty new, and it's still under heavy development.
 ## Goals
 * Make sure containerd meets the requirement of Kubernetes, now and into the foreseeable future.
@@ -44,8 +44,8 @@ Containerd doesn't provide persistent container log. It redirects container STDI
 
 CRI-containerd should start a goroutine (process/container in the future) to:
 * Continuously drain the FIFO;
-* Decorate the log line into [CRI-defined format](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution);
-* Write the log into [CRI-defined log path](https://github.com/kubernetes/community/blob/master/contributors/design-proposals/node/kubelet-cri-logging.md#proposed-solution).
+* Decorate the log line into [CRI-defined format](https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-cri-logging.md#proposed-solution);
+* Write the log into [CRI-defined log path](https://github.com/kubernetes/design-proposals-archive/blob/main/node/kubelet-cri-logging.md#proposed-solution).
 ### Container Streaming
 Containerd supports creating a process in the container with `Exec`, and the STDIO is also exposed as FIFOs. Containerd also supports resizing console of a specific process with `Pty`.
 
@@ -61,10 +61,10 @@ Containerd doesn't provide container networking, but OCI runtime spec supports j
 
 CRI-containerd should:
 * Create a network namespace for a sandbox;
-* Call [network plugin](https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/network/plugins.go) to update the options of the network namespace;
+* Call [network plugin](https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/) to update the options of the network namespace;
 * Let the user containers in the same sandbox share the network namespace.
 ### Container Metrics
-Containerd provides [container cgroup metrics](https://github.com/containerd/containerd/blob/main/reports/2017-03-17.md#metrics), and plans to provide [container writable layer disk usage](https://github.com/containerd/containerd/issues/678).
+Containerd provides [container cgroup metrics](https://github.com/containerd/containerd/blob/main/docs/historical/reports/2017-03-17.md#metrics), and plans to provide [container writable layer disk usage](https://github.com/containerd/containerd/issues/678).
 
 CRI container metrics api needs to be defined ([#27097](https://github.com/kubernetes/kubernetes/issues/27097)). After that, CRI-containerd should translate containerd container metrics into CRI container metrics.
 ### Image Management
@@ -77,7 +77,7 @@ CRI image filesystem metrics needs to be defined ([#33048](https://github.com/ku
 ### Out of Scope
 Following items are out of the scope of this design, we may address them in future version as enhancement or optimization.
 * **Debuggability**: One of the biggest concern of CRI-containerd is debuggability. We should provide equivalent debuggability with Docker CLI through `kubectl`, [`cri-tools`](https://github.com/kubernetes-sigs/cri-tools) or containerd CLI.
-* **Built-in CRI support**: The [plugin model](https://github.com/containerd/containerd/blob/main/design/plugins.md) provided by containerd makes it possible to directly build CRI support into containerd as a plugin, which will eliminate one more hop from the stack. But because of the [limitation of golang plugin](https://github.com/containerd/containerd/issues/563), we have to either maintain our own branch or push CRI plugin upstream.
+* **Built-in CRI support**: The [plugin model](https://github.com/containerd/containerd/blob/main/docs/PLUGINS.md) provided by containerd makes it possible to directly build CRI support into containerd as a plugin, which will eliminate one more hop from the stack. But because of the [limitation of golang plugin](https://github.com/containerd/containerd/issues/563), we have to either maintain our own branch or push CRI plugin upstream.
 * **Seccomp**: ([#36997](https://github.com/kubernetes/kubernetes/issues/36997)) Seccomp is supported in OCI runtime spec. However, current seccomp implementation in Kubernetes is experimental and docker specific, the api needs to be defined in CRI first before CRI-containerd implements it.
 * **Streaming server authentication**: ([#36666](https://github.com/kubernetes/kubernetes/issues/36666)) CRI-containerd will be out-of-process with Kubelet, so it could not reuse Kubelet authentication. Its streaming server should implement its own authentication mechanism.
 * **Move container facilities into pod cgroup**: Container facilities including container image puller, container streaming handler, log handler and containerd-shim serve a specific container. They should be moved to the corresponding pod cgroup, and the overhead introduced by them should be charged to the pod.

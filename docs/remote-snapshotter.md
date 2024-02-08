@@ -45,7 +45,7 @@ These user-defined labels must be prefixed by `containerd.io/snapshot/`.
 ```go
 import (
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots"
 )
 
 image, err := client.Pull(ctx, ref,

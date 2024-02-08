@@ -20,10 +20,10 @@ import (
 	"context"
 
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
-	"github.com/containerd/containerd/v2/diff"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -60,6 +60,7 @@ func (s *service) Apply(ctx context.Context, er *diffapi.ApplyRequest) (*diffapi
 		}
 		opts = append(opts, diff.WithPayloads(payloads))
 	}
+	opts = append(opts, diff.WithSyncFs(er.SyncFs))
 
 	ocidesc, err = s.applier.Apply(ctx, desc, mounts, opts...)
 	if err != nil {

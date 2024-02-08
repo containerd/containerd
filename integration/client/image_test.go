@@ -24,11 +24,12 @@ import (
 	"testing"
 
 	. "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/defaults"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/labels"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -57,7 +58,7 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 
 	// Check that image is not unpacked
-	unpacked, err := image.IsUnpacked(ctx, DefaultSnapshotter)
+	unpacked, err := image.IsUnpacked(ctx, defaults.DefaultSnapshotter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,11 +67,11 @@ func TestImageIsUnpacked(t *testing.T) {
 	}
 
 	// Check that image is unpacked
-	err = image.Unpack(ctx, DefaultSnapshotter)
+	err = image.Unpack(ctx, defaults.DefaultSnapshotter)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unpacked, err = image.IsUnpacked(ctx, DefaultSnapshotter)
+	unpacked, err = image.IsUnpacked(ctx, defaults.DefaultSnapshotter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +219,7 @@ func TestImageUsage(t *testing.T) {
 		t.Fatalf("Expected actual usage to equal manifest reported usage of %d: got %d", s3, s)
 	}
 
-	err = image.Unpack(ctx, DefaultSnapshotter)
+	err = image.Unpack(ctx, defaults.DefaultSnapshotter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,12 +257,12 @@ func TestImageSupportedBySnapshotter_Error(t *testing.T) {
 	_, err = client.Pull(ctx, unsupportedImage,
 		WithSchema1Conversion,
 		WithPlatform(platforms.DefaultString()),
-		WithPullSnapshotter(DefaultSnapshotter),
+		WithPullSnapshotter(defaults.DefaultSnapshotter),
 		WithPullUnpack,
 		WithUnpackOpts([]UnpackOpt{WithSnapshotterPlatformCheck()}),
 	)
 
 	if err == nil {
-		t.Fatalf("expected unpacking %s for snapshotter %s to fail", unsupportedImage, DefaultSnapshotter)
+		t.Fatalf("expected unpacking %s for snapshotter %s to fail", unsupportedImage, defaults.DefaultSnapshotter)
 	}
 }

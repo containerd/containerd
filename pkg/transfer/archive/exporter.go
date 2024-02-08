@@ -25,14 +25,14 @@ import (
 
 	"github.com/containerd/containerd/v2/api/types"
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/pkg/streaming"
 	"github.com/containerd/containerd/v2/pkg/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 func init() {

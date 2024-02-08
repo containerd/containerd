@@ -39,30 +39,32 @@ import (
 	"github.com/containerd/containerd/v2/api/services/tasks/v1"
 	versionservice "github.com/containerd/containerd/v2/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/content"
-	contentproxy "github.com/containerd/containerd/v2/content/proxy"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/content"
+	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
+	leasesproxy "github.com/containerd/containerd/v2/core/leases/proxy"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	sandboxproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/events"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/leases"
-	leasesproxy "github.com/containerd/containerd/v2/leases/proxy"
-	"github.com/containerd/containerd/v2/namespaces"
 	"github.com/containerd/containerd/v2/pkg/dialer"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/pkg/events"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/introspection"
+	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/containerd/v2/remotes"
-	"github.com/containerd/containerd/v2/remotes/docker"
-	"github.com/containerd/containerd/v2/sandbox"
-	sandboxproxy "github.com/containerd/containerd/v2/sandbox/proxy"
-	"github.com/containerd/containerd/v2/services/introspection"
-	"github.com/containerd/containerd/v2/snapshots"
-	snproxy "github.com/containerd/containerd/v2/snapshots/proxy"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -78,6 +80,7 @@ func init() {
 	typeurl.Register(&specs.Process{}, prefix, "opencontainers/runtime-spec", major, "Process")
 	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
+	typeurl.Register(&features.Features{}, prefix, "opencontainers/runtime-spec", major, "features", "Features")
 }
 
 // New returns a new containerd client that is connected to the containerd
@@ -626,7 +629,7 @@ func (c *Client) ContentStore() content.Store {
 func (c *Client) SnapshotService(snapshotterName string) snapshots.Snapshotter {
 	snapshotterName, err := c.resolveSnapshotterName(context.Background(), snapshotterName)
 	if err != nil {
-		snapshotterName = DefaultSnapshotter
+		snapshotterName = defaults.DefaultSnapshotter
 	}
 	if c.snapshotters != nil {
 		return c.snapshotters[snapshotterName]
@@ -801,7 +804,7 @@ func (c *Client) resolveSnapshotterName(ctx context.Context, name string) (strin
 		if label != "" {
 			name = label
 		} else {
-			name = DefaultSnapshotter
+			name = defaults.DefaultSnapshotter
 		}
 	}
 
@@ -870,4 +873,77 @@ func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName
 
 	sn := resp.Plugins[0]
 	return sn.Capabilities, nil
+}
+
+type RuntimeVersion struct {
+	Version  string
+	Revision string
+}
+
+type RuntimeInfo struct {
+	Name        string
+	Version     RuntimeVersion
+	Options     interface{}
+	Features    interface{}
+	Annotations map[string]string
+}
+
+func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOptions interface{}) (*RuntimeInfo, error) {
+	rt := c.runtime
+	if runtimePath != "" {
+		rt = runtimePath
+	}
+	rr := &apitypes.RuntimeRequest{
+		RuntimePath: rt,
+	}
+	var err error
+	if runtimeOptions != nil {
+		rr.Options, err = protobuf.MarshalAnyToProto(runtimeOptions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
+		}
+	}
+	options, err := protobuf.MarshalAnyToProto(rr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal runtime requst: %w", err)
+	}
+
+	s := c.IntrospectionService()
+
+	req := &introspectionapi.PluginInfoRequest{
+		Type:    string(plugins.RuntimePluginV2),
+		ID:      "task",
+		Options: options,
+	}
+
+	resp, err := s.PluginInfo(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	var info apitypes.RuntimeInfo
+	if err := typeurl.UnmarshalTo(resp.Extra, &info); err != nil {
+		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+
+	var result RuntimeInfo
+	result.Name = info.Name
+	if info.Version != nil {
+		result.Version.Version = info.Version.Version
+		result.Version.Revision = info.Version.Revision
+	}
+	if info.Options != nil {
+		result.Options, err = typeurl.UnmarshalAny(info.Options)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal RuntimeInfo.Options (%T): %w", info.Options, err)
+		}
+	}
+	if info.Features != nil {
+		result.Features, err = typeurl.UnmarshalAny(info.Features)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal RuntimeInfo.Features (%T): %w", info.Features, err)
+		}
+	}
+	result.Annotations = info.Annotations
+	return &result, nil
 }

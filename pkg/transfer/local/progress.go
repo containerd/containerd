@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/content"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/pkg/transfer"
-	"github.com/containerd/containerd/v2/remotes"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -106,6 +106,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 							Parents:  job.parents,
 							Progress: status.Offset,
 							Total:    status.Total,
+							Desc:     &job.desc,
 						})
 						job.progress = status.Offset
 						job.state = jobInProgress
@@ -122,6 +123,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 							Parents:  job.parents,
 							Progress: job.desc.Size,
 							Total:    job.desc.Size,
+							Desc:     &job.desc,
 						})
 
 					}
@@ -165,6 +167,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 					//Digest:   desc.Digest.String(),
 					Progress: 0,
 					Total:    update.desc.Size,
+					Desc:     &job.desc,
 				})
 			}
 			if update.exists {
@@ -173,6 +176,7 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 					Name:     remotes.MakeRefKey(ctx, update.desc),
 					Progress: update.desc.Size,
 					Total:    update.desc.Size,
+					Desc:     &job.desc,
 				})
 				job.state = jobComplete
 				job.progress = job.desc.Size

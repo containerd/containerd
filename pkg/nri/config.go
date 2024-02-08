@@ -17,7 +17,7 @@
 package nri
 
 import (
-	"github.com/containerd/containerd/v2/pkg/tomlext"
+	"github.com/containerd/containerd/v2/internal/tomlext"
 	nri "github.com/containerd/nri/pkg/adaptation"
 )
 
@@ -42,7 +42,7 @@ type Config struct {
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	return &Config{
-		Disable:          true,
+		Disable:          false,
 		SocketPath:       nri.DefaultSocketPath,
 		PluginPath:       nri.DefaultPluginPath,
 		PluginConfigPath: nri.DefaultPluginConfigPath,

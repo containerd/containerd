@@ -22,12 +22,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/pkg/transfer"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -63,6 +63,7 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			Event: "pushing content",
 			Name:  img.Name,
 			//Digest: img.Target.Digest.String(),
+			Desc: &img.Target,
 		})
 	}
 
@@ -109,9 +110,11 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			Event: "pushed content",
 			Name:  img.Name,
 			//Digest: img.Target.Digest.String(),
+			Desc: &img.Target,
 		})
 		tops.Progress(transfer.Progress{
 			Event: fmt.Sprintf("Completed push to %s", p),
+			Desc:  &img.Target,
 		})
 	}
 

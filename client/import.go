@@ -20,10 +20,10 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/images/archive"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -37,6 +37,8 @@ type importOpts struct {
 	platformMatcher platforms.MatchComparer
 	compress        bool
 	discardLayers   bool
+	skipMissing     bool
+	imageLabels     map[string]string
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -47,6 +49,14 @@ type ImportOpt func(*importOpts) error
 func WithImageRefTranslator(f func(string) string) ImportOpt {
 	return func(c *importOpts) error {
 		c.imageRefT = f
+		return nil
+	}
+}
+
+// WithImageLabels are the image labels to apply to a new image
+func WithImageLabels(labels map[string]string) ImportOpt {
+	return func(c *importOpts) error {
+		c.imageLabels = labels
 		return nil
 	}
 }
@@ -113,6 +123,15 @@ func WithDiscardUnpackedLayers() ImportOpt {
 	}
 }
 
+// WithSkipMissing allows to import an archive which doesn't contain all the
+// referenced blobs.
+func WithSkipMissing() ImportOpt {
+	return func(c *importOpts) error {
+		c.skipMissing = true
+		return nil
+	}
+}
+
 // Import imports an image from a Tar stream using reader.
 // Caller needs to specify importer. Future version may use oci.v1 as the default.
 // Note that unreferenced blobs may be imported to the content store as well.
@@ -162,7 +181,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	var handler images.HandlerFunc = func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		// Only save images at top level
 		if desc.Digest != index.Digest {
-			return images.Children(ctx, cs, desc)
+			// Don't set labels on missing content.
+			children, err := images.Children(ctx, cs, desc)
+			if iopts.skipMissing && errdefs.IsNotFound(err) {
+				return nil, images.ErrSkipDesc
+			}
+			return children, err
 		}
 
 		idx, err := decodeIndex(ctx, cs, desc)
@@ -208,7 +232,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 
 	for i := range imgs {
-		img, err := is.Update(ctx, imgs[i], "target")
+		fieldsPath := []string{"target"}
+		if iopts.imageLabels != nil {
+			fieldsPath = append(fieldsPath, "labels")
+			imgs[i].Labels = iopts.imageLabels
+		}
+		img, err := is.Update(ctx, imgs[i], fieldsPath...)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				return nil, err

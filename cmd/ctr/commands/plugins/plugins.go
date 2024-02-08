@@ -17,6 +17,7 @@
 package plugins
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sort"
@@ -25,7 +26,7 @@ import (
 
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
@@ -39,6 +40,7 @@ var Command = cli.Command{
 	Usage:   "Provides information about containerd plugins",
 	Subcommands: []cli.Command{
 		listCommand,
+		inspectRuntimeCommand,
 	},
 }
 
@@ -161,4 +163,33 @@ func prettyPlatforms(pspb []*types.Platform) string {
 	}
 	sort.Stable(sort.StringSlice(ps))
 	return strings.Join(ps, ",")
+}
+
+var inspectRuntimeCommand = cli.Command{
+	Name:      "inspect-runtime",
+	Usage:     "Display runtime info",
+	ArgsUsage: "[flags]",
+	Flags:     commands.RuntimeFlags,
+	Action: func(context *cli.Context) error {
+		rt := context.String("runtime")
+		rtOptions, err := commands.RuntimeOptions(context)
+		if err != nil {
+			return err
+		}
+		client, ctx, cancel, err := commands.NewClient(context)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		rtInfo, err := client.RuntimeInfo(ctx, rt, rtOptions)
+		if err != nil {
+			return err
+		}
+		j, err := json.MarshalIndent(rtInfo, "", "    ")
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintln(context.App.Writer, string(j))
+		return err
+	},
 }

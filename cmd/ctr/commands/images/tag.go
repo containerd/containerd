@@ -22,8 +22,8 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 )
 
@@ -37,7 +37,7 @@ var tagCommand = cli.Command{
 			Name:  "force",
 			Usage: "Force target_ref to be created, regardless if it already exists",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run tag locally rather than through transfer API",
 		},
@@ -63,7 +63,7 @@ var tagCommand = cli.Command{
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			for _, targetRef := range context.Args()[1:] {
 				if !context.Bool("skip-reference-check") {
 					if _, err := reference.ParseAnyReference(targetRef); err != nil {

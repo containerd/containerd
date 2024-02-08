@@ -22,10 +22,11 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/leases"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/urfave/cli"
 )
@@ -69,7 +70,7 @@ When you are done, use the unmount command.
 
 		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
-			snapshotter = containerd.DefaultSnapshotter
+			snapshotter = defaults.DefaultSnapshotter
 		}
 
 		ctx, done, err := client.WithLease(ctx,

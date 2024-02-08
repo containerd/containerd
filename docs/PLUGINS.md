@@ -44,7 +44,7 @@ containerd to start and manage those containers using the runtime shim api retur
 the binary.
 
 For more details on runtimes and shims, including how to invoke and configure them,
-see the [runtime v2 documentation](../runtime/v2/README.md)
+see the [runtime v2 documentation](../core/runtime/v2/README.md)
 
 ### Proxy Plugins
 
@@ -92,7 +92,7 @@ import (
 
 	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/contrib/snapshotservice"
-	"github.com/containerd/containerd/v2/snapshots/native"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 )
 
 func main() {

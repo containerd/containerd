@@ -22,9 +22,9 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/containerd/containerd/v2/cio"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 

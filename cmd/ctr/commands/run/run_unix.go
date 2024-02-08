@@ -19,7 +19,6 @@
 package run
 
 import (
-	"context"
 	gocontext "context"
 	"errors"
 	"fmt"
@@ -28,38 +27,24 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/container-orchestrated-devices/container-device-interface/pkg/cdi"
-	"github.com/container-orchestrated-devices/container-device-interface/pkg/parser"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/containers"
 	"github.com/containerd/containerd/v2/contrib/apparmor"
 	"github.com/containerd/containerd/v2/contrib/nvidia"
 	"github.com/containerd/containerd/v2/contrib/seccomp"
-	"github.com/containerd/containerd/v2/oci"
-	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli"
+	"tags.cncf.io/container-device-interface/pkg/cdi"
+	"tags.cncf.io/container-device-interface/pkg/parser"
 )
 
 var platformRunFlags = []cli.Flag{
-	cli.StringFlag{
-		Name:  "runc-binary",
-		Usage: "Specify runc-compatible binary",
-	},
-	cli.StringFlag{
-		Name:  "runc-root",
-		Usage: "Specify runc-compatible root",
-	},
-	cli.BoolFlag{
-		Name:  "runc-systemd-cgroup",
-		Usage: "Start runc with systemd cgroup manager",
-	},
 	cli.StringFlag{
 		Name:  "uidmap",
 		Usage: "Run inside a user namespace with the specified UID mapping range; specified with the format `container-uid:host-uid:length`",
@@ -413,7 +398,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		cOpts = append(cOpts, containerd.WithContainerExtension(commands.CtrCniMetadataExtension, cniMeta))
 	}
 
-	runtimeOpts, err := getRuntimeOptions(context)
+	runtimeOpts, err := commands.RuntimeOptions(context)
 	if err != nil {
 		return nil, err
 	}
@@ -428,45 +413,6 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
 	return client.NewContainer(ctx, id, cOpts...)
-}
-
-func getRuncOptions(context *cli.Context) (*options.Options, error) {
-	runtimeOpts := &options.Options{}
-	if runcBinary := context.String("runc-binary"); runcBinary != "" {
-		runtimeOpts.BinaryName = runcBinary
-	}
-	if context.Bool("runc-systemd-cgroup") {
-		if context.String("cgroup") == "" {
-			// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
-			return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
-		}
-		runtimeOpts.SystemdCgroup = true
-	}
-	if root := context.String("runc-root"); root != "" {
-		runtimeOpts.Root = root
-	}
-
-	return runtimeOpts, nil
-}
-
-func getRuntimeOptions(context *cli.Context) (interface{}, error) {
-	// validate first
-	if (context.String("runc-binary") != "" || context.Bool("runc-systemd-cgroup")) &&
-		context.String("runtime") != "io.containerd.runc.v2" {
-		return nil, errors.New("specifying runc-binary and runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
-	}
-
-	if context.String("runtime") == "io.containerd.runc.v2" {
-		return getRuncOptions(context)
-	}
-
-	if configPath := context.String("runtime-config-path"); configPath != "" {
-		return &runtimeoptions.Options{
-			ConfigPath: configPath,
-		}, nil
-	}
-
-	return nil, nil
 }
 
 func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {
@@ -518,7 +464,7 @@ func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
 // This is used from the `run` command to avoid creating a registry with auto-refresh enabled.
 // It also provides a way to override the CDI spec file paths if required.
 func withStaticCDIRegistry() oci.SpecOpts {
-	return func(ctx context.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
+	return func(ctx gocontext.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
 		registry := cdi.GetRegistry(cdi.WithAutoRefresh(false))
 		if err := registry.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.

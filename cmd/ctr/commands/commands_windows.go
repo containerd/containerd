@@ -38,3 +38,7 @@ func init() {
 			Usage: "Identifier of a device to add to the container  (e.g. class://5B45201D-F2F2-4F3B-85BB-30FF1F953599)",
 		})
 }
+
+func RuntimeOptions(context *cli.Context) (interface{}, error) {
+	return nil, nil
+}

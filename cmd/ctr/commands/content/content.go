@@ -28,9 +28,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/remotes"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
@@ -424,7 +424,7 @@ var (
 
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
-			log.G(ctx).Debugf("resolving")
+			log.G(ctx).Tracef("resolving")
 			name, desc, err := resolver.Resolve(ctx, ref)
 			if err != nil {
 				return err
@@ -434,7 +434,7 @@ var (
 				return err
 			}
 
-			log.G(ctx).Debugf("fetching")
+			log.G(ctx).Tracef("fetching")
 			rc, err := fetcher.Fetch(ctx, desc)
 			if err != nil {
 				return err
@@ -475,7 +475,7 @@ var (
 
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
-			log.G(ctx).Debugf("resolving")
+			log.G(ctx).Tracef("resolving")
 			fetcher, err := resolver.Fetcher(ctx, ref)
 			if err != nil {
 				return err
@@ -491,10 +491,11 @@ var (
 				if err != nil {
 					return err
 				}
-				rc, _, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(context.String("media-type")))
+				rc, desc, err := fetcherByDigest.FetchByDigest(ctx, dgst, remotes.WithMediaType(context.String("media-type")))
 				if err != nil {
 					return err
 				}
+				log.G(ctx).Debugf("desc=%+v", desc)
 				_, err = io.Copy(os.Stdout, rc)
 				rc.Close()
 				if err != nil {
@@ -534,7 +535,7 @@ var (
 
 			ctx = log.WithLogger(ctx, log.G(ctx).WithField("ref", ref))
 
-			log.G(ctx).Debugf("resolving")
+			log.G(ctx).Tracef("resolving")
 			pusher, err := resolver.Pusher(ctx, ref)
 			if err != nil {
 				return err

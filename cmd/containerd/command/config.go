@@ -21,11 +21,11 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/images"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/containerd/v2/services/server"
-	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
@@ -120,6 +120,28 @@ var configCommand = cli.Command{
 								return err
 							}
 						}
+					}
+				}
+
+				plugins, err := server.LoadPlugins(ctx, config)
+				if err != nil {
+					return err
+				}
+				if len(plugins) != 0 {
+					if config.Plugins == nil {
+						config.Plugins = make(map[string]interface{})
+					}
+					for _, p := range plugins {
+						if p.Config == nil {
+							continue
+						}
+
+						pc, err := config.Decode(ctx, p.URI(), p.Config)
+						if err != nil {
+							return err
+						}
+
+						config.Plugins[p.URI()] = pc
 					}
 				}
 

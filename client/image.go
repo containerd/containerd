@@ -23,16 +23,16 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/diff"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/images/usage"
-	"github.com/containerd/containerd/v2/labels"
-	"github.com/containerd/containerd/v2/pkg/kmutex"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/rootfs"
-	"github.com/containerd/containerd/v2/snapshots"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/usage"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/kmutex"
+	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/rootfs"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -279,6 +279,14 @@ func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
 	}
 }
 
+// WithUnpackApplyOpts appends new apply options on the UnpackConfig.
+func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.ApplyOpts = append(uc.ApplyOpts, opts...)
+		return nil
+	}
+}
+
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
@@ -327,7 +335,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	for _, layer := range layers {
 		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
 		if err != nil {
-			return err
+			return fmt.Errorf("apply layer error for %q: %w", i.Name(), err)
 		}
 
 		if unpacked {

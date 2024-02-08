@@ -26,10 +26,10 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/errdefs"
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/pkg/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -235,6 +235,35 @@ func TestContainerdSandboxImage(t *testing.T) {
 	require.NotNil(t, pimg)
 	t.Log("verify pinned field is set for pause image")
 	assert.True(t, pimg.Pinned)
+}
+
+func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
+	var pauseImage = images.Get(images.Pause)
+	ctx := context.Background()
+
+	t.Log("make sure the pause image does not exist")
+	imageService.RemoveImage(&runtime.ImageSpec{Image: pauseImage})
+
+	t.Log("pull pause image")
+	_, err := containerdClient.Pull(ctx, pauseImage)
+	assert.NoError(t, err)
+
+	t.Log("pause image should be seen by cri plugin")
+	var pimg *runtime.Image
+	require.NoError(t, Eventually(func() (bool, error) {
+		pimg, err = imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})
+		return pimg != nil, err
+	}, time.Second, 10*time.Second))
+
+	t.Log("verify pinned field is set for pause image")
+	assert.True(t, pimg.Pinned)
+
+	t.Log("make sure the pause image exist")
+	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
+	require.NoError(t, err)
+
+	t.Log("ensure correct labels are set on pause image")
+	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
 }
 
 func TestContainerdImageWithDockerSchema1(t *testing.T) {

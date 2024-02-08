@@ -23,7 +23,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/containerd/containerd/v2/contrib/seccomp/kernelversion"
+	"github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -64,6 +64,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"alarm",
 				"bind",
 				"brk",
+				"cachestat", // kernel v6.5, libseccomp v2.5.5
 				"capget",
 				"capset",
 				"chdir",
@@ -109,6 +110,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"fchdir",
 				"fchmod",
 				"fchmodat",
+				"fchmodat2", // kernel v6.6, libseccomp v2.5.5
 				"fchown",
 				"fchown32",
 				"fchownat",
@@ -130,8 +132,11 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"ftruncate",
 				"ftruncate64",
 				"futex",
+				"futex_requeue", // kernel v6.7, libseccomp v2.5.5
 				"futex_time64",
+				"futex_wait", // kernel v6.7, libseccomp v2.5.5
 				"futex_waitv",
+				"futex_wake", // kernel v6.7, libseccomp v2.5.5
 				"futimesat",
 				"getcpu",
 				"getcwd",
@@ -214,6 +219,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"mlock",
 				"mlock2",
 				"mlockall",
+				"map_shadow_stack", // kernel v6.6, libseccomp v2.5.5
 				"mmap",
 				"mmap2",
 				"mprotect",
@@ -671,6 +677,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 					"get_mempolicy",
 					"mbind",
 					"set_mempolicy",
+					"set_mempolicy_home_node", // kernel v5.17, libseccomp v2.5.4
 				},
 				Action: specs.ActAllow,
 				Args:   []specs.LinuxSeccompArg{},

@@ -24,36 +24,38 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/platforms"
+	ctrdsrv "github.com/containerd/containerd/v2/cmd/containerd/server"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/plugins"
-	ctrdsrv "github.com/containerd/containerd/v2/services/server"
-	srvconfig "github.com/containerd/containerd/v2/services/server/config"
 	"github.com/containerd/log/logtest"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/opencontainers/go-digest"
 
-	_ "github.com/containerd/containerd/v2/diff/walking/plugin"
-	_ "github.com/containerd/containerd/v2/events/plugin"
-	_ "github.com/containerd/containerd/v2/gc/scheduler"
-	_ "github.com/containerd/containerd/v2/leases/plugin"
-	_ "github.com/containerd/containerd/v2/metadata/plugin"
-	_ "github.com/containerd/containerd/v2/runtime/v2"
-	_ "github.com/containerd/containerd/v2/runtime/v2/runc/options"
-	_ "github.com/containerd/containerd/v2/services/containers"
-	_ "github.com/containerd/containerd/v2/services/content"
-	_ "github.com/containerd/containerd/v2/services/diff"
-	_ "github.com/containerd/containerd/v2/services/events"
-	_ "github.com/containerd/containerd/v2/services/images"
-	_ "github.com/containerd/containerd/v2/services/introspection"
-	_ "github.com/containerd/containerd/v2/services/leases"
-	_ "github.com/containerd/containerd/v2/services/namespaces"
-	_ "github.com/containerd/containerd/v2/services/snapshots"
-	_ "github.com/containerd/containerd/v2/services/tasks"
-	_ "github.com/containerd/containerd/v2/services/version"
+	_ "github.com/containerd/containerd/v2/core/runtime/v2"
+	_ "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/cri/images"
+	_ "github.com/containerd/containerd/v2/plugins/cri/runtime"
+	_ "github.com/containerd/containerd/v2/plugins/diff/walking/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/gc"
+	_ "github.com/containerd/containerd/v2/plugins/leases"
+	_ "github.com/containerd/containerd/v2/plugins/metadata"
+	_ "github.com/containerd/containerd/v2/plugins/services/containers"
+	_ "github.com/containerd/containerd/v2/plugins/services/content"
+	_ "github.com/containerd/containerd/v2/plugins/services/diff"
+	_ "github.com/containerd/containerd/v2/plugins/services/events"
+	_ "github.com/containerd/containerd/v2/plugins/services/images"
+	_ "github.com/containerd/containerd/v2/plugins/services/introspection"
+	_ "github.com/containerd/containerd/v2/plugins/services/leases"
+	_ "github.com/containerd/containerd/v2/plugins/services/namespaces"
+	_ "github.com/containerd/containerd/v2/plugins/services/snapshots"
+	_ "github.com/containerd/containerd/v2/plugins/services/tasks"
+	_ "github.com/containerd/containerd/v2/plugins/services/version"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -72,7 +74,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 	// load plugins
 	loadPluginOnce.Do(func() {
 		loadedPlugins, loadedPluginsErr = ctrdsrv.LoadPlugins(ctx, &srvconfig.Config{})
-		assert.NoError(t, loadedPluginsErr)
+		require.NoError(t, loadedPluginsErr)
 	})
 
 	// init plugins
@@ -104,7 +106,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		// load the plugin specific configuration if it is provided
 		if p.Config != nil {
 			pc, err := config.Decode(ctx, p.URI(), p.Config)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			initContext.Config = pc
 		}
@@ -114,10 +116,10 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		}
 
 		result := p.Init(initContext)
-		assert.NoError(t, initialized.Add(result))
+		require.NoError(t, initialized.Add(result))
 
 		_, err := result.Instance()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		lastInitContext = initContext
 	}
@@ -129,7 +131,7 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		containerd.WithInMemoryServices(lastInitContext),
 		containerd.WithInMemorySandboxControllers(lastInitContext),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return client
 }

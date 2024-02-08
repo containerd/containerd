@@ -67,11 +67,16 @@ const (
 	ImageVerifierPlugin plugin.Type = "io.containerd.image-verifier.v1"
 	// WarningPlugin implements a warning service
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
+	// CRIServicePlugin implements a cri service
+	CRIServicePlugin plugin.Type = "io.containerd.cri.v1"
 )
 
 const (
 	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
 	RuntimeRuncV2 = "io.containerd.runc.v2"
+
+	// RuntimeRunhcsV1 is the runtime type for runhcs.
+	RuntimeRunhcsV1 = "io.containerd.runhcs.v1"
 
 	DeprecationsPlugin = "deprecations"
 )

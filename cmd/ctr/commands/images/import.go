@@ -27,12 +27,12 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/images/archive"
+	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer"
 	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
 	"github.com/containerd/containerd/v2/pkg/transfer/image"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 var importCommand = cli.Command{
@@ -86,7 +86,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "no-unpack",
 			Usage: "Skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
-		cli.BoolTFlag{
+		cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run import locally rather than through transfer API",
 		},
@@ -98,7 +98,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			Name:  "discard-unpacked-layers",
 			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
 		},
-	}, commands.SnapshotterFlags...),
+	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 
 	Action: func(context *cli.Context) error {
 		var (
@@ -113,7 +113,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			var opts []image.StoreOpt
 			prefix := context.String("base-name")
 			var overwrite bool
@@ -121,6 +121,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				prefix = fmt.Sprintf("import-%s", time.Now().Format("2006-01-02"))
 				// Allow overwriting auto-generated prefix with named annotation
 				overwrite = true
+			}
+
+			labels := context.StringSlice("label")
+			if len(labels) > 0 {
+				opts = append(opts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
 			if context.Bool("digests") {
@@ -235,6 +240,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
 			}
 			opts = append(opts, containerd.WithDiscardUnpackedLayers())
+		}
+
+		labels := context.StringSlice("label")
+		if len(labels) > 0 {
+			opts = append(opts, containerd.WithImageLabels(commands.LabelArgs(labels)))
 		}
 
 		ctx, done, err := client.WithLease(ctx)

@@ -30,7 +30,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/remote"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
@@ -264,13 +264,12 @@ func serve(c config) error {
 
 func criTest(c config) error {
 	var (
-		timeout     = 1 * time.Minute
-		wg          sync.WaitGroup
-		ctx         = namespaces.WithNamespace(context.Background(), stressNs)
-		criEndpoint = "unix:///run/containerd/containerd.sock"
+		timeout = 1 * time.Minute
+		wg      sync.WaitGroup
+		ctx     = namespaces.WithNamespace(context.Background(), stressNs)
 	)
 
-	client, err := remote.NewRuntimeService(criEndpoint, timeout)
+	client, err := remote.NewRuntimeService(c.Address, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}

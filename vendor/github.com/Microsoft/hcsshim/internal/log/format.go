@@ -9,13 +9,16 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
-const TimeFormat = log.RFC3339NanoFixed
+// TimeFormat is [time.RFC3339Nano] with nanoseconds padded using
+// zeros to ensure the formatted time is always the same number of
+// characters.
+// Based on RFC3339NanoFixed from github.com/containerd/log
+const TimeFormat = "2006-01-02T15:04:05.000000000Z07:00"
 
 func FormatTime(t time.Time) string {
 	return t.Format(TimeFormat)
@@ -101,6 +104,7 @@ func encode(v interface{}) (_ []byte, err error) {
 	if jErr := enc.Encode(v); jErr != nil {
 		if err != nil {
 			// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+			//nolint:errorlint // non-wrapping format verb for fmt.Errorf
 			return nil, fmt.Errorf("protojson encoding: %v; json encoding: %w", err, jErr)
 		}
 		return nil, fmt.Errorf("json encoding: %w", jErr)
