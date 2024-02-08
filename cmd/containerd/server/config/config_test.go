@@ -17,11 +17,16 @@
 package config
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/stretchr/testify/assert"
 
@@ -259,4 +264,131 @@ func TestDecodePluginInV1Config(t *testing.T) {
 	_, err = out.Decode(ctx, "io.containerd.runtime.v2.task", &pluginConfig)
 	assert.NoError(t, err)
 	assert.Equal(t, true, pluginConfig["shim_debug"])
+}
+
+func TestMergingTwoPluginConfigs(t *testing.T) {
+	data1 := `
+[plugins."io.containerd.grpc.v1.cri".cni]
+    bin_dir = "/cm/local/apps/kubernetes/current/bin/cni"
+`
+	data2 := `
+[plugins."io.containerd.grpc.v1.cri".registry]
+    config_path = "/cm/local/apps/containerd/var/etc/certs.d"
+`
+	expected := `
+[cni]
+  bin_dir = '/cm/local/apps/kubernetes/current/bin/cni'
+
+[registry]
+  config_path = '/cm/local/apps/containerd/var/etc/certs.d'
+`
+
+	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
+	testMergeConfig(t, []string{data2, data1}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func TestMergingTwoPluginConfigsMerge(t *testing.T) {
+	data1 := `
+[plugins."io.containerd.grpc.v1.cri".cni]
+    bin_dir = "/cm/local/apps/kubernetes/current/bin/cni"
+`
+	data2 := `
+[plugins."io.containerd.grpc.v1.cri".cni]
+    conf_dir = "/tmp"
+`
+	expected := `
+[cni]
+  bin_dir = '/cm/local/apps/kubernetes/current/bin/cni'
+  conf_dir = '/tmp'
+`
+	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func TestMergingTwoPluginConfigsWithNesting(t *testing.T) {
+	// Configuration that configures runtime: runc
+	data1 := `
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+    SystemdCgroup = true
+`
+	// Configuration that configures runtime: nvidia (and makes it default)
+	data2 := `
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+          privileged_without_host_devices = false
+          runtime_engine = ""
+          runtime_root = ""
+          runtime_type = "io.containerd.runc.v2"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+            BinaryName = "/usr/bin/nvidia-container-runtime"
+            SystemdCgroup = true
+`
+	// Configuration that changes back default runtime to runc
+	data3 := `
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runc"
+`
+	expected := `
+[containerd]
+  default_runtime_name = 'runc'
+
+  [containerd.runtimes]
+    [containerd.runtimes.nvidia]
+      privileged_without_host_devices = false
+      runtime_engine = ''
+      runtime_root = ''
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.nvidia.options]
+        BinaryName = '/usr/bin/nvidia-container-runtime'
+        SystemdCgroup = true
+
+    [containerd.runtimes.runc]
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.runc.options]
+        SystemdCgroup = true
+`
+	testMergeConfig(t, []string{data1, data2, data3}, expected, "io.containerd.grpc.v1.cri")
+	testMergeConfig(t, []string{data2, data1, data3}, expected, "io.containerd.grpc.v1.cri")
+
+	expected = strings.Replace(expected, "default_runtime_name = 'runc'", "default_runtime_name = 'nvidia'", 1)
+	testMergeConfig(t, []string{data3, data1, data2}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) {
+	tempDir := t.TempDir()
+	var result Config
+
+	for i, data := range inputs {
+		filename := fmt.Sprintf("data%d.toml", i+1)
+		filepath := filepath.Join(tempDir, filename)
+		err := os.WriteFile(filepath, []byte(data), 0600)
+		assert.NoError(t, err)
+
+		var tempOut Config
+		err = LoadConfig(context.Background(), filepath, &tempOut)
+		assert.NoError(t, err)
+
+		if i == 0 {
+			result = tempOut
+		} else {
+			err = mergeConfig(&result, &tempOut)
+			assert.NoError(t, err)
+		}
+	}
+
+	criPlugin := result.Plugins[comparePlugin]
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).SetIndentTables(true).Encode(criPlugin); err != nil {
+		panic(err)
+	}
+	assert.Equal(t, strings.TrimLeft(expected, "\n"), buf.String())
 }
