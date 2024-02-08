@@ -19,12 +19,15 @@
 package cgroups
 
 import (
+	"context"
+
 	"github.com/containerd/cgroups/v3"
 	v1 "github.com/containerd/containerd/v2/core/metrics/cgroups/v1"
 	v2 "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -45,6 +48,20 @@ func init() {
 			plugins.EventPlugin,
 		},
 		Config: &Config{},
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+			if configVersion >= version.ConfigVersion {
+				return nil
+			}
+			// Previous plugin name
+			const pluginName = "io.containerd.monitor.v1.cgroups"
+			c, ok := pluginConfigs[pluginName]
+			if ok {
+				pluginConfigs[string(plugins.TaskMonitorPlugin)+".cgroups"] = c
+				delete(pluginConfigs, pluginName)
+			}
+
+			return nil
+		},
 	})
 }
 
