@@ -110,7 +110,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.Key.ID, err)
 	}
 
 	start := time.Now()
@@ -155,7 +155,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		// Create container image volumes mounts.
 		volumeMounts = c.volumeMounts(platform, containerRootDir, config, &image.ImageSpec.Config)
 	} else if len(image.ImageSpec.Config.Volumes) != 0 {
-		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.ID)
+		log.G(ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", image.Key.ID)
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
@@ -234,7 +234,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 		opts = append(opts, customopts.WithVolumes(mountMap, platform))
 	}
-	meta.ImageRef = image.ID
+	meta.ImageRef = image.Key.ID
 	meta.StopSignal = image.ImageSpec.Config.StopSignal
 
 	// Validate log paths and compose full container log path.

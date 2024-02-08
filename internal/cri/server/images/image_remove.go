@@ -62,7 +62,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		}
 		return fmt.Errorf("can not resolve %q locally: %w", imageSpec.GetImage(), err)
 	}
-	span.SetAttributes(tracing.Attribute("image.id", image.ID))
+	span.SetAttributes(tracing.Attribute("image.id", image.Key.ID))
 	// Remove all image references.
 	for i, ref := range image.References {
 		var opts []images.DeleteOpt
@@ -76,11 +76,11 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
 			if err := c.imageStore.Update(ctx, ref, platforms.Format(platformSpec)); err != nil {
-				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
+				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.Key.ID, err)
 			}
 			continue
 		}
-		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
+		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.Key.ID, err)
 	}
 	return nil
 }

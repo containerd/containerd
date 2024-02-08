@@ -87,7 +87,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return cin, fmt.Errorf("failed to get image from containerd %q: %w", image.Key.ID, err)
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(config, metadata.RuntimeHandler)
