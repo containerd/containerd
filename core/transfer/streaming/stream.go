@@ -27,7 +27,7 @@ import (
 	"time"
 
 	transferapi "github.com/containerd/containerd/v2/api/types/transfer"
-	"github.com/containerd/containerd/v2/pkg/streaming"
+	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 )

@@ -26,9 +26,9 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/archive"
-	"github.com/containerd/containerd/v2/pkg/transfer"
-	tarchive "github.com/containerd/containerd/v2/pkg/transfer/archive"
-	"github.com/containerd/containerd/v2/pkg/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer"
+	tarchive "github.com/containerd/containerd/v2/core/transfer/archive"
+	"github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/platforms"
 )
 

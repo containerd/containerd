@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
-	"github.com/containerd/containerd/v2/pkg/transfer"
-	"github.com/containerd/containerd/v2/pkg/unpack"
 	"github.com/containerd/errdefs"
 )
 
