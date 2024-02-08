@@ -300,9 +300,6 @@ loaded for the user's shell environment.
 
 `cri` is a native plugin of containerd. Since containerd 1.1, the cri plugin is built into the release binaries and enabled by default.
 
-> **Note:** As of containerd 1.5, the `cri` plugin is merged into the containerd/containerd repo. For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
-was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/main/pkg/cri).
-
 The `cri` plugin has reached GA status, representing that it is:
 * Feature complete
 * Works with Kubernetes 1.10 and above
