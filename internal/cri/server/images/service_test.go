@@ -24,7 +24,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +41,7 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 		config:           testImageConfig,
 		runtimePlatforms: map[string]ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
+		imageStore:       imagestore.NewStore(nil, nil),
 		snapshotStore:    snapshotstore.NewStore(),
 	}
 
@@ -57,7 +56,7 @@ var testImageConfig = criconfig.ImageConfig{
 
 func TestLocalResolve(t *testing.T) {
 	image := imagestore.Image{
-		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
+		Key:     imagestore.ImageIDKey{ID: "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799", Platform: ""},
 		ChainID: "test-chain-id-1",
 		References: []string{
 			"docker.io/library/busybox:latest",

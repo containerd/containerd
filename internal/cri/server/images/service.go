@@ -106,7 +106,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		images:                      options.Images,
 		content:                     options.Content,
 		client:                      options.Client,
-		imageStore:                  imagestore.NewStore(options.Images, options.Content, platforms.Default()),
+		imageStore:                  imagestore.NewStore(options.Images, options.Content),
 		imageFSPaths:                options.ImageFSPaths,
 		runtimePlatforms:            options.RuntimePlatforms,
 		snapshotStore:               snapshotstore.NewStore(),
