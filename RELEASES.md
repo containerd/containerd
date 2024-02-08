@@ -461,25 +461,6 @@ version = 2
 
 </p></details>
 
-## Other breaking changes
-### containerd v2.0
-#### CRI plugin treats read-only mounts recursively read-only
-Starting with containerd v2.0, the CRI plugin treats read-only mounts
-as recursively read-only mounts when running on Linux kernel v5.12 or later.
-
-To rollback to the legacy behavior that corresponds to containerd v1.x,
-set the following config:
-```toml
-version = 2
-[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-  # treat_ro_mounts_as_rro ("Enabled"|"IfPossible"|"Disabled")
-  # treats read-only mounts as recursive read-only mounts.
-  # An empty string means "IfPossible".
-  # "Enabled" requires Linux kernel v5.12 or later.
-  # This configuration does not apply to non-volume mounts such as "/sys/fs/cgroup".
-  treat_ro_mounts_as_rro = "Disabled"
-```
-
 ## Experimental features
 
 Experimental features are new features added to containerd which do not have the

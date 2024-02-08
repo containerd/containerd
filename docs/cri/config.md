@@ -369,14 +369,6 @@ version = 2
       # See https://github.com/containerd/containerd/issues/6657 for context.
       snapshotter = ""
 
-      # treat_ro_mounts_as_rro ("Enabled"|"IfPossible"|"Disabled")
-      # treats read-only mounts as recursive read-only mounts.
-      # An empty string means "IfPossible".
-      # "Enabled" requires Linux kernel v5.12 or later.
-      # Introduced in containerd v2.0.
-      # This configuration does not apply to non-volume mounts such as "/sys/fs/cgroup".
-      treat_ro_mounts_as_rro = ""
-
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .

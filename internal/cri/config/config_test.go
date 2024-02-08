@@ -222,7 +222,7 @@ func TestValidateConfig(t *testing.T) {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning
 			if test.runtimeConfig != nil {
-				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig, nil)
+				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
 					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {

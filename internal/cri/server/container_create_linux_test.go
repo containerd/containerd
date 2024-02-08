@@ -597,7 +597,7 @@ func TestMountPropagation(t *testing.T) {
 			var spec runtimespec.Spec
 			spec.Linux = &runtimespec.Linux{}
 
-			err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "", nil)(context.Background(), nil, nil, &spec)
+			err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "")(context.Background(), nil, nil, &spec)
 			if test.expectErr {
 				require.Error(t, err)
 			} else {
