@@ -40,8 +40,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: 1.21.x
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: script/go-test-fuzz.sh

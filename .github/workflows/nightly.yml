@@ -6,9 +6,6 @@ on:
     paths:
       - ".github/workflows/nightly.yml"
 
-env:
-  GO_VERSION: "1.21.6"
-
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -23,13 +20,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - name: Set env
         shell: bash
@@ -143,13 +138,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - name: Set env
         shell: bash
