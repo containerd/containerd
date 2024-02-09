@@ -281,14 +281,28 @@ func (c *criService) createImageReference(ctx context.Context, name string, desc
 	}
 	// TODO(random-liu): Figure out which is the more performant sequence create then update or
 	// update then create.
-	oldImg, err := c.client.ImageService().Create(ctx, img)
+	_, err := c.client.ImageService().Create(ctx, img)
 	if err == nil || !errdefs.IsAlreadyExists(err) {
 		return err
 	}
-	if oldImg.Target.Digest == img.Target.Digest && oldImg.Labels[crilabels.ImageLabelKey] == labels[crilabels.ImageLabelKey] {
+	// Retrieve oldImg from image store here because Create routine returns an
+	// empty image on ErrAlreadyExists
+	oldImg, err := c.client.ImageService().Get(ctx, name)
+	if err != nil {
+		return err
+	}
+	fieldpaths := []string{"target"}
+	if oldImg.Labels[crilabels.ImageLabelKey] != labels[crilabels.ImageLabelKey] {
+		fieldpaths = append(fieldpaths, "labels."+crilabels.ImageLabelKey)
+	}
+	if oldImg.Labels[crilabels.PinnedImageLabelKey] != labels[crilabels.PinnedImageLabelKey] &&
+		labels[crilabels.PinnedImageLabelKey] == crilabels.PinnedImageLabelValue {
+		fieldpaths = append(fieldpaths, "labels."+crilabels.PinnedImageLabelKey)
+	}
+	if oldImg.Target.Digest == img.Target.Digest && len(fieldpaths) < 2 {
 		return nil
 	}
-	_, err = c.client.ImageService().Update(ctx, img, "target", "labels."+crilabels.ImageLabelKey)
+	_, err = c.client.ImageService().Update(ctx, img, fieldpaths...)
 	return err
 }
 
@@ -326,7 +340,7 @@ func (c *criService) updateImage(ctx context.Context, r string) error {
 			return fmt.Errorf("get image id: %w", err)
 		}
 		id := configDesc.Digest.String()
-		labels := c.getLabels(ctx, id)
+		labels := c.getLabels(ctx, r)
 		if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
 			return fmt.Errorf("create image id reference %q: %w", id, err)
 		}
