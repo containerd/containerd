@@ -134,11 +134,7 @@ func toCRISandboxStatus(meta sandboxstore.Metadata, status string, createdAt tim
 		},
 		Linux: &runtime.LinuxPodSandboxStatus{
 			Namespaces: &runtime.Namespace{
-				Options: &runtime.NamespaceOption{
-					Network: nsOpts.GetNetwork(),
-					Pid:     nsOpts.GetPid(),
-					Ipc:     nsOpts.GetIpc(),
-				},
+				Options: nsOpts,
 			},
 		},
 		Labels:         meta.Config.GetLabels(),
