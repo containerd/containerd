@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/transfer"
+	"github.com/containerd/containerd/v2/core/transfer"
 )
 
 func (ts *localTransferService) exportStream(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageExporter, tops *transfer.Config) error {

@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/pkg/transfer/archive"
+	"github.com/containerd/containerd/v2/core/transfer/archive"
 )
 
 func TestTransferEcho(t *testing.T) {

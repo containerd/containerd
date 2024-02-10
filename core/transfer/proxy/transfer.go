@@ -25,10 +25,10 @@ import (
 
 	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
+	"github.com/containerd/containerd/v2/core/streaming"
+	"github.com/containerd/containerd/v2/core/transfer"
+	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/streaming"
-	"github.com/containerd/containerd/v2/pkg/transfer"
-	tstreaming "github.com/containerd/containerd/v2/pkg/transfer/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"

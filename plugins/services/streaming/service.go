@@ -21,7 +21,7 @@ import (
 	"io"
 
 	api "github.com/containerd/containerd/v2/api/services/streaming/v1"
-	"github.com/containerd/containerd/v2/pkg/streaming"
+	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
