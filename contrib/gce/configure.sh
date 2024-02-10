@@ -250,6 +250,12 @@ fi
 echo "export PATH=${CONTAINERD_HOME}/usr/local/bin/:${CONTAINERD_HOME}/usr/local/sbin/:\$PATH" > \
   /etc/profile.d/containerd_env.sh
 
+mkdir -p /etc/systemd/system/containerd.service.d/
+cat >> /etc/systemd/system/containerd.service.d/override.conf <<EOF
+[Service]
+LimitNOFILE=1048576
+EOF
+
 # Run extra init script for test.
 if [ "${CONTAINERD_TEST:-"false"}"  == "true" ]; then
   # EXTRA_INIT_SCRIPT is the name of the extra init script after being downloaded.
