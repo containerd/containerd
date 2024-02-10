@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	capaRemapIds     = "remap-ids"
-	capaOnlyRemapIds = "only-remap-ids"
+	capaRemapIDs     = "remap-ids"
+	capaOnlyRemapIDs = "only-remap-ids"
 )
 
 // Config represents configuration for the overlay plugin.
@@ -80,16 +80,16 @@ func init() {
 				oOpts = append(oOpts, overlay.WithMountOptions(config.MountOptions))
 			}
 			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
-				oOpts = append(oOpts, overlay.WithRemapIds)
-				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIds)
+				oOpts = append(oOpts, overlay.WithRemapIDs)
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIDs)
 			}
 
 			if config.SlowChown {
 				oOpts = append(oOpts, overlay.WithSlowChown)
 			} else {
-				// If slowChown is false, we use capaOnlyRemapIds to signal we only
+				// If slowChown is false, we use capaOnlyRemapIDs to signal we only
 				// allow idmap mounts.
-				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIds)
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
 			}
 
 			ic.Meta.Exports["root"] = root

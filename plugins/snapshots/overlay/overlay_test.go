@@ -54,7 +54,7 @@ func TestOverlay(t *testing.T) {
 		// default in init()
 		"AsynchronousRemove": {AsynchronousRemove},
 		// idmapped mounts enabled
-		"WithRemapIds": {WithRemapIds},
+		"WithRemapIDs": {WithRemapIDs},
 	}
 
 	for optsName, opts := range optTestCases {
@@ -211,7 +211,7 @@ func testOverlayRemappedBind(t *testing.T, newSnapshotter testsuite.SnapshotterF
 		t.Fatal(err)
 	}
 
-	if sn, ok := o.(*snapshotter); !ok || !sn.remapIds {
+	if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
 		t.Skip("overlayfs doesn't support idmapped mounts")
 	}
 
@@ -316,7 +316,7 @@ func testOverlayRemappedActive(t *testing.T, newSnapshotter testsuite.Snapshotte
 		t.Fatal(err)
 	}
 
-	if sn, ok := o.(*snapshotter); !ok || !sn.remapIds {
+	if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
 		t.Skip("overlayfs doesn't support idmapped mounts")
 	}
 
@@ -390,7 +390,7 @@ func testOverlayRemappedInvalidMapping(t *testing.T, newSnapshotter testsuite.Sn
 		t.Fatal(err)
 	}
 
-	if sn, ok := o.(*snapshotter); !ok || !sn.remapIds {
+	if sn, ok := o.(*snapshotter); !ok || !sn.remapIDs {
 		t.Skip("overlayfs doesn't support idmapped mounts")
 	}
 

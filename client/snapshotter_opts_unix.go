@@ -27,7 +27,7 @@ import (
 
 const (
 	capaRemapIDs     = "remap-ids"
-	capaOnlyRemapIds = "only-remap-ids"
+	capaOnlyRemapIDs = "only-remap-ids"
 )
 
 // WithRemapperLabels creates the labels used by any supporting snapshotter
@@ -75,7 +75,7 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 
 	capaOnlyRemap := false
 	for _, capa := range capabs {
-		if capa == capaOnlyRemapIds {
+		if capa == capaOnlyRemapIDs {
 			capaOnlyRemap = true
 		}
 	}

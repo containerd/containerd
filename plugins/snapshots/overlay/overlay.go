@@ -45,7 +45,7 @@ type SnapshotterConfig struct {
 	upperdirLabel bool
 	ms            MetaStore
 	mountOptions  []string
-	remapIds      bool
+	remapIDs      bool
 	slowChown     bool
 }
 
@@ -94,8 +94,8 @@ func WithMetaStore(ms MetaStore) Opt {
 	}
 }
 
-func WithRemapIds(config *SnapshotterConfig) error {
-	config.remapIds = true
+func WithRemapIDs(config *SnapshotterConfig) error {
+	config.remapIDs = true
 	return nil
 }
 
@@ -110,7 +110,7 @@ type snapshotter struct {
 	asyncRemove   bool
 	upperdirLabel bool
 	options       []string
-	remapIds      bool
+	remapIDs      bool
 	slowChown     bool
 }
 
@@ -167,7 +167,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		asyncRemove:   config.asyncRemove,
 		upperdirLabel: config.upperdirLabel,
 		options:       config.mountOptions,
-		remapIds:      config.remapIds,
+		remapIDs:      config.remapIDs,
 		slowChown:     config.slowChown,
 	}, nil
 }
@@ -573,7 +573,7 @@ func (o *snapshotter) prepareDirectory(ctx context.Context, snapshotDir string, 
 func (o *snapshotter) mounts(s storage.Snapshot, info snapshots.Info) []mount.Mount {
 	var options []string
 
-	if o.remapIds {
+	if o.remapIDs {
 		if v, ok := info.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
 			options = append(options, fmt.Sprintf("uidmap=%s", v))
 		}
