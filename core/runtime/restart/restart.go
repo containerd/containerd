@@ -38,7 +38,6 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
 )
 
@@ -155,32 +154,6 @@ func WithLogURIString(uriString string) func(context.Context, *containerd.Client
 		c.Labels[LogURILabel] = uriString
 		return nil
 	}
-}
-
-// WithBinaryLogURI sets the binary-type log uri for a container.
-//
-// Deprecated(in release 1.5): use WithLogURI
-func WithBinaryLogURI(binary string, args map[string]string) func(context.Context, *containerd.Client, *containers.Container) error {
-	uri, err := cio.LogURIGenerator("binary", binary, args)
-	if err != nil {
-		return func(context.Context, *containerd.Client, *containers.Container) error {
-			return err
-		}
-	}
-	return WithLogURI(uri)
-}
-
-// WithFileLogURI sets the file-type log uri for a container.
-//
-// Deprecated(in release 1.5): use WithLogURI
-func WithFileLogURI(path string) func(context.Context, *containerd.Client, *containers.Container) error {
-	uri, err := cio.LogURIGenerator("file", path, nil)
-	if err != nil {
-		return func(context.Context, *containerd.Client, *containers.Container) error {
-			return err
-		}
-	}
-	return WithLogURI(uri)
 }
 
 // WithStatus sets the status for a container
