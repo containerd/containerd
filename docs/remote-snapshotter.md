@@ -87,7 +87,7 @@ if _, err := client.Pull(ctx, ref,
 
 The containerd client queries remote snapshots to the underlying remote snapshotter using snapshotter APIs.
 This section describes the high-level overview of how snapshotter APIs are used for remote snapshots functionality, with some piece of pseudo-codes that describe the simplified logic implemented in the containerd client.
-For more details, see [`unpacker.go`](../pkg/unpack/unpacker.go) that implements this logic.
+For more details, see [`unpacker.go`](../core/unpack/unpacker.go) that implements this logic.
 
 During image pull, the containerd client calls `Prepare` API with the label `containerd.io/snapshot.ref`.
 This is a containerd-defined label which contains ChainID that targets a committed snapshot that the client is trying to prepare.
