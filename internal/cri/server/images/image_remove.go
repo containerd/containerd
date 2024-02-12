@@ -19,12 +19,14 @@ package images
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 
+	ctrdlabels "github.com/containerd/containerd/v2/pkg/labels"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -52,6 +54,7 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 			platformSpec = runtimePlatform.Platform
 		}
 	}
+	platform := platforms.Format(platformSpec)
 
 	image, err := c.LocalResolve(imageSpec.GetImage(), runtimeHandler)
 	if err != nil {
@@ -64,23 +67,57 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 	}
 	span.SetAttributes(tracing.Attribute("image.id", image.Key.ID))
 	// Remove all image references.
-	for i, ref := range image.References {
+	for _, ref := range image.References {
 		var opts []images.DeleteOpt
-		if i == len(image.References)-1 {
+
+		// Remove only the platform label from the containerd image as the image
+		// could exist for many platforms with the image pull per runtime class feature.
+		ctrdImg, err := c.images.Get(ctx, ref)
+		if err != nil {
+			continue
+		}
+
+		// Delete platform image label from ctrdImg
+		updatedImg, err := c.deletePlatformLabelAndUpdateImage(ctx, ctrdImg, platform)
+		if err != nil {
+			return err
+		}
+
+		// Delete ref from CRI image store
+		if err := c.imageStore.Update(ctx, ref, platform); err != nil {
+			return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.Key.ID, err)
+		}
+
+		if !platformImageLabelExists(updatedImg.Labels) {
+			// we removed the last platform label reference from the image, so completely remove
+			// this image from containerd store.
 			// Delete the last image reference synchronously to trigger garbage collection.
 			// This is best effort. It is possible that the image reference is deleted by
 			// someone else before this point.
 			opts = []images.DeleteOpt{images.SynchronousDelete()}
-		}
-		err = c.images.Delete(ctx, ref, opts...)
-		if err == nil || errdefs.IsNotFound(err) {
-			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref, platforms.Format(platformSpec)); err != nil {
-				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.Key.ID, err)
+			err = c.images.Delete(ctx, ref, opts...)
+			if err == nil || errdefs.IsNotFound(err) {
+				// Update image store to reflect the newest state in containerd.
+				if err := c.imageStore.Update(ctx, ref, platform); err != nil {
+					return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.Key.ID, err)
+				}
+				continue
 			}
-			continue
+			return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.Key.ID, err)
 		}
-		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.Key.ID, err)
 	}
 	return nil
+}
+
+// platformImageLabelExists checks if a platform image label
+// exists in labels.
+func platformImageLabelExists(labels map[string]string) bool {
+	platformLabelExists := false
+	for key := range labels {
+		if strings.HasPrefix(key, ctrdlabels.PlatformLabelPrefix) {
+			platformLabelExists = true
+			break
+		}
+	}
+	return platformLabelExists
 }
