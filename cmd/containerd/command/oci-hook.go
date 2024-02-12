@@ -27,10 +27,10 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var ociHook = cli.Command{
+var ociHook = &cli.Command{
 	Name:  "oci-hook",
 	Usage: "Provides a base for OCI runtime hooks to allow arguments to be injected.",
 	Action: func(context *cli.Context) error {
@@ -45,7 +45,7 @@ var ociHook = cli.Command{
 		}
 		var (
 			ctx  = newTemplateContext(state, spec)
-			args = []string(context.Args())
+			args = context.Args().Slice()
 			env  = os.Environ()
 		)
 		if err := newList(&args).render(ctx); err != nil {

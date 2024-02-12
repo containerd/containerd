@@ -23,23 +23,23 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var checkpointCommand = cli.Command{
+var checkpointCommand = &cli.Command{
 	Name:      "checkpoint",
 	Usage:     "Checkpoint a container",
 	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "exit",
 			Usage: "Stop the container after the checkpoint",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "image-path",
 			Usage: "Path to criu image files",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "work-path",
 			Usage: "Path to criu work files and logs",
 		},

@@ -36,10 +36,10 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var pullCommand = cli.Command{
+var pullCommand = &cli.Command{
 	Name:      "pull",
 	Usage:     "Pull an image from a remote",
 	ArgsUsage: "[flags] <ref>",
@@ -53,33 +53,33 @@ command. As part of this process, we do the following:
 3. Register metadata for the image.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{},
+			Value: cli.NewStringSlice(),
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Pull content and metadata from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:   "all-metadata",
 			Usage:  "(Deprecated: use skip-metadata) Pull metadata for all platforms",
 			Hidden: true,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-metadata",
 			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "max-concurrent-downloads",
 			Usage: "Set the max concurrent downloads for each pull",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},

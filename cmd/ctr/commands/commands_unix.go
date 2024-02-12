@@ -23,37 +23,37 @@ import (
 
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func init() {
-	RuntimeFlags = append(RuntimeFlags, cli.StringFlag{
+	RuntimeFlags = append(RuntimeFlags, &cli.StringFlag{
 		Name:  "runc-binary",
 		Usage: "Specify runc-compatible binary",
-	}, cli.StringFlag{
+	}, &cli.StringFlag{
 		Name:  "runc-root",
 		Usage: "Specify runc-compatible root",
-	}, cli.BoolFlag{
+	}, &cli.BoolFlag{
 		Name:  "runc-systemd-cgroup",
 		Usage: "Start runc with systemd cgroup manager",
 	})
-	ContainerFlags = append(ContainerFlags, cli.BoolFlag{
+	ContainerFlags = append(ContainerFlags, &cli.BoolFlag{
 		Name:  "rootfs",
 		Usage: "Use custom rootfs that is not managed by containerd snapshotter",
-	}, cli.BoolFlag{
+	}, &cli.BoolFlag{
 		Name:  "no-pivot",
 		Usage: "Disable use of pivot-root (linux only)",
-	}, cli.Int64Flag{
+	}, &cli.Int64Flag{
 		Name:  "cpu-quota",
 		Usage: "Limit CPU CFS quota",
 		Value: -1,
-	}, cli.Uint64Flag{
+	}, &cli.Uint64Flag{
 		Name:  "cpu-period",
 		Usage: "Limit CPU CFS period",
-	}, cli.StringFlag{
+	}, &cli.StringFlag{
 		Name:  "rootfs-propagation",
 		Usage: "Set the propagation of the container rootfs",
-	}, cli.StringSliceFlag{
+	}, &cli.StringSliceFlag{
 		Name:  "device",
 		Usage: "File path to a device to add to the container; or a path to a directory tree of devices to add to the container",
 	})

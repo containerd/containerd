@@ -27,11 +27,11 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 // Command is a set of subcommands to manage runtimes with sandbox support
-var Command = cli.Command{
+var Command = &cli.Command{
 	Name:    "sandboxes",
 	Aliases: []string{"sandbox", "sb", "s"},
 	Usage:   "Manage sandboxes",
@@ -42,13 +42,13 @@ var Command = cli.Command{
 	},
 }
 
-var runCommand = cli.Command{
+var runCommand = &cli.Command{
 	Name:      "run",
 	Aliases:   []string{"create", "c", "r"},
 	Usage:     "Run a new sandbox",
 	ArgsUsage: "[flags] <pod-config.json> <sandbox-id>",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "runtime",
 			Usage: "Runtime name",
 			Value: defaults.DefaultRuntime,
@@ -97,12 +97,12 @@ var runCommand = cli.Command{
 	},
 }
 
-var listCommand = cli.Command{
+var listCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List sandboxes",
 	Flags: []cli.Flag{
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "filters",
 			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
@@ -143,15 +143,16 @@ var listCommand = cli.Command{
 	},
 }
 
-var removeCommand = cli.Command{
+var removeCommand = &cli.Command{
 	Name:      "remove",
 	Aliases:   []string{"rm"},
 	ArgsUsage: "<id> [<id>, ...]",
 	Usage:     "Remove sandboxes",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "Ignore shutdown errors when removing sandbox",
+		&cli.BoolFlag{
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "Ignore shutdown errors when removing sandbox",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -163,7 +164,7 @@ var removeCommand = cli.Command{
 
 		force := context.Bool("force")
 
-		for _, id := range context.Args() {
+		for _, id := range context.Args().Slice() {
 			sandbox, err := client.LoadSandbox(ctx, id)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to load sandbox %s", id)

@@ -28,10 +28,10 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var mountCommand = cli.Command{
+var mountCommand = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount an image to a target path",
 	ArgsUsage: "[flags] <ref> <target>",
@@ -40,11 +40,11 @@ var mountCommand = cli.Command{
 When you are done, use the unmount command.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rw",
 			Usage: "Enable write support on the mount",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Mount the image for the specified platform",
 			Value: platforms.DefaultString(),

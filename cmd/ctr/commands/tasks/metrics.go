@@ -28,7 +28,7 @@ import (
 	v2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/typeurl/v2"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -37,13 +37,13 @@ const (
 	formatJSON  = "json"
 )
 
-var metricsCommand = cli.Command{
+var metricsCommand = &cli.Command{
 	Name:      "metrics",
 	Usage:     "Get a single data point of metrics for a task with the built-in Linux runtime",
 	ArgsUsage: "CONTAINER",
 	Aliases:   []string{"metric"},
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  formatFlag,
 			Usage: `"table" or "json"`,
 			Value: formatTable,

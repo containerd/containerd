@@ -23,16 +23,16 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var unmountCommand = cli.Command{
+var unmountCommand = &cli.Command{
 	Name:        "unmount",
 	Usage:       "Unmount the image from the target",
 	ArgsUsage:   "[flags] <target>",
 	Description: "Unmount the image rootfs from the specified target.",
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rm",
 			Usage: "Remove the snapshot after a successful unmount",
 		},

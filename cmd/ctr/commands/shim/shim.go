@@ -37,39 +37,40 @@ import (
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var fifoFlags = []cli.Flag{
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stdin",
 		Usage: "Specify the path to the stdin fifo",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stdout",
 		Usage: "Specify the path to the stdout fifo",
 	},
-	cli.StringFlag{
+	&cli.StringFlag{
 		Name:  "stderr",
 		Usage: "Specify the path to the stderr fifo",
 	},
-	cli.BoolFlag{
-		Name:  "tty,t",
-		Usage: "Enable tty support",
+	&cli.BoolFlag{
+		Name:    "tty",
+		Aliases: []string{"t"},
+		Usage:   "Enable tty support",
 	},
 }
 
 // Command is the cli command for interacting with a task
-var Command = cli.Command{
+var Command = &cli.Command{
 	Name:  "shim",
 	Usage: "Interact with a shim directly",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "id",
 			Usage: "Container id",
 		},
 	},
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		deleteCommand,
 		execCommand,
 		startCommand,
@@ -77,7 +78,7 @@ var Command = cli.Command{
 	},
 }
 
-var startCommand = cli.Command{
+var startCommand = &cli.Command{
 	Name:  "start",
 	Usage: "Start a container with a task",
 	Action: func(context *cli.Context) error {
@@ -92,7 +93,7 @@ var startCommand = cli.Command{
 	},
 }
 
-var deleteCommand = cli.Command{
+var deleteCommand = &cli.Command{
 	Name:  "delete",
 	Usage: "Delete a container with a task",
 	Action: func(context *cli.Context) error {
@@ -111,7 +112,7 @@ var deleteCommand = cli.Command{
 	},
 }
 
-var stateCommand = cli.Command{
+var stateCommand = &cli.Command{
 	Name:  "state",
 	Usage: "Get the state of all the processes of the task",
 	Action: func(context *cli.Context) error {
@@ -120,7 +121,7 @@ var stateCommand = cli.Command{
 			return err
 		}
 		r, err := service.State(gocontext.Background(), &task.StateRequest{
-			ID: context.GlobalString("id"),
+			ID: context.String("id"),
 		})
 		if err != nil {
 			return err
@@ -130,24 +131,26 @@ var stateCommand = cli.Command{
 	},
 }
 
-var execCommand = cli.Command{
+var execCommand = &cli.Command{
 	Name:  "exec",
 	Usage: "Exec a new process in the task's container",
 	Flags: append(fifoFlags,
-		cli.BoolFlag{
-			Name:  "attach,a",
-			Usage: "Stay attached to the container and open the fifos",
+		&cli.BoolFlag{
+			Name:    "attach",
+			Aliases: []string{"a"},
+			Usage:   "Stay attached to the container and open the fifos",
 		},
-		cli.StringSliceFlag{
-			Name:  "env,e",
-			Usage: "Add environment vars",
-			Value: &cli.StringSlice{},
+		&cli.StringSliceFlag{
+			Name:    "env",
+			Aliases: []string{"e"},
+			Usage:   "Add environment vars",
+			Value:   cli.NewStringSlice(),
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cwd",
 			Usage: "Current working directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "spec",
 			Usage: "Runtime spec",
 		},
@@ -230,18 +233,18 @@ var execCommand = cli.Command{
 }
 
 func getTaskService(context *cli.Context) (task.TaskService, error) {
-	id := context.GlobalString("id")
+	id := context.String("id")
 	if id == "" {
 		return nil, fmt.Errorf("container id must be specified")
 	}
-	ns := context.GlobalString("namespace")
+	ns := context.String("namespace")
 
 	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
 	// compatible it
 	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
 	// this should not error, ctr always get a default ns
 	ctx := namespaces.WithNamespace(gocontext.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, context.GlobalString("address"), id)
+	s2, _ := shim.SocketAddress(ctx, context.String("address"), id)
 	s2 = strings.TrimPrefix(s2, "unix://")
 
 	for _, socket := range []string{s2, "\x00" + s1} {

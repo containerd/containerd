@@ -21,10 +21,10 @@ import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var attachCommand = cli.Command{
+var attachCommand = &cli.Command{
 	Name:      "attach",
 	Usage:     "Attach to the IO of a running container",
 	ArgsUsage: "CONTAINER",
@@ -79,7 +79,7 @@ var attachCommand = cli.Command{
 			return err
 		}
 		if code != 0 {
-			return cli.NewExitError("", int(code))
+			return cli.Exit("", int(code))
 		}
 		return nil
 	},

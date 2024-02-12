@@ -25,7 +25,7 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
 	"github.com/containerd/containerd/v2/cmd/ctr/app"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func main() {

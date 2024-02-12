@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/containers"
@@ -46,7 +46,7 @@ import (
 	"github.com/containerd/containerd/v2/version"
 )
 
-var extraCmds = []cli.Command{}
+var extraCmds = []*cli.Command{}
 
 func init() {
 	// Discard grpc logs so that they don't mess with our stdio
@@ -55,13 +55,15 @@ func init() {
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version)
 	}
-	cli.VersionFlag = cli.BoolFlag{
-		Name:  "version, v",
-		Usage: "Print the version",
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"v"},
+		Usage:   "Print the version",
 	}
-	cli.HelpFlag = cli.BoolFlag{
-		Name:  "help, h",
-		Usage: "Show help",
+	cli.HelpFlag = &cli.BoolFlag{
+		Name:    "help",
+		Aliases: []string{"h"},
+		Usage:   "Show help",
 	}
 }
 
@@ -86,32 +88,34 @@ containerd CLI
 `
 	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "Enable debug output in logs",
 		},
-		cli.StringFlag{
-			Name:   "address, a",
-			Usage:  "Address for containerd's GRPC server",
-			Value:  defaults.DefaultAddress,
-			EnvVar: "CONTAINERD_ADDRESS",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Usage:   "Address for containerd's GRPC server",
+			Value:   defaults.DefaultAddress,
+			EnvVars: []string{"CONTAINERD_ADDRESS"},
 		},
-		cli.DurationFlag{
+		&cli.DurationFlag{
 			Name:  "timeout",
 			Usage: "Total timeout for ctr commands",
 		},
-		cli.DurationFlag{
+		&cli.DurationFlag{
 			Name:  "connect-timeout",
 			Usage: "Timeout for connecting to containerd",
 		},
-		cli.StringFlag{
-			Name:   "namespace, n",
-			Usage:  "Namespace to use with commands",
-			Value:  namespaces.Default,
-			EnvVar: namespaces.NamespaceEnvVar,
+		&cli.StringFlag{
+			Name:    "namespace",
+			Aliases: []string{"n"},
+			Usage:   "Namespace to use with commands",
+			Value:   namespaces.Default,
+			EnvVars: []string{namespaces.NamespaceEnvVar},
 		},
 	}
-	app.Commands = append([]cli.Command{
+	app.Commands = append([]*cli.Command{
 		plugins.Command,
 		versionCmd.Command,
 		containers.Command,
@@ -131,7 +135,7 @@ containerd CLI
 		deprecations.Command,
 	}, extraCmds...)
 	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("debug") {
+		if context.Bool("debug") {
 			return log.SetLevel("debug")
 		}
 		return nil

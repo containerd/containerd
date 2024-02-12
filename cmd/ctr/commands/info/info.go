@@ -20,7 +20,7 @@ import (
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 type Info struct {
@@ -28,7 +28,7 @@ type Info struct {
 }
 
 // Command is a cli command to output the containerd server info
-var Command = cli.Command{
+var Command = &cli.Command{
 	Name:  "info",
 	Usage: "Print the server info",
 	Action: func(context *cli.Context) error {

@@ -18,10 +18,10 @@ package tasks
 
 import (
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var pauseCommand = cli.Command{
+var pauseCommand = &cli.Command{
 	Name:      "pause",
 	Usage:     "Pause an existing container",
 	ArgsUsage: "CONTAINER",

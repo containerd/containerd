@@ -27,10 +27,10 @@ import (
 	"github.com/containerd/containerd/v2/pkg/progress"
 
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var usageCommand = cli.Command{
+var usageCommand = &cli.Command{
 	Name:      "usage",
 	Usage:     "Display usage of snapshots for a given image ref",
 	ArgsUsage: "[flags] <ref>",

@@ -29,33 +29,35 @@ import (
 	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
 )
 
 // Command is a cli command that outputs plugin information
-var Command = cli.Command{
+var Command = &cli.Command{
 	Name:    "plugins",
 	Aliases: []string{"plugin"},
 	Usage:   "Provides information about containerd plugins",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		listCommand,
 		inspectRuntimeCommand,
 	},
 }
 
-var listCommand = cli.Command{
+var listCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "Lists containerd plugins",
 	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "quiet,q",
-			Usage: "Print only the plugin ids",
+		&cli.BoolFlag{
+			Name:    "quiet",
+			Aliases: []string{"q"},
+			Usage:   "Print only the plugin ids",
 		},
-		cli.BoolFlag{
-			Name:  "detailed,d",
-			Usage: "Print detailed information about each plugin",
+		&cli.BoolFlag{
+			Name:    "detailed",
+			Aliases: []string{"d"},
+			Usage:   "Print detailed information about each plugin",
 		},
 	},
 	Action: func(context *cli.Context) error {
@@ -69,7 +71,7 @@ var listCommand = cli.Command{
 		}
 		defer cancel()
 		ps := client.IntrospectionService()
-		response, err := ps.Plugins(ctx, context.Args())
+		response, err := ps.Plugins(ctx, context.Args().Slice())
 		if err != nil {
 			return err
 		}
@@ -165,7 +167,7 @@ func prettyPlatforms(pspb []*types.Platform) string {
 	return strings.Join(ps, ",")
 }
 
-var inspectRuntimeCommand = cli.Command{
+var inspectRuntimeCommand = &cli.Command{
 	Name:      "inspect-runtime",
 	Usage:     "Display runtime info",
 	ArgsUsage: "[flags]",

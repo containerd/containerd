@@ -25,33 +25,34 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var startCommand = cli.Command{
+var startCommand = &cli.Command{
 	Name:      "start",
 	Usage:     "Start a container that has been created",
 	ArgsUsage: "CONTAINER",
 	Flags: append(platformStartFlags, []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "null-io",
 			Usage: "Send all IO to /dev/null",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "log-uri",
 			Usage: "Log uri",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "fifo-dir",
 			Usage: "Directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "pid-file",
 			Usage: "File path to write the task's pid",
 		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "Detach from the task after it has started execution",
+		&cli.BoolFlag{
+			Name:    "detach",
+			Aliases: []string{"d"},
+			Usage:   "Detach from the task after it has started execution",
 		},
 	}...),
 	Action: func(context *cli.Context) error {
@@ -137,7 +138,7 @@ var startCommand = cli.Command{
 			return err
 		}
 		if code != 0 {
-			return cli.NewExitError("", int(code))
+			return cli.Exit("", int(code))
 		}
 		return nil
 	},
