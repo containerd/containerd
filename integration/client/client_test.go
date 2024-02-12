@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/internal/testutil"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -422,6 +423,7 @@ func TestImagePullSomePlatforms(t *testing.T) {
 }
 
 func TestImagePullSchema1(t *testing.T) {
+	t.Setenv(deprecation.EnvPullSchema1Image, "1")
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

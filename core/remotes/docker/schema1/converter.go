@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -67,14 +69,30 @@ type Converter struct {
 	layerBlobs map[digest.Digest]ocispec.Descriptor
 }
 
+var ErrDisabled = fmt.Errorf("Pulling Schema 1 images have been deprecated and disabled by default since containerd v2.0. "+
+	"As a workaround you may set an environment variable `%s=1`, but this will be completely removed in containerd v2.1.",
+	deprecation.EnvPullSchema1Image)
+
 // NewConverter returns a new converter
-func NewConverter(contentStore content.Store, fetcher remotes.Fetcher) *Converter {
+func NewConverter(contentStore content.Store, fetcher remotes.Fetcher) (*Converter, error) {
+	s := os.Getenv(deprecation.EnvPullSchema1Image)
+	if s == "" {
+		return nil, ErrDisabled
+	}
+	enable, err := strconv.ParseBool(s)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse `%s=%s`: %w", deprecation.EnvPullSchema1Image, s, err)
+	}
+	if !enable {
+		return nil, ErrDisabled
+	}
+	log.L.Warn(ErrDisabled)
 	return &Converter{
 		contentStore: contentStore,
 		fetcher:      fetcher,
 		blobMap:      map[digest.Digest]blobState{},
 		layerBlobs:   map[digest.Digest]ocispec.Descriptor{},
-	}
+	}, nil
 }
 
 // Handle fetching descriptors for a docker media type
