@@ -20,13 +20,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/usage"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
@@ -254,8 +255,13 @@ func (s *store) add(img Image) error {
 		s.images[img.ID] = img
 		return nil
 	}
-	// Or else, merge and sort the references.
-	i.References = docker.Sort(util.MergeStringSlices(i.References, img.References))
+
+	// Merge + sort + remove duplicates
+	refs := append(i.References, img.References...)
+	slices.Sort(refs)
+	refs = slices.Compact(refs)
+
+	i.References = docker.Sort(refs)
 	i.Pinned = i.Pinned || img.Pinned
 	s.images[img.ID] = i
 	return nil
@@ -357,7 +363,7 @@ func (s *store) delete(id, ref string) {
 	if !ok {
 		return
 	}
-	i.References = util.SubtractStringSlice(i.References, ref)
+	i.References = slices.DeleteFunc(i.References, func(s string) bool { return strings.EqualFold(s, ref) })
 	if len(i.References) != 0 {
 		if refs := s.pinnedRefs[digest.String()]; refs != nil {
 			if refs.Delete(ref); len(refs) == 0 {

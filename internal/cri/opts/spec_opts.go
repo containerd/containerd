@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,7 +31,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -178,10 +178,10 @@ func WithCapabilities(sc *runtime.LinuxContainerSecurityContext, allCaps []strin
 	// following individual add/drop could still work. E.g.
 	// AddCapabilities: []string{"ALL"}, DropCapabilities: []string{"CHOWN"}
 	// will be all capabilities without `CAP_CHOWN`.
-	if util.InStringSlice(capabilities.GetAddCapabilities(), "ALL") {
+	if slices.ContainsFunc(capabilities.GetAddCapabilities(), func(s string) bool { return strings.EqualFold(s, "ALL") }) {
 		opts = append(opts, oci.WithCapabilities(allCaps))
 	}
-	if util.InStringSlice(capabilities.GetDropCapabilities(), "ALL") {
+	if slices.ContainsFunc(capabilities.GetDropCapabilities(), func(s string) bool { return strings.EqualFold(s, "ALL") }) {
 		opts = append(opts, oci.WithCapabilities(nil))
 	}
 
