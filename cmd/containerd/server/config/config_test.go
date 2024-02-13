@@ -17,11 +17,16 @@
 package config
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 
 	"github.com/stretchr/testify/assert"
 
@@ -56,7 +61,7 @@ func TestMergeConfigs(t *testing.T) {
 		StreamProcessors: map[string]StreamProcessor{"1": {Path: "3"}},
 	}
 
-	err := mergeConfig(a, b)
+	err := MergeConfig(a, b)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, a.Version)
@@ -72,13 +77,13 @@ func TestMergeConfigs(t *testing.T) {
 	// https://github.com/containerd/containerd/blob/v1.6.0/services/server/config/config.go#L322-L323
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
-	err = mergeConfig(a, b)
+	err = MergeConfig(a, b)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
-	err = mergeConfig(a, b)
+	err = MergeConfig(a, b)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 }
@@ -250,108 +255,41 @@ func TestDecodePluginInV1Config(t *testing.T) {
 }
 
 func TestMergingTwoPluginConfigs(t *testing.T) {
-	// Configuration that customizes the cni bin_dir
 	data1 := `
 [plugins."io.containerd.grpc.v1.cri".cni]
     bin_dir = "/cm/local/apps/kubernetes/current/bin/cni"
 `
-	// Configuration that customizes the registry config_path
 	data2 := `
 [plugins."io.containerd.grpc.v1.cri".registry]
     config_path = "/cm/local/apps/containerd/var/etc/certs.d"
 `
-	// Write both to disk
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
-	assert.NoError(t, err)
-	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
-	assert.NoError(t, err)
+	expected := `
+[cni]
+  bin_dir = '/cm/local/apps/kubernetes/current/bin/cni'
 
-	// Parse them both
-	var out Config
-	var out2 Config
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data2.toml"), &out2)
-	assert.NoError(t, err)
+[registry]
+  config_path = '/cm/local/apps/containerd/var/etc/certs.d'
+`
 
-	// Merge into one config
-	err = mergeConfig(&out, &out2)
-	assert.NoError(t, err)
-
-	// Test if all values are present
-	criPlugin := out.Plugins["io.containerd.grpc.v1.cri"]
-	assert.Equal(t, criPlugin, map[string]interface{}{
-		// originating from first config
-		"cni": map[string]interface{}{
-			"bin_dir": "/cm/local/apps/kubernetes/current/bin/cni",
-		},
-		// originating from second config
-		"registry": map[string]interface{}{
-			"config_path": "/cm/local/apps/containerd/var/etc/certs.d",
-		},
-	})
+	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
+	testMergeConfig(t, []string{data2, data1}, expected, "io.containerd.grpc.v1.cri")
 }
 
 func TestMergingTwoPluginConfigsMerge(t *testing.T) {
-	// Configuration that customizes the cni bin_dir
 	data1 := `
 [plugins."io.containerd.grpc.v1.cri".cni]
     bin_dir = "/cm/local/apps/kubernetes/current/bin/cni"
 `
-	// Configuration that customizes the cni conf_dir
 	data2 := `
 [plugins."io.containerd.grpc.v1.cri".cni]
     conf_dir = "/tmp"
 `
-	// Write both to disk
-	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
-	assert.NoError(t, err)
-	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
-	assert.NoError(t, err)
-
-	// Parse them both
-	var out Config
-	var out2 Config
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data2.toml"), &out2)
-	assert.NoError(t, err)
-
-	// Merge into one config
-	err = mergeConfig(&out, &out2)
-	assert.NoError(t, err)
-
-	// Test if all values are present
-	criPlugin := out.Plugins["io.containerd.grpc.v1.cri"]
-	assert.Equal(t, criPlugin, map[string]interface{}{
-		// originating from first config
-		"cni": map[string]interface{}{
-			"conf_dir": "/tmp",
-			// bin_dir is also preserved
-			"bin_dir": "/cm/local/apps/kubernetes/current/bin/cni",
-		},
-	})
-
-	// Restore first config
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
-
-	// Test the other way around
-	err = mergeConfig(&out2, &out)
-	assert.NoError(t, err)
-
-	// Test if all values are present
-	criPlugin = out.Plugins["io.containerd.grpc.v1.cri"]
-	assert.Equal(t, criPlugin, map[string]interface{}{
-		// originating from first config
-		"cni": map[string]interface{}{
-			"bin_dir": "/cm/local/apps/kubernetes/current/bin/cni",
-			// conf_dir is also preserved
-			"conf_dir": "/tmp",
-		},
-	})
+	expected := `
+[cni]
+  bin_dir = '/cm/local/apps/kubernetes/current/bin/cni'
+  conf_dir = '/tmp'
+`
+	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
 }
 
 func TestMergingTwoPluginConfigsRecursively(t *testing.T) {
@@ -378,59 +316,67 @@ func TestMergingTwoPluginConfigsRecursively(t *testing.T) {
             BinaryName = "/usr/bin/nvidia-container-runtime"
             SystemdCgroup = true
 `
-	// Write both to disk
+	// Configuration that changes back default runtime to runc
+	data3 := `
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runc"
+`
+	expected := `
+[containerd]
+  default_runtime_name = 'runc'
+
+  [containerd.runtimes]
+    [containerd.runtimes.nvidia]
+      privileged_without_host_devices = false
+      runtime_engine = ''
+      runtime_root = ''
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.nvidia.options]
+        BinaryName = '/usr/bin/nvidia-container-runtime'
+        SystemdCgroup = true
+
+    [containerd.runtimes.runc]
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.runc.options]
+        SystemdCgroup = true
+`
+	testMergeConfig(t, []string{data1, data2, data3}, expected, "io.containerd.grpc.v1.cri")
+	testMergeConfig(t, []string{data2, data1, data3}, expected, "io.containerd.grpc.v1.cri")
+
+	expected = strings.Replace(expected, "default_runtime_name = 'runc'", "default_runtime_name = 'nvidia'", 1)
+	testMergeConfig(t, []string{data3, data1, data2}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) {
 	tempDir := t.TempDir()
-	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0600)
-	assert.NoError(t, err)
-	err = os.WriteFile(filepath.Join(tempDir, "data2.toml"), []byte(data2), 0600)
-	assert.NoError(t, err)
+	var result Config
 
-	// Parse them both
-	var out Config
-	var out2 Config
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data2.toml"), &out2)
-	assert.NoError(t, err)
+	for i, data := range inputs {
+		filename := fmt.Sprintf("data%d.toml", i+1)
+		filepath := filepath.Join(tempDir, filename)
+		err := os.WriteFile(filepath, []byte(data), 0600)
+		assert.NoError(t, err)
 
-	// Merge into one config
-	err = mergeConfig(&out, &out2)
-	assert.NoError(t, err)
+		var tempOut Config
+		err = LoadConfig(context.Background(), filepath, &tempOut)
+		assert.NoError(t, err)
 
-	// Test if both runtimes are present
-	criPlugin := out.Plugins["io.containerd.grpc.v1.cri"]
-	expectedConfig := map[string]interface{}{
-		"containerd": map[string]interface{}{
-			"default_runtime_name": string("nvidia"),
-			"runtimes": map[string]interface{}{
-				"nvidia": map[string]interface{}{
-					"options": map[string]interface{}{
-						"BinaryName":    "/usr/bin/nvidia-container-runtime",
-						"SystemdCgroup": bool(true),
-					},
-					"privileged_without_host_devices": bool(false),
-					"runtime_engine":                  string(""),
-					"runtime_root":                    string(""),
-					"runtime_type":                    string("io.containerd.runc.v2"),
-				},
-				"runc": map[string]interface{}{
-					"options":      map[string]interface{}{"SystemdCgroup": bool(true)},
-					"runtime_type": string("io.containerd.runc.v2"),
-				},
-			},
-		},
+		if i == 0 {
+			result = tempOut
+		} else {
+			err = MergeConfig(&result, &tempOut)
+			assert.NoError(t, err)
+		}
 	}
-	assert.Equal(t, criPlugin, expectedConfig)
 
-	// Restore first config
-	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
-	assert.NoError(t, err)
-
-	// Test the other way around
-	err = mergeConfig(&out2, &out)
-	assert.NoError(t, err)
-
-	// Test if both runtimes are present
-	criPlugin = out.Plugins["io.containerd.grpc.v1.cri"]
-	assert.Equal(t, criPlugin, expectedConfig)
+	criPlugin := result.Plugins[comparePlugin]
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).SetIndentTables(true).Encode(criPlugin); err != nil {
+		panic(err)
+	}
+	assert.Equal(t, strings.TrimLeft(expected, "\n"), buf.String())
 }

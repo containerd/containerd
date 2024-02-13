@@ -298,7 +298,7 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 			return err
 		}
 
-		if err := mergeConfig(out, config); err != nil {
+		if err := MergeConfig(out, config); err != nil {
 			return err
 		}
 
@@ -395,7 +395,7 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 	return out, nil
 }
 
-// mergeConfig merges Config structs with the following rules:
+// MergeConfig merges Config structs with the following rules:
 // 'to'         'from'      'result'
 // ""           "value"     "value"
 // "value"      ""          "value"
@@ -406,7 +406,7 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 // []{"1", "2"} []{"1"}     []{"1","2"}
 // []{}         []{"2"}     []{"2"}
 // Maps merged by keys, but values are replaced entirely.
-func mergeConfig(to, from *Config) error {
+func MergeConfig(to, from *Config) error {
 	err := mergo.Merge(to, from, mergo.WithOverride, mergo.WithTransformers(sliceTransformer{}))
 	if err != nil {
 		return err

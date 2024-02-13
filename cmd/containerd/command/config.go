@@ -18,6 +18,7 @@ package command
 
 import (
 	gocontext "context"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -32,7 +33,13 @@ import (
 	"github.com/urfave/cli"
 )
 
-func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
+func outputConfig(ctx gocontext.Context, userConfig *srvconfig.Config) error {
+	return generateConfig(ctx, userConfig, os.Stdout)
+}
+
+func generateConfig(ctx gocontext.Context, userConfig *srvconfig.Config, output io.Writer) error {
+	// Make sure we have a 'base' config with all available plugins set
+	config := &srvconfig.Config{}
 	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
@@ -65,13 +72,18 @@ func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 		}
 	}
 
-	// for the time being, keep the defaultConfig's version set at 1 so that
+	// for the time being, keep the defaultConfig's version set at 3 so that
 	// when a config without a version is loaded from disk and has no version
-	// set, we assume it's a v1 config.  But when generating new configs via
+	// set, we assume it's a v3 config.  But when generating new configs via
 	// this command, generate the max configuration version
 	config.Version = srvconfig.CurrentConfigVersion
 
-	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+	// Now merge on top of this, the actual user config that is present on disk
+	if err = srvconfig.MergeConfig(config, userConfig); err != nil {
+		return err
+	}
+
+	return toml.NewEncoder(output).SetIndentTables(true).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {
@@ -106,23 +118,24 @@ var configCommand = cli.Command{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
 			Action: func(context *cli.Context) error {
-				config := defaultConfig()
+				userConfig := defaultConfig()
 				ctx := gocontext.Background()
-				if err := srvconfig.LoadConfig(ctx, context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(ctx, context.GlobalString("userConfig"), userConfig); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
-				if config.Version < srvconfig.CurrentConfigVersion {
-					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+				if userConfig.Version < srvconfig.CurrentConfigVersion {
+					plugins := registry.Graph(srvconfig.V2DisabledFilter(userConfig.DisabledPlugins))
 					for _, p := range plugins {
 						if p.ConfigMigration != nil {
-							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+							if err := p.ConfigMigration(ctx, userConfig.Version, userConfig.Plugins); err != nil {
 								return err
 							}
 						}
 					}
 				}
 
+				config := &srvconfig.Config{}
 				plugins, err := server.LoadPlugins(ctx, config)
 				if err != nil {
 					return err
@@ -147,7 +160,12 @@ var configCommand = cli.Command{
 
 				config.Version = srvconfig.CurrentConfigVersion
 
-				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+				// Now merge on top of this, the actual user config that is present on disk
+				if err = srvconfig.MergeConfig(userConfig, userConfig); err != nil {
+					return err
+				}
+
+				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(userConfig)
 			},
 		},
 	},
