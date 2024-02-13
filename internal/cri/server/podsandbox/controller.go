@@ -107,7 +107,7 @@ type RuntimeService interface {
 type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 	GetImage(id string) (imagestore.Image, error)
-	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig) (string, error)
+	PullImage(ctx context.Context, name string, creds func(string) (string, string, error), sc *runtime.PodSandboxConfig, runtimeHandler string) (string, error)
 	RuntimeSnapshotter(ctx context.Context, ociRuntime criconfig.Runtime) string
 	PinnedImage(string) string
 }

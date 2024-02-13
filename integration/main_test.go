@@ -735,7 +735,7 @@ func EnsureImageExists(t *testing.T, imageName string) string {
 	}
 
 	t.Logf("Pull test image %q", imageName)
-	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil, "")
 	require.NoError(t, err)
 
 	return imgID
