@@ -258,10 +258,10 @@ func (s *store) add(img Image) error {
 
 	// Merge + sort + remove duplicates
 	refs := append(i.References, img.References...)
-	slices.Sort(refs)
+	refs = docker.Sort(refs)
 	refs = slices.Compact(refs)
 
-	i.References = docker.Sort(refs)
+	i.References = refs
 	i.Pinned = i.Pinned || img.Pinned
 	s.images[img.ID] = i
 	return nil
