@@ -35,13 +35,6 @@ const (
 	ebusyString = "device or resource busy"
 )
 
-type LoopConfig struct {
-	Fd        uint32
-	BlockSize uint32
-	Info      unix.LoopInfo64
-	Reserved  [8]uint64
-}
-
 // LoopParams parameters to control loop device setup
 type LoopParams struct {
 	// Loop device should forbid write
