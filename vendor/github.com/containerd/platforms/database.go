@@ -17,6 +17,7 @@
 package platforms
 
 import (
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -59,11 +60,29 @@ func isKnownArch(arch string) bool {
 	return false
 }
 
-func normalizeOS(os string) string {
-	if os == "" {
+// normalizeOSVersion will only include the OSVersion if present.
+// The formart of OS on the platform specifier is <OS>[(<OSVersion>)]
+// OSVersion is optional only and is currently used only by windows OS.
+// If OsVersion is not specified, empty string is returned.
+func normalizeOSVersion(OSAndVersion string) string {
+	if OSAndVersion == "" {
+		return ""
+	}
+
+	parts := regexp.MustCompile("[()]").Split(OSAndVersion, -1)
+	if len(parts) > 1 {
+		if parts[1] != "" {
+			return parts[1]
+		}
+	}
+	return ""
+}
+
+func normalizeOS(OSAndVersion string) string {
+	if OSAndVersion == "" {
 		return runtime.GOOS
 	}
-	os = strings.ToLower(os)
+	os := strings.Split(strings.ToLower(OSAndVersion), "(")[0]
 
 	switch os {
 	case "macos":

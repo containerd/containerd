@@ -139,7 +139,7 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
-# github.com/containerd/platforms v0.1.1
+# github.com/containerd/platforms v0.1.1 => ../../../../platforms/
 ## explicit; go 1.20
 github.com/containerd/platforms
 # github.com/containerd/plugin v0.1.0
@@ -794,3 +794,4 @@ tags.cncf.io/container-device-interface/pkg/parser
 # tags.cncf.io/container-device-interface/specs-go v0.6.0
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
+# github.com/containerd/platforms => ../../../../platforms/

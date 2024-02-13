@@ -121,7 +121,8 @@ import (
 )
 
 var (
-	specifierRe = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+	specifierRe        = regexp.MustCompile(`^[()A-Za-z0-9_.-]+$`)
+	OSAndVersionFormat = "%s(%s)"
 )
 
 // Platform is a type alias for convenience, so there is no need to import image-spec package everywhere.
@@ -174,9 +175,13 @@ func ParseAll(specifiers []string) ([]specs.Platform, error) {
 
 // Parse parses the platform specifier syntax into a platform declaration.
 //
-// Platform specifiers are in the format `<os>|<arch>|<os>/<arch>[/<variant>]`.
+// Platform specifiers are in the format `<os>[(<OSVersion>)]|<arch>|<os>[(<OSVersion>)]/<arch>[/<variant>]`.
 // The minimum required information for a platform specifier is the operating
-// system or architecture. If there is only a single string (no slashes), the
+// system or architecture. The OSVersion can be part of the OS like windows(10.0.17763)
+// Currently, the OS version is only used by windows. Therefore, if the OS is windows
+// and an os version is specified, then specs.Platform.OSVersion is populated. If not it
+// is left empty.
+// If there is only a single string (no slashes), the
 // value will be matched against the known set of operating systems, then fall
 // back to the known set of architectures. The missing component will be
 // inferred based on the local environment.
@@ -197,21 +202,19 @@ func Parse(specifier string) (specs.Platform, error) {
 	var p specs.Platform
 	switch len(parts) {
 	case 1:
-		// in this case, we will test that the value might be an OS, then look
-		// it up. If it is not known, we'll treat it as an architecture. Since
+		// in this case, we will test that the value might be an OS (with or
+		// without the optional osversion specified) and look it up.
+		// If it is not known, we'll treat it as an architecture. Since
 		// we have very little information about the platform here, we are
 		// going to be a little more strict if we don't know about the argument
 		// value.
 		p.OS = normalizeOS(parts[0])
+		p.OSVersion = normalizeOSVersion(parts[0])
 		if isKnownOS(p.OS) {
 			// picks a default architecture
 			p.Architecture = runtime.GOARCH
 			if p.Architecture == "arm" && cpuVariant() != "v7" {
 				p.Variant = cpuVariant()
-			}
-
-			if p.OS == "windows" {
-				p.OSVersion = GetWindowsOsVersion()
 			}
 
 			return p, nil
@@ -228,29 +231,23 @@ func Parse(specifier string) (specs.Platform, error) {
 
 		return specs.Platform{}, fmt.Errorf("%q: unknown operating system or architecture: %w", specifier, errInvalidArgument)
 	case 2:
-		// In this case, we treat as a regular os/arch pair. We don't care
+		// In this case, we treat as a regular os[(osversion)]/arch pair. We don't care
 		// about whether or not we know of the platform.
 		p.OS = normalizeOS(parts[0])
+		p.OSVersion = normalizeOSVersion(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], "")
 		if p.Architecture == "arm" && p.Variant == "v7" {
 			p.Variant = ""
-		}
-
-		if p.OS == "windows" {
-			p.OSVersion = GetWindowsOsVersion()
 		}
 
 		return p, nil
 	case 3:
 		// we have a fully specified variant, this is rare
 		p.OS = normalizeOS(parts[0])
+		p.OSVersion = normalizeOSVersion(parts[0])
 		p.Architecture, p.Variant = normalizeArch(parts[1], parts[2])
 		if p.Architecture == "arm64" && p.Variant == "" {
 			p.Variant = "v8"
-		}
-
-		if p.OS == "windows" {
-			p.OSVersion = GetWindowsOsVersion()
 		}
 
 		return p, nil
@@ -273,6 +270,11 @@ func MustParse(specifier string) specs.Platform {
 func Format(platform specs.Platform) string {
 	if platform.OS == "" {
 		return "unknown"
+	}
+
+	if strings.ToLower(platform.OS) == "windows" && platform.OSVersion != "" {
+		windowsOsVersion := fmt.Sprintf(OSAndVersionFormat, platform.OS, platform.OSVersion)
+		return path.Join(windowsOsVersion, platform.Architecture, platform.Variant)
 	}
 
 	return path.Join(platform.OS, platform.Architecture, platform.Variant)
