@@ -22,6 +22,8 @@ import (
 	"fmt"
 	goruntime "runtime"
 
+	"github.com/containerd/containerd/v2/api/services/introspection/v1"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -94,5 +96,51 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 		}
 		resp.Info["lastCNILoadStatus"] = defaultStatus
 	}
+	intro, err := c.client.IntrospectionService().Server(ctx, &ptypes.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	cond, err := runtimeConditionContainerdHasNoDeprecationWarnings(intro.Deprecations, c.config.IgnoreDeprecationWarnings)
+	if err != nil {
+		return nil, err
+	}
+	resp.Status.Conditions = append(resp.Status.Conditions, cond)
 	return resp, nil
 }
+
+func runtimeConditionContainerdHasNoDeprecationWarnings(deprecations []*introspection.DeprecationWarning, ignore []string) (*runtime.RuntimeCondition, error) {
+	cond := &runtime.RuntimeCondition{
+		Type:   ContainerdHasNoDeprecationWarnings,
+		Status: true,
+	}
+	ignoreM := make(map[string]struct{})
+	for _, f := range ignore {
+		ignoreM[f] = struct{}{}
+	}
+	messages := make(map[string]string) // key: id, value: message
+	for _, d := range deprecations {
+		if _, ok := ignoreM[d.ID]; !ok {
+			messages[d.ID] = d.Message
+		}
+	}
+	if len(messages) > 0 {
+		cond.Status = false
+		cond.Reason = ContainerdHasDeprecationWarnings
+		messageJ, err := json.Marshal(messages)
+		if err != nil {
+			return nil, err
+		}
+		cond.Message = string(messageJ) // Arbitrary string
+	}
+	return cond, nil
+}
+
+const (
+	// ContainerdHasNoDeprecationWarnings is a string for [runtime.RuntimeCondition.Type].
+	ContainerdHasNoDeprecationWarnings = "ContainerdHasNoDeprecationWarnings"
+
+	// ContainerdHasDeprecationWarnings is a string for [runtime.RuntimeCondition.Reason].
+	// CamelCase is demanded by the spec.
+	// https://github.com/kubernetes/cri-api/blob/v0.29.1/pkg/apis/runtime/v1/api.proto#L1514
+	ContainerdHasDeprecationWarnings = "ContainerdHasDeprecationWarnings"
+)
