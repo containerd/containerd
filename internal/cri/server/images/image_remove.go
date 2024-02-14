@@ -34,17 +34,24 @@ import (
 // Remove the whole image no matter the it's image id or reference. This is the
 // semantic defined in CRI now.
 func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.RemoveImageRequest) (*runtime.RemoveImageResponse, error) {
+	err := c.CRIImageService.RemoveImage(ctx, r.GetImage())
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, err
+	}
+	return &runtime.RemoveImageResponse{}, nil
+}
+
+func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.ImageSpec) error {
 	span := tracing.SpanFromContext(ctx)
 
-	// TODO: Move to separate function
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+	image, err := c.LocalResolve(imageSpec.GetImage())
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			span.AddEvent(err.Error())
 			// return empty without error when image not found.
-			return &runtime.RemoveImageResponse{}, nil
+			return nil
 		}
-		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
+		return fmt.Errorf("can not resolve %q locally: %w", imageSpec.GetImage(), err)
 	}
 	span.SetAttributes(tracing.Attribute("image.id", image.ID))
 	// Remove all image references.
@@ -60,11 +67,11 @@ func (c *GRPCCRIImageService) RemoveImage(ctx context.Context, r *runtime.Remove
 		if err == nil || errdefs.IsNotFound(err) {
 			// Update image store to reflect the newest state in containerd.
 			if err := c.imageStore.Update(ctx, ref); err != nil {
-				return nil, fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
+				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
 			}
 			continue
 		}
-		return nil, fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
+		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
 	}
-	return &runtime.RemoveImageResponse{}, nil
+	return nil
 }
