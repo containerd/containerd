@@ -18,10 +18,13 @@ package commands
 
 import (
 	gocontext "context"
+	"os"
+	"strconv"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
 )
@@ -62,5 +65,22 @@ func NewClient(context *cli.Context, opts ...containerd.Opt) (*containerd.Client
 		return nil, nil, nil, err
 	}
 	ctx, cancel := AppContext(context)
+	var suppressDeprecationWarnings bool
+	if s := os.Getenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS"); s != "" {
+		suppressDeprecationWarnings, err = strconv.ParseBool(s)
+		if err != nil {
+			log.L.WithError(err).Warn("Failed to parse CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS=" + s)
+		}
+	}
+	if !suppressDeprecationWarnings {
+		resp, err := client.IntrospectionService().Server(ctx, &ptypes.Empty{})
+		if err != nil {
+			log.L.WithError(err).Warn("Failed to check deprecations")
+		} else {
+			for _, d := range resp.Deprecations {
+				log.L.Warn("DEPRECATION: " + d.Message)
+			}
+		}
+	}
 	return client, ctx, cancel, nil
 }
