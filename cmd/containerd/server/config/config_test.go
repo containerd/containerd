@@ -61,7 +61,7 @@ func TestMergeConfigs(t *testing.T) {
 		StreamProcessors: map[string]StreamProcessor{"1": {Path: "3"}},
 	}
 
-	err := MergeConfig(a, b)
+	err := mergeConfig(a, b)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 2, a.Version)
@@ -77,13 +77,13 @@ func TestMergeConfigs(t *testing.T) {
 	// https://github.com/containerd/containerd/blob/v1.6.0/services/server/config/config.go#L322-L323
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
-	err = MergeConfig(a, b)
+	err = mergeConfig(a, b)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 
 	a = &Config{Version: 2, OOMScore: 1}
 	b = &Config{Version: 2, OOMScore: 0} // OOMScore "not set / default"
-	err = MergeConfig(a, b)
+	err = mergeConfig(a, b)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, a.OOMScore)
 }
@@ -292,7 +292,7 @@ func TestMergingTwoPluginConfigsMerge(t *testing.T) {
 	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
 }
 
-func TestMergingTwoPluginConfigsRecursively(t *testing.T) {
+func TestMergingTwoPluginConfigsWithNesting(t *testing.T) {
 	// Configuration that configures runtime: runc
 	data1 := `
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
@@ -368,7 +368,7 @@ func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlug
 		if i == 0 {
 			result = tempOut
 		} else {
-			err = MergeConfig(&result, &tempOut)
+			err = mergeConfig(&result, &tempOut)
 			assert.NoError(t, err)
 		}
 	}
