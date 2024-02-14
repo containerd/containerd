@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,7 +44,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/cap"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
@@ -234,7 +234,7 @@ func TestContainerCapabilities(t *testing.T) {
 				AddCapabilities:  []string{"ALL"},
 				DropCapabilities: []string{"CHOWN"},
 			},
-			includes: util.SubtractStringSlice(allCaps, "CAP_CHOWN"),
+			includes: slices.DeleteFunc(slices.Clone(allCaps), func(s string) bool { return strings.EqualFold(s, "CAP_CHOWN") }),
 			excludes: []string{"CAP_CHOWN"},
 		},
 		{
@@ -244,7 +244,7 @@ func TestContainerCapabilities(t *testing.T) {
 				DropCapabilities: []string{"ALL"},
 			},
 			includes: []string{"CAP_SYS_ADMIN"},
-			excludes: util.SubtractStringSlice(allCaps, "CAP_SYS_ADMIN"),
+			excludes: slices.DeleteFunc(slices.Clone(allCaps), func(s string) bool { return strings.EqualFold(s, "CAP_SYS_ADMIN") }),
 		},
 	} {
 		test := test
