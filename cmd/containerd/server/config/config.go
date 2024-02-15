@@ -36,13 +36,11 @@ import (
 	"dario.cat/mergo"
 	"github.com/pelletier/go-toml/v2"
 
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 )
-
-// CurrentConfigVersion is the max config version which is supported
-const CurrentConfigVersion = 3
 
 // migrations hold the migration functions for every prior containerd config version
 var migrations = []func(context.Context, *Config) error{
@@ -115,8 +113,8 @@ type StreamProcessor struct {
 
 // ValidateVersion validates the config for a v2 file
 func (c *Config) ValidateVersion() error {
-	if c.Version > CurrentConfigVersion {
-		return fmt.Errorf("expected containerd config version equal to or less than `%d`, got `%d`", CurrentConfigVersion, c.Version)
+	if c.Version > version.ConfigVersion {
+		return fmt.Errorf("expected containerd config version equal to or less than `%d`, got `%d`", version.ConfigVersion, c.Version)
 	}
 
 	for _, p := range c.DisabledPlugins {
@@ -135,7 +133,7 @@ func (c *Config) ValidateVersion() error {
 
 // MigrateConfig will convert the config to the latest version before using
 func (c *Config) MigrateConfig(ctx context.Context) error {
-	for c.Version < CurrentConfigVersion {
+	for c.Version < version.ConfigVersion {
 		if m := migrations[c.Version]; m != nil {
 			if err := m(ctx, c); err != nil {
 				return err

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestMigration(t *testing.T) {
 	registry.Reset()
 	defer registry.Reset()
 
-	version := srvconfig.CurrentConfigVersion - 1
+	configVersion := version.ConfigVersion - 1
 
 	type testConfig struct {
 		Migrated    string `toml:"migrated"`
@@ -109,7 +110,7 @@ func TestMigration(t *testing.T) {
 			return nil, nil
 		},
 		ConfigMigration: func(ctx context.Context, v int, plugins map[string]interface{}) error {
-			if v != version {
+			if v != configVersion {
 				t.Errorf("unxpected version: %d", v)
 			}
 			t1, ok := plugins["io.containerd.test.t1"]
@@ -133,7 +134,7 @@ func TestMigration(t *testing.T) {
 	})
 
 	config := &srvconfig.Config{}
-	config.Version = version
+	config.Version = configVersion
 	config.Plugins = map[string]interface{}{
 		"io.containerd.test.t1": map[string]interface{}{
 			"migrated":    "migrate me",

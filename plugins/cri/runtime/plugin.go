@@ -30,12 +30,12 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"k8s.io/klog/v2"
 
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
@@ -51,8 +51,8 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.WarningPlugin,
 		},
-		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
-			if version >= srvconfig.CurrentConfigVersion {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+			if configVersion >= version.ConfigVersion {
 				return nil
 			}
 			c, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"]

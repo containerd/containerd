@@ -32,3 +32,9 @@ var (
 	// GoVersion is Go tree's version.
 	GoVersion = runtime.Version()
 )
+
+// ConfigVersion is the current highest supported configuration version.
+// This version is used by the main configuration as well as all plugins.
+// Any configuration less than this version which has structural changes
+// should migrate the configuration structures used by this version.
+const ConfigVersion = 3
