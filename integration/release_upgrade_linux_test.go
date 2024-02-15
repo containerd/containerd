@@ -116,7 +116,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, criRuntimeService cri.Run
 	var busyboxImage = images.Get(images.BusyBox)
 
 	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
+	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
 	require.NoError(t, err)
 
 	t.Log("Create first sandbox")
@@ -195,7 +195,7 @@ func execToExistingContainer(t *testing.T, criRuntimeService cri.RuntimeService,
 	var busyboxImage = images.Get(images.BusyBox)
 
 	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
+	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
 	require.NoError(t, err)
 	t.Log("Create sandbox")
 	sbConfig := PodSandboxConfig("sandbox", "running")
@@ -263,7 +263,7 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService
 	var busyboxImage = images.Get(images.BusyBox)
 
 	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil)
+	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
 	require.NoError(t, err)
 
 	t.Log("Create a sandbox")
@@ -353,7 +353,7 @@ func shouldRecoverExistingImages(t *testing.T, criRuntimeService cri.RuntimeServ
 	expectedRefs := []string{}
 	for _, img := range images {
 		t.Logf("Pulling image %q", img)
-		imgRef, err := criImageService.PullImage(&criruntime.ImageSpec{Image: img}, nil, nil)
+		imgRef, err := criImageService.PullImage(&criruntime.ImageSpec{Image: img}, nil, nil, "")
 		require.NoError(t, err)
 		expectedRefs = append(expectedRefs, imgRef)
 	}
