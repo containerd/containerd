@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/plugin/registry"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
@@ -36,6 +35,7 @@ import (
 	nriservice "github.com/containerd/containerd/v2/pkg/nri"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/platforms"
 
 	"google.golang.org/grpc"
@@ -61,8 +61,8 @@ func init() {
 			plugins.WarningPlugin,
 		},
 		Config: &defaultConfig,
-		ConfigMigration: func(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
-			if version >= srvconfig.CurrentConfigVersion {
+		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+			if configVersion >= version.ConfigVersion {
 				return nil
 			}
 			const pluginName = string(plugins.GRPCPlugin) + ".cri"

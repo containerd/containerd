@@ -64,6 +64,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/dynamic"
@@ -112,10 +113,10 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 // New creates and initializes a new containerd server
 func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	var (
-		version    = config.Version
-		migrationT time.Duration
+		currentVersion = config.Version
+		migrationT     time.Duration
 	)
-	if version < srvconfig.CurrentConfigVersion {
+	if currentVersion < version.ConfigVersion {
 		// Migrate config to latest version
 		t1 := time.Now()
 		err := config.MigrateConfig(ctx)
@@ -224,12 +225,12 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		required[r] = struct{}{}
 	}
 
-	if version < srvconfig.CurrentConfigVersion {
+	if currentVersion < version.ConfigVersion {
 		t1 := time.Now()
 		// Run migration for each configuration version
 		// Run each plugin migration for each version to ensure that migration logic is simple and
 		// focused on upgrading from one version at a time.
-		for v := version; v < srvconfig.CurrentConfigVersion; v++ {
+		for v := currentVersion; v < version.ConfigVersion; v++ {
 			for _, p := range loaded {
 				if p.ConfigMigration != nil {
 					if err := p.ConfigMigration(ctx, v, config.Plugins); err != nil {
@@ -241,7 +242,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		migrationT = migrationT + time.Since(t1)
 	}
 	if migrationT > 0 {
-		log.G(ctx).WithField("t", migrationT).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", version)
+		log.G(ctx).WithField("t", migrationT).Warnf("Configuration migrated from version %d, use `containerd config migrate` to avoid migration", currentVersion)
 	}
 
 	for _, p := range loaded {

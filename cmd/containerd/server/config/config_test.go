@@ -25,12 +25,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log/logtest"
 )
 
 func TestMigrations(t *testing.T) {
-	if len(migrations) != CurrentConfigVersion {
-		t.Fatalf("Migration missing, expected %d migrations, only %d defined", CurrentConfigVersion, len(migrations))
+	if len(migrations) != version.ConfigVersion {
+		t.Fatalf("Migration missing, expected %d migrations, only %d defined", version.ConfigVersion, len(migrations))
 	}
 }
 

@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -30,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/images"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -154,8 +154,8 @@ func init() {
 	})
 }
 
-func configMigration(ctx context.Context, version int, pluginConfigs map[string]interface{}) error {
-	if version >= srvconfig.CurrentConfigVersion {
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+	if configVersion >= version.ConfigVersion {
 		return nil
 	}
 	original, ok := pluginConfigs[string(plugins.GRPCPlugin)+".cri"]

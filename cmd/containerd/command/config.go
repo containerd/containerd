@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
@@ -69,7 +70,7 @@ func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
 	// when a config without a version is loaded from disk and has no version
 	// set, we assume it's a v1 config.  But when generating new configs via
 	// this command, generate the max configuration version
-	config.Version = srvconfig.CurrentConfigVersion
+	config.Version = version.ConfigVersion
 
 	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 }
@@ -112,7 +113,7 @@ var configCommand = cli.Command{
 					return err
 				}
 
-				if config.Version < srvconfig.CurrentConfigVersion {
+				if config.Version < version.ConfigVersion {
 					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
 					for _, p := range plugins {
 						if p.ConfigMigration != nil {
@@ -145,7 +146,7 @@ var configCommand = cli.Command{
 					}
 				}
 
-				config.Version = srvconfig.CurrentConfigVersion
+				config.Version = version.ConfigVersion
 
 				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 			},
@@ -155,7 +156,7 @@ var configCommand = cli.Command{
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		Version: srvconfig.CurrentConfigVersion,
+		Version: version.ConfigVersion,
 		Root:    defaults.DefaultRootDir,
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{
