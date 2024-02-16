@@ -22,7 +22,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/platforms"
 )
 
-var exportCommand = cli.Command{
+var exportCommand = &cli.Command{
 	Name:      "export",
 	Usage:     "Export images",
 	ArgsUsage: "[flags] <out> <image> ...",
@@ -44,24 +44,24 @@ Use '--platform' to define the output platform.
 When '--all-platforms' is given all images in a manifest list must be available.
 `,
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-manifest-json",
 			Usage: "Do not add Docker compatible manifest.json to archive",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-non-distributable",
 			Usage: "Do not add non-distributable blobs such as Windows layers to archive",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{},
+			Value: cli.NewStringSlice(),
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Exports content from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run export locally rather than through transfer API",
 		},

@@ -23,7 +23,7 @@ import (
 	"time"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -35,7 +35,7 @@ import (
 	"github.com/containerd/platforms"
 )
 
-var importCommand = cli.Command{
+var importCommand = &cli.Command{
 	Name:      "import",
 	Usage:     "Import images",
 	ArgsUsage: "[flags] <in>",
@@ -57,44 +57,44 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 "foo/bar:latest" and "foo/bar@sha256:deadbeef" images in the containerd store.
 `,
 	Flags: append([]cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "base-name",
 			Value: "",
 			Usage: "Base image name for added images, when provided only images with this name prefix are imported",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "digests",
 			Usage: "Whether to create digest images (default: false)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-digest-for-named",
 			Usage: "Skip applying --digests option to images named in the importing tar (use it in conjunction with --digests)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "index-name",
 			Usage: "Image name to keep index as, by default index is discarded",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Imports content for all platforms, false by default",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Imports content for specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "no-unpack",
 			Usage: "Skip unpacking the images, cannot be used with --discard-unpacked-layers, false by default",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run import locally rather than through transfer API",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "compress-blobs",
 			Usage: "Compress uncompressed blobs when creating manifest (Docker format only)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "discard-unpacked-layers",
 			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
 		},

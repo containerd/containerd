@@ -37,10 +37,10 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var fetchCommand = cli.Command{
+var fetchCommand = &cli.Command{
 	Name:      "fetch",
 	Usage:     "Fetch all content for an image into containerd",
 	ArgsUsage: "[flags] <remote> <object>",
@@ -59,24 +59,24 @@ content and snapshots ready for a direct use via the 'ctr run'.
 
 Most of this is experimental and there are few leaps to make this work.`,
 	Flags: append(commands.RegistryFlags, commands.LabelFlag,
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Pull content from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:   "all-metadata",
 			Usage:  "(Deprecated: use skip-metadata) Pull metadata for all platforms",
 			Hidden: true,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-metadata",
 			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "metadata-only",
 			Usage: "Pull all metadata including manifests and configs",
 		},
@@ -131,7 +131,7 @@ func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig,
 		Labels:    clicontext.StringSlice("label"),
 		TraceHTTP: clicontext.Bool("http-trace"),
 	}
-	if !clicontext.GlobalBool("debug") {
+	if !clicontext.Bool("debug") {
 		config.ProgressOutput = os.Stdout
 	}
 	if !clicontext.Bool("all-platforms") {

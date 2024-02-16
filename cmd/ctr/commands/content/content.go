@@ -35,12 +35,12 @@ import (
 	units "github.com/docker/go-units"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var (
 	// Command is the cli command for managing content
-	Command = cli.Command{
+	Command = &cli.Command{
 		Name:  "content",
 		Usage: "Manage content",
 		Subcommands: cli.Commands{
@@ -59,7 +59,7 @@ var (
 		},
 	}
 
-	getCommand = cli.Command{
+	getCommand = &cli.Command{
 		Name:        "get",
 		Usage:       "Get the data for an object",
 		ArgsUsage:   "[<digest>, ...]",
@@ -88,17 +88,17 @@ var (
 		},
 	}
 
-	ingestCommand = cli.Command{
+	ingestCommand = &cli.Command{
 		Name:        "ingest",
 		Usage:       "Accept content into the store",
 		ArgsUsage:   "[flags] <key>",
 		Description: "ingest objects into the local content store",
 		Flags: []cli.Flag{
-			cli.Int64Flag{
+			&cli.Int64Flag{
 				Name:  "expected-size",
 				Usage: "Validate against provided size",
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "expected-digest",
 				Usage: "Verify content against expected digest",
 			},
@@ -130,18 +130,19 @@ var (
 		},
 	}
 
-	activeIngestCommand = cli.Command{
+	activeIngestCommand = &cli.Command{
 		Name:        "active",
 		Usage:       "Display active transfers",
 		ArgsUsage:   "[flags] [<regexp>]",
 		Description: "display the ongoing transfers",
 		Flags: []cli.Flag{
-			cli.DurationFlag{
-				Name:   "timeout, t",
-				Usage:  "Total timeout for fetch",
-				EnvVar: "CONTAINERD_FETCH_TIMEOUT",
+			&cli.DurationFlag{
+				Name:    "timeout",
+				Aliases: []string{"t"},
+				Usage:   "Total timeout for fetch",
+				EnvVars: []string{"CONTAINERD_FETCH_TIMEOUT"},
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "root",
 				Usage: "Path to content store root",
 				Value: "/tmp/content", // TODO(stevvooe): for now, just use the PWD/.content
@@ -172,22 +173,23 @@ var (
 		},
 	}
 
-	listCommand = cli.Command{
+	listCommand = &cli.Command{
 		Name:        "list",
 		Aliases:     []string{"ls"},
 		Usage:       "List all blobs in the store",
 		ArgsUsage:   "[flags]",
 		Description: "list blobs in the content store",
 		Flags: []cli.Flag{
-			cli.BoolFlag{
-				Name:  "quiet, q",
-				Usage: "Print only the blob digest",
+			&cli.BoolFlag{
+				Name:    "quiet",
+				Aliases: []string{"q"},
+				Usage:   "Print only the blob digest",
 			},
 		},
 		Action: func(context *cli.Context) error {
 			var (
 				quiet = context.Bool("quiet")
-				args  = []string(context.Args())
+				args  = context.Args().Slice()
 			)
 			client, ctx, cancel, err := commands.NewClient(context)
 			if err != nil {
@@ -232,7 +234,7 @@ var (
 		},
 	}
 
-	setLabelsCommand = cli.Command{
+	setLabelsCommand = &cli.Command{
 		Name:        "label",
 		Usage:       "Add labels to content",
 		ArgsUsage:   "<digest> [<label>=<value> ...]",
@@ -286,20 +288,20 @@ var (
 		},
 	}
 
-	editCommand = cli.Command{
+	editCommand = &cli.Command{
 		Name:        "edit",
 		Usage:       "Edit a blob and return a new digest",
 		ArgsUsage:   "[flags] <digest>",
 		Description: "edit a blob and return a new digest",
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "validate",
 				Usage: "Validate the result against a format (json, mediatype, etc.)",
 			},
-			cli.StringFlag{
-				Name:   "editor",
-				Usage:  "Select editor (vim, emacs, etc.)",
-				EnvVar: "EDITOR",
+			&cli.StringFlag{
+				Name:    "editor",
+				Usage:   "Select editor (vim, emacs, etc.)",
+				EnvVars: []string{"EDITOR"},
 			},
 		},
 		Action: func(context *cli.Context) error {
@@ -355,7 +357,7 @@ var (
 		},
 	}
 
-	deleteCommand = cli.Command{
+	deleteCommand = &cli.Command{
 		Name:      "delete",
 		Aliases:   []string{"del", "remove", "rm"},
 		Usage:     "Permanently delete one or more blobs",
@@ -364,7 +366,7 @@ var (
 	blobs are printed to stdout.`,
 		Action: func(context *cli.Context) error {
 			var (
-				args      = []string(context.Args())
+				args      = context.Args().Slice()
 				exitError error
 			)
 			client, ctx, cancel, err := commands.NewClient(context)
@@ -404,7 +406,7 @@ var (
 	// TODO(stevvooe): Create "multi-fetch" mode that just takes a remote
 	// then receives object/hint lines on stdin, returning content as
 	// needed.
-	fetchObjectCommand = cli.Command{
+	fetchObjectCommand = &cli.Command{
 		Name:        "fetch-object",
 		Usage:       "Retrieve objects from a remote",
 		ArgsUsage:   "[flags] <remote> <object> [<hint>, ...]",
@@ -446,13 +448,13 @@ var (
 		},
 	}
 
-	fetchBlobCommand = cli.Command{
+	fetchBlobCommand = &cli.Command{
 		Name:        "fetch-blob",
 		Usage:       "Retrieve blobs from a remote",
 		ArgsUsage:   "[flags] <remote> [<digest>, ...]",
 		Description: `Fetch blobs by digests from a remote.`,
 		Flags: append(commands.RegistryFlags, []cli.Flag{
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:  "media-type",
 				Usage: "Specify target mediatype for request header",
 			},
@@ -506,7 +508,7 @@ var (
 		},
 	}
 
-	pushObjectCommand = cli.Command{
+	pushObjectCommand = &cli.Command{
 		Name:        "push-object",
 		Usage:       "Push an object to a remote",
 		ArgsUsage:   "[flags] <remote> <object> <type>",

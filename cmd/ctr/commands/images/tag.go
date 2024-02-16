@@ -19,7 +19,7 @@ package images
 import (
 	"fmt"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/core/transfer/image"
@@ -27,21 +27,21 @@ import (
 	"github.com/distribution/reference"
 )
 
-var tagCommand = cli.Command{
+var tagCommand = &cli.Command{
 	Name:        "tag",
 	Usage:       "Tag an image",
 	ArgsUsage:   "[flags] <source_ref> <target_ref> [<target_ref>, ...]",
 	Description: `Tag an image for use in containerd.`,
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "force",
 			Usage: "Force target_ref to be created, regardless if it already exists",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run tag locally rather than through transfer API",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-reference-check",
 			Usage: "Skip the strict check for reference names",
 		},
@@ -64,7 +64,7 @@ var tagCommand = cli.Command{
 		defer cancel()
 
 		if !context.Bool("local") {
-			for _, targetRef := range context.Args()[1:] {
+			for _, targetRef := range context.Args().Slice()[1:] {
 				if !context.Bool("skip-reference-check") {
 					if _, err := reference.ParseAnyReference(targetRef); err != nil {
 						return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
@@ -91,7 +91,7 @@ var tagCommand = cli.Command{
 			return err
 		}
 		// Support multiple references for one command run
-		for _, targetRef := range context.Args()[1:] {
+		for _, targetRef := range context.Args().Slice()[1:] {
 			if !context.Bool("skip-reference-check") {
 				if _, err := reference.ParseAnyReference(targetRef); err != nil {
 					return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)

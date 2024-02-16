@@ -28,41 +28,42 @@ import (
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var execCommand = cli.Command{
-	Name:           "exec",
-	Usage:          "Execute additional processes in an existing container",
-	ArgsUsage:      "[flags] CONTAINER CMD [ARG...]",
-	SkipArgReorder: true,
+var execCommand = &cli.Command{
+	Name:      "exec",
+	Usage:     "Execute additional processes in an existing container",
+	ArgsUsage: "[flags] CONTAINER CMD [ARG...]",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cwd",
 			Usage: "Working directory of the new process",
 		},
-		cli.BoolFlag{
-			Name:  "tty,t",
-			Usage: "Allocate a TTY for the container",
+		&cli.BoolFlag{
+			Name:    "tty",
+			Aliases: []string{"t"},
+			Usage:   "Allocate a TTY for the container",
 		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "Detach from the task after it has started execution",
+		&cli.BoolFlag{
+			Name:    "detach",
+			Aliases: []string{"d"},
+			Usage:   "Detach from the task after it has started execution",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:     "exec-id",
 			Required: true,
 			Usage:    "Exec specific id for the process",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "fifo-dir",
 			Usage: "Directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "log-uri",
 			Usage: "Log uri for custom shim logging",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "user",
 			Usage: "User id or name",
 		},
@@ -186,7 +187,7 @@ var execCommand = cli.Command{
 			return err
 		}
 		if code != 0 {
-			return cli.NewExitError("", int(code))
+			return cli.Exit("", int(code))
 		}
 		return nil
 	},

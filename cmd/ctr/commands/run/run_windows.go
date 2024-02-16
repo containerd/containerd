@@ -30,11 +30,11 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var platformRunFlags = []cli.Flag{
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "isolated",
 		Usage: "Run the container with vm isolation",
 	},
@@ -62,7 +62,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	} else {
 		var (
 			ref  = context.Args().First()
-			args = context.Args()[2:]
+			args = context.Args().Slice()[2:]
 		)
 
 		id = context.Args().Get(1)
@@ -176,7 +176,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 	var runtimeOpts interface{}
 	if runtime == "io.containerd.runhcs.v1" {
 		runtimeOpts = &options.Options{
-			Debug: context.GlobalBool("debug"),
+			Debug: context.Bool("debug"),
 		}
 	}
 	cOpts = append(cOpts, containerd.WithRuntime(runtime, runtimeOpts))

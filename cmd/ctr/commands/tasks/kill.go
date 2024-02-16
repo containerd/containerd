@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/moby/sys/signal"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 const defaultSignal = "SIGTERM"
@@ -61,23 +61,25 @@ func RemoveCniNetworkIfExist(ctx context.Context, container containerd.Container
 	return nil
 }
 
-var killCommand = cli.Command{
+var killCommand = &cli.Command{
 	Name:      "kill",
 	Usage:     "Signal a container (default: SIGTERM)",
 	ArgsUsage: "[flags] CONTAINER",
 	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "signal, s",
-			Value: "",
-			Usage: "Signal to send to the container",
+		&cli.StringFlag{
+			Name:    "signal",
+			Aliases: []string{"s"},
+			Value:   "",
+			Usage:   "Signal to send to the container",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "exec-id",
 			Usage: "Process ID to kill",
 		},
-		cli.BoolFlag{
-			Name:  "all, a",
-			Usage: "Send signal to all processes inside the container",
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "Send signal to all processes inside the container",
 		},
 	},
 	Action: func(context *cli.Context) error {

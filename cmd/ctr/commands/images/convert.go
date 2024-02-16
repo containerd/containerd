@@ -24,10 +24,10 @@ import (
 	"github.com/containerd/containerd/v2/core/images/converter"
 	"github.com/containerd/containerd/v2/core/images/converter/uncompress"
 	"github.com/containerd/platforms"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var convertCommand = cli.Command{
+var convertCommand = &cli.Command{
 	Name:      "convert",
 	Usage:     "Convert an image",
 	ArgsUsage: "[flags] <source_ref> <target_ref>",
@@ -40,21 +40,21 @@ When '--all-platforms' is given all images in a manifest list must be available.
 `,
 	Flags: []cli.Flag{
 		// generic flags
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "uncompress",
 			Usage: "Convert tar.gz layers to uncompressed tar layers",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "oci",
 			Usage: "Convert Docker media types to OCI media types",
 		},
 		// platform flags
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{},
+			Value: cli.NewStringSlice(),
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Exports content from all platforms",
 		},

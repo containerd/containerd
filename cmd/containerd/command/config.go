@@ -30,7 +30,7 @@ import (
 	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
@@ -79,10 +79,10 @@ func defaultConfig() *srvconfig.Config {
 	return platformAgnosticDefaultConfig()
 }
 
-var configCommand = cli.Command{
+var configCommand = &cli.Command{
 	Name:  "config",
 	Usage: "Information on the containerd config",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
@@ -96,7 +96,7 @@ var configCommand = cli.Command{
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
 				ctx := gocontext.Background()
-				if err := srvconfig.LoadConfig(ctx, context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
@@ -109,7 +109,7 @@ var configCommand = cli.Command{
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
 				ctx := gocontext.Background()
-				if err := srvconfig.LoadConfig(ctx, context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 

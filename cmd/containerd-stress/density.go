@@ -34,14 +34,14 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var densityCommand = cli.Command{
+var densityCommand = &cli.Command{
 	Name:  "density",
 	Usage: "Stress tests density of containers running on a system",
 	Flags: []cli.Flag{
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "count",
 			Usage: "Number of containers to run",
 			Value: 10,
@@ -58,14 +58,14 @@ var densityCommand = cli.Command{
 		}
 
 		config := config{
-			Address:     cliContext.GlobalString("address"),
-			Duration:    cliContext.GlobalDuration("duration"),
-			Concurrency: cliContext.GlobalInt("concurrent"),
-			Exec:        cliContext.GlobalBool("exec"),
-			Image:       cliContext.GlobalString("image"),
-			JSON:        cliContext.GlobalBool("json"),
-			Metrics:     cliContext.GlobalString("metrics"),
-			Snapshotter: cliContext.GlobalString("snapshotter"),
+			Address:     cliContext.String("address"),
+			Duration:    cliContext.Duration("duration"),
+			Concurrency: cliContext.Int("concurrent"),
+			Exec:        cliContext.Bool("exec"),
+			Image:       cliContext.String("image"),
+			JSON:        cliContext.Bool("json"),
+			Metrics:     cliContext.String("metrics"),
+			Snapshotter: cliContext.String("snapshotter"),
 		}
 		client, err := config.newClient()
 		if err != nil {
