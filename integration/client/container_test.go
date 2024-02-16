@@ -795,8 +795,8 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 
 	// We skip this case when runtime is crun.
 	// More information in https://github.com/containerd/containerd/pull/4214#discussion_r422769497
-	if os.Getenv("RUNC_FLAVOR") == "crun" {
-		t.Skip("skip it when using crun")
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
 	}
 
 	client, err := newClient(t, address)

@@ -1426,8 +1426,8 @@ func TestShimOOMScore(t *testing.T) {
 // status after container.NewTask. It's used to simulate that the runc-init
 // might be killed by oom-kill.
 func TestIssue9103(t *testing.T) {
-	if os.Getenv("RUNC_FLAVOR") == "crun" {
-		t.Skip("skip it when using crun")
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
 	}
 
 	client, err := newClient(t, address)
