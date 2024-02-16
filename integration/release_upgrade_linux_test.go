@@ -19,6 +19,7 @@ package integration
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -37,10 +38,14 @@ import (
 	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/integration/remote"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // upgradeVerifyCaseFunc is used to verify the behavior after upgrade.
-type upgradeVerifyCaseFunc func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService)
+type upgradeVerifyCaseFunc func(*testing.T, cri.RuntimeService, cri.ImageManagerService)
+
+// beforeUpgradeHookFunc is a hook before upgrade.
+type beforeUpgradeHookFunc func(*testing.T)
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
@@ -51,15 +56,16 @@ func TestUpgrade(t *testing.T) {
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
 	t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
 	t.Run("recover-images", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverExistingImages))
-	// TODO:
-	// Add stats/stop-existing-running-pods/...
+	t.Run("metrics", runUpgradeTestCase(previousReleaseBinDir, shouldParseMetricDataCorrectly))
 }
 
 func runUpgradeTestCase(
 	previousReleaseBinDir string,
-	setupUpgradeVerifyCase func(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc,
+	setupUpgradeVerifyCase func(*testing.T, cri.RuntimeService, cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
+		// NOTE: Using t.TempDir() here is to ensure there are no leaky
+		// mountpoint after test completed.
 		workDir := t.TempDir()
 
 		t.Log("Install config for previous release")
@@ -85,12 +91,17 @@ func runUpgradeTestCase(
 		})
 
 		t.Log("Prepare pods for current release")
-		upgradeCaseFunc := setupUpgradeVerifyCase(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+		upgradeCaseFunc, hookFunc := setupUpgradeVerifyCase(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
 		needToCleanup = false
 
 		t.Log("Gracefully stop previous release's containerd process")
 		require.NoError(t, previousProc.kill(syscall.SIGTERM))
 		require.NoError(t, previousProc.wait(5*time.Minute))
+
+		if hookFunc != nil {
+			t.Log("Run hook before upgrade")
+			hookFunc(t)
+		}
 
 		t.Log("Install default config for current release")
 		currentReleaseCtrdDefaultConfig(t, workDir)
@@ -112,57 +123,56 @@ func runUpgradeTestCase(
 	}
 }
 
-func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
-	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
-	require.NoError(t, err)
+	pullImagesByCRI(t, iSvc, busyboxImage)
 
-	t.Log("Create first sandbox")
-	firstSBConfig := PodSandboxConfig("sandbox", "running-pod")
-	firstSB, err := criRuntimeService.RunPodSandbox(firstSBConfig, "")
-	require.NoError(t, err)
+	firstPodCtx := newPodTCtx(t, rSvc, "running-pod", "sandbox")
 
-	t.Logf("Create a container config and run container in first pod")
-	containerConfig := ContainerConfig("running", busyboxImage, WithCommand("sleep", "1d"))
-	cn1InFirstSB, err := criRuntimeService.CreateContainer(firstSB, containerConfig, firstSBConfig)
-	require.NoError(t, err)
-	require.NoError(t, criRuntimeService.StartContainer(cn1InFirstSB))
+	cn1InFirstPod := firstPodCtx.createContainer("running", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "1d"))
 
-	t.Logf("Just create a container in first pod")
-	containerConfig = ContainerConfig("created", busyboxImage)
-	cn2InFirstSB, err := criRuntimeService.CreateContainer(firstSB, containerConfig, firstSBConfig)
-	require.NoError(t, err)
+	cn2InFirstPod := firstPodCtx.createContainer("created", busyboxImage,
+		criruntime.ContainerState_CONTAINER_CREATED)
 
-	t.Logf("Just create stopped container in first pod")
-	containerConfig = ContainerConfig("stopped", busyboxImage, WithCommand("sleep", "1d"))
-	cn3InFirstSB, err := criRuntimeService.CreateContainer(firstSB, containerConfig, firstSBConfig)
-	require.NoError(t, err)
-	require.NoError(t, criRuntimeService.StartContainer(cn3InFirstSB))
-	require.NoError(t, criRuntimeService.StopContainer(cn3InFirstSB, 0))
+	cn3InFirstPod := firstPodCtx.createContainer("stopped", busyboxImage,
+		criruntime.ContainerState_CONTAINER_EXITED,
+		WithCommand("sleep", "1d"),
+	)
 
-	t.Log("Create second sandbox")
-	secondSBConfig := PodSandboxConfig("sandbox", "stopped-pod")
-	secondSB, err := criRuntimeService.RunPodSandbox(secondSBConfig, "")
-	require.NoError(t, err)
-	t.Log("Stop second sandbox")
-	require.NoError(t, criRuntimeService.StopPodSandbox(secondSB))
+	secondPodCtx := newPodTCtx(t, rSvc, "stopped-pod", "sandbox")
+	secondPodCtx.stop(false)
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
+	thirdPodCtx := newPodTCtx(t, rSvc, "kill-before-upgrade", "failpoint")
+	thirdPodCtx.createContainer("sorry", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "3d"))
+
+	thirdPodShimPid := int(thirdPodCtx.shimPid())
+
+	hookFunc := func(t *testing.T) {
+		// Kill the shim after stop previous containerd process
+		syscall.Kill(thirdPodShimPid, syscall.SIGKILL)
+	}
+
+	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
 		t.Log("List Pods")
 
-		pods, err := criRuntimeService.ListPodSandbox(nil)
+		pods, err := rSvc.ListPodSandbox(nil)
 		require.NoError(t, err)
-		require.Len(t, pods, 2)
+		require.Len(t, pods, 3)
 
 		for _, pod := range pods {
 			t.Logf("Checking pod %s", pod.Id)
 			switch pod.Id {
-			case firstSB:
+			case firstPodCtx.id:
 				assert.Equal(t, criruntime.PodSandboxState_SANDBOX_READY, pod.State)
 
-				cntrs, err := criRuntimeService.ListContainers(&criruntime.ContainerFilter{
+				cntrs, err := rSvc.ListContainers(&criruntime.ContainerFilter{
 					PodSandboxId: pod.Id,
 				})
 				require.NoError(t, err)
@@ -170,86 +180,93 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, criRuntimeService cri.Run
 
 				for _, cntr := range cntrs {
 					switch cntr.Id {
-					case cn1InFirstSB:
+					case cn1InFirstPod:
 						assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING, cntr.State)
-					case cn2InFirstSB:
+					case cn2InFirstPod:
 						assert.Equal(t, criruntime.ContainerState_CONTAINER_CREATED, cntr.State)
-					case cn3InFirstSB:
+					case cn3InFirstPod:
 						assert.Equal(t, criruntime.ContainerState_CONTAINER_EXITED, cntr.State)
 					default:
 						t.Errorf("unexpected container %s in %s", cntr.Id, pod.Id)
 					}
-
 				}
 
-			case secondSB:
+			case secondPodCtx.id:
 				assert.Equal(t, criruntime.PodSandboxState_SANDBOX_NOTREADY, pod.State)
+
+			case thirdPodCtx.id:
+				assert.Equal(t, criruntime.PodSandboxState_SANDBOX_NOTREADY, pod.State)
+
+				cntrs, err := rSvc.ListContainers(&criruntime.ContainerFilter{
+					PodSandboxId: pod.Id,
+				})
+				require.NoError(t, err)
+				require.Equal(t, 1, len(cntrs))
+				assert.Equal(t, criruntime.ContainerState_CONTAINER_EXITED, cntrs[0].State)
+
 			default:
 				t.Errorf("unexpected pod %s", pod.Id)
 			}
 		}
-	}
+	}, hookFunc
 }
 
-func execToExistingContainer(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+func execToExistingContainer(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
-	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
-	require.NoError(t, err)
-	t.Log("Create sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "running")
-	sbConfig.LogDirectory = t.TempDir()
-	sb, err := criRuntimeService.RunPodSandbox(sbConfig, "")
-	require.NoError(t, err)
+	pullImagesByCRI(t, iSvc, busyboxImage)
 
-	t.Logf("Create a running container")
-	containerConfig := ContainerConfig("running", busyboxImage, WithCommand("sh", "-c", "while true; do date; sleep 1; done"))
-	containerConfig.LogPath = "running#0.log"
-	cntr, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
-	require.NoError(t, err)
-	require.NoError(t, criRuntimeService.StartContainer(cntr))
+	podLogDir := t.TempDir()
+	podCtx := newPodTCtx(t, rSvc, "running", "sandbox", WithPodLogDirectory(podLogDir))
+
+	cntrLogName := "running#0.log"
+	cnID := podCtx.createContainer("running", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sh", "-c", "while true; do date; sleep 1; done"),
+		WithLogPath(cntrLogName),
+	)
 
 	// NOTE: Wait for containerd to flush data into log
 	time.Sleep(2 * time.Second)
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
-		pods, err := criRuntimeService.ListPodSandbox(nil)
+	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
+		pods, err := rSvc.ListPodSandbox(nil)
 		require.NoError(t, err)
 		require.Len(t, pods, 1)
 
-		cntrs, err := criRuntimeService.ListContainers(&criruntime.ContainerFilter{
+		cntrs, err := rSvc.ListContainers(&criruntime.ContainerFilter{
 			PodSandboxId: pods[0].Id,
 		})
 		require.NoError(t, err)
 		require.Equal(t, 1, len(cntrs))
 		assert.Equal(t, criruntime.ContainerState_CONTAINER_RUNNING, cntrs[0].State)
+		assert.Equal(t, cnID, cntrs[0].Id)
 
-		func() {
-			logPath := filepath.Join(sbConfig.LogDirectory, "running#0.log")
+		logPath := filepath.Join(podLogDir, cntrLogName)
 
-			// NOTE: containerd should recover container's IO as well
-			t.Logf("Check container's log %s", logPath)
+		// NOTE: containerd should recover container's IO as well
+		t.Logf("Check container's log %s", logPath)
 
-			logSizeChange := false
-			curSize := getFileSize(t, logPath)
-			for i := 0; i < 30; i++ {
-				time.Sleep(1 * time.Second)
+		logSizeChange := false
+		curSize := getFileSize(t, logPath)
+		for i := 0; i < 30; i++ {
+			time.Sleep(1 * time.Second)
 
-				if curSize < getFileSize(t, logPath) {
-					logSizeChange = true
-					break
-				}
+			if curSize < getFileSize(t, logPath) {
+				logSizeChange = true
+				break
 			}
-			require.True(t, logSizeChange)
-		}()
+		}
+		require.True(t, logSizeChange)
 
 		t.Log("Run ExecSync")
-		stdout, stderr, err := criRuntimeService.ExecSync(cntrs[0].Id, []string{"echo", "-n", "true"}, 0)
+		stdout, stderr, err := rSvc.ExecSync(cntrs[0].Id, []string{"echo", "-n", "true"}, 0)
 		require.NoError(t, err)
 		require.Len(t, stderr, 0)
 		require.Equal(t, "true", string(stdout))
-	}
+	}, nil
 }
 
 // getFileSize returns file's size.
@@ -259,47 +276,45 @@ func getFileSize(t *testing.T, filePath string) int64 {
 	return st.Size()
 }
 
-func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldManipulateContainersInPodAfterUpgrade(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	var busyboxImage = images.Get(images.BusyBox)
 
-	t.Logf("Pulling image %q", busyboxImage)
-	_, err := criImageService.PullImage(&criruntime.ImageSpec{Image: busyboxImage}, nil, nil, "")
-	require.NoError(t, err)
+	pullImagesByCRI(t, iSvc, busyboxImage)
 
-	t.Log("Create a sandbox")
-	sbConfig := PodSandboxConfig("sandbox", "running-pod")
-	sb, err := criRuntimeService.RunPodSandbox(sbConfig, "")
-	require.NoError(t, err)
+	podCtx := newPodTCtx(t, rSvc, "running-pod", "sandbox")
 
-	t.Logf("Create a container config and run container in the pod")
-	containerConfig := ContainerConfig("running", busyboxImage, WithCommand("sleep", "1d"))
-	cn1, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
-	require.NoError(t, err)
-	require.NoError(t, criRuntimeService.StartContainer(cn1))
+	cntr1 := podCtx.createContainer("running", busyboxImage,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sleep", "1d"))
 
-	t.Logf("Just create a container in the pod")
-	containerConfig = ContainerConfig("created", busyboxImage)
-	cn2, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
-	require.NoError(t, err)
+	cntr2 := podCtx.createContainer("created", busyboxImage,
+		criruntime.ContainerState_CONTAINER_CREATED,
+		WithCommand("sleep", "1d"))
 
-	t.Logf("Just create stopped container in the pod")
-	containerConfig = ContainerConfig("stopped", busyboxImage, WithCommand("sleep", "1d"))
-	cn3, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
-	require.NoError(t, err)
-	require.NoError(t, criRuntimeService.StartContainer(cn3))
-	require.NoError(t, criRuntimeService.StopContainer(cn3, 0))
+	cntr3 := podCtx.createContainer("stopped", busyboxImage,
+		criruntime.ContainerState_CONTAINER_EXITED,
+		WithCommand("sleep", "1d"))
 
-	return func(t *testing.T, criRuntimeService cri.RuntimeService, _ cri.ImageManagerService) {
+	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
+		// TODO(fuweid): make svc re-connect to new socket
+		podCtx.rSvc = rSvc
+
 		t.Log("Manipulating containers in the previous pod")
+
 		// For the running container, we get status and stats of it,
 		// exec and execsync in it, stop and remove it
-		status, err := criRuntimeService.ContainerStatus(cn1)
+		checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		t.Logf("Checking container %s's stats", cntr1)
+		stats, err := rSvc.ContainerStats(cntr1)
 		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
-		_, err = criRuntimeService.ContainerStats(cn1)
-		require.NoError(t, err)
-		_, err = criRuntimeService.Exec(&criruntime.ExecRequest{
-			ContainerId: cn1,
+		require.True(t, stats.GetMemory().GetWorkingSetBytes().GetValue() > 0)
+
+		t.Logf("Preparing attachable exec for container %s", cntr1)
+		_, err = rSvc.Exec(&criruntime.ExecRequest{
+			ContainerId: cntr1,
 			Cmd:         []string{"/bin/sh"},
 			Stderr:      false,
 			Stdout:      true,
@@ -307,70 +322,287 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, criRuntimeService
 			Tty:         true,
 		})
 		require.NoError(t, err)
-		require.NoError(t, criRuntimeService.StopContainer(cn1, 0))
-		status, err = criRuntimeService.ContainerStatus(cn1)
-		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
-		require.NoError(t, criRuntimeService.RemoveContainer(cn1))
 
-		// For the created container, we start it, stop it and remove it
-		status, err = criRuntimeService.ContainerStatus(cn2)
-		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_CREATED)
-		require.NoError(t, criRuntimeService.StartContainer(cn2))
-		status, err = criRuntimeService.ContainerStatus(cn2)
-		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
-		require.NoError(t, criRuntimeService.StopContainer(cn2, 0))
-		status, err = criRuntimeService.ContainerStatus(cn2)
-		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
-		require.NoError(t, criRuntimeService.RemoveContainer(cn2))
+		t.Logf("Stopping container %s", cntr1)
+		require.NoError(t, rSvc.StopContainer(cntr1, 0))
+		checkContainerState(t, rSvc, cntr1, criruntime.ContainerState_CONTAINER_EXITED)
 
-		// For the stopped container, we remove it
-		status, err = criRuntimeService.ContainerStatus(cn3)
+		cntr1DataDir := podCtx.containerDataDir(cntr1)
+		t.Logf("Container %s's data dir %s should be remained until RemoveContainer", cntr1, cntr1DataDir)
+		_, err = os.Stat(cntr1DataDir)
 		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_EXITED)
-		require.NoError(t, criRuntimeService.RemoveContainer(cn3))
+
+		t.Logf("Starting created container %s", cntr2)
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_CREATED)
+
+		require.NoError(t, rSvc.StartContainer(cntr2))
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		t.Logf("Stopping running container %s", cntr2)
+		require.NoError(t, rSvc.StopContainer(cntr2, 0))
+		checkContainerState(t, rSvc, cntr2, criruntime.ContainerState_CONTAINER_EXITED)
+
+		t.Logf("Removing exited container %s", cntr3)
+		checkContainerState(t, rSvc, cntr3, criruntime.ContainerState_CONTAINER_EXITED)
+
+		cntr3DataDir := podCtx.containerDataDir(cntr3)
+		_, err = os.Stat(cntr3DataDir)
+		require.NoError(t, err)
+
+		require.NoError(t, rSvc.RemoveContainer(cntr3))
+
+		t.Logf("Container %s's data dir %s should be deleted after RemoveContainer", cntr3, cntr3DataDir)
+		_, err = os.Stat(cntr3DataDir)
+		require.True(t, os.IsNotExist(err))
 
 		// Create a new container in the previous pod, start, stop, and remove it
-		t.Logf("Create a container config and run container in the previous pod")
-		containerConfig = ContainerConfig("runinpreviouspod", busyboxImage, WithCommand("sleep", "1d"))
-		cn4, err := criRuntimeService.CreateContainer(sb, containerConfig, sbConfig)
+		podCtx.createContainer("runinpreviouspod", busyboxImage,
+			criruntime.ContainerState_CONTAINER_EXITED,
+			WithCommand("sleep", "1d"))
+
+		podCtx.stop(true)
+		podDataDir := podCtx.dataDir()
+
+		t.Logf("Pod %s's data dir %s should be deleted", podCtx.id, podDataDir)
+		_, err = os.Stat(podDataDir)
+		require.True(t, os.IsNotExist(err))
+
+		cntrDataDir := filepath.Dir(cntr3DataDir)
+		t.Logf("Containers data dir %s should be empty", cntrDataDir)
+		ents, err := os.ReadDir(cntrDataDir)
 		require.NoError(t, err)
-		require.NoError(t, criRuntimeService.StartContainer(cn4))
-		status, err = criRuntimeService.ContainerStatus(cn4)
-		require.NoError(t, err)
-		assert.Equal(t, status.State, criruntime.ContainerState_CONTAINER_RUNNING)
-		require.NoError(t, criRuntimeService.StopContainer(cn4, 0))
-		require.NoError(t, criRuntimeService.RemoveContainer(cn4))
-	}
+		require.Len(t, ents, 0, cntrDataDir)
+	}, nil
 }
 
-func shouldRecoverExistingImages(t *testing.T, criRuntimeService cri.RuntimeService, criImageService cri.ImageManagerService) upgradeVerifyCaseFunc {
+func shouldRecoverExistingImages(t *testing.T,
+	_ cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
 	images := []string{images.Get(images.BusyBox), images.Get(images.Alpine)}
+	expectedRefs := pullImagesByCRI(t, iSvc, images...)
 
-	expectedRefs := []string{}
-	for _, img := range images {
-		t.Logf("Pulling image %q", img)
-		imgRef, err := criImageService.PullImage(&criruntime.ImageSpec{Image: img}, nil, nil, "")
-		require.NoError(t, err)
-		expectedRefs = append(expectedRefs, imgRef)
-	}
-
-	return func(t *testing.T, _ cri.RuntimeService, criImageService cri.ImageManagerService) {
+	return func(t *testing.T, _ cri.RuntimeService, iSvc cri.ImageManagerService) {
 		t.Log("List all images")
-		res, err := criImageService.ListImages(nil)
+		res, err := iSvc.ListImages(nil)
 		require.NoError(t, err)
 		require.Len(t, res, 2)
 
 		for idx, img := range images {
 			t.Logf("Check image %s status", img)
-			gotImg, err := criImageService.ImageStatus(&criruntime.ImageSpec{Image: img})
+			gotImg, err := iSvc.ImageStatus(&criruntime.ImageSpec{Image: img})
 			require.NoError(t, err)
 			require.Equal(t, expectedRefs[idx], gotImg.Id)
 		}
+	}, nil
+}
+
+// shouldParseMetricDataCorrectly is to check new release containerd can parse
+// metric data from existing shim created by previous release.
+func shouldParseMetricDataCorrectly(t *testing.T,
+	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
+
+	imageName := images.Get(images.BusyBox)
+	pullImagesByCRI(t, iSvc, imageName)
+
+	scriptVolume := t.TempDir()
+	scriptInHost := filepath.Join(scriptVolume, "run.sh")
+
+	fileSize := 1024 * 1024 * 96 // 96 MiB
+	require.NoError(t, os.WriteFile(scriptInHost, []byte(fmt.Sprintf(`#!/bin/sh
+set -euo pipefail
+
+head -c %d </dev/urandom >/tmp/log
+
+# increase page cache usage
+for i in {1..10}; do
+  cat /tmp/log > /dev/null
+done
+
+echo "ready"
+
+while true; do
+  cat /tmp/log > /dev/null
+  sleep 1
+done
+`, fileSize,
+	),
+	), 0600))
+
+	podLogDir := t.TempDir()
+	podCtx := newPodTCtx(t, rSvc, "running", "sandbox", WithPodLogDirectory(podLogDir))
+
+	scriptInContainer := "/run.sh"
+	cntrLogName := "running#0.log"
+
+	cntr := podCtx.createContainer("app", imageName,
+		criruntime.ContainerState_CONTAINER_RUNNING,
+		WithCommand("sh", scriptInContainer),
+		WithVolumeMount(scriptInHost, scriptInContainer),
+		WithLogPath(cntrLogName),
+	)
+
+	return func(t *testing.T, rSvc cri.RuntimeService, _ cri.ImageManagerService) {
+		checkContainerState(t, rSvc, cntr, criruntime.ContainerState_CONTAINER_RUNNING)
+
+		logPath := filepath.Join(podLogDir, cntrLogName)
+
+		t.Log("Warm-up page cache")
+		isReady := false
+		for i := 0; i < 30 && !isReady; i++ {
+			data, err := os.ReadFile(logPath)
+			require.NoError(t, err)
+
+			isReady = strings.Contains(string(data), "ready")
+
+			time.Sleep(1 * time.Second)
+		}
+		require.True(t, isReady, "warm-up page cache")
+
+		stats, err := rSvc.ContainerStats(cntr)
+		require.NoError(t, err)
+
+		data, err := json.MarshalIndent(stats, "", "  ")
+		require.NoError(t, err)
+		t.Logf("Dump container %s's metric: \n%s", cntr, string(data))
+
+		// NOTE: Just in case that part of inactive cache has been reclaimed.
+		expectedBytes := uint64(fileSize * 2 / 3)
+		require.True(t, stats.GetMemory().GetUsageBytes().GetValue() > expectedBytes)
+	}, nil
+}
+
+func newPodTCtx(t *testing.T, rSvc cri.RuntimeService,
+	name, ns string, opts ...PodSandboxOpts) *podTCtx {
+
+	t.Logf("Run a sandbox %s in namespace %s", name, ns)
+	sbConfig := PodSandboxConfig(name, ns, opts...)
+	sbID, err := rSvc.RunPodSandbox(sbConfig, "")
+	require.NoError(t, err)
+
+	return &podTCtx{
+		t:    t,
+		id:   sbID,
+		name: name,
+		ns:   ns,
+		cfg:  sbConfig,
+		rSvc: rSvc,
 	}
+}
+
+// podTCtx is used to construct pod.
+type podTCtx struct {
+	t    *testing.T
+	id   string
+	name string
+	ns   string
+	cfg  *criruntime.PodSandboxConfig
+	rSvc cri.RuntimeService
+}
+
+// createContainer creates a container in that pod.
+func (pCtx *podTCtx) createContainer(name, imageRef string, wantedState criruntime.ContainerState, opts ...ContainerOpts) string {
+	t := pCtx.t
+
+	t.Logf("Create a container %s (wantedState: %s) in pod %s", name, wantedState, pCtx.name)
+	cfg := ContainerConfig(name, imageRef, opts...)
+	cnID, err := pCtx.rSvc.CreateContainer(pCtx.id, cfg, pCtx.cfg)
+	require.NoError(t, err)
+
+	switch wantedState {
+	case criruntime.ContainerState_CONTAINER_CREATED:
+		// no-op
+	case criruntime.ContainerState_CONTAINER_RUNNING:
+		require.NoError(t, pCtx.rSvc.StartContainer(cnID))
+	case criruntime.ContainerState_CONTAINER_EXITED:
+		require.NoError(t, pCtx.rSvc.StartContainer(cnID))
+		require.NoError(t, pCtx.rSvc.StopContainer(cnID, 0))
+	default:
+		t.Fatalf("unsupport state %s", wantedState)
+	}
+	return cnID
+}
+
+// containerDataDir returns container metadata dir maintained by CRI plugin.
+func (pCtx *podTCtx) containerDataDir(cntrID string) string {
+	t := pCtx.t
+
+	// check if container exists
+	status, err := pCtx.rSvc.ContainerStatus(cntrID)
+	require.NoError(t, err)
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+
+	rootDir := cfg["rootDir"].(string)
+	return filepath.Join(rootDir, "containers", status.Id)
+}
+
+// shimPid returns shim's pid.
+func (pCtx *podTCtx) shimPid() uint32 {
+	t := pCtx.t
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// NOTE: use version 2 to be compatible with previous release
+	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 2, pCtx.id)
+	return shimPid(ctx, t, shimCli)
+}
+
+// dataDir returns pod metadata dir maintained by CRI plugin.
+func (pCtx *podTCtx) dataDir() string {
+	t := pCtx.t
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+	rootDir := cfg["rootDir"].(string)
+	return filepath.Join(rootDir, "sandboxes", pCtx.id)
+}
+
+// stop stops that pod.
+func (pCtx *podTCtx) stop(remove bool) {
+	t := pCtx.t
+
+	t.Logf("Stopping pod %s", pCtx.id)
+	require.NoError(t, pCtx.rSvc.StopPodSandbox(pCtx.id))
+	if remove {
+		t.Logf("Removing pod %s", pCtx.id)
+		require.NoError(t, pCtx.rSvc.RemovePodSandbox(pCtx.id))
+	}
+}
+
+// criRuntimeInfo dumps CRI config.
+func criRuntimeInfo(t *testing.T, svc cri.RuntimeService) map[string]interface{} {
+	resp, err := svc.Status()
+	require.NoError(t, err)
+
+	cfg := map[string]interface{}{}
+	err = json.Unmarshal([]byte(resp.GetInfo()["config"]), &cfg)
+	require.NoError(t, err)
+
+	return cfg
+}
+
+// checkContainerState checks container's state.
+func checkContainerState(t *testing.T, svc cri.RuntimeService, name string, expected criruntime.ContainerState) {
+	t.Logf("Checking container %s state", name)
+	status, err := svc.ContainerStatus(name)
+	require.NoError(t, err)
+	assert.Equal(t, expected, status.State)
+}
+
+// pullImagesByCRI pulls images by CRI.
+func pullImagesByCRI(t *testing.T, svc cri.ImageManagerService, images ...string) []string {
+	expectedRefs := make([]string, 0, len(images))
+
+	for _, image := range images {
+		t.Logf("Pulling image %q", image)
+		imgRef, err := svc.PullImage(&criruntime.ImageSpec{Image: image}, nil, nil, "")
+		require.NoError(t, err)
+		expectedRefs = append(expectedRefs, imgRef)
+	}
+	return expectedRefs
 }
 
 // cleanupPods deletes all the pods based on the cri.RuntimeService connection.

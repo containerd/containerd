@@ -91,8 +91,10 @@ func gitLsRemoteCtrdTags(t *testing.T, pattern string) (_tags []string) {
 	cmd := exec.Command("git", "ls-remote", "--tags", "--exit-code",
 		"https://github.com/containerd/containerd.git", pattern)
 
-	out, err := cmd.Output()
-	require.NoError(t, err, "failed to list tags by pattern %s", pattern)
+	t.Logf("Running %s", cmd.String())
+
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "failed to list tags by pattern %s: %s", pattern, string(out))
 
 	// output is like
 	//
