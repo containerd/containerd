@@ -373,6 +373,11 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 	var out []string
 
 	for _, path := range imports {
+		path = filepath.Clean(path)
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(filepath.Dir(parent), path)
+		}
+
 		if strings.Contains(path, "*") {
 			matches, err := filepath.Glob(path)
 			if err != nil {
@@ -381,11 +386,6 @@ func resolveImports(parent string, imports []string) ([]string, error) {
 
 			out = append(out, matches...)
 		} else {
-			path = filepath.Clean(path)
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(filepath.Dir(parent), path)
-			}
-
 			out = append(out, path)
 		}
 	}
