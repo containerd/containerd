@@ -601,3 +601,20 @@ jobs:
           path: |
             *-junit.xml
             *-gotest.json
+
+  # Currently Github actions UI supports no masks to mark matrix jobs as required to pass status checks.
+  # This means that every time version of Go, containerd, or OS is changed, a corresponding job should
+  # be added to the list of required checks. Which is not very convenient.
+  # To workaround this, a special job is added to report statuses of all other jobs, with fixed title.
+  # So it needs to be added to the list of required checks only once.
+  #
+  # See https://github.com/orgs/community/discussions/26822
+  results:
+    name: Report required job statuses
+    runs-on: ubuntu-latest
+    # List job dependencies which are required to pass status checks in order to be merged via merge queue.
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-vagrant, tests-cri-in-userns, tests-mac-os]
+    if: ${{ always() }}
+    steps:
+      - run: exit 1
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
