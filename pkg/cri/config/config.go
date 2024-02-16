@@ -306,6 +306,15 @@ type PluginConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
+	// API' IO EOF event after exec init process exits. A zero value means
+	// there is no timeout.
+	//
+	// The string is in the golang duration format, see:
+	//   https://golang.org/pkg/time/#ParseDuration
+	//
+	// For example, the value can be '5h', '2h30m', '10s'.
+	DrainExecSyncIOTimeout string `toml:"drain_exec_sync_io_timeout" json:"drainExecSyncIOTimeout"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming
@@ -465,6 +474,13 @@ func ValidatePluginConfig(ctx context.Context, c *PluginConfig) ([]deprecation.W
 	if c.StreamIdleTimeout != "" {
 		if _, err := time.ParseDuration(c.StreamIdleTimeout); err != nil {
 			return warnings, fmt.Errorf("invalid stream idle timeout: %w", err)
+		}
+	}
+
+	// Validation for drain_exec_sync_io_timeout
+	if c.DrainExecSyncIOTimeout != "" {
+		if _, err := time.ParseDuration(c.DrainExecSyncIOTimeout); err != nil {
+			return warnings, fmt.Errorf("invalid `drain_exec_sync_io_timeout`: %w", err)
 		}
 	}
 	return warnings, nil
