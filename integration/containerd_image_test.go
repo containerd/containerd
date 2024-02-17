@@ -28,6 +28,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
@@ -267,6 +268,7 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 }
 
 func TestContainerdImageWithDockerSchema1(t *testing.T) {
+	t.Setenv(deprecation.EnvPullSchema1Image, "1")
 	if goruntime.GOOS == "windows" {
 		t.Skip("Skipped on Windows because the test image is not a multi-platform one.")
 	}

@@ -197,7 +197,10 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	)
 
 	if desc.MediaType == images.MediaTypeDockerSchema1Manifest && rCtx.ConvertSchema1 {
-		schema1Converter := schema1.NewConverter(store, fetcher)
+		schema1Converter, err := schema1.NewConverter(store, fetcher)
+		if err != nil {
+			return images.Image{}, fmt.Errorf("failed to get converter for %q: %w", ref, err)
+		}
 
 		handler = images.Handlers(append(rCtx.BaseHandlers, schema1Converter)...)
 
