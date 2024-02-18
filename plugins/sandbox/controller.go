@@ -23,16 +23,16 @@ import (
 
 	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/events"
-	"github.com/containerd/containerd/v2/events/exchange"
-	"github.com/containerd/containerd/v2/mount"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/runtime"
+	v2 "github.com/containerd/containerd/v2/core/runtime/v2"
+	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/pkg/events"
+	"github.com/containerd/containerd/v2/pkg/events/exchange"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/runtime"
-	v2 "github.com/containerd/containerd/v2/runtime/v2"
-	"github.com/containerd/containerd/v2/sandbox"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
@@ -201,12 +201,18 @@ func (c *controllerLocal) Stop(ctx context.Context, sandboxID string, opts ...sa
 	}
 
 	svc, err := c.getSandbox(ctx, sandboxID)
+	if errdefs.IsNotFound(err) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
 	if _, err := svc.StopSandbox(ctx, req); err != nil {
-		return fmt.Errorf("failed to stop sandbox: %w", errdefs.FromGRPC(err))
+		err = errdefs.FromGRPC(err)
+		if !errdefs.IsNotFound(err) && !errdefs.IsUnavailable(err) {
+			return fmt.Errorf("failed to stop sandbox: %w", err)
+		}
 	}
 
 	return nil

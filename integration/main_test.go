@@ -34,16 +34,6 @@ import (
 	"testing"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
-	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
-	"github.com/containerd/containerd/v2/integration/remote"
-	dialer "github.com/containerd/containerd/v2/integration/remote/util"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/util"
 	"github.com/containerd/log"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/assert"
@@ -52,6 +42,17 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
+	"github.com/containerd/containerd/v2/integration/remote"
+	dialer "github.com/containerd/containerd/v2/integration/remote/util"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/constants"
+	"github.com/containerd/containerd/v2/internal/cri/types"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 const (
@@ -62,6 +63,7 @@ const (
 
 var (
 	runtimeService     cri.RuntimeService
+	runtimeService2    cri.RuntimeService // to test GetContainerEvents broadcast
 	imageService       cri.ImageManagerService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
@@ -86,6 +88,10 @@ func ConnectDaemons() error {
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}
+	runtimeService2, err = remote.NewRuntimeService(*criEndpoint, timeout)
+	if err != nil {
+		return fmt.Errorf("failed to create runtime service: %w", err)
+	}
 	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create image service: %w", err)
@@ -94,6 +100,10 @@ func ConnectDaemons() error {
 	// need to check whether it is actually connected.
 	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	_, err = runtimeService2.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -676,7 +686,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -689,7 +699,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, err
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info server.SandboxInfo
+	var info types.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}
@@ -725,7 +735,7 @@ func EnsureImageExists(t *testing.T, imageName string) string {
 	}
 
 	t.Logf("Pull test image %q", imageName)
-	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil, "")
 	require.NoError(t, err)
 
 	return imgID

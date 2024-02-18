@@ -29,22 +29,22 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/containerd/v2/pkg/transfer"
-	"github.com/containerd/containerd/v2/pkg/transfer/image"
-	"github.com/containerd/containerd/v2/pkg/transfer/registry"
-	"github.com/containerd/containerd/v2/platforms"
-	"github.com/containerd/containerd/v2/remotes"
-	"github.com/containerd/containerd/v2/remotes/docker"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
 )
 
-var pushCommand = cli.Command{
+var pushCommand = &cli.Command{
 	Name:      "push",
 	Usage:     "Push an image to a remote",
 	ArgsUsage: "[flags] <remote> [<local>]",
@@ -57,24 +57,24 @@ var pushCommand = cli.Command{
 	creating the associated configuration, and creating the manifest
 	which references those resources.
 `,
-	Flags: append(commands.RegistryFlags, cli.StringFlag{
+	Flags: append(commands.RegistryFlags, &cli.StringFlag{
 		Name:  "manifest",
 		Usage: "Digest of manifest",
-	}, cli.StringFlag{
+	}, &cli.StringFlag{
 		Name:  "manifest-type",
 		Usage: "Media type of manifest digest",
 		Value: ocispec.MediaTypeImageManifest,
-	}, cli.StringSliceFlag{
+	}, &cli.StringSliceFlag{
 		Name:  "platform",
 		Usage: "Push content from a specific platform",
-		Value: &cli.StringSlice{},
-	}, cli.IntFlag{
+		Value: cli.NewStringSlice(),
+	}, &cli.IntFlag{
 		Name:  "max-concurrent-uploaded-layers",
 		Usage: "Set the max concurrent uploaded layers for each push",
-	}, cli.BoolTFlag{
+	}, &cli.BoolFlag{
 		Name:  "local",
 		Usage: "Push content from local client rather than using transfer service",
-	}, cli.BoolFlag{
+	}, &cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
@@ -82,7 +82,7 @@ var pushCommand = cli.Command{
 		var (
 			ref   = context.Args().First()
 			local = context.Args().Get(1)
-			debug = context.GlobalBool("debug")
+			debug = context.Bool("debug")
 			desc  ocispec.Descriptor
 		)
 		if ref == "" {
@@ -95,7 +95,7 @@ var pushCommand = cli.Command{
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
 			if err != nil {
 				return err

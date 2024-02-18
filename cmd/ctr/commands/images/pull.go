@@ -27,19 +27,19 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/progress"
-	"github.com/containerd/containerd/v2/pkg/transfer"
-	"github.com/containerd/containerd/v2/pkg/transfer/image"
-	"github.com/containerd/containerd/v2/pkg/transfer/registry"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var pullCommand = cli.Command{
+var pullCommand = &cli.Command{
 	Name:      "pull",
 	Usage:     "Pull an image from a remote",
 	ArgsUsage: "[flags] <ref>",
@@ -53,33 +53,33 @@ command. As part of this process, we do the following:
 3. Register metadata for the image.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{},
+			Value: cli.NewStringSlice(),
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Pull content and metadata from all platforms",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:   "all-metadata",
 			Usage:  "(Deprecated: use skip-metadata) Pull metadata for all platforms",
 			Hidden: true,
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-metadata",
 			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
-		cli.IntFlag{
+		&cli.IntFlag{
 			Name:  "max-concurrent-downloads",
 			Usage: "Set the max concurrent downloads for each pull",
 		},
-		cli.BoolTFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
@@ -102,7 +102,7 @@ command. As part of this process, we do the following:
 		}
 		defer cancel()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			ch, err := commands.NewStaticCredentials(ctx, context, ref)
 			if err != nil {
 				return err
@@ -207,6 +207,18 @@ type progressNode struct {
 	transfer.Progress
 	children []*progressNode
 	root     bool
+}
+
+func (n *progressNode) mainDesc() *ocispec.Descriptor {
+	if n.Desc != nil {
+		return n.Desc
+	}
+	for _, c := range n.children {
+		if desc := c.mainDesc(); desc != nil {
+			return desc
+		}
+	}
+	return nil
 }
 
 // ProgressHandler continuously updates the output with job progress
@@ -332,6 +344,11 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 
 func DisplayHierarchy(w io.Writer, status string, roots []*progressNode, start time.Time) {
 	total := displayNode(w, "", roots)
+	for _, r := range roots {
+		if desc := r.mainDesc(); desc != nil {
+			fmt.Fprintf(w, "%s %s\n", desc.MediaType, desc.Digest)
+		}
+	}
 	// Print the Status line
 	fmt.Fprintf(w, "%s\telapsed: %-4.1fs\ttotal: %7.6v\t(%v)\t\n",
 		status,

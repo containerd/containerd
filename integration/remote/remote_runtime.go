@@ -513,12 +513,12 @@ func (r *RuntimeService) UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeCo
 }
 
 // Status returns the status of the runtime.
-func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeStatus, error) {
+func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.StatusResponse, error) {
 	klog.V(10).Infof("[RuntimeService] Status (timeout=%v)", r.timeout)
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	resp, err := r.runtimeClient.Status(ctx, &runtimeapi.StatusRequest{}, opts...)
+	resp, err := r.runtimeClient.Status(ctx, &runtimeapi.StatusRequest{Verbose: true}, opts...)
 	if err != nil {
 		klog.Errorf("Status from runtime service failed: %v", err)
 		return nil, err
@@ -532,7 +532,7 @@ func (r *RuntimeService) Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeSta
 		return nil, errors.New(errorMessage)
 	}
 
-	return resp.Status, nil
+	return resp, nil
 }
 
 // RuntimeConfig returns the CgroupDriver of the runtime.

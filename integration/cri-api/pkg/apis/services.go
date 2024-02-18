@@ -120,7 +120,7 @@ type RuntimeService interface {
 	// UpdateRuntimeConfig updates runtime configuration if specified
 	UpdateRuntimeConfig(runtimeConfig *runtimeapi.RuntimeConfig, opts ...grpc.CallOption) error
 	// Status returns the status of the runtime.
-	Status(opts ...grpc.CallOption) (*runtimeapi.RuntimeStatus, error)
+	Status(opts ...grpc.CallOption) (*runtimeapi.StatusResponse, error)
 	// RuntimeConfig returns configuration information of the runtime.
 	// A couple of notes:
 	//   - The RuntimeConfigRequest object is not to be confused with the contents of UpdateRuntimeConfigRequest.
@@ -140,7 +140,7 @@ type ImageManagerService interface {
 	// ImageStatus returns the status of the image.
 	ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.CallOption) (*runtimeapi.Image, error)
 	// PullImage pulls an image with the authentication config.
-	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, opts ...grpc.CallOption) (string, error)
+	PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, opts ...grpc.CallOption) (string, error)
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeapi.ImageSpec, opts ...grpc.CallOption) error
 	// ImageFsInfo returns information of the filesystem that is used to store images.

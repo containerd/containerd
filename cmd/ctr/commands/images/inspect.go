@@ -21,17 +21,17 @@ import (
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/display"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var inspectCommand = cli.Command{
+var inspectCommand = &cli.Command{
 	Name:        "inspect",
 	Aliases:     []string{"i"},
 	Usage:       "inspect an image",
 	ArgsUsage:   "<image> [flags]",
 	Description: `Inspect an image`,
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "content",
 			Usage: "Show JSON content",
 		},

@@ -32,21 +32,21 @@ import (
 	"time"
 
 	apievents "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/cio"
 	. "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/oci"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
+	_ "github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
 	gogotypes "github.com/containerd/containerd/v2/protobuf/types"
-	_ "github.com/containerd/containerd/v2/runtime"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
 	"github.com/containerd/continuity/fs"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/go-runc"
 	"github.com/containerd/log/logtest"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
@@ -795,8 +795,8 @@ func TestKillContainerDeletedByRunc(t *testing.T) {
 
 	// We skip this case when runtime is crun.
 	// More information in https://github.com/containerd/containerd/pull/4214#discussion_r422769497
-	if os.Getenv("RUNC_FLAVOR") == "crun" {
-		t.Skip("skip it when using crun")
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
 	}
 
 	client, err := newClient(t, address)

@@ -23,13 +23,14 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/progress"
 
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var usageCommand = cli.Command{
+var usageCommand = &cli.Command{
 	Name:      "usage",
 	Usage:     "Display usage of snapshots for a given image ref",
 	ArgsUsage: "[flags] <ref>",
@@ -48,7 +49,7 @@ var usageCommand = cli.Command{
 
 		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
-			snapshotter = containerd.DefaultSnapshotter
+			snapshotter = defaults.DefaultSnapshotter
 		}
 
 		img, err := client.ImageService().Get(ctx, ref)

@@ -34,14 +34,14 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	"github.com/containerd/containerd/v2/cio"
 	. "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
-	"github.com/containerd/containerd/v2/sys"
+	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
@@ -1426,8 +1426,8 @@ func TestShimOOMScore(t *testing.T) {
 // status after container.NewTask. It's used to simulate that the runc-init
 // might be killed by oom-kill.
 func TestIssue9103(t *testing.T) {
-	if os.Getenv("RUNC_FLAVOR") == "crun" {
-		t.Skip("skip it when using crun")
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
 	}
 
 	client, err := newClient(t, address)

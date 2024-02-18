@@ -25,9 +25,9 @@ import (
 
 	"github.com/containerd/cgroups/v3/cgroup1"
 	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/pkg/oom"
-	"github.com/containerd/containerd/v2/runtime"
-	"github.com/containerd/containerd/v2/runtime/v2/shim"
 	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )

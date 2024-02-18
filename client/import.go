@@ -20,10 +20,10 @@ import (
 	"context"
 	"io"
 
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/images"
-	"github.com/containerd/containerd/v2/images/archive"
-	"github.com/containerd/containerd/v2/platforms"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -38,6 +38,7 @@ type importOpts struct {
 	compress        bool
 	discardLayers   bool
 	skipMissing     bool
+	imageLabels     map[string]string
 }
 
 // ImportOpt allows the caller to specify import specific options
@@ -48,6 +49,14 @@ type ImportOpt func(*importOpts) error
 func WithImageRefTranslator(f func(string) string) ImportOpt {
 	return func(c *importOpts) error {
 		c.imageRefT = f
+		return nil
+	}
+}
+
+// WithImageLabels are the image labels to apply to a new image
+func WithImageLabels(labels map[string]string) ImportOpt {
+	return func(c *importOpts) error {
+		c.imageLabels = labels
 		return nil
 	}
 }
@@ -223,7 +232,12 @@ func (c *Client) Import(ctx context.Context, reader io.Reader, opts ...ImportOpt
 	}
 
 	for i := range imgs {
-		img, err := is.Update(ctx, imgs[i], "target")
+		fieldsPath := []string{"target"}
+		if iopts.imageLabels != nil {
+			fieldsPath = append(fieldsPath, "labels")
+			imgs[i].Labels = iopts.imageLabels
+		}
+		img, err := is.Update(ctx, imgs[i], fieldsPath...)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
 				return nil, err

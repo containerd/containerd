@@ -30,9 +30,10 @@ import (
 	"time"
 
 	apitask "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	shimcore "github.com/containerd/containerd/v2/core/runtime/v2"
+	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/namespaces"
-	"github.com/containerd/containerd/v2/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,7 +50,7 @@ func TestIssue7496(t *testing.T) {
 	sbID, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
 	require.NoError(t, err)
 
-	shimCli := connectToShim(ctx, t, sbID)
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 
 	delayInSec := 12
 	t.Logf("[shim pid: %d]: Injecting %d seconds delay to umount2 syscall",
@@ -116,11 +117,13 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 
 	doneCh := make(chan struct{})
 
+	// use strace command to mock the delay of umount2
+	// this require strace version >= 4.22
 	cmd := exec.CommandContext(ctx, "strace",
 		"-p", strconv.Itoa(int(pid)), "-f", // attach to all the threads
-		"--detach-on=execve", // stop to attach runc child-processes
-		"--trace=umount2",    // only trace umount2 syscall
-		"-e", "inject=umount2:delay_enter="+strconv.Itoa(delayInSec)+"s",
+		"-b", "execve", // stop to attach runc child-processes
+		"-e", "trace=umount2", // only trace umount2 syscall
+		"-e", "inject=umount2:delay_enter="+strconv.Itoa(delayInSec)+"000000",
 	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 
@@ -153,8 +156,8 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 	return doneCh
 }
 
-func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TTRPCTaskService {
-	addr, err := shim.SocketAddress(ctx, containerdEndpoint, id)
+func connectToShim(ctx context.Context, t *testing.T, ctrdEndpoint string, version int, id string) shimcore.TaskServiceClient {
+	addr, err := shim.SocketAddress(ctx, ctrdEndpoint, id)
 	require.NoError(t, err)
 	addr = strings.TrimPrefix(addr, "unix://")
 
@@ -162,10 +165,12 @@ func connectToShim(ctx context.Context, t *testing.T, id string) apitask.TTRPCTa
 	require.NoError(t, err)
 
 	client := ttrpc.NewClient(conn)
-	return apitask.NewTTRPCTaskClient(client)
+	cli, err := shimcore.NewTaskClient(client, version)
+	require.NoError(t, err)
+	return cli
 }
 
-func shimPid(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskService) uint32 {
+func shimPid(ctx context.Context, t *testing.T, shimCli shimcore.TaskServiceClient) uint32 {
 	resp, err := shimCli.Connect(ctx, &apitask.ConnectRequest{})
 	require.NoError(t, err)
 	return resp.GetShimPid()

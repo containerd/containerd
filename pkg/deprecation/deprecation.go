@@ -33,8 +33,13 @@ const (
 	CRIRegistryConfigs Warning = Prefix + "cri-registry-configs"
 )
 
+const (
+	EnvPrefix           = "CONTAINERD_ENABLE_DEPRECATED_"
+	EnvPullSchema1Image = EnvPrefix + "PULL_SCHEMA_1_IMAGE"
+)
+
 var messages = map[Warning]string{
-	PullSchema1Image: "Schema 1 images are deprecated since containerd v1.7 and removed in containerd v2.0. " +
+	PullSchema1Image: "Schema 1 images are deprecated since containerd v1.7, disabled in containerd v2.0, and will be removed in containerd v2.1. " +
 		`Since containerd v1.7.8, schema 1 images are identified by the "io.containerd.image/converted-docker-schema1" label.`,
 	GoPluginLibrary: "Dynamically-linked Go plugins as containerd runtimes are deprecated since containerd v2.0 and removed in containerd v2.1.",
 	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.0." +

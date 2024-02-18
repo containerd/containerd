@@ -20,6 +20,7 @@ import (
 	"time"
 
 	grpc_codes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
@@ -43,7 +44,7 @@ type serverHandler struct {
 	*config
 }
 
-// NewServerHandler creates a stats.Handler for gRPC server.
+// NewServerHandler creates a stats.Handler for a gRPC server.
 func NewServerHandler(opts ...Option) stats.Handler {
 	h := &serverHandler{
 		config: newConfig(opts, "server"),
@@ -54,9 +55,6 @@ func NewServerHandler(opts ...Option) stats.Handler {
 
 // TagConn can attach some information to the given context.
 func (h *serverHandler) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
-	span := trace.SpanFromContext(ctx)
-	attrs := peerAttr(peerFromCtx(ctx))
-	span.SetAttributes(attrs...)
 	return ctx
 }
 
@@ -85,14 +83,15 @@ func (h *serverHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 
 // HandleRPC processes the RPC stats.
 func (h *serverHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
-	h.handleRPC(ctx, rs)
+	isServer := true
+	h.handleRPC(ctx, rs, isServer)
 }
 
 type clientHandler struct {
 	*config
 }
 
-// NewClientHandler creates a stats.Handler for gRPC client.
+// NewClientHandler creates a stats.Handler for a gRPC client.
 func NewClientHandler(opts ...Option) stats.Handler {
 	h := &clientHandler{
 		config: newConfig(opts, "client"),
@@ -121,14 +120,12 @@ func (h *clientHandler) TagRPC(ctx context.Context, info *stats.RPCTagInfo) cont
 
 // HandleRPC processes the RPC stats.
 func (h *clientHandler) HandleRPC(ctx context.Context, rs stats.RPCStats) {
-	h.handleRPC(ctx, rs)
+	isServer := false
+	h.handleRPC(ctx, rs, isServer)
 }
 
 // TagConn can attach some information to the given context.
-func (h *clientHandler) TagConn(ctx context.Context, cti *stats.ConnTagInfo) context.Context {
-	span := trace.SpanFromContext(ctx)
-	attrs := peerAttr(cti.RemoteAddr.String())
-	span.SetAttributes(attrs...)
+func (h *clientHandler) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context {
 	return ctx
 }
 
@@ -137,20 +134,23 @@ func (h *clientHandler) HandleConn(context.Context, stats.ConnStats) {
 	// no-op
 }
 
-func (c *config) handleRPC(ctx context.Context, rs stats.RPCStats) {
+func (c *config) handleRPC(ctx context.Context, rs stats.RPCStats, isServer bool) { // nolint: revive  // isServer is not a control flag.
 	span := trace.SpanFromContext(ctx)
-	gctx, _ := ctx.Value(gRPCContextKey{}).(*gRPCContext)
+	var metricAttrs []attribute.KeyValue
 	var messageId int64
-	metricAttrs := make([]attribute.KeyValue, 0, len(gctx.metricAttrs)+1)
-	metricAttrs = append(metricAttrs, gctx.metricAttrs...)
-	wctx := withoutCancel(ctx)
+
+	gctx, _ := ctx.Value(gRPCContextKey{}).(*gRPCContext)
+	if gctx != nil {
+		metricAttrs = make([]attribute.KeyValue, 0, len(gctx.metricAttrs)+1)
+		metricAttrs = append(metricAttrs, gctx.metricAttrs...)
+	}
 
 	switch rs := rs.(type) {
 	case *stats.Begin:
 	case *stats.InPayload:
 		if gctx != nil {
 			messageId = atomic.AddInt64(&gctx.messagesReceived, 1)
-			c.rpcRequestSize.Record(wctx, int64(rs.Length), metric.WithAttributes(metricAttrs...))
+			c.rpcRequestSize.Record(ctx, int64(rs.Length), metric.WithAttributes(metricAttrs...))
 		}
 
 		if c.ReceivedEvent {
@@ -166,7 +166,7 @@ func (c *config) handleRPC(ctx context.Context, rs stats.RPCStats) {
 	case *stats.OutPayload:
 		if gctx != nil {
 			messageId = atomic.AddInt64(&gctx.messagesSent, 1)
-			c.rpcResponseSize.Record(wctx, int64(rs.Length), metric.WithAttributes(metricAttrs...))
+			c.rpcResponseSize.Record(ctx, int64(rs.Length), metric.WithAttributes(metricAttrs...))
 		}
 
 		if c.SentEvent {
@@ -180,12 +180,21 @@ func (c *config) handleRPC(ctx context.Context, rs stats.RPCStats) {
 			)
 		}
 	case *stats.OutTrailer:
+	case *stats.OutHeader:
+		if p, ok := peer.FromContext(ctx); ok {
+			span.SetAttributes(peerAttr(p.Addr.String())...)
+		}
 	case *stats.End:
 		var rpcStatusAttr attribute.KeyValue
 
 		if rs.Error != nil {
 			s, _ := status.FromError(rs.Error)
-			span.SetStatus(codes.Error, s.Message())
+			if isServer {
+				statusCode, msg := serverStatus(s)
+				span.SetStatus(statusCode, msg)
+			} else {
+				span.SetStatus(codes.Error, s.Message())
+			}
 			rpcStatusAttr = semconv.RPCGRPCStatusCodeKey.Int(int(s.Code()))
 		} else {
 			rpcStatusAttr = semconv.RPCGRPCStatusCodeKey.Int(int(grpc_codes.OK))
@@ -198,41 +207,12 @@ func (c *config) handleRPC(ctx context.Context, rs stats.RPCStats) {
 		// Use floating point division here for higher precision (instead of Millisecond method).
 		elapsedTime := float64(rs.EndTime.Sub(rs.BeginTime)) / float64(time.Millisecond)
 
-		c.rpcDuration.Record(wctx, elapsedTime, metric.WithAttributes(metricAttrs...))
-		c.rpcRequestsPerRPC.Record(wctx, atomic.LoadInt64(&gctx.messagesReceived), metric.WithAttributes(metricAttrs...))
-		c.rpcResponsesPerRPC.Record(wctx, atomic.LoadInt64(&gctx.messagesSent), metric.WithAttributes(metricAttrs...))
+		c.rpcDuration.Record(ctx, elapsedTime, metric.WithAttributes(metricAttrs...))
+		if gctx != nil {
+			c.rpcRequestsPerRPC.Record(ctx, atomic.LoadInt64(&gctx.messagesReceived), metric.WithAttributes(metricAttrs...))
+			c.rpcResponsesPerRPC.Record(ctx, atomic.LoadInt64(&gctx.messagesSent), metric.WithAttributes(metricAttrs...))
+		}
 	default:
 		return
 	}
-}
-
-func withoutCancel(parent context.Context) context.Context {
-	if parent == nil {
-		panic("cannot create context from nil parent")
-	}
-	return withoutCancelCtx{parent}
-}
-
-type withoutCancelCtx struct {
-	c context.Context
-}
-
-func (withoutCancelCtx) Deadline() (deadline time.Time, ok bool) {
-	return
-}
-
-func (withoutCancelCtx) Done() <-chan struct{} {
-	return nil
-}
-
-func (withoutCancelCtx) Err() error {
-	return nil
-}
-
-func (w withoutCancelCtx) Value(key any) any {
-	return w.c.Value(key)
-}
-
-func (w withoutCancelCtx) String() string {
-	return "withoutCancel"
 }

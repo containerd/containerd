@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apitask "github.com/containerd/containerd/v2/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/namespaces"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 // TestIssue7496_ShouldRetryShutdown is based on https://github.com/containerd/containerd/issues/7496.
@@ -51,7 +51,7 @@ func TestIssue7496_ShouldRetryShutdown(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Logf("Connect to the shim %s", sbID)
-	shimCli := connectToShim(ctx, t, sbID)
+	shimCli := connectToShim(ctx, t, containerdEndpoint, 3, sbID)
 
 	t.Logf("Log shim %s's pid: %d", sbID, shimPid(ctx, t, shimCli))
 

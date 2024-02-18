@@ -19,24 +19,23 @@ package transfer
 import (
 	"fmt"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/diff"
-	"github.com/containerd/containerd/v2/errdefs"
-	"github.com/containerd/containerd/v2/leases"
-	"github.com/containerd/containerd/v2/metadata"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/transfer/local"
+	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
-	"github.com/containerd/containerd/v2/pkg/transfer/local"
-	"github.com/containerd/containerd/v2/pkg/unpack"
-	"github.com/containerd/containerd/v2/platforms"
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
 	// Load packages with type registrations
-	_ "github.com/containerd/containerd/v2/pkg/transfer/archive"
-	_ "github.com/containerd/containerd/v2/pkg/transfer/image"
-	_ "github.com/containerd/containerd/v2/pkg/transfer/registry"
+	_ "github.com/containerd/containerd/v2/core/transfer/archive"
+	_ "github.com/containerd/containerd/v2/core/transfer/image"
+	_ "github.com/containerd/containerd/v2/core/transfer/registry"
 )
 
 // Register local transfer service plugin
@@ -77,6 +76,12 @@ func init() {
 			var lc local.TransferConfig
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+
+			// If UnpackConfiguration is not defined, set the default.
+			// If UnpackConfiguration is defined and empty, ignore.
+			if config.UnpackConfiguration == nil {
+				config.UnpackConfiguration = defaultUnpackConfig()
+			}
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
 				if err != nil {
@@ -111,7 +116,7 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", name)
+							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", plugin.Registration.ID)
 							continue
 						}
 						inst, err := plugin.Instance()
@@ -148,7 +153,7 @@ type transferConfig struct {
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
 
 	// UnpackConfiguration is used to read config from toml
-	UnpackConfiguration []unpackConfiguration `toml:"unpack_config"`
+	UnpackConfiguration []unpackConfiguration `toml:"unpack_config,omitempty"`
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
@@ -169,11 +174,5 @@ func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
-		UnpackConfiguration: []unpackConfiguration{
-			{
-				Platform:    platforms.Format(platforms.DefaultSpec()),
-				Snapshotter: containerd.DefaultSnapshotter,
-			},
-		},
 	}
 }

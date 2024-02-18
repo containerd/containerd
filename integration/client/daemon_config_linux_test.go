@@ -28,9 +28,9 @@ import (
 
 	"github.com/containerd/cgroups/v3"
 	. "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/runtime/v2/runc/options"
 )
 
 // TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored

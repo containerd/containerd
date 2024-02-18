@@ -190,6 +190,7 @@ rm -f "${CONTAINERD_HOME}/etc/crictl.yaml"
 
 # Generate containerd config
 config_path="${CONTAINERD_CONFIG_PATH:-"/etc/containerd/config.toml"}"
+registry_config_path="${CONTAINERD_REGISTRY_CONFIG_PATH:-"/etc/containerd/certs.d"}"
 mkdir -p $(dirname ${config_path})
 cni_bin_dir="${CONTAINERD_HOME}/opt/cni/bin"
 cni_template_path="${CONTAINERD_HOME}/opt/containerd/cluster/gce/cni.template"
@@ -223,8 +224,8 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
   bin_dir = "${cni_bin_dir}"
   conf_dir = "/etc/cni/net.d"
   conf_template = "${cni_template_path}"
-[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
-  endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+[plugins."io.containerd.grpc.v1.cri".registry]
+  config_path = "${registry_config_path}"
 [plugins."io.containerd.grpc.v1.cri".containerd]
   default_runtime_name = "${CONTAINERD_DEFAULT_RUNTIME:-"runc"}"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
@@ -234,6 +235,17 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
   SystemdCgroup = ${systemdCgroup}
 EOF
 chmod 644 "${config_path}"
+
+
+docker_registry_host_namespace="${registry_config_path}/docker.io/hosts.toml"
+mkdir -p $(dirname ${docker_registry_host_namespace})
+cat > ${docker_registry_host_namespace} <<EOF
+server = "https://registry-1.docker.io"
+
+[host."https://mirror.gcr.io"]
+  capabilities = ["pull", "resolve"]
+EOF
+chmod 644 "${docker_registry_host_namespace}"
 
 # containerd_extra_runtime_handler is the extra runtime handler to install.
 containerd_extra_runtime_handler=${CONTAINERD_EXTRA_RUNTIME_HANDLER:-""}

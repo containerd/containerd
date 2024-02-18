@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: ['main', 'release/**']
 
-env:
-  # Go version we currently use to build containerd across all CI.
-  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.21.5"
-
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -31,13 +26,9 @@ jobs:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
-      - uses: golangci/golangci-lint-action@v3
+      - uses: ./.github/actions/install-go
+      - uses: golangci/golangci-lint-action@v4
         with:
           version: v1.55.2
           skip-cache: true
@@ -53,15 +44,12 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: containerd/project-checks@v1.1.0
         with:
@@ -87,14 +75,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - name: Set env
         shell: bash
@@ -120,11 +105,8 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -154,11 +136,8 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: |
           set -e -x
 
@@ -209,22 +188,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
-        go-version: ["1.20.12", "1.21.5"]
+        go-version: ["1.21.6", "1.22.0"]
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
-
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        run: |
-          choco upgrade mingw --version=12.2.0.3042023
-
+      - uses: ./.github/actions/install-go
       - name: Make
         run: |
           make build
@@ -244,7 +211,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022] # windows-2019 is temporarily removed until mingw issue fixed
+        os: [windows-2022, windows-2019]
 
     defaults:
       run:
@@ -252,14 +219,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: actions/checkout@v4
         with:
@@ -275,14 +239,19 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
-      # NOTE(aznashwan): starting with Golang 1.21, the windows-2019 GitHub runner's
-      # builtin MinGW version leads to DLL loading errors during runtime.
+      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
+      - name: Upgrade Chocolaty on Windows 2019
+        if: matrix.os == 'windows-2019'
+        shell: powershell
+        run: .\script\setup\upgrade_chocolaty_windows_2019.ps1
+
       - name: Upgrade MinGW on Windows 2019
         if: matrix.os == 'windows-2019'
-        run: |
-          choco upgrade mingw --version=12.2.0.3042023
+        shell: powershell
+        run: .\script\setup\upgrade_mingw_windows_2019.ps1
 
       - name: Binaries
+        shell: bash
         env:
           CGO_ENABLED: 1
         run: |
@@ -385,7 +354,7 @@ jobs:
           }
           critest.exe --runtime-endpoint=npipe://.//pipe//containerd-containerd --test-images-file='${{env.CRI_TEST_IMAGES}}' --report-dir='${{github.workspace}}/critestreport' $skip
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults ${{ matrix.os }}
@@ -411,12 +380,8 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
 
       - name: Install containerd dependencies
         env:
@@ -523,10 +488,10 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
           path: |
             *-junit.xml
             *-gotest.json
@@ -535,9 +500,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    # "Larger" runner is needed for nested virtualization
-    # https://github.com/organizations/containerd/settings/actions/runners
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -546,7 +509,7 @@ jobs:
       matrix:
         box:
           - fedora/39-cloud-base
-          - rockylinux/8@8.0.0
+          - rockylinux/8@9.0.0
     env:
       BOX: ${{ matrix.box }}
 
@@ -559,7 +522,7 @@ jobs:
           cat /proc/cpuinfo
           free -mt
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
@@ -618,11 +581,8 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: false # see actions/setup-go#368
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
@@ -634,10 +594,27 @@ jobs:
         if: always()
       - run: script/test/test2annotation.sh *-gotest.json
         if: always()
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults MacOS
           path: |
             *-junit.xml
             *-gotest.json
+
+  # Currently Github actions UI supports no masks to mark matrix jobs as required to pass status checks.
+  # This means that every time version of Go, containerd, or OS is changed, a corresponding job should
+  # be added to the list of required checks. Which is not very convenient.
+  # To workaround this, a special job is added to report statuses of all other jobs, with fixed title.
+  # So it needs to be added to the list of required checks only once.
+  #
+  # See https://github.com/orgs/community/discussions/26822
+  results:
+    name: Report required job statuses
+    runs-on: ubuntu-latest
+    # List job dependencies which are required to pass status checks in order to be merged via merge queue.
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-vagrant, tests-cri-in-userns, tests-mac-os]
+    if: ${{ always() }}
+    steps:
+      - run: exit 1
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

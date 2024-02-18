@@ -20,13 +20,16 @@ package fuzz
 
 import (
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/oci"
-	criconfig "github.com/containerd/containerd/v2/pkg/cri/config"
-	"github.com/containerd/containerd/v2/pkg/cri/server"
-	"github.com/containerd/containerd/v2/pkg/cri/server/base"
-	"github.com/containerd/containerd/v2/pkg/cri/server/images"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/instrument"
+	"github.com/containerd/containerd/v2/internal/cri/server"
+	"github.com/containerd/containerd/v2/internal/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 )
 
 func FuzzCRIServer(data []byte) int {
@@ -40,22 +43,50 @@ func FuzzCRIServer(data []byte) int {
 	}
 	defer client.Close()
 
-	config := criconfig.Config{}
+	imageConfig := criconfig.ImageConfig{}
 
-	criBase := &base.CRIBase{
-		Config:       config,
-		BaseOCISpecs: map[string]*oci.Spec{},
-	}
-
-	imageService, err := images.NewService(config, client)
+	imageService, err := images.NewService(imageConfig, &images.CRIImageServiceOptions{
+		Client: client,
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	c, err := server.NewCRIService(criBase, imageService, client, nil)
+	c, rs, err := server.NewCRIService(&server.CRIServiceOptions{
+		RuntimeService: &fakeRuntimeService{},
+		ImageService:   imageService,
+		Client:         client,
+	})
 	if err != nil {
 		panic(err)
 	}
 
-	return fuzzCRI(f, c)
+	return fuzzCRI(f, &service{
+		CRIService:           c,
+		RuntimeServiceServer: rs,
+		ImageServiceServer:   imageService.GRPCService(),
+	})
+}
+
+type fakeRuntimeService struct{}
+
+func (fakeRuntimeService) Config() criconfig.Config {
+	return criconfig.Config{}
+}
+
+func (fakeRuntimeService) LoadOCISpec(string) (*oci.Spec, error) {
+	return nil, errdefs.ErrNotFound
+}
+
+type service struct {
+	server.CRIService
+	runtime.RuntimeServiceServer
+	runtime.ImageServiceServer
+}
+
+func (c *service) Register(s *grpc.Server) error {
+	instrumented := instrument.NewService(c)
+	runtime.RegisterRuntimeServiceServer(s, instrumented)
+	runtime.RegisterImageServiceServer(s, instrumented)
+	return nil
 }

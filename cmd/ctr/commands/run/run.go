@@ -26,16 +26,16 @@ import (
 	"github.com/containerd/console"
 	gocni "github.com/containerd/go-cni"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
-	"github.com/containerd/containerd/v2/cio"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/tasks"
-	"github.com/containerd/containerd/v2/containers"
-	"github.com/containerd/containerd/v2/errdefs"
-	clabels "github.com/containerd/containerd/v2/labels"
-	"github.com/containerd/containerd/v2/oci"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	clabels "github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
 
@@ -89,47 +89,48 @@ func parseMountFlag(m string) (specs.Mount, error) {
 }
 
 // Command runs a container
-var Command = cli.Command{
-	Name:           "run",
-	Usage:          "Run a container",
-	ArgsUsage:      "[flags] Image|RootFS ID [COMMAND] [ARG...]",
-	SkipArgReorder: true,
+var Command = &cli.Command{
+	Name:      "run",
+	Usage:     "Run a container",
+	ArgsUsage: "[flags] Image|RootFS ID [COMMAND] [ARG...]",
 	Flags: append([]cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rm",
 			Usage: "Remove the container after running, cannot be used with --detach",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "null-io",
 			Usage: "Send all IO to /dev/null",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "log-uri",
 			Usage: "Log uri",
 		},
-		cli.BoolFlag{
-			Name:  "detach,d",
-			Usage: "Detach from the task after it has started execution, cannot be used with --rm",
+		&cli.BoolFlag{
+			Name:    "detach",
+			Aliases: []string{"d"},
+			Usage:   "Detach from the task after it has started execution, cannot be used with --rm",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "fifo-dir",
 			Usage: "Directory used for storing IO FIFOs",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "cgroup",
 			Usage: "Cgroup path (To disable use of cgroup, set to \"\" explicitly)",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Run image for specific platform",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "cni",
 			Usage: "Enable cni networking for the container",
 		},
 	}, append(platformRunFlags,
-		append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
-			commands.ContainerFlags...)...)...),
+		append(commands.RuntimeFlags,
+			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
+				commands.ContainerFlags...)...)...)...),
 	Action: func(context *cli.Context) error {
 		var (
 			err error
@@ -258,7 +259,7 @@ var Command = cli.Command{
 			return err
 		}
 		if code != 0 {
-			return cli.NewExitError("", int(code))
+			return cli.Exit("", int(code))
 		}
 		return nil
 	},

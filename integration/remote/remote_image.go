@@ -122,7 +122,7 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 }
 
 // PullImage pulls an image with authentication config.
-func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, opts ...grpc.CallOption) (string, error) {
+func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, opts ...grpc.CallOption) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 

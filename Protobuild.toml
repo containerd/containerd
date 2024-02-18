@@ -14,8 +14,8 @@ generators = ["go"]
   after = ["/usr/local/include", "/usr/include"]
 
 [[descriptors]]
-prefix = "github.com/containerd/containerd/runtime/v2/runc/options"
-target = "runtime/v2/runc/options/next.pb.txt"
+prefix = "github.com/containerd/containerd/core/runtime/v2/runc/options"
+target = "core/runtime/v2/runc/options/next.pb.txt"
 ignore_files = [
 	"google/protobuf/descriptor.proto",
 ]

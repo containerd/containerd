@@ -104,7 +104,7 @@ EOF
   config.vm.provision "install-golang", type: "shell", run: "once" do |sh|
     sh.upload_path = "/tmp/vagrant-install-golang"
     sh.env = {
-        'GO_VERSION': ENV['GO_VERSION'] || "1.21.5",
+        'GO_VERSION': ENV['GO_VERSION'] || "1.21.6",
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -257,7 +257,7 @@ EOF
         set -eux -o pipefail
         rm -rf /var/lib/containerd-test /run/containerd-test
         cd ${GOPATH}/src/github.com/containerd/containerd
-        go test -v -count=1 -race ./metrics/cgroups
+        go test -v -count=1 -race ./core/metrics/cgroups
         make integration EXTRA_TESTFLAGS="-timeout 15m -no-criu -test.v" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
     SHELL
   end

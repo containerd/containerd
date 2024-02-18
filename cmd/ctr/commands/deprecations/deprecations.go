@@ -22,7 +22,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -31,22 +31,25 @@ import (
 )
 
 // Command is the parent for all commands under "deprecations"
-var Command = cli.Command{
+var Command = &cli.Command{
 	Name: "deprecations",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		listCommand,
 	},
 }
-var listCommand = cli.Command{
+var listCommand = &cli.Command{
 	Name:  "list",
 	Usage: "Print warnings for deprecations",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "format",
 			Usage: "output format to use (Examples: 'default', 'json')",
 		},
 	},
 	Action: func(context *cli.Context) error {
+		// Suppress automatic warnings, since we print the warnings by ourselves.
+		os.Setenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS", "1")
+
 		client, ctx, cancel, err := commands.NewClient(context)
 		if err != nil {
 			return err

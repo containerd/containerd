@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/content"
-	"github.com/containerd/containerd/v2/images"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/moby/sys/signal"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -80,13 +80,4 @@ func GetOCIStopSignal(ctx context.Context, image Image, defaultSignal string) (s
 	}
 
 	return config.StopSignal, nil
-}
-
-// ParseSignal parses a given string into a syscall.Signal
-// the rawSignal can be a string with "SIG" prefix,
-// or a signal number in string format.
-//
-// Deprecated: Use github.com/moby/sys/signal instead.
-func ParseSignal(rawSignal string) (syscall.Signal, error) {
-	return signal.ParseSignal(rawSignal)
 }

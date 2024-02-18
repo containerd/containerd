@@ -11,12 +11,13 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    if: github.repository == 'containerd/containerd'
     name: lychee
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - uses: lycheeverse/lychee-action@v1.8.0
+      - uses: lycheeverse/lychee-action@v1.9.3
         with:
           # Fail action on broken links
           fail: true

@@ -23,7 +23,7 @@ var (
 	Package = "github.com/containerd/containerd/v2"
 
 	// Version holds the complete version number. Filled in at linking time.
-	Version = "2.0.0-beta.0+unknown"
+	Version = "2.0.0-beta.2+unknown"
 
 	// Revision is filled with the VCS (e.g. git) revision being used to build
 	// the program at linking time.
@@ -32,3 +32,9 @@ var (
 	// GoVersion is Go tree's version.
 	GoVersion = runtime.Version()
 )
+
+// ConfigVersion is the current highest supported configuration version.
+// This version is used by the main configuration as well as all plugins.
+// Any configuration less than this version which has structural changes
+// should migrate the configuration structures used by this version.
+const ConfigVersion = 3

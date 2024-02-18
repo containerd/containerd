@@ -17,8 +17,8 @@
 package builtins
 
 import (
-	_ "github.com/containerd/containerd/v2/diff/lcow"
-	_ "github.com/containerd/containerd/v2/diff/windows"
-	_ "github.com/containerd/containerd/v2/snapshots/lcow"
-	_ "github.com/containerd/containerd/v2/snapshots/windows"
+	_ "github.com/containerd/containerd/v2/plugins/diff/lcow"
+	_ "github.com/containerd/containerd/v2/plugins/diff/windows"
+	_ "github.com/containerd/containerd/v2/plugins/snapshots/lcow"
+	_ "github.com/containerd/containerd/v2/plugins/snapshots/windows"
 )
