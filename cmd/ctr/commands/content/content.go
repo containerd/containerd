@@ -53,6 +53,7 @@ var (
 			getCommand,
 			ingestCommand,
 			listCommand,
+			listReferencesCommand,
 			pushObjectCommand,
 			setLabelsCommand,
 			pruneCommand,
@@ -230,6 +231,59 @@ var (
 
 			}
 
+			return cs.Walk(ctx, walkFn, args...)
+		},
+	}
+
+	listReferencesCommand = cli.Command{
+		Name:        "references",
+		Usage:       "List references to the given content",
+		ArgsUsage:   "<digest>",
+		Description: "Return all references to the given piece of content",
+		Action: func(context *cli.Context) error {
+			var object = context.Args().First()
+			client, ctx, cancel, err := commands.NewClient(context)
+			if err != nil {
+				return err
+			}
+			defer cancel()
+			cs := client.ContentStore()
+
+			tw := tabwriter.NewWriter(os.Stdout, 1, 8, 1, '\t', 0)
+			defer tw.Flush()
+			fmt.Fprintln(tw, "DIGEST\tSIZE\tAGE\tLABELS")
+
+			dgst, err := digest.Parse(object)
+			if err != nil {
+				return err
+			}
+			labelGCContentRef := "containerd.io/gc.ref.content"
+			walkFn := func(info content.Info) error {
+				var isRef = false
+				var labelStrings []string
+				for k, v := range info.Labels {
+					if strings.HasPrefix(k, labelGCContentRef) && v == string(dgst) {
+						isRef = true
+					}
+					labelStrings = append(labelStrings, strings.Join([]string{k, v}, "="))
+				}
+				if isRef {
+					sort.Strings(labelStrings)
+					labels := strings.Join(labelStrings, ",")
+					if labels == "" {
+						labels = "-"
+					}
+
+					fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n",
+						info.Digest,
+						units.HumanSize(float64(info.Size)),
+						units.HumanDuration(time.Since(info.CreatedAt)),
+						labels)
+				}
+				return nil
+			}
+
+			args := make([]string, 0)
 			return cs.Walk(ctx, walkFn, args...)
 		},
 	}
