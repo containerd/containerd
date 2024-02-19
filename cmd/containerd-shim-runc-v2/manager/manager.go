@@ -25,23 +25,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	goruntime "runtime"
 	"syscall"
 	"time"
 
-	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
-	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
-	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
@@ -186,11 +178,6 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	cmd.ExtraFiles = append(cmd.ExtraFiles, f)
 
 	goruntime.LockOSThread()
-	if os.Getenv("SCHED_CORE") != "" {
-		if err := schedcore.Create(schedcore.ProcessGroup); err != nil {
-			return params, fmt.Errorf("enable sched core support: %w", err)
-		}
-	}
 
 	if err := cmd.Start(); err != nil {
 		f.Close()
@@ -207,28 +194,6 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 	// make sure to wait after start
 	go cmd.Wait()
 
-	if opts, err := shim.ReadRuntimeOptions[*options.Options](os.Stdin); err == nil {
-		if opts.ShimCgroup != "" {
-			if cgroups.Mode() == cgroups.Unified {
-				cg, err := cgroupsv2.Load(opts.ShimCgroup)
-				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
-				}
-				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
-				}
-			} else {
-				cg, err := cgroup1.Load(cgroup1.StaticPath(opts.ShimCgroup))
-				if err != nil {
-					return params, fmt.Errorf("failed to load cgroup %s: %w", opts.ShimCgroup, err)
-				}
-				if err := cg.AddProc(uint64(cmd.Process.Pid)); err != nil {
-					return params, fmt.Errorf("failed to join cgroup %s: %w", opts.ShimCgroup, err)
-				}
-			}
-		}
-	}
-
 	if err := shim.AdjustOOMScore(cmd.Process.Pid); err != nil {
 		return params, fmt.Errorf("failed to adjust OOM score for shim: %w", err)
 	}
@@ -238,46 +203,11 @@ func (manager) Start(ctx context.Context, id string, opts shim.StartOpts) (_ shi
 }
 
 func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return shim.StopStatus{}, err
-	}
 
-	path := filepath.Join(filepath.Dir(cwd), id)
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return shim.StopStatus{}, err
-	}
-	runtime, err := runc.ReadRuntime(path)
-	if err != nil {
-		return shim.StopStatus{}, err
-	}
-	opts, err := runc.ReadOptions(path)
-	if err != nil {
-		return shim.StopStatus{}, err
-	}
-	root := process.RuncRoot
-	if opts != nil && opts.Root != "" {
-		root = opts.Root
-	}
-
-	r := process.NewRunc(root, path, ns, runtime, false)
-	if err := r.Delete(ctx, id, &runcC.DeleteOpts{
-		Force: true,
-	}); err != nil {
-		log.G(ctx).WithError(err).Warn("failed to remove runc container")
-	}
-	if err := mount.UnmountRecursive(filepath.Join(path, "rootfs"), 0); err != nil {
-		log.G(ctx).WithError(err).Warn("failed to cleanup rootfs mount")
-	}
-	pid, err := runcC.ReadPidFile(filepath.Join(path, process.InitPidFile))
-	if err != nil {
-		log.G(ctx).WithError(err).Warn("failed to read init pid file")
-	}
 	return shim.StopStatus{
 		ExitedAt:   time.Now(),
 		ExitStatus: 128 + int(unix.SIGKILL),
-		Pid:        pid,
+		Pid:        0,
 	}, nil
 }
 
