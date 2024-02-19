@@ -684,6 +684,13 @@ func (nw *namespacedWriter) Status() (st content.Status, err error) {
 	return
 }
 
+func (cs *contentStore) BlobPath(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+	if err := cs.checkAccess(ctx, desc.Digest); err != nil {
+		return "", err
+	}
+	return cs.Store.BlobPath(ctx, desc)
+}
+
 func (cs *contentStore) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
 	if err := cs.checkAccess(ctx, desc.Digest); err != nil {
 		return nil, err

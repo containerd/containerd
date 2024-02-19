@@ -90,6 +90,10 @@ func (pcs *proxyContentStore) Delete(ctx context.Context, dgst digest.Digest) er
 	return nil
 }
 
+func (pcs *proxyContentStore) BlobPath(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+	return "", errdefs.ErrNotImplemented
+}
+
 // ReaderAt ignores MediaType.
 func (pcs *proxyContentStore) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
 	i, err := pcs.Info(ctx, desc.Digest)

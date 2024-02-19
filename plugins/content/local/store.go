@@ -121,6 +121,10 @@ func (s *store) info(dgst digest.Digest, fi os.FileInfo, labels map[string]strin
 	}
 }
 
+func (s *store) BlobPath(ctx context.Context, desc ocispec.Descriptor) (string, error) {
+	return s.blobPath(desc.Digest)
+}
+
 // ReaderAt returns an io.ReaderAt for the blob.
 func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.ReaderAt, error) {
 	p, err := s.blobPath(desc.Digest)

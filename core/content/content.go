@@ -58,6 +58,8 @@ type Provider interface {
 	// Other fields in the descriptor may be used internally for resolving
 	// the location of the actual data.
 	ReaderAt(ctx context.Context, desc ocispec.Descriptor) (ReaderAt, error)
+
+	BlobPath(ctx context.Context, desc ocispec.Descriptor) (string, error)
 }
 
 // Ingester writes content
