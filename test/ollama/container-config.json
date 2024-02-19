@@ -1,0 +1,14 @@
+{
+    "metadata": {
+        "name": "tinyllama"
+    },
+    "image":{
+        "image": "registry.ollama.ai/library/tinyllama:latest"
+    },
+    "command": [
+        "top"
+    ],
+    "log_path":"tinyllama.0.log",
+    "linux": {
+    }
+  }

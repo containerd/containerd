@@ -12,6 +12,15 @@
             "processId": 0,
             "asRoot": true,
             "console": "integratedTerminal",
-        }
+        },
+        {
+            "name": "Launch containerd-shim-runc-v2",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/cmd/containerd-shim-runc-v2/main.go",
+            "env": {},
+            "args": ["-namespace", "k8s.io"]
+        },
     ]
 }
