@@ -38,7 +38,9 @@ const (
 	// SnapshotPlugin implements a snapshotter
 	SnapshotPlugin plugin.Type = "io.containerd.snapshotter.v1"
 	// TaskMonitorPlugin implements a task monitor
-	TaskMonitorPlugin plugin.Type = "io.containerd.monitor.v1"
+	TaskMonitorPlugin plugin.Type = "io.containerd.monitor.task.v1"
+	// TaskMonitorPlugin implements a container monitor
+	ContainerMonitorPlugin plugin.Type = "io.containerd.monitor.container.v1"
 	// DiffPlugin implements a differ
 	DiffPlugin plugin.Type = "io.containerd.differ.v1"
 	// MetadataPlugin implements a metadata store
