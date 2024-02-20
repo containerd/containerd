@@ -18,8 +18,10 @@ package task
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/pkg/llm"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/protobuf"
@@ -36,6 +39,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"github.com/jmorganca/ollama/api"
 )
 
 var (
@@ -84,6 +88,8 @@ type service struct {
 	running map[int][]containerProcess // pid -> running process, guarded by lifecycleMu
 
 	shutdown shutdown.Service
+
+	runner llm.LLM
 }
 
 type containerProcess struct {
@@ -262,5 +268,65 @@ func (s *service) forward(ctx context.Context, publisher shim.Publisher) {
 // initialize a single epoll fd to manage our consoles. `initPlatform` should
 // only be called once.
 func (s *service) initPlatform() error {
+	return nil
+}
+
+// LLM
+func getModel(rootfs string) (*Model, error) {
+	model := &Model{
+		Template: "{{ .Prompt }}",
+	}
+
+	// model
+	model.ModelPath = filepath.Join(rootfs, "model")
+
+	// system
+	bts, err := os.ReadFile(filepath.Join(rootfs, "system"))
+	if err != nil {
+		return nil, err
+	}
+
+	model.System = string(bts)
+
+	// params
+	params, err := os.Open(filepath.Join(rootfs, "params"))
+	if err != nil {
+		return nil, err
+	}
+	defer params.Close()
+
+	// parse model options parameters into a map so that we can see which fields have been specified explicitly
+	if err = json.NewDecoder(params).Decode(&model.Options); err != nil {
+		return nil, err
+	}
+
+	// template
+	bts, err = os.ReadFile(filepath.Join(rootfs, "template"))
+	if err != nil {
+		return nil, err
+	}
+
+	model.Template = string(bts)
+
+	return model, nil
+}
+
+type Model struct {
+	ModelPath      string
+	AdapterPaths   []string
+	ProjectorPaths []string
+	Template       string
+	System         string
+	Options        map[string]interface{}
+}
+
+func (s *service) load(rootfs string) error {
+	model, err := getModel(rootfs)
+	if err != nil {
+		return err
+	}
+	opts := api.DefaultOptions()
+	llmRunner, err := llm.New(rootfs, model.ModelPath, model.AdapterPaths, model.ProjectorPaths, opts)
+	s.runner = llmRunner
 	return nil
 }
