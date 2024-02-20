@@ -1737,7 +1737,7 @@ func TestContainerHook(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		s.Hooks.Prestart = []specs.Hook{
+		s.Hooks.CreateRuntime = []specs.Hook{
 			{
 				Path: path,
 				Args: []string{

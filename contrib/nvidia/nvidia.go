@@ -87,7 +87,7 @@ func WithGPUs(opts ...Opts) oci.SpecOpts {
 		if s.Hooks == nil {
 			s.Hooks = &specs.Hooks{}
 		}
-		s.Hooks.Prestart = append(s.Hooks.Prestart, specs.Hook{
+		s.Hooks.CreateRuntime = append(s.Hooks.CreateRuntime, specs.Hook{
 			Path: c.OCIHookPath,
 			Args: append([]string{
 				"containerd",
