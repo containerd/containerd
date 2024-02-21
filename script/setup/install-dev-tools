@@ -26,4 +26,4 @@ go install github.com/cpuguy83/go-md2man/v2@v2.0.2
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
 go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
-go install github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@5cc9169d1fc1a8292866224ae09dc47827801874
+go install github.com/containerd/ttrpc/cmd/protoc-gen-go-ttrpc@faba5896a9c4d7b65495cb9b2c02531feb1434d6
