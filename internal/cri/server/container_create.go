@@ -167,6 +167,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
+	var runtimeHandler *runtime.RuntimeHandler
+	for _, f := range c.runtimeHandlers {
+		f := f
+		if f.Name == sandbox.Metadata.RuntimeHandler {
+			runtimeHandler = f
+			break
+		}
+	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
 	spec, err := c.buildContainerSpec(
@@ -182,6 +190,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		&image.ImageSpec.Config,
 		volumeMounts,
 		ociRuntime,
+		runtimeHandler,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate container %q spec: %w", id, err)
@@ -530,6 +539,7 @@ func (c *criService) buildContainerSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
+	runtimeHandler *runtime.RuntimeHandler,
 ) (_ *runtimespec.Spec, retErr error) {
 	var (
 		specOpts []oci.SpecOpts
@@ -559,6 +569,7 @@ func (c *criService) buildContainerSpec(
 			imageConfig,
 			append(linuxMounts, extraMounts...),
 			ociRuntime,
+			runtimeHandler,
 		)
 	case isWindows:
 		specOpts, err = c.buildWindowsSpec(
@@ -573,6 +584,7 @@ func (c *criService) buildContainerSpec(
 			imageConfig,
 			extraMounts,
 			ociRuntime,
+			runtimeHandler,
 		)
 	case isDarwin:
 		specOpts, err = c.buildDarwinSpec(
@@ -585,6 +597,7 @@ func (c *criService) buildContainerSpec(
 			imageConfig,
 			extraMounts,
 			ociRuntime,
+			runtimeHandler,
 		)
 	default:
 		return nil, fmt.Errorf("unsupported spec platform: %s", platform.OS)
@@ -609,6 +622,7 @@ func (c *criService) buildLinuxSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
+	runtimeHandler *runtime.RuntimeHandler,
 ) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		oci.WithoutRunMount,
@@ -683,7 +697,7 @@ func (c *criService) buildLinuxSpec(
 		}
 	}()
 
-	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel))
+	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler))
 
 	if !c.config.DisableProcMount {
 		// Change the default masked/readonly paths to empty slices
@@ -841,6 +855,7 @@ func (c *criService) buildWindowsSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
+	runtimeHandler *runtime.RuntimeHandler,
 ) (_ []oci.SpecOpts, retErr error) {
 	var specOpts []oci.SpecOpts
 	specOpts = append(specOpts, customopts.WithProcessCommandLineOrArgsForWindows(config, imageConfig))
@@ -935,6 +950,7 @@ func (c *criService) buildDarwinSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
+	runtimeHandler *runtime.RuntimeHandler,
 ) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		customopts.WithProcessArgs(config, imageConfig),

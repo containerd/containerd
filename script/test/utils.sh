@@ -348,4 +348,8 @@ readiness_check() {
       echo "$attempt_num attempt \"$command\"! Trying again in $attempt_num seconds..."
       sleep $(( attempt_num++ ))
   done
+  set -x
+  cat "${report_dir}/containerd.log"
+  cat "${config_file}"
+  set +x
 }

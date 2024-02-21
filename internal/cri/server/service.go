@@ -21,18 +21,25 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
+	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	apitypes "github.com/containerd/containerd/v2/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
+	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox"
@@ -46,7 +53,12 @@ import (
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services/introspection"
+	"github.com/containerd/containerd/v2/protobuf"
 )
+
+var kernelSupportsRRO bool
 
 // defaultNetworkPlugin is used for the default CNI configuration
 const defaultNetworkPlugin = "default"
@@ -135,6 +147,8 @@ type criService struct {
 	nri *nri.API
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
+	// runtimeHandlers contains runtime handler info
+	runtimeHandlers []*runtime.RuntimeHandler
 }
 
 type CRIServiceOptions struct {
@@ -157,6 +171,7 @@ type CRIServiceOptions struct {
 
 // NewCRIService returns a new instance of CRIService
 func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServiceServer, error) {
+	ctx := context.Background()
 	var err error
 	labels := label.NewStore()
 	config := options.RuntimeService.Config()
@@ -221,6 +236,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	podSandboxController.Init(c)
 
 	c.nri = options.NRI
+
+	c.runtimeHandlers, err = c.introspectRuntimeHandlers(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to introspect runtime handlers: %w", err)
+	}
 
 	return c, c, nil
 }
@@ -339,4 +359,82 @@ func (c *criService) Close() error {
 // IsInitialized indicates whether CRI service has finished initialization.
 func (c *criService) IsInitialized() bool {
 	return c.initialized.Load()
+}
+
+func (c *criService) introspectRuntimeHandlers(ctx context.Context) ([]*runtime.RuntimeHandler, error) {
+	var res []*runtime.RuntimeHandler
+	intro := c.client.IntrospectionService()
+	for name, r := range c.config.Runtimes {
+		h := runtime.RuntimeHandler{
+			Name: name,
+		}
+		rawFeatures, err := introspectRuntimeFeatures(ctx, intro, r)
+		if err != nil {
+			log.G(ctx).WithError(err).Debugf("failed to introspect features of runtime %q", name)
+		} else {
+			h.Features = &runtime.RuntimeHandlerFeatures{}
+			if slices.Contains(rawFeatures.MountOptions, "rro") {
+				if kernelSupportsRRO {
+					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts", name)
+					h.Features.RecursiveReadOnlyMounts = true
+				} else {
+					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
+				}
+			}
+		}
+		res = append(res, &h)
+		if name == c.config.DefaultRuntimeName {
+			defH := h
+			defH.Name = "" // denotes default
+			res = append(res, &defH)
+		}
+	}
+	return res, nil
+}
+
+func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {
+	if r.Type != plugins.RuntimeRuncV2 {
+		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
+			plugins.RuntimeRuncV2, r.Type)
+		// For other runtimes, protobuf.MarshalAnyToProto will cause nil panic during typeurl dereference
+	}
+	infoReq := &introspectionapi.PluginInfoRequest{
+		Type: string(plugins.RuntimePluginV2), // "io.containerd.runtime.v2"
+		ID:   "task",
+	}
+	rr := &apitypes.RuntimeRequest{
+		RuntimePath: r.Type, // "io.containerd.runc.v2"
+	}
+	if r.Path != "" {
+		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
+	}
+	options, err := config.GenerateRuntimeOptions(r)
+	if err != nil {
+		return nil, err
+	}
+	rr.Options, err = protobuf.MarshalAnyToProto(options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
+	}
+	infoReq.Options, err = protobuf.MarshalAnyToProto(rr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal %T: %w", rr, err)
+	}
+	infoResp, err := intro.PluginInfo(ctx, infoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
+	}
+	var info apitypes.RuntimeInfo
+	if err := typeurl.UnmarshalTo(infoResp.Extra, &info); err != nil {
+		return nil, fmt.Errorf("failed to get runtime info from plugin info: %w", err)
+	}
+	featuresX, err := typeurl.UnmarshalAny(info.Features)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal Features (%T): %w", info.Features, err)
+	}
+	features, ok := featuresX.(*features.Features)
+	if !ok {
+		return nil, fmt.Errorf("unknown features type %T", featuresX)
+	}
+	return features, nil
 }
