@@ -8,6 +8,7 @@ package task
 
 import (
 	context "context"
+	types "github.com/containerd/containerd/v2/api/types"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -228,7 +229,7 @@ func (c *taskClient) Events(ctx context.Context, in *emptypb.Empty, opts ...grpc
 }
 
 type Task_EventsClient interface {
-	Recv() (*Event, error)
+	Recv() (*types.Envelope, error)
 	grpc.ClientStream
 }
 
@@ -236,8 +237,8 @@ type taskEventsClient struct {
 	grpc.ClientStream
 }
 
-func (x *taskEventsClient) Recv() (*Event, error) {
-	m := new(Event)
+func (x *taskEventsClient) Recv() (*types.Envelope, error) {
+	m := new(types.Envelope)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -663,7 +664,7 @@ func _Task_Events_Handler(srv interface{}, stream grpc.ServerStream) error {
 }
 
 type Task_EventsServer interface {
-	Send(*Event) error
+	Send(*types.Envelope) error
 	grpc.ServerStream
 }
 
@@ -671,7 +672,7 @@ type taskEventsServer struct {
 	grpc.ServerStream
 }
 
-func (x *taskEventsServer) Send(m *Event) error {
+func (x *taskEventsServer) Send(m *types.Envelope) error {
 	return x.ServerStream.SendMsg(m)
 }
 
