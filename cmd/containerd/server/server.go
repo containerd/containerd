@@ -510,7 +510,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
-				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn))
+				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn), name)
 			}
 		case string(plugins.DiffPlugin), "diff":
 			t = plugins.DiffPlugin
