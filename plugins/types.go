@@ -63,6 +63,8 @@ const (
 	TransferPlugin plugin.Type = "io.containerd.transfer.v1"
 	// SandboxStorePlugin implements a sandbox store
 	SandboxStorePlugin plugin.Type = "io.containerd.sandbox.store.v1"
+	// PodSandboxPlugin is a special sandbox controller which use pause container as a sandbox.
+	PodSandboxPlugin plugin.Type = "io.containerd.podsandbox.controller.v1"
 	// SandboxControllerPlugin implements a sandbox controller
 	SandboxControllerPlugin plugin.Type = "io.containerd.sandbox.controller.v1"
 	// ImageVerifierPlugin implements an image verifier service
