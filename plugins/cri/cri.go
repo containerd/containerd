@@ -50,6 +50,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.CRIServicePlugin,
 			plugins.SandboxControllerPlugin,
+			plugins.SandboxControllerPluginV2,
 			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
 			plugins.ServicePlugin,
@@ -245,6 +246,14 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 	}
 	sc := make(map[string]sandbox.Controller)
 	for name, p := range sandboxers {
+		sc[name] = p.(sandbox.Controller)
+	}
+
+	v2Sandboxers, err := ic.GetByType(plugins.SandboxControllerPluginV2)
+	if err != nil {
+		return nil, err
+	}
+	for name, p := range v2Sandboxers {
 		sc[name] = p.(sandbox.Controller)
 	}
 	return sc, nil
