@@ -52,6 +52,7 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.CRIServicePlugin,
 			plugins.SandboxControllerPlugin,
+			plugins.SandboxControllerPluginV2,
 			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
 			plugins.ServicePlugin,
