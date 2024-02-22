@@ -59,6 +59,37 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			networkCondition,
 		}},
 	}
+
+	var handlers []*runtime.RuntimeHandler
+
+	for name := range c.config.ContainerdConfig.Runtimes {
+		h := &runtime.RuntimeHandler{
+			Name: name,
+		}
+
+		// We can only advertise this for the runc runtime.
+		// For other runtimes, we don't know if they support it and we don't have the
+		// plumbing to query the features via pluginInfo.
+		// (https://github.com/containerd/containerd/pull/9442).
+		if name == "runc" {
+			// For runc-compatible runtimes, is fine as the userns/idmap request won't
+			// be silently ignored. If the handler doesn't support it, we will block it
+			// in pkg/process/init.go when calling validateRuncFeatures().
+			h.Features = &runtime.RuntimeHandlerFeatures{
+				UserNamespaces: true,
+			}
+		}
+
+		handlers = append(handlers, h)
+		if name == c.config.DefaultRuntimeName {
+			defH := h
+			defH.Name = "" // denotes default
+			handlers = append(handlers, defH)
+		}
+	}
+
+	resp.RuntimeHandlers = handlers
+
 	if r.Verbose {
 		configByt, err := json.Marshal(c.config)
 		if err != nil {
