@@ -61,7 +61,7 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 
 	if err := os.Chown(path, uid, gid); err != nil {
 		l.Close()
-		return nil, err
+		return nil, fmt.Errorf("%w uid(%d) gid(%d)", err, uid, gid)
 	}
 
 	return l, nil
