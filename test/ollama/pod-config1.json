@@ -1,0 +1,10 @@
+{
+    "metadata": {
+        "name": "tinyllama-sandbox1",
+        "namespace": "default",
+        "attempt": 1,
+        "uid": "hdishd83djaidwnduwk28bcsd"
+    },
+    "log_directory": "/tmp",
+    "linux": {}
+}
