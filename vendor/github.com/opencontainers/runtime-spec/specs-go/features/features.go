@@ -24,6 +24,12 @@ type Features struct {
 	// Annotations contains implementation-specific annotation strings,
 	// such as the implementation version, and third-party extensions.
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// PotentiallyUnsafeConfigAnnotations the list of the potential unsafe annotations
+	// that may appear in `config.json`.
+	//
+	// A value that ends with "." is interpreted as a prefix of annotations.
+	PotentiallyUnsafeConfigAnnotations []string `json:"potentiallyUnsafeConfigAnnotations,omitempty"`
 }
 
 // Linux is specific to Linux.
