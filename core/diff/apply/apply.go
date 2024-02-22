@@ -113,19 +113,19 @@ func (s *fsApplier) Apply(ctx context.Context, desc ocispec.Descriptor, mounts [
 		if err := apply(ctx, mounts, rc, config.SyncFs); err != nil {
 			return emptyDesc, err
 		}
+	}
 
-		// Read any trailing data
-		if _, err := io.Copy(io.Discard, rc); err != nil {
-			return emptyDesc, err
-		}
+	// Read any trailing data
+	if _, err := io.Copy(io.Discard, rc); err != nil {
+		return emptyDesc, err
+	}
 
-		for _, p := range processors {
-			if ep, ok := p.(interface {
-				Err() error
-			}); ok {
-				if err := ep.Err(); err != nil {
-					return emptyDesc, err
-				}
+	for _, p := range processors {
+		if ep, ok := p.(interface {
+			Err() error
+		}); ok {
+			if err := ep.Err(); err != nil {
+				return emptyDesc, err
 			}
 		}
 	}
