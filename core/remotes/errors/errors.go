@@ -33,7 +33,11 @@ type ErrUnexpectedStatus struct {
 }
 
 func (e ErrUnexpectedStatus) Error() string {
-	return fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	errorMessage := fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
+	if len(e.Body) > 0 {
+		errorMessage += fmt.Sprintf("\nResponse Body: %s", string(e.Body))
+	}
+	return errorMessage
 }
 
 // NewUnexpectedStatusErr creates an ErrUnexpectedStatus from HTTP response
