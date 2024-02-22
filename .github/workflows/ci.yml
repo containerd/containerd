@@ -30,7 +30,7 @@ jobs:
       - uses: ./.github/actions/install-go
       - uses: golangci/golangci-lint-action@v4
         with:
-          version: v1.55.2
+          version: v1.56.1
           skip-cache: true
           args: --timeout=8m
 
