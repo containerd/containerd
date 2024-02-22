@@ -17,6 +17,7 @@
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -28,14 +29,14 @@ var _ error = ErrUnexpectedStatus{}
 type ErrUnexpectedStatus struct {
 	Status                    string
 	StatusCode                int
-	Body                      []byte
+	Body                      Errors
 	RequestURL, RequestMethod string
 }
 
 func (e ErrUnexpectedStatus) Error() string {
 	errorMessage := fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
-	if len(e.Body) > 0 {
-		errorMessage += fmt.Sprintf("\nResponse Body: %s", string(e.Body))
+	if e.Body.Len() > 0 {
+		errorMessage += fmt.Sprintf(" - Server message: %+v", e.Body)
 	}
 	return errorMessage
 }
@@ -46,8 +47,12 @@ func NewUnexpectedStatusErr(resp *http.Response) error {
 	if resp.Body != nil {
 		b, _ = io.ReadAll(io.LimitReader(resp.Body, 64000)) // 64KB
 	}
+
+	var registryErr Errors
+	json.Unmarshal(b, &registryErr)
+
 	err := ErrUnexpectedStatus{
-		Body:          b,
+		Body:          registryErr,
 		Status:        resp.Status,
 		StatusCode:    resp.StatusCode,
 		RequestMethod: resp.Request.Method,

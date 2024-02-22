@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
-	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/docker/errors"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
@@ -322,7 +322,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 				}
 				log.G(ctx).WithFields(log.Fields{
 					"status": errStatus.Status,
-					"body":   string(errStatus.Body),
+					"body":   errStatus.Body,
 				}).Debugf("token request failed")
 			}
 			return "", "", err
