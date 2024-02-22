@@ -185,9 +185,10 @@ version = 2
   [plugins."io.containerd.internal.v1.restart"]
     interval = "10s"
 
-  [plugins."io.containerd.internal.v1.tracing"]
-    sampling_ratio = 1.0
-    service_name = "containerd"
+  # Removed in latest
+  #[plugins."io.containerd.internal.v1.tracing"]
+  #  sampling_ratio = 1.0
+  #  service_name = "containerd"
 
   [plugins."io.containerd.metadata.v1.bolt"]
     content_sharing_policy = "shared"
@@ -260,10 +261,11 @@ version = 2
   #[plugins."io.containerd.snapshotter.v1.zfs"]
   #  root_path = ""
 
-  [plugins."io.containerd.tracing.processor.v1.otlp"]
-    endpoint = ""
-    insecure = false
-    protocol = ""
+  # Removed in latest
+  #[plugins."io.containerd.tracing.processor.v1.otlp"]
+  #  endpoint = ""
+  #  insecure = false
+  #  protocol = ""
 
   [plugins."io.containerd.transfer.v1.local"]
     config_path = ""
