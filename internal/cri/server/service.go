@@ -381,6 +381,9 @@ func (c *criService) introspectRuntimeHandlers(ctx context.Context) ([]*runtime.
 					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
 				}
 			}
+			userns := supportsCRIUserns(rawFeatures)
+			h.Features.UserNamespaces = userns
+			log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
 		}
 		res = append(res, &h)
 		if name == c.config.DefaultRuntimeName {
@@ -437,4 +440,21 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 		return nil, fmt.Errorf("unknown features type %T", featuresX)
 	}
 	return features, nil
+}
+
+func supportsCRIUserns(f *features.Features) bool {
+	if f == nil {
+		return false
+	}
+	userns := slices.Contains(f.Linux.Namespaces, "user")
+
+	var idmap bool
+	if m := f.Linux.MountExtensions; m != nil && m.IDMap != nil && m.IDMap.Enabled != nil {
+		if *m.IDMap.Enabled {
+			idmap = true
+		}
+	}
+
+	// user namespace support in CRI requires userns and idmap support.
+	return userns && idmap
 }
