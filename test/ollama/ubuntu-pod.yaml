@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu
+  labels:
+    app: ubuntu
+spec:
+  hostNetwork: true
+  containers:
+    - name: ubuntu
+      image: ubuntu:20.04
+      command: ["sleep", "604800"]
+      imagePullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 30080
+          hostPort: 30080
+  nodeSelector:
+    kubernetes.io/hostname: vcluster-control-plane
