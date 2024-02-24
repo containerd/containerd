@@ -3,7 +3,9 @@ package process
 import (
 	"context"
 	"io"
+	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/containerd/console"
@@ -125,7 +127,25 @@ func (p *Init) Kill(ctx context.Context, signal uint32, all bool) error {
 }
 
 func (p *Init) kill(ctx context.Context, signal uint32, all bool) error {
-	p.setExited(127)
+	if p.pid != 0 {
+		process, err := os.FindProcess(p.pid)
+		if err != nil {
+			return err
+		}
+		if err := process.Signal(syscall.Signal(signal)); err != nil {
+			return err
+		}
+		processState, err := process.Wait()
+		if err != nil {
+			return err
+		}
+		p.setExited(processState.ExitCode())
+
+		p.pid = 0
+	} else {
+		p.setExited(0)
+	}
+
 	return nil
 }
 

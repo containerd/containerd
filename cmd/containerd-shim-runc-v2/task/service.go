@@ -152,6 +152,12 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+	// if we deleted an init task, send the task delete event
+	if r.ExecID == "" {
+		s.mu.Lock()
+		delete(s.containers, r.ID)
+		s.mu.Unlock()
+	}
 	return &taskAPI.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),

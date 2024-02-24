@@ -37,7 +37,9 @@ func (s *createdState) Start(ctx context.Context) error {
 		}
 		cmd := exec.Command(filepath.Join(rootPath, "runm"), args...)
 		err = cmd.Start()
-
+		if err == nil {
+			s.p.pid = cmd.Process.Pid
+		}
 		return err
 	}
 	return nil
