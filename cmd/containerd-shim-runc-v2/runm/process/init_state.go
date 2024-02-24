@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 type initState interface {
@@ -30,11 +32,17 @@ func (s *createdState) Start(ctx context.Context) error {
 			return err
 		}
 		rootPath := filepath.Dir(exePath)
+
 		args := []string{
 			"serve",
-			"--port", "11111",
 			"--rootfs", s.p.Rootfs,
 		}
+		spec, err := oci.ReadSpec(filepath.Join(s.p.Bundle, oci.ConfigFilename))
+		if err != nil {
+			return err
+		}
+		args = append(args, spec.Process.Args...)
+
 		cmd := exec.Command(filepath.Join(rootPath, "runm"), args...)
 		err = cmd.Start()
 		if err == nil {

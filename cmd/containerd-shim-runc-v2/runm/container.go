@@ -75,7 +75,6 @@ func NewContainer(ctx context.Context, r *task.CreateTaskRequest) (_ *Container,
 }
 
 func newInit(ctx context.Context, path, workDir string, r *process.CreateConfig, rootfs string) (*runm_process.Init, error) {
-	// runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := runm_process.New(r.ID, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,

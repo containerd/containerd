@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tinyllama-11111
+  labels:
+    app: tinyllama
+spec:
+  containers:
+    - name: tinyllama
+      image: registry.ollama.ai/library/tinyllama:latest
+      args: ["--port", "11111"]
+      imagePullPolicy: IfNotPresent
+  nodeSelector:
+    type: virtual-kubelet

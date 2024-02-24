@@ -1,19 +1,14 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: tinyllama
+  name: tinyllama-11112
   labels:
     app: tinyllama
 spec:
-  hostNetwork: true
   containers:
     - name: tinyllama
       image: registry.ollama.ai/library/tinyllama:latest
-      command: ["sleep", "604800"]
+      args: ["--port", "11112"]
       imagePullPolicy: IfNotPresent
-      ports:
-        - name: http
-          containerPort: 30080
-          hostPort: 30080
   nodeSelector:
     type: virtual-kubelet
