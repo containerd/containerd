@@ -229,6 +229,7 @@ jobs:
         with:
           repository: kubernetes-sigs/cri-tools
           path: src/github.com/kubernetes-sigs/cri-tools
+          fetch-depth: 0
 
       - name: Set env
         run: |
@@ -257,7 +258,9 @@ jobs:
         run: |
           set -o xtrace
           mingw32-make.exe binaries
+          CRITEST_VERSION=$(cat script/setup/critools-version)
           cd ../../kubernetes-sigs/cri-tools
+          git checkout "${CRITEST_VERSION}"
           make critest
 
       - run: script/setup/install-cni-windows
