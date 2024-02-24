@@ -74,7 +74,7 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 	switch s := src.(type) {
 	case transfer.ImageFetcher:
 		switch d := dest.(type) {
-		case transfer.ImageStorer:
+		case transfer.ImageStore:
 			return ts.pull(ctx, s, d, topts)
 		}
 	case transfer.ImageGetter:
@@ -83,14 +83,14 @@ func (ts *localTransferService) Transfer(ctx context.Context, src interface{}, d
 			return ts.push(ctx, s, d, topts)
 		case transfer.ImageExporter:
 			return ts.exportStream(ctx, s, d, topts)
-		case transfer.ImageStorer:
+		case transfer.ImageStore:
 			return ts.tag(ctx, s, d, topts)
 		}
 	case transfer.ImageImporter:
 		switch d := dest.(type) {
 		case transfer.ImageExportStreamer:
 			return ts.echo(ctx, s, d, topts)
-		case transfer.ImageStorer:
+		case transfer.ImageStore:
 			// TODO: verify imports with ImageVerifiers?
 			return ts.importStream(ctx, s, d, topts)
 		}

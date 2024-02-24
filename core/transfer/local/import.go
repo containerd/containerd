@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/log"
 )
 
-func (ts *localTransferService) importStream(ctx context.Context, i transfer.ImageImporter, is transfer.ImageStorer, tops *transfer.Config) error {
+func (ts *localTransferService) importStream(ctx context.Context, i transfer.ImageImporter, is transfer.ImageStore, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err

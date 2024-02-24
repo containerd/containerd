@@ -33,7 +33,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
+func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStore, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err

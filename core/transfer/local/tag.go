@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 )
 
-func (ts *localTransferService) tag(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageStorer, tops *transfer.Config) error {
+func (ts *localTransferService) tag(ctx context.Context, ig transfer.ImageGetter, is transfer.ImageStore, tops *transfer.Config) error {
 	ctx, done, err := ts.withLease(ctx)
 	if err != nil {
 		return err
