@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	goruntime "runtime"
 	"time"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -99,16 +101,43 @@ func (c *criService) getIPs(sandbox sandboxstore.Sandbox) (string, []string, err
 	// For sandboxes using the node network we are not
 	// responsible for reporting the IP.
 	if hostNetwork(config) {
-		return "", nil, nil
+		// XXX: For pod IP/IPs
+		if goruntime.GOOS == "darwin" {
+			iface, err := net.InterfaceByName("en0")
+			if err != nil {
+				goto Empty
+			}
+			addrs, err := iface.Addrs()
+			if err != nil {
+				goto Empty
+			}
+
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
+				if !ok {
+					continue
+				}
+
+				ip := ipNet.IP
+				if ip.To4() != nil {
+					ipv4 := ip.String()
+					return ipv4, []string{ipv4}, nil
+				}
+			}
+		}
+		goto Empty
 	}
 
 	if closed, err := sandbox.NetNS.Closed(); err != nil {
 		return "", nil, fmt.Errorf("check network namespace closed: %w", err)
 	} else if closed {
-		return "", nil, nil
+		goto Empty
 	}
 
 	return sandbox.IP, sandbox.AdditionalIPs, nil
+
+Empty:
+	return "", nil, nil
 }
 
 // toCRISandboxStatus converts sandbox metadata into CRI pod sandbox status.

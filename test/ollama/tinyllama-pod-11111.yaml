@@ -10,5 +10,9 @@ spec:
       image: registry.ollama.ai/library/tinyllama:latest
       args: ["--port", "11111"]
       imagePullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 11111
+          hostPort: 11111
   nodeSelector:
     type: virtual-kubelet
