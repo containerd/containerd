@@ -322,7 +322,7 @@ func (ah *authHandler) doBearerAuth(ctx context.Context) (token, refreshToken st
 				}
 				log.G(ctx).WithFields(log.Fields{
 					"status": errStatus.Status,
-					"body":   errStatus.Body,
+					"body":   errStatus.Body.Error(),
 				}).Debugf("token request failed")
 			}
 			return "", "", err

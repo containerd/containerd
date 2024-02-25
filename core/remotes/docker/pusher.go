@@ -149,7 +149,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			}
 		} else if resp.StatusCode != http.StatusNotFound {
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body).Debug("unexpected response")
+			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body.Error()).Debug("unexpected response")
 			resp.Body.Close()
 			return nil, err
 		}
@@ -220,7 +220,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			return nil, fmt.Errorf("content %v on remote: %w", desc.Digest, errdefs.ErrAlreadyExists)
 		default:
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body).Debug("unexpected response")
+			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body.Error()).Debug("unexpected response")
 			return nil, err
 		}
 
@@ -295,7 +295,7 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 		case http.StatusOK, http.StatusCreated, http.StatusNoContent:
 		default:
 			err := remoteserrors.NewUnexpectedStatusErr(resp)
-			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body).Debug("unexpected response")
+			log.G(ctx).WithField("resp", resp).WithField("body", err.(remoteserrors.ErrUnexpectedStatus).Body.Error()).Debug("unexpected response")
 			pushw.setError(err)
 			return
 		}

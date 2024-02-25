@@ -36,7 +36,7 @@ type ErrUnexpectedStatus struct {
 func (e ErrUnexpectedStatus) Error() string {
 	errorMessage := fmt.Sprintf("unexpected status from %s request to %s: %s", e.RequestMethod, e.RequestURL, e.Status)
 	if e.Body.Len() > 0 {
-		errorMessage += fmt.Sprintf(" - Server message: %+v", e.Body)
+		errorMessage += fmt.Sprintf("\n%s", e.Body.Error())
 	}
 	return errorMessage
 }
