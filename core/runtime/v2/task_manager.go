@@ -19,18 +19,19 @@ package v2
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/runtime"
-	"github.com/containerd/containerd/v2/internal/cleanup"
-	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf/proto"
 )
@@ -41,6 +42,7 @@ func init() {
 		ID:   "task",
 		Requires: []plugin.Type{
 			plugins.ShimPlugin,
+			plugins.SandboxControllerPluginV2,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			shimManagerI, err := ic.GetByID(plugins.ShimPlugin, "shim")
@@ -48,38 +50,54 @@ func init() {
 				return nil, err
 			}
 			shimManager := shimManagerI.(*ShimManager)
+
+			sandboxedTaskManager, err := NewSandboxedTaskManager(ic)
+			if err != nil {
+				return nil, err
+			}
+			shimedTaskManager := &ShimTaskManager{
+				shimManager: shimManager,
+			}
+
 			root, state := ic.Properties[plugins.PropertyRootDir], ic.Properties[plugins.PropertyStateDir]
 			for _, d := range []string{root, state} {
 				if err := os.MkdirAll(d, 0711); err != nil {
 					return nil, err
 				}
 			}
-			return NewTaskManager(ic.Context, root, state, shimManager)
+
+			return NewTaskManager(ic.Context, root, state, shimedTaskManager, sandboxedTaskManager)
 		},
 	})
 }
 
-// TaskManager wraps task service client on top of shim manager.
+// TaskManager wraps task service client on top of ShimTaskManager or SandboxedTaskManager.
 type TaskManager struct {
-	root    string
-	state   string
-	manager *ShimManager
+	root                 string
+	state                string
+	shimTaskManager      *ShimTaskManager
+	sandboxedTaskManager *SandboxedTaskManager
 }
 
-// NewTaskManager creates a new task manager instance.
-func NewTaskManager(ctx context.Context, root, state string, shims *ShimManager) (*TaskManager, error) {
-	if err := shims.LoadExistingShims(ctx, state, root); err != nil {
-		return nil, fmt.Errorf("failed to load existing shims for task manager")
-	}
+// NewTaskManager creates a new task TaskManager instance.
+func NewTaskManager(ctx context.Context,
+	root, state string,
+	shimTaskManager *ShimTaskManager,
+	sandboxedTaskManager *SandboxedTaskManager) (*TaskManager, error) {
+
 	m := &TaskManager{
-		root:    root,
-		state:   state,
-		manager: shims,
+		root:                 root,
+		state:                state,
+		shimTaskManager:      shimTaskManager,
+		sandboxedTaskManager: sandboxedTaskManager,
+	}
+	if err := m.loadExistingTasks(ctx, state, root); err != nil {
+		return nil, fmt.Errorf("failed to load existing shims for task manager")
 	}
 	return m, nil
 }
 
-// ID of the task manager
+// ID of the task shimTaskManager
 func (m *TaskManager) ID() string {
 	return plugins.RuntimePluginV2.String() + ".task"
 }
@@ -96,98 +114,50 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		}
 	}()
 
-	shim, err := m.manager.Start(ctx, taskID, bundle, opts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start shim: %w", err)
-	}
-
-	// Cast to shim task and call task service to create a new container task instance.
-	// This will not be required once shim service / client implemented.
-	shimTask, err := newShimTask(shim)
-	if err != nil {
-		return nil, err
-	}
-
-	t, err := shimTask.Create(ctx, opts)
-	if err != nil {
-		// NOTE: ctx contains required namespace information.
-		m.manager.shims.Delete(ctx, taskID)
-
-		dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
-		defer cancel()
-
-		sandboxed := opts.SandboxID != ""
-		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
-		if errShim != nil {
-			if errdefs.IsDeadlineExceeded(errShim) {
-				dctx, cancel = timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
-				defer cancel()
-			}
-
-			shimTask.Shutdown(dctx)
-			shimTask.Close()
+	if len(opts.SandboxID) > 0 {
+		// if err==ErrCanNotHandle, we should fallback to the shim
+		if t, err := m.sandboxedTaskManager.Create(ctx, taskID, bundle, opts); err != ErrCanNotHandle {
+			return t, err
 		}
-
-		return nil, fmt.Errorf("failed to create shim task: %w", err)
 	}
-
-	return t, nil
+	return m.shimTaskManager.Create(ctx, taskID, bundle, opts)
 }
 
 // Get a specific task
 func (m *TaskManager) Get(ctx context.Context, id string) (runtime.Task, error) {
-	shim, err := m.manager.shims.Get(ctx, id)
-	if err != nil {
-		return nil, err
+	t, err := m.sandboxedTaskManager.Get(ctx, id)
+	if errdefs.IsNotFound(err) {
+		t, err = m.shimTaskManager.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return newShimTask(shim)
+	return t, err
 }
 
 // Tasks lists all tasks
 func (m *TaskManager) Tasks(ctx context.Context, all bool) ([]runtime.Task, error) {
-	shims, err := m.manager.shims.GetAll(ctx, all)
+	var tasks []runtime.Task
+	sts, err := m.sandboxedTaskManager.GetAll(ctx, all)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]runtime.Task, len(shims))
-	for i := range shims {
-		newClient, err := newShimTask(shims[i])
-		if err != nil {
-			return nil, err
-		}
-		out[i] = newClient
+	tasks = append(tasks, sts...)
+	shimedTasks, err := m.shimTaskManager.GetAll(ctx, all)
+	if err != nil {
+		return nil, err
 	}
-	return out, nil
+	tasks = append(tasks, shimedTasks...)
+	return tasks, nil
 }
 
 // Delete deletes the task and shim instance
 func (m *TaskManager) Delete(ctx context.Context, taskID string) (*runtime.Exit, error) {
-	shim, err := m.manager.shims.Get(ctx, taskID)
-	if err != nil {
-		return nil, err
+	exit, err := m.sandboxedTaskManager.Delete(ctx, taskID)
+	if !errdefs.IsNotFound(err) {
+		return exit, err
 	}
-
-	container, err := m.manager.containers.Get(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	shimTask, err := newShimTask(shim)
-	if err != nil {
-		return nil, err
-	}
-
-	sandboxed := container.SandboxID != ""
-
-	exit, err := shimTask.delete(ctx, sandboxed, func(ctx context.Context, id string) {
-		m.manager.shims.Delete(ctx, id)
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to delete task: %w", err)
-	}
-
-	return exit, nil
+	return m.shimTaskManager.Delete(ctx, taskID)
 }
 
 func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
@@ -196,7 +166,7 @@ func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (inte
 		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
 	}
 
-	runtimePath, err := m.manager.resolveRuntimePath(req.RuntimePath)
+	runtimePath, err := m.shimTaskManager.shimManager.resolveRuntimePath(req.RuntimePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
 	}
@@ -220,4 +190,46 @@ func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (inte
 		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
 	}
 	return &info, nil
+}
+
+func (m *TaskManager) loadExistingTasks(ctx context.Context, stateDir string, rootDir string) error {
+	if err := TraversBundles(ctx, stateDir, func(ctx context.Context, bundle *Bundle) error {
+		// Read sandbox ID this task belongs to.
+		// it will return ErrorNotExit if it is not a sandboxed task
+		sbID, err := os.ReadFile(filepath.Join(bundle.Path, "sandbox"))
+		if err == nil {
+			loadErr := m.sandboxedTaskManager.Load(ctx, string(sbID), bundle)
+			if loadErr != nil && loadErr != ErrCanNotHandle {
+				log.G(ctx).WithError(loadErr).Errorf("failed to load %s", bundle.Path)
+			}
+			// if loadErr == ErrCanNotHandle, should fallback to the shim load
+			if loadErr == nil {
+				return nil
+			}
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			bundle.Delete()
+			return err
+		}
+
+		if err := m.shimTaskManager.Load(ctx, bundle.ID, bundle); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := TraversWorkDirs(ctx, rootDir, func(ctx context.Context, ns, dir string) error {
+		if _, err := m.Get(ctx, dir); err != nil {
+			path := filepath.Join(rootDir, ns, dir)
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
 }

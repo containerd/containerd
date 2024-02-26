@@ -23,12 +23,14 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // LoadBundle loads an existing bundle from disk
@@ -166,4 +168,130 @@ func atomicDelete(path string) error {
 		return err
 	}
 	return os.RemoveAll(atomicPath)
+}
+
+type traverseFn func(context.Context, *Bundle) error
+
+// TraversBundles traverse the bundles in the stateDir,
+// if traverse function returns error, the bundle will be cleaned up
+func TraversBundles(ctx context.Context, stateDir string, traverse traverseFn) error {
+	nsDirs, err := os.ReadDir(stateDir)
+	if err != nil {
+		return err
+	}
+	for _, nsd := range nsDirs {
+		if !nsd.IsDir() {
+			continue
+		}
+		ns := nsd.Name()
+		// skip hidden directories
+		if len(ns) > 0 && ns[0] == '.' {
+			continue
+		}
+		log.G(ctx).
+			WithField("namespace", ns).
+			WithField("stateDir", stateDir).
+			Debug("traverse bundles in namespace")
+		if err := traverseNamespacedBundles(namespaces.WithNamespace(ctx, ns), stateDir, traverse); err != nil {
+			log.G(ctx).
+				WithField("namespace", ns).
+				WithField("stateDir", stateDir).
+				WithError(err).Error("traverse in namespace")
+			continue
+		}
+	}
+	return nil
+}
+
+func traverseNamespacedBundles(ctx context.Context, stateDir string, traverse traverseFn) error {
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
+
+	bundlePaths, err := os.ReadDir(filepath.Join(stateDir, ns))
+	if err != nil {
+		return err
+	}
+	for _, sd := range bundlePaths {
+		if !sd.IsDir() {
+			continue
+		}
+		id := sd.Name()
+		// skip hidden directories
+		if len(id) > 0 && id[0] == '.' {
+			continue
+		}
+		bundle, err := LoadBundle(ctx, stateDir, id)
+		if err != nil {
+			// fine to return error here, it is a programmer error if the context
+			// does not have a namespace
+			return err
+		}
+		// fast path
+		f, err := os.Open(bundle.Path)
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+
+		bf, err := f.Readdirnames(-1)
+		f.Close()
+		if err != nil {
+			bundle.Delete()
+			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+			continue
+		}
+		if len(bf) == 0 {
+			bundle.Delete()
+			continue
+		}
+		if err := traverse(ctx, bundle); err != nil {
+			log.G(ctx).WithError(err).Errorf("failed to traverse %s", bundle.Path)
+			bundle.Delete()
+			continue
+		}
+
+	}
+	return nil
+}
+
+type traverseWorkDirFn func(ctx context.Context, ns string, dir string) error
+
+func TraversWorkDirs(ctx context.Context, rootDir string, traverse traverseWorkDirFn) error {
+	nsDirs, err := os.ReadDir(rootDir)
+	if err != nil {
+		return err
+	}
+	for _, nsd := range nsDirs {
+		if !nsd.IsDir() {
+			continue
+		}
+		ns := nsd.Name()
+		// skip hidden directories
+		if len(ns) > 0 && ns[0] == '.' {
+			continue
+		}
+
+		f, err := os.Open(filepath.Join(rootDir, ns))
+		if err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to open %s in %s", ns, rootDir)
+			continue
+		}
+		defer f.Close()
+
+		dirs, err := f.Readdirnames(-1)
+		if err != nil {
+			continue
+		}
+
+		for _, dir := range dirs {
+			if err := traverse(ctx, ns, dir); err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to traverse %s", dir)
+			}
+		}
+	}
+	return nil
 }
