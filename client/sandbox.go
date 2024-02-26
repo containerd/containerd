@@ -34,8 +34,8 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// PID returns sandbox's process PID or error if its not yet started.
-	PID() (uint32, error)
+	// Metadata returns metadata of the sandbox
+	Metadata() api.Sandbox
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
@@ -51,7 +51,6 @@ type Sandbox interface {
 }
 
 type sandboxClient struct {
-	pid      *uint32
 	client   *Client
 	metadata api.Sandbox
 }
@@ -60,12 +59,8 @@ func (s *sandboxClient) ID() string {
 	return s.metadata.ID
 }
 
-func (s *sandboxClient) PID() (uint32, error) {
-	if s.pid == nil {
-		return 0, fmt.Errorf("sandbox not started")
-	}
-
-	return *s.pid, nil
+func (s *sandboxClient) Metadata() api.Sandbox {
+	return s.metadata
 }
 
 func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -82,12 +77,11 @@ func (s *sandboxClient) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (s *sandboxClient) Start(ctx context.Context) error {
-	resp, err := s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
+	_, err := s.client.SandboxController(s.metadata.Sandboxer).Start(ctx, s.ID())
 	if err != nil {
 		return err
 	}
 
-	s.pid = &resp.Pid
 	return nil
 }
 
@@ -154,7 +148,6 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}
 
 	return &sandboxClient{
-		pid:      nil, // Not yet started
 		client:   c,
 		metadata: metadata,
 	}, nil
@@ -167,13 +160,7 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController(sandbox.Sandboxer).Status(ctx, id, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
-	}
-
 	return &sandboxClient{
-		pid:      &status.Pid,
 		client:   c,
 		metadata: sandbox,
 	}, nil
