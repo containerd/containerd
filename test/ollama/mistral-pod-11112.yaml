@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mistral-11112
+  labels:
+    app: mistral
+spec:
+  containers:
+    - name: mistral
+      image: registry.ollama.ai/library/mistral:latest
+      args: ["--port", "11112"]
+      imagePullPolicy: IfNotPresent
+      ports:
+        - name: http
+          containerPort: 11112
+          hostPort: 11112
+  nodeSelector:
+    type: virtual-kubelet
