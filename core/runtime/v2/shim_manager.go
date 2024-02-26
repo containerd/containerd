@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -157,42 +158,46 @@ func (m *ShimManager) ID() string {
 	return plugins.RuntimePluginV2.String() + ".shim"
 }
 
-// Start launches a new shim instance
-func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		params, err := m.sandboxBootstrapParams(ctx, opts.SandboxID)
-		if err != nil {
-			// fallback to lagacy implementation
-			p, restoreErr := m.restoreBootstrapParams(ctx, opts.SandboxID)
-			if restoreErr != nil {
-				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
-			}
-			params = p
-		}
-
-		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
-			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
-		}
-
-		shim, err := loadShim(ctx, bundle, func() {})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
-		}
-
-		if err := m.shims.Add(ctx, shim); err != nil {
-			return nil, err
-		}
-
-		return shim, nil
+func (m *ShimManager) Create(ctx context.Context, taskID string, bundle *Bundle, opts runtime.CreateOpts) (runtime.Task, error) {
+	shim, err := m.Start(ctx, taskID, bundle, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start shim: %w", err)
 	}
 
+	// Cast to shim task and call task service to create a new container task instance.
+	// This will not be required once shim service / client implemented.
+	shimTask, err := newShimTask(shim)
+	if err != nil {
+		return nil, err
+	}
+
+	err = shimTask.Create(ctx, bundle.Path, opts)
+	if err != nil {
+		// NOTE: ctx contains required namespace information.
+		m.shims.Delete(ctx, taskID)
+
+		dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+		defer cancel()
+
+		_, errShim := shimTask.delete(dctx, func(context.Context, string) {})
+		if errShim != nil {
+			if errdefs.IsDeadlineExceeded(errShim) {
+				dctx, cancel = timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+				defer cancel()
+			}
+
+			shimTask.Shutdown(dctx)
+			shimTask.Close()
+		}
+
+		return nil, fmt.Errorf("failed to create shim task: %w", err)
+	}
+
+	return shimTask, nil
+}
+
+// Start launches a new shim instance
+func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
 		return nil, err
@@ -248,36 +253,6 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	return shim, nil
-}
-
-func (m *ShimManager) sandboxBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
-	sb, err := m.sandboxStore.Get(ctx, sandboxID)
-	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox in store %s, %v", sandboxID, err)
-	}
-
-	endpoint, err := sb.GetEndpoint()
-	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("can't get endpoint in sandbox %s, %v", sandboxID, err)
-	}
-
-	return shimbinary.BootstrapParams{
-		Version:  endpoint.Version,
-		Address:  endpoint.Address,
-		Protocol: endpoint.Protocol,
-	}, nil
-}
-
-func (m *ShimManager) restoreBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
-	process, err := m.Get(ctx, sandboxID)
-	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox %s", sandboxID)
-	}
-	params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), sandboxID))
-	if err != nil {
-		return shimbinary.BootstrapParams{}, err
-	}
-	return params, nil
 }
 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.
