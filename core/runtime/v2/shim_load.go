@@ -18,105 +18,43 @@ package v2
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/internal/cleanup"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/timeout"
 )
 
 // LoadExistingShims loads existing shims from the path specified by stateDir
 // rootDir is for cleaning up the unused paths of removed shims.
 func (m *ShimManager) LoadExistingShims(ctx context.Context, stateDir string, rootDir string) error {
-	nsDirs, err := os.ReadDir(stateDir)
-	if err != nil {
-		return err
-	}
-	for _, nsd := range nsDirs {
-		if !nsd.IsDir() {
-			continue
-		}
-		ns := nsd.Name()
-		// skip hidden directories
-		if len(ns) > 0 && ns[0] == '.' {
-			continue
-		}
-		log.G(ctx).WithField("namespace", ns).Debug("loading tasks in namespace")
-		if err := m.loadShims(namespaces.WithNamespace(ctx, ns), stateDir); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("loading tasks in namespace")
-			continue
-		}
-		if err := m.cleanupWorkDirs(namespaces.WithNamespace(ctx, ns), rootDir); err != nil {
-			log.G(ctx).WithField("namespace", ns).WithError(err).Error("cleanup working directory in namespace")
-			continue
-		}
-	}
-	return nil
-}
-
-func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
-
-	shimDirs, err := os.ReadDir(filepath.Join(stateDir, ns))
-	if err != nil {
-		return err
-	}
-	for _, sd := range shimDirs {
-		if !sd.IsDir() {
-			continue
-		}
-		id := sd.Name()
-		// skip hidden directories
-		if len(id) > 0 && id[0] == '.' {
-			continue
-		}
-		bundle, err := LoadBundle(ctx, stateDir, id)
-		if err != nil {
-			// fine to return error here, it is a programmer error if the context
-			// does not have a namespace
-			return err
-		}
-		// fast path
-		f, err := os.Open(bundle.Path)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-
-		bf, err := f.Readdirnames(-1)
-		f.Close()
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-		if len(bf) == 0 {
-			bundle.Delete()
-			continue
-		}
-		if err := m.loadShim(ctx, bundle); err != nil {
+	if err := TraversBundles(ctx, stateDir, func(ctx context.Context, bundle *Bundle) error {
+		if err := m.loadShim(ctx, bundle, func(instance ShimInstance) error {
+			return nil
+		}); err != nil {
 			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
 			bundle.Delete()
-			continue
 		}
-
+		return nil
+	}); err != nil {
+		return err
 	}
+	TraversWorkDirs(ctx, rootDir, func(ctx context.Context, ns, dir string) error {
+		if _, err := m.shims.Get(ctx, dir); err != nil {
+			path := filepath.Join(rootDir, ns, dir)
+			if err := os.RemoveAll(path); err != nil {
+				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
+			}
+		}
+		return nil
+	})
 	return nil
 }
 
-func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
+func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle, check func(ShimInstance) error) error {
 	var (
 		runtime string
 		id      = bundle.ID
@@ -156,8 +94,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			ttrpcAddress: m.containerdTTRPCAddress,
 			env:          m.env,
 		})
-	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
-	shim, err := loadShimTask(ctx, bundle, func() {
+	shim, err := loadAndCheckShim(ctx, bundle, check, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
@@ -168,76 +105,21 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 		cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
 		return fmt.Errorf("unable to load shim %q: %w", id, err)
 	}
-
-	// There are 3 possibilities for the loaded shim here:
-	// 1. It could be a shim that is running a task.
-	// 2. It could be a sandbox shim.
-	// 3. Or it could be a shim that was created for running a task but
-	// something happened (probably a containerd crash) and the task was never
-	// created. This shim process should be cleaned up here. Look at
-	// containerd/containerd#6860 for further details.
-
-	_, sgetErr := m.sandboxStore.Get(ctx, id)
-	pInfo, pidErr := shim.Pids(ctx)
-	if sgetErr != nil && errors.Is(sgetErr, errdefs.ErrNotFound) && (len(pInfo) == 0 || errors.Is(pidErr, errdefs.ErrNotFound)) {
-		log.G(ctx).WithField("id", id).Info("cleaning leaked shim process")
-		// We are unable to get Pids from the shim and it's not a sandbox
-		// shim. We should clean it up her.
-		// No need to do anything for removeTask since we never added this shim.
-		shim.delete(ctx, false, func(ctx context.Context, id string) {})
-	} else {
-		m.shims.Add(ctx, shim.ShimInstance)
+	if err := m.shims.Add(ctx, shim); err != nil {
+		return err
 	}
 	return nil
 }
 
-func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimTask, retErr error) {
+func loadAndCheckShim(ctx context.Context, bundle *Bundle, check func(ShimInstance) error, onClose func()) (_ ShimInstance, retErr error) {
 	shim, err := loadShim(ctx, bundle, onClose)
 	if err != nil {
 		return nil, err
 	}
 	// Check connectivity, TaskService is the only required service, so create a temp one to check connection.
-	s, err := newShimTask(shim)
-	if err != nil {
+	if err := check(shim); err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := timeout.WithContext(ctx, loadTimeout)
-	defer cancel()
-
-	if _, err := s.PID(ctx); err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return err
-	}
-
-	f, err := os.Open(filepath.Join(rootDir, ns))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	dirs, err := f.Readdirnames(-1)
-	if err != nil {
-		return err
-	}
-
-	for _, dir := range dirs {
-		// if the task was not loaded, cleanup and empty working directory
-		// this can happen on a reboot where /run for the bundle state is cleaned up
-		// but that persistent working dir is left
-		if _, err := m.shims.Get(ctx, dir); err != nil {
-			path := filepath.Join(rootDir, ns, dir)
-			if err := os.RemoveAll(path); err != nil {
-				log.G(ctx).WithError(err).Errorf("cleanup working dir %s", path)
-			}
-		}
-	}
-	return nil
+	return shim, nil
 }

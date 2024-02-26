@@ -163,6 +163,13 @@ func WithSandboxStore(client sandbox.Store) ServicesOpt {
 	}
 }
 
+// WithSandboxControllers sets the sandbox controllers.
+func WithSandboxControllers(sandboxers map[string]sandbox.Controller) ServicesOpt {
+	return func(s *services) {
+		s.sandboxers = sandboxers
+	}
+}
+
 // WithInMemoryServices is suitable for cases when there is need to use containerd's client from
 // another (in-memory) containerd plugin (such as CRI).
 func WithInMemoryServices(ic *plugin.InitContext) Opt {

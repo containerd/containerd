@@ -17,6 +17,7 @@
 package v2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -26,6 +27,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+
+	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -33,14 +41,11 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 // ShimConfig for the shim
@@ -163,58 +168,6 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		var params shimbinary.BootstrapParams
-		if opts.Address != "" {
-			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
-			// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
-			protocol, address, ok := strings.Cut(opts.Address, "+")
-			if !ok {
-				return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-					" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
-			}
-			params = shimbinary.BootstrapParams{
-				Version:  int(opts.Version),
-				Protocol: protocol,
-				Address:  address,
-			}
-		} else {
-			// For those sandbox we can not get endpoint,
-			// fallback to legacy implementation
-			process, err := m.Get(ctx, opts.SandboxID)
-			if err != nil {
-				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-			}
-			p, restoreErr := restoreBootstrapParams(process.Bundle())
-			if restoreErr != nil {
-				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
-			}
-			params = p
-		}
-
-		// Write sandbox ID this task belongs to.
-		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		if err := writeBootstrapParams(filepath.Join(bundle.Path, "bootstrap.json"), params); err != nil {
-			return nil, fmt.Errorf("failed to write bootstrap.json for bundle %s: %w", bundle.Path, err)
-		}
-
-		shim, err := loadShim(ctx, bundle, func() {})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load sandbox task %q: %w", opts.SandboxID, err)
-		}
-
-		if err := m.shims.Add(ctx, shim); err != nil {
-			return nil, err
-		}
-
-		return shim, nil
-	}
-
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
 		return nil, err
@@ -303,6 +256,38 @@ func restoreBootstrapParams(bundlePath string) (shimbinary.BootstrapParams, erro
 	}
 
 	return params, nil
+}
+
+func (m *ShimManager) PluginInfo(ctx context.Context, request interface{}) (interface{}, error) {
+	req, ok := request.(*apitypes.RuntimeRequest)
+	if !ok {
+		return nil, fmt.Errorf("unknown request type %T: %w", request, errdefs.ErrNotImplemented)
+	}
+
+	runtimePath, err := m.resolveRuntimePath(req.RuntimePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve runtime path: %w", err)
+	}
+	var optsB []byte
+	if req.Options != nil {
+		optsB, err = proto.Marshal(req.Options)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %s: %w", req.Options.TypeUrl, err)
+		}
+	}
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, runtimePath, "-info")
+	cmd.Stdin = bytes.NewReader(optsB)
+	cmd.Stderr = &stderr
+	stdout, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run %v: %w (stderr: %q)", cmd.Args, err, stderr.String())
+	}
+	var info apitypes.RuntimeInfo
+	if err = proto.Unmarshal(stdout, &info); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
+	}
+	return &info, nil
 }
 
 func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
