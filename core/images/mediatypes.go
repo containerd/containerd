@@ -63,6 +63,9 @@ const (
 	MediaTypeOllamaTemplate = MediaTypeOllamaBase + "template"
 	MediaTypeOllamaSystem   = MediaTypeOllamaBase + "system"
 	MediaTypeOllamaParams   = MediaTypeOllamaBase + "params"
+	MediaTypeOllamaAdapter  = MediaTypeOllamaBase + "adapter"
+	MediaTypeOllamaLicense  = MediaTypeOllamaBase + "license"
+	MediaTypeOllamaMessage  = MediaTypeOllamaBase + "message"
 )
 
 // DiffCompression returns the compression as defined by the layer diff media
@@ -97,7 +100,8 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 			}
 		}
 		return "", nil
-	case MediaTypeOllamaModel, MediaTypeOllamaTemplate, MediaTypeOllamaSystem, MediaTypeOllamaParams:
+	case MediaTypeOllamaModel, MediaTypeOllamaTemplate, MediaTypeOllamaSystem, MediaTypeOllamaParams,
+		MediaTypeOllamaAdapter, MediaTypeOllamaLicense, MediaTypeOllamaMessage:
 		// XXX: Ollama media types are not compressed
 		return "", nil
 	default:
