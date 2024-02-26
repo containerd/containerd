@@ -416,7 +416,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 		}
 	}
 
-	infoResp, err := intro.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
+	infoResp, err := intro.PluginInfo(ctx, string(plugins.ShimPlugin), "shim", rr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}
