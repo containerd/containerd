@@ -906,7 +906,7 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 
 	s := c.IntrospectionService()
 
-	resp, err := s.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
+	resp, err := s.PluginInfo(ctx, string(plugins.ShimPlugin), "shim", rr)
 	if err != nil {
 		return nil, err
 	}
