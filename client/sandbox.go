@@ -36,8 +36,10 @@ import (
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// PID returns sandbox's process PID or error if its not yet started.
-	PID() (uint32, error)
+	// Endpoint returns endpoint of the sandbox
+	Endpoint() api.Endpoint
+	// Metadata returns metadata of the sandbox
+	Metadata() api.Sandbox
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
@@ -53,21 +55,21 @@ type Sandbox interface {
 }
 
 type sandboxClient struct {
-	pid      *uint32
 	client   *Client
 	metadata api.Sandbox
+	endpoint api.Endpoint
 }
 
 func (s *sandboxClient) ID() string {
 	return s.metadata.ID
 }
 
-func (s *sandboxClient) PID() (uint32, error) {
-	if s.pid == nil {
-		return 0, fmt.Errorf("sandbox not started")
-	}
+func (s *sandboxClient) Endpoint() api.Endpoint {
+	return s.endpoint
+}
 
-	return *s.pid, nil
+func (s *sandboxClient) Metadata() api.Sandbox {
+	return s.metadata
 }
 
 func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -99,7 +101,6 @@ func (s *sandboxClient) Start(ctx context.Context) error {
 		}
 		return err
 	}
-	s.pid = &resp.Pid
 	return nil
 }
 
@@ -180,7 +181,6 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}
 
 	return &sandboxClient{
-		pid:      nil, // Not yet started
 		client:   c,
 		metadata: metadata,
 	}, nil
@@ -193,15 +193,15 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController(sandbox.Sandboxer).Status(ctx, id, false)
+	endpoint, err := sandbox.GetEndpoint()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
+		return nil, fmt.Errorf("failed to get endpoint of sandbox %s: %w", id, err)
 	}
 
 	return &sandboxClient{
-		pid:      &status.Pid,
 		client:   c,
 		metadata: sandbox,
+		endpoint: endpoint,
 	}, nil
 }
 
