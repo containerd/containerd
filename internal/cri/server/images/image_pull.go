@@ -223,7 +223,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		if r == "" {
 			continue
 		}
-		if err := c.createImageReference(ctx, r, image.Target(), labels); err != nil {
+		if err := c.createOrUpdateImageReference(ctx, r, image.Target(), labels); err != nil {
 			return "", fmt.Errorf("failed to create image reference %q: %w", r, err)
 		}
 		// Update image store to reflect the newest state in containerd.
@@ -304,11 +304,11 @@ func ParseAuth(auth *runtime.AuthConfig, host string) (string, string, error) {
 	return "", "", nil
 }
 
-// createImageReference creates image reference inside containerd image store.
+// createOrUpdateImageReference creates or updates image reference inside containerd image store.
 // Note that because create and update are not finished in one transaction, there could be race. E.g.
 // the image reference is deleted by someone else after create returns already exists, but before update
 // happens.
-func (c *CRIImageService) createImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) error {
+func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name string, desc imagespec.Descriptor, labels map[string]string) error {
 	img := containerdimages.Image{
 		Name:   name,
 		Target: desc,
@@ -362,31 +362,42 @@ func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string
 func (c *CRIImageService) UpdateImage(ctx context.Context, r string) error {
 	// TODO: Use image service
 	img, err := c.client.GetImage(ctx, r)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("get image by reference: %w", err)
+	if err != nil {
+		if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("get image by reference: %w", err)
+		}
+		// If the image is not found, we should continue updating the cache,
+		// so that the image can be removed from the cache.
+		if err := c.imageStore.Update(ctx, r); err != nil {
+			return fmt.Errorf("update image store for %q: %w", r, err)
+		}
+		return nil
 	}
-	if err == nil && img.Labels()[crilabels.ImageLabelKey] != crilabels.ImageLabelValue {
-		// Make sure the image has the image id as its unique
-		// identifier that references the image in its lifetime.
-		configDesc, err := img.Config(ctx)
-		if err != nil {
-			return fmt.Errorf("get image id: %w", err)
-		}
-		id := configDesc.Digest.String()
-		labels := c.getLabels(ctx, r)
-		if err := c.createImageReference(ctx, id, img.Target(), labels); err != nil {
-			return fmt.Errorf("create image id reference %q: %w", id, err)
-		}
-		if err := c.imageStore.Update(ctx, id); err != nil {
-			return fmt.Errorf("update image store for %q: %w", id, err)
-		}
-		// The image id is ready, add the label to mark the image as managed.
-		if err := c.createImageReference(ctx, r, img.Target(), labels); err != nil {
-			return fmt.Errorf("create managed label: %w", err)
+
+	labels := img.Labels()
+	criLabels := c.getLabels(ctx, r)
+	for key, value := range criLabels {
+		if labels[key] != value {
+			// Make sure the image has the image id as its unique
+			// identifier that references the image in its lifetime.
+			configDesc, err := img.Config(ctx)
+			if err != nil {
+				return fmt.Errorf("get image id: %w", err)
+			}
+			id := configDesc.Digest.String()
+			if err := c.createOrUpdateImageReference(ctx, id, img.Target(), criLabels); err != nil {
+				return fmt.Errorf("create image id reference %q: %w", id, err)
+			}
+			if err := c.imageStore.Update(ctx, id); err != nil {
+				return fmt.Errorf("update image store for %q: %w", id, err)
+			}
+			// The image id is ready, add the label to mark the image as managed.
+			if err := c.createOrUpdateImageReference(ctx, r, img.Target(), criLabels); err != nil {
+				return fmt.Errorf("create managed label: %w", err)
+			}
+			break
 		}
 	}
-	// If the image is not found, we should continue updating the cache,
-	// so that the image can be removed from the cache.
 	if err := c.imageStore.Update(ctx, r); err != nil {
 		return fmt.Errorf("update image store for %q: %w", r, err)
 	}
