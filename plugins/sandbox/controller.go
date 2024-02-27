@@ -46,7 +46,6 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.RuntimePluginV2,
 			plugins.EventPlugin,
-			plugins.SandboxStorePlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			shimPlugin, err := ic.GetByID(plugins.RuntimePluginV2, "shim")
