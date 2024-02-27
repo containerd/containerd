@@ -34,6 +34,7 @@ const (
 	MediaTypeDockerSchema2Layer            = "application/vnd.docker.image.rootfs.diff.tar"
 	MediaTypeDockerSchema2LayerForeign     = "application/vnd.docker.image.rootfs.foreign.diff.tar"
 	MediaTypeDockerSchema2LayerGzip        = "application/vnd.docker.image.rootfs.diff.tar.gzip"
+	MediaTypeDockerSchema2LayerZstd        = "application/vnd.docker.image.rootfs.diff.tar.zstd"
 	MediaTypeDockerSchema2LayerForeignGzip = "application/vnd.docker.image.rootfs.foreign.diff.tar.gzip"
 	MediaTypeDockerSchema2Config           = "application/vnd.docker.container.image.v1+json"
 	MediaTypeDockerSchema2Manifest         = "application/vnd.docker.distribution.manifest.v2+json"
@@ -81,6 +82,12 @@ func DiffCompression(ctx context.Context, mediaType string) (string, error) {
 			return "", nil
 		}
 		return "gzip", nil
+	case MediaTypeDockerSchema2LayerZstd:
+		if len(ext) > 0 {
+			// Type is wrapped
+			return "", nil
+		}
+		return "zstd", nil
 	case ocispec.MediaTypeImageLayer, ocispec.MediaTypeImageLayerNonDistributable: //nolint:staticcheck // Non-distributable layers are deprecated
 		if len(ext) > 0 {
 			switch ext[len(ext)-1] {
@@ -132,7 +139,7 @@ func IsLayerType(mt string) bool {
 	// Parse Docker media types, strip off any + suffixes first
 	switch base, _ := parseMediaTypes(mt); base {
 	case MediaTypeDockerSchema2Layer, MediaTypeDockerSchema2LayerGzip,
-		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip:
+		MediaTypeDockerSchema2LayerForeign, MediaTypeDockerSchema2LayerForeignGzip, MediaTypeDockerSchema2LayerZstd:
 		return true
 	}
 	return false
