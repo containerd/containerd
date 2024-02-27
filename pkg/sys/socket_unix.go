@@ -59,10 +59,11 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 		return nil, err
 	}
 
-	if err := os.Chown(path, uid, gid); err != nil {
-		l.Close()
-		return nil, err
-	}
+	// XXX: We don't have privileges to change the owner of the socket without sudo
+	// if err := os.Chown(path, uid, gid); err != nil {
+	// 	l.Close()
+	// 	return nil, err
+	// }
 
 	return l, nil
 }

@@ -16,7 +16,17 @@
 
 package defaults
 
+import (
+	"os"
+	"path/filepath"
+)
+
 const (
+	// DefaultRuntime would be a multiple of choices, thus empty
+	DefaultRuntime = ""
+)
+
+var (
 	// DefaultRootDir is the default location used by containerd to store
 	// persistent data
 	DefaultRootDir = "/var/lib/containerd"
@@ -30,8 +40,25 @@ const (
 	// DefaultFIFODir is the default location used by client-side cio library
 	// to store FIFOs.
 	DefaultFIFODir = "/var/run/containerd/fifo"
-	// DefaultRuntime would be a multiple of choices, thus empty
-	DefaultRuntime = ""
 	// DefaultConfigDir is the default location for config files.
 	DefaultConfigDir = "/etc/containerd"
 )
+
+func init() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+
+	path := filepath.Join(home, ".modeld")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		panic(err)
+	}
+
+	DefaultRootDir = filepath.Join(path, DefaultRootDir)
+	DefaultStateDir = filepath.Join(path, DefaultStateDir)
+	DefaultAddress = filepath.Join(path, DefaultAddress)
+	DefaultDebugAddress = filepath.Join(path, DefaultDebugAddress)
+	DefaultFIFODir = filepath.Join(path, DefaultFIFODir)
+	DefaultConfigDir = filepath.Join(path, DefaultConfigDir)
+}

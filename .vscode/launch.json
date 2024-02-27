@@ -14,13 +14,12 @@
             "console": "integratedTerminal",
         },
         {
-            "name": "Launch containerd-shim-runc-v2",
+            "name": "Launch Containerd",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/containerd-shim-runc-v2/main.go",
+            "program": "${workspaceFolder}/cmd/containerd/main.go",
             "env": {},
-            "args": ["-namespace", "k8s.io"]
         },
     ]
 }
