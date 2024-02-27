@@ -65,9 +65,9 @@ func ParseKind(s string) Kind {
 		return KindActive
 	case "committed":
 		return KindCommitted
+	default:
+		return KindUnknown
 	}
-
-	return KindUnknown
 }
 
 // String returns the string representation of the Kind
@@ -79,9 +79,9 @@ func (k Kind) String() string {
 		return "Active"
 	case KindCommitted:
 		return "Committed"
+	default:
+		return "Unknown"
 	}
-
-	return "Unknown"
 }
 
 // MarshalJSON the Kind to JSON
@@ -102,25 +102,27 @@ func (k *Kind) UnmarshalJSON(b []byte) error {
 
 // KindToProto converts from [Kind] to the protobuf definition [snapshots.Kind].
 func KindToProto(kind Kind) snapshotsapi.Kind {
-	if kind == KindActive {
+	switch kind {
+	case KindActive:
 		return snapshotsapi.Kind_ACTIVE
-	}
-	if kind == KindView {
+	case KindView:
 		return snapshotsapi.Kind_VIEW
+	default:
+		return snapshotsapi.Kind_COMMITTED
 	}
-	return snapshotsapi.Kind_COMMITTED
 }
 
 // KindFromProto converts from the protobuf definition [snapshots.Kind] to
 // [Kind].
 func KindFromProto(kind snapshotsapi.Kind) Kind {
-	if kind == snapshotsapi.Kind_ACTIVE {
+	switch kind {
+	case snapshotsapi.Kind_ACTIVE:
 		return KindActive
-	}
-	if kind == snapshotsapi.Kind_VIEW {
+	case snapshotsapi.Kind_VIEW:
 		return KindView
+	default:
+		return KindCommitted
 	}
-	return KindCommitted
 }
 
 // Info provides information about a particular snapshot.
