@@ -40,12 +40,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
-      - uses: golangci/golangci-lint-action@v3
+      - uses: actions/checkout@v4
+      - uses: golangci/golangci-lint-action@v4
         with:
           version: v1.55.0
           skip-cache: true
@@ -61,11 +61,11 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
@@ -94,11 +94,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
@@ -126,10 +126,10 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.1
       - run: make man
 
@@ -164,10 +164,10 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: |
           set -e -x
 
@@ -241,7 +241,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -251,7 +251,7 @@ jobs:
           echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
           echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
@@ -283,15 +283,15 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           repository: Microsoft/hcsshim
           path: src/github.com/Microsoft/hcsshim
@@ -338,10 +338,10 @@ jobs:
           CGO_ENABLED: 1
           GOTESTSUM_JUNITFILE: ${{github.workspace}}/test-integration-parallel-junit.xml
         run: mingw32-make.exe integration
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults Windows
+          name: TestResults ${{ matrix.os }}
           path: |
             ${{github.workspace}}/*-junit.xml
 
@@ -372,11 +372,11 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install containerd dependencies
         env:
@@ -484,10 +484,10 @@ jobs:
           sudo lsmod
           sudo dmesg -T -f kern
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
           path: |
             *-junit.xml
             ${{github.workspace}}/critestreport/*.xml
@@ -501,16 +501,16 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - run: script/setup/install-gotestsum
       - name: Tests
         env:
           GOTESTSUM_JUNITFILE: "${{ github.workspace }}/macos-test-junit.xml"
         run: make test
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: TestResults MacOS
@@ -535,10 +535,10 @@ jobs:
       BOX: ${{ matrix.box }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /root/.vagrant.d
           key: vagrant-${{ matrix.box }}
@@ -584,7 +584,7 @@ jobs:
         run: |
           sudo vagrant scp :/tmp/test-integration-junit.xml "${{ github.workspace }}/"
           sudo vagrant scp :/tmp/critestreport "${{ github.workspace }}/critestreport"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           # ${{ matrix.box }} cannot be used here due to character limitation
@@ -599,10 +599,10 @@ jobs:
     timeout-minutes: 45
     needs: [linters, protos, man]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: "Cache ~/.vagrant.d/boxes"
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /root/.vagrant.d/boxes
           key: vagrant-${{ hashFiles('Vagrantfile*') }}
