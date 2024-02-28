@@ -245,7 +245,7 @@ containerd versions:
 | Runtime Shim API | Stable   | 1.2                | - |
 | Daemon Config    | Stable   | 1.0                | - |
 | CRI GRPC API     | Stable   | 1.6 (_CRI v1_)     | [cri-api](https://github.com/kubernetes/cri-api/tree/master/pkg/apis/runtime/v1) |
-| Go client API    | Unstable | _future_           | [godoc](https://godoc.org/github.com/containerd/containerd/v2/client) |
+| Go client API    | Stable   | 2.0                | [godoc](https://pkg.go.dev/github.com/containerd/containerd/v2/client) |
 | `ctr` tool       | Unstable | Out of scope       | - |
 
 From the version stated in the above table, that component must adhere to the
@@ -254,6 +254,11 @@ stability constraints expected in release versions.
 Unless explicitly stated here, components that are called out as unstable or
 not covered may change in a future minor version. Breaking changes to
 "unstable" components will be avoided in patch versions.
+
+Go client API stability includes the `client`, `defaults` and `version` package
+as well as all packages under `pkg`, `core`, `api` and `protobuf`.
+All packages under `cmd`, `contrib`, `integration`, and `internal` are not
+considered part of the stable client API.
 
 ### GRPC API
 
