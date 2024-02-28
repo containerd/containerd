@@ -23,7 +23,7 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/pkg/events"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"

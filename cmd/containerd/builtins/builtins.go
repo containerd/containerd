@@ -19,8 +19,8 @@ package builtins
 // register containerd builtins here
 import (
 	_ "github.com/containerd/containerd/v2/core/runtime/v2"
-	_ "github.com/containerd/containerd/v2/pkg/events/plugin"
 	_ "github.com/containerd/containerd/v2/pkg/nri/plugin"
+	_ "github.com/containerd/containerd/v2/plugins/events"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/imageverifier"
 	_ "github.com/containerd/containerd/v2/plugins/leases"

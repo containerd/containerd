@@ -14,10 +14,10 @@
    limitations under the License.
 */
 
-package plugin
+package events
 
 import (
-	"github.com/containerd/containerd/v2/pkg/events/exchange"
+	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
