@@ -95,6 +95,7 @@ service Controller {
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
 	rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
+	rpc UpdateResource(ControllerUpdateResourceRequest) returns (ControllerUpdateResourceResponse);
 }
 
 message ControllerCreateRequest {
@@ -189,4 +190,15 @@ message ControllerMetricsRequest {
 
 message ControllerMetricsResponse {
 	types.Metric metrics = 1;
+}
+
+message ControllerUpdateResourceRequest {
+	string sandbox_id = 1;
+	string sandboxer = 2;
+	containerd.types.ResourceOp op = 3;
+	containerd.types.TaskResource resource = 4;
+	google.protobuf.Any extra = 5;
+}
+
+message	ControllerUpdateResourceResponse {
 }

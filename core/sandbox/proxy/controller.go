@@ -179,3 +179,19 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 	}
 	return resp.Metrics, nil
 }
+
+func (s *remoteSandboxController) UpdateResource(
+	ctx context.Context,
+	sandboxID string,
+	op types.ResourceOp,
+	resource *types.TaskResource) error {
+	_, err := s.client.UpdateResource(ctx, &api.ControllerUpdateResourceRequest{
+		SandboxID: sandboxID,
+		Op:        op,
+		Resource:  resource,
+	})
+	if err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
+}

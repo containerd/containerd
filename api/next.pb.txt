@@ -5135,6 +5135,7 @@ file {
   package: "containerd.types"
   dependency: "google/protobuf/any.proto"
   dependency: "google/protobuf/timestamp.proto"
+  dependency: "github.com/containerd/containerd/api/types/mount.proto"
   message_type {
     name: "Sandbox"
     field {
@@ -5257,6 +5258,104 @@ file {
       options {
         map_entry: true
       }
+    }
+  }
+  message_type {
+    name: "TaskResource"
+    field {
+      name: "task_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskId"
+    }
+    field {
+      name: "exec_id"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+    field {
+      name: "spec"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "spec"
+    }
+    field {
+      name: "rootfs"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Mount"
+      json_name: "rootfs"
+    }
+    field {
+      name: "stdin"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdin"
+    }
+    field {
+      name: "stdout"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stdout"
+    }
+    field {
+      name: "stderr"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "stderr"
+    }
+    field {
+      name: "extensions"
+      number: 8
+      label: LABEL_REPEATED
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.TaskResource.ExtensionsEntry"
+      json_name: "extensions"
+    }
+    nested_type {
+      name: "ExtensionsEntry"
+      field {
+        name: "key"
+        number: 1
+        label: LABEL_OPTIONAL
+        type: TYPE_STRING
+        json_name: "key"
+      }
+      field {
+        name: "value"
+        number: 2
+        label: LABEL_OPTIONAL
+        type: TYPE_MESSAGE
+        type_name: ".google.protobuf.Any"
+        json_name: "value"
+      }
+      options {
+        map_entry: true
+      }
+    }
+  }
+  enum_type {
+    name: "ResourceOp"
+    value {
+      name: "ADD"
+      number: 0
+    }
+    value {
+      name: "REMOVE"
+      number: 1
+    }
+    value {
+      name: "UPDATE"
+      number: 2
     }
   }
   options {
@@ -5793,6 +5892,50 @@ file {
       json_name: "metrics"
     }
   }
+  message_type {
+    name: "ControllerUpdateResourceRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
+    field {
+      name: "op"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.types.ResourceOp"
+      json_name: "op"
+    }
+    field {
+      name: "resource"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.TaskResource"
+      json_name: "resource"
+    }
+    field {
+      name: "extra"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".google.protobuf.Any"
+      json_name: "extra"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateResourceResponse"
+  }
   service {
     name: "Store"
     method {
@@ -5862,6 +6005,11 @@ file {
       name: "Metrics"
       input_type: ".containerd.services.sandbox.v1.ControllerMetricsRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerMetricsResponse"
+    }
+    method {
+      name: "UpdateResource"
+      input_type: ".containerd.services.sandbox.v1.ControllerUpdateResourceRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerUpdateResourceResponse"
     }
   }
   options {

@@ -111,6 +111,8 @@ type Controller interface {
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Metrics queries the sandbox for metrics.
 	Metrics(ctx context.Context, sandboxID string) (*types.Metric, error)
+	// UpdateResource updates the resources in sandbox for task create/delete/update.
+	UpdateResource(ctx context.Context, sandboxID string, op types.ResourceOp, resource *types.TaskResource) error
 }
 
 type ControllerInstance struct {
