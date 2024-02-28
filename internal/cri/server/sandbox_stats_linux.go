@@ -38,7 +38,8 @@ func (c *criService) podSandboxStats(
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state: %w", meta.ID, errdefs.ErrUnavailable)
+		log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats since sandbox container %q is not in ready state", meta.ID)
+		return nil, errdefs.ErrUnavailable
 	}
 
 	stats, err := metricsForSandbox(sandbox)
