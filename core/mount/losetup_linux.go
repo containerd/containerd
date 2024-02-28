@@ -48,10 +48,10 @@ type LoopParams struct {
 
 func getFreeLoopDev() (uint32, error) {
 	ctrl, err := os.OpenFile(loopControlPath, os.O_RDWR, 0)
+	defer ctrl.Close()
 	if err != nil {
 		return 0, fmt.Errorf("could not open %v: %v", loopControlPath, err)
 	}
-	defer ctrl.Close()
 	num, err := unix.IoctlRetInt(int(ctrl.Fd()), unix.LOOP_CTL_GET_FREE)
 	if err != nil {
 		return 0, fmt.Errorf("could not get free loop device: %w", err)
@@ -70,20 +70,20 @@ func setupLoopDev(backingFile, loopDev string, param LoopParams) (_ *os.File, re
 	}
 
 	back, err := os.OpenFile(backingFile, flags, 0)
+	defer back.Close()
 	if err != nil {
 		return nil, fmt.Errorf("could not open backing file: %s: %w", backingFile, err)
 	}
-	defer back.Close()
 
 	loop, err := os.OpenFile(loopDev, flags, 0)
-	if err != nil {
-		return nil, fmt.Errorf("could not open loop device: %s: %w", loopDev, err)
-	}
 	defer func() {
 		if retErr != nil {
 			loop.Close()
 		}
 	}()
+	if err != nil {
+		return nil, fmt.Errorf("could not open loop device: %s: %w", loopDev, err)
+	}
 
 	fiveDotEight := kernel.KernelVersion{Kernel: 5, Major: 8}
 	if ok, err := kernel.GreaterEqualThan(fiveDotEight); err == nil && ok {
@@ -192,10 +192,10 @@ func setupLoop(backingFile string, param LoopParams) (*os.File, error) {
 
 func removeLoop(loopdev string) error {
 	file, err := os.Open(loopdev)
+	defer file.Close()
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
 	return unix.IoctlSetInt(int(file.Fd()), unix.LOOP_CLR_FD, 0)
 }
@@ -203,10 +203,10 @@ func removeLoop(loopdev string) error {
 // AttachLoopDevice attaches a specified backing file to a loop device
 func AttachLoopDevice(backingFile string) (string, error) {
 	file, err := setupLoop(backingFile, LoopParams{})
+	defer file.Close()
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
 	return file.Name(), nil
 }
 

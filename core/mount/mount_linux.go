@@ -163,10 +163,10 @@ func (m *Mount) mount(target string) (err error) {
 		source := m.Source
 		if opt.losetup {
 			loFile, err := setupLoop(m.Source, loopParams)
+			defer loFile.Close()
 			if err != nil {
 				return err
 			}
-			defer loFile.Close()
 
 			// Mount the loop device instead
 			source = loFile.Name()
