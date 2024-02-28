@@ -156,6 +156,14 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 
 }
 
+func (c *Controller) Update(
+	ctx context.Context,
+	sandboxID string,
+	sandbox sandbox.Sandbox,
+	fields ...string) error {
+	return nil
+}
+
 func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) error {
 	select {
 	case e := <-exitCh:

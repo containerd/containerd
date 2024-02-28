@@ -336,6 +336,14 @@ func (c *controllerLocal) Metrics(ctx context.Context, sandboxID string) (*types
 	return resp.Metrics, nil
 }
 
+func (c *controllerLocal) Update(
+	ctx context.Context,
+	sandboxID string,
+	sandbox sandbox.Sandbox,
+	fields ...string) error {
+	return nil
+}
+
 func (c *controllerLocal) getSandbox(ctx context.Context, id string) (runtimeAPI.TTRPCSandboxService, error) {
 	shim, err := c.shims.Get(ctx, id)
 	if err != nil {

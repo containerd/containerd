@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -46,7 +47,11 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbo
 	for _, opt := range opts {
 		opt(&options)
 	}
-	_, err := s.client.Create(ctx, &api.ControllerCreateRequest{
+	apiSandbox, err := toAPISandbox(sandboxInfo)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Create(ctx, &api.ControllerCreateRequest{
 		SandboxID: sandboxInfo.ID,
 		Rootfs:    mount.ToProto(options.Rootfs),
 		Options: &anypb.Any{
@@ -55,6 +60,7 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbo
 		},
 		NetnsPath:   options.NetNSPath,
 		Annotations: options.Annotations,
+		Sandbox:     &apiSandbox,
 	})
 	if err != nil {
 		return errdefs.FromGRPC(err)
@@ -177,4 +183,56 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 		return nil, errdefs.FromGRPC(err)
 	}
 	return resp.Metrics, nil
+}
+
+func (s *remoteSandboxController) Update(
+	ctx context.Context,
+	sandboxID string,
+	sandbox sandbox.Sandbox,
+	fields ...string) error {
+	apiSandbox, err := toAPISandbox(sandbox)
+	if err != nil {
+		return err
+	}
+	_, err = s.client.Update(ctx, &api.ControllerUpdateRequest{
+		SandboxID: sandboxID,
+		Sandbox:   &apiSandbox,
+		Fields:    fields,
+	})
+	if err != nil {
+		return errdefs.FromGRPC(err)
+	}
+	return nil
+}
+
+func toAPISandbox(sb sandbox.Sandbox) (types.Sandbox, error) {
+	options, err := protobuf.MarshalAnyToProto(sb.Runtime.Options)
+	if err != nil {
+		return types.Sandbox{}, err
+	}
+	spec, err := protobuf.MarshalAnyToProto(sb.Spec)
+	if err != nil {
+		return types.Sandbox{}, err
+	}
+	extensions := make(map[string]*anypb.Any)
+	for k, v := range sb.Extensions {
+		pb, err := protobuf.MarshalAnyToProto(v)
+		if err != nil {
+			return types.Sandbox{}, err
+		}
+		extensions[k] = pb
+	}
+	return types.Sandbox{
+		SandboxID: sb.ID,
+		Runtime: &types.Sandbox_Runtime{
+			Name:    sb.Runtime.Name,
+			Options: options,
+		},
+		Spec:       spec,
+		Labels:     sb.Labels,
+		CreatedAt:  protobuf.ToTimestamp(sb.CreatedAt),
+		UpdatedAt:  protobuf.ToTimestamp(sb.UpdatedAt),
+		Extensions: extensions,
+		Sandboxer:  sb.Sandboxer,
+	}, nil
 }
