@@ -37,6 +37,8 @@ type Sandbox struct {
 	Status StatusStorage
 	// Container is the containerd sandbox container client.
 	Container containerd.Container
+	// Sandboxer is the sandbox controller name of the sandbox
+	Sandboxer string
 	// CNI network namespace client.
 	// For hostnetwork pod, this is always nil;
 	// For non hostnetwork pod, this should never be nil.

@@ -22,16 +22,17 @@ import (
 	goruntime "runtime"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	sandbox2 "github.com/containerd/containerd/v2/core/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/netns"
-	"github.com/containerd/errdefs"
 )
 
 // loadContainerTimeout is the default timeout for loading a container/sandbox.
@@ -133,8 +134,9 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 	}
 	if ch != nil {
 		go func() {
-			code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, ch)
-			podSandbox.Exit(*containerd.NewExitStatus(code, exitTime, err))
+			if err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, ch); err != nil {
+				log.G(context.Background()).Warnf("failed to wait pod sandbox exit %v", err)
+			}
 		}()
 	}
 
@@ -144,6 +146,7 @@ func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Conta
 
 	sandbox = sandboxstore.NewSandbox(*meta, s)
 	sandbox.Container = cntr
+	sandbox.Sandboxer = string(config.ModePodSandbox)
 
 	// Load network namespace.
 	sandbox.NetNS = getNetNS(meta)

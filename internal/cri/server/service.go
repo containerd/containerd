@@ -28,9 +28,9 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
-
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
@@ -74,7 +74,14 @@ type CRIService interface {
 }
 
 type sandboxService interface {
-	SandboxController(config *runtime.PodSandboxConfig, runtimeHandler string) (sandbox.Controller, error)
+	CreateSandbox(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error
+	StartSandbox(ctx context.Context, sandboxer string, sandboxID string) (sandbox.ControllerInstance, error)
+	WaitSandbox(ctx context.Context, sandboxer string, sandboxID string) (<-chan containerd.ExitStatus, error)
+	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
+	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
+	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
+	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (platforms.Platform, error)
+	SandboxController(sandboxer string) (sandbox.Controller, error)
 }
 
 // RuntimeService specifies dependencies to runtime service which provides
@@ -188,7 +195,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
-		sandboxService:     newCriSandboxService(&config, options.Client),
+		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
 	}
 
 	// TODO: Make discard time configurable
@@ -231,8 +238,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	// Initialize pod sandbox controller
-	// TODO: Get this from options, NOT client
-	podSandboxController := options.Client.SandboxController(string(criconfig.ModePodSandbox)).(*podsandbox.Controller)
+	podSandboxController := options.SandboxControllers[string(criconfig.ModePodSandbox)].(*podsandbox.Controller)
 	podSandboxController.Init(c)
 
 	c.nri = options.NRI

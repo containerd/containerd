@@ -24,6 +24,8 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -37,10 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/platforms"
-
-	"google.golang.org/grpc"
-
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // Register CRI service plugin
@@ -127,10 +125,9 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
 	}
 
-	// TODO(dmcgowan): Get the full list directly from configured plugins
-	sbControllers := map[string]sandbox.Controller{
-		string(criconfig.ModePodSandbox): client.SandboxController(string(criconfig.ModePodSandbox)),
-		string(criconfig.ModeShim):       client.SandboxController(string(criconfig.ModeShim)),
+	sbControllers, err := getSandboxControllers(ic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox controllers from plugins %v", err)
 	}
 
 	streamingConfig, err := config.StreamingConfig()
@@ -239,4 +236,16 @@ func getNRIAPI(ic *plugin.InitContext) *nri.API {
 	log.G(ctx).Info("using experimental NRI integration - disable nri plugin to prevent this")
 
 	return nri.NewAPI(api)
+}
+
+func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controller, error) {
+	sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
+	if err != nil {
+		return nil, err
+	}
+	sc := make(map[string]sandbox.Controller)
+	for name, p := range sandboxers {
+		sc[name] = p.(sandbox.Controller)
+	}
+	return sc, nil
 }

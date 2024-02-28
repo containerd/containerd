@@ -216,7 +216,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err != nil {
 		return cin, fmt.Errorf("failed to get sandbox container info: %w", err)
 	}
-	podSandbox.CreatedAt = info.CreatedAt
 
 	// Create sandbox task in containerd.
 	log.G(ctx).Tracef("Create sandbox container (id=%q, name=%q).", id, metadata.Name)
@@ -242,7 +241,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 			}
 		}
 	}()
-	podSandbox.Pid = task.Pid()
 
 	// wait is a long running background request, no timeout needed.
 	exitCh, err := task.Wait(ctrdutil.NamespacedContext())
@@ -267,7 +265,15 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err := task.Start(ctx); err != nil {
 		return cin, fmt.Errorf("failed to start sandbox container task %q: %w", id, err)
 	}
-	podSandbox.State = sandboxstore.StateReady
+	pid := task.Pid()
+	if err := podSandbox.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.Pid = pid
+		status.State = sandboxstore.StateReady
+		status.CreatedAt = info.CreatedAt
+		return status, nil
+	}); err != nil {
+		return cin, fmt.Errorf("failed to update status of pod sandbox %q: %w", id, err)
+	}
 
 	cin.SandboxID = id
 	cin.Pid = task.Pid()
@@ -275,8 +281,9 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	cin.Labels = labels
 
 	go func() {
-		code, exitTime, err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh)
-		podSandbox.Exit(*containerd.NewExitStatus(code, exitTime, err))
+		if err := c.waitSandboxExit(ctrdutil.NamespacedContext(), podSandbox, exitCh); err != nil {
+			log.G(context.Background()).Warnf("failed to wait pod sandbox exit %v", err)
+		}
 	}()
 
 	return

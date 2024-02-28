@@ -403,7 +403,7 @@ func TestRecoverContainer(t *testing.T) {
 
 		pSb := controller.store.Get(cont.ID())
 		assert.NotNil(t, pSb)
-		assert.Equal(t, c.expectedState, pSb.State, "%s state is not expected", cont.ID())
+		assert.Equal(t, c.expectedState, pSb.Status.Get().State, "%s state is not expected", cont.ID())
 
 		if c.expectedExitCode > 0 {
 			cont.t.waitExitCh <- struct{}{}

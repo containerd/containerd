@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	containerd "github.com/containerd/containerd/v2/client"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/bandwidth"
@@ -124,6 +123,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			CreatedAt: time.Now().UTC(),
 		},
 	)
+	sandbox.Sandboxer = ociRuntime.Sandboxer
 
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
@@ -240,21 +240,16 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
 	}
 
-	controller, err := c.sandboxService.SandboxController(config, r.GetRuntimeHandler())
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox controller: %w", err)
-	}
-
 	// Save sandbox metadata to store
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
 		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 	}
 
-	if err := controller.Create(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
+	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
 		return nil, fmt.Errorf("failed to create sandbox %q: %w", id, err)
 	}
 
-	ctrl, err := controller.Start(ctx, id)
+	ctrl, err := c.sandboxService.StartSandbox(ctx, sandbox.Sandboxer, id)
 	if err != nil {
 		var cerr podsandbox.CleanupErr
 		if errors.As(err, &cerr) {
@@ -401,21 +396,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	// SandboxStatus from the store and include it in the event.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_CREATED_EVENT)
 
-	// TODO: Use sandbox client instead
-	exitCh := make(chan containerd.ExitStatus, 1)
-	go func() {
-		defer close(exitCh)
-
-		ctx := util.NamespacedContext()
-		resp, err := controller.Wait(ctx, id)
-		if err != nil {
-			log.G(ctx).WithError(err).Error("failed to wait for sandbox exit")
-			exitCh <- *containerd.NewExitStatus(containerd.UnknownExitStatus, time.Time{}, err)
-			return
-		}
-
-		exitCh <- *containerd.NewExitStatus(resp.ExitStatus, resp.ExitedAt, nil)
-	}()
+	exitCh, err := c.sandboxService.WaitSandbox(util.NamespacedContext(), sandbox.Sandboxer, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wait sandbox %s: %v", id, err)
+	}
 
 	// start the monitor after adding sandbox into the store, this ensures
 	// that sandbox is in the store, when event monitor receives the TaskExit event.

@@ -277,7 +277,7 @@ type ImageConfig struct {
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
-	PinnedImages map[string]string
+	PinnedImages map[string]string `toml:"pinned_images" json:"pinned_images"`
 
 	// RuntimePlatforms is map between the runtime and the image platform to
 	// use for that runtime. When resolving an image for a runtime, this

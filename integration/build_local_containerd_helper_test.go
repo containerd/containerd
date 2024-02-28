@@ -129,7 +129,6 @@ func buildLocalContainerdClient(t *testing.T, tmpDir string, tweakInitFn tweakPl
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(lastInitContext),
-		containerd.WithInMemorySandboxControllers(lastInitContext),
 	)
 	require.NoError(t, err)
 
