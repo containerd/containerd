@@ -76,6 +76,14 @@ func (f fakeSandboxController) Metrics(ctx context.Context, sandboxID string) (*
 	return &types.Metric{}, errdefs.ErrNotImplemented
 }
 
+func (f fakeSandboxController) UpdateResource(
+	ctx context.Context,
+	sandboxID string,
+	op types.ResourceOp,
+	resource *types.TaskResource) error {
+	return errdefs.ErrNotImplemented
+}
+
 type fakeRuntimeService struct {
 	ocispecs map[string]*oci.Spec
 }

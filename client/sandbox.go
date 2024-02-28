@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 
+	types2 "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
 	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -52,6 +53,8 @@ type Sandbox interface {
 	Wait(ctx context.Context) (<-chan ExitStatus, error)
 	// Shutdown removes sandbox from the metadata store and shutdowns shim instance.
 	Shutdown(ctx context.Context) error
+	// UpdateResource update resources in sandbox for task create/delete/update in it.
+	UpdateResource(ctx context.Context, op types2.ResourceOp, resource *types2.TaskResource) error
 }
 
 type sandboxClient struct {
@@ -140,6 +143,13 @@ func (s *sandboxClient) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("failed to delete sandbox from store: %w", err)
 	}
 
+	return nil
+}
+
+func (s *sandboxClient) UpdateResource(ctx context.Context, op types2.ResourceOp, resource *types2.TaskResource) error {
+	if err := s.client.SandboxController(s.metadata.Sandboxer).UpdateResource(ctx, s.ID(), op, resource); err != nil {
+		return fmt.Errorf("failed to update sandbox resource: %w", err)
+	}
 	return nil
 }
 
