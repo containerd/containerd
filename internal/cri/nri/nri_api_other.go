@@ -29,7 +29,7 @@ import (
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/constants"
-	"github.com/containerd/containerd/v2/pkg/nri"
+	"github.com/containerd/containerd/v2/internal/nri"
 
 	"github.com/containerd/nri/pkg/api"
 )

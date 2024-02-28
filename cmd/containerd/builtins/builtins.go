@@ -19,12 +19,12 @@ package builtins
 // register containerd builtins here
 import (
 	_ "github.com/containerd/containerd/v2/core/runtime/v2"
-	_ "github.com/containerd/containerd/v2/pkg/nri/plugin"
 	_ "github.com/containerd/containerd/v2/plugins/events"
 	_ "github.com/containerd/containerd/v2/plugins/gc"
 	_ "github.com/containerd/containerd/v2/plugins/imageverifier"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
+	_ "github.com/containerd/containerd/v2/plugins/nri"
 	_ "github.com/containerd/containerd/v2/plugins/restart"
 	_ "github.com/containerd/containerd/v2/plugins/sandbox"
 	_ "github.com/containerd/containerd/v2/plugins/services/containers"
