@@ -182,6 +182,23 @@ func (r *remoteTask) Resume(ctx context.Context) error {
 	return nil
 }
 
+func (r *remoteTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
+	resp, err := r.client.Pids(ctx, &task.PidsRequest{
+		ID: r.id,
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	var processList []runtime.ProcessInfo
+	for _, p := range resp.Processes {
+		processList = append(processList, runtime.ProcessInfo{
+			Pid:  p.Pid,
+			Info: p.Info,
+		})
+	}
+	return processList, nil
+}
+
 func (r *remoteTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
 	if err := identifiers.Validate(id); err != nil {
 		return nil, fmt.Errorf("invalid exec id %s: %w", id, err)
@@ -202,23 +219,6 @@ func (r *remoteTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts)
 		id:   id,
 		task: r,
 	}, nil
-}
-
-func (r *remoteTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
-	resp, err := r.client.Pids(ctx, &task.PidsRequest{
-		ID: r.id,
-	})
-	if err != nil {
-		return nil, errdefs.FromGRPC(err)
-	}
-	var processList []runtime.ProcessInfo
-	for _, p := range resp.Processes {
-		processList = append(processList, runtime.ProcessInfo{
-			Pid:  p.Pid,
-			Info: p.Info,
-		})
-	}
-	return processList, nil
 }
 
 func (r *remoteTask) Checkpoint(ctx context.Context, path string, opts *ptypes.Any) error {
