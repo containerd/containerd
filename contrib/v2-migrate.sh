@@ -34,7 +34,8 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/snapshots/$1$2"github.com\/containerd\/containerd\/v2\/core\/snapshots/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/archive/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/archive/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/cio/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/cio/g' $GOFILE
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/events/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/events/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/events\/plugin/$1$2"github.com\/containerd\/containerd\/v2\/plugins\/events/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/events/$1$2"github.com\/containerd\/containerd\/v2\/core\/events/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/errdefs/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/errdefs/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/filters/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/filters/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/gc\/scheduler/$1$2"github.com\/containerd\/containerd\/v2\/plugins\/gc/g' $GOFILE

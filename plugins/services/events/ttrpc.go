@@ -21,8 +21,8 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/pkg/events"
-	"github.com/containerd/containerd/v2/pkg/events/exchange"
+	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/errdefs"

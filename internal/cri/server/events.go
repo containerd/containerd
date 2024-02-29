@@ -31,12 +31,12 @@ import (
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	apitasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/events"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"
 )

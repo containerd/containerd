@@ -20,8 +20,8 @@ import (
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	eventstypes "github.com/containerd/containerd/v2/api/events"
-	"github.com/containerd/containerd/v2/pkg/events"
-	"github.com/containerd/containerd/v2/pkg/events/exchange"
+	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
