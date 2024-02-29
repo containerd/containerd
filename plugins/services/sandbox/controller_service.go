@@ -42,16 +42,25 @@ func init() {
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
 			plugins.SandboxControllerPlugin,
+			plugins.SandboxControllerPluginV2,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			sc := make(map[string]sandbox.Controller)
+
 			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			sc := make(map[string]sandbox.Controller)
 			for name, p := range sandboxers {
+				sc[name] = p.(sandbox.Controller)
+			}
+
+			sandboxersV2, err := ic.GetByType(plugins.SandboxControllerPluginV2)
+			if err != nil {
+				return nil, err
+			}
+			for name, p := range sandboxersV2 {
 				sc[name] = p.(sandbox.Controller)
 			}
 

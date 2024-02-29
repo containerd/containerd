@@ -63,14 +63,18 @@ const (
 	TransferPlugin plugin.Type = "io.containerd.transfer.v1"
 	// SandboxStorePlugin implements a sandbox store
 	SandboxStorePlugin plugin.Type = "io.containerd.sandbox.store.v1"
-	// SandboxControllerPlugin implements a sandbox controller
+	// SandboxControllerPlugin is a legacy sandbox controller which use pause container as a sandbox.
 	SandboxControllerPlugin plugin.Type = "io.containerd.sandbox.controller.v1"
+	// SandboxControllerPluginV2 implements a sandbox controller
+	SandboxControllerPluginV2 plugin.Type = "io.containerd.sandbox.controller.v2"
 	// ImageVerifierPlugin implements an image verifier service
 	ImageVerifierPlugin plugin.Type = "io.containerd.image-verifier.v1"
 	// WarningPlugin implements a warning service
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
 	// CRIServicePlugin implements a cri service
 	CRIServicePlugin plugin.Type = "io.containerd.cri.v1"
+	// ShimPlugin implements a shim service
+	ShimPlugin plugin.Type = "io.containerd.shim.v1"
 )
 
 const (

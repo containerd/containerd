@@ -22,20 +22,24 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
 )
 
 // Sandbox is a high level client to containerd's sandboxes.
 type Sandbox interface {
 	// ID is a sandbox identifier
 	ID() string
-	// PID returns sandbox's process PID or error if its not yet started.
-	PID() (uint32, error)
+	// Endpoint returns endpoint of the sandbox
+	Endpoint() api.Endpoint
+	// Metadata returns metadata of the sandbox
+	Metadata() api.Sandbox
 	// NewContainer creates new container that will belong to this sandbox
 	NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error)
 	// Labels returns the labels set on the sandbox
@@ -51,21 +55,21 @@ type Sandbox interface {
 }
 
 type sandboxClient struct {
-	pid      *uint32
 	client   *Client
 	metadata api.Sandbox
+	endpoint api.Endpoint
 }
 
 func (s *sandboxClient) ID() string {
 	return s.metadata.ID
 }
 
-func (s *sandboxClient) PID() (uint32, error) {
-	if s.pid == nil {
-		return 0, fmt.Errorf("sandbox not started")
-	}
+func (s *sandboxClient) Endpoint() api.Endpoint {
+	return s.endpoint
+}
 
-	return *s.pid, nil
+func (s *sandboxClient) Metadata() api.Sandbox {
+	return s.metadata
 }
 
 func (s *sandboxClient) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
@@ -86,8 +90,17 @@ func (s *sandboxClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	s.pid = &resp.Pid
+	if err := s.addExtension(ctx, api.EndpointKey, &api.Endpoint{
+		Version:  resp.Version,
+		Address:  resp.Address,
+		Protocol: resp.Protocol,
+	}); err != nil {
+		stopErr := s.client.SandboxController(s.metadata.Sandboxer).Stop(ctx, s.ID())
+		if stopErr != nil {
+			log.G(ctx).WithError(stopErr).Error("failed to stop sandbox when add endpoint extension error")
+		}
+		return err
+	}
 	return nil
 }
 
@@ -130,6 +143,20 @@ func (s *sandboxClient) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+func (s *sandboxClient) addExtension(ctx context.Context, key string, obj interface{}) error {
+	if err := s.metadata.AddExtension(key, obj); err != nil {
+		stopErr := s.client.SandboxController(s.metadata.Sandboxer).Stop(ctx, s.ID())
+		if stopErr != nil {
+			log.G(ctx).WithError(stopErr).Error("failed to stop sandbox when add endpoint extension error")
+		}
+		return err
+	}
+	if _, err := s.client.SandboxStore().Update(ctx, s.metadata, fmt.Sprintf("extensions.%s", api.EndpointKey)); err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewSandbox creates new sandbox client
 func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSandboxOpts) (Sandbox, error) {
 	if sandboxID == "" {
@@ -154,7 +181,6 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}
 
 	return &sandboxClient{
-		pid:      nil, // Not yet started
 		client:   c,
 		metadata: metadata,
 	}, nil
@@ -167,15 +193,15 @@ func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 		return nil, err
 	}
 
-	status, err := c.SandboxController(sandbox.Sandboxer).Status(ctx, id, false)
+	endpoint, err := sandbox.GetEndpoint()
 	if err != nil {
-		return nil, fmt.Errorf("failed to load sandbox %s, status request failed: %w", id, err)
+		return nil, fmt.Errorf("failed to get endpoint of sandbox %s: %w", id, err)
 	}
 
 	return &sandboxClient{
-		pid:      &status.Pid,
 		client:   c,
 		metadata: sandbox,
+		endpoint: endpoint,
 	}, nil
 }
 
