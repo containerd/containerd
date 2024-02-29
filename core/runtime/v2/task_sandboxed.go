@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/ttrpc"
 
 	"github.com/containerd/containerd/v2/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/runtime"
@@ -37,6 +38,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
+	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 )
 
 var ErrCanNotHandle = errors.New("can not handle this task")
@@ -97,12 +99,14 @@ func (s *SandboxedTaskManager) Create(ctx context.Context, taskID string, bundle
 	if err != nil {
 		return nil, fmt.Errorf("failed to new sandboxed task: %w", err)
 	}
-	err = sandboxedTask.Create(ctx, bundle.Path, opts)
+	t, err := sandboxedTask.create(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sandboxed task: %w", err)
 	}
-	s.tasks.Add(ctx, sandboxedTask)
-	return sandboxedTask, nil
+	if err := s.tasks.Add(ctx, sandboxedTask); err != nil {
+
+	}
+	return t, nil
 }
 
 func (s *SandboxedTaskManager) Load(ctx context.Context, sandboxID string, bundle *Bundle) error {
@@ -150,6 +154,15 @@ func (s *SandboxedTaskManager) Delete(ctx context.Context, taskID string) (*runt
 			if !errdefs.IsNotFound(taskErr) {
 				return nil, taskErr
 			}
+		}
+	}
+
+	err = st.sandbox.UpdateResource(ctx, types.ResourceOp_REMOVE, &types.TaskResource{TaskID: taskID})
+	if err != nil {
+		log.G(ctx).WithField("id", taskID).WithError(err).Debug("failed to remove task resource from sandbox")
+		// also ignore not found error here, maybe the resource is already removed from the sandbox
+		if !errdefs.IsNotFound(err) {
+			return nil, err
 		}
 	}
 
@@ -240,4 +253,113 @@ func (s *sandboxedTask) ID() string {
 
 func (s *sandboxedTask) Namespace() string {
 	return s.namespace
+}
+
+func (s *sandboxedTask) create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
+	// Update the resource in sandbox first
+	var rootfs []*types.Mount
+	for _, m := range opts.Rootfs {
+		rootfs = append(rootfs, &types.Mount{
+			Type:    m.Type,
+			Source:  m.Source,
+			Target:  m.Target,
+			Options: m.Options,
+		})
+	}
+	err := s.sandbox.UpdateResource(ctx, types.ResourceOp_ADD, &types.TaskResource{
+		TaskID: s.ID(),
+		Spec:   protobuf.FromAny(opts.Spec),
+		Rootfs: rootfs,
+		Stdin:  opts.IO.Stdin,
+		Stdout: opts.IO.Stdout,
+		Stderr: opts.IO.Stderr,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Then call Task Create api in sandbox to create the task inside sandbox
+	if err := s.remoteTask.Create(ctx, s.bundle.Path, opts); err != nil {
+		if removeErr := s.sandbox.UpdateResource(ctx, types.ResourceOp_REMOVE, &types.TaskResource{
+			TaskID: s.ID(),
+		}); removeErr != nil {
+			log.G(ctx).Warnf("failed to remove task resource %s in sandbox %s: %v", s.ID(), s.sandbox.ID(), removeErr)
+		}
+		return nil, err
+	}
+	return s, nil
+}
+
+func (s *sandboxedTask) Update(ctx context.Context, resources *ptypes.Any, annotations map[string]string) error {
+	// Update resources in sandbox firstly
+	err := s.sandbox.UpdateResource(ctx, types.ResourceOp_UPDATE, &types.TaskResource{
+		TaskID: s.ID(),
+		Spec:   resources,
+	})
+	if err != nil {
+		return err
+	}
+
+	// then call Update of task API
+	err = s.remoteTask.Update(ctx, resources, annotations)
+	if err != nil {
+		// TODO: note that we do not rollback of the resource change in sandbox.
+		// if we want to do it, we have to get the resource from the spec file in bundle
+		// and call UpdateResource to change it back,
+		// also we have to update the resources in the spec file in bundle after Update call succeed.
+		return err
+	}
+
+	return nil
+}
+
+func (s *sandboxedTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (runtime.ExecProcess, error) {
+	// Update resources in sandbox firstly
+	//
+	err := s.sandbox.UpdateResource(ctx, types.ResourceOp_ADD, &types.TaskResource{
+		TaskID: s.ID(),
+		ExecID: id,
+		Spec:   opts.Spec,
+		Stdin:  opts.IO.Stdin,
+		Stdout: opts.IO.Stdout,
+		Stderr: opts.IO.Stderr,
+	})
+	if err != nil {
+		return nil, err
+	}
+	p, err := s.remoteTask.Exec(ctx, id, opts)
+	if err != nil {
+		removeErr := s.sandbox.UpdateResource(ctx, types.ResourceOp_REMOVE, &types.TaskResource{
+			TaskID: s.ID(),
+			ExecID: id,
+		})
+		if removeErr != nil {
+			log.G(ctx).Warnf("failed to remove exec task resource %s %s in sandbox %s: %v", s.ID(), id, s.sandbox.ID(), removeErr)
+		}
+		return nil, err
+	}
+	return &sandboxedProcess{
+		ExecProcess: p,
+		sbTask:      s,
+	}, nil
+}
+
+type sandboxedProcess struct {
+	runtime.ExecProcess
+	sbTask *sandboxedTask
+}
+
+func (p *sandboxedProcess) Delete(ctx context.Context) (*runtime.Exit, error) {
+	exit, err := p.ExecProcess.Delete(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = p.sbTask.sandbox.UpdateResource(ctx, types.ResourceOp_REMOVE, &types.TaskResource{
+		TaskID: p.sbTask.ID(),
+		ExecID: p.ID(),
+	})
+	if err != nil {
+		return nil, errdefs.FromGRPC(err)
+	}
+	return exit, nil
 }
