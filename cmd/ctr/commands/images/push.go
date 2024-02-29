@@ -104,7 +104,10 @@ var pushCommand = &cli.Command{
 			if local == "" {
 				local = ref
 			}
-			reg := registry.NewOCIRegistry(ref, nil, ch)
+			reg, err := registry.NewOCIRegistry(ctx, ref, registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir")))
+			if err != nil {
+				return err
+			}
 			is := image.NewStore(local)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)
