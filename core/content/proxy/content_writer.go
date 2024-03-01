@@ -30,7 +30,7 @@ import (
 
 type remoteWriter struct {
 	ref    string
-	client contentapi.Content_WriteClient
+	client contentapi.TTRPCContent_WriteClient
 	offset int64
 	digest digest.Digest
 }

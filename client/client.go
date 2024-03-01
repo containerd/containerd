@@ -27,7 +27,6 @@ import (
 	"time"
 
 	containersapi "github.com/containerd/containerd/v2/api/services/containers/v1"
-	contentapi "github.com/containerd/containerd/v2/api/services/content/v1"
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
 	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
@@ -622,7 +621,7 @@ func (c *Client) ContentStore() content.Store {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return contentproxy.NewContentStore(contentapi.NewContentClient(c.conn))
+	return contentproxy.NewContentStore(c.conn)
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
