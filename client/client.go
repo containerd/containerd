@@ -737,8 +737,9 @@ func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }
 
-// Conn returns the underlying GRPC connection object
-func (c *Client) Conn() *grpc.ClientConn {
+// Conn returns the underlying RPC connection object
+// Either *grpc.ClientConn or *ttrpc.Conn
+func (c *Client) Conn() any {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	return c.conn
