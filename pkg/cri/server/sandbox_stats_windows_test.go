@@ -306,8 +306,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			desc: "pod sandbox with a container that has no cpu shouldn't error",
+		"pod sandbox with a container that has no cpu shouldn't error": {
 			metrics: map[string]*wstats.Statistics{
 				"c1": {},
 				"s1": {},
@@ -323,8 +322,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedContainerStats: []expectedStats{},
 			expectError:            false,
 		},
-		{
-			desc:                   "pod sandbox with no stats in metric mapp will fail",
+		"pod sandbox with no stats in metric mapp will fail": {
 			metrics:                map[string]*wstats.Statistics{},
 			sandbox:                sandboxPod("s1", initialStatsTimestamp, 200),
 			containers:             []containerstore.Container{},
