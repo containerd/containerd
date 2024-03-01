@@ -26,6 +26,7 @@ import (
 	"github.com/Microsoft/hcsshim/hcn"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
@@ -36,12 +37,11 @@ import (
 
 func (c *criService) podSandboxStats(
 	ctx context.Context,
-	sandbox sandboxstore.Sandbox,
-) (*runtime.PodSandboxStats, error) {
+	sandbox sandboxstore.Sandbox) (*runtime.PodSandboxStats, error) {
 	meta := sandbox.Metadata
 
 	if sandbox.Status.Get().State != sandboxstore.StateReady {
-		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state", meta.ID)
+		return nil, fmt.Errorf("failed to get pod sandbox stats since sandbox container %q is not in ready state: %w", meta.ID, errdefs.ErrUnavailable)
 	}
 
 	timestamp := time.Now()
@@ -62,7 +62,7 @@ func (c *criService) podSandboxStats(
 
 	statsMap, err := convertMetricsToWindowsStats(metrics, sandbox)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert stats: %w", err)
 	}
 
 	podCPU, containerStats, err := c.toPodSandboxStats(sandbox, statsMap, containers, timestamp)
@@ -72,12 +72,11 @@ func (c *criService) podSandboxStats(
 	podSandboxStats.Windows.Cpu = podCPU.Cpu
 	podSandboxStats.Windows.Memory = podCPU.Memory
 	podSandboxStats.Windows.Containers = containerStats
-
 	podSandboxStats.Windows.Network = windowsNetworkUsage(ctx, sandbox, timestamp)
 
 	pidCount, err := c.getSandboxPidCount(ctx, sandbox)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get pid count: %w", err)
 	}
 
 	podSandboxStats.Windows.Process = &runtime.WindowsProcessUsage{
@@ -131,11 +130,13 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 
 		if cntr.Status.Get().State() != runtime.ContainerState_CONTAINER_RUNNING {
 			// containers that are just created, in a failed state or exited (init containers) will not have stats
+			log.L.Warnf("failed to get container stats since container %q is not in running state", cntr.ID)
 			continue
 		}
 
 		if containerMetric == nil {
-			return nil, nil, fmt.Errorf("failed to find metrics for container with id %s: %w", cntr.ID, err)
+			log.L.Warnf("no metrics found for container %q", cntr.ID)
+			continue
 		}
 
 		containerStats, err := c.convertToCRIStats(containerMetric)
@@ -144,7 +145,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		}
 
 		// Calculate NanoCores for container
-		if containerStats.Cpu.UsageCoreNanoSeconds != nil {
+		if containerStats.Cpu != nil && containerStats.Cpu.UsageCoreNanoSeconds != nil {
 			nanoCoreUsage := getUsageNanoCores(containerStats.Cpu.UsageCoreNanoSeconds.Value, cntr.Stats, containerStats.Cpu.Timestamp)
 			containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
 		}
@@ -180,7 +181,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 	}
 
 	// Calculate NanoCores for pod after adding containers cpu including the pods cpu
-	if podRuntimeStats.Cpu.UsageCoreNanoSeconds != nil {
+	if podRuntimeStats.Cpu != nil && podRuntimeStats.Cpu.UsageCoreNanoSeconds != nil {
 		nanoCoreUsage := getUsageNanoCores(podRuntimeStats.Cpu.UsageCoreNanoSeconds.Value, sandbox.Stats, podRuntimeStats.Cpu.Timestamp)
 		podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
 	}
@@ -391,10 +392,16 @@ func (c *criService) getSandboxPidCount(ctx context.Context, sandbox sandboxstor
 	// get process count inside PodSandbox for Windows
 	task, err := sandbox.Container.Task(ctx, nil)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return 0, nil
+		}
 		return 0, err
 	}
 	processes, err := task.Pids(ctx)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			return 0, nil
+		}
 		return 0, err
 	}
 	pidCount += uint64(len(processes))
@@ -416,6 +423,9 @@ func (c *criService) getSandboxPidCount(ctx context.Context, sandbox sandboxstor
 
 		processes, err := task.Pids(ctx)
 		if err != nil {
+			if errdefs.IsNotFound(err) {
+				continue
+			}
 			return 0, err
 		}
 		pidCount += uint64(len(processes))
