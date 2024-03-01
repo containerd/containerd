@@ -21,6 +21,7 @@ package process
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -140,6 +141,13 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 	if socket != nil {
 		opts.ConsoleSocket = socket
 	}
+
+	// runc ignores silently features it doesn't know about, so for things that this is
+	// problematic let's check if this runc version supports them.
+	if err := p.validateRuncFeatures(ctx, r.Bundle); err != nil {
+		return fmt.Errorf("failed to detect OCI runtime features: %w", err)
+	}
+
 	if err := p.runtime.Create(ctx, r.ID, r.Bundle, opts); err != nil {
 		return p.runtimeError(err, "OCI runtime create failed")
 	}
@@ -170,6 +178,56 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		return fmt.Errorf("failed to retrieve OCI runtime container pid: %w", err)
 	}
 	p.pid = pid
+	return nil
+}
+
+func (p *Init) validateRuncFeatures(ctx context.Context, bundle string) error {
+	// TODO: We should remove the logic from here and rebase on #8509.
+	// This way we can avoid the call to readConfig() here and the call to p.runtime.Features()
+	// in validateIDMapMounts().
+	// But that PR is not yet merged nor it is clear if it will be refactored.
+	// Do this contained hack for now.
+	spec, err := readConfig(bundle)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %w", err)
+	}
+
+	if err := p.validateIDMapMounts(ctx, spec); err != nil {
+		return fmt.Errorf("OCI runtime doesn't support idmap mounts: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Init) validateIDMapMounts(ctx context.Context, spec *specs.Spec) error {
+	var used bool
+	for _, m := range spec.Mounts {
+		if m.UIDMappings != nil || m.GIDMappings != nil {
+			used = true
+			break
+		}
+	}
+
+	if !used {
+		return nil
+	}
+
+	// From here onwards, we require idmap mounts. So if we fail to check, we return an error.
+	features, err := p.runtime.Features(ctx)
+	if err != nil {
+		// If the features command is not implemented, then runc is too old.
+		return fmt.Errorf("features command failed: %w", err)
+
+	}
+
+	if features.Linux.MountExtensions == nil || features.Linux.MountExtensions.IDMap == nil {
+		return errors.New("missing `mountExtensions.idmap` entry in `features` command")
+	}
+
+	if enabled := features.Linux.MountExtensions.IDMap.Enabled; enabled == nil || !*enabled {
+		return errors.New("idmap mounts not supported")
+	}
+
 	return nil
 }
 

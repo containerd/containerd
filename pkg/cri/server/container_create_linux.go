@@ -62,6 +62,12 @@ const (
 func (c *criService) containerMounts(sandboxID string, config *runtime.ContainerConfig) []*runtime.Mount {
 	var mounts []*runtime.Mount
 	securityContext := config.GetLinux().GetSecurityContext()
+	var uidMappings, gidMappings []*runtime.IDMapping
+	if usernsOpts := securityContext.GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
+		uidMappings = usernsOpts.GetUids()
+		gidMappings = usernsOpts.GetGids()
+	}
+
 	if !isInCRIMounts(etcHostname, config.GetMounts()) {
 		// /etc/hostname is added since 1.1.6, 1.2.4 and 1.3.
 		// For in-place upgrade, the old sandbox doesn't have the hostname file,
@@ -75,6 +81,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 				HostPath:       hostpath,
 				Readonly:       securityContext.GetReadonlyRootfs(),
 				SelinuxRelabel: true,
+				UidMappings:    uidMappings,
+				GidMappings:    gidMappings,
 			})
 		}
 	}
@@ -85,6 +93,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 			HostPath:       c.getSandboxHosts(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 
@@ -96,6 +106,8 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 			HostPath:       c.getResolvPath(sandboxID),
 			Readonly:       securityContext.GetReadonlyRootfs(),
 			SelinuxRelabel: true,
+			UidMappings:    uidMappings,
+			GidMappings:    gidMappings,
 		})
 	}
 
@@ -109,6 +121,16 @@ func (c *criService) containerMounts(sandboxID string, config *runtime.Container
 			HostPath:       sandboxDevShm,
 			Readonly:       false,
 			SelinuxRelabel: sandboxDevShm != devShm,
+			// XXX: tmpfs support for idmap mounts got merged in
+			// Linux 6.3.
+			// Our CI runs with 5.15 kernels, so disabling idmap
+			// mounts for this case makes the CI happy (the other fs
+			// used support idmap mounts in 5.15 kernels).
+			// We can enable this at a later stage, but as this
+			// tmpfs mount is exposed empty to the container (no
+			// prepopulated files) and using the hostIPC with userns
+			// is blocked by k8s, we can just avoid using the
+			// mappings and it should work fine.
 		})
 	}
 	return mounts

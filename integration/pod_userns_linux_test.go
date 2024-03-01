@@ -17,6 +17,8 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,6 +28,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/integration/images"
+	runc "github.com/containerd/go-runc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -104,6 +107,9 @@ func TestPodUserNS(t *testing.T) {
 			if err := cmd.Run(); err != nil {
 				t.Skip("skipping test: user namespaces are unavailable")
 			}
+			if err := supportsRuncIDMap(); err != nil {
+				t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+			}
 
 			testPodLogDir := t.TempDir()
 			sandboxOpts := append(test.sandboxOpts, WithPodLogDirectory(testPodLogDir))
@@ -166,4 +172,23 @@ func TestPodUserNS(t *testing.T) {
 			test.checkOutput(t, string(content))
 		})
 	}
+}
+
+func supportsRuncIDMap() error {
+	var r runc.Runc
+	features, err := r.Features(context.Background())
+	if err != nil {
+		// If the features command is not implemented, then runc is too old.
+		return fmt.Errorf("features command failed: %w", err)
+	}
+
+	if features.Linux.MountExtensions == nil || features.Linux.MountExtensions.IDMap == nil {
+		return errors.New("missing `mountExtensions.idmap` entry in `features` command")
+
+	}
+	if enabled := features.Linux.MountExtensions.IDMap.Enabled; enabled == nil || !*enabled {
+		return errors.New("idmap mounts not supported")
+	}
+
+	return nil
 }

@@ -1745,3 +1745,7 @@ func (in *instrumentedService) ListPodSandboxMetrics(ctx context.Context, r *run
 	res, err = in.c.ListPodSandboxMetrics(ctx, r)
 	return res, errdefs.ToGRPC(err)
 }
+
+func (in *instrumentedService) RuntimeConfig(ctx context.Context, r *runtime.RuntimeConfigRequest) (res *runtime.RuntimeConfigResponse, err error) {
+	return nil, errors.New("not implemented")
+}
