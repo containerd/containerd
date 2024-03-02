@@ -31,7 +31,6 @@ import (
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
 	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
-	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	leasesapi "github.com/containerd/containerd/v2/api/services/leases/v1"
 	namespacesapi "github.com/containerd/containerd/v2/api/services/namespaces/v1"
 	sandboxsapi "github.com/containerd/containerd/v2/api/services/sandbox/v1"
@@ -44,6 +43,8 @@ import (
 	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/introspection"
+	introspectionproxy "github.com/containerd/containerd/v2/core/introspection/proxy"
 	"github.com/containerd/containerd/v2/core/leases"
 	leasesproxy "github.com/containerd/containerd/v2/core/leases/proxy"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -56,7 +57,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services/introspection"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/errdefs"
@@ -681,7 +681,7 @@ func (c *Client) IntrospectionService() introspection.Service {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return introspection.NewIntrospectionServiceFromClient(introspectionapi.NewIntrospectionClient(c.conn))
+	return introspectionproxy.NewIntrospectionProxy(c.conn)
 }
 
 // LeasesService returns the underlying Leases Client
@@ -785,7 +785,7 @@ func (c *Client) Server(ctx context.Context) (ServerInfo, error) {
 	}
 	c.connMu.Unlock()
 
-	response, err := c.IntrospectionService().Server(ctx, &ptypes.Empty{})
+	response, err := c.IntrospectionService().Server(ctx)
 	if err != nil {
 		return ServerInfo{}, err
 	}
@@ -831,7 +831,7 @@ func (c *Client) GetSnapshotterSupportedPlatforms(ctx context.Context, snapshott
 	filters := []string{fmt.Sprintf("type==%s, id==%s", plugins.SnapshotPlugin, snapshotterName)}
 	in := c.IntrospectionService()
 
-	resp, err := in.Plugins(ctx, filters)
+	resp, err := in.Plugins(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -862,7 +862,7 @@ func (c *Client) GetSnapshotterCapabilities(ctx context.Context, snapshotterName
 	filters := []string{fmt.Sprintf("type==%s, id==%s", plugins.SnapshotPlugin, snapshotterName)}
 	in := c.IntrospectionService()
 
-	resp, err := in.Plugins(ctx, filters)
+	resp, err := in.Plugins(ctx, filters...)
 	if err != nil {
 		return nil, err
 	}
@@ -903,20 +903,10 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
 		}
 	}
-	options, err := protobuf.MarshalAnyToProto(rr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal runtime requst: %w", err)
-	}
 
 	s := c.IntrospectionService()
 
-	req := &introspectionapi.PluginInfoRequest{
-		Type:    string(plugins.RuntimePluginV2),
-		ID:      "task",
-		Options: options,
-	}
-
-	resp, err := s.PluginInfo(ctx, req)
+	resp, err := s.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
 	if err != nil {
 		return nil, err
 	}

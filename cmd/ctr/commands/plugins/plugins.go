@@ -71,7 +71,7 @@ var listCommand = &cli.Command{
 		}
 		defer cancel()
 		ps := client.IntrospectionService()
-		response, err := ps.Plugins(ctx, context.Args().Slice())
+		response, err := ps.Plugins(ctx, context.Args().Slice()...)
 		if err != nil {
 			return err
 		}

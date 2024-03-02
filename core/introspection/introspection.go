@@ -14,34 +14,17 @@
    limitations under the License.
 */
 
-package info
+package introspection
 
 import (
+	context "context"
+
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/urfave/cli/v2"
 )
 
-type Info struct {
-	Server *api.ServerResponse `json:"server"`
-}
-
-// Command is a cli command to output the containerd server info
-var Command = &cli.Command{
-	Name:  "info",
-	Usage: "Print the server info",
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
-		if err != nil {
-			return err
-		}
-		defer cancel()
-		var info Info
-		info.Server, err = client.IntrospectionService().Server(ctx)
-		if err != nil {
-			return err
-		}
-		commands.PrintAsJSON(info)
-		return nil
-	},
+// Service defines the introspection service interface
+type Service interface {
+	Plugins(context.Context, ...string) (*api.PluginsResponse, error)
+	Server(context.Context) (*api.ServerResponse, error)
+	PluginInfo(context.Context, string, string, any) (*api.PluginInfoResponse, error)
 }
