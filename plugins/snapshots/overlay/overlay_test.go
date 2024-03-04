@@ -31,7 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
-	"github.com/containerd/containerd/v2/internal/testutil"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/overlayutils"
 	"github.com/opencontainers/runtime-spec/specs-go"
 )

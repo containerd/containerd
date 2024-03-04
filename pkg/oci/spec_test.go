@@ -24,8 +24,8 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/internal/testutil"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 func TestGenerateSpec(t *testing.T) {

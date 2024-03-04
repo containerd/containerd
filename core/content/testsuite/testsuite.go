@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/internal/testutil"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
