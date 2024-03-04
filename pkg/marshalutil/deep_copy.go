@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package util
+package marshalutil
 
 import (
 	"encoding/json"
