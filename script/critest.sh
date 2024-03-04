@@ -35,6 +35,13 @@ cat > ${BDIR}/config.toml <<EOF
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${TEST_RUNTIME}"
+[plugins."io.containerd.snapshotter.v1.overlayfs"]
+# slow_chown is needed to avoid an error with kernel < 5.19:
+# > "snapshotter \"overlayfs\" doesn't support idmap mounts on this host,
+# > configure \`slow_chown\` to allow a slower and expensive fallback"
+# https://github.com/containerd/containerd/pull/9920#issuecomment-1978901454
+# This is safely ignored for kernel >= 5.19.
+slow_chown = true
 EOF
 ls /etc/cni/net.d
 
