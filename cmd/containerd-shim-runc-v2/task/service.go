@@ -80,6 +80,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		shutdown:        sd,
 		containers:      make(map[string]*runc.Container),
 		running:         make(map[int][]containerProcess),
+		pendingExecs:    make(map[*runc.Container]int),
 		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
 	}
 	go s.processExits()
@@ -113,8 +114,9 @@ type service struct {
 
 	containers map[string]*runc.Container
 
-	lifecycleMu sync.Mutex
-	running     map[int][]containerProcess // pid -> running process, guarded by lifecycleMu
+	lifecycleMu  sync.Mutex
+	running      map[int][]containerProcess // pid -> running process, guarded by lifecycleMu
+	pendingExecs map[*runc.Container]int    // container -> num pending execs, guarded by lifecycleMu
 	// Subscriptions to exits for PIDs. Adding/deleting subscriptions and
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
@@ -129,26 +131,23 @@ type containerProcess struct {
 }
 
 // preStart prepares for starting a container process and handling its exit.
-// The container being started should be passed in as c when starting the
-// container init process for an already-created container. c should be nil when
-// creating a container or when starting an exec.
+// The container being started should be passed in as c when starting the container
+// init process for an already-created container. c should be nil when creating a
+// container or when starting an exec.
 //
 // The returned handleStarted closure records that the process has started so
 // that its exit can be handled efficiently. If the process has already exited,
-// it handles the exit immediately. handleStarted should be called after the
-// event announcing the start of the process has been published.
-// Note that handleStarted needs to be aware of whether s.mu is already held
-// when it is called. If s.mu has been held, we don't need to lock it when
-// calling handleProcessExit.
+// it handles the exit immediately. In addition, if the process is an exec and
+// its container's init process has already exited, that exit is also processed.
+// handleStarted should be called after the event announcing the start of the
+// process has been published. Note that s.lifecycleMu must not be held when
+// calling handleStarted.
 //
 // The returned cleanup closure releases resources used to handle early exits.
 // It must be called before the caller of preStart returns, otherwise severe
 // memory leaks will occur.
-func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Container, process.Process, bool), cleanup func()) {
+func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Container, process.Process), cleanup func()) {
 	exits := make(map[int][]runcC.Exit)
-
-	s.lifecycleMu.Lock()
-	defer s.lifecycleMu.Unlock()
 	s.exitSubscribers[&exits] = struct{}{}
 
 	if c != nil {
@@ -168,30 +167,65 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		}
 	}
 
-	handleStarted = func(c *runc.Container, p process.Process, muLocked bool) {
+	handleStarted = func(c *runc.Container, p process.Process) {
 		var pid int
 		if p != nil {
 			pid = p.Pid()
 		}
 
+		_, init := p.(*process.Init)
 		s.lifecycleMu.Lock()
+
+		var initExits []runcC.Exit
+		var initCps []containerProcess
+		if !init {
+			s.pendingExecs[c]--
+
+			initPid := c.Pid()
+			iExits, initExited := exits[initPid]
+			if initExited && s.pendingExecs[c] == 0 {
+				// c's init process has exited before handleStarted was called and
+				// this is the last pending exec process start - we need to process
+				// the exit for the init process after processing this exec, so:
+				// - delete c from the s.pendingExecs map
+				// - keep the exits for the init pid to process later (after we process
+				// this exec's exits)
+				// - get the necessary containerProcesses for the init process (that we
+				// need to process the exits), and remove them from s.running (which we skipped
+				// doing in processExits).
+				delete(s.pendingExecs, c)
+				initExits = iExits
+				var skipped []containerProcess
+				for _, initPidCp := range s.running[initPid] {
+					if initPidCp.Container == c {
+						initCps = append(initCps, initPidCp)
+					} else {
+						skipped = append(skipped, initPidCp)
+					}
+				}
+				if len(skipped) == 0 {
+					delete(s.running, initPid)
+				} else {
+					s.running[initPid] = skipped
+				}
+			}
+		}
+
 		ees, exited := exits[pid]
 		delete(s.exitSubscribers, &exits)
 		exits = nil
-		if pid == 0 { // no-op
-			s.lifecycleMu.Unlock()
-		} else if exited {
+		if pid == 0 || exited {
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
-				if muLocked {
-					s.handleProcessExit(ee, c, p)
-				} else {
-					s.mu.Lock()
-					s.handleProcessExit(ee, c, p)
-					s.mu.Unlock()
+				s.handleProcessExit(ee, c, p)
+			}
+			for _, eee := range initExits {
+				for _, cp := range initCps {
+					s.handleProcessExit(eee, cp.Container, cp.Process)
 				}
 			}
 		} else {
+			// Process start was successful, add to `s.running`.
 			s.running[pid] = append(s.running[pid], containerProcess{
 				Container: c,
 				Process:   p,
@@ -216,7 +250,9 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	s.lifecycleMu.Lock()
 	handleStarted, cleanup := s.preStart(nil)
+	s.lifecycleMu.Unlock()
 	defer cleanup()
 
 	container, err := runc.NewContainer(ctx, s.platform, r)
@@ -244,7 +280,7 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	// could happen would also cause the container.Pid() call above to
 	// nil-deference panic.
 	proc, _ := container.Process("")
-	handleStarted(container, proc, true)
+	handleStarted(container, proc)
 
 	return &taskAPI.CreateTaskResponse{
 		Pid: uint32(container.Pid()),
@@ -264,14 +300,19 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	}
 
 	var cinit *runc.Container
+	s.lifecycleMu.Lock()
 	if r.ExecID == "" {
 		cinit = container
+	} else {
+		s.pendingExecs[container]++
 	}
 	handleStarted, cleanup := s.preStart(cinit)
+	s.lifecycleMu.Unlock()
 	defer cleanup()
+
 	p, err := container.Start(ctx, r)
 	if err != nil {
-		handleStarted(container, p, false)
+		handleStarted(container, p)
 		return nil, errdefs.ToGRPC(err)
 	}
 
@@ -311,7 +352,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 			Pid:         uint32(p.Pid()),
 		})
 	}
-	handleStarted(container, p, false)
+	handleStarted(container, p)
 	return &taskAPI.StartResponse{
 		Pid: uint32(p.Pid()),
 	}, nil
@@ -635,14 +676,27 @@ func (s *service) processExits() {
 		// Handle the exit for a created/started process. If there's more than
 		// one, assume they've all exited. One of them will be the correct
 		// process.
-		cps := s.running[e.Pid]
-		delete(s.running, e.Pid)
+		var cps, skipped []containerProcess
+		for _, cp := range s.running[e.Pid] {
+			if s.pendingExecs[cp.Container] != 0 {
+				// This exit relates to a container for which we have pending execs. In
+				// order to ensure order between execs and the init process for a given
+				// container, skip processing this exit here and let the `handleStarted`
+				// closure for the pending exec publish it.
+				skipped = append(skipped, cp)
+			} else {
+				cps = append(cps, cp)
+			}
+		}
+		if len(skipped) > 0 {
+			s.running[e.Pid] = skipped
+		} else {
+			delete(s.running, e.Pid)
+		}
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
-			s.mu.Lock()
 			s.handleProcessExit(e, cp.Container, cp.Process)
-			s.mu.Unlock()
 		}
 	}
 }
