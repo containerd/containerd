@@ -9,11 +9,6 @@ on:
       - main
       - "release/**"
 
-env:
-  # Go version we currently use to build containerd across all CI.
-  # Note: don't forget to update `Binaries` step, as it contains the matrix of all supported Go versions.
-  GO_VERSION: "1.20.13"
-
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -34,11 +29,8 @@ jobs:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - uses: golangci/golangci-lint-action@v4
         with:
           version: v1.56.1
@@ -55,14 +47,12 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
           fetch-depth: 100
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: containerd/project-checks@v1.1.0
         with:
@@ -88,13 +78,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - name: Set env
         shell: bash
@@ -120,10 +108,8 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: go install github.com/cpuguy83/go-md2man/v2@v2.0.2
       - run: make man
 
@@ -153,10 +139,8 @@ jobs:
             goarm: "7"
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: |
           set -e -x
 
@@ -207,13 +191,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
-        go-version: ["1.20.13", "1.21.6"]
+        go-version: ["1.21.6", "1.22.0"]
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
 
       - name: Make
         run: |
@@ -243,13 +224,11 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
         with:
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: actions/checkout@v4
         with:
@@ -266,7 +245,64 @@ jobs:
 
       - run: script/setup/install-dev-tools
 
+      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
+      - name: Upgrade Chocolaty on Windows 2019
+        if: matrix.os == 'windows-2019'
+        shell: powershell
+        run: |
+          Write-Output '::group::Update chocolaty'
+          choco upgrade -y chocolatey
+          Write-Output '::endgroup::'
+
+          if ( $LASTEXITCODE ) {
+            Write-Output '::error::Could not update chocolatey.'
+            exit $LASTEXITCODE
+          }
+
+      - name: Upgrade MinGW on Windows 2019
+        if: matrix.os == 'windows-2019'
+        shell: powershell
+        run: |
+          # Add retry and backoff
+          foreach ( $i in 1..3 ) {
+            Write-Output "::group::Attempt $i"
+            if ( $i -gt 1 ) {
+              # remove any left-over state
+              choco uninstall -y --no-progress --force mingw
+
+              Write-Output 'Sleeping for 60 seconds'
+              Sleep -Seconds 60
+            }
+
+            Write-Output 'manually force remove C:\mingw64'
+            Remove-Item -Path "C:\mingw64" -Recurse -Force -ErrorAction Ignore
+
+            choco install -y --no-progress --stop-on-first-failure --force mingw --allow-downgrade --version 12.2.0.3042023
+            Write-Output '::endgroup::'
+            if ( -not $LASTEXITCODE ) {
+              Write-Output "Attempt $i succeeded (exit code: $LASTEXITCODE)"
+              break
+            }
+            Write-Output "::warning title=mingw::Attempt $i failed (exit code: $LASTEXITCODE)"
+          }
+
+          if ( $LASTEXITCODE ) {
+            Write-Output "::error::Could not install mingw after $i attempts."
+            exit $LASTEXITCODE
+          }
+
+          # Copy to default path
+          Copy-Item -Path "C:\ProgramData\chocolatey\lib\mingw\tools\install\mingw64" -Destination "C:\mingw64" -Recurse -Force
+
+          # Copy as make.exe
+          $path = "C:\mingw64\bin\mingw32-make.exe" | Get-Item
+          Copy-Item -Path $path.FullName -Destination (Join-Path $path.Directory.FullName 'make.exe') -Force
+
+          # verify mingw32-make was installed
+          Get-Command -CommandType Application -ErrorAction Stop mingw32-make.exe
+
       - name: Binaries
+        shell: bash
         env:
           CGO_ENABLED: 1
         run: |
@@ -413,11 +449,8 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
 
       - name: Install containerd dependencies
         env:
@@ -548,10 +581,8 @@ jobs:
       GOTEST: gotestsum --
 
     steps:
-      - uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-go
       - run: script/setup/install-gotestsum
       - run: script/setup/install-teststat
       - name: Tests
