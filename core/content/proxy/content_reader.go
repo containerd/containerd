@@ -27,7 +27,7 @@ type remoteReaderAt struct {
 	ctx    context.Context
 	digest digest.Digest
 	size   int64
-	client contentapi.ContentClient
+	client contentapi.TTRPCContentClient
 }
 
 func (ra *remoteReaderAt) Size() int64 {

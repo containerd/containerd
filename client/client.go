@@ -27,9 +27,7 @@ import (
 	"time"
 
 	containersapi "github.com/containerd/containerd/v2/api/services/containers/v1"
-	contentapi "github.com/containerd/containerd/v2/api/services/content/v1"
 	diffapi "github.com/containerd/containerd/v2/api/services/diff/v1"
-	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
 	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
 	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	leasesapi "github.com/containerd/containerd/v2/api/services/leases/v1"
@@ -43,6 +41,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	contentproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/core/events"
+	eventsproxy "github.com/containerd/containerd/v2/core/events/proxy"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
 	leasesproxy "github.com/containerd/containerd/v2/core/leases/proxy"
@@ -622,7 +621,7 @@ func (c *Client) ContentStore() content.Store {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return contentproxy.NewContentStore(contentapi.NewContentClient(c.conn))
+	return contentproxy.NewContentStore(c.conn)
 }
 
 // SnapshotService returns the underlying snapshotter for the provided snapshotter name
@@ -708,7 +707,7 @@ func (c *Client) EventService() EventService {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return NewEventServiceFromClient(eventsapi.NewEventsClient(c.conn))
+	return eventsproxy.NewRemoteEvents(c.conn)
 }
 
 // SandboxStore returns the underlying sandbox store client
@@ -738,8 +737,9 @@ func (c *Client) VersionService() versionservice.VersionClient {
 	return versionservice.NewVersionClient(c.conn)
 }
 
-// Conn returns the underlying GRPC connection object
-func (c *Client) Conn() *grpc.ClientConn {
+// Conn returns the underlying RPC connection object
+// Either *grpc.ClientConn or *ttrpc.Conn
+func (c *Client) Conn() any {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	return c.conn
