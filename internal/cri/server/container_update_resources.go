@@ -86,6 +86,11 @@ func (c *criService) updateContainerResources(ctx context.Context,
 		return newStatus, fmt.Errorf("container %q is in removing state", id)
 	}
 
+	// Do not update the container when there is an exit in progress.
+	if status.Exiting {
+		return newStatus, fmt.Errorf("container %q is in exiting state", id)
+	}
+
 	// Update container spec. If the container is not started yet, updating
 	// spec makes sure that the resource limits are correct when start;
 	// if the container is already started, updating spec is still required,

@@ -90,6 +90,8 @@ type Status struct {
 	// Starting indicates that the container is in starting state.
 	// This field doesn't need to be checkpointed.
 	Starting bool `json:"-"`
+	// Exiting indicates that the container is in exiting state.
+	Exiting bool `json:"-"`
 	// Removing indicates that the container is in removing state.
 	// This field doesn't need to be checkpointed.
 	Removing bool `json:"-"`
