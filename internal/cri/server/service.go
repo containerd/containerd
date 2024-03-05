@@ -34,9 +34,9 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
-	introspectionapi "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/config"
@@ -54,7 +54,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services/introspection"
 	"github.com/containerd/containerd/v2/protobuf"
 )
 
@@ -407,10 +406,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 			plugins.RuntimeRuncV2, r.Type)
 		// For other runtimes, protobuf.MarshalAnyToProto will cause nil panic during typeurl dereference
 	}
-	infoReq := &introspectionapi.PluginInfoRequest{
-		Type: string(plugins.RuntimePluginV2), // "io.containerd.runtime.v2"
-		ID:   "task",
-	}
+
 	rr := &apitypes.RuntimeRequest{
 		RuntimePath: r.Type, // "io.containerd.runc.v2"
 	}
@@ -425,11 +421,8 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
 	}
-	infoReq.Options, err = protobuf.MarshalAnyToProto(rr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal %T: %w", rr, err)
-	}
-	infoResp, err := intro.PluginInfo(ctx, infoReq)
+
+	infoResp, err := intro.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to call PluginInfo: %w", err)
 	}

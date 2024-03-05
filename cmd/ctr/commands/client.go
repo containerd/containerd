@@ -24,7 +24,6 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/log"
 	"github.com/urfave/cli/v2"
 )
@@ -73,7 +72,7 @@ func NewClient(context *cli.Context, opts ...containerd.Opt) (*containerd.Client
 		}
 	}
 	if !suppressDeprecationWarnings {
-		resp, err := client.IntrospectionService().Server(ctx, &ptypes.Empty{})
+		resp, err := client.IntrospectionService().Server(ctx)
 		if err != nil {
 			log.L.WithError(err).Warn("Failed to check deprecations")
 		} else {

@@ -112,8 +112,7 @@ func (c *Client) getInstallPath(ctx context.Context, config InstallConfig) (stri
 	if config.Path != "" {
 		return config.Path, nil
 	}
-	filters := []string{"id==opt"}
-	resp, err := c.IntrospectionService().Plugins(ctx, filters)
+	resp, err := c.IntrospectionService().Plugins(ctx, "id==opt")
 	if err != nil {
 		return "", err
 	}

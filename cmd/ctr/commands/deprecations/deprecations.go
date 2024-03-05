@@ -27,7 +27,6 @@ import (
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/protobuf"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 )
 
 // Command is the parent for all commands under "deprecations"
@@ -56,7 +55,7 @@ var listCommand = &cli.Command{
 		}
 		defer cancel()
 
-		resp, err := client.IntrospectionService().Server(ctx, &ptypes.Empty{})
+		resp, err := client.IntrospectionService().Server(ctx)
 		if err != nil {
 			return err
 		}

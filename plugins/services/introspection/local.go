@@ -28,11 +28,11 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/genproto/googleapis/rpc/code"
 	rpc "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
@@ -80,7 +80,7 @@ type Local struct {
 	warningClient warning.Service
 }
 
-var _ = (api.IntrospectionClient)(&Local{})
+var _ = (introspection.Service)(&Local{})
 
 // UpdateLocal updates the local introspection service
 func (l *Local) UpdateLocal(root string) {
@@ -90,10 +90,10 @@ func (l *Local) UpdateLocal(root string) {
 }
 
 // Plugins returns the locally defined plugins
-func (l *Local) Plugins(ctx context.Context, req *api.PluginsRequest, _ ...grpc.CallOption) (*api.PluginsResponse, error) {
-	filter, err := filters.ParseAll(req.Filters...)
+func (l *Local) Plugins(ctx context.Context, fs ...string) (*api.PluginsResponse, error) {
+	filter, err := filters.ParseAll(fs...)
 	if err != nil {
-		return nil, errdefs.ToGRPCf(errdefs.ErrInvalidArgument, err.Error())
+		return nil, fmt.Errorf("%w: %w", errdefs.ErrInvalidArgument, err)
 	}
 
 	var plugins []*api.Plugin
@@ -121,17 +121,17 @@ func (l *Local) getPlugins() []*api.Plugin {
 }
 
 // Server returns the local server information
-func (l *Local) Server(ctx context.Context, _ *ptypes.Empty, _ ...grpc.CallOption) (*api.ServerResponse, error) {
+func (l *Local) Server(ctx context.Context) (*api.ServerResponse, error) {
 	u, err := l.getUUID()
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, err
 	}
 	pid := os.Getpid()
 	var pidns uint64
 	if runtime.GOOS == "linux" {
 		pidns, err = statPIDNS(pid)
 		if err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, err
 		}
 	}
 	return &api.ServerResponse{
@@ -278,11 +278,10 @@ type pluginInfoProvider interface {
 	PluginInfo(context.Context, interface{}) (interface{}, error)
 }
 
-func (l *Local) PluginInfo(ctx context.Context, req *api.PluginInfoRequest, _ ...grpc.CallOption) (*api.PluginInfoResponse, error) {
-	p := l.plugins.Get(plugin.Type(req.Type), req.ID)
+func (l *Local) PluginInfo(ctx context.Context, pluginType, id string, options any) (*api.PluginInfoResponse, error) {
+	p := l.plugins.Get(plugin.Type(pluginType), id)
 	if p == nil {
-		err := fmt.Errorf("plugin %s.%s not found: %w", req.Type, req.ID, errdefs.ErrNotFound)
-		return nil, errdefs.ToGRPC(err)
+		return nil, fmt.Errorf("plugin %s.%s not found: %w", pluginType, id, errdefs.ErrNotFound)
 	}
 
 	resp := &api.PluginInfoResponse{
@@ -290,35 +289,26 @@ func (l *Local) PluginInfo(ctx context.Context, req *api.PluginInfoRequest, _ ..
 	}
 
 	// Request additional info from plugin instance
-	if req.Options != nil {
+	if options != nil {
 		if p.Err() != nil {
-			err := fmt.Errorf("cannot get extra info, plugin not successfully loaded: %w", errdefs.ErrFailedPrecondition)
-			return resp, errdefs.ToGRPC(err)
+			return resp, fmt.Errorf("cannot get extra info, plugin not successfully loaded: %w", errdefs.ErrFailedPrecondition)
 		}
 		inst, err := p.Instance()
 		if err != nil {
-			err := fmt.Errorf("failed to get plugin instance: %w", errdefs.ErrFailedPrecondition)
-			return resp, errdefs.ToGRPC(err)
+			return resp, fmt.Errorf("failed to get plugin instance: %w", errdefs.ErrFailedPrecondition)
 		}
 		pi, ok := inst.(pluginInfoProvider)
 		if !ok {
-			err := fmt.Errorf("plugin does not provided extra information: %w", errdefs.ErrNotImplemented)
-			return resp, errdefs.ToGRPC(err)
+			return resp, fmt.Errorf("plugin does not provided extra information: %w", errdefs.ErrNotImplemented)
 		}
 
-		options, err := typeurl.UnmarshalAny(req.Options)
-		if err != nil {
-			err = fmt.Errorf("failed to unmarshal plugin info Options: %w", err)
-			return resp, errdefs.ToGRPC(err)
-		}
 		info, err := pi.PluginInfo(ctx, options)
 		if err != nil {
 			return resp, errdefs.ToGRPC(err)
 		}
 		ai, err := typeurl.MarshalAny(info)
 		if err != nil {
-			err = fmt.Errorf("failed to marshal plugin info: %w", err)
-			return resp, errdefs.ToGRPC(err)
+			return resp, fmt.Errorf("failed to marshal plugin info: %w", err)
 		}
 		resp.Extra = &ptypes.Any{
 			TypeUrl: ai.GetTypeUrl(),
