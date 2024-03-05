@@ -22,65 +22,6 @@ import (
 
 const defaultVHDXBlockSizeInMB = 1
 
-func createContainerBaseLayerVHDs(ctx context.Context, layerPath string) (err error) {
-	baseVhdPath := filepath.Join(layerPath, wclayer.ContainerBaseVhd)
-	diffVhdPath := filepath.Join(layerPath, wclayer.ContainerScratchVhd)
-	defaultVhdSize := uint64(20)
-
-	if _, err := os.Stat(baseVhdPath); err == nil {
-		if err := os.RemoveAll(baseVhdPath); err != nil {
-			return fmt.Errorf("failed to remove base vhdx path:  %w", err)
-		}
-	}
-	if _, err := os.Stat(diffVhdPath); err == nil {
-		if err := os.RemoveAll(diffVhdPath); err != nil {
-			return fmt.Errorf("failed to remove differencing vhdx: %w", err)
-		}
-	}
-
-	createParams := &vhd.CreateVirtualDiskParameters{
-		Version: 2,
-		Version2: vhd.CreateVersion2{
-			MaximumSize:      defaultVhdSize * memory.GiB,
-			BlockSizeInBytes: defaultVHDXBlockSizeInMB * memory.MiB,
-		},
-	}
-	handle, err := vhd.CreateVirtualDisk(baseVhdPath, vhd.VirtualDiskAccessNone, vhd.CreateVirtualDiskFlagNone, createParams)
-	if err != nil {
-		return fmt.Errorf("failed to create vhdx: %w", err)
-	}
-
-	defer func() {
-		if err != nil {
-			os.RemoveAll(baseVhdPath)
-			os.RemoveAll(diffVhdPath)
-		}
-	}()
-
-	err = computestorage.FormatWritableLayerVhd(ctx, windows.Handle(handle))
-	// we always wanna close the handle whether format succeeds for not.
-	closeErr := syscall.CloseHandle(handle)
-	if err != nil {
-		return err
-	} else if closeErr != nil {
-		return fmt.Errorf("failed to close vhdx handle: %w", closeErr)
-	}
-
-	// Create the differencing disk that will be what's copied for the final rw layer
-	// for a container.
-	if err = vhd.CreateDiffVhd(diffVhdPath, baseVhdPath, defaultVHDXBlockSizeInMB); err != nil {
-		return fmt.Errorf("failed to create differencing disk: %w", err)
-	}
-
-	if err = security.GrantVmGroupAccess(baseVhdPath); err != nil {
-		return fmt.Errorf("failed to grant vm group access to %s: %w", baseVhdPath, err)
-	}
-	if err = security.GrantVmGroupAccess(diffVhdPath); err != nil {
-		return fmt.Errorf("failed to grant vm group access to %s: %w", diffVhdPath, err)
-	}
-	return nil
-}
-
 // processUtilityVMLayer is similar to createContainerBaseLayerVHDs but along with the scratch creation it
 // also does some BCD modifications to allow the UVM to boot from the CIM. It expects that the UVM BCD file is
 // present at layerPath/`wclayer.BcdFilePath` and a UVM SYSTEM hive is present at
@@ -228,10 +169,6 @@ func processLayoutFile(layerPath string) ([]pendingCimOp, error) {
 // inside the cim, some registry file links must be updated. This function takes care of all those
 // steps. This function opens the cim file for writing and updates it.
 func (cw *CimLayerWriter) processBaseLayer(ctx context.Context, processUtilityVM bool) (err error) {
-	if err = createContainerBaseLayerVHDs(ctx, cw.path); err != nil {
-		return fmt.Errorf("failed to create container base VHDs: %w", err)
-	}
-
 	if processUtilityVM {
 		if err = processUtilityVMLayer(ctx, cw.path); err != nil {
 			return fmt.Errorf("process utilityVM layer: %w", err)
