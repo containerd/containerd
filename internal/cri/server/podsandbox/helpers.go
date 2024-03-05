@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"time"
 
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -52,10 +51,6 @@ const (
 const (
 	// unknownExitCode is the exit code when exit reason is unknown.
 	unknownExitCode = 255
-)
-
-const (
-	handleEventTimeout = 10 * time.Second
 )
 
 // getSandboxRootDir returns the root directory for managing sandbox files,

@@ -18,34 +18,24 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"sync"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/utils/clock"
 
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	apitasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
 	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/internal/cri/constants"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/errdefs"
 )
 
 const (
-	backOffInitDuration        = 1 * time.Second
-	backOffMaxDuration         = 5 * time.Minute
-	backOffExpireCheckDuration = 1 * time.Second
-
 	// handleEventTimeout is the timeout for handling 1 event. Event monitor
 	// handles events in serial, if one event blocks the event monitor, no
 	// other events can be handled.
@@ -54,62 +44,8 @@ const (
 	handleEventTimeout = 10 * time.Second
 )
 
-// eventMonitor monitors containerd event and updates internal state correspondingly.
-type eventMonitor struct {
-	c       *criService
-	ch      <-chan *events.Envelope
-	errCh   <-chan error
-	ctx     context.Context
-	cancel  context.CancelFunc
-	backOff *backOff
-}
-
-type backOff struct {
-	// queuePoolMu is mutex used to protect the queuePool map
-	queuePoolMu sync.Mutex
-
-	queuePool map[string]*backOffQueue
-	// tickerMu is mutex used to protect the ticker.
-	tickerMu      sync.Mutex
-	ticker        *time.Ticker
-	minDuration   time.Duration
-	maxDuration   time.Duration
-	checkDuration time.Duration
-	clock         clock.Clock
-}
-
-type backOffQueue struct {
-	events     []interface{}
-	expireTime time.Time
-	duration   time.Duration
-	clock      clock.Clock
-}
-
-// Create new event monitor. New event monitor will start subscribing containerd event. All events
-// happen after it should be monitored.
-func newEventMonitor(c *criService) *eventMonitor {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &eventMonitor{
-		c:       c,
-		ctx:     ctx,
-		cancel:  cancel,
-		backOff: newBackOff(),
-	}
-}
-
-// subscribe starts to subscribe containerd events.
-func (em *eventMonitor) subscribe(subscriber events.Subscriber) {
-	// note: filters are any match, if you want any match but not in namespace foo
-	// then you have to manually filter namespace foo
-	filters := []string{
-		`topic=="/tasks/oom"`,
-		`topic~="/images/"`,
-	}
-	em.ch, em.errCh = subscriber.Subscribe(em.ctx, filters...)
-}
-
 // startSandboxExitMonitor starts an exit monitor for a given sandbox.
-func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
+func (c *criService) startSandboxExitMonitor(ctx context.Context, id string, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
 	stopCh := make(chan struct{})
 	go func() {
 		defer close(stopCh)
@@ -135,9 +71,9 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 				defer dcancel()
 
-				sb, err := em.c.sandboxStore.Get(e.GetSandboxID())
+				sb, err := c.sandboxStore.Get(id)
 				if err == nil {
-					if err := handleSandboxExit(dctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
+					if err := c.handleSandboxExit(dctx, sb, exitStatus, exitedAt); err != nil {
 						return err
 					}
 					return nil
@@ -148,7 +84,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 			}()
 			if err != nil {
 				log.L.WithError(err).Errorf("failed to handle sandbox TaskExit event %+v", e)
-				em.backOff.enBackOff(id, e)
+				c.eventMonitor.Backoff(id, e)
 			}
 			return
 		case <-ctx.Done():
@@ -157,8 +93,26 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 	return stopCh
 }
 
+// handleSandboxExit handles sandbox exit event.
+func (c *criService) handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, exitStatus uint32, exitTime time.Time) error {
+	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
+		status.State = sandboxstore.StateNotReady
+		status.Pid = 0
+		status.ExitStatus = exitStatus
+		status.ExitedAt = exitTime
+		return status, nil
+	}); err != nil {
+		return fmt.Errorf("failed to update sandbox state: %w", err)
+	}
+
+	// Using channel to propagate the information of sandbox stop
+	sb.Stop()
+	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
+	return nil
+}
+
 // startContainerExitMonitor starts an exit monitor for a given container.
-func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
+func (c *criService) startContainerExitMonitor(ctx context.Context, id string, pid uint32, exitCh <-chan containerd.ExitStatus) <-chan struct{} {
 	stopCh := make(chan struct{})
 	go func() {
 		defer close(stopCh)
@@ -186,9 +140,9 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 				defer dcancel()
 
-				cntr, err := em.c.containerStore.Get(e.ID)
+				cntr, err := c.containerStore.Get(e.ID)
 				if err == nil {
-					if err := handleContainerExit(dctx, e, cntr, cntr.SandboxID, em.c); err != nil {
+					if err := c.handleContainerExit(dctx, e, cntr, cntr.SandboxID); err != nil {
 						return err
 					}
 					return nil
@@ -199,7 +153,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 			}()
 			if err != nil {
 				log.L.WithError(err).Errorf("failed to handle container TaskExit event %+v", e)
-				em.backOff.enBackOff(id, e)
+				c.eventMonitor.Backoff(id, e)
 			}
 			return
 		case <-ctx.Done():
@@ -208,177 +162,8 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 	return stopCh
 }
 
-func convertEvent(e typeurl.Any) (string, interface{}, error) {
-	id := ""
-	evt, err := typeurl.UnmarshalAny(e)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to unmarshalany: %w", err)
-	}
-
-	switch e := evt.(type) {
-	case *eventtypes.TaskOOM:
-		id = e.ContainerID
-	case *eventtypes.SandboxExit:
-		id = e.SandboxID
-	case *eventtypes.ImageCreate:
-		id = e.Name
-	case *eventtypes.ImageUpdate:
-		id = e.Name
-	case *eventtypes.ImageDelete:
-		id = e.Name
-	default:
-		return "", nil, errors.New("unsupported event")
-	}
-	return id, evt, nil
-}
-
-// start starts the event monitor which monitors and handles all subscribed events.
-// It returns an error channel for the caller to wait for stop errors from the
-// event monitor.
-//
-// NOTE:
-//  1. start must be called after subscribe.
-//  2. The task exit event has been handled in individual startSandboxExitMonitor
-//     or startContainerExitMonitor goroutine at the first. If the goroutine fails,
-//     it puts the event into backoff retry queue and event monitor will handle
-//     it later.
-func (em *eventMonitor) start() <-chan error {
-	errCh := make(chan error)
-	if em.ch == nil || em.errCh == nil {
-		panic("event channel is nil")
-	}
-	backOffCheckCh := em.backOff.start()
-	go func() {
-		defer close(errCh)
-		for {
-			select {
-			case e := <-em.ch:
-				log.L.Debugf("Received containerd event timestamp - %v, namespace - %q, topic - %q", e.Timestamp, e.Namespace, e.Topic)
-				if e.Namespace != constants.K8sContainerdNamespace {
-					log.L.Debugf("Ignoring events in namespace - %q", e.Namespace)
-					break
-				}
-				id, evt, err := convertEvent(e.Event)
-				if err != nil {
-					log.L.WithError(err).Errorf("Failed to convert event %+v", e)
-					break
-				}
-				if em.backOff.isInBackOff(id) {
-					log.L.Infof("Events for %q is in backoff, enqueue event %+v", id, evt)
-					em.backOff.enBackOff(id, evt)
-					break
-				}
-				if err := em.handleEvent(evt); err != nil {
-					log.L.WithError(err).Errorf("Failed to handle event %+v for %s", evt, id)
-					em.backOff.enBackOff(id, evt)
-				}
-			case err := <-em.errCh:
-				// Close errCh in defer directly if there is no error.
-				if err != nil {
-					log.L.WithError(err).Error("Failed to handle event stream")
-					errCh <- err
-				}
-				return
-			case <-backOffCheckCh:
-				ids := em.backOff.getExpiredIDs()
-				for _, id := range ids {
-					queue := em.backOff.deBackOff(id)
-					for i, evt := range queue.events {
-						if err := em.handleEvent(evt); err != nil {
-							log.L.WithError(err).Errorf("Failed to handle backOff event %+v for %s", evt, id)
-							em.backOff.reBackOff(id, queue.events[i:], queue.duration)
-							break
-						}
-					}
-				}
-			}
-		}
-	}()
-	return errCh
-}
-
-// stop stops the event monitor. It will close the event channel.
-// Once event monitor is stopped, it can't be started.
-func (em *eventMonitor) stop() {
-	em.backOff.stop()
-	em.cancel()
-}
-
-// handleEvent handles a containerd event.
-func (em *eventMonitor) handleEvent(any interface{}) error {
-	ctx := ctrdutil.NamespacedContext()
-	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
-	defer cancel()
-
-	switch e := any.(type) {
-	case *eventtypes.TaskExit:
-		log.L.Infof("TaskExit event %+v", e)
-		// Use ID instead of ContainerID to rule out TaskExit event for exec.
-		cntr, err := em.c.containerStore.Get(e.ID)
-		if err == nil {
-			if err := handleContainerExit(ctx, e, cntr, cntr.SandboxID, em.c); err != nil {
-				return fmt.Errorf("failed to handle container TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find container for TaskExit event: %w", err)
-		}
-		sb, err := em.c.sandboxStore.Get(e.ID)
-		if err == nil {
-			if err := handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
-				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
-		}
-		return nil
-	case *eventtypes.SandboxExit:
-		log.L.Infof("SandboxExit event %+v", e)
-		sb, err := em.c.sandboxStore.Get(e.GetSandboxID())
-		if err == nil {
-			if err := handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime(), em.c); err != nil {
-				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
-		}
-		return nil
-	case *eventtypes.TaskOOM:
-		log.L.Infof("TaskOOM event %+v", e)
-		// For TaskOOM, we only care which container it belongs to.
-		cntr, err := em.c.containerStore.Get(e.ContainerID)
-		if err != nil {
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("can't find container for TaskOOM event: %w", err)
-			}
-			return nil
-		}
-		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-			status.Reason = oomExitReason
-			return status, nil
-		})
-		if err != nil {
-			return fmt.Errorf("failed to update container status for TaskOOM event: %w", err)
-		}
-	// TODO: ImageService should handle these events directly
-	case *eventtypes.ImageCreate:
-		log.L.Infof("ImageCreate event %+v", e)
-		return em.c.UpdateImage(ctx, e.Name)
-	case *eventtypes.ImageUpdate:
-		log.L.Infof("ImageUpdate event %+v", e)
-		return em.c.UpdateImage(ctx, e.Name)
-	case *eventtypes.ImageDelete:
-		log.L.Infof("ImageDelete event %+v", e)
-		return em.c.UpdateImage(ctx, e.Name)
-	}
-
-	return nil
-}
-
 // handleContainerExit handles TaskExit event for container.
-func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container, sandboxID string, c *criService) error {
+func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr containerstore.Container, sandboxID string) error {
 	// Attach container IO so that `Delete` could cleanup the stream properly.
 	task, err := cntr.Container.Task(ctx,
 		func(*containerdio.FIFOSet) (containerdio.IO, error) {
@@ -426,7 +211,7 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	// ErrNotFound. If we don't delete the shim instance in io.containerd.service.v1.tasks-service,
 	// shim will be leaky.
 	//
-	// Based on containerd/containerd#7496 issue, when host is under IO
+	// Based on containerd/containerd/v2#7496 issue, when host is under IO
 	// pressure, the umount2 syscall will take more than 10 seconds so that
 	// the CRI plugin will cancel this task.Delete call. However, the shim
 	// server isn't aware about this. After return from umount2 syscall, the
@@ -476,116 +261,78 @@ func handleContainerExit(ctx context.Context, e *eventtypes.TaskExit, cntr conta
 	return nil
 }
 
-// handleSandboxExit handles sandbox exit event.
-func handleSandboxExit(ctx context.Context, sb sandboxstore.Sandbox, exitStatus uint32, exitTime time.Time, c *criService) error {
-	if err := sb.Status.Update(func(status sandboxstore.Status) (sandboxstore.Status, error) {
-		status.State = sandboxstore.StateNotReady
-		status.Pid = 0
-		status.ExitStatus = exitStatus
-		status.ExitedAt = exitTime
-		return status, nil
-	}); err != nil {
-		return fmt.Errorf("failed to update sandbox state: %w", err)
-	}
-
-	// Using channel to propagate the information of sandbox stop
-	sb.Stop()
-	c.generateAndSendContainerEvent(ctx, sb.ID, sb.ID, runtime.ContainerEventType_CONTAINER_STOPPED_EVENT)
-	return nil
+type criEventHandler struct {
+	c *criService
 }
 
-func newBackOff() *backOff {
-	return &backOff{
-		queuePool:     map[string]*backOffQueue{},
-		minDuration:   backOffInitDuration,
-		maxDuration:   backOffMaxDuration,
-		checkDuration: backOffExpireCheckDuration,
-		clock:         clock.RealClock{},
-	}
-}
+// HandleEvent handles a containerd event.
+func (ce *criEventHandler) HandleEvent(any interface{}) error {
+	ctx := ctrdutil.NamespacedContext()
+	ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
+	defer cancel()
 
-func (b *backOff) getExpiredIDs() []string {
-	b.queuePoolMu.Lock()
-	defer b.queuePoolMu.Unlock()
-
-	var ids []string
-	for id, q := range b.queuePool {
-		if q.isExpire() {
-			ids = append(ids, id)
+	switch e := any.(type) {
+	case *eventtypes.TaskExit:
+		log.L.Infof("TaskExit event %+v", e)
+		// Use ID instead of ContainerID to rule out TaskExit event for exec.
+		cntr, err := ce.c.containerStore.Get(e.ID)
+		if err == nil {
+			if err := ce.c.handleContainerExit(ctx, e, cntr, cntr.SandboxID); err != nil {
+				return fmt.Errorf("failed to handle container TaskExit event: %w", err)
+			}
+			return nil
+		} else if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("can't find container for TaskExit event: %w", err)
 		}
+		sb, err := ce.c.sandboxStore.Get(e.ID)
+		if err == nil {
+			if err := ce.c.handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime()); err != nil {
+				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
+			}
+			return nil
+		} else if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
+		}
+		return nil
+	case *eventtypes.SandboxExit:
+		log.L.Infof("SandboxExit event %+v", e)
+		sb, err := ce.c.sandboxStore.Get(e.GetSandboxID())
+		if err == nil {
+			if err := ce.c.handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime()); err != nil {
+				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
+			}
+			return nil
+		} else if !errdefs.IsNotFound(err) {
+			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
+		}
+		return nil
+	case *eventtypes.TaskOOM:
+		log.L.Infof("TaskOOM event %+v", e)
+		// For TaskOOM, we only care which container it belongs to.
+		cntr, err := ce.c.containerStore.Get(e.ContainerID)
+		if err != nil {
+			if !errdefs.IsNotFound(err) {
+				return fmt.Errorf("can't find container for TaskOOM event: %w", err)
+			}
+			return nil
+		}
+		err = cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+			status.Reason = oomExitReason
+			return status, nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to update container status for TaskOOM event: %w", err)
+		}
+	case *eventtypes.ImageCreate:
+		log.L.Infof("ImageCreate event %+v", e)
+		return ce.c.UpdateImage(ctx, e.Name)
+	case *eventtypes.ImageUpdate:
+		log.L.Infof("ImageUpdate event %+v", e)
+		return ce.c.UpdateImage(ctx, e.Name)
+	case *eventtypes.ImageDelete:
+		log.L.Infof("ImageDelete event %+v", e)
+		return ce.c.UpdateImage(ctx, e.Name)
 	}
-	return ids
-}
 
-func (b *backOff) isInBackOff(key string) bool {
-	b.queuePoolMu.Lock()
-	defer b.queuePoolMu.Unlock()
-
-	if _, ok := b.queuePool[key]; ok {
-		return true
-	}
-	return false
-}
-
-// enBackOff start to backOff and put event to the tail of queue
-func (b *backOff) enBackOff(key string, evt interface{}) {
-	b.queuePoolMu.Lock()
-	defer b.queuePoolMu.Unlock()
-
-	if queue, ok := b.queuePool[key]; ok {
-		queue.events = append(queue.events, evt)
-		return
-	}
-	b.queuePool[key] = newBackOffQueue([]interface{}{evt}, b.minDuration, b.clock)
-}
-
-// enBackOff get out the whole queue
-func (b *backOff) deBackOff(key string) *backOffQueue {
-	b.queuePoolMu.Lock()
-	defer b.queuePoolMu.Unlock()
-
-	queue := b.queuePool[key]
-	delete(b.queuePool, key)
-	return queue
-}
-
-// enBackOff start to backOff again and put events to the queue
-func (b *backOff) reBackOff(key string, events []interface{}, oldDuration time.Duration) {
-	b.queuePoolMu.Lock()
-	defer b.queuePoolMu.Unlock()
-
-	duration := 2 * oldDuration
-	if duration > b.maxDuration {
-		duration = b.maxDuration
-	}
-	b.queuePool[key] = newBackOffQueue(events, duration, b.clock)
-}
-
-func (b *backOff) start() <-chan time.Time {
-	b.tickerMu.Lock()
-	defer b.tickerMu.Unlock()
-	b.ticker = time.NewTicker(b.checkDuration)
-	return b.ticker.C
-}
-
-func (b *backOff) stop() {
-	b.tickerMu.Lock()
-	defer b.tickerMu.Unlock()
-	if b.ticker != nil {
-		b.ticker.Stop()
-	}
-}
-
-func newBackOffQueue(events []interface{}, init time.Duration, c clock.Clock) *backOffQueue {
-	return &backOffQueue{
-		events:     events,
-		duration:   init,
-		expireTime: c.Now().Add(init),
-		clock:      c,
-	}
-}
-
-func (q *backOffQueue) isExpire() bool {
-	// return time.Now >= expireTime
-	return !q.clock.Now().Before(q.expireTime)
+	return nil
 }

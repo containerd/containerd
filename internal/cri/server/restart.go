@@ -157,7 +157,7 @@ func (c *criService) recover(ctx context.Context) error {
 			log.G(ctx).WithError(err).Error("failed to wait sandbox")
 			continue
 		}
-		c.eventMonitor.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
+		c.startSandboxExitMonitor(context.Background(), sb.ID, exitCh)
 	}
 	// Recover all containers.
 	containers, err := c.client.Containers(ctx, filterLabel(crilabels.ContainerKindLabel, crilabels.ContainerKindContainer))
@@ -387,7 +387,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.Reason = unknownExitReason
 				} else {
 					// Start exit monitor.
-					c.eventMonitor.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
+					c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
 				}
 			case containerd.Stopped:
 				// Task is stopped. Update status and delete the task.
