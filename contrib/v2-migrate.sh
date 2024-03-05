@@ -52,6 +52,8 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/failpoint/$1$2"github.com\/containerd\/containerd\/v2\/internal\/failpoint/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/hasher/$1$2"github.com\/containerd\/containerd\/v2\/internal\/hasher/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/kmutex/$1$2"github.com\/containerd\/containerd\/v2\/internal\/kmutex/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/nri\/plugin/$1$2"github.com\/containerd\/containerd\/v2\/plugins\/nri/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/nri/$1$2"github.com\/containerd\/containerd\/v2\/internal\/nri/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/randutil/$1$2"github.com\/containerd\/containerd\/v2\/internal\/randutil/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/registrar/$1$2"github.com\/containerd\/containerd\/v2\/internal\/registrar/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/streaming/$1$2"github.com\/containerd\/containerd\/v2\/core\/streaming/g' $GOFILE
