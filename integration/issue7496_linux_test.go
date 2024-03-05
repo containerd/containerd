@@ -31,9 +31,9 @@ import (
 
 	apitask "github.com/containerd/containerd/v2/api/runtime/task/v3"
 	shimcore "github.com/containerd/containerd/v2/core/runtime/v2"
-	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
 	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

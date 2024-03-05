@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	client "github.com/containerd/containerd/v2/core/runtime/v2/shim"
+	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/require"
 )
