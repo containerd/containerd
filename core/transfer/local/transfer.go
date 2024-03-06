@@ -168,6 +168,12 @@ type TransferConfig struct {
 
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int
+	// MaxConcurrentFetchPerDownload is the max number of connection we can have
+	// per Download. Anything lower than 1 means 1.
+	MaxConcurrentFetchPerDownload int
+	// ConcurrentFetchChunkSizes is the size of chunks used when
+	// max_concurrent_fetch_per_download > 1
+	ConcurrentFetchChunksSizeMB int
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int
 

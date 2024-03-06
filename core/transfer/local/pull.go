@@ -91,8 +91,14 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			// Digest: img.Target.Digest.String(),
 		})
 	}
-
-	fetcher, err := ir.Fetcher(ctx, name)
+	opts := []transfer.FetcherOpt{}
+	if ts.config.MaxConcurrentFetchPerDownload > 0 && ts.config.ConcurrentFetchChunksSizeMB > 0 {
+		opts = append(opts,
+			transfer.WithMaxConcurrentFetchPerDownload(ts.config.MaxConcurrentFetchPerDownload),
+			transfer.WithConcurrentFetchChunksSizeMB(ts.config.ConcurrentFetchChunksSizeMB),
+		)
+	}
+	fetcher, err := ir.Fetcher(ctx, name, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
