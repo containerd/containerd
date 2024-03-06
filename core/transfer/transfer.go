@@ -37,7 +37,7 @@ type ImageResolver interface {
 type ImageFetcher interface {
 	ImageResolver
 
-	Fetcher(ctx context.Context, ref string) (Fetcher, error)
+	Fetcher(ctx context.Context, ref string, opts ...FetcherOpt) (Fetcher, error)
 }
 
 type ImagePusher interface {
@@ -124,6 +124,34 @@ type Opt func(*Config)
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
+	}
+}
+
+type FetcherConfig struct {
+	MaxConcurrentFetchPerDownload int
+	ConcurrentFetchChunksSizeMB   int
+}
+
+type FetcherOpt func(*FetcherConfig)
+
+type FetcherOpts []FetcherOpt
+
+func (opts FetcherOpts) Config() (cfg FetcherConfig) {
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return
+}
+
+func WithMaxConcurrentFetchPerDownload(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.MaxConcurrentFetchPerDownload = max
+	}
+}
+
+func WithConcurrentFetchChunksSizeMB(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.ConcurrentFetchChunksSizeMB = max
 	}
 }
 

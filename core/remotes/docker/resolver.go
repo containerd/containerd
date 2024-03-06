@@ -39,6 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
@@ -425,7 +426,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	return "", ocispec.Descriptor{}, firstErr
 }
 
-func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
+func (r *dockerResolver) Fetcher(ctx context.Context, ref string, opts ...transfer.FetcherOpt) (remotes.Fetcher, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
@@ -433,6 +434,7 @@ func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetch
 
 	return dockerFetcher{
 		dockerBase: base,
+		config:     transfer.FetcherOpts(opts).Config(),
 	}, nil
 }
 
@@ -552,6 +554,13 @@ type request struct {
 	host   RegistryHost
 	body   func() (io.ReadCloser, error)
 	size   int64
+}
+
+func (r *request) clone() *request {
+	res := *r
+	res.header = r.header.Clone()
+	//res.host.Header = r.host.Header.Clone()
+	return &res
 }
 
 func (r *request) do(ctx context.Context) (*http.Response, error) {

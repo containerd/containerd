@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -43,7 +44,7 @@ type Resolver interface {
 	// Fetcher returns a new fetcher for the provided reference.
 	// All content fetched from the returned fetcher will be
 	// from the namespace referred to by ref.
-	Fetcher(ctx context.Context, ref string) (Fetcher, error)
+	Fetcher(ctx context.Context, ref string, opts ...transfer.FetcherOpt) (Fetcher, error)
 
 	// Pusher returns a new pusher for the provided reference
 	// The returned Pusher should satisfy content.Ingester and concurrent attempts

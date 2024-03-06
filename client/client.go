@@ -55,6 +55,7 @@ import (
 	sandboxproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -395,6 +396,14 @@ type RemoteContext struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
 	MaxConcurrentDownloads int
 
+	// MaxConcurrentFetchPerDownload is the max number of connection we can have
+	// per Download. Anything lower than 1 means 1.
+	MaxConcurrentFetchPerDownload int
+
+	// ConcurrentFetchChunkSizes is the size of chunks used when
+	// max_concurrent_fetch_per_download > 1
+	ConcurrentFetchChunksSizeMB int
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
 
@@ -404,6 +413,16 @@ type RemoteContext struct {
 	// ChildLabelMap sets the labels used to reference child objects in the content
 	// store. By default, all GC reference labels will be set for all fetched content.
 	ChildLabelMap func(ocispec.Descriptor) []string
+}
+
+func (rCtx *RemoteContext) fetcherOptions() (opts []transfer.FetcherOpt) {
+	if rCtx.MaxConcurrentFetchPerDownload > 0 && rCtx.ConcurrentFetchChunksSizeMB > 0 {
+		opts = append(opts,
+			transfer.WithMaxConcurrentFetchPerDownload(rCtx.MaxConcurrentFetchPerDownload),
+			transfer.WithConcurrentFetchChunksSizeMB(rCtx.ConcurrentFetchChunksSizeMB),
+		)
+	}
+	return
 }
 
 func defaultRemoteContext() *RemoteContext {
