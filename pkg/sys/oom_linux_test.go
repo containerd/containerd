@@ -21,12 +21,14 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sys/unix"
 )
 
 func TestSetPositiveOomScoreAdjustment(t *testing.T) {
@@ -48,15 +50,75 @@ func TestSetNegativeOomScoreAdjustmentWhenPrivileged(t *testing.T) {
 }
 
 func TestSetNegativeOomScoreAdjustmentWhenUnprivilegedHasNoEffect(t *testing.T) {
-	// TODO: remove skip once we have determined cause of failure in GHA (2024-03-06)
-	t.Skip("test consistently failing in GitHub Actions")
-
 	if runningPrivileged() && !userns.RunningInUserNS() {
 		t.Skip("needs to be run as non-root or in user namespace")
 		return
 	}
+	if b, err := os.ReadFile("/proc/self/oom_score_adj"); err == nil {
+		t.Logf("/proc/self/oom_score_adj: %s", b)
+	}
+	if b, err := os.ReadFile("/proc/self/oom_score"); err == nil {
+		t.Logf("/proc/self/oom_score: %s", b)
+	}
 
-	initial, adjustment, err := adjustOom(-123)
+	cmd := exec.Command("sleep", "100")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	defer cmd.Process.Kill()
+
+	pid, err := waitForPid(cmd.Process)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initial, err := GetOOMScoreAdj(pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := fmt.Sprintf("/proc/%d/oom_score_adj", pid)
+	oompath := fmt.Sprintf("/proc/%d/oom_score", pid)
+
+	if b, err := os.ReadFile(path); err == nil {
+		t.Logf("%s: %s", path, b)
+	}
+	if b, err := os.ReadFile(oompath); err == nil {
+		t.Logf("%s: %s", oompath, b)
+	}
+
+	f, err := os.OpenFile(path, os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err = f.WriteString("-123"); err != nil {
+		if os.IsPermission(err) && (!runningPrivileged() || userns.RunningInUserNS()) {
+			t.Logf("Write failed, skipping error: %v", err)
+		} else {
+			t.Fatal(err)
+		}
+	} else {
+		t.Logf("Write succeeded")
+	}
+	if b, err := os.ReadFile(path); err == nil {
+		t.Logf("%s: %s", path, b)
+	}
+	if b, err := os.ReadFile(oompath); err == nil {
+		t.Logf("%s: %s", oompath, b)
+	}
+	fi, _ := os.Stat(path)
+	t.Logf("/proc/%d/oom_score_adj: current euid? %d, running in user ns? %t, file mode? %o, file owner? %d", pid, unix.Geteuid(), userns.RunningInUserNS(), fi.Mode(), fi.Sys().(*syscall.Stat_t).Uid)
+	if b, err := os.ReadFile("/proc/self/status"); err == nil {
+		t.Logf("/proc/self/status:\n%s", b)
+	}
+
+	adjustment, err := GetOOMScoreAdj(pid)
+	if err != nil {
+		t.Fatal(err)
+
+	}
+
 	assert.NoError(t, err)
 	assert.EqualValues(t, adjustment, initial)
 }
