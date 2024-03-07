@@ -19,7 +19,6 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sys v0.16.0
-	gotest.tools/v3 v3.5.0
 )
 
 require (
@@ -37,7 +36,6 @@ require (
 	github.com/gogo/googleapis v1.4.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/uuid v1.3.1 // indirect
 	github.com/klauspost/compress v1.15.9 // indirect
 	github.com/moby/locker v1.0.1 // indirect
@@ -52,7 +50,7 @@ require (
 	golang.org/x/net v0.18.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -75,5 +73,6 @@ replace (
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	// urfave/cli must be <= v1.22.1 due to a regression: https://github.com/urfave/cli/issues/1092
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
+
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
 )

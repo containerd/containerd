@@ -33,7 +33,9 @@ import (
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/typeurl"
 	"github.com/gogo/protobuf/types"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/google/go-cmp/cmp"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/stretchr/testify/assert"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -709,10 +711,27 @@ func checkContainerTimestamps(t *testing.T, c *containers.Container, now time.Ti
 	}
 }
 
-func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
-	if !reflect.DeepEqual(a, b) {
-		t.Fatalf("containers not equal \n\t%v != \n\t%v: "+format, append([]interface{}{a, b}, args...)...)
+// isNil returns true if the given parameter is nil or typed nil.
+func isNil(x interface{}) bool {
+	if x == nil {
+		return true
 	}
+	v := reflect.ValueOf(x)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
+func checkContainersEqual(t *testing.T, a, b *containers.Container, format string, args ...interface{}) {
+	// Ignore the difference of nil and typed nil.
+	opt := cmp.FilterValues(
+		func(x, y interface{}) bool {
+			return isNil(x) && isNil(y)
+		},
+		cmp.Comparer(func(_, _ interface{}) bool {
+			return true
+		}),
+	)
+
+	assert.True(t, cmp.Equal(a, b, opt))
 }
 
 func testEnv(t *testing.T) (context.Context, *bolt.DB, func()) {

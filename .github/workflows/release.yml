@@ -5,9 +5,6 @@ on:
 
 name: Containerd Release
 
-env:
-  GO_VERSION: "1.20.13"
-
 permissions:  # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -75,19 +72,6 @@ jobs:
           - dockerfile-ubuntu: 18.04
             dockerfile-platform: windows/amd64
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-      - name: Set env
-        shell: bash
-        env:
-          MOS: ubuntu-20.04
-        run: |
-          releasever=${{ github.ref }}
-          releasever="${releasever#refs/tags/}"
-          echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
-          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
       - name: Checkout containerd
         uses: actions/checkout@v4
         with:
@@ -97,6 +81,18 @@ jobs:
           repository: ${{ github.repository }}
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
+
+      - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+
+      - name: Set env
+        shell: bash
+        env:
+          MOS: ubuntu-20.04
+        run: |
+          releasever=${{ github.ref }}
+          releasever="${releasever#refs/tags/}"
+          echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
       - name: Setup buildx instance
         uses: docker/setup-buildx-action@v3

@@ -19,7 +19,7 @@ package cio
 import (
 	"testing"
 
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewFifoSetInDir_NoTerminal(t *testing.T) {
@@ -28,10 +28,10 @@ func TestNewFifoSetInDir_NoTerminal(t *testing.T) {
 		t.Fatalf("NewFifoSetInDir failed with: %v", err)
 	}
 
-	assert.Assert(t, !set.Terminal, "FIFOSet.Terminal should be false")
-	assert.Assert(t, set.Stdin != "", "FIFOSet.Stdin should be set")
-	assert.Assert(t, set.Stdout != "", "FIFOSet.Stdout should be set")
-	assert.Assert(t, set.Stderr != "", "FIFOSet.Stderr should be set")
+	assert.True(t, !set.Terminal, "FIFOSet.Terminal should be false")
+	assert.NotEmpty(t, set.Stdin, "FIFOSet.Stdin should be set")
+	assert.NotEmpty(t, set.Stdout, "FIFOSet.Stdout should be set")
+	assert.NotEmpty(t, set.Stderr, "FIFOSet.Stderr should be set")
 }
 
 func TestNewFifoSetInDir_Terminal(t *testing.T) {
@@ -40,8 +40,8 @@ func TestNewFifoSetInDir_Terminal(t *testing.T) {
 		t.Fatalf("NewFifoSetInDir failed with: %v", err)
 	}
 
-	assert.Assert(t, set.Terminal, "FIFOSet.Terminal should be false")
-	assert.Assert(t, set.Stdin != "", "FIFOSet.Stdin should be set")
-	assert.Assert(t, set.Stdout != "", "FIFOSet.Stdout should be set")
-	assert.Assert(t, set.Stderr == "", "FIFOSet.Stderr should not be set")
+	assert.True(t, set.Terminal, "FIFOSet.Terminal should be true")
+	assert.NotEmpty(t, set.Stdin, "FIFOSet.Stdin should be set")
+	assert.NotEmpty(t, set.Stdout, "FIFOSet.Stdout should be set")
+	assert.Empty(t, set.Stderr, "FIFOSet.Stderr should not be set")
 }

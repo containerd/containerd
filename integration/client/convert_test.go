@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/containerd/images/converter/uncompress"
 	"github.com/containerd/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"gotest.tools/v3/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestConvert creates an image from testImage, with the following conversion:
@@ -72,7 +72,7 @@ func TestConvert(t *testing.T) {
 	}
 	// Assert that the image does not have any extra arch.
 	assert.Equal(t, 1, len(plats))
-	assert.Check(t, defPlat.Match(plats[0]))
+	assert.True(t, defPlat.Match(plats[0]))
 
 	// Assert that the media type is converted to OCI and also uncompressed
 	mani, err := images.Manifest(ctx, cs, dstImg.Target, defPlat)

@@ -59,7 +59,7 @@ func TestContainerStats(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if s.GetWritableLayer().GetUsedBytes().GetValue() != 0 {
+		if s.GetWritableLayer().GetTimestamp() != 0 {
 			return true, nil
 		}
 		return false, nil
@@ -101,8 +101,14 @@ func TestContainerConsumedStats(t *testing.T) {
 		if err != nil {
 			return false, err
 		}
-		if s.GetMemory().GetWorkingSetBytes().GetValue() > 0 {
-			return true, nil
+		if goruntime.GOOS == "windows" {
+			if s.GetMemory().GetWorkingSetBytes().GetValue() > 0 {
+				return true, nil
+			}
+		} else {
+			if s.GetWritableLayer().GetTimestamp() > 0 {
+				return true, nil
+			}
 		}
 		return false, nil
 	}, time.Second, 30*time.Second))
@@ -176,7 +182,7 @@ func TestContainerListStats(t *testing.T) {
 			return false, err
 		}
 		for _, s := range stats {
-			if s.GetWritableLayer().GetUsedBytes().GetValue() == 0 {
+			if s.GetWritableLayer().GetTimestamp() == 0 {
 				return false, nil
 			}
 		}
@@ -234,7 +240,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 			if len(stats) != 1 {
 				return false, errors.New("unexpected stats length")
 			}
-			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
+			if stats[0].GetWritableLayer().GetTimestamp() != 0 {
 				return true, nil
 			}
 			return false, nil
@@ -295,7 +301,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 
 		for _, containerStats := range stats {
 			// Wait for stats on all containers, not just the first one in the list.
-			if containerStats.GetWritableLayer().GetUsedBytes().GetValue() == 0 {
+			if containerStats.GetWritableLayer().GetTimestamp() == 0 {
 				return false, nil
 			}
 		}
@@ -352,7 +358,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 			if len(stats) != 1 {
 				return false, errors.New("unexpected stats length")
 			}
-			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
+			if stats[0].GetWritableLayer().GetTimestamp() != 0 {
 				return true, nil
 			}
 			return false, nil
@@ -374,7 +380,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 			if len(stats) != 1 {
 				return false, fmt.Errorf("expected only one stat, but got %v", stats)
 			}
-			if stats[0].GetWritableLayer().GetUsedBytes().GetValue() != 0 {
+			if stats[0].GetWritableLayer().GetTimestamp() != 0 {
 				return true, nil
 			}
 			return false, nil
@@ -404,7 +410,12 @@ func testStats(t *testing.T,
 	require.NotEmpty(t, s.GetMemory().GetWorkingSetBytes().GetValue())
 	require.NotEmpty(t, s.GetWritableLayer().GetTimestamp())
 	require.NotEmpty(t, s.GetWritableLayer().GetFsId().GetMountpoint())
-	require.NotEmpty(t, s.GetWritableLayer().GetUsedBytes().GetValue())
+
+	// UsedBytes of a fresh container can be zero on Linux, depending on the backing filesystem.
+	// https://github.com/containerd/containerd/issues/7909
+	if goruntime.GOOS == "windows" {
+		require.NotEmpty(t, s.GetWritableLayer().GetUsedBytes().GetValue())
+	}
 
 	// Windows does not collect inodes stats.
 	if goruntime.GOOS != "windows" {
