@@ -21,17 +21,14 @@ package windows
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/Microsoft/hcsshim"
-	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/continuity/fs"
@@ -134,64 +131,6 @@ func (w *windowsBaseSnapshotter) Usage(ctx context.Context, key string) (usage s
 	return usage, nil
 }
 
-func (w *windowsBaseSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount {
-	var (
-		roFlag string
-	)
-
-	if sn.Kind == snapshots.KindView {
-		roFlag = "ro"
-	} else {
-		roFlag = "rw"
-	}
-
-	source := w.getSnapshotDir(sn.ID)
-	parentLayerPaths := w.parentIDsToParentPaths(sn.ParentIDs)
-
-	mountType := "windows-layer"
-
-	// error is not checked here, as a string array will never fail to Marshal
-	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
-	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
-
-	options := []string{
-		roFlag,
-	}
-	if len(sn.ParentIDs) != 0 {
-		options = append(options, parentLayersOption)
-	}
-	mounts := []mount.Mount{
-		{
-			Source:  source,
-			Type:    mountType,
-			Options: options,
-		},
-	}
-
-	return mounts
-}
-
-// Mounts returns the mounts for the transaction identified by key. Can be
-// called on an read-write or readonly transaction.
-//
-// This can be used to recover mounts after calling View or Prepare.
-func (w *windowsBaseSnapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, err error) {
-	var snapshot storage.Snapshot
-	err = w.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		snapshot, err = storage.GetSnapshot(ctx, key)
-		if err != nil {
-			return fmt.Errorf("failed to get snapshot mount: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return w.mounts(snapshot, key), nil
-}
-
 // Walk the committed snapshots.
 func (w *windowsBaseSnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 	return w.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
@@ -260,113 +199,6 @@ func (w *windowsBaseSnapshotter) Close() error {
 	return w.ms.Close()
 }
 
-func (w *windowsBaseSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
-	var newSnapshot storage.Snapshot
-	err = w.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
-		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
-		if err != nil {
-			return fmt.Errorf("failed to create snapshot: %w", err)
-		}
-
-		log.G(ctx).Debug("createSnapshot")
-		// Create the new snapshot dir
-		snDir := w.getSnapshotDir(newSnapshot.ID)
-		if err = os.MkdirAll(snDir, 0700); err != nil {
-			return fmt.Errorf("failed to create snapshot dir %s: %w", snDir, err)
-		}
-
-		if strings.Contains(key, snapshots.UnpackKeyPrefix) {
-			// IO/disk space optimization: Do nothing
-			//
-			// We only need one sandbox.vhdx for the container. Skip making one for this
-			// snapshot if this isn't the snapshot that just houses the final sandbox.vhd
-			// that will be mounted as the containers scratch. Currently the key for a snapshot
-			// where a layer will be extracted to will have the string `extract-` in it.
-			return nil
-		}
-
-		if len(newSnapshot.ParentIDs) == 0 {
-			// A parentless snapshot a new base layer. Valid base layers must have a "Files" folder.
-			// When committed, there'll be some post-processing to fill in the rest
-			// of the metadata.
-			filesDir := filepath.Join(snDir, "Files")
-			if err := os.MkdirAll(filesDir, 0700); err != nil {
-				return fmt.Errorf("creating Files dir: %w", err)
-			}
-			return nil
-		}
-
-		parentLayerPaths := w.parentIDsToParentPaths(newSnapshot.ParentIDs)
-		var snapshotInfo snapshots.Info
-		for _, o := range opts {
-			o(&snapshotInfo)
-		}
-
-		var sizeInBytes uint64
-		if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
-			log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
-
-			sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
-			if err != nil {
-				return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
-			}
-			sizeInBytes = sizeInGB * 1024 * 1024 * 1024
-		}
-
-		// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
-		if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
-			sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
-			if err != nil {
-				return fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
-			}
-		}
-
-		var makeUVMScratch bool
-		if _, ok := snapshotInfo.Labels[uvmScratchLabel]; ok {
-			makeUVMScratch = true
-		}
-
-		// This has to be run first to avoid clashing with the containers sandbox.vhdx.
-		if makeUVMScratch {
-			if err = w.createUVMScratchLayer(ctx, snDir, parentLayerPaths); err != nil {
-				return fmt.Errorf("failed to make UVM's scratch layer: %w", err)
-			}
-		}
-		if err = w.createScratchLayer(ctx, snDir, parentLayerPaths, sizeInBytes); err != nil {
-			return fmt.Errorf("failed to create scratch layer: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return w.mounts(newSnapshot, key), nil
-}
-
-// This is essentially a recreation of what HCS' CreateSandboxLayer does with some extra bells and
-// whistles like expanding the volume if a size is specified.
-func (w *windowsBaseSnapshotter) createScratchLayer(ctx context.Context, snDir string, parentLayers []string, sizeInBytes uint64) error {
-	parentLen := len(parentLayers)
-	if parentLen == 0 {
-		return errors.New("no parent layers present")
-	}
-
-	baseLayer := parentLayers[parentLen-1]
-	templateDiffDisk := filepath.Join(baseLayer, "blank.vhdx")
-	dest := filepath.Join(snDir, "sandbox.vhdx")
-	if err := copyScratchDisk(templateDiffDisk, dest); err != nil {
-		return err
-	}
-
-	if sizeInBytes != 0 {
-		if err := hcsshim.ExpandSandboxSize(w.info, filepath.Base(snDir), sizeInBytes); err != nil {
-			return fmt.Errorf("failed to expand sandbox vhdx size to %d bytes: %w", sizeInBytes, err)
-		}
-	}
-	return nil
-}
-
 // This handles creating the UVMs scratch layer.
 func (w *windowsBaseSnapshotter) createUVMScratchLayer(ctx context.Context, snDir string, parentLayers []string) error {
 	parentLen := len(parentLayers)
@@ -416,4 +248,27 @@ func copyScratchDisk(source, dest string) error {
 		return fmt.Errorf("failed to copy cached %q to %q in snapshot: %w", source, dest, err)
 	}
 	return nil
+}
+
+func getRequestedScratchSize(ctx context.Context, snapshotInfo snapshots.Info) (uint64, error) {
+	var sizeInBytes uint64
+	var err error
+	if sizeGBstr, ok := snapshotInfo.Labels[rootfsSizeInGBLabel]; ok {
+		log.G(ctx).Warnf("%q label is deprecated, please use %q instead.", rootfsSizeInGBLabel, rootfsSizeInBytesLabel)
+
+		sizeInGB, err := strconv.ParseUint(sizeGBstr, 10, 32)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInGBLabel, sizeGBstr, err)
+		}
+		sizeInBytes = sizeInGB * 1024 * 1024 * 1024
+	}
+
+	// Prefer the newer label in bytes over the deprecated Windows specific GB variant.
+	if sizeBytesStr, ok := snapshotInfo.Labels[rootfsSizeInBytesLabel]; ok {
+		sizeInBytes, err = strconv.ParseUint(sizeBytesStr, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse label %q=%q: %w", rootfsSizeInBytesLabel, sizeBytesStr, err)
+		}
+	}
+	return sizeInBytes, nil
 }
