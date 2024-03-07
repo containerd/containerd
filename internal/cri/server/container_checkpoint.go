@@ -1,3 +1,5 @@
+//go:build !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -18,6 +20,7 @@ package server
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,5 +28,7 @@ import (
 )
 
 func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.CheckpointContainerRequest) (res *runtime.CheckpointContainerResponse, err error) {
+	// The next line is just needed to make the linter happy.
+	containerCheckpointTimer.WithValues("no-runtime").UpdateSince(time.Now())
 	return nil, status.Errorf(codes.Unimplemented, "method CheckpointContainer not implemented")
 }

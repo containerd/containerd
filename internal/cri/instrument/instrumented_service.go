@@ -565,7 +565,7 @@ func (in *instrumentedService) CheckpointContainer(ctx context.Context, r *runti
 		}
 	}()
 
-	res, err = in.c.CheckpointContainer(ctx, r)
+	res, err = in.c.CheckpointContainer(ctrdutil.WithNamespace(ctx), r)
 	return res, errdefs.ToGRPC(err)
 }
 
