@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd/v2/core/runtime/v2/example"
-	"github.com/containerd/containerd/v2/core/runtime/v2/shim"
+	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
 func main() {
