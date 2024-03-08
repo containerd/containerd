@@ -182,7 +182,7 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 		metricAttrs = append(metricAttrs, semconv.HTTPStatusCode(res.StatusCode))
 	}
 	o := metric.WithAttributes(metricAttrs...)
-	t.requestBytesCounter.Add(ctx, bw.read, o)
+	t.requestBytesCounter.Add(ctx, bw.read.Load(), o)
 	// For handling response bytes we leverage a callback when the client reads the http response
 	readRecordFunc := func(n int64) {
 		t.responseBytesCounter.Add(ctx, n, o)

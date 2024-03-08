@@ -31,14 +31,6 @@ const (
 
 // Server HTTP metrics.
 const (
-	// Deprecated: This field is unused.
-	RequestCount = "http.server.request_count" // Incoming request count total
-	// Deprecated: Use of this field has been migrated to serverRequestSize. It will be removed in a future version.
-	RequestContentLength = "http.server.request_content_length" // Incoming request bytes total
-	// Deprecated: Use of this field has been migrated to serverResponseSize. It will be removed in a future version.
-	ResponseContentLength = "http.server.response_content_length" // Incoming response bytes total
-	// Deprecated: Use of this field has been migrated to serverDuration. It will be removed in a future version.
-	ServerLatency      = "http.server.duration"      // Incoming end to end duration, milliseconds
 	serverRequestSize  = "http.server.request.size"  // Incoming request bytes total
 	serverResponseSize = "http.server.response.size" // Incoming response bytes total
 	serverDuration     = "http.server.duration"      // Incoming end to end duration, milliseconds

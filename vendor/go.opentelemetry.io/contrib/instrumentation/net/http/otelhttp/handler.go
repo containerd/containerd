@@ -224,7 +224,7 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 
 	next.ServeHTTP(w, r.WithContext(ctx))
 
-	setAfterServeAttributes(span, bw.read, rww.written, rww.statusCode, bw.err, rww.err)
+	setAfterServeAttributes(span, bw.read.Load(), rww.written, rww.statusCode, bw.err, rww.err)
 
 	// Add metrics
 	attributes := append(labeler.Get(), semconvutil.HTTPServerRequestMetrics(h.server, r)...)
@@ -232,7 +232,7 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 		attributes = append(attributes, semconv.HTTPStatusCode(rww.statusCode))
 	}
 	o := metric.WithAttributes(attributes...)
-	h.requestBytesCounter.Add(ctx, bw.read, o)
+	h.requestBytesCounter.Add(ctx, bw.read.Load(), o)
 	h.responseBytesCounter.Add(ctx, rww.written, o)
 
 	// Use floating point division here for higher precision (instead of Millisecond method).
