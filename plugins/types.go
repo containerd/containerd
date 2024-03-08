@@ -90,6 +90,6 @@ const (
 	PropertyStateDir = "io.containerd.plugin.state"
 	// PropertyGRPCAddress is the grpc address used for client connections to containerd
 	PropertyGRPCAddress = "io.containerd.plugin.grpc.address"
-	// PropertyGRPCAddress is the ttrpc address used for client connections to containerd
+	// PropertyTTRPCAddress is the ttrpc address used for client connections to containerd
 	PropertyTTRPCAddress = "io.containerd.plugin.ttrpc.address"
 )
