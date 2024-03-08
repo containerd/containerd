@@ -236,6 +236,8 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+        with:
+          go-version: ${{ matrix.go-version }}
 
       - name: Make
         run: |
