@@ -18,17 +18,6 @@ containerd is designed to be embedded into a larger system, rather than being us
 
 ## Announcements
 
-### Hello Kubernetes v1.24!
-The containerd project would like to announce containerd [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). While other prior releases are supported, this latest release and the containerd [v1.5.11](https://github.com/containerd/containerd/releases/tag/v1.5.11) release are recommended for Kubernetes v1.24.
-
-We felt it important to announce this, particularly in view of [the dockershim removal from this release of Kubernetes](https://kubernetes.io/blog/2022/05/03/dockershim-historical-context/).
-
-It should be noted here that moving to CRI integrations has been in the plan for many years.  `containerd` began as part of `Docker` and was donated to `CNCF`. `containerd` remains in use today by Docker/moby/buildkit etc., and has many other [adopters](https://github.com/containerd/containerd/blob/main/ADOPTERS.md). `containerd` has a namespace that isolates use of `containerd` from various clients/adopters. The Kubernetes namespace is appropriately named `k8s.io`. The CRI API and `containerd` CRI plugin project has, from the start, been an effort to reduce the impact surface for Kubernetes container runtime integration. If you can't tell, we are excited to see this come to fruition.
-
-If you have any concerns or questions, we will be here to answer them in [issues, discussions, and/or on slack](#communication). Below you will find information/detail about our [CRI Integration](#cri) implementation.
-
-For containerd users already on v1.6.0-v1.6.3, there are known issues addressed by [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). The issues are primarily related to [CNI setup](https://github.com/kubernetes/website/blob/dev-1.24/content/en/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors.md)
-
 ### Now Recruiting
 
 We are a large inclusive OSS project that is welcoming help of any kind shape or form:
