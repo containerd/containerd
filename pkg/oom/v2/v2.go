@@ -19,13 +19,13 @@
 package v2
 
 import (
-    "context"
-    "fmt"
+	"context"
+	"fmt"
 
-    cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-    eventstypes "github.com/containerd/containerd/v2/api/events"
-    "github.com/containerd/containerd/v2/pkg/oom"
-    "github.com/containerd/log"
+	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	eventstypes "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/pkg/oom"
+	"github.com/containerd/log"
 )
 
 // New returns an implementation that listens to OOM events

@@ -17,27 +17,27 @@
 package plugin
 
 import (
-    "github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task"
-    "github.com/containerd/containerd/v2/pkg/shutdown"
-    "github.com/containerd/containerd/v2/plugins"
-    "github.com/containerd/plugin"
-    "github.com/containerd/plugin/registry"
+	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 )
 
 func init() {
-    registry.Register(&plugin.Registration{
-        Type: plugins.TTRPCPlugin,
-        ID:   "task",
-        Requires: []plugin.Type{
-            plugins.EventPlugin,
-            plugins.InternalPlugin,
-        },
-        InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-            ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
-            if err != nil {
-                return nil, err
-            }
-            return task.NewTaskService(ic.Context, ss.(shutdown.Service))
-        },
-    })
+	registry.Register(&plugin.Registration{
+		Type: plugins.TTRPCPlugin,
+		ID:   "task",
+		Requires: []plugin.Type{
+			plugins.EventPlugin,
+			plugins.InternalPlugin,
+		},
+		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
+			if err != nil {
+				return nil, err
+			}
+			return task.NewTaskService(ic.Context, ss.(shutdown.Service))
+		},
+	})
 }
