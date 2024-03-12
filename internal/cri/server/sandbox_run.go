@@ -275,6 +275,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			}); err != nil {
 			return nil, fmt.Errorf("unable to add extension %s to sandbox %s: %v", sb.EndpointKey, id, err)
 		}
+		sandbox.Endpoint = sb.Endpoint{
+			Protocol: ctrl.Protocol,
+			Version:  ctrl.Version,
+			Address:  ctrl.Address,
+		}
 	}
 
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {

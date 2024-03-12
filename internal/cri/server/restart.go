@@ -141,6 +141,13 @@ func (c *criService) recover(ctx context.Context) error {
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
 
+		// Load sandbox endpoint
+		if endpoint, err := sbx.GetEndpoint(); err == nil {
+			sb.Endpoint = endpoint
+		} else {
+			log.G(ctx).Warnf("no sandbox endpoint for %s", sbx.ID)
+		}
+
 		if err := c.sandboxStore.Add(sb); err != nil {
 			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
 		}
