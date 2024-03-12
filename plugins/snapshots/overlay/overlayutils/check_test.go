@@ -22,7 +22,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/containerd/containerd/v2/internal/testutil"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/testutil/loopback"
 )
 

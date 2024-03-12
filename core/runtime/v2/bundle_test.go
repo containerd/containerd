@@ -19,5 +19,5 @@ package v2
 import (
 	// When testutil is imported for one platform (bundle_linux_test.go) it
 	// should be imported for all platforms.
-	_ "github.com/containerd/containerd/v2/internal/testutil"
+	_ "github.com/containerd/containerd/v2/pkg/testutil"
 )
