@@ -24,6 +24,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
+        exclude:
+          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +42,6 @@ jobs:
   #
   project:
     name: Project Checks
-    if: github.repository == 'containerd/containerd'
     runs-on: ubuntu-22.04
     timeout-minutes: 5
 
@@ -52,6 +54,7 @@ jobs:
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
 
       - uses: containerd/project-checks@v1.1.0
+        if: github.repository == 'containerd/containerd'
         with:
           working-directory: src/github.com/containerd/containerd
           repo-access-token: ${{ secrets.GITHUB_TOKEN }}
@@ -189,6 +192,8 @@ jobs:
       matrix:
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.21.8", "1.22.1"]
+        exclude:
+          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-go
@@ -381,6 +386,8 @@ jobs:
           - io.containerd.runc.v2
         runc: [runc, crun]
         os: [ubuntu-22.04, actuated-arm64-4cpu-16gb]
+        exclude:
+          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
 
     env:
       GOTEST: gotestsum --
