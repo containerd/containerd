@@ -90,7 +90,7 @@ func init() {
 			eventMonitor := events.NewEventMonitor(&podSandboxEventHandler{
 				controller: &c,
 			})
-			eventMonitor.Subscribe(client, []string{`topic="/tasks/exit"`})
+			eventMonitor.Subscribe(client, []string{`topic=="/tasks/exit"`})
 			eventMonitor.Start()
 			c.eventMonitor = eventMonitor
 
