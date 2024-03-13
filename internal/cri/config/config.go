@@ -71,6 +71,10 @@ const (
 	// DefaultSandboxImage is the default image to use for sandboxes when empty or
 	// for default configurations.
 	DefaultSandboxImage = "registry.k8s.io/pause:3.9"
+	// IOTypeFifo is container io implemented by creating named pipe
+	IOTypeFifo = "fifo"
+	// IOTypeStreaming is container io implemented by connecting the streaming api to sandbox endpoint
+	IOTypeStreaming = "streaming"
 )
 
 // Runtime struct to contain the type(ID), engine, and root variables for a default runtime
@@ -116,6 +120,11 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+	// IOType defines how containerd transfer the io streams of the container
+	// if it is not set, the named pipe will be created for the container
+	// we can also set it to "streaming" to create a stream by streaming api,
+	// and use it as a channel to transfer the io stream
+	IOType string `toml:"io_type" json:"io_type"`
 }
 
 // ContainerdConfig contains toml config related to containerd
@@ -526,6 +535,13 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		if len(r.Sandboxer) == 0 {
 			r.Sandboxer = string(ModePodSandbox)
 			c.ContainerdConfig.Runtimes[k] = r
+		}
+
+		if len(r.IOType) == 0 {
+			r.IOType = IOTypeFifo
+		}
+		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
+			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe`")
 		}
 	}
 

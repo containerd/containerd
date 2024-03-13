@@ -20,36 +20,55 @@ import (
 	"io"
 	"sync"
 
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
-	"github.com/containerd/log"
 )
 
 // ExecIO holds the exec io.
 type ExecIO struct {
 	id    string
 	fifos *cio.FIFOSet
-	*stdioPipes
+	*stdioStream
 	closer *wgCloser
 }
 
 var _ cio.IO = &ExecIO{}
 
-// NewExecIO creates exec io.
-func NewExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
+// NewFifoExecIO creates exec io by named pipes.
+func NewFifoExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
 	fifos, err := newFifos(root, id, tty, stdin)
 	if err != nil {
 		return nil, err
 	}
-	stdio, closer, err := newStdioPipes(fifos)
+	stdio, closer, err := newStdioStream(fifos)
 	if err != nil {
 		return nil, err
 	}
 	return &ExecIO{
-		id:         id,
-		fifos:      fifos,
-		stdioPipes: stdio,
-		closer:     closer,
+		id:          id,
+		fifos:       fifos,
+		stdioStream: stdio,
+		closer:      closer,
+	}, nil
+}
+
+// NewStreamExecIO creates exec io with streaming.
+func NewStreamExecIO(id, address string, tty, stdin bool) (*ExecIO, error) {
+	fifos, err := newStreams(address, id, tty, stdin)
+	if err != nil {
+		return nil, err
+	}
+	stdio, closer, err := newStdioStream(fifos)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecIO{
+		id:          id,
+		fifos:       fifos,
+		stdioStream: stdio,
+		closer:      closer,
 	}, nil
 }
 
