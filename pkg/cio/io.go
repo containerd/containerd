@@ -71,7 +71,9 @@ type Creator func(id string) (IO, error)
 // will be sent only to the first reads
 type Attach func(*FIFOSet) (IO, error)
 
-// FIFOSet is a set of file paths to FIFOs for a task's standard IO streams
+// FIFOSet is a set of file paths to FIFOs for a task's standard IO streams,
+// Although it supports streaming io other than FIFOs,
+// we do not change the name "FIFOSet" because it is referenced in too many codes.
 type FIFOSet struct {
 	Config
 	close func() error
