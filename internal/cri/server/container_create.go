@@ -556,7 +556,6 @@ func (c *criService) buildContainerSpec(
 			id,
 			sandboxID,
 			sandboxPid,
-			netNSPath,
 			containerName,
 			imageName,
 			config,
@@ -568,9 +567,7 @@ func (c *criService) buildContainerSpec(
 		)
 	case isWindows:
 		specOpts, err = c.buildWindowsSpec(
-			id,
 			sandboxID,
-			sandboxPid,
 			netNSPath,
 			containerName,
 			imageName,
@@ -579,11 +576,9 @@ func (c *criService) buildContainerSpec(
 			imageConfig,
 			extraMounts,
 			ociRuntime,
-			runtimeHandler,
 		)
 	case isDarwin:
 		specOpts, err = c.buildDarwinSpec(
-			id,
 			sandboxID,
 			containerName,
 			imageName,
@@ -592,7 +587,6 @@ func (c *criService) buildContainerSpec(
 			imageConfig,
 			extraMounts,
 			ociRuntime,
-			runtimeHandler,
 		)
 	default:
 		return nil, fmt.Errorf("unsupported spec platform: %s", platform.OS)
@@ -609,7 +603,6 @@ func (c *criService) buildLinuxSpec(
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
-	netNSPath string,
 	containerName string,
 	imageName string,
 	config *runtime.ContainerConfig,
@@ -839,9 +832,7 @@ func (c *criService) buildLinuxSpec(
 }
 
 func (c *criService) buildWindowsSpec(
-	id string,
 	sandboxID string,
-	sandboxPid uint32,
 	netNSPath string,
 	containerName string,
 	imageName string,
@@ -850,7 +841,6 @@ func (c *criService) buildWindowsSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
-	runtimeHandler *runtime.RuntimeHandler,
 ) (_ []oci.SpecOpts, retErr error) {
 	var specOpts []oci.SpecOpts
 	specOpts = append(specOpts, customopts.WithProcessCommandLineOrArgsForWindows(config, imageConfig))
@@ -936,7 +926,6 @@ func (c *criService) buildWindowsSpec(
 }
 
 func (c *criService) buildDarwinSpec(
-	id string,
 	sandboxID string,
 	containerName string,
 	imageName string,
@@ -945,7 +934,6 @@ func (c *criService) buildDarwinSpec(
 	imageConfig *imagespec.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
-	runtimeHandler *runtime.RuntimeHandler,
 ) (_ []oci.SpecOpts, retErr error) {
 	specOpts := []oci.SpecOpts{
 		customopts.WithProcessArgs(config, imageConfig),
