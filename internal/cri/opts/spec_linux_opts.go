@@ -357,7 +357,7 @@ func WithResources(resources *runtime.LinuxContainerResources, tolerateMissingHu
 			s.Linux.Resources.CPU.Cpus = cpus
 		}
 		if mems := resources.GetCpusetMems(); mems != "" {
-			s.Linux.Resources.CPU.Mems = resources.GetCpusetMems()
+			s.Linux.Resources.CPU.Mems = mems
 		}
 		if limit != 0 {
 			s.Linux.Resources.Memory.Limit = &limit
