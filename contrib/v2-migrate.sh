@@ -2,10 +2,11 @@
 set -e
 for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   #First migrate containerd imports to v2 module
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd(?!\/v2)(\/\S+)?"/$1$2"github.com\/containerd\/containerd\/v2$3"/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd(?!\/v2)(\/\S+)?"( \/\/.*)?$/$1$2"github.com\/containerd\/containerd\/v2$3"$4/g' $GOFILE
 
   #Migrate moved packages
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2"/$1$2"github.com\/containerd\/containerd\/v2\/client"/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )"github\.com\/containerd\/containerd\/v2"/$1containerd "github.com\/containerd\/containerd\/v2\/client"/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )"github\.com\/containerd\/containerd\/v2"/$1$2"github.com\/containerd\/containerd\/v2\/client"/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/content\/local/$1$2"github.com\/containerd\/containerd\/v2\/plugins\/content\/local/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/content/$1$2"github.com\/containerd\/containerd\/v2\/core\/content/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/containers/$1$2"github.com\/containerd\/containerd\/v2\/core\/containers/g' $GOFILE
@@ -68,6 +69,7 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   # Migrate packages split out to their own repository
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/platforms/$1$2"github.com\/containerd\/platforms/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/errdefs/$1$2"github.com\/containerd\/errdefs/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/plugin(\/|")/$1$2"github.com\/containerd\/plugin$3/g' $GOFILE
 
   gofmt -s -w $GOFILE
 done
