@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/streaming"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/log"
 )
 
@@ -64,7 +65,18 @@ func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (
 	if iis.forceCompress {
 		opts = append(opts, archive.WithImportCompression())
 	}
-	return archive.ImportIndex(ctx, store, iis.stream, opts...)
+
+	r := iis.stream
+	if iis.mediaType == "" {
+		d, err := compression.DecompressStream(iis.stream)
+		if err != nil {
+			return ocispec.Descriptor{}, err
+		}
+		defer d.Close()
+		r = d
+	}
+
+	return archive.ImportIndex(ctx, store, r, opts...)
 }
 
 func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
