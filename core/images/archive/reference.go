@@ -72,7 +72,6 @@ func isImagePrefix(s, prefix string) bool {
 }
 
 func normalizeReference(ref string) (string, error) {
-	// TODO: Replace this function to not depend on reference package
 	normalized, err := distref.ParseDockerRef(ref)
 	if err != nil {
 		return "", fmt.Errorf("normalize image ref %q: %w", ref, err)
