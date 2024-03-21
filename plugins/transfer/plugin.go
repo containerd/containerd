@@ -94,7 +94,7 @@ func init() {
 				}
 
 				var applier diff.Applier
-				target := platforms.OnlyStrict(p)
+				target := platforms.Only(p)
 				if uc.Differ != "" {
 					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
 					if err != nil {
