@@ -28,18 +28,18 @@ import (
 	"syscall"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/pkg/seccomp"
-	"github.com/containerd/containerd/v2/pkg/seutil"
 	"github.com/containerd/log"
-
 	"github.com/moby/sys/mountinfo"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux/label"
 	"golang.org/x/sys/unix"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/cri/seutil"
+	"github.com/containerd/containerd/v2/pkg/seccomp"
 )
 
 const (

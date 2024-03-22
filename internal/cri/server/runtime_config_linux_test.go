@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
-	"github.com/containerd/containerd/v2/pkg/systemd"
+	"github.com/containerd/containerd/v2/internal/cri/systemd"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
