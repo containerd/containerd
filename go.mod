@@ -36,7 +36,7 @@ require (
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.0
-	github.com/intel/goresctrl v0.6.0
+	github.com/intel/goresctrl v0.7.0
 	github.com/klauspost/compress v1.17.7
 	github.com/mdlayher/vsock v1.2.1
 	github.com/minio/sha256-simd v1.0.1
