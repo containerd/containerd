@@ -18,6 +18,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -624,6 +625,16 @@ func GenerateRuntimeOptions(r Runtime) (interface{}, error) {
 	// For generic configuration, if no config path specified (preserving old behavior), pass
 	// the whole TOML configuration section to the runtime.
 	if runtimeOpts, ok := options.(*runtimeoptions.Options); ok && runtimeOpts.ConfigPath == "" {
+		if runtimeOpts.TypeUrl != "" {
+			body, err := json.Marshal(r.Options)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal config body as JSON for runtime %q: %v", r.Type, err)
+			}
+
+			runtimeOpts.ConfigBody = body
+			return options, nil
+		}
+
 		runtimeOpts.ConfigBody = b
 	}
 
