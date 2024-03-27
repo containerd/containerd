@@ -45,7 +45,7 @@ type RestoreOpts func(context.Context, string, *Client, Image, *imagespec.Index)
 // WithRestoreImage restores the image for the container
 func WithRestoreImage(ctx context.Context, id string, client *Client, checkpoint Image, index *imagespec.Index) NewContainerOpts {
 	return func(ctx context.Context, client *Client, c *containers.Container) error {
-		name, ok := index.Annotations[checkpointImageNameLabel]
+		name, ok := index.Annotations[imagespec.AnnotationRefName]
 		if !ok || name == "" {
 			return ErrImageNameNotFoundInIndex
 		}
