@@ -71,6 +71,8 @@ const (
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
 	// CRIServicePlugin implements a cri service
 	CRIServicePlugin plugin.Type = "io.containerd.cri.v1"
+	// CredentialPlugin implements a credential manager
+	CredentialPlugin plugin.Type = "io.containerd.credential.v1" // #nosec G101
 )
 
 const (

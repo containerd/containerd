@@ -352,6 +352,8 @@ type hostFileConfig struct {
 	OverridePath bool `toml:"override_path"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
+	// CredsStore is suffix of the program you want to use. eg. osxkeychain、secretservice、wincred、pass、file、memory
+	CredsStore string `toml:"creds_store" json:"credsStore"`
 }
 
 func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
