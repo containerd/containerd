@@ -537,3 +537,9 @@ It works with standard protobufs and GRPC services as well as generating clients
 The only difference between grpc and ttrpc is the wire protocol.
 ttrpc removes the http stack in order to save memory and binary size to keep shims small.
 It is recommended to use ttrpc in your shim but grpc support is currently an experimental feature.
+
+#### runc-shim reap orphan process created by exec-init
+After this commit https://github.com/torvalds/linux/commit/c6c70f4455d1eda91065e93cc4f7eddf4499b105 (merged in kernel 4.11)
+reaper can't cross the namespaces,so runc-shim is forbidden to reap orphan process created by exec-init even shim has process to reap,process1 in container will become reaper.
+If orphan process exited it will become zombie process(if process1 in container doesn't call wait4 to reap zombie process).
+We can let tini https://github.com/krallin/tini as process1 in container to reap zombie process,or use "shareProcessNamespace: true"  for kubernetes let pause process  to reap zombie process.
