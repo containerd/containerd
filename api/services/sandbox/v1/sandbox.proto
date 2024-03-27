@@ -120,6 +120,9 @@ message ControllerStartResponse {
 	uint32 pid = 2;
 	google.protobuf.Timestamp created_at = 3;
 	map<string, string> labels = 4;
+	string address = 5;
+	uint32 version = 6;
+	string protocol = 7;
 }
 
 message ControllerPlatformRequest {
