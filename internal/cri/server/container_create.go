@@ -44,6 +44,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	"github.com/containerd/containerd/v2/pkg/marshalutil"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/platforms"
 )
@@ -404,7 +405,7 @@ func (c *criService) runtimeSpec(id string, platform platforms.Platform, baseSpe
 		}
 
 		spec := oci.Spec{}
-		if err := util.DeepCopy(&spec, &baseSpec); err != nil {
+		if err := marshalutil.DeepCopy(&spec, &baseSpec); err != nil {
 			return nil, fmt.Errorf("failed to clone OCI spec: %w", err)
 		}
 

@@ -25,7 +25,7 @@ import (
 
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
-	"github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/pkg/marshalutil"
 )
 
 // updateOCIResource updates container resource limit.
@@ -34,7 +34,7 @@ func updateOCIResource(ctx context.Context, spec *runtimespec.Spec, r *runtime.U
 
 	// Copy to make sure old spec is not changed.
 	var cloned runtimespec.Spec
-	if err := util.DeepCopy(&cloned, spec); err != nil {
+	if err := marshalutil.DeepCopy(&cloned, spec); err != nil {
 		return nil, fmt.Errorf("failed to deep copy: %w", err)
 	}
 	if cloned.Windows == nil {

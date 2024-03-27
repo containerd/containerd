@@ -35,6 +35,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/marshalutil"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -160,7 +161,7 @@ func (c *Controller) runtimeSpec(id string, baseSpecFile string, opts ...oci.Spe
 		}
 
 		spec := oci.Spec{}
-		if err := ctrdutil.DeepCopy(&spec, &baseSpec); err != nil {
+		if err := marshalutil.DeepCopy(&spec, &baseSpec); err != nil {
 			return nil, fmt.Errorf("failed to clone OCI spec: %w", err)
 		}
 
