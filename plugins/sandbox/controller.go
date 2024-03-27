@@ -19,7 +19,15 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/v2/api/types"
@@ -30,13 +38,6 @@ import (
 	v2 "github.com/containerd/containerd/v2/core/runtime/v2"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func init() {
@@ -44,11 +45,11 @@ func init() {
 		Type: plugins.SandboxControllerPlugin,
 		ID:   "shim",
 		Requires: []plugin.Type{
-			plugins.RuntimePluginV2,
+			plugins.ShimPlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimPlugin, err := ic.GetByID(plugins.RuntimePluginV2, "shim")
+			shimPlugin, err := ic.GetByID(plugins.ShimPlugin, "shim")
 			if err != nil {
 				return nil, err
 			}
@@ -62,16 +63,32 @@ func init() {
 				shims     = shimPlugin.(*v2.ShimManager)
 				publisher = exchangePlugin.(*exchange.Exchange)
 			)
+			state := ic.Properties[plugins.PropertyStateDir]
+			root := ic.Properties[plugins.PropertyRootDir]
+			for _, d := range []string{root, state} {
+				if err := os.MkdirAll(d, 0711); err != nil {
+					return nil, err
+				}
+			}
 
-			return &controllerLocal{
+			if err := shims.LoadExistingShims(ic.Context, root, state); err != nil {
+				return nil, fmt.Errorf("failed to load existing shim sandboxes, %v", err)
+			}
+
+			c := &controllerLocal{
+				root:      root,
+				state:     state,
 				shims:     shims,
 				publisher: publisher,
-			}, nil
+			}
+			return c, nil
 		},
 	})
 }
 
 type controllerLocal struct {
+	root      string
+	state     string
 	shims     *v2.ShimManager
 	publisher events.Publisher
 }
@@ -97,7 +114,7 @@ func (c *controllerLocal) cleanupShim(ctx context.Context, sandboxID string, svc
 	}
 }
 
-func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) error {
+func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts ...sandbox.CreateOpt) (retErr error) {
 	var coptions sandbox.CreateOptions
 	sandboxID := info.ID
 	for _, opt := range opts {
@@ -108,7 +125,17 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		return fmt.Errorf("sandbox %s already running: %w", sandboxID, errdefs.ErrAlreadyExists)
 	}
 
-	shim, err := c.shims.Start(ctx, sandboxID, runtime.CreateOpts{
+	bundle, err := v2.NewBundle(ctx, c.root, c.state, sandboxID, info.Spec)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if retErr != nil {
+			bundle.Delete()
+		}
+	}()
+
+	shim, err := c.shims.Start(ctx, sandboxID, bundle, runtime.CreateOpts{
 		Spec:           info.Spec,
 		RuntimeOptions: info.Runtime.Options,
 		Runtime:        info.Runtime.Name,
