@@ -31,6 +31,13 @@ func TestPodSandboxStatus(t *testing.T) {
 		id = "test-id"
 		ip = "10.10.10.10"
 	)
+	idmap := []*runtime.IDMapping{
+		{
+			ContainerId: 0,
+			HostId:      100,
+			Length:      1,
+		},
+	}
 	additionalIPs := []string{"8.8.8.8", "2001:db8:85a3::8a2e:370:7334"}
 	createdAt := time.Now()
 	config := &runtime.PodSandboxConfig{
@@ -46,6 +53,11 @@ func TestPodSandboxStatus(t *testing.T) {
 					Network: runtime.NamespaceMode_NODE,
 					Pid:     runtime.NamespaceMode_CONTAINER,
 					Ipc:     runtime.NamespaceMode_POD,
+					UsernsOptions: &runtime.UserNamespace{
+						Uids: idmap,
+						Gids: idmap,
+						Mode: runtime.NamespaceMode_POD,
+					},
 				},
 			},
 		},
@@ -80,6 +92,11 @@ func TestPodSandboxStatus(t *testing.T) {
 					Network: runtime.NamespaceMode_NODE,
 					Pid:     runtime.NamespaceMode_CONTAINER,
 					Ipc:     runtime.NamespaceMode_POD,
+					UsernsOptions: &runtime.UserNamespace{
+						Uids: idmap,
+						Gids: idmap,
+						Mode: runtime.NamespaceMode_POD,
+					},
 				},
 			},
 		},
