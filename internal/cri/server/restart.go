@@ -138,6 +138,14 @@ func (c *criService) recover(ctx context.Context) error {
 		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
 		sb.Sandboxer = sbx.Sandboxer
 
+		if status.Protocol != "" && status.Address != "" {
+			sb.Endpoint = sandboxstore.Endpoint{
+				Protocol: status.Protocol,
+				Version:  status.Version,
+				Address:  status.Address,
+			}
+		}
+
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
 
