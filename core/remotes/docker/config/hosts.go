@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -291,6 +292,39 @@ func hostDirectory(host string) string {
 		return host[:idx] + "_" + host[idx+1:] + "_"
 	}
 	return host
+}
+
+// hostMatchWildcardPrefix scans the root directory for any directories beginning w/ a '_'
+// The rest of the directory name is used to check the current host for a match. If a match is found it is appended to wildcardHosts.
+// The returning list is ordered by match length in descending order, meaning if "_.registry.io" and "_.io" are present, than "_.registry.io" will take precedence over "_.io"
+func hostDirectoryScanWildcards(root string, host string) (wildcardHosts []string) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+
+	// Order the entries in descending order by base file name length
+	sort.Slice(entries, func(i, j int) bool {
+		return len(entries[i].Name()) > len(entries[j].Name())
+	})
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+
+		dirName := e.Name()
+		if dirName == "_default" {
+			continue
+		}
+
+		wildcardSuffix, found := strings.CutPrefix(dirName, "_")
+		if found && strings.HasSuffix(host, wildcardSuffix) {
+			wildcardHosts = append(wildcardHosts, hostDirectory(filepath.Join(root, dirName)))
+		}
+	}
+
+	return
 }
 
 func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
