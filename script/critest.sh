@@ -36,6 +36,14 @@ version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
 runtime_type = "${TEST_RUNTIME}"
 EOF
+
+if [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
+  cat >> ${BDIR}/config.toml <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+   SystemdCgroup = true
+EOF
+fi
+
 ls /etc/cni/net.d
 
 /usr/local/bin/containerd \
