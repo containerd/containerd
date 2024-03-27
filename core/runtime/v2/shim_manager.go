@@ -163,18 +163,26 @@ func (m *ShimManager) ID() string {
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	// This container belongs to sandbox which supposed to be already started via sandbox API.
 	if opts.SandboxID != "" {
-		process, err := m.Get(ctx, opts.SandboxID)
-		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+		var params shimbinary.BootstrapParams
+		if opts.Address != "" && opts.Protocol != "" {
+			params = shimbinary.BootstrapParams{
+				Version:  int(opts.Version),
+				Address:  opts.Address,
+				Protocol: opts.Protocol,
+			}
+		} else {
+			// For those sandbox we can not get endpoint,
+			// fallback to legacy implementation
+			p, restoreErr := m.restoreBootstrapParams(ctx, opts.SandboxID)
+			if restoreErr != nil {
+				return nil, fmt.Errorf("failed to get bootstrap "+
+					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
+			}
+			params = p
 		}
 
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		params, err := restoreBootstrapParams(process.Bundle())
-		if err != nil {
 			return nil, err
 		}
 
@@ -249,6 +257,18 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	return shim, nil
+}
+
+func (m *ShimManager) restoreBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
+	process, err := m.Get(ctx, sandboxID)
+	if err != nil {
+		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox %s", sandboxID)
+	}
+	params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), sandboxID))
+	if err != nil {
+		return shimbinary.BootstrapParams{}, err
+	}
+	return params, nil
 }
 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.

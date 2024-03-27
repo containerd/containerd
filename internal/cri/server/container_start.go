@@ -123,7 +123,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	endpoint := sandbox.Endpoint
 	if endpoint.IsValid() {
 		taskOpts = append(taskOpts,
-			containerd.WithTaskApiEndpoint(endpoint.Address, endpoint.Protocol, endpoint.Version))
+			containerd.WithTaskAPIEndpoint(endpoint.Address, endpoint.Protocol, endpoint.Version))
 	}
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)

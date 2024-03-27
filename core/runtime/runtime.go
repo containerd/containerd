@@ -51,6 +51,12 @@ type CreateOpts struct {
 	Runtime string
 	// SandboxID is an optional ID of sandbox this container belongs to
 	SandboxID string
+	// Address is an optional Address for Task API server
+	Address string
+	// Protocol is an optional Protocol for Task API connection
+	Protocol string
+	// Version is an optional Version of the Task API
+	Version uint32
 }
 
 // Exit information for a process
