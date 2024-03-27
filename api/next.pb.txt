@@ -7461,6 +7461,13 @@ file {
       type_name: ".containerd.types.transfer.RegistryResolver.HeadersEntry"
       json_name: "headers"
     }
+    field {
+      name: "host_dir"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "hostDir"
+    }
     nested_type {
       name: "HeadersEntry"
       field {
