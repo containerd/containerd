@@ -5,6 +5,7 @@ This document describes the method to configure encrypted container image decryp
 
 Encrypted container images are OCI images which contain encrypted blobs. These encrypted images can be created through the use of [containerd/imgcrypt project](https://github.com/containerd/imgcrypt). To decrypt these images, the `containerd` runtime uses information passed from the `cri` such as keys, options and encryption metadata.
 
+
 ## The "node" Key Model
 
 Encryption ties trust to an entity based on the model in which a key is associated with it. We call this the key model. One such usecase is when we want to tie the trust of a key to the node in a cluster. In this case, we call it the "node" or "host" Key Model. Future work will include more key models to facilitate other trust associations (i.e. for multi-tenancy).
@@ -43,3 +44,43 @@ In this example, container image decryption is set to use the "node" key model.
 In addition, the decryption [`stream_processors`](https://github.com/containerd/containerd/blob/main/docs/stream_processors.md) are configured as specified in [containerd/imgcrypt project](https://github.com/containerd/imgcrypt), with the additional field `--decryption-keys-path` configured to specify where decryption keys are located locally in the node.
 
 The `$OCICRYPT_KEYPROVIDER_CONFIG` environment variable is used for [ocicrypt keyprovider protocol](https://github.com/containers/ocicrypt/blob/main/docs/keyprovider.md).
+
+## The "pod" Key Model
+
+When running in the "node" key model, the key to decrypt image layers needs to reside on the node. To allow a pod to specify which key to use when decrypting it's image the "pod" key model can be used.
+
+Using the annotation `io.containerd.cri.decryption-key` on a pod specifies
+which key to decrypt the layers of the image. For instance:
+
+- `jwe:/path/to/key.pem`
+- `pgp:admin@example.com`
+- `pkcs7:/path/to/x509-file`
+- `provider:<keyprovider>:<key-material>`.
+### Configuring image decryption for "node" key model
+Add the following configuration to `/etc/containerd/config.toml` and restart the `containerd` service manually.
+
+```toml
+version = 2
+
+[plugins."io.containerd.grpc.v1.cri".image_decryption]
+  key_model = "pod"
+```
+
+
+### Example using pod annotations in Kubernetes manifests
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "encrypted"
+  annotations:
+    io.containerd.cri.decryption-key: provider:kms-crypt:139845b9-fb6f-43e0-a6f3-8134496e4823
+spec:
+  containers:
+    - name: encrypted
+      image: "ttl.sh/imgcrypt-test"
+```
+
+The image `ttl.sh/imgcrypt-test` will be decrypted using the keyprovider
+kms-crypt and key-material 139845b9-fb6f-43e0-a6f3-8134496e4823.

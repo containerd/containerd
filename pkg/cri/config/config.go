@@ -424,6 +424,9 @@ const (
 	// KeyModelNode is the key model where key for encrypted images reside
 	// on the worker nodes
 	KeyModelNode = "node"
+	// KeyModelPod is the key model where key for encrypted images reside
+	// in annotations on pod config
+	KeyModelPod = "pod"
 )
 
 // ValidatePluginConfig validates the given plugin configuration.
