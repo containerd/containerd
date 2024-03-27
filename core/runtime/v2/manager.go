@@ -29,6 +29,7 @@ import (
 
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/runtime"
@@ -101,7 +102,7 @@ func init() {
 				return nil, err
 			}
 
-			return NewTaskManager(shimManager), nil
+			return NewTaskManager(ic.Context, shimManager)
 		},
 	})
 
@@ -430,10 +431,36 @@ type TaskManager struct {
 }
 
 // NewTaskManager creates a new task manager instance.
-func NewTaskManager(shims *ShimManager) *TaskManager {
-	return &TaskManager{
-		manager: shims,
+func NewTaskManager(ctx context.Context, shims *ShimManager) (*TaskManager, error) {
+	manager := &TaskManager{manager: shims}
+	if err := manager.restoreTasks(ctx); err != nil {
+		return nil, err
 	}
+	return manager, nil
+}
+
+func (m *TaskManager) restoreTasks(ctx context.Context) error {
+	log.G(ctx).Info("restoring task event streamers")
+	instances, err := m.manager.shims.GetAll(ctx, true)
+	if err != nil {
+		return err
+	}
+
+	// See if any of restored shims supports event streaming
+	for _, instance := range instances {
+		shimTask, err := newShimTask(instance)
+		if err != nil {
+			log.G(ctx).WithError(err).Error("unable to get shim task")
+			continue
+		}
+
+		if err := m.tryStreamEvents(context.Background(), shimTask); err != nil {
+			log.G(ctx).WithError(err).Errorf("unable to resetore event stream for task %q: %v", instance.ID(), err)
+			continue
+		}
+	}
+
+	return nil
 }
 
 // ID of the task manager
@@ -452,6 +479,10 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	// This will not be required once shim service / client implemented.
 	shimTask, err := newShimTask(shim)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := m.tryStreamEvents(ctx, shimTask); err != nil {
 		return nil, err
 	}
 
@@ -479,6 +510,54 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 	}
 
 	return t, nil
+}
+
+// tryStreamEvents attempts to stream shim events using bidirectional TTRPC/GRPC channel.
+func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error {
+	// TODO: Use slices.Contains once on Go 1.21
+	supportsStreaming := false
+	for _, f := range shim.Features() {
+		if f == shimbinary.EventStreaming {
+			supportsStreaming = true
+			break
+		}
+	}
+
+	// Not supported, shim will use legacy events reporting.
+	if !supportsStreaming {
+		return nil
+	}
+
+	log.G(ctx).Info("using shim events streaming")
+
+	stream, err := shim.task.Events(context.Background(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to obtain events streamer from shim: %w", err)
+	}
+
+	go func() {
+		for {
+			evt, err := stream.Recv()
+			if err != nil {
+				log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
+				break
+			}
+
+			log.G(ctx).Debugf("got shim event %q from stream: %+v", evt.Topic, evt.Event.GetTypeUrl())
+
+			if err := m.manager.events.Forward(context.Background(), &events.Envelope{
+				Timestamp: evt.Timestamp.AsTime(),
+				Namespace: evt.Namespace,
+				Topic:     evt.Topic,
+				Event:     evt.Event,
+			}); err != nil {
+				log.G(ctx).WithError(err).Error("failed to publish event from shim stream: %w", evt)
+				continue
+			}
+		}
+	}()
+
+	return nil
 }
 
 // Get a specific task

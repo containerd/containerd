@@ -112,7 +112,7 @@ func TestIssue7496(t *testing.T) {
 // example, umount overlayfs rootfs which doesn't with volatile.
 //
 // REF: https://man7.org/linux/man-pages/man1/strace.1.html
-func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskService, delayInSec int) chan struct{} {
+func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTRPCTaskClient, delayInSec int) chan struct{} {
 	pid := shimPid(ctx, t, shimCli)
 
 	doneCh := make(chan struct{})

@@ -48,10 +48,6 @@ func init() {
 			plugins.InternalPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			pp, err := ic.GetByID(plugins.EventPlugin, "publisher")
-			if err != nil {
-				return nil, err
-			}
 			ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
 			if err != nil {
 				return nil, err
@@ -60,7 +56,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			service, err := task.NewTaskService(ic.Context, pp.(shim.Publisher), ss.(shutdown.Service))
+			service, err := task.NewTaskService(ic.Context, ss.(shutdown.Service))
 			if err != nil {
 				return nil, err
 			}

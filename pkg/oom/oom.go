@@ -20,11 +20,12 @@ package oom
 
 import (
 	"context"
+	"io"
 )
 
 // Watcher watches OOM events
 type Watcher interface {
-	Close() error
+	io.Closer
 	Run(ctx context.Context)
 	Add(id string, cg interface{}) error
 }

@@ -59,6 +59,12 @@ type StartOpts struct {
 	Debug        bool
 }
 
+const (
+	// EventStreaming means containerd will utilize TTRPC/GRPC streaming to get events
+	// from shim.
+	EventStreaming = "shim_events_streaming"
+)
+
 // BootstrapParams is a JSON payload returned in stdout from shim.Start call.
 type BootstrapParams struct {
 	// Version is the version of shim parameters (expected 2 for shim v2)
@@ -67,6 +73,8 @@ type BootstrapParams struct {
 	Address string `json:"address"`
 	// Protocol is either TTRPC or GRPC.
 	Protocol string `json:"protocol"`
+	// Features enumerates additional features supported by newer shims.
+	Features []string `json:"features"`
 }
 
 type StopStatus struct {
