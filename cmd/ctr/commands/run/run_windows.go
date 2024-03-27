@@ -163,6 +163,11 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			if idType == "" {
 				return nil, errors.New("devices must have a non-empty IDType")
 			}
+			parts := strings.Split(devID, ":")
+			if len(parts) > 3 {
+				return nil, errors.New("--device requires the format 'hostpath:containerpath:permission', while containerpath and permission are optional")
+			}
+			devID = parts[0]
 			opts = append(opts, oci.WithWindowsDevice(idType, devID))
 		}
 	}
