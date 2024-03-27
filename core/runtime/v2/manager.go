@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
@@ -45,6 +46,9 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/runtime-spec/specs-go/features"
 )
 
 // Config for the v2 runtime
@@ -455,6 +459,10 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, err
 	}
 
+	if err := m.validateRuntimeFeatures(ctx, opts); err != nil {
+		return nil, fmt.Errorf("failed to validate OCI runtime features: %w", err)
+	}
+
 	t, err := shimTask.Create(ctx, opts)
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
@@ -567,4 +575,73 @@ func (m *TaskManager) PluginInfo(ctx context.Context, request interface{}) (inte
 		return nil, fmt.Errorf("failed to unmarshal stdout from %v into %T: %w", cmd.Args, &info, err)
 	}
 	return &info, nil
+}
+
+func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.CreateOpts) error {
+	var spec specs.Spec
+	if err := typeurl.UnmarshalTo(opts.Spec, &spec); err != nil {
+		return fmt.Errorf("unmarshal spec: %w", err)
+	}
+
+	// Only ask for the PluginInfo if idmap mounts are used.
+	if !usesIDMapMounts(spec) {
+		return nil
+	}
+
+	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime})
+	if err != nil {
+		return fmt.Errorf("runtime info: %w", err)
+	}
+
+	pluginInfo, ok := pInfo.(*apitypes.RuntimeInfo)
+	if !ok {
+		return fmt.Errorf("invalid runtime info type: %T", pInfo)
+	}
+
+	feat, err := typeurl.UnmarshalAny(pluginInfo.Features)
+	if err != nil {
+		return fmt.Errorf("unmarshal runtime features: %w", err)
+	}
+
+	// runc-compatible runtimes silently ignores features it doesn't know about. But ignoring
+	// our request to use idmap mounts can break permissions in the volume, so let's make sure
+	// it supports it. For more info, see:
+	//	https://github.com/opencontainers/runtime-spec/pull/1219
+	//
+	features, ok := feat.(*features.Features)
+	if !ok {
+		// Leave alone non runc-compatible runtimes that don't provide the features info,
+		// they might not be affected by this.
+		return nil
+	}
+
+	if err := supportsIDMapMounts(features); err != nil {
+		return fmt.Errorf("idmap mounts: %w", err)
+	}
+
+	return nil
+}
+
+func usesIDMapMounts(spec specs.Spec) bool {
+	for _, m := range spec.Mounts {
+		if m.UIDMappings != nil || m.GIDMappings != nil {
+			return true
+		}
+		if slices.Contains(m.Options, "idmap") || slices.Contains(m.Options, "ridmap") {
+			return true
+		}
+
+	}
+	return false
+}
+
+func supportsIDMapMounts(features *features.Features) error {
+	if features.Linux.MountExtensions == nil || features.Linux.MountExtensions.IDMap == nil {
+		return errors.New("missing `mountExtensions.idmap` entry in `features` command")
+
+	}
+	if enabled := features.Linux.MountExtensions.IDMap.Enabled; enabled == nil || !*enabled {
+		return errors.New("not supported or disabled")
+	}
+	return nil
 }
