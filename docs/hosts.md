@@ -28,9 +28,11 @@ ctr images pull --hosts-dir "/etc/containerd/certs.d" myregistry.io:5000/image_n
 ```
 
 ### CRI
-_The old CRI config pattern for specifying registry.mirrors and registry.configs has
+_The old CRI config pattern for specifying `registry.mirrors` and `registry.configs` has
 been **DEPRECATED**._ You should now point your registry `config_path` to the path where your
 `hosts.toml` files are located.
+
+You cannot configure `config_path` if the deprecated pattern is in use. containerd will refuse to start.
 
 Modify your `config.toml` (default location: `/etc/containerd/config.toml`) as follows:
 ```toml
@@ -40,11 +42,16 @@ version = 2
    config_path = "/etc/containerd/certs.d"
 ```
 
+You may specify more than one directory using the operating system's path separator:
+```toml
+config_path = "/etc/containerd/certs.d:/an/additional/directory"
+```
+
 ## Support for Docker's Certificate File Pattern
 
-If no hosts.toml configuration exists in the host directory, it will fallback to check
+If no `hosts.toml` configuration exists in the host directory, it will fallback to check
 certificate files based on [Docker's certificate file pattern](https://docs.docker.com/engine/reference/commandline/dockerd/#insecure-registries)
-(".crt" files for CA certificates and ".cert"/".key" files for client certificates).
+(`.crt` files for CA certificates and `.cert`/`.key` files for client certificates).
 
 ## Registry Host Namespace
 
@@ -53,18 +60,18 @@ registry hosts may be local or remote and are typically accessed via http/https 
 [OCI distribution specification](https://github.com/opencontainers/distribution-spec/blob/main/spec.md).
 A registry mirror is not a registry host but these mirrors can also be used to pull content.
 Registry hosts are typically referred to by their internet domain names, aka. registry
-host names. For example, docker.io, quay.io, gcr.io, and ghcr.io.
+host names. For example, `docker.io`, `quay.io`, `gcr.io`, and `ghcr.io`.
 
 A registry host namespace is, for the purpose of containerd registry configuration, a
-path to the `hosts.toml` file specified by the registry host name, or ip address, and an
+path to the `hosts.toml` file specified by the registry host name, or IP address, and an
 optional port identifier. When making a pull request for an image the format is
 typically as follows:
 ```
-pull [registry_host_name|IP address][:port][/v2][/org_path]<image_name>[:tag|@DIGEST]
+pull [registry_host_name|IP address][:port][/org_path]<image_name>[:tag|@DIGEST]
 ```
 
 The registry host namespace portion is `[registry_host_name|IP address][:port]`. Example
-tree for docker.io:
+tree for `docker.io`:
 
 ```
 $ tree /etc/containerd/certs.d
@@ -77,7 +84,7 @@ Optionally the `_default` registry host namespace can be used as a fallback, if 
 other namespace matches.
 
 The `/v2` portion of the pull request format shown above refers to the version of the
-distribution api. If not included in the pull request, `/v2` is added by default for all
+distribution API. If not included in the pull request, `/v2` is added by default for all
 clients compliant to the distribution specification linked above.
 
 If a host is configured that's different to the registry host namespace (e.g. a mirror), then
@@ -123,23 +130,24 @@ OPTIONS:
 
 ## CRI
 
-Although we have deprecated the old CRI config pattern for specifying registry.mirrors
-and registry.configs you can still specify your credentials via
+Although we have deprecated the old CRI config pattern for specifying `registry.mirrors`
+and `registry.configs` you can still specify your credentials via
 [CRI config](https://github.com/containerd/containerd/blob/main/docs/cri/registry.md#configure-registry-credentials).
 
 Additionally, the containerd CRI plugin implements/supports the authentication parameters passed in through CRI pull image service requests.
-For example, when containerd is the container runtime implementation for `Kubernetes`, the containerd CRI plugin receives
+For example, when containerd is the container runtime implementation for Kubernetes, the containerd CRI plugin receives
 authentication credentials from kubelet as retrieved from
 [Kubernetes Image Pull Secrets](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/)
 
 # Registry Configuration - Examples
 
-### Simple (default) Host Config for Docker
-Here is a simple example for a default registry hosts configuration. Set
-`config_path = "/etc/containerd/certs.d"` in your config.toml for containerd.
-Make a directory tree at the config path that includes `docker.io` as a directory
-representing the host namespace to be configured. Then add a `hosts.toml` file
-in the `docker.io` to configure the host namespace. It should look like this:
+### Setup a Local Mirror for Docker Hub
+
+This example configures two mirrors with different capabilities.
+It also demonstrates how to configure custom headers for a host.
+
+For a pull using a tag name, the internal mirror will be used first to resolve it into a digest as its the only one with the `resolve` capability.
+Pulling the resolved manifest and any blobs it references will then use the public mirror first, before falling back to the internal mirror and then the upstream default registry (Docker Hub).
 
 ```
 $ tree /etc/containerd/certs.d
@@ -148,28 +156,20 @@ $ tree /etc/containerd/certs.d
     └── hosts.toml
 
 $ cat /etc/containerd/certs.d/docker.io/hosts.toml
-server = "https://docker.io"
-
-[host."https://registry-1.docker.io"]
-  capabilities = ["pull", "resolve"]
-```
-
-### Setup a Local Mirror for Docker
-
-```
-server = "https://registry-1.docker.io"    # Exclude this to not use upstream
-
 [host."https://public-mirror.example.com"]
   capabilities = ["pull"]                  # Requires less trust, won't resolve tag to digest from this host
+
 [host."https://docker-mirror.internal"]
   capabilities = ["pull", "resolve"]
   ca = "docker-mirror.crt"                 # Or absolute path /etc/containerd/certs.d/docker.io/docker-mirror.crt
+  [host."https://docker-mirror.internal".header]
+    X-Cluster-Name = ["dc01-primary"]
 ```
 
 ### Setup Default Mirror for All Registries
 
 This is an example of using a mirror regardless of the intended registry.
-The upstream registry will automatically be used after all defined hosts have been tried.
+The normal upstream registry will automatically be used after all defined hosts have been tried.
 
 ```
 $ tree /etc/containerd/certs.d
@@ -182,7 +182,7 @@ $ cat /etc/containerd/certs.d/_default/hosts.toml
   capabilities = ["pull", "resolve"]
 ```
 
-If you wish to ensure *only* the mirror is utilised and the upstream not consulted, set the mirror as the `server` instead of a host.
+If you wish to ensure *only* the mirror is utilised and the upstream not consulted, set the mirror as the `server` instead of a `host`.
 You may still specify additional hosts if you'd like to use other mirrors first.
 
 ```
@@ -192,13 +192,15 @@ server = "https://registry.example.com"
 
 ### Bypass TLS Verification Example
 
-To bypass the TLS verification for a private registry at `192.168.31.250:5000`
+To bypass the TLS verification for a private registry mirroring Docker Hub at `192.168.31.250:5000`.
 
-Create a path and `hosts.toml` text at the path "/etc/containerd/certs.d/docker.io/hosts.toml" with following or similar contents:
+```
+$ tree /etc/containerd/certs.d
+/etc/containerd/certs.d
+└── docker.io
+    └── hosts.toml
 
-```toml
-server = "https://registry-1.docker.io"
-
+$ cat /etc/containerd/certs.d/docker.io/hosts.toml
 [host."http://192.168.31.250:5000"]
   capabilities = ["pull", "resolve", "push"]
   skip_verify = true
@@ -215,22 +217,26 @@ to the `hosts.toml` file.
 
 ## server field
 
-`server` specifies the default server for this registry host namespace.
+`server` specifies the default server (URL) for this registry host namespace.
 
 When `host`(s) are specified, the hosts will be tried first in the order listed.
 If all `host`(s) are tried then `server` will be used as a fallback.
 
 If `server` is not specified then the image's registry host namespace will automatically be used.
+If this mechanism is used, containerd will automatically map `docker.io` images to `registry-1.docker.io` as a special case.
 
-```
-server = "https://docker.io"
+`/v2` will be appended to the URL if it does not already have a path ending in `/v2`, following the OCI distribution specification.
+See `override_path` if this behaviour isn't desired.
+
+```toml
+server = "https://quay.io"
 ```
 
 ## capabilities field
 
 `capabilities` is an optional setting for specifying what operations a host is
 capable of performing. Include only the values that apply.
-```
+```toml
 capabilities =  ["pull", "resolve", "push"]
 ```
 
@@ -260,11 +266,11 @@ A public mirror should never be trusted to do a resolve action.
 `ca` (Certificate Authority Certification) can be set to a path or an array of
 paths each pointing to a ca file for use in authenticating with the registry
 namespace.
-```
+```toml
 ca = "/etc/certs/mirror.pem"
 ```
 or
-```
+```toml
 ca = ["/etc/certs/test-1-ca.pem", "/etc/certs/special.pem"]
 ```
 
@@ -273,17 +279,17 @@ ca = ["/etc/certs/test-1-ca.pem", "/etc/certs/special.pem"]
 `client` certificates are configured as follows
 
 a path:
-```
+```toml
 client = "/etc/certs/client.pem"
 ```
 
 an array of paths:
-```
+```toml
 client = ["/etc/certs/client-1.pem", "/etc/certs/client-2.pem"]
 ```
 
 an array of pairs of paths:
-```
+```toml
 client = [["/etc/certs/client.cert", "/etc/certs/client.key"],["/etc/certs/client.pem", ""]]
 ```
 
@@ -293,43 +299,60 @@ client = [["/etc/certs/client.cert", "/etc/certs/client.key"],["/etc/certs/clien
 host name when set to `true`. This should only be used for testing or in
 combination with other method of verifying connections. (Defaults to `false`)
 
-```
+```toml
 skip_verify = false
 ```
 
 ## header fields (in the toml table format)
 
 `[header]` contains some number of keys where each key is to one of a string or
-
 an array of strings as follows:
-```
+```toml
 [header]
   x-custom-1 = "custom header"
 ```
 
 or
-```
+```toml
 [header]
   x-custom-1 = ["custom header part a","part b"]
 ```
 
 or
-```
+```toml
 [header]
-  x-custom-1 = "custom header",
+  x-custom-1 = "custom header"
   x-custom-1-2 = "another custom header"
 ```
+
+While you can set a static `Authorization` header here it's **strongly discouraged** to have credentials in plain text.
+containerd will overwrite such a header using values from any relevant credential plugin if the registry returns 401 Unauthorized after the first request.
 
 ## override_path field
 
 `override_path` is used to indicate the host's API root endpoint is defined
 in the URL path rather than by the API specification. This may be used with
-non-compliant OCI registries which are missing the `/v2` prefix.
+non-compliant OCI registries which are missing the `/v2` prefix. containerd
+will recognise any provided URL ending in `/v2` and will avoid repeating it
+when this is `false`.
 (Defaults to `false`)
 
 ```
 override_path = true
 ```
+
+Here's some examples when resolving the image `my-registry.io/image_name:tag_name` with different combinations:
+
+| `server` (or `host`)                    | `override_path` | Resolved request URL                                                  |
+| --------------------------------------- | --------------- | --------------------------------------------------------------------- |
+| `https://my-registry.io`                | `false`         | `https://my-registry.io/v2/image_name/manifests/tag_name`             |
+| `https://my-registry.io/v2`             | `false`         | `https://my-registry.io/v2/image_name/manifests/tag_name`             |
+| `https://my-registry.io/custom/path`    | `false`         | `https://my-registry.io/custom/path/v2/image_name/manifests/tag_name` |
+| `https://my-registry.io/custom/path/v2` | `false`         | `https://my-registry.io/custom/path/v2/image_name/manifests/tag_name` |
+| `https://my-registry.io`                | `true`          | `https://my-registry.io/image_name/manifests/tag_name`                |
+| `https://my-registry.io/v2`             | `true`          | `https://my-registry.io/v2/image_name/manifests/tag_name`             |
+| `https://my-registry.io/custom/path`    | `true`          | `https://my-registry.io/custom/path/image_name/manifests/tag_name`    |
+| `https://my-registry.io/custom/path/v2` | `true`          | `https://my-registry.io/custom/path/v2/image_name/manifests/tag_name` |
 
 ## host field(s) (in the toml table format)
 
@@ -342,7 +365,7 @@ configured in much the same way as the default registry namespace. Notably the
 `server` is not specified in the `host` description because it is specified in
 the namespace. Here are a few rough examples configuring host mirror namespaces
 for this registry host namespace:
-```
+```toml
 [host."https://mirror.registry"]
   capabilities = ["pull"]
   ca = "/etc/certs/mirror.pem"
@@ -375,7 +398,7 @@ for this registry host namespace:
 
 **Note**: Recursion is not supported in the specification of host mirror
 namespaces in the hosts.toml file. Thus the following is not allowed/supported:
-```
+```toml
 [host."http://mirror.registry"]
   capabilities = ["pull"]
   [host."http://double-mirror.registry"]
