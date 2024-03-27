@@ -374,8 +374,9 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 	if nric != nil {
 		nriSB := &nri.Sandbox{
-			ID:     id,
-			Labels: config.Labels,
+			ID:          id,
+			Labels:      config.Labels,
+			Annotations: config.Annotations,
 		}
 		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Create, nriSB); err != nil {
 			return nil, fmt.Errorf("nri invoke: %w", err)
