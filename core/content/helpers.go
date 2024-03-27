@@ -17,6 +17,7 @@
 package content
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -50,6 +51,31 @@ func NewReader(ra ReaderAt) io.Reader {
 		return rd.Reader()
 	}
 	return io.NewSectionReader(ra, 0, ra.Size())
+}
+
+type nopCloserBytesReader struct {
+	*bytes.Reader
+}
+
+func (*nopCloserBytesReader) Close() error { return nil }
+
+type nopCloserSectionReader struct {
+	*io.SectionReader
+}
+
+func (*nopCloserSectionReader) Close() error { return nil }
+
+// BlobReadSeeker returns a read seeker for the blob from the provider.
+func BlobReadSeeker(ctx context.Context, provider Provider, desc ocispec.Descriptor) (io.ReadSeekCloser, error) {
+	if int64(len(desc.Data)) == desc.Size && digest.FromBytes(desc.Data) == desc.Digest {
+		return &nopCloserBytesReader{bytes.NewReader(desc.Data)}, nil
+	}
+
+	ra, err := provider.ReaderAt(ctx, desc)
+	if err != nil {
+		return nil, err
+	}
+	return &nopCloserSectionReader{io.NewSectionReader(ra, 0, ra.Size())}, nil
 }
 
 // ReadBlob retrieves the entire contents of the blob from the provider.
