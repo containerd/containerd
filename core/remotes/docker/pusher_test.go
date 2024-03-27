@@ -87,6 +87,20 @@ func TestPusherErrClosedRetry(t *testing.T) {
 	}
 }
 
+func TestPusherAcceptsMissingDigestHeader(t *testing.T) {
+	ctx := context.Background()
+
+	p, reg, _, done := samplePusher(t)
+	defer done()
+	reg.omitDigestHdr = true
+	reg.uploadable = true
+	layerContent := []byte("test")
+
+	if err := tryUpload(ctx, t, p, layerContent); err != nil {
+		t.Errorf("upload should succeed but got %v", err)
+	}
+}
+
 func TestPusherHTTPFallback(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
 
@@ -225,6 +239,7 @@ var blobUploadRegexp = regexp.MustCompile(`/([a-z0-9]+)/blobs/uploads/(.*)`)
 type uploadableMockRegistry struct {
 	availableContents []string
 	uploadable        bool
+	omitDigestHdr     bool
 	putHandlerFunc    func(w http.ResponseWriter, r *http.Request) bool
 	locationPrefix    string
 	username          string
@@ -267,7 +282,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 
 			query := r.URL.Query()
 			if query.Has("mount") && query.Get("from") == "always-mount" {
-				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				if !u.omitDigestHdr {
+					w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+				}
 				w.WriteHeader(http.StatusCreated)
 				return
 			}
@@ -285,7 +302,9 @@ func (u *uploadableMockRegistry) defaultHandler(w http.ResponseWriter, r *http.R
 				return
 			}
 			u.availableContents = append(u.availableContents, dgstr.Digest().String())
-			w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			if !u.omitDigestHdr {
+				w.Header().Set("Docker-Content-Digest", dgstr.Digest().String())
+			}
 			w.WriteHeader(http.StatusCreated)
 			return
 		} else if r.URL.Path == "/cannotupload" {
