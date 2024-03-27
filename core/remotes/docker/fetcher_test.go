@@ -31,6 +31,7 @@ import (
 	"strconv"
 	"testing"
 
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/docker/errors"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
 )
@@ -279,8 +280,8 @@ func TestDockerFetcherOpen(t *testing.T) {
 		{
 			name:         "should return status and error.message if it exists if the registry request fails",
 			mockedStatus: 500,
-			mockedErr: Errors{Error{
-				Code:    ErrorCodeUnknown,
+			mockedErr: remoteerrors.Errors{remoteerrors.Error{
+				Code:    remoteerrors.ErrorCodeUnknown,
 				Message: "Test Error",
 			}},
 			want:                   nil,

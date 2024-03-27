@@ -30,8 +30,10 @@ import (
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/docker/errors"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -296,7 +298,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
 		}
-		var registryErr Errors
+		var registryErr remoteerrors.Errors
 		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
 			return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
 		}
