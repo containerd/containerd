@@ -86,6 +86,7 @@ stable from release to release of the containerd project.`
 
 containerd CLI
 `
+	app.DisableSliceFlagSeparator = true
 	app.EnableBashCompletion = true
 	app.Flags = []cli.Flag{
 		&cli.BoolFlag{
