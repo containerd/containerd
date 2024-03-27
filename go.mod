@@ -1,6 +1,7 @@
 module github.com/containerd/containerd/v2
 
 go 1.21
+toolchain go1.22.1
 
 require (
 	dario.cat/mergo v1.0.0
@@ -73,12 +74,12 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240123012728-ef4313101c80
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.33.0
-	k8s.io/apimachinery v0.29.2
-	k8s.io/client-go v0.29.2
-	k8s.io/component-base v0.29.2
-	k8s.io/cri-api v0.30.0-alpha.3
+	k8s.io/apimachinery v0.29.3
+	k8s.io/client-go v0.29.3
+	k8s.io/component-base v0.29.3
+	k8s.io/cri-api v0.30.0-beta.0
 	k8s.io/klog/v2 v2.120.1
-	k8s.io/kubelet v0.29.2
+	k8s.io/kubelet v0.29.3
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 	tags.cncf.io/container-device-interface v0.6.2
 )
@@ -133,8 +134,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.29.2 // indirect
-	k8s.io/apiserver v0.29.2 // indirect
+	k8s.io/api v0.29.3 // indirect
+	k8s.io/apiserver v0.29.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
