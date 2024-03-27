@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store"
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
@@ -47,6 +48,8 @@ type Sandbox struct {
 	*store.StopCh
 	// Stats contains (mutable) stats for the (pause) sandbox container
 	Stats *stats.ContainerStats
+	// Endpoint is the sandbox endpoint, for task or streaming api connection
+	Endpoint sandbox.Endpoint
 }
 
 // NewSandbox creates an internally used sandbox type. This functions reminds

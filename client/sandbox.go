@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	api "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
 )
 
 // Sandbox is a high level client to containerd's sandboxes.
@@ -86,7 +88,17 @@ func (s *sandboxClient) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
+	if err := s.addExtension(ctx, api.EndpointKey, &api.Endpoint{
+		Version:  resp.Version,
+		Address:  resp.Address,
+		Protocol: resp.Protocol,
+	}); err != nil {
+		stopErr := s.client.SandboxController(s.metadata.Sandboxer).Stop(ctx, s.ID())
+		if stopErr != nil {
+			log.G(ctx).WithError(stopErr).Error("failed to stop sandbox when add endpoint extension error")
+		}
+		return err
+	}
 	s.pid = &resp.Pid
 	return nil
 }
@@ -127,6 +139,20 @@ func (s *sandboxClient) Shutdown(ctx context.Context) error {
 		return fmt.Errorf("failed to delete sandbox from store: %w", err)
 	}
 
+	return nil
+}
+
+func (s *sandboxClient) addExtension(ctx context.Context, key string, obj interface{}) error {
+	if err := s.metadata.AddExtension(key, obj); err != nil {
+		stopErr := s.client.SandboxController(s.metadata.Sandboxer).Stop(ctx, s.ID())
+		if stopErr != nil {
+			log.G(ctx).WithError(stopErr).Error("failed to stop sandbox when add endpoint extension error")
+		}
+		return err
+	}
+	if _, err := s.client.SandboxStore().Update(ctx, s.metadata, fmt.Sprintf("extensions.%s", api.EndpointKey)); err != nil {
+		return err
+	}
 	return nil
 }
 

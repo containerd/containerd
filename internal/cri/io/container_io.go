@@ -18,6 +18,7 @@ package io
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -39,7 +40,7 @@ type ContainerIO struct {
 	id string
 
 	fifos *cio.FIFOSet
-	*stdioPipes
+	*stdioStream
 
 	stdoutGroup *cioutil.WriterGroup
 	stderrGroup *cioutil.WriterGroup
@@ -71,6 +72,20 @@ func WithNewFIFOs(root string, tty, stdin bool) ContainerIOOpts {
 	}
 }
 
+// WithStreams creates new streams for the container io.
+func WithStreams(address, protocol string, tty, stdin bool) ContainerIOOpts {
+	return func(c *ContainerIO) error {
+		if address == "" || protocol == "" {
+			return fmt.Errorf("address and protocol can not be empty for io stream")
+		}
+		fifos, err := newStreams(address, protocol, c.id, tty, stdin)
+		if err != nil {
+			return err
+		}
+		return WithFIFOs(fifos)(c)
+	}
+}
+
 // NewContainerIO creates container io.
 func NewContainerIO(id string, opts ...ContainerIOOpts) (_ *ContainerIO, err error) {
 	c := &ContainerIO{
@@ -87,11 +102,11 @@ func NewContainerIO(id string, opts ...ContainerIOOpts) (_ *ContainerIO, err err
 		return nil, errors.New("fifos are not set")
 	}
 	// Create actual fifos.
-	stdio, closer, err := newStdioPipes(c.fifos)
+	stdio, closer, err := newStdioStream(c.fifos)
 	if err != nil {
 		return nil, err
 	}
-	c.stdioPipes = stdio
+	c.stdioStream = stdio
 	c.closer = closer
 	return c, nil
 }

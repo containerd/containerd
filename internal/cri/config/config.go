@@ -116,6 +116,11 @@ type Runtime struct {
 	// shim - means use whatever Controller implementation provided by shim (e.g. use RemoteController).
 	// podsandbox - means use Controller implementation from sbserver podsandbox package.
 	Sandboxer string `toml:"sandboxer" json:"sandboxer"`
+	// IOType defines how containerd transfer the io streams of the container
+	// if it is not set, the named pipe will be created for the container
+	// we can also set it to "streaming" to create a stream by streaming api,
+	// and use it as a channel to transfer the io stream
+	IOType string `toml:"io_type" json:"io_type"`
 }
 
 // ContainerdConfig contains toml config related to containerd

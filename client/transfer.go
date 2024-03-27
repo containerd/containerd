@@ -21,14 +21,18 @@ import (
 	"errors"
 	"io"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+
 	streamingapi "github.com/containerd/containerd/v2/api/services/streaming/v1"
 	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/proxy"
 	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
 )
 
 func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}, opts ...transfer.Opt) error {
@@ -48,11 +52,27 @@ func (c *Client) streamCreator() streaming.StreamCreator {
 }
 
 type streamCreator struct {
-	client streamingapi.StreamingClient
+	client      streamingapi.StreamingClient
+	ttrpcClient streamingapi.TTRPCStreamingClient
+}
+
+func NewTTRPCStreamCreator(client *ttrpc.Client) streaming.StreamCreator {
+	return &streamCreator{ttrpcClient: streamingapi.NewTTRPCStreamingClient(client)}
+}
+
+func NewGRPCStreamCreator(client *grpc.ClientConn) streaming.StreamCreator {
+	return &streamCreator{client: streamingapi.NewStreamingClient(client)}
 }
 
 func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Stream, error) {
-	stream, err := sc.client.Stream(ctx)
+	var stream streamClient
+	var err error
+	if sc.client != nil {
+		stream, err = sc.client.Stream(ctx)
+	} else if sc.ttrpcClient != nil {
+		stream, err = sc.ttrpcClient.Stream(ctx)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +105,15 @@ func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Strea
 }
 
 type clientStream struct {
-	s streamingapi.Streaming_StreamClient
+	s streamClient
+}
+
+// streamClient is a common interface to adopt both
+// grpc.Streaming_StreamClient and ttrpc.TTRPCStreaming_StreamClient
+type streamClient interface {
+	Send(*anypb.Any) error
+	Recv() (*anypb.Any, error)
+	CloseSend() error
 }
 
 func (cs *clientStream) Send(a typeurl.Any) (err error) {

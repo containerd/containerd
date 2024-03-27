@@ -29,27 +29,45 @@ import (
 type ExecIO struct {
 	id    string
 	fifos *cio.FIFOSet
-	*stdioPipes
+	*stdioStream
 	closer *wgCloser
 }
 
 var _ cio.IO = &ExecIO{}
 
-// NewExecIO creates exec io.
-func NewExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
+// NewFifoExecIO creates exec io by named pipes.
+func NewFifoExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
 	fifos, err := newFifos(root, id, tty, stdin)
 	if err != nil {
 		return nil, err
 	}
-	stdio, closer, err := newStdioPipes(fifos)
+	stdio, closer, err := newStdioStream(fifos)
 	if err != nil {
 		return nil, err
 	}
 	return &ExecIO{
-		id:         id,
-		fifos:      fifos,
-		stdioPipes: stdio,
-		closer:     closer,
+		id:          id,
+		fifos:       fifos,
+		stdioStream: stdio,
+		closer:      closer,
+	}, nil
+}
+
+// NewStreamExecIO creates exec io with streaming.
+func NewStreamExecIO(id, address, protocol string, tty, stdin bool) (*ExecIO, error) {
+	fifos, err := newStreams(address, protocol, id, tty, stdin)
+	if err != nil {
+		return nil, err
+	}
+	stdio, closer, err := newStdioStream(fifos)
+	if err != nil {
+		return nil, err
+	}
+	return &ExecIO{
+		id:          id,
+		fifos:       fifos,
+		stdioStream: stdio,
+		closer:      closer,
 	}, nil
 }
 
