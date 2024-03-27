@@ -678,7 +678,8 @@ func (s *service) processExits() {
 		// process.
 		var cps, skipped []containerProcess
 		for _, cp := range s.running[e.Pid] {
-			if s.pendingExecs[cp.Container] != 0 {
+			_, init := cp.Process.(*process.Init)
+			if init && s.pendingExecs[cp.Container] != 0 {
 				// This exit relates to a container for which we have pending execs. In
 				// order to ensure order between execs and the init process for a given
 				// container, skip processing this exit here and let the `handleStarted`
