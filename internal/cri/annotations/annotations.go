@@ -78,6 +78,9 @@ const (
 	// ImageName is the name of the image used to create the container
 	ImageName = "io.kubernetes.cri.image-name"
 
+	// SandboxImageName is the name of the sandbox image
+	SandboxImageName = "io.kubernetes.cri.podsandbox.image-name"
+
 	// PodAnnotations are the annotations of the pod
 	PodAnnotations = "io.kubernetes.cri.pod-annotations"
 
@@ -110,11 +113,15 @@ func DefaultCRIAnnotations(
 	ctrType := ContainerTypeContainer
 	if sandbox {
 		ctrType = ContainerTypeSandbox
-		// Sandbox log dir only gets passed for sandboxes, the other metadata always
+		// Sandbox log dir and sandbox image name get passed for sandboxes, the other metadata always
 		// gets sent however.
-		opts = append(opts, customopts.WithAnnotation(SandboxLogDir, config.GetLogDirectory()))
+		opts = append(
+			opts,
+			customopts.WithAnnotation(SandboxLogDir, config.GetLogDirectory()),
+			customopts.WithAnnotation(SandboxImageName, imageName),
+		)
 	} else {
-		// Image name and container name only get passed for containers.s
+		// Image name and container name get passed for containers.
 		opts = append(
 			opts,
 			customopts.WithAnnotation(ContainerName, containerName),
