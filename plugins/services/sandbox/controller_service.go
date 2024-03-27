@@ -224,3 +224,18 @@ func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetr
 		Metrics: metrics,
 	}, nil
 }
+
+func (s *controllerService) UpdateResource(
+	ctx context.Context,
+	req *api.ControllerUpdateResourceRequest) (*api.ControllerUpdateResourceResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("sandbox update resource")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	err = ctrl.UpdateResource(ctx, req.GetSandboxID(), req.Op, req.Resource)
+	if err != nil {
+		return &api.ControllerUpdateResourceResponse{}, errdefs.ToGRPC(err)
+	}
+	return &api.ControllerUpdateResourceResponse{}, nil
+}
