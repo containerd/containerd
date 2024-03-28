@@ -144,3 +144,7 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v0.6.0 // indirect
 )
+
+// Workaround for indirect dependency no longer being available.
+// https://github.com/containerd/containerd/issues/9969
+exclude github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f
