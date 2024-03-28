@@ -24,11 +24,6 @@ import (
 	"github.com/Microsoft/hcsshim/osversion"
 )
 
-//nolint:unused // some variables used for fuzz
-const (
-	defaultAddress = `\\.\pipe\containerd-containerd-test`
-)
-
 var (
 	defaultRoot           = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
 	defaultState          = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
