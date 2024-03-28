@@ -7468,6 +7468,13 @@ file {
       type: TYPE_STRING
       json_name: "hostDir"
     }
+    field {
+      name: "default_scheme"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "defaultScheme"
+    }
     nested_type {
       name: "HeadersEntry"
       field {

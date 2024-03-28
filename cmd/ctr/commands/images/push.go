@@ -104,7 +104,11 @@ var pushCommand = &cli.Command{
 			if local == "" {
 				local = ref
 			}
-			reg, err := registry.NewOCIRegistry(ctx, ref, registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir")))
+			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir"))}
+			if context.Bool("plain-http") {
+				opts = append(opts, registry.WithDefaultScheme("http"))
+			}
+			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 			if err != nil {
 				return err
 			}
