@@ -24,4 +24,6 @@ type ContainerStats struct {
 	Timestamp time.Time
 	// Cumulative CPU usage (sum across all cores) since object creation.
 	UsageCoreNanoSeconds uint64
+	// Usage NanoCores
+	UsageNanoCores uint64
 }
