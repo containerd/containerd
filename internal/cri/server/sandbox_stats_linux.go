@@ -59,9 +59,13 @@ func (c *criService) podSandboxStats(
 	if stats != nil {
 		timestamp := time.Now()
 
-		cpuStats, err := c.cpuContainerStats(meta.ID, true /* isSandbox */, stats, timestamp)
+		cpuStats, err := c.cpuContainerStats(stats, timestamp)
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
+		}
+		if cpuStats != nil && sandbox.Stats != nil {
+			// this is a calculated value every 10s
+			cpuStats.UsageNanoCores = &runtime.UInt64Value{Value: sandbox.Stats.UsageNanoCores}
 		}
 		podSandboxStats.Linux.Cpu = cpuStats
 

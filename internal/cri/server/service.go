@@ -156,6 +156,8 @@ type criService struct {
 	sandboxService sandboxService
 	// runtimeHandlers contains runtime handler info
 	runtimeHandlers []*runtime.RuntimeHandler
+	// metric Monitor is used to calculate and cache stat values
+	metricMonitor *metricMonitor
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
 }
@@ -221,6 +223,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	c.eventMonitor = events.NewEventMonitor(&criEventHandler{c: c})
+	c.metricMonitor = newMetricMonitor(c)
 
 	c.cniNetConfMonitor = make(map[string]*cniNetConfSyncer)
 	for name, i := range c.netPlugin {
