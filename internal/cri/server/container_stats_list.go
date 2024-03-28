@@ -27,13 +27,11 @@ import (
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/api/services/tasks/v1"
 	"github.com/containerd/containerd/v2/api/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
-	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"
 )
@@ -143,82 +141,13 @@ func (c *criService) toCRIContainerStats(
 			return nil, fmt.Errorf("failed to decode container metrics for %q: %w", cntr.ID, err)
 		}
 
-		if cs.Cpu != nil && cs.Cpu.UsageCoreNanoSeconds != nil {
-			// this is a calculated value and should be computed for all OSes
-			nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.Cpu.Timestamp))
-			if err != nil {
-				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
-			}
-			cs.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
+		if cs.Cpu != nil && cntr.Stats != nil {
+			// this is a calculated value every 10s
+			cs.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: cntr.Stats.UsageNanoCores}
 		}
 		containerStats.Stats = append(containerStats.Stats, cs)
 	}
 	return containerStats, nil
-}
-
-func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, currentUsageCoreNanoSeconds uint64, currentTimestamp time.Time) (uint64, error) {
-	var oldStats *stats.ContainerStats
-
-	if isSandbox {
-		sandbox, err := c.sandboxStore.Get(containerID)
-		if err != nil {
-			return 0, fmt.Errorf("failed to get sandbox container: %s: %w", containerID, err)
-		}
-		oldStats = sandbox.Stats
-	} else {
-		container, err := c.containerStore.Get(containerID)
-		if err != nil {
-			return 0, fmt.Errorf("failed to get container ID: %s: %w", containerID, err)
-		}
-		oldStats = container.Stats
-	}
-
-	if oldStats == nil {
-		newStats := &stats.ContainerStats{
-			UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
-			Timestamp:            currentTimestamp,
-		}
-		if isSandbox {
-			err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
-			if err != nil {
-				return 0, fmt.Errorf("failed to update sandbox stats container ID: %s: %w", containerID, err)
-			}
-		} else {
-			err := c.containerStore.UpdateContainerStats(containerID, newStats)
-			if err != nil {
-				return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
-			}
-		}
-		return 0, nil
-	}
-
-	nanoSeconds := currentTimestamp.UnixNano() - oldStats.Timestamp.UnixNano()
-
-	// zero or negative interval
-	if nanoSeconds <= 0 {
-		return 0, nil
-	}
-
-	newUsageNanoCores := uint64(float64(currentUsageCoreNanoSeconds-oldStats.UsageCoreNanoSeconds) /
-		float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
-
-	newStats := &stats.ContainerStats{
-		UsageCoreNanoSeconds: currentUsageCoreNanoSeconds,
-		Timestamp:            currentTimestamp,
-	}
-	if isSandbox {
-		err := c.sandboxStore.UpdateContainerStats(containerID, newStats)
-		if err != nil {
-			return 0, fmt.Errorf("failed to update sandbox container stats: %s: %w", containerID, err)
-		}
-	} else {
-		err := c.containerStore.UpdateContainerStats(containerID, newStats)
-		if err != nil {
-			return 0, fmt.Errorf("failed to update container stats ID: %s: %w", containerID, err)
-		}
-	}
-
-	return newUsageNanoCores, nil
 }
 
 func (c *criService) normalizeContainerStatsFilter(filter *runtime.ContainerStatsFilter) {
@@ -301,14 +230,15 @@ func (c *criService) windowsContainerMetrics(
 	}
 
 	if stats != nil {
-		s, err := typeurl.UnmarshalAny(stats.Data)
+		data, err := convertMetric(stats)
 		if err != nil {
-			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
+			return nil, err
 		}
-		wstats := s.(*wstats.Statistics).GetWindows()
+		wstats := data.(*wstats.Statistics).GetWindows()
 		if wstats == nil {
 			return nil, errors.New("windows stats is empty")
 		}
+
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.CpuUsage{
 				Timestamp:            (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
@@ -357,23 +287,12 @@ func (c *criService) linuxContainerMetrics(
 	}
 
 	if stats != nil {
-		var data interface{}
-		switch {
-		case typeurl.Is(stats.Data, (*cg1.Metrics)(nil)):
-			data = &cg1.Metrics{}
-		case typeurl.Is(stats.Data, (*cg2.Metrics)(nil)):
-			data = &cg2.Metrics{}
-		case typeurl.Is(stats.Data, (*wstats.Statistics)(nil)):
-			data = &wstats.Statistics{}
-		default:
-			return nil, errors.New("cannot convert metric data to cgroups.Metrics or windows.Statistics")
+		data, err := convertMetric(stats)
+		if err != nil {
+			return nil, err
 		}
 
-		if err := typeurl.UnmarshalTo(stats.Data, data); err != nil {
-			return nil, fmt.Errorf("failed to extract container metrics: %w", err)
-		}
-
-		cpuStats, err := c.cpuContainerStats(meta.ID, false /* isSandbox */, data, protobuf.FromTimestamp(stats.Timestamp))
+		cpuStats, err := c.cpuContainerStats(data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to obtain cpu stats: %w", err)
 		}
@@ -440,7 +359,7 @@ func getAvailableBytesV2(memory *cg2.MemoryStat, workingSetBytes uint64) uint64 
 	return 0
 }
 
-func (c *criService) cpuContainerStats(ID string, isSandbox bool, stats interface{}, timestamp time.Time) (*runtime.CpuUsage, error) {
+func (c *criService) cpuContainerStats(stats interface{}, timestamp time.Time) (*runtime.CpuUsage, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
 		metrics.GetCPU().GetUsage()
