@@ -27,8 +27,8 @@ import (
 const (
 	// NameTotalLengthMax is the maximum total number of characters in a repository name.
 	//
-	// Deprecated: use [reference.NameTotalLengthMax].
-	NameTotalLengthMax = reference.NameTotalLengthMax
+	// Deprecated: use [reference.RepositoryNameTotalLengthMax].
+	NameTotalLengthMax = reference.RepositoryNameTotalLengthMax
 )
 
 var (
