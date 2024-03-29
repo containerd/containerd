@@ -53,7 +53,9 @@ message TaskIO {
 	string stdin = 1;
 	string stdout = 2;
 	string stderr = 3;
-	bool terminal = 4;
+	string attachableOut = 4;
+	string attachableErr = 5;
+	bool terminal = 6;
 }
 
 message TaskExit {
