@@ -35,6 +35,7 @@ type CreateConfig struct {
 	Runtime          string
 	Rootfs           []Mount
 	Terminal         bool
+	Attach           bool
 	Stdin            string
 	Stdout           string
 	Stderr           string
@@ -47,6 +48,7 @@ type CreateConfig struct {
 type ExecConfig struct {
 	ID       string
 	Terminal bool
+	Attach   bool
 	Stdin    string
 	Stdout   string
 	Stderr   string

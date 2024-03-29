@@ -32,6 +32,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/fifo"
@@ -81,7 +83,7 @@ func (p *processIO) Copy(ctx context.Context, wg *sync.WaitGroup) error {
 	return nil
 }
 
-func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdio) (*processIO, error) {
+func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdio, attach bool) (*processIO, error) {
 	pio := &processIO{
 		stdio: stdio,
 	}
@@ -106,7 +108,19 @@ func createIO(ctx context.Context, id string, ioUID, ioGID int, stdio stdio.Stdi
 		pio.copy = true
 		pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
 	case "binary":
-		pio.io, err = NewBinaryIO(ctx, id, u)
+		if attach {
+			var fifoSet *cio.FIFOSet
+			_, fifoSet, err = NewBinaryIO(ctx, true, id, u)
+			if err != nil {
+				return nil, err
+			}
+			pio.stdio.Stdout = fifoSet.Stdout
+			pio.stdio.Stderr = fifoSet.Stderr
+			pio.copy = true
+			pio.io, err = runc.NewPipeIO(ioUID, ioGID, withConditionalIO(stdio))
+		} else {
+			pio.io, _, err = NewBinaryIO(ctx, false, id, u)
+		}
 	case "file":
 		filePath := u.Path
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
@@ -243,14 +257,21 @@ func (c *countingWriteCloser) Close() error {
 	return c.WriteCloser.Close()
 }
 
-// NewBinaryIO runs a custom binary process for pluggable shim logging
-func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err error) {
-	ns, err := namespaces.NamespaceRequired(ctx)
-	if err != nil {
-		return nil, err
-	}
+type pipesReader struct {
+	stdout io.ReadCloser
+	stderr io.ReadCloser
+}
 
-	var closers []func() error
+type pipesWriter struct {
+	stdout io.WriteCloser
+	stderr io.WriteCloser
+}
+
+// NewBinaryIO runs a custom binary process for pluggable shim logging
+func NewBinaryIO(ctx context.Context, attach bool, id string, uri *url.URL) (_ runc.IO, binaryFifos *cio.FIFOSet, err error) {
+	type closer func() error
+	var closers []closer
+
 	defer func() {
 		if err == nil {
 			return
@@ -262,49 +283,210 @@ func NewBinaryIO(ctx context.Context, id string, uri *url.URL) (_ runc.IO, err e
 		err = errors.Join(result...)
 	}()
 
-	out, err := newPipe()
+	binaryOut, err := newPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stdout pipes: %w", err)
+		return nil, nil, fmt.Errorf("failed to create stdout pipes: %w", err)
 	}
-	closers = append(closers, out.Close)
+	closers = append(closers, binaryOut.Close)
 
-	serr, err := newPipe()
+	binarySerr, err := newPipe()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create stderr pipes: %w", err)
+		return nil, nil, fmt.Errorf("failed to create stderr pipes: %w", err)
 	}
-	closers = append(closers, serr.Close)
+	closers = append(closers, binarySerr.Close)
 
 	r, w, err := os.Pipe()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	closers = append(closers, r.Close, w.Close)
 
+	ns, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	cmd := NewBinaryCmd(uri, id, ns)
-	cmd.ExtraFiles = append(cmd.ExtraFiles, out.r, serr.r, w)
+	cmd.ExtraFiles = append(cmd.ExtraFiles, binaryOut.r, binarySerr.r, w)
 	// don't need to register this with the reaper or wait when
 	// running inside a shim
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start binary process: %w", err)
+		return nil, nil, fmt.Errorf("failed to start binary process: %w", err)
 	}
 	closers = append(closers, func() error { return cmd.Process.Kill() })
 
 	// close our side of the pipe after start
 	if err := w.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close write pipe after start: %w", err)
+		return nil, nil, fmt.Errorf("failed to close write pipe after start: %w", err)
 	}
 
 	// wait for the logging binary to be ready
 	b := make([]byte, 1)
 	if _, err := r.Read(b); err != nil && err != io.EOF {
-		return nil, fmt.Errorf("failed to read from logging binary: %w", err)
+		return nil, nil, fmt.Errorf("failed to read from logging binary: %w", err)
+	}
+
+	if attach {
+		binaryFifos, err = cio.NewFIFOSetInDir(defaults.DefaultFIFODir, id, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create birany fifos: %w", err)
+		}
+
+		binaryFifosPipes, err := openBinaryFifos(ctx, binaryFifos)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		attachableFifos, err := cio.NewFIFOSetInDir(filepath.Join(defaults.DefaultFIFODir, "attach"), id, true)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create attachable fifos: %w", err)
+		}
+
+		pipesAttachableFifosPipes, err := openAttachableFifos(ctx, attachableFifos)
+		if err != nil {
+			return nil, nil, err
+		}
+		closers = append(closers, []closer{pipesAttachableFifosPipes.stdout.Close, pipesAttachableFifosPipes.stderr.Close}...)
+
+		stdoutWriters := io.MultiWriter(binaryOut.w, pipesAttachableFifosPipes.stdout)
+		stderrWriters := io.MultiWriter(binarySerr.w, pipesAttachableFifosPipes.stderr)
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			if _, err := copyBuffered(ctx, stdoutWriters, binaryFifosPipes.stdout); err != nil {
+				log.G(ctx).Debug(err.Error())
+				log.G(ctx).Warn("error copying stdout")
+			}
+			wg.Done()
+			binaryOut.w.Close()
+			pipesAttachableFifosPipes.stdout.Close()
+		}()
+		go func() {
+			if _, err := copyBuffered(ctx, stderrWriters, binaryFifosPipes.stderr); err != nil {
+				log.G(ctx).Debug(err.Error())
+				log.G(ctx).Warn("error copying stderr")
+			}
+			wg.Done()
+			binarySerr.w.Close()
+			pipesAttachableFifosPipes.stderr.Close()
+		}()
+		go func() {
+			wg.Wait()
+			// Send SIGTERM first, so logger process has a chance to flush and exit properly
+			if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+				log.L.WithError(err).Warn("failed to send SIGTERM")
+				if err := cmd.Process.Kill(); err != nil {
+					log.L.WithError(err).Warn("failed to kill process after faulty SIGTERM")
+				}
+				return
+			}
+
+			done := make(chan error, 1)
+			go func() {
+				done <- cmd.Wait()
+			}()
+
+			select {
+			case err := <-done:
+				log.L.WithError(err).Warn("failed to kill shim logger process")
+			case <-time.After(binaryIOProcTermTimeout):
+				log.L.Warn("failed to wait for shim logger process to exit, killing")
+				err := cmd.Process.Kill()
+				if err != nil {
+					log.L.WithError(err).Warn("failed to kill shim logger process")
+				}
+			}
+		}()
+		return nil, binaryFifos, nil
 	}
 
 	return &binaryIO{
 		cmd: cmd,
-		out: out,
-		err: serr,
-	}, nil
+		out: binaryOut,
+		err: binarySerr,
+	}, nil, nil
+}
+
+func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written int64, err error) {
+	buf := bufPool.Get().(*[]byte)
+	defer bufPool.Put(buf)
+
+	for {
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		default:
+		}
+
+		nr, er := src.Read(*buf)
+		if nr > 0 {
+			nw, ew := dst.Write((*buf)[0:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if ew != nil {
+				if errors.Is(ew, syscall.EAGAIN) {
+					log.G(ctx).WithError(ew).Warn("AttachableFifos are full")
+				} else {
+					err = ew
+					break
+				}
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
+
+}
+
+func openBinaryFifos(ctx context.Context, fifos *cio.FIFOSet) (f pipesReader, retErr error) {
+
+	if fifos.Stdout != "" {
+		if f.stdout, retErr = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stdout fifo: %w", retErr)
+		}
+	}
+	if fifos.Stderr != "" {
+		defer func() {
+			if retErr != nil {
+				f.stdout.Close()
+			}
+		}()
+		if f.stderr, retErr = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_RDONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stderr fifo: %w", retErr)
+		}
+	}
+	return f, nil
+}
+
+func openAttachableFifos(ctx context.Context, fifos *cio.FIFOSet) (f pipesWriter, retErr error) {
+	if fifos.Stdout != "" {
+		if f.stdout, retErr = fifo.OpenFifo(ctx, fifos.Stdout, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stdout fifo: %w", retErr)
+		}
+	}
+	if fifos.Stderr != "" {
+		defer func() {
+			if retErr != nil {
+				f.stdout.Close()
+			}
+		}()
+		if f.stderr, retErr = fifo.OpenFifo(ctx, fifos.Stderr, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_NONBLOCK, 0700); retErr != nil {
+			return f, fmt.Errorf("failed to open stderr fifo: %w", retErr)
+		}
+	}
+	return f, nil
 }
 
 type binaryIO struct {

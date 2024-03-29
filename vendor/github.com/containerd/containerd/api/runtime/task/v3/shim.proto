@@ -55,12 +55,13 @@ message CreateTaskRequest {
 	string bundle = 2;
 	repeated containerd.types.Mount rootfs = 3;
 	bool terminal = 4;
-	string stdin = 5;
-	string stdout = 6;
-	string stderr = 7;
-	string checkpoint = 8;
-	string parent_checkpoint = 9;
-	google.protobuf.Any options = 10;
+	bool attach = 5;
+	string stdin = 6;
+	string stdout = 7;
+	string stderr = 8;
+	string checkpoint = 9;
+	string parent_checkpoint = 10;
+	google.protobuf.Any options = 11;
 }
 
 message CreateTaskResponse {
