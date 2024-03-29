@@ -130,6 +130,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		config,
 		opts,
 		rootfs,
+		r.Attach,
 	)
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
@@ -201,7 +202,7 @@ func WriteRuntime(path, runtime string) error {
 }
 
 func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
-	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
+	r *process.CreateConfig, options *options.Options, rootfs string, attach bool) (*process.Init, error) {
 	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
@@ -212,6 +213,7 @@ func newInit(ctx context.Context, path, workDir, namespace string, platform stdi
 	p.Bundle = r.Bundle
 	p.Platform = platform
 	p.Rootfs = rootfs
+	p.Attach = attach
 	p.WorkDir = workDir
 	p.IoUID = int(options.IoUid)
 	p.IoGID = int(options.IoGid)
@@ -379,6 +381,7 @@ func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (proce
 	process, err := c.process.(*process.Init).Exec(ctx, c.Bundle, &process.ExecConfig{
 		ID:       r.ExecID,
 		Terminal: r.Terminal,
+		Attach:   r.Attach,
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,

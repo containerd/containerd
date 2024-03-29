@@ -60,7 +60,8 @@ message CreateTaskRequest {
 	string stderr = 7;
 	string checkpoint = 8;
 	string parent_checkpoint = 9;
-	google.protobuf.Any options = 10;
+	bool attach = 10;
+	google.protobuf.Any options = 11;
 }
 
 message CreateTaskResponse {

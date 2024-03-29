@@ -47,6 +47,7 @@ type CreateConfig struct {
 type ExecConfig struct {
 	ID       string
 	Terminal bool
+	Attach   bool
 	Stdin    string
 	Stdout   string
 	Stderr   string

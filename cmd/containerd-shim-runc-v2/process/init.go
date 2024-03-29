@@ -61,6 +61,7 @@ type Init struct {
 	console  console.Console
 	Platform stdio.Platform
 	io       *processIO
+	Attach   bool
 	runtime  *runc.Runc
 	// pausing preserves the pausing state.
 	pausing      atomic.Bool
@@ -121,7 +122,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		}
 		defer socket.Close()
 	} else {
-		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio); err != nil {
+		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio, p.Attach); err != nil {
 			return fmt.Errorf("failed to create init process I/O: %w", err)
 		}
 		p.io = pio
@@ -408,6 +409,7 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 			Stderr:   r.Stderr,
 			Terminal: r.Terminal,
 		},
+		attach:    r.Attach,
 		waitBlock: make(chan struct{}),
 	}
 	e.execState = &execCreatedState{p: e}

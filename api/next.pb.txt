@@ -1570,8 +1570,15 @@ file {
       json_name: "parentCheckpoint"
     }
     field {
-      name: "options"
+      name: "attach"
       number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "options"
+      number: 11
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
@@ -2285,8 +2292,15 @@ file {
       json_name: "parentCheckpoint"
     }
     field {
-      name: "options"
+      name: "attach"
       number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "options"
+      number: 11
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
@@ -2390,8 +2404,15 @@ file {
       json_name: "stderr"
     }
     field {
-      name: "spec"
+      name: "attach"
       number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "spec"
+      number: 8
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"

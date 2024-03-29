@@ -47,6 +47,7 @@ type execProcess struct {
 	id      string
 	console console.Console
 	io      *processIO
+	attach  bool
 	status  int
 	exited  time.Time
 	pid     safePid
@@ -189,7 +190,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		}
 		defer socket.Close()
 	} else {
-		if pio, err = createIO(ctx, e.id, e.parent.IoUID, e.parent.IoGID, e.stdio); err != nil {
+		if pio, err = createIO(ctx, e.id, e.parent.IoUID, e.parent.IoGID, e.stdio, e.attach); err != nil {
 			return fmt.Errorf("failed to create init process I/O: %w", err)
 		}
 		e.io = pio
