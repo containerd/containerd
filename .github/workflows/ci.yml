@@ -392,6 +392,13 @@ jobs:
     env:
       GOTEST: gotestsum --
     steps:
+      - name: Fix up for actuated
+        # https://github.com/containerd/containerd/pull/9920#issuecomment-2024823587
+        if: matrix.os == 'actuated-arm64-4cpu-16gb'
+        run: |
+          sudo chmod g+rx /home/runner /home/runner/actions-runner /home/runner/actions-runner/_work
+          sudo chmod o+rx /home/runner /home/runner/actions-runner /home/runner/actions-runner/_work
+
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-go
 
