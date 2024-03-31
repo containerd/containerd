@@ -39,7 +39,7 @@ func (c *criService) ListPodSandboxStats(
 	for _, sandbox := range sandboxes {
 		sandboxStats, err := c.podSandboxStats(ctx, sandbox)
 		switch {
-		case errdefs.IsUnavailable(err):
+		case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
 			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, this is likely a transient error: %v", err)
 		case err != nil:
 			errs = append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
