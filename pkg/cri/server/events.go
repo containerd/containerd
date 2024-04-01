@@ -129,7 +129,7 @@ func (em *eventMonitor) startSandboxExitMonitor(ctx context.Context, id string, 
 				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
-			logrus.Debugf("received exit event %+v", e)
+			logrus.Infof("received exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
@@ -180,7 +180,7 @@ func (em *eventMonitor) startContainerExitMonitor(ctx context.Context, id string
 				ExitedAt:    protobuf.ToTimestamp(exitedAt),
 			}
 
-			logrus.Debugf("received exit event %+v", e)
+			logrus.Infof("received exit event %+v", e)
 
 			err = func() error {
 				dctx := ctrdutil.NamespacedContext()
