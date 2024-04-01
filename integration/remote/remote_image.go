@@ -42,10 +42,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"k8s.io/klog/v2"
 
-	internalapi "github.com/containerd/containerd/integration/cri-api/pkg/apis"
+	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/integration/remote/util"
+	"github.com/containerd/containerd/v2/integration/remote/util"
 )
 
 // ImageService is a gRPC implementation of internalapi.ImageManagerService.
@@ -122,7 +122,7 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 }
 
 // PullImage pulls an image with authentication config.
-func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, opts ...grpc.CallOption) (string, error) {
+func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.AuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string, opts ...grpc.CallOption) (string, error) {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 

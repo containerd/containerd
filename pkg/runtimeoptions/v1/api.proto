@@ -3,7 +3,7 @@ syntax = "proto3";
 
 package runtimeoptions.v1;
 
-option go_package = "github.com/containerd/containerd/pkg/runtimeoptions/v1;runtimeoptions_v1";
+option go_package = "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1;runtimeoptions_v1";
 
 message Options {
 	// TypeUrl specifies the type of the content inside the config file.

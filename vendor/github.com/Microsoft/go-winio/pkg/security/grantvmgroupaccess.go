@@ -21,7 +21,6 @@ type (
 	trusteeForm         uint32
 	trusteeType         uint32
 
-	//nolint:structcheck // structcheck thinks fields are unused, but the are used to pass data to OS
 	explicitAccess struct {
 		accessPermissions accessMask
 		accessMode        accessMode
@@ -29,7 +28,6 @@ type (
 		trustee           trustee
 	}
 
-	//nolint:structcheck,unused // structcheck thinks fields are unused, but the are used to pass data to OS
 	trustee struct {
 		multipleTrustee          *trustee
 		multipleTrusteeOperation int32

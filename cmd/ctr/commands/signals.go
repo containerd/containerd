@@ -22,9 +22,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 type killer interface {

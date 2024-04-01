@@ -22,18 +22,17 @@ import (
 	"io"
 	"os"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/pkg/transfer"
-	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
-	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/images/archive"
+	"github.com/containerd/containerd/v2/core/transfer"
+	tarchive "github.com/containerd/containerd/v2/core/transfer/archive"
+	"github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/platforms"
 )
 
-var exportCommand = cli.Command{
+var exportCommand = &cli.Command{
 	Name:      "export",
 	Usage:     "Export images",
 	ArgsUsage: "[flags] <out> <image> ...",
@@ -45,24 +44,24 @@ Use '--platform' to define the output platform.
 When '--all-platforms' is given all images in a manifest list must be available.
 `,
 	Flags: []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-manifest-json",
 			Usage: "Do not add Docker compatible manifest.json to archive",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "skip-non-distributable",
 			Usage: "Do not add non-distributable blobs such as Windows layers to archive",
 		},
-		cli.StringSliceFlag{
+		&cli.StringSliceFlag{
 			Name:  "platform",
 			Usage: "Pull content from a specific platform",
-			Value: &cli.StringSlice{},
+			Value: cli.NewStringSlice(),
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "all-platforms",
 			Usage: "Exports content from all platforms",
 		},
-		cli.BoolTFlag{
+		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Run export locally rather than through transfer API",
 		},
@@ -94,7 +93,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 		defer w.Close()
 
-		if !context.BoolT("local") {
+		if !context.Bool("local") {
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
@@ -133,13 +132,9 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 
 		if pss := context.StringSlice("platform"); len(pss) > 0 {
-			var all []ocispec.Platform
-			for _, ps := range pss {
-				p, err := platforms.Parse(ps)
-				if err != nil {
-					return fmt.Errorf("invalid platform %q: %w", ps, err)
-				}
-				all = append(all, p)
+			all, err := platforms.ParseAll(pss)
+			if err != nil {
+				return err
 			}
 			exportOpts = append(exportOpts, archive.WithPlatform(platforms.Ordered(all...)))
 		} else {

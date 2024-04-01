@@ -36,10 +36,6 @@ func ContextDialer(ctx context.Context, address string) (net.Conn, error) {
 	return timeoutDialer(address, 0)
 }
 
-// Dialer returns a GRPC net.Conn connected to the provided address
-// Deprecated: use ContextDialer and grpc.WithContextDialer.
-var Dialer = timeoutDialer
-
 func timeoutDialer(address string, timeout time.Duration) (net.Conn, error) {
 	var (
 		stopC = make(chan struct{})

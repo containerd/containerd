@@ -18,49 +18,36 @@ package command
 
 import (
 	gocontext "context"
-	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/services/server"
-	srvconfig "github.com/containerd/containerd/services/server/config"
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/timeout"
+	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/plugin/registry"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/pelletier/go-toml"
-	"github.com/urfave/cli"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/urfave/cli/v2"
 )
 
-// Config is a wrapper of server config for printing out.
-type Config struct {
-	*srvconfig.Config
-	// Plugins overrides `Plugins map[string]toml.Tree` in server config.
-	Plugins map[string]interface{} `toml:"plugins"`
-}
-
-// WriteTo marshals the config to the provided writer
-func (c *Config) WriteTo(w io.Writer) (int64, error) {
-	return 0, toml.NewEncoder(w).Encode(c)
-}
-
-func outputConfig(cfg *srvconfig.Config) error {
-	config := &Config{
-		Config: cfg,
-	}
-
-	plugins, err := server.LoadPlugins(gocontext.Background(), config.Config)
+func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
+	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
 	}
 	if len(plugins) != 0 {
-		config.Plugins = make(map[string]interface{})
+		if config.Plugins == nil {
+			config.Plugins = make(map[string]interface{})
+		}
 		for _, p := range plugins {
 			if p.Config == nil {
 				continue
 			}
 
-			pc, err := config.Decode(p)
+			pc, err := config.Decode(ctx, p.URI(), p.Config)
 			if err != nil {
 				return err
 			}
@@ -82,29 +69,25 @@ func outputConfig(cfg *srvconfig.Config) error {
 	// for the time being, keep the defaultConfig's version set at 1 so that
 	// when a config without a version is loaded from disk and has no version
 	// set, we assume it's a v1 config.  But when generating new configs via
-	// this command, generate the v2 config
-	config.Config.Version = 2
+	// this command, generate the max configuration version
+	config.Version = version.ConfigVersion
 
-	// remove overridden Plugins type to avoid duplication in output
-	config.Config.Plugins = nil
-
-	_, err = config.WriteTo(os.Stdout)
-	return err
+	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {
 	return platformAgnosticDefaultConfig()
 }
 
-var configCommand = cli.Command{
+var configCommand = &cli.Command{
 	Name:  "config",
 	Usage: "Information on the containerd config",
-	Subcommands: []cli.Command{
+	Subcommands: []*cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
 			Action: func(context *cli.Context) error {
-				return outputConfig(defaultConfig())
+				return outputConfig(gocontext.Background(), defaultConfig())
 			},
 		},
 		{
@@ -112,11 +95,60 @@ var configCommand = cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(context *cli.Context) error {
 				config := defaultConfig()
-				if err := srvconfig.LoadConfig(context.GlobalString("config"), config); err != nil && !os.IsNotExist(err) {
+				ctx := gocontext.Background()
+				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
-				return outputConfig(config)
+				return outputConfig(ctx, config)
+			},
+		},
+		{
+			Name:  "migrate",
+			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
+			Action: func(context *cli.Context) error {
+				config := defaultConfig()
+				ctx := gocontext.Background()
+				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
+					return err
+				}
+
+				if config.Version < version.ConfigVersion {
+					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+					for _, p := range plugins {
+						if p.ConfigMigration != nil {
+							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+								return err
+							}
+						}
+					}
+				}
+
+				plugins, err := server.LoadPlugins(ctx, config)
+				if err != nil {
+					return err
+				}
+				if len(plugins) != 0 {
+					if config.Plugins == nil {
+						config.Plugins = make(map[string]interface{})
+					}
+					for _, p := range plugins {
+						if p.Config == nil {
+							continue
+						}
+
+						pc, err := config.Decode(ctx, p.URI(), p.Config)
+						if err != nil {
+							return err
+						}
+
+						config.Plugins[p.URI()] = pc
+					}
+				}
+
+				config.Version = version.ConfigVersion
+
+				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
 			},
 		},
 	},
@@ -124,11 +156,7 @@ var configCommand = cli.Command{
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
 	return &srvconfig.Config{
-		// see: https://github.com/containerd/containerd/blob/5c6ea7fdc1247939edaddb1eba62a94527418687/RELEASES.md#daemon-configuration
-		// this version MUST remain set to 1 until either there exists a means to
-		// override / configure the default at the containerd cli .. or when
-		// version 1 is no longer supported
-		Version: 1,
+		Version: version.ConfigVersion,
 		Root:    defaults.DefaultRootDir,
 		State:   defaults.DefaultStateDir,
 		GRPC: srvconfig.GRPCConfig{

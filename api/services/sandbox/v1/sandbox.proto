@@ -31,8 +31,9 @@ import "google/protobuf/timestamp.proto";
 import "github.com/containerd/containerd/api/types/sandbox.proto";
 import "github.com/containerd/containerd/api/types/mount.proto";
 import "github.com/containerd/containerd/api/types/platform.proto";
+import "github.com/containerd/containerd/api/types/metrics.proto";
 
-option go_package = "github.com/containerd/containerd/api/services/sandbox/v1;sandbox";
+option go_package = "github.com/containerd/containerd/v2/api/services/sandbox/v1;sandbox";
 
 // Store provides a metadata storage interface for sandboxes. Similarly to `Containers`,
 // sandbox object includes info required to start a new instance, but no runtime state.
@@ -93,6 +94,7 @@ service Controller {
 	rpc Wait(ControllerWaitRequest) returns (ControllerWaitResponse);
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
+	rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
 }
 
 message ControllerCreateRequest {
@@ -100,6 +102,8 @@ message ControllerCreateRequest {
 	repeated containerd.types.Mount rootfs = 2;
 	google.protobuf.Any options = 3;
 	string netns_path = 4;
+	map<string, string> annotations = 5;
+	string sandboxer = 10;
 }
 
 message ControllerCreateResponse {
@@ -108,6 +112,7 @@ message ControllerCreateResponse {
 
 message ControllerStartRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerStartResponse {
@@ -119,6 +124,7 @@ message ControllerStartResponse {
 
 message ControllerPlatformRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerPlatformResponse {
@@ -128,12 +134,14 @@ message ControllerPlatformResponse {
 message ControllerStopRequest {
 	string sandbox_id = 1;
 	uint32 timeout_secs = 2;
+	string sandboxer = 10;
 }
 
 message ControllerStopResponse {}
 
 message ControllerWaitRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerWaitResponse {
@@ -144,6 +152,7 @@ message ControllerWaitResponse {
 message ControllerStatusRequest {
 	string sandbox_id = 1;
 	bool verbose = 2;
+	string sandboxer = 10;
 }
 
 message ControllerStatusResponse {
@@ -158,6 +167,16 @@ message ControllerStatusResponse {
 
 message ControllerShutdownRequest {
 	string sandbox_id = 1;
+	string sandboxer = 10;
 }
 
 message ControllerShutdownResponse {}
+
+message ControllerMetricsRequest {
+	string sandbox_id = 1;
+	string sandboxer = 10;
+}
+
+message ControllerMetricsResponse {
+	types.Metric metrics = 1;
+}

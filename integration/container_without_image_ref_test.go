@@ -19,7 +19,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -53,7 +53,7 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	t.Log("Container status should be running")
 	status, err := runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
-	assert.Equal(t, status.GetState(), runtime.ContainerState_CONTAINER_RUNNING)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_RUNNING, status.GetState())
 
 	t.Logf("Stop container")
 	err = runtimeService.StopContainer(cn, 1)
@@ -62,5 +62,5 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 	t.Log("Container status should be exited")
 	status, err = runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
-	assert.Equal(t, status.GetState(), runtime.ContainerState_CONTAINER_EXITED)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, status.GetState())
 }

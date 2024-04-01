@@ -25,17 +25,20 @@ script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 # e2e will fail with "sudo: command not found"
 SUDO=''
 if (( $EUID != 0 )); then
-    SUDO='sudo'
+    # The actuated ARM64 env needs PATH=$PATH to get `go` path. Otherwise
+    # `make install` recipe will fail.
+    SUDO="sudo -E PATH=$PATH"
 fi
 
 cd "$(go env GOPATH)"
-go install github.com/onsi/ginkgo/v2/ginkgo@v2.4.0
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.9.2
 
 : "${CRITEST_COMMIT:=$(cat "${script_dir}/critools-version")}"
 : "${DESTDIR:=""}"
+: "${CRI_TOOLS_REPO:=https://github.com/kubernetes-sigs/cri-tools.git}"
 
 TMPROOT=$(mktemp -d)
-git clone https://github.com/kubernetes-sigs/cri-tools.git "${TMPROOT}/cri-tools"
+git clone "${CRI_TOOLS_REPO}" "${TMPROOT}/cri-tools"
 pushd "${TMPROOT}"/cri-tools
 git checkout "$CRITEST_COMMIT"
 make

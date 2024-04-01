@@ -21,9 +21,10 @@ package client
 import (
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/integration/images"
-	"github.com/containerd/containerd/platforms"
+	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
+	"github.com/containerd/platforms"
 )
 
 var (
@@ -46,6 +47,7 @@ var (
 )
 
 func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
+	t.Setenv(deprecation.EnvPullSchema1Image, "1")
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)

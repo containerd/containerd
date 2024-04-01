@@ -20,7 +20,7 @@ import (
 	goruntime "runtime"
 	"testing"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -42,7 +42,7 @@ func TestTruncIndex(t *testing.T) {
 	t.Logf("Get image status by truncindex, truncID: %s", imgTruncID)
 	res, err := imageService.ImageStatus(&runtimeapi.ImageSpec{Image: imgTruncID})
 	require.NoError(t, err)
-	require.NotEqual(t, nil, res)
+	require.NotNil(t, res)
 	assert.Equal(t, imgID, res.Id)
 
 	// TODO(yanxuean): for failure test case where there are two images with the same truncindex.

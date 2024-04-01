@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"strings"
 	"sync/atomic"
 
 	hcsschema "github.com/Microsoft/hcsshim/internal/hcs/schema2"
@@ -56,11 +55,11 @@ func ScrubProcessParameters(s string) (string, error) {
 	}
 	pp.Environment = map[string]string{_scrubbedReplacement: _scrubbedReplacement}
 
-	buf := bytes.NewBuffer(b[:0])
-	if err := encode(buf, pp); err != nil {
+	b, err := encode(pp)
+	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(buf.String()), nil
+	return string(b), nil
 }
 
 // ScrubBridgeCreate scrubs requests sent over the bridge of type
@@ -90,11 +89,11 @@ func scrubBridgeCreate(m genMap) error {
 }
 
 func scrubLinuxHostedSystem(m genMap) error {
-	if m, ok := index(m, "OciSpecification"); ok {
+	if m, ok := index(m, "OciSpecification"); ok { //nolint:govet // shadow
 		if _, ok := m["annotations"]; ok {
 			m["annotations"] = map[string]string{_scrubbedReplacement: _scrubbedReplacement}
 		}
-		if m, ok := index(m, "process"); ok {
+		if m, ok := index(m, "process"); ok { //nolint:govet // shadow
 			if _, ok := m["env"]; ok {
 				m["env"] = []string{_scrubbedReplacement}
 				return nil
@@ -114,7 +113,7 @@ func scrubExecuteProcess(m genMap) error {
 	if !isRequestBase(m) {
 		return ErrUnknownType
 	}
-	if m, ok := index(m, "Settings"); ok {
+	if m, ok := index(m, "Settings"); ok { //nolint:govet // shadow
 		if ss, ok := m["ProcessParameters"]; ok {
 			// ProcessParameters is a json encoded struct passed as a regular sting field
 			s, ok := ss.(string)
@@ -150,21 +149,12 @@ func scrubBytes(b []byte, scrub scrubberFunc) ([]byte, error) {
 		return nil, err
 	}
 
-	buf := &bytes.Buffer{}
-	if err := encode(buf, m); err != nil {
+	b, err := encode(m)
+	if err != nil {
 		return nil, err
 	}
 
-	return bytes.TrimSpace(buf.Bytes()), nil
-}
-
-func encode(buf *bytes.Buffer, v interface{}) error {
-	enc := json.NewEncoder(buf)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return err
-	}
-	return nil
+	return b, nil
 }
 
 func isRequestBase(m genMap) bool {

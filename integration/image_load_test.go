@@ -17,13 +17,13 @@
 package integration
 
 import (
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -55,8 +55,10 @@ func TestImageLoad(t *testing.T) {
 	t.Logf("load image in cri")
 	ctr, err := exec.LookPath("ctr")
 	require.NoError(t, err, "ctr should be installed, make sure you've run `make install-deps`")
+	// Add --local=true option since currently the transfer service
+	// does not provide enough progress to avoid timeout
 	output, err = exec.Command(ctr, "-address="+containerdEndpoint,
-		"-n=k8s.io", "images", "import", tar).CombinedOutput()
+		"-n=k8s.io", "images", "import", "--local=true", tar).CombinedOutput()
 	require.NoError(t, err, "output: %q", output)
 
 	t.Logf("make sure image is loaded")

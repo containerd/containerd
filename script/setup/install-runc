@@ -31,9 +31,10 @@ fi
 function install_runc() {
 	# When updating runc-version, consider updating the runc module in go.mod as well
 	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
+	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
 
 	TMPROOT=$(mktemp -d)
-	git clone https://github.com/opencontainers/runc.git "${TMPROOT}"/runc
+	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
 	make BUILDTAGS='seccomp' runc
@@ -44,7 +45,8 @@ function install_runc() {
 
 function install_crun() {
 	: "${CRUN_VERSION:=$(cat "${script_dir}/crun-version")}"
-	$SUDO curl -S -o /usr/local/sbin/runc -L https://github.com/containers/crun/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
+	: "${CRUN_REPO:=https://github.com/containers/crun}"
+	$SUDO curl -S -o /usr/local/sbin/runc -L "${CRUN_REPO}"/releases/download/"${CRUN_VERSION}"/crun-"${CRUN_VERSION}"-linux-"$(go env GOARCH)"
 	$SUDO chmod +x /usr/local/sbin/runc
 }
 

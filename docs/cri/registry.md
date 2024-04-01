@@ -13,7 +13,7 @@ This document describes the method to configure the image registry for `containe
 ## Configure Registry Credentials
 
 > **_NOTE:_**  registry.configs.*.auth is DEPRECATED and will NOT have an equivalent way to store
-> unecrypted secrets in the host configuration files. However, it will not be removed until
+> unencrypted secrets in the host configuration files. However, it will not be removed until
 > a suitable secret management alternative is available as a plugin. It remains supported
 > in 1.x releases, including the 1.6 LTS release.
 
@@ -43,7 +43,7 @@ After modifying this config, you need to restart the `containerd` service.
 
 ### Configure Registry Credentials Example - GCR with Service Account Key Authentication
 
-If you don't already have Google Container Registry (GCR) set-up then you need to do the following steps:
+If you don't already have Google Container Registry (GCR) set up then you need to do the following steps:
 
 * Create a Google Cloud Platform (GCP) account and project if not already created (see [GCP getting started](https://cloud.google.com/gcp/getting-started))
 * Enable GCR for your project (see [Quickstart for Container Registry](https://cloud.google.com/container-registry/docs/quickstart))

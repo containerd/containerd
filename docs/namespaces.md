@@ -12,7 +12,7 @@ It is trivial for clients to switch namespaces.
 ## Who specifies the namespace?
 
 The client specifies the namespace via the `context`.
-There is a `github.com/containerd/containerd/namespaces` package that allows a user to get and set the namespace on a context.
+There is a `github.com/containerd/containerd/v2/namespaces` package that allows a user to get and set the namespace on a context.
 
 ```go
 // set a namespace

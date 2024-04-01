@@ -2,7 +2,7 @@ package runtime
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net/http"
 	"net/textproto"
@@ -48,15 +48,15 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 	var wroteHeader bool
 	for {
 		resp, err := recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return
 		}
 		if err != nil {
-			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err)
+			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err, delimiter)
 			return
 		}
 		if err := handleForwardResponseOptions(ctx, w, resp, opts); err != nil {
-			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err)
+			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err, delimiter)
 			return
 		}
 
@@ -82,15 +82,15 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 
 		if err != nil {
 			grpclog.Infof("Failed to marshal response chunk: %v", err)
-			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err)
+			handleForwardResponseStreamError(ctx, wroteHeader, marshaler, w, req, mux, err, delimiter)
 			return
 		}
-		if _, err = w.Write(buf); err != nil {
+		if _, err := w.Write(buf); err != nil {
 			grpclog.Infof("Failed to send response chunk: %v", err)
 			return
 		}
 		wroteHeader = true
-		if _, err = w.Write(delimiter); err != nil {
+		if _, err := w.Write(delimiter); err != nil {
 			grpclog.Infof("Failed to send delimiter chunk: %v", err)
 			return
 		}
@@ -108,18 +108,20 @@ func handleForwardResponseServerMetadata(w http.ResponseWriter, mux *ServeMux, m
 	}
 }
 
-func handleForwardResponseTrailerHeader(w http.ResponseWriter, md ServerMetadata) {
+func handleForwardResponseTrailerHeader(w http.ResponseWriter, mux *ServeMux, md ServerMetadata) {
 	for k := range md.TrailerMD {
-		tKey := textproto.CanonicalMIMEHeaderKey(fmt.Sprintf("%s%s", MetadataTrailerPrefix, k))
-		w.Header().Add("Trailer", tKey)
+		if h, ok := mux.outgoingTrailerMatcher(k); ok {
+			w.Header().Add("Trailer", textproto.CanonicalMIMEHeaderKey(h))
+		}
 	}
 }
 
-func handleForwardResponseTrailer(w http.ResponseWriter, md ServerMetadata) {
+func handleForwardResponseTrailer(w http.ResponseWriter, mux *ServeMux, md ServerMetadata) {
 	for k, vs := range md.TrailerMD {
-		tKey := fmt.Sprintf("%s%s", MetadataTrailerPrefix, k)
-		for _, v := range vs {
-			w.Header().Add(tKey, v)
+		if h, ok := mux.outgoingTrailerMatcher(k); ok {
+			for _, v := range vs {
+				w.Header().Add(h, v)
+			}
 		}
 	}
 }
@@ -147,11 +149,9 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 	doForwardTrailers := requestAcceptsTrailers(req)
 
 	if doForwardTrailers {
-		handleForwardResponseTrailerHeader(w, md)
+		handleForwardResponseTrailerHeader(w, mux, md)
 		w.Header().Set("Transfer-Encoding", "chunked")
 	}
-
-	handleForwardResponseTrailerHeader(w, md)
 
 	contentType := marshaler.ContentType(resp)
 	w.Header().Set("Content-Type", contentType)
@@ -178,7 +178,7 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 	}
 
 	if doForwardTrailers {
-		handleForwardResponseTrailer(w, md)
+		handleForwardResponseTrailer(w, mux, md)
 	}
 }
 
@@ -200,20 +200,24 @@ func handleForwardResponseOptions(ctx context.Context, w http.ResponseWriter, re
 	return nil
 }
 
-func handleForwardResponseStreamError(ctx context.Context, wroteHeader bool, marshaler Marshaler, w http.ResponseWriter, req *http.Request, mux *ServeMux, err error) {
+func handleForwardResponseStreamError(ctx context.Context, wroteHeader bool, marshaler Marshaler, w http.ResponseWriter, req *http.Request, mux *ServeMux, err error, delimiter []byte) {
 	st := mux.streamErrorHandler(ctx, err)
 	msg := errorChunk(st)
 	if !wroteHeader {
 		w.Header().Set("Content-Type", marshaler.ContentType(msg))
 		w.WriteHeader(HTTPStatusFromCode(st.Code()))
 	}
-	buf, merr := marshaler.Marshal(msg)
-	if merr != nil {
-		grpclog.Infof("Failed to marshal an error: %v", merr)
+	buf, err := marshaler.Marshal(msg)
+	if err != nil {
+		grpclog.Infof("Failed to marshal an error: %v", err)
 		return
 	}
-	if _, werr := w.Write(buf); werr != nil {
-		grpclog.Infof("Failed to notify error to client: %v", werr)
+	if _, err := w.Write(buf); err != nil {
+		grpclog.Infof("Failed to notify error to client: %v", err)
+		return
+	}
+	if _, err := w.Write(delimiter); err != nil {
+		grpclog.Infof("Failed to send delimiter chunk: %v", err)
 		return
 	}
 }

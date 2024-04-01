@@ -25,7 +25,7 @@ A codespace will open in a web-based version of Visual Studio Code. The [dev con
 
 To build the `containerd` daemon, and the `ctr` simple test client, the following build system dependencies are required:
 
-* Go 1.19.x or above
+* Go 1.21.x or above
 * Protoc 3.x compiler and headers (download at the [Google protobuf releases page](https://github.com/protocolbuffers/protobuf/releases))
 * Btrfs headers and libraries for your distribution. Note that building the btrfs driver can be disabled via the build tag `no_btrfs`, removing this dependency.
 
@@ -43,12 +43,7 @@ You need `git` to checkout the source code:
 git clone https://github.com/containerd/containerd
 ```
 
-For proper results, install the `protoc` release into `/usr/local` on your build system. For example, the following commands will download and install the 3.11.4 release for a 64-bit Linux host:
-
-```sh
-wget -c https://github.com/protocolbuffers/protobuf/releases/download/v3.11.4/protoc-3.11.4-linux-x86_64.zip
-sudo unzip protoc-3.11.4-linux-x86_64.zip -d /usr/local
-```
+For proper results, install the `protoc` release into `/usr/local` on your build system. When generating source code from `.proto` files, containerd may rely on some external protocol buffer files. These external dependencies should be added to the `/usr/local/include` directory. To install the appropriate version of `protoc` and download any necessary external protocol buffer files on a Linux host, run the install script located at `script/setup/install-protobuf`.
 
 To enable optional [Btrfs](https://en.wikipedia.org/wiki/Btrfs) snapshotter, you should have the headers from the Linux kernel 4.12 or later.
 The dependency on the kernel headers only affects users building containerd from source.
@@ -125,6 +120,8 @@ make generate
 >   * `no_btrfs`: A build tag disables building the Btrfs snapshot driver.
 >   * `no_devmapper`: A build tag disables building the device mapper snapshot driver.
 >   * `no_zfs`: A build tag disables building the ZFS snapshot driver.
+> * platform
+>   * `no_systemd`: disables any systemd specific code
 >
 > For example, adding `BUILDTAGS=no_btrfs` to your environment before calling the **binaries**
 > Makefile target will disable the btrfs driver within the containerd Go build.

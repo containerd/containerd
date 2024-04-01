@@ -119,6 +119,9 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	if err := g.AdjustMounts(adjust.GetMounts()); err != nil {
 		return err
 	}
+	if err := g.AdjustRlimits(adjust.GetRlimits()); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -318,6 +321,20 @@ func (g *Generator) AdjustDevices(devices []*nri.LinuxDevice) {
 		major, minor, access := &d.Major, &d.Minor, d.AccessString()
 		g.AddLinuxResourcesDevice(true, d.Type, major, minor, access)
 	}
+}
+
+func (g *Generator) AdjustRlimits(rlimits []*nri.POSIXRlimit) error {
+	for _, l := range rlimits {
+		if l == nil {
+			continue
+		}
+		g.Config.Process.Rlimits = append(g.Config.Process.Rlimits, rspec.POSIXRlimit{
+			Type: l.Type,
+			Hard: l.Hard,
+			Soft: l.Soft,
+		})
+	}
+	return nil
 }
 
 // AdjustMounts adjusts the mounts in the OCI Spec.

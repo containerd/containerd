@@ -24,27 +24,27 @@ import (
 	"os"
 	"time"
 
-	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/dialer"
-	"github.com/containerd/containerd/protobuf/proto"
-	"github.com/containerd/containerd/protobuf/types"
-	"github.com/urfave/cli"
+	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
+	"github.com/containerd/containerd/v2/pkg/dialer"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/protobuf/proto"
+	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/errdefs"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var publishCommand = cli.Command{
+var publishCommand = &cli.Command{
 	Name:  "publish",
 	Usage: "Binary to publish events to containerd",
 	Flags: []cli.Flag{
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "namespace",
 			Usage: "Namespace to publish to",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "topic",
 			Usage: "Topic of the event",
 		},
@@ -59,7 +59,7 @@ var publishCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := connectEvents(context.GlobalString("address"))
+		client, err := connectEvents(context.String("address"))
 		if err != nil {
 			return err
 		}
@@ -78,11 +78,11 @@ func getEventPayload(r io.Reader) (*types.Any, error) {
 	if err != nil {
 		return nil, err
 	}
-	var any types.Any
-	if err := proto.Unmarshal(data, &any); err != nil {
+	var payload types.Any
+	if err := proto.Unmarshal(data, &payload); err != nil {
 		return nil, err
 	}
-	return &any, nil
+	return &payload, nil
 }
 
 func connectEvents(address string) (eventsapi.EventsClient, error) {

@@ -20,14 +20,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/namespaces"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/typeurl/v2"
 )
 
 func init() {
 	typeurl.Register(&NetworkMetaData{},
-		"github.com/containerd/containerd/cmd/ctr/commands", "NetworkMetaData")
+		"github.com/containerd/containerd/v2/cmd/ctr/commands", "NetworkMetaData")
 }
 
 const (
@@ -36,7 +36,7 @@ const (
 	CtrCniMetadataExtension = "ctr.cni-containerd.metadata"
 )
 
-// ctr pass cni network metadata to containerd if ctr run use option of --cni
+// NetworkMetaData ctr pass cni network metadata to containerd if ctr run use option of --cni
 type NetworkMetaData struct {
 	EnableCni bool
 }

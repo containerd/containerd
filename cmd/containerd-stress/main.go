@@ -28,13 +28,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/integration/remote"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/plugin"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/integration/remote"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/log"
 	metrics "github.com/docker/go-metrics"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var (
@@ -61,6 +61,12 @@ func init() {
 	// set higher ulimits
 	if err := setRlimit(); err != nil {
 		panic(err)
+	}
+
+	cli.HelpFlag = &cli.BoolFlag{
+		Name:    "help",
+		Aliases: []string{"h"},
+		Usage:   "Show help",
 	}
 }
 
@@ -124,85 +130,91 @@ func main() {
 	app.Name = "containerd-stress"
 	app.Description = "stress test a containerd daemon"
 	app.Flags = []cli.Flag{
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "debug",
 			Usage: "Set debug output in the logs",
 		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Value: "/run/containerd/containerd.sock",
-			Usage: "Path to the containerd socket",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Value:   "/run/containerd/containerd.sock",
+			Usage:   "Path to the containerd socket",
 		},
-		cli.IntFlag{
-			Name:  "concurrent,c",
-			Value: 1,
-			Usage: "Set the concurrency of the stress test",
+		&cli.IntFlag{
+			Name:    "concurrent",
+			Aliases: []string{"c"},
+			Value:   1,
+			Usage:   "Set the concurrency of the stress test",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "cri",
 			Usage: "Utilize CRI to create pods for the stress test. This requires a runtime that matches CRI runtime handler. Example: --runtime runc",
 		},
-		cli.DurationFlag{
-			Name:  "duration,d",
-			Value: 1 * time.Minute,
-			Usage: "Set the duration of the stress test",
+		&cli.DurationFlag{
+			Name:    "duration",
+			Aliases: []string{"d"},
+			Value:   1 * time.Minute,
+			Usage:   "Set the duration of the stress test",
 		},
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "exec",
 			Usage: "Add execs to the stress tests (non-CRI only)",
 		},
-		cli.StringFlag{
-			Name:  "image,i",
-			Value: "docker.io/library/alpine:latest",
-			Usage: "Image to be utilized for testing",
+		&cli.StringFlag{
+			Name:    "image",
+			Aliases: []string{"i"},
+			Value:   "docker.io/library/alpine:latest",
+			Usage:   "Image to be utilized for testing",
 		},
-		cli.BoolFlag{
-			Name:  "json,j",
-			Usage: "Output results in json format",
+		&cli.BoolFlag{
+			Name:    "json",
+			Aliases: []string{"j"},
+			Usage:   "Output results in json format",
 		},
-		cli.StringFlag{
-			Name:  "metrics,m",
-			Usage: "Address to serve the metrics API",
+		&cli.StringFlag{
+			Name:    "metrics",
+			Aliases: []string{"m"},
+			Usage:   "Address to serve the metrics API",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "runtime",
 			Usage: "Set the runtime to stress test",
-			Value: plugin.RuntimeRuncV2,
+			Value: plugins.RuntimeRuncV2,
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "snapshotter",
 			Usage: "Set the snapshotter to use",
 			Value: "overlayfs",
 		},
 	}
 	app.Before = func(context *cli.Context) error {
-		if context.GlobalBool("json") {
+		if context.Bool("json") {
 			if err := log.SetLevel("warn"); err != nil {
 				return err
 			}
 		}
-		if context.GlobalBool("debug") {
+		if context.Bool("debug") {
 			if err := log.SetLevel("debug"); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		densityCommand,
 	}
 	app.Action = func(context *cli.Context) error {
 		config := config{
-			Address:     context.GlobalString("address"),
-			Duration:    context.GlobalDuration("duration"),
-			Concurrency: context.GlobalInt("concurrent"),
-			CRI:         context.GlobalBool("cri"),
-			Exec:        context.GlobalBool("exec"),
-			Image:       context.GlobalString("image"),
-			JSON:        context.GlobalBool("json"),
-			Metrics:     context.GlobalString("metrics"),
-			Runtime:     context.GlobalString("runtime"),
-			Snapshotter: context.GlobalString("snapshotter"),
+			Address:     context.String("address"),
+			Duration:    context.Duration("duration"),
+			Concurrency: context.Int("concurrent"),
+			CRI:         context.Bool("cri"),
+			Exec:        context.Bool("exec"),
+			Image:       context.String("image"),
+			JSON:        context.Bool("json"),
+			Metrics:     context.String("metrics"),
+			Runtime:     context.String("runtime"),
+			Snapshotter: context.String("snapshotter"),
 		}
 		if config.Metrics != "" {
 			return serve(config)
@@ -259,13 +271,12 @@ func serve(c config) error {
 
 func criTest(c config) error {
 	var (
-		timeout     = 1 * time.Minute
-		wg          sync.WaitGroup
-		ctx         = namespaces.WithNamespace(context.Background(), stressNs)
-		criEndpoint = "unix:///run/containerd/containerd.sock"
+		timeout = 1 * time.Minute
+		wg      sync.WaitGroup
+		ctx     = namespaces.WithNamespace(context.Background(), stressNs)
 	)
 
-	client, err := remote.NewRuntimeService(criEndpoint, timeout)
+	client, err := remote.NewRuntimeService(c.Address, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}

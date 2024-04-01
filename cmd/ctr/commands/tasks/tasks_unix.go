@@ -26,15 +26,15 @@ import (
 	"os/signal"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/log"
-	"github.com/urfave/cli"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
 	"golang.org/x/sys/unix"
 )
 
 var platformStartFlags = []cli.Flag{
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "no-pivot",
 		Usage: "Disable use of pivot-root (linux only)",
 	},

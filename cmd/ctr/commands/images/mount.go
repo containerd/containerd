@@ -20,17 +20,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
-var mountCommand = cli.Command{
+var mountCommand = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount an image to a target path",
 	ArgsUsage: "[flags] <ref> <target>",
@@ -39,11 +40,11 @@ var mountCommand = cli.Command{
 When you are done, use the unmount command.
 `,
 	Flags: append(append(commands.RegistryFlags, append(commands.SnapshotterFlags, commands.LabelFlag)...),
-		cli.BoolFlag{
+		&cli.BoolFlag{
 			Name:  "rw",
 			Usage: "Enable write support on the mount",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "platform",
 			Usage: "Mount the image for the specified platform",
 			Value: platforms.DefaultString(),
@@ -69,15 +70,13 @@ When you are done, use the unmount command.
 
 		snapshotter := context.String("snapshotter")
 		if snapshotter == "" {
-			snapshotter = containerd.DefaultSnapshotter
+			snapshotter = defaults.DefaultSnapshotter
 		}
 
 		ctx, done, err := client.WithLease(ctx,
 			leases.WithID(target),
 			leases.WithExpiration(24*time.Hour),
-			leases.WithLabels(map[string]string{
-				"containerd.io/gc.ref.snapshot." + snapshotter: target,
-			}),
+			leases.WithLabel("containerd.io/gc.ref.snapshot."+snapshotter, target),
 		)
 		if err != nil && !errdefs.IsAlreadyExists(err) {
 			return err

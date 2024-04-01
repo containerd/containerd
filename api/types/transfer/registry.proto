@@ -20,7 +20,7 @@ package containerd.types.transfer;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/containerd/containerd/api/types/transfer";
+option go_package = "github.com/containerd/containerd/v2/api/types/transfer";
 
 message OCIRegistry {
 	string reference = 1;

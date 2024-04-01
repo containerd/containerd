@@ -32,6 +32,22 @@ cgroupDriver: "systemd"
 
 kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/docs/tasks/administer-cluster/kubeadm/configure-cgroup-driver/).
 
+> Note: Kubernetes v1.28 supports automatic detection of the cgroup driver as
+> an alpha feature. With the `KubeletCgroupDriverFromCRI` kubelet feature gate
+> enabled, the kubelet automatically detects the cgroup driver from the CRI
+> runtime and the `KubeletConfiguration` configuration step above is not
+> needed.
+>
+> When determining the cgroup driver, containerd uses the `SystemdCgroup`
+> setting from runc-based runtime classes, starting from the default runtime
+> class. If no runc-based runtime classes have been configured containerd
+> relies on auto-detection based on determining if systemd is running.
+> Note that all runc-based runtime classes should be configured to have the
+> same `SystemdCgroup` setting in order to avoid unexpected behavior.
+>
+> The automatic cgroup driver configuration for kubelet feature is supported in
+> containerd v2.0 and later.
+
 ### Snapshotter
 
 The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
@@ -137,7 +153,7 @@ version = 2
   selinux_category_range = 1024
 
   # sandbox_image is the image used by sandbox container.
-  sandbox_image = "registry.k8s.io/pause:3.7"
+  sandbox_image = "registry.k8s.io/pause:3.9"
 
   # stats_collect_period is the period (in seconds) of snapshots stats collection.
   stats_collect_period = 10
@@ -219,12 +235,18 @@ version = 2
 
   # enable_cdi enables support of the Container Device Interface (CDI)
   # For more details about CDI and the syntax of CDI Spec files please refer to
-  # https://github.com/container-orchestrated-devices/container-device-interface.
-  enable_cdi = false
+  # https://tags.cncf.io/container-device-interface.
+  # TODO: Deprecate this option when either Dynamic Resource Allocation(DRA)
+  # or CDI support for the Device Plugins are graduated to GA.
+  # `Dynamic Resource Allocation` KEP:
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/3063-dynamic-resource-allocation
+  # `Add CDI devices to device plugin API` KEP:
+  # https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4009-add-cdi-devices-to-device-plugin-api
+  enable_cdi = true
 
   # cdi_spec_dirs is the list of directories to scan for CDI spec files
   # For more details about CDI configuration please refer to
-  # https://github.com/container-orchestrated-devices/container-device-interface#containerd-configuration
+  # https://tags.cncf.io/container-device-interface#containerd-configuration
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
 
   # drain_exec_sync_io_timeout is the maximum duration to wait for ExecSync API'
@@ -402,9 +424,6 @@ version = 2
     # If this is set, containerd will generate a cni config file from the
     # template. Otherwise, containerd will wait for the system admin or cni
     # daemon to drop the config file into the conf_dir.
-    # This is a temporary backward-compatible solution for kubenet users
-    # who don't have a cni daemonset in production yet.
-    # This will be deprecated when kubenet is deprecated.
     # See the "CNI Config Template" section for more details.
     conf_template = ""
     # ip_pref specifies the strategy to use when selecting the main IP address for a pod.
@@ -503,11 +522,8 @@ runtime will be used. For example, see
 
 ## CNI Config Template
 
-Ideally the cni config should be placed by system admin or cni daemon like calico,
-weaveworks etc. However, there are still users using [kubenet](https://kubernetes.io/docs/concepts/cluster-administration/network-plugins/#kubenet)
-today, who don't have a cni daemonset in production. The cni config template is
-a temporary backward-compatible solution for them. This is expected to be
-deprecated when kubenet is deprecated.
+Ideally the cni config should be placed by system admin or cni daemon like calico, weaveworks etc.
+However, this is useful for the cases when there is no cni daemonset to place cni config.
 
 The cni config template uses the [golang
 template](https://golang.org/pkg/text/template/) format. Currently supported

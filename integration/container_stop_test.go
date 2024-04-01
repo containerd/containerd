@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/integration/images"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -67,7 +67,7 @@ func TestSharedPidMultiProcessContainerStop(t *testing.T) {
 			t.Log("The container state should be exited")
 			s, err := runtimeService.ContainerStatus(cn)
 			require.NoError(t, err)
-			assert.Equal(t, s.GetState(), runtime.ContainerState_CONTAINER_EXITED)
+			assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, s.GetState())
 		})
 	}
 }
@@ -126,5 +126,5 @@ func TestContainerStopCancellation(t *testing.T) {
 	t.Log("The container state should be exited")
 	s, err := runtimeService.ContainerStatus(cn)
 	require.NoError(t, err)
-	assert.Equal(t, s.GetState(), runtime.ContainerState_CONTAINER_EXITED)
+	assert.Equal(t, runtime.ContainerState_CONTAINER_EXITED, s.GetState())
 }

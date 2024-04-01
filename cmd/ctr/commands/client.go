@@ -18,12 +18,14 @@ package commands
 
 import (
 	gocontext "context"
+	"os"
+	"strconv"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/pkg/epoch"
-	"github.com/urfave/cli"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/epoch"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
 )
 
 // AppContext returns the context for a command. Should only be called once per
@@ -34,8 +36,8 @@ import (
 func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) {
 	var (
 		ctx       = gocontext.Background()
-		timeout   = context.GlobalDuration("timeout")
-		namespace = context.GlobalString("namespace")
+		timeout   = context.Duration("timeout")
+		namespace = context.String("namespace")
 		cancel    gocontext.CancelFunc
 	)
 	ctx = namespaces.WithNamespace(ctx, namespace)
@@ -54,13 +56,30 @@ func AppContext(context *cli.Context) (gocontext.Context, gocontext.CancelFunc) 
 }
 
 // NewClient returns a new containerd client
-func NewClient(context *cli.Context, opts ...containerd.ClientOpt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
-	timeoutOpt := containerd.WithTimeout(context.GlobalDuration("connect-timeout"))
+func NewClient(context *cli.Context, opts ...containerd.Opt) (*containerd.Client, gocontext.Context, gocontext.CancelFunc, error) {
+	timeoutOpt := containerd.WithTimeout(context.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
-	client, err := containerd.New(context.GlobalString("address"), opts...)
+	client, err := containerd.New(context.String("address"), opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	ctx, cancel := AppContext(context)
+	var suppressDeprecationWarnings bool
+	if s := os.Getenv("CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS"); s != "" {
+		suppressDeprecationWarnings, err = strconv.ParseBool(s)
+		if err != nil {
+			log.L.WithError(err).Warn("Failed to parse CONTAINERD_SUPPRESS_DEPRECATION_WARNINGS=" + s)
+		}
+	}
+	if !suppressDeprecationWarnings {
+		resp, err := client.IntrospectionService().Server(ctx)
+		if err != nil {
+			log.L.WithError(err).Warn("Failed to check deprecations")
+		} else {
+			for _, d := range resp.Deprecations {
+				log.L.Warn("DEPRECATION: " + d.Message)
+			}
+		}
+	}
 	return client, ctx, cancel, nil
 }

@@ -35,6 +35,18 @@ issues:
       text: "^line-length-limit: "
       source: "^//(go:generate|sys) "
 
+    #TODO: remove after upgrading to go1.18
+    # ignore comment spacing for nolint and sys directives
+    - linters:
+        - revive
+      text: "^comment-spacings: no space between comment delimiter and comment text"
+      source: "//(cspell:|nolint:|sys |todo)"
+
+    # not on go 1.18 yet, so no any
+    - linters:
+        - revive
+      text: "^use-any: since GO 1.18 'interface{}' can be replaced by 'any'"
+
     # allow unjustified ignores of error checks in defer statements
     - linters:
         - nolintlint

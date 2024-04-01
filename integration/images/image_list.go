@@ -22,8 +22,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/pelletier/go-toml"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
+	"github.com/pelletier/go-toml/v2"
 )
 
 var imageListFile = flag.String("image-list", "", "The TOML file containing the non-default images to be used in tests.")
@@ -37,6 +37,7 @@ type ImageList struct {
 	VolumeCopyUp     string
 	VolumeOwnership  string
 	ArgsEscaped      string
+	DockerSchema1    string
 }
 
 var (
@@ -50,15 +51,16 @@ func initImages(imageListFile string) {
 	imageList = ImageList{
 		Alpine:           "ghcr.io/containerd/alpine:3.14.0",
 		BusyBox:          "ghcr.io/containerd/busybox:1.36",
-		Pause:            "registry.k8s.io/pause:3.8",
+		Pause:            "registry.k8s.io/pause:3.9",
 		ResourceConsumer: "registry.k8s.io/e2e-test-images/resource-consumer:1.10",
-		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.1",
+		VolumeCopyUp:     "ghcr.io/containerd/volume-copy-up:2.2",
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
+		DockerSchema1:    "registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
 	}
 
 	if imageListFile != "" {
-		logrus.Infof("loading image list from file: %s", imageListFile)
+		log.L.Infof("loading image list from file: %s", imageListFile)
 
 		fileContent, err := os.ReadFile(imageListFile)
 		if err != nil {
@@ -71,7 +73,7 @@ func initImages(imageListFile string) {
 		}
 	}
 
-	logrus.Infof("Using the following image list: %+v", imageList)
+	log.L.Infof("Using the following image list: %+v", imageList)
 	imageMap = initImageMap(imageList)
 }
 
@@ -90,8 +92,10 @@ const (
 	VolumeCopyUp
 	// VolumeOwnership image
 	VolumeOwnership
-	// Test image for ArgsEscaped windows bug
+	// ArgsEscaped tests image for ArgsEscaped windows bug
 	ArgsEscaped
+	// DockerSchema1 image with docker schema 1
+	DockerSchema1
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -103,6 +107,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[VolumeCopyUp] = imageList.VolumeCopyUp
 	images[VolumeOwnership] = imageList.VolumeOwnership
 	images[ArgsEscaped] = imageList.ArgsEscaped
+	images[DockerSchema1] = imageList.DockerSchema1
 	return images
 }
 

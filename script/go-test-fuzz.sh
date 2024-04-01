@@ -15,7 +15,7 @@
 #   limitations under the License.
 
 # Running Go 1.18's fuzzing for 30 seconds each. While this would be too
-# short to acutally find issues, we want to make sure that these fuzzing
+# short to actually find issues, we want to make sure that these fuzzing
 # tests are not fundamentally broken.
 
 set -euo pipefail

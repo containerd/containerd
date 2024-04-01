@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strconv"
@@ -33,47 +34,49 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	cri "github.com/containerd/containerd/integration/cri-api/pkg/apis"
-	_ "github.com/containerd/containerd/integration/images" // Keep this around to parse `imageListFile` command line var
-	"github.com/containerd/containerd/integration/remote"
-	dialer "github.com/containerd/containerd/integration/remote/util"
-	criconfig "github.com/containerd/containerd/pkg/cri/config"
-	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/server"
-	"github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/log"
 	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"k8s.io/klog/v2"
+
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	cri "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	_ "github.com/containerd/containerd/v2/integration/images" // Keep this around to parse `imageListFile` command line var
+	"github.com/containerd/containerd/v2/integration/remote"
+	dialer "github.com/containerd/containerd/v2/integration/remote/util"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/constants"
+	"github.com/containerd/containerd/v2/internal/cri/types"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 const (
-	timeout      = 1 * time.Minute
-	k8sNamespace = constants.K8sContainerdNamespace
+	timeout                    = 1 * time.Minute
+	k8sNamespace               = constants.K8sContainerdNamespace
+	defaultCgroupSystemdParent = "/containerd-test.slice"
 )
 
 var (
 	runtimeService     cri.RuntimeService
+	runtimeService2    cri.RuntimeService // to test GetContainerEvents broadcast
 	imageService       cri.ImageManagerService
 	containerdClient   *containerd.Client
 	containerdEndpoint string
 )
 
 var criEndpoint = flag.String("cri-endpoint", "unix:///run/containerd/containerd.sock", "The endpoint of cri plugin.")
-var criRoot = flag.String("cri-root", "/var/lib/containerd/io.containerd.grpc.v1.cri", "The root directory of cri plugin.")
 var runtimeHandler = flag.String("runtime-handler", "", "The runtime handler to use in the test.")
 var containerdBin = flag.String("containerd-bin", "containerd", "The containerd binary name. The name is used to restart containerd during test.")
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if err := ConnectDaemons(); err != nil {
-		logrus.WithError(err).Fatalf("Failed to connect daemons")
+		log.L.WithError(err).Fatalf("Failed to connect daemons")
 	}
 	os.Exit(m.Run())
 }
@@ -85,6 +88,10 @@ func ConnectDaemons() error {
 	if err != nil {
 		return fmt.Errorf("failed to create runtime service: %w", err)
 	}
+	runtimeService2, err = remote.NewRuntimeService(*criEndpoint, timeout)
+	if err != nil {
+		return fmt.Errorf("failed to create runtime service: %w", err)
+	}
 	imageService, err = remote.NewImageService(*criEndpoint, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create image service: %w", err)
@@ -93,6 +100,10 @@ func ConnectDaemons() error {
 	// need to check whether it is actually connected.
 	// TODO(#6069) Use grpc options to block on connect and remove for this list containers request.
 	_, err = runtimeService.ListContainers(&runtime.ContainerFilter{})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	_, err = runtimeService2.ListContainers(&runtime.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -209,6 +220,13 @@ func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
+	var cgroupParent string
+	runtimeConfig, err := runtimeService.RuntimeConfig(&runtime.RuntimeConfigRequest{})
+	if err != nil {
+		klog.Errorf("runtime service call RuntimeConfig error %s", err.Error())
+	} else if runtimeConfig.GetLinux().GetCgroupDriver() == runtime.CgroupDriver_SYSTEMD {
+		cgroupParent = defaultCgroupSystemdParent
+	}
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name: name,
@@ -217,7 +235,9 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 			Uid:       util.GenerateID(),
 			Namespace: Randomize(ns),
 		},
-		Linux:       &runtime.LinuxPodSandboxConfig{},
+		Linux: &runtime.LinuxPodSandboxConfig{
+			CgroupParent: cgroupParent,
+		},
 		Annotations: make(map[string]string),
 		Labels:      make(map[string]string),
 	}
@@ -287,6 +307,10 @@ func WithWindowsResources(r *runtime.WindowsContainerResources) ContainerOpts {
 }
 
 func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
+	return WithIDMapVolumeMount(hostPath, containerPath, nil, nil)
+}
+
+func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		hostPath, _ = filepath.Abs(hostPath)
 		containerPath, _ = filepath.Abs(containerPath)
@@ -294,6 +318,8 @@ func WithVolumeMount(hostPath, containerPath string) ContainerOpts {
 			HostPath:       hostPath,
 			ContainerPath:  containerPath,
 			SelinuxRelabel: selinux.GetEnabled(),
+			UidMappings:    uidMaps,
+			GidMappings:    gidMaps,
 		}
 		c.Mounts = append(c.Mounts, mount)
 	}
@@ -660,7 +686,7 @@ func CRIConfig() (*criconfig.Config, error) {
 }
 
 // SandboxInfo gets sandbox info.
-func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, error) {
+func SandboxInfo(id string) (*runtime.PodSandboxStatus, *types.SandboxInfo, error) {
 	client, err := RawRuntimeClient()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get raw runtime client: %w", err)
@@ -673,7 +699,7 @@ func SandboxInfo(id string) (*runtime.PodSandboxStatus, *server.SandboxInfo, err
 		return nil, nil, fmt.Errorf("failed to get sandbox status: %w", err)
 	}
 	status := resp.GetStatus()
-	var info server.SandboxInfo
+	var info types.SandboxInfo
 	if err := json.Unmarshal([]byte(resp.GetInfo()["info"]), &info); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal sandbox info: %w", err)
 	}
@@ -709,7 +735,7 @@ func EnsureImageExists(t *testing.T, imageName string) string {
 	}
 
 	t.Logf("Pull test image %q", imageName)
-	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil)
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil, "")
 	require.NoError(t, err)
 
 	return imgID

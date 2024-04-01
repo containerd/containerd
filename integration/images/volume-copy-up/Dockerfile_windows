@@ -34,4 +34,10 @@ RUN mkdir C:\test_dir && \
     /bin/sh.exe -c "echo test_content > /test_dir/test_file"
 
 ENV PATH="C:\bin;C:\Windows\System32;C:\Windows;"
-VOLUME "C:/test_dir"
+
+# Add an extra volume under D: to test that WithVoumes() doesn't err out when dealing with
+# a non-C volume in WCOW.
+#
+# See:
+# https://github.com/containerd/containerd/issues/8171
+VOLUME ["C:/test_dir", "D:"]

@@ -20,11 +20,11 @@ import (
 	"runtime"
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/images"
-	imagelist "github.com/containerd/containerd/integration/images"
-	"github.com/containerd/containerd/leases"
+	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/leases"
+	imagelist "github.com/containerd/containerd/v2/integration/images"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/image-spec/identity"
 )
 

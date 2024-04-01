@@ -21,7 +21,7 @@ package containerd.v1.types;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/any.proto";
 
-option go_package = "github.com/containerd/containerd/api/types/task";
+option go_package = "github.com/containerd/containerd/v2/api/types/task";
 
 enum Status {
 	UNKNOWN = 0;

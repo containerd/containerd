@@ -18,42 +18,41 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	taskapi "github.com/containerd/containerd/api/runtime/task/v2"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/failpoint"
-	"github.com/containerd/containerd/pkg/shutdown"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime/v2/runc/task"
-	"github.com/containerd/containerd/runtime/v2/shim"
+	taskapi "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/task"
+	"github.com/containerd/containerd/v2/internal/failpoint"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/shim"
+	"github.com/containerd/containerd/v2/pkg/shutdown"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
 )
 
 const (
-	ociConfigFilename = "config.json"
-
 	failpointPrefixKey = "io.containerd.runtime.v2.shim.failpoint."
 )
 
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.TTRPCPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.TTRPCPlugin,
 		ID:   "task",
 		Requires: []plugin.Type{
-			plugin.EventPlugin,
-			plugin.InternalPlugin,
+			plugins.EventPlugin,
+			plugins.InternalPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			pp, err := ic.GetByID(plugin.EventPlugin, "publisher")
+			pp, err := ic.GetByID(plugins.EventPlugin, "publisher")
 			if err != nil {
 				return nil, err
 			}
-			ss, err := ic.GetByID(plugin.InternalPlugin, "shutdown")
+			ss, err := ic.GetByID(plugins.InternalPlugin, "shutdown")
 			if err != nil {
 				return nil, err
 			}
@@ -72,16 +71,19 @@ func init() {
 			}, nil
 		},
 	})
-
 }
+
+var (
+	_ = shim.TTRPCServerOptioner(&taskServiceWithFp{})
+)
 
 type taskServiceWithFp struct {
 	fps   map[string]*failpoint.Failpoint
-	local taskapi.TaskService
+	local taskapi.TTRPCTaskService
 }
 
 func (s *taskServiceWithFp) RegisterTTRPC(server *ttrpc.Server) error {
-	taskapi.RegisterTaskService(server, s.local)
+	taskapi.RegisterTTRPCTaskService(server, s.local)
 	return nil
 }
 
@@ -113,15 +115,10 @@ func newFailpointFromOCIAnnotation() (map[string]*failpoint.Failpoint, error) {
 		return nil, fmt.Errorf("failed to get current working dir: %w", err)
 	}
 
-	configPath := filepath.Join(cwd, ociConfigFilename)
-	data, err := os.ReadFile(configPath)
+	configPath := filepath.Join(cwd, oci.ConfigFilename)
+	spec, err := oci.ReadSpec(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %v: %w", configPath, err)
-	}
-
-	var spec oci.Spec
-	if err := json.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("failed to parse oci.Spec(%v): %w", string(data), err)
+		return nil, err
 	}
 
 	res := make(map[string]*failpoint.Failpoint)

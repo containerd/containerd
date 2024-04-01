@@ -178,29 +178,41 @@ func ReadDMVerityInfo(vhdPath string, offsetInBytes int64) (*VerityInfo, error) 
 		return nil, errors.Errorf("failed to seek dm-verity super block: expected bytes=%d, actual=%d", offsetInBytes, s)
 	}
 
+	return ReadDMVerityInfoReader(vhd)
+}
+
+func ReadDMVerityInfoReader(r io.Reader) (*VerityInfo, error) {
 	block := make([]byte, blockSize)
-	if s, err := vhd.Read(block); err != nil || s != blockSize {
+	if s, err := r.Read(block); err != nil || s != blockSize {
 		if err != nil {
-			return nil, errors.Wrapf(err, "%s", ErrSuperBlockReadFailure)
+			// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+			//nolint:errorlint // non-wrapping format verb for fmt.Errorf
+			return nil, fmt.Errorf("%s: %w", ErrSuperBlockReadFailure, err)
 		}
-		return nil, errors.Wrapf(ErrSuperBlockReadFailure, "unexpected bytes read: expected=%d, actual=%d", blockSize, s)
+		return nil, fmt.Errorf("unexpected bytes read expected=%d actual=%d: %w", blockSize, s, ErrSuperBlockReadFailure)
 	}
 
 	dmvSB := &dmveritySuperblock{}
 	b := bytes.NewBuffer(block)
 	if err := binary.Read(b, binary.LittleEndian, dmvSB); err != nil {
-		return nil, errors.Wrapf(err, "%s", ErrSuperBlockParseFailure)
+		// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+		//nolint:errorlint // non-wrapping format verb for fmt.Errorf
+		return nil, fmt.Errorf("%s: %w", ErrSuperBlockParseFailure, err)
 	}
+
 	if string(bytes.Trim(dmvSB.Signature[:], "\x00")[:]) != VeritySignature {
 		return nil, ErrNotVeritySuperBlock
 	}
-	// read the merkle tree root
-	if s, err := vhd.Read(block); err != nil || s != blockSize {
+
+	if s, err := r.Read(block); err != nil || s != blockSize {
 		if err != nil {
-			return nil, errors.Wrapf(err, "%s", ErrRootHashReadFailure)
+			// TODO (go1.20): use multierror via fmt.Errorf("...: %w; ...: %w", ...)
+			//nolint:errorlint // non-wrapping format verb for fmt.Errorf
+			return nil, fmt.Errorf("%s: %w", ErrRootHashReadFailure, err)
 		}
-		return nil, errors.Wrapf(ErrRootHashReadFailure, "unexpected bytes read: expected=%d, actual=%d", blockSize, s)
+		return nil, fmt.Errorf("unexpected bytes read expected=%d, actual=%d: %w", blockSize, s, ErrRootHashReadFailure)
 	}
+
 	rootHash := hash2(dmvSB.Salt[:dmvSB.SaltSize], block)
 	return &VerityInfo{
 		RootDigest:         fmt.Sprintf("%x", rootHash),
@@ -215,12 +227,21 @@ func ReadDMVerityInfo(vhdPath string, offsetInBytes int64) (*VerityInfo, error) 
 	}, nil
 }
 
-// ComputeAndWriteHashDevice builds merkle tree from a given io.ReadSeeker and writes the result
-// hash device (dm-verity super-block combined with merkle tree) to io.WriteSeeker.
-func ComputeAndWriteHashDevice(r io.ReadSeeker, w io.WriteSeeker) error {
+// ComputeAndWriteHashDevice builds merkle tree from a given io.ReadSeeker and
+// writes the result hash device (dm-verity super-block combined with merkle
+// tree) to io.Writer.
+func ComputeAndWriteHashDevice(r io.ReadSeeker, w io.Writer) error {
+	// save current reader position
+	currBytePos, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	// reset to the beginning to find the device size
 	if _, err := r.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
+
 	tree, err := MerkleTree(r)
 	if err != nil {
 		return errors.Wrap(err, "failed to build merkle tree")
@@ -230,10 +251,13 @@ func ComputeAndWriteHashDevice(r io.ReadSeeker, w io.WriteSeeker) error {
 	if err != nil {
 		return err
 	}
-	dmVeritySB := NewDMVeritySuperblock(uint64(devSize))
-	if _, err := w.Seek(0, io.SeekEnd); err != nil {
+
+	// reset reader to initial position
+	if _, err := r.Seek(currBytePos, io.SeekStart); err != nil {
 		return err
 	}
+
+	dmVeritySB := NewDMVeritySuperblock(uint64(devSize))
 	if err := binary.Write(w, binary.LittleEndian, dmVeritySB); err != nil {
 		return errors.Wrap(err, "failed to write dm-verity super-block")
 	}

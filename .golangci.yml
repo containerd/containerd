@@ -1,5 +1,6 @@
 linters:
   enable:
+    - depguard # Checks for dependencies that should not be (re)introduced. See "linter-settings" for further details.
     - exportloopref # Checks for pointers to enclosing loop variables
     - gofmt
     - goimports
@@ -32,6 +33,8 @@ issues:
     - path: 'archive[\\/]tarheader[\\/]'
       # conversion is necessary on Linux, unnecessary on macOS
       text: "unnecessary conversion"
+    - path: 'integration[\\/]client'
+      text: "dot-imports:"
     - linters:
         - revive
       text: "if-return"
@@ -52,6 +55,13 @@ issues:
       text: "redefines-builtin-id"
 
 linters-settings:
+  depguard:
+    rules:
+      main:
+        deny:
+          - pkg: github.com/opencontainers/runc
+            desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+
   gosec:
     # The following issues surfaced when `gosec` linter
     # was enabled. They are temporarily excluded to unblock
@@ -63,15 +73,15 @@ linters-settings:
       - G306
       - G402
       - G404
+  nolintlint:
+    allow-unused: true
 
 run:
   timeout: 8m
   skip-dirs:
     - api
     - cluster
-    - design
     - docs
     - docs/man
     - releases
-    - reports
     - test # e2e scripts

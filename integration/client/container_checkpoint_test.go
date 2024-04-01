@@ -29,9 +29,9 @@ import (
 	"syscall"
 	"testing"
 
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/oci"
+	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 const (
@@ -488,7 +488,7 @@ func TestCheckpointRestoreWithImagePath(t *testing.T) {
 
 	stdout := bytes.NewBuffer(nil)
 	spec.Process.Args = []string{"ps", "-ef"}
-	process, err := ntask.Exec(ctx, t.Name()+"_exec", spec.Process, cio.NewCreator(withByteBuffers(stdout)))
+	process, err := ntask.Exec(ctx, t.Name()+"_exec", spec.Process, cio.NewCreator(withStdout(stdout)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,9 +17,9 @@
 package namespaces
 
 import (
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/runtime/opts"
-	"github.com/urfave/cli"
+	"github.com/containerd/containerd/v2/core/runtime/opts"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/urfave/cli/v2"
 )
 
 func deleteOpts(context *cli.Context) []namespaces.DeleteOpts {

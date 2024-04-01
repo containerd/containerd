@@ -27,16 +27,16 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/log"
-	_ "github.com/containerd/containerd/metrics" // import containerd build info
-	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/services/server"
-	srvconfig "github.com/containerd/containerd/services/server/config"
-	"github.com/containerd/containerd/sys"
-	"github.com/containerd/containerd/version"
-	"github.com/urfave/cli"
+	"github.com/containerd/containerd/v2/cmd/containerd/server"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	_ "github.com/containerd/containerd/v2/core/metrics" // import containerd build info
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/grpclog"
 )
 
@@ -56,6 +56,16 @@ func init() {
 
 	cli.VersionPrinter = func(c *cli.Context) {
 		fmt.Println(c.App.Name, version.Package, c.App.Version, version.Revision)
+	}
+	cli.VersionFlag = &cli.BoolFlag{
+		Name:    "version",
+		Aliases: []string{"v"},
+		Usage:   "Print the version",
+	}
+	cli.HelpFlag = &cli.BoolFlag{
+		Name:    "help",
+		Aliases: []string{"h"},
+		Usage:   "Show help",
 	}
 }
 
@@ -77,30 +87,33 @@ at the default file location. The *containerd config* command can be used to
 generate the default configuration for containerd. The output of that command
 can be used and modified as necessary as a custom configuration.`
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:  "config,c",
-			Usage: "Path to the configuration file",
-			Value: filepath.Join(defaults.DefaultConfigDir, "config.toml"),
+		&cli.StringFlag{
+			Name:    "config",
+			Aliases: []string{"c"},
+			Usage:   "Path to the configuration file",
+			Value:   filepath.Join(defaults.DefaultConfigDir, "config.toml"),
 		},
-		cli.StringFlag{
-			Name:  "log-level,l",
-			Usage: "Set the logging level [trace, debug, info, warn, error, fatal, panic]",
+		&cli.StringFlag{
+			Name:    "log-level",
+			Aliases: []string{"l"},
+			Usage:   "Set the logging level [trace, debug, info, warn, error, fatal, panic]",
 		},
-		cli.StringFlag{
-			Name:  "address,a",
-			Usage: "Address for containerd's GRPC server",
+		&cli.StringFlag{
+			Name:    "address",
+			Aliases: []string{"a"},
+			Usage:   "Address for containerd's GRPC server",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
-		cli.StringFlag{
+		&cli.StringFlag{
 			Name:  "state",
 			Usage: "containerd state directory",
 		},
 	}
 	app.Flags = append(app.Flags, serviceFlags()...)
-	app.Commands = []cli.Command{
+	app.Commands = []*cli.Command{
 		configCommand,
 		publishCommand,
 		ociHook,
@@ -118,10 +131,10 @@ can be used and modified as necessary as a custom configuration.`
 
 		// Only try to load the config if it either exists, or the user explicitly
 		// told us to load this path.
-		configPath := context.GlobalString("config")
+		configPath := context.String("config")
 		_, err := os.Stat(configPath)
-		if !os.IsNotExist(err) || context.GlobalIsSet("config") {
-			if err := srvconfig.LoadConfig(configPath, config); err != nil {
+		if !os.IsNotExist(err) || context.IsSet("config") {
+			if err := srvconfig.LoadConfig(ctx, configPath, config); err != nil {
 				return err
 			}
 		}
@@ -270,12 +283,21 @@ can be used and modified as necessary as a custom configuration.`
 		}
 		serve(ctx, l, server.ServeGRPC)
 
-		if err := notifyReady(ctx); err != nil {
-			log.G(ctx).WithError(err).Warn("notify ready failed")
-		}
+		readyC := make(chan struct{})
+		go func() {
+			server.Wait()
+			close(readyC)
+		}()
 
-		log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
-		<-done
+		select {
+		case <-readyC:
+			if err := notifyReady(ctx); err != nil {
+				log.G(ctx).WithError(err).Warn("notify ready failed")
+			}
+			log.G(ctx).Infof("containerd successfully booted in %fs", time.Since(start).Seconds())
+			<-done
+		case <-done:
+		}
 		return nil
 	}
 	return app
@@ -319,7 +341,7 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 			d:    &config.GRPC.Address,
 		},
 	} {
-		if s := context.GlobalString(v.name); s != "" {
+		if s := context.String(v.name); s != "" {
 			*v.d = s
 			if v.name == "root" || v.name == "state" {
 				absPath, err := filepath.Abs(s)
@@ -337,7 +359,7 @@ func applyFlags(context *cli.Context, config *srvconfig.Config) error {
 }
 
 func setLogLevel(context *cli.Context, config *srvconfig.Config) error {
-	l := context.GlobalString("log-level")
+	l := context.String("log-level")
 	if l == "" {
 		l = config.Debug.Level
 	}
@@ -348,7 +370,7 @@ func setLogLevel(context *cli.Context, config *srvconfig.Config) error {
 }
 
 func setLogFormat(config *srvconfig.Config) error {
-	f := config.Debug.Format
+	f := log.OutputFormat(config.Debug.Format)
 	if f == "" {
 		f = log.TextFormat
 	}

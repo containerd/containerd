@@ -19,9 +19,9 @@ package snapshotters
 import (
 	"context"
 
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/labels"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
@@ -55,8 +55,7 @@ func AppendInfoHandlerWrapper(ref string) func(f images.Handler) images.Handler 
 			if err != nil {
 				return nil, err
 			}
-			switch desc.MediaType {
-			case ocispec.MediaTypeImageManifest, images.MediaTypeDockerSchema2Manifest:
+			if images.IsManifestType(desc.MediaType) {
 				for i := range children {
 					c := &children[i]
 					if images.IsLayerType(c.MediaType) {

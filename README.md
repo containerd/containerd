@@ -1,11 +1,12 @@
 ![containerd banner light mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/color/containerd-horizontal-color.png#gh-light-mode-only)
 ![containerd banner dark mode](https://raw.githubusercontent.com/cncf/artwork/master/projects/containerd/horizontal/white/containerd-horizontal-white.png#gh-dark-mode-only)
 
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd)](https://pkg.go.dev/github.com/containerd/containerd)
-[![Build Status](https://github.com/containerd/containerd/workflows/CI/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ACI)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/containerd/containerd/v2)](https://pkg.go.dev/github.com/containerd/containerd/v2)
+[![Build Status](https://github.com/containerd/containerd/actions/workflows/ci.yml/badge.svg?event=merge_group)](https://github.com/containerd/containerd/actions?query=workflow%3ACI+event%3Amerge_group)
 [![Nightlies](https://github.com/containerd/containerd/workflows/Nightly/badge.svg)](https://github.com/containerd/containerd/actions?query=workflow%3ANightly)
-[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd)](https://goreportcard.com/report/github.com/containerd/containerd)
+[![Go Report Card](https://goreportcard.com/badge/github.com/containerd/containerd/v2)](https://goreportcard.com/report/github.com/containerd/containerd/v2)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1271/badge)](https://bestpractices.coreinfrastructure.org/projects/1271)
+[![Check Links](https://github.com/containerd/containerd/actions/workflows/links.yml/badge.svg)](https://github.com/containerd/containerd/actions/workflows/links.yml)
 
 containerd is an industry-standard container runtime with an emphasis on simplicity, robustness, and portability. It is available as a daemon for Linux and Windows, which can manage the complete container lifecycle of its host system: image transfer and storage, container execution and supervision, low-level storage and network attachments, etc.
 
@@ -16,17 +17,6 @@ containerd is designed to be embedded into a larger system, rather than being us
 ![architecture](docs/historical/design/architecture.png)
 
 ## Announcements
-
-### Hello Kubernetes v1.24!
-The containerd project would like to announce containerd [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). While other prior releases are supported, this latest release and the containerd [v1.5.11](https://github.com/containerd/containerd/releases/tag/v1.5.11) release are recommended for Kubernetes v1.24.
-
-We felt it important to announce this, particularly in view of [the dockershim removal from this release of Kubernetes](https://kubernetes.io/blog/2022/05/03/dockershim-historical-context/).
-
-It should be noted here that moving to CRI integrations has been in the plan for many years.  `containerd` began as part of `Docker` and was donated to `CNCF`. `containerd` remains in use today by Docker/moby/buildkit etc., and has many other [adopters](https://github.com/containerd/containerd/blob/main/ADOPTERS.md). `containerd` has a namespace that isolates use of `containerd` from various clients/adopters. The Kubernetes namespace is appropriately named `k8s.io`. The CRI API and `containerd` CRI plugin project has, from the start, been an effort to reduce the impact surface for Kubernetes container runtime integration. If you can't tell, we are excited to see this come to fruition.
-
-If you have any concerns or questions, we will be here to answer them in [issues, discussions, and/or on slack](#communication). Below you will find information/detail about our [CRI Integration](#cri) implementation.
-
-For containerd users already on v1.6.0-v1.6.3, there are known issues addressed by [v1.6.4](https://github.com/containerd/containerd/releases/tag/v1.6.4). The issues are primarily related to [CNI setup](https://github.com/kubernetes/website/blob/dev-1.24/content/en/docs/tasks/administer-cluster/migrating-from-dockershim/troubleshooting-cni-plugin-related-errors.md)
 
 ### Now Recruiting
 
@@ -47,7 +37,7 @@ See our documentation on [containerd.io](https://containerd.io):
 * [namespaces](docs/namespaces.md)
 * [client options](docs/client-opts.md)
 
-See how to build containerd from source at [BUILDING](BUILDING.md).
+To get started contributing to containerd, see [CONTRIBUTING](CONTRIBUTING.md).
 
 If you are interested in trying out containerd see our example at [Getting Started](docs/getting-started.md).
 
@@ -107,9 +97,9 @@ containerd offers a full client package to help you integrate containerd into yo
 import (
   "context"
 
-  "github.com/containerd/containerd"
-  "github.com/containerd/containerd/cio"
-  "github.com/containerd/containerd/namespaces"
+  containerd "github.com/containerd/containerd/v2/client"
+  "github.com/containerd/containerd/v2/pkg/cio"
+  "github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 
@@ -299,9 +289,6 @@ loaded for the user's shell environment.
 
 `cri` is a native plugin of containerd. Since containerd 1.1, the cri plugin is built into the release binaries and enabled by default.
 
-> **Note:** As of containerd 1.5, the `cri` plugin is merged into the containerd/containerd repo. For example, the source code previously stored under [`containerd/cri/pkg`](https://github.com/containerd/cri/tree/release/1.4/pkg)
-was moved to [`containerd/containerd/pkg/cri` package](https://github.com/containerd/containerd/tree/main/pkg/cri).
-
 The `cri` plugin has reached GA status, representing that it is:
 * Feature complete
 * Works with Kubernetes 1.10 and above
@@ -309,7 +296,7 @@ The `cri` plugin has reached GA status, representing that it is:
 * Passes all [node e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/e2e-node-tests.md).
 * Passes all [e2e tests](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/e2e-tests.md).
 
-See results on the containerd k8s [test dashboard](https://k8s-testgrid.appspot.com/sig-node-containerd)
+See results on the containerd k8s [test dashboard](https://testgrid.k8s.io/containerd)
 
 #### Validating Your `cri` Setup
 A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/cri-tools), includes programs for exercising CRI implementations. More importantly, cri-tools includes the program `critest` which is used for running [CRI Validation Testing](https://github.com/kubernetes/community/blob/master/contributors/devel/sig-node/cri-validation.md).

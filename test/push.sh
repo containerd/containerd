@@ -21,7 +21,7 @@ set -o pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/utils.sh"
 
 # DEPLOY_BUCKET is the gcs bucket where the tarball should be stored in.
-DEPLOY_BUCKET=${DEPLOY_BUCKET:-"cri-containerd-staging"}
+DEPLOY_BUCKET=${DEPLOY_BUCKET:-"k8s-staging-cri-tools"}
 # DEPLOY_DIR is the directory in the gcs bucket to store the tarball.
 DEPLOY_DIR=${DEPLOY_DIR:-""}
 # BUILD_DIR is the directory of the build out.

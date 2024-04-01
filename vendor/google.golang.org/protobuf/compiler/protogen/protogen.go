@@ -5,8 +5,8 @@
 // Package protogen provides support for writing protoc plugins.
 //
 // Plugins for protoc, the Protocol Buffer compiler,
-// are programs which read a CodeGeneratorRequest message from standard input
-// and write a CodeGeneratorResponse message to standard output.
+// are programs which read a [pluginpb.CodeGeneratorRequest] message from standard input
+// and write a [pluginpb.CodeGeneratorResponse] message to standard output.
 // This package provides support for writing plugins which generate Go code.
 package protogen
 
@@ -36,18 +36,19 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
-const goPackageDocURL = "https://developers.google.com/protocol-buffers/docs/reference/go-generated#package"
+const goPackageDocURL = "https://protobuf.dev/reference/go/go-generated#package"
 
 // Run executes a function as a protoc plugin.
 //
-// It reads a CodeGeneratorRequest message from os.Stdin, invokes the plugin
-// function, and writes a CodeGeneratorResponse message to os.Stdout.
+// It reads a [pluginpb.CodeGeneratorRequest] message from [os.Stdin], invokes the plugin
+// function, and writes a [pluginpb.CodeGeneratorResponse] message to [os.Stdout].
 //
 // If a failure occurs while reading or writing, Run prints an error to
-// os.Stderr and calls os.Exit(1).
+// [os.Stderr] and calls [os.Exit](1).
 func (opts Options) Run(f func(*Plugin) error) {
 	if err := run(opts, f); err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", filepath.Base(os.Args[0]), err)
@@ -209,6 +210,7 @@ func (opts Options) New(req *pluginpb.CodeGeneratorRequest) (*Plugin, error) {
 			}
 		}
 	}
+
 	// When the module= option is provided, we strip the module name
 	// prefix from generated files. This only makes sense if generated
 	// filenames are based on the import path.
@@ -298,6 +300,8 @@ func (opts Options) New(req *pluginpb.CodeGeneratorRequest) (*Plugin, error) {
 		}
 	}
 
+	// The extracted types from the full import set
+	typeRegistry := newExtensionRegistry()
 	for _, fdesc := range gen.Request.ProtoFile {
 		filename := fdesc.GetName()
 		if gen.FilesByPath[filename] != nil {
@@ -309,6 +313,9 @@ func (opts Options) New(req *pluginpb.CodeGeneratorRequest) (*Plugin, error) {
 		}
 		gen.Files = append(gen.Files, f)
 		gen.FilesByPath[filename] = f
+		if err = typeRegistry.registerAllExtensionsFromFile(f.Desc); err != nil {
+			return nil, err
+		}
 	}
 	for _, filename := range gen.Request.FileToGenerate {
 		f, ok := gen.FilesByPath[filename]
@@ -316,6 +323,20 @@ func (opts Options) New(req *pluginpb.CodeGeneratorRequest) (*Plugin, error) {
 			return nil, fmt.Errorf("no descriptor for generated file: %v", filename)
 		}
 		f.Generate = true
+	}
+
+	// Create fully-linked descriptors if new extensions were found
+	if typeRegistry.hasNovelExtensions() {
+		for _, f := range gen.Files {
+			b, err := proto.Marshal(f.Proto.ProtoReflect().Interface())
+			if err != nil {
+				return nil, err
+			}
+			err = proto.UnmarshalOptions{Resolver: typeRegistry}.Unmarshal(b, f.Proto)
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	return gen, nil
 }
@@ -813,7 +834,7 @@ func newOneof(gen *Plugin, f *File, message *Message, desc protoreflect.OneofDes
 	}
 }
 
-// Extension is an alias of Field for documentation.
+// Extension is an alias of [Field] for documentation.
 type Extension = Field
 
 // A Service describes a service.
@@ -899,7 +920,7 @@ type GeneratedFile struct {
 	packageNames     map[GoImportPath]GoPackageName
 	usedPackageNames map[GoPackageName]bool
 	manualImports    map[GoImportPath]bool
-	annotations      map[string][]Location
+	annotations      map[string][]Annotation
 }
 
 // NewGeneratedFile creates a new generated file with the given filename
@@ -912,7 +933,7 @@ func (gen *Plugin) NewGeneratedFile(filename string, goImportPath GoImportPath) 
 		packageNames:     make(map[GoImportPath]GoPackageName),
 		usedPackageNames: make(map[GoPackageName]bool),
 		manualImports:    make(map[GoImportPath]bool),
-		annotations:      make(map[string][]Location),
+		annotations:      make(map[string][]Annotation),
 	}
 
 	// All predeclared identifiers in Go are already used.
@@ -925,7 +946,7 @@ func (gen *Plugin) NewGeneratedFile(filename string, goImportPath GoImportPath) 
 }
 
 // P prints a line to the generated output. It converts each parameter to a
-// string following the same rules as fmt.Print. It never inserts spaces
+// string following the same rules as [fmt.Print]. It never inserts spaces
 // between parameters.
 func (g *GeneratedFile) P(v ...interface{}) {
 	for _, x := range v {
@@ -962,14 +983,14 @@ func (g *GeneratedFile) QualifiedGoIdent(ident GoIdent) string {
 
 // Import ensures a package is imported by the generated file.
 //
-// Packages referenced by QualifiedGoIdent are automatically imported.
+// Packages referenced by [GeneratedFile.QualifiedGoIdent] are automatically imported.
 // Explicitly importing a package with Import is generally only necessary
 // when the import will be blank (import _ "package").
 func (g *GeneratedFile) Import(importPath GoImportPath) {
 	g.manualImports[importPath] = true
 }
 
-// Write implements io.Writer.
+// Write implements [io.Writer].
 func (g *GeneratedFile) Write(p []byte) (n int, err error) {
 	return g.buf.Write(p)
 }
@@ -979,8 +1000,8 @@ func (g *GeneratedFile) Skip() {
 	g.skip = true
 }
 
-// Unskip reverts a previous call to Skip, re-including the generated file in
-// the plugin output.
+// Unskip reverts a previous call to [GeneratedFile.Skip],
+// re-including the generated file in the plugin output.
 func (g *GeneratedFile) Unskip() {
 	g.skip = false
 }
@@ -991,8 +1012,32 @@ func (g *GeneratedFile) Unskip() {
 // The symbol may refer to a type, constant, variable, function, method, or
 // struct field.  The "T.sel" syntax is used to identify the method or field
 // 'sel' on type 'T'.
+//
+// Deprecated: Use the [GeneratedFile.AnnotateSymbol] method instead.
 func (g *GeneratedFile) Annotate(symbol string, loc Location) {
-	g.annotations[symbol] = append(g.annotations[symbol], loc)
+	g.AnnotateSymbol(symbol, Annotation{Location: loc})
+}
+
+// An Annotation provides semantic detail for a generated proto element.
+//
+// See the google.protobuf.GeneratedCodeInfo.Annotation documentation in
+// descriptor.proto for details.
+type Annotation struct {
+	// Location is the source .proto file for the element.
+	Location Location
+
+	// Semantic is the symbol's effect on the element in the original .proto file.
+	Semantic *descriptorpb.GeneratedCodeInfo_Annotation_Semantic
+}
+
+// AnnotateSymbol associates a symbol in a generated Go file with a location
+// in a source .proto file and a semantic type.
+//
+// The symbol may refer to a type, constant, variable, function, method, or
+// struct field.  The "T.sel" syntax is used to identify the method or field
+// 'sel' on type 'T'.
+func (g *GeneratedFile) AnnotateSymbol(symbol string, info Annotation) {
+	g.annotations[symbol] = append(g.annotations[symbol], info)
 }
 
 // Content returns the contents of the generated file.
@@ -1085,25 +1130,24 @@ func (g *GeneratedFile) Content() ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// metaFile returns the contents of the file's metadata file, which is a
-// text formatted string of the google.protobuf.GeneratedCodeInfo.
-func (g *GeneratedFile) metaFile(content []byte) (string, error) {
+func (g *GeneratedFile) generatedCodeInfo(content []byte) (*descriptorpb.GeneratedCodeInfo, error) {
 	fset := token.NewFileSet()
 	astFile, err := parser.ParseFile(fset, "", content, 0)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	info := &descriptorpb.GeneratedCodeInfo{}
 
 	seenAnnotations := make(map[string]bool)
 	annotate := func(s string, ident *ast.Ident) {
 		seenAnnotations[s] = true
-		for _, loc := range g.annotations[s] {
+		for _, a := range g.annotations[s] {
 			info.Annotation = append(info.Annotation, &descriptorpb.GeneratedCodeInfo_Annotation{
-				SourceFile: proto.String(loc.SourceFile),
-				Path:       loc.Path,
+				SourceFile: proto.String(a.Location.SourceFile),
+				Path:       a.Location.Path,
 				Begin:      proto.Int32(int32(fset.Position(ident.Pos()).Offset)),
 				End:        proto.Int32(int32(fset.Position(ident.End()).Offset)),
+				Semantic:   a.Semantic,
 			})
 		}
 	}
@@ -1150,8 +1194,19 @@ func (g *GeneratedFile) metaFile(content []byte) (string, error) {
 	}
 	for a := range g.annotations {
 		if !seenAnnotations[a] {
-			return "", fmt.Errorf("%v: no symbol matching annotation %q", g.filename, a)
+			return nil, fmt.Errorf("%v: no symbol matching annotation %q", g.filename, a)
 		}
+	}
+
+	return info, nil
+}
+
+// metaFile returns the contents of the file's metadata file, which is a
+// text formatted string of the google.protobuf.GeneratedCodeInfo.
+func (g *GeneratedFile) metaFile(content []byte) (string, error) {
+	info, err := g.generatedCodeInfo(content)
+	if err != nil {
+		return "", err
 	}
 
 	b, err := prototext.Marshal(info)
@@ -1258,4 +1313,79 @@ func (c Comments) String() string {
 		b = append(b, "\n"...)
 	}
 	return string(b)
+}
+
+// extensionRegistry allows registration of new extensions defined in the .proto
+// file for which we are generating bindings.
+//
+// Lookups consult the local type registry first and fall back to the base type
+// registry which defaults to protoregistry.GlobalTypes.
+type extensionRegistry struct {
+	base  *protoregistry.Types
+	local *protoregistry.Types
+}
+
+func newExtensionRegistry() *extensionRegistry {
+	return &extensionRegistry{
+		base:  protoregistry.GlobalTypes,
+		local: &protoregistry.Types{},
+	}
+}
+
+// FindExtensionByName implements proto.UnmarshalOptions.FindExtensionByName
+func (e *extensionRegistry) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
+	if xt, err := e.local.FindExtensionByName(field); err == nil {
+		return xt, nil
+	}
+
+	return e.base.FindExtensionByName(field)
+}
+
+// FindExtensionByNumber implements proto.UnmarshalOptions.FindExtensionByNumber
+func (e *extensionRegistry) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
+	if xt, err := e.local.FindExtensionByNumber(message, field); err == nil {
+		return xt, nil
+	}
+
+	return e.base.FindExtensionByNumber(message, field)
+}
+
+func (e *extensionRegistry) hasNovelExtensions() bool {
+	return e.local.NumExtensions() > 0
+}
+
+func (e *extensionRegistry) registerAllExtensionsFromFile(f protoreflect.FileDescriptor) error {
+	if err := e.registerAllExtensions(f.Extensions()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *extensionRegistry) registerAllExtensionsFromMessage(ms protoreflect.MessageDescriptors) error {
+	for i := 0; i < ms.Len(); i++ {
+		m := ms.Get(i)
+		if err := e.registerAllExtensions(m.Extensions()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (e *extensionRegistry) registerAllExtensions(exts protoreflect.ExtensionDescriptors) error {
+	for i := 0; i < exts.Len(); i++ {
+		if err := e.registerExtension(exts.Get(i)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// registerExtension adds the given extension to the type registry if an
+// extension with that full name does not exist yet.
+func (e *extensionRegistry) registerExtension(xd protoreflect.ExtensionDescriptor) error {
+	if _, err := e.FindExtensionByName(xd.FullName()); err != protoregistry.NotFound {
+		// Either the extension already exists or there was an error, either way we're done.
+		return err
+	}
+	return e.local.RegisterExtension(dynamicpb.NewExtensionType(xd))
 }

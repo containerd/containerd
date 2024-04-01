@@ -13,7 +13,7 @@ with an image registry, or loading an image from tar. containerd's Go client
 gives a user access to many points of extensions from creating their own
 options on container creation to resolving image registry names.
 
-See [containerd's Go documentation](https://godoc.org/github.com/containerd/containerd)
+See [containerd's Go documentation](https://godoc.org/github.com/containerd/containerd/v2/client)
 
 ## External Plugins
 
@@ -27,12 +27,24 @@ containerd allows extensions through two methods:
 
 ### V2 Runtimes
 
-The runtime v2 interface allows resolving runtimes to binaries on the system.
-These binaries are used to start the shim process for containerd and allows
-containerd to manage those containers using the runtime shim api returned by
+containerd supports multiple container runtimes. Each container can be
+invoked with a different runtime.
+
+When using the Container Runtime Interface (CRI) plugin, named runtimes can be defined
+in the containerd configuration file. When a container is run without specifying a runtime,
+the configured default runtime is used. Alternatively, a different named runtime can be
+specified explicitly when creating a container via CRI gRPC by selecting the runtime handler to be used.
+
+When a client such as `ctr` or `nerdctl` creates a container, it can optionally specify a runtime and options to use.
+If a runtime is not specified, containerd will use its default runtime.
+
+containerd invokes v2 runtimes as binaries on the system,
+which are used to start the shim process for containerd. This, in turn, allows
+containerd to start and manage those containers using the runtime shim api returned by
 the binary.
 
-See [runtime v2 documentation](../runtime/v2/README.md)
+For more details on runtimes and shims, including how to invoke and configure them,
+see the [runtime v2 documentation](../core/runtime/v2/README.md)
 
 ### Proxy Plugins
 
@@ -48,7 +60,7 @@ Update the containerd config file, which by default is at
 `/etc/containerd/config.toml`. Add a `[proxy_plugins]` section along with a
 section for your given plugin `[proxy_plugins.myplugin]`. The `address` must
 refer to a local socket file which the containerd process has access to. The
-currently supported types are `snapshot` and `content`.
+currently supported types are `snapshot`, `content`, and `diff`.
 
 ```toml
 version = 2
@@ -63,12 +75,11 @@ version = 2
 
 Implementing a proxy plugin is as easy as implementing the gRPC API for a
 service. For implementing a proxy plugin in Go, look at the go doc for
-[content store service](https://godoc.org/github.com/containerd/containerd/api/services/content/v1#ContentServer)
-and [snapshotter service](https://godoc.org/github.com/containerd/containerd/api/services/snapshots/v1#SnapshotsServer).
+[content store service](https://godoc.org/github.com/containerd/containerd/v2/api/services/content/v1#ContentServer), [snapshotter service](https://godoc.org/github.com/containerd/containerd/v2/api/services/snapshots/v1#SnapshotsServer), and [diff service](https://pkg.go.dev/github.com/containerd/containerd/v2/api/services/diff/v1#DiffServer).
 
 The following example creates a snapshot plugin binary which can be used
 with any implementation of
-[containerd's Snapshotter interface](https://godoc.org/github.com/containerd/containerd/snapshots#Snapshotter)
+[containerd's Snapshotter interface](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter)
 ```go
 package main
 
@@ -79,9 +90,9 @@ import (
 
 	"google.golang.org/grpc"
 
-	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
-	"github.com/containerd/containerd/contrib/snapshotservice"
-	"github.com/containerd/containerd/snapshots/native"
+	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
+	"github.com/containerd/containerd/v2/contrib/snapshotservice"
+	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 )
 
 func main() {

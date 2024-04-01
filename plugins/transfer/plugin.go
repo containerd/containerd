@@ -19,54 +19,73 @@ package transfer
 import (
 	"fmt"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/diff"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/log"
-	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/pkg/transfer/local"
-	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/containerd/platforms"
-	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/containerd/v2/core/diff"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/transfer/local"
+	"github.com/containerd/containerd/v2/core/unpack"
+	"github.com/containerd/containerd/v2/pkg/imageverifier"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
 
 	// Load packages with type registrations
-	_ "github.com/containerd/containerd/pkg/transfer/archive"
-	_ "github.com/containerd/containerd/pkg/transfer/image"
-	_ "github.com/containerd/containerd/pkg/transfer/registry"
+	_ "github.com/containerd/containerd/v2/core/transfer/archive"
+	_ "github.com/containerd/containerd/v2/core/transfer/image"
+	_ "github.com/containerd/containerd/v2/core/transfer/registry"
 )
 
 // Register local transfer service plugin
 func init() {
-	plugin.Register(&plugin.Registration{
-		Type: plugin.TransferPlugin,
+	registry.Register(&plugin.Registration{
+		Type: plugins.TransferPlugin,
 		ID:   "local",
 		Requires: []plugin.Type{
-			plugin.LeasePlugin,
-			plugin.MetadataPlugin,
-			plugin.DiffPlugin,
+			plugins.LeasePlugin,
+			plugins.MetadataPlugin,
+			plugins.DiffPlugin,
+			plugins.ImageVerifierPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			config := ic.Config.(*transferConfig)
-			m, err := ic.Get(plugin.MetadataPlugin)
+			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
 				return nil, err
 			}
 			ms := m.(*metadata.DB)
-			l, err := ic.Get(plugin.LeasePlugin)
+			l, err := ic.GetSingle(plugins.LeasePlugin)
 			if err != nil {
 				return nil, err
+			}
+
+			vfs := make(map[string]imageverifier.ImageVerifier)
+			vps, err := ic.GetByType(plugins.ImageVerifierPlugin)
+			if err != nil {
+				return nil, err
+			}
+
+			for name, vp := range vps {
+				vfs[name] = vp.(imageverifier.ImageVerifier)
 			}
 
 			// Set configuration based on default or user input
 			var lc local.TransferConfig
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
+
+			// If UnpackConfiguration is not defined, set the default.
+			// If UnpackConfiguration is defined and empty, ignore.
+			if config.UnpackConfiguration == nil {
+				config.UnpackConfiguration = defaultUnpackConfig()
+			}
 			for _, uc := range config.UnpackConfiguration {
 				p, err := platforms.Parse(uc.Platform)
 				if err != nil {
-					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugin.TransferPlugin, uc.Platform)
+					return nil, fmt.Errorf("%s: platform configuration %v invalid", plugins.TransferPlugin, uc.Platform)
 				}
 
 				sn := ms.Snapshotter(uc.Snapshotter)
@@ -74,24 +93,19 @@ func init() {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
 
-				diffPlugins, err := ic.GetByType(plugin.DiffPlugin)
-				if err != nil {
-					return nil, fmt.Errorf("error loading diff plugins: %w", err)
-				}
 				var applier diff.Applier
-				target := platforms.OnlyStrict(p)
+				target := platforms.Only(p)
 				if uc.Differ != "" {
-					plugin, ok := diffPlugins[uc.Differ]
-					if !ok {
-						return nil, fmt.Errorf("diff plugin %q: %w", uc.Differ, errdefs.ErrNotFound)
-					}
-					inst, err := plugin.Instance()
+					inst, err := ic.GetByID(plugins.DiffPlugin, uc.Differ)
 					if err != nil {
 						return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", uc.Differ, err)
 					}
 					applier = inst.(diff.Applier)
 				} else {
-					for name, plugin := range diffPlugins {
+					for name, plugin := range ic.GetAll() {
+						if plugin.Registration.Type != plugins.DiffPlugin {
+							continue
+						}
 						var matched bool
 						for _, p := range plugin.Meta.Platforms {
 							if target.Match(p) {
@@ -102,7 +116,7 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", name)
+							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", plugin.Registration.ID)
 							continue
 						}
 						inst, err := plugin.Instance()
@@ -126,7 +140,7 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), &lc), nil
+			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc), nil
 		},
 	})
 }
@@ -139,7 +153,7 @@ type transferConfig struct {
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
 
 	// UnpackConfiguration is used to read config from toml
-	UnpackConfiguration []unpackConfiguration `toml:"unpack_config"`
+	UnpackConfiguration []unpackConfiguration `toml:"unpack_config,omitempty"`
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
@@ -160,11 +174,5 @@ func defaultConfig() *transferConfig {
 	return &transferConfig{
 		MaxConcurrentDownloads:      3,
 		MaxConcurrentUploadedLayers: 3,
-		UnpackConfiguration: []unpackConfiguration{
-			{
-				Platform:    platforms.Format(platforms.DefaultSpec()),
-				Snapshotter: containerd.DefaultSnapshotter,
-			},
-		},
 	}
 }

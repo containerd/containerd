@@ -7,6 +7,6 @@ import (
 )
 
 // Pause suspends all processes inside the container.
-func (r *Runhcs) Pause(context context.Context, id string) error {
-	return r.runOrError(r.command(context, "pause", id))
+func (r *Runhcs) Pause(ctx context.Context, id string) error {
+	return r.runOrError(r.command(ctx, "pause", id))
 }

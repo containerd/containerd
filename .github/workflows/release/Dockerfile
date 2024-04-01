@@ -27,7 +27,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN	apt-get update && \
 	apt-get install -y dpkg-dev git make pkg-config
 ARG TARGETPLATFORM
-RUN xx-apt-get install -y libseccomp-dev btrfs-progs gcc
+# gcc is needed for github.com/containerd/btrfs/v2
+RUN xx-apt-get install -y gcc
 ENV PATH=/usr/local/go/bin:$PATH
 ENV GOPATH=/go
 ENV CGO_ENABLED=1
@@ -49,13 +50,13 @@ RUN \
 	--mount=type=cache,target=/root/.cache/go-build \
 	--mount=type=cache,target=/go/pkg \
 	export CC=$(xx-info)-gcc && xx-go --wrap && \
-	make release static-release cri-release cri-cni-release && \
+	make release static-release && \
 	for f in $(find bin -executable -type f); do xx-verify $f; done
 
 # check git working tree after build
 RUN \
 	export GIT_STATUS_OUTPUT=$(git status --porcelain) && \
-	test -z $GIT_STATUS_OUTPUT || (echo $GIT_STATUS_OUTPUT && exit 1)
+	test -z $GIT_STATUS_OUTPUT || (echo "repository contains uncommitted changes" && exit 1)
 
 FROM scratch AS release
 COPY --from=target /go/src/github.com/containerd/containerd/releases/ /

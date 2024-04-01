@@ -110,25 +110,53 @@ To install containerd and its dependencies from the source, see [`BUILDING.md`](
 From a PowerShell session run the following commands:
 
 ```PowerShell
+# If containerd previously installed run:
+Stop-Service containerd
+
 # Download and extract desired containerd Windows binaries
-$Version="1.6.4"
+$Version="1.7.13" # update to your preferred version
 curl.exe -L https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-amd64.tar.gz -o containerd-windows-amd64.tar.gz
 tar.exe xvf .\containerd-windows-amd64.tar.gz
 
 # Copy and configure
-Copy-Item -Path ".\bin\*" -Destination "$Env:ProgramFiles\containerd" -Recurse -Force
+Copy-Item -Path ".\bin" -Destination "$Env:ProgramFiles\containerd" -Recurse -Container:$false -Force
 cd $Env:ProgramFiles\containerd\
 .\containerd.exe config default | Out-File config.toml -Encoding ascii
 
+# Copy
+Copy-Item -Path .\bin\* -Destination (New-Item -Type Directory $Env:ProgramFiles\containerd -Force) -Recurse -Force
+
+# add the binaries (containerd.exe, ctr.exe) in $env:Path
+$Path = [Environment]::GetEnvironmentVariable("PATH", "Machine") + [IO.Path]::PathSeparator + "$Env:ProgramFiles\containerd"
+[Environment]::SetEnvironmentVariable( "Path", $Path, "Machine")
+# reload path, so you don't have to open a new PS terminal later if needed
+$Env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+# configure
+containerd.exe config default | Out-File $Env:ProgramFiles\containerd\config.toml -Encoding ascii
 # Review the configuration. Depending on setup you may want to adjust:
 # - the sandbox_image (Kubernetes pause image)
 # - cni bin_dir and conf_dir locations
-Get-Content config.toml
+Get-Content $Env:ProgramFiles\containerd\config.toml
 
 # Register and start service
-.\containerd.exe --register-service
+containerd.exe --register-service
 Start-Service containerd
 ```
+
+> **Tip for Running `containerd` Service on Windows:**
+>
+> `containerd` logs are not persisted when we start it as a service
+using Windows Service Manager. [`nssm`](https://nssm.cc) can be used to
+configure logs to go into a cyclic buffer:
+> ```powershell
+> nssm.exe install containerd
+> nssm.exe set containerd AppStdout "\containerd.log"
+> nssm.exe set containerd AppStderr "\containerd.err.log"
+> nssm.exe start containerd
+> # to stop:
+> nssm.exe stop containerd
+> ```
 
 ## Interacting with containerd via CLI
 
@@ -189,7 +217,7 @@ See the header of [`go.mod`](https://github.com/containerd/containerd/blob/main/
 
 ### Connecting to containerd
 
-We will start a new `main.go` file and import the containerd root package that contains the client.
+We will start a new `main.go` file and import the containerd client package.
 
 
 ```go
@@ -198,7 +226,7 @@ package main
 import (
 	"log"
 
-	"github.com/containerd/containerd"
+	containerd "github.com/containerd/containerd/v2/client"
 )
 
 func main() {
@@ -252,8 +280,8 @@ import (
         "context"
         "log"
 
-        "github.com/containerd/containerd"
-        "github.com/containerd/containerd/namespaces"
+        containerd "github.com/containerd/containerd/v2/client"
+        "github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func main() {
@@ -327,9 +355,9 @@ import (
         "context"
         "log"
 
-        "github.com/containerd/containerd"
-        "github.com/containerd/containerd/oci"
-        "github.com/containerd/containerd/namespaces"
+        containerd "github.com/containerd/containerd/v2/client"
+        "github.com/containerd/containerd/v2/pkg/namespaces"
+        "github.com/containerd/containerd/v2/pkg/oci"
 )
 
 func main() {
@@ -474,10 +502,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
 func main() {
@@ -526,7 +554,7 @@ func redisExample() error {
 	// make sure we wait before calling start
 	exitStatusC, err := task.Wait(ctx)
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	// call start on the task to execute the redis server

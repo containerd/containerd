@@ -25,11 +25,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"text/template"
-
-	exec "golang.org/x/sys/execabs"
 )
 
 // NOTE: This code is copied from <github.com/docker/docker/profiles/apparmor>.
@@ -77,6 +76,7 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
   deny /sys/fs/c[^g]*/** wklx,
   deny /sys/fs/cg[^r]*/** wklx,
   deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
   deny /sys/kernel/security/** rwklx,
 
   # allow processes within the container to trace each other,

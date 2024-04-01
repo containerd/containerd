@@ -24,6 +24,7 @@ set -eu -o pipefail
 CNI_COMMIT=${1:-$(go list -f "{{.Version}}" -m github.com/containernetworking/plugins)}
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
+: "${CNI_REPO:=https://github.com/containernetworking/plugins.git}"
 
 # e2e and Cirrus will fail with "sudo: command not found"
 SUDO=''
@@ -32,7 +33,7 @@ if (( $EUID != 0 )); then
 fi
 
 TMPROOT=$(mktemp -d)
-git clone https://github.com/containernetworking/plugins.git "${TMPROOT}"/plugins
+git clone "${CNI_REPO}" "${TMPROOT}"/plugins
 pushd "${TMPROOT}"/plugins
 git checkout "$CNI_COMMIT"
 ./build_linux.sh

@@ -45,17 +45,17 @@ jobs:
         win_ver: [ltsc2019, ltsc2022]
         include:
         - win_ver: ltsc2019
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter-with-Containers-smalldisk:17763.4131.230311"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2019-Datacenter:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2019-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2019/"
         - win_ver: ltsc2022
-          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:20348.1607.230310"
+          AZURE_IMG: "MicrosoftWindowsServer:WindowsServer:2022-datacenter-smalldisk-g2:latest"
           AZURE_RESOURCE_GROUP: ctrd-integration-ltsc2022-${{ github.run_id }}
           GOOGLE_BUCKET: "containerd-integration/logs/windows-ltsc2022/"
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install required packages
         run: |
@@ -81,7 +81,7 @@ jobs:
           echo "SSH_PUB_KEY=$(cat ~/.ssh/id_rsa.pub)" >> $GITHUB_ENV
 
       - name: AZLogin
-        uses: azure/login@v1
+        uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDS }}
 
@@ -128,13 +128,11 @@ jobs:
             exit 1
           fi
 
-      - name: InstallContainerFeatureWS2022
-        if: ${{ matrix.win_ver == 'ltsc2022' }}
+      - name: InstallContainerFeature
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Install-WindowsFeature -Name 'Containers' -Restart }"
 
       - name: WaitForVMToRestart
-        if: ${{ matrix.win_ver == 'ltsc2022' }}
         timeout-minutes: 5
         run: |
           # give the vm 30 seconds to actually stop. SSH server might actually respond while server is shutting down.
@@ -145,8 +143,7 @@ jobs:
           done
           echo "Connection reestablished. VM restarted succesfully."
 
-      - name: CreateNatNetworkWS2022
-        if: ${{ matrix.win_ver == 'ltsc2022' }}
+      - name: CreateNatNetwork
         run: |
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { curl.exe -L 'https://raw.githubusercontent.com/microsoft/SDN/master/Kubernetes/windows/hns.psm1' -o hns.psm1 }"
           ssh -i $HOME/.ssh/id_rsa ${{ env.SSH_OPTS }} azureuser@${{ env.VM_PUB_IP }} "powershell.exe -command { Import-Module .\hns.psm1 ; New-HnsNetwork -Type NAT -Name nat -AddressPrefix 172.19.208.0/20 -Gateway 172.19.208.1 }"
@@ -259,14 +256,14 @@ jobs:
           echo 'GCP_WORKLOAD_IDENTITY_PROVIDER=${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}' >> $GITHUB_OUTPUT
 
       - name: AuthGcp
-        uses: google-github-actions/auth@v0
+        uses: google-github-actions/auth@v2
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@v0.10.4
+        uses: google-github-actions/upload-cloud-storage@v2.1.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ github.workspace }}/latest-build.txt
@@ -274,7 +271,7 @@ jobs:
           parent: false
 
       - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@v0.10.4
+        uses: google-github-actions/upload-cloud-storage@v2.1.0
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ env.LOGS_DIR }}
@@ -282,7 +279,7 @@ jobs:
           parent: false
 
       - name: Check all CI stages succeeded
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             const stepResults = {

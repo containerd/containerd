@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/oci"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -39,6 +39,11 @@ func WithProfile(profile string) oci.SpecOpts {
 
 // WithDefaultProfile will generate a default apparmor profile under the provided name
 // for the container.  It is only generated if a profile under that name does not exist.
+//
+// FIXME: pkg/cri/[sb]server/container_create_linux_test.go depends on go:noinline
+// since Go 1.21.
+//
+//go:noinline
 func WithDefaultProfile(name string) oci.SpecOpts {
 	return func(_ context.Context, _ oci.Client, _ *containers.Container, s *specs.Spec) error {
 		if err := LoadDefaultProfile(name); err != nil {

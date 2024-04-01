@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -33,16 +34,17 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/containerd/sys"
+	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/errdefs"
+
 	"github.com/opencontainers/runtime-spec/specs-go"
-	exec "golang.org/x/sys/execabs"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
 
@@ -897,8 +899,7 @@ func TestContainerKillAll(t *testing.T) {
 	}
 	defer container.Delete(ctx, WithSnapshotCleanup)
 
-	stdout := bytes.NewBuffer(nil)
-	task, err := container.NewTask(ctx, cio.NewCreator(withByteBuffers(stdout)))
+	task, err := container.NewTask(ctx, cio.NullIO)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1027,7 +1028,7 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 		ctx, id,
 		WithNewSnapshot(id, image),
 		WithNewSpec(oci.WithImageConfig(image), withExitStatus(7)),
-		WithRuntime(plugin.RuntimeRuncV2, &options.Options{BinaryName: "no-runc"}),
+		WithRuntime(plugins.RuntimeRuncV2, &options.Options{BinaryName: "no-runc"}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1412,5 +1413,101 @@ func TestShimOOMScore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-statusC
+	select {
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for task exit event")
+	case <-statusC:
+	}
+}
+
+// TestIssue9103 is used as regression case for issue 9103.
+//
+// The runc-fp will kill the init process so that the shim should return stopped
+// status after container.NewTask. It's used to simulate that the runc-init
+// might be killed by oom-kill.
+func TestIssue9103(t *testing.T) {
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
+	}
+
+	client, err := newClient(t, address)
+	require.NoError(t, err)
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	require.NoError(t, err)
+
+	for idx, tc := range []struct {
+		desc           string
+		cntrOpts       []NewContainerOpts
+		bakingFn       func(ctx context.Context, t *testing.T, task Task)
+		expectedStatus ProcessStatus
+	}{
+		{
+			desc: "should be created status",
+			cntrOpts: []NewContainerOpts{
+				WithNewSpec(oci.WithImageConfig(image),
+					withProcessArgs("sleep", "30"),
+				),
+			},
+			bakingFn:       func(context.Context, *testing.T, Task) {},
+			expectedStatus: Created,
+		},
+		{
+			desc: "should be stopped status if init has been killed",
+			cntrOpts: []NewContainerOpts{
+				WithNewSpec(oci.WithImageConfig(image),
+					withProcessArgs("sleep", "30"),
+					oci.WithAnnotations(map[string]string{
+						"oci.runc.failpoint.profile": "issue9103",
+					}),
+				),
+				WithRuntime(client.Runtime(), &options.Options{
+					BinaryName: "runc-fp",
+				}),
+			},
+			bakingFn: func(ctx context.Context, t *testing.T, task Task) {
+				waitCh, err := task.Wait(ctx)
+				require.NoError(t, err)
+
+				select {
+				case <-time.After(30 * time.Second):
+					t.Fatal("timeout")
+				case e := <-waitCh:
+					require.NoError(t, e.Error())
+				}
+			},
+			expectedStatus: Stopped,
+		},
+	} {
+		tc := tc
+		tName := fmt.Sprintf("%s%d", id, idx)
+		t.Run(tc.desc, func(t *testing.T) {
+			container, err := client.NewContainer(ctx, tName,
+				append([]NewContainerOpts{WithNewSnapshot(tName, image)}, tc.cntrOpts...)...,
+			)
+			require.NoError(t, err)
+			defer container.Delete(ctx, WithSnapshotCleanup)
+
+			cctx, ccancel := context.WithTimeout(ctx, 30*time.Second)
+			task, err := container.NewTask(cctx, empty())
+			ccancel()
+			require.NoError(t, err)
+
+			defer task.Delete(ctx, WithProcessKill)
+
+			tc.bakingFn(ctx, t, task)
+
+			status, err := task.Status(ctx)
+			require.NoError(t, err)
+			require.Equal(t, tc.expectedStatus, status.Status)
+		})
+	}
 }

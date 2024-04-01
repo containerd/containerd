@@ -17,11 +17,11 @@
 package tasks
 
 import (
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/urfave/cli"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/urfave/cli/v2"
 )
 
-var resumeCommand = cli.Command{
+var resumeCommand = &cli.Command{
 	Name:      "resume",
 	Usage:     "Resume a paused container",
 	ArgsUsage: "CONTAINER",

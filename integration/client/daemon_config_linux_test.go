@@ -18,19 +18,19 @@ package client
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/containerd/cgroups/v3"
-	. "github.com/containerd/containerd"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
+	. "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 // TestDaemonRuntimeRoot ensures plugin.linux.runtime_root is not ignored
@@ -55,7 +55,7 @@ version = 2
 	}
 
 	id := t.Name()
-	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithRuntime(plugin.RuntimeRuncV2, &options.Options{
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), withProcessArgs("top")), WithRuntime(plugins.RuntimeRuncV2, &options.Options{
 		Root: runtimeRoot,
 	}))
 	if err != nil {
@@ -133,7 +133,7 @@ func TestDaemonCustomCgroup(t *testing.T) {
 		t.Skip("skip TestDaemonCustomCgroup since no cgroup path available")
 	}
 
-	customCgroup := fmt.Sprintf("%d", time.Now().Nanosecond())
+	customCgroup := strconv.Itoa(time.Now().Nanosecond())
 	configTOML := `
 version = 2
 [cgroup]

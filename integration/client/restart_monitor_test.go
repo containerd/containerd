@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -30,18 +31,16 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/containerd/containerd"
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/pkg/testutil"
-	"github.com/containerd/containerd/runtime/restart"
-	srvconfig "github.com/containerd/containerd/services/server/config"
+	eventtypes "github.com/containerd/containerd/v2/api/events"
+	. "github.com/containerd/containerd/v2/client"
+	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"github.com/containerd/containerd/v2/core/runtime/restart"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/require"
-	exec "golang.org/x/sys/execabs"
 )
 
-//nolint:unused // Ignore on non-Linux
 func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, func()) {
 	if testing.Short() {
 		t.Skip()
@@ -60,7 +59,7 @@ func newDaemonWithConfig(t *testing.T, configTOML string) (*Client, *daemon, fun
 		t.Fatal(err)
 	}
 
-	if err := srvconfig.LoadConfig(configTOMLFile, &configTOMLDecoded); err != nil {
+	if err := srvconfig.LoadConfig(context.TODO(), configTOMLFile, &configTOMLDecoded); err != nil {
 		t.Fatal(err)
 	}
 
@@ -262,11 +261,6 @@ func testRestartMonitorPausedTaskWithAlways(t *testing.T, client *Client, interv
 	if runtime.GOOS == "windows" {
 		t.Skip("Pause task is not supported on Windows")
 	}
-
-	const (
-		epsilon = 1 * time.Second
-		count   = 20
-	)
 
 	var (
 		ctx, cancel = testContext(t)

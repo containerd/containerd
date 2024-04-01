@@ -15,7 +15,7 @@
 all: build
 
 PROJ=ghcr.io/containerd
-VERSION=2.1
+VERSION=2.2
 IMAGE=$(PROJ)/volume-copy-up:$(VERSION)
 DOCKER_CERT_PATH ?= "$(HOME)/.docker"
 REMOTE_DOCKER_URL ?=
@@ -81,7 +81,7 @@ sub-container-%:
 container: .container-${OS}-$(ARCH)
 
 .container-linux-$(ARCH):
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/${ARCH} \
+	docker buildx build --provenance=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/${ARCH} \
 		-t $(IMAGE)-${OS}-${ARCH} --build-arg BASE=${BASE} .
 
 .container-windows-$(ARCH):

@@ -21,12 +21,11 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/log"
-	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/log"
+	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -35,17 +34,17 @@ const (
 )
 
 var pruneFlags = []cli.Flag{
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "async",
 		Usage: "Allow garbage collection to cleanup asynchronously",
 	},
-	cli.BoolFlag{
+	&cli.BoolFlag{
 		Name:  "dry",
 		Usage: "Just show updates without applying (enables debug logging)",
 	},
 }
 
-var pruneCommand = cli.Command{
+var pruneCommand = &cli.Command{
 	Name:  "prune",
 	Usage: "Prunes content from the content store",
 	Subcommands: cli.Commands{
@@ -53,7 +52,7 @@ var pruneCommand = cli.Command{
 	},
 }
 
-var pruneReferencesCommand = cli.Command{
+var pruneReferencesCommand = &cli.Command{
 	Name:  "references",
 	Usage: "Prunes preference labels from the content store (layers only by default)",
 	Flags: pruneFlags,
@@ -66,7 +65,7 @@ var pruneReferencesCommand = cli.Command{
 
 		dryRun := clicontext.Bool("dry")
 		if dryRun {
-			log.G(ctx).Logger.SetLevel(logrus.DebugLevel)
+			log.G(ctx).Logger.SetLevel(log.DebugLevel)
 			log.G(ctx).Debug("dry run, no changes will be applied")
 		}
 
