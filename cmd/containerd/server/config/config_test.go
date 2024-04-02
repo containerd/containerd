@@ -304,6 +304,100 @@ func TestMergingPluginsWithTwoCriCniDropInConfigs(t *testing.T) {
 	testMergeConfig(t, []string{data1, data2}, expected, "io.containerd.grpc.v1.cri")
 }
 
+func TestMergingPluginsWithTwoCriRuntimeDropInConfigs(t *testing.T) {
+	runcRuntime := `
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+      SystemdCgroup = true
+`
+	nvidiaRuntime := `
+[plugins]
+  [plugins."io.containerd.grpc.v1.cri"]
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "nvidia"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes]
+        [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+          privileged_without_host_devices = false
+          runtime_engine = ""
+          runtime_root = ""
+          runtime_type = "io.containerd.runc.v2"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+            BinaryName = "/usr/bin/nvidia-container-runtime"
+            SystemdCgroup = true
+`
+	expected := `
+[containerd]
+  default_runtime_name = 'nvidia'
+
+  [containerd.runtimes]
+    [containerd.runtimes.nvidia]
+      privileged_without_host_devices = false
+      runtime_engine = ''
+      runtime_root = ''
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.nvidia.options]
+        BinaryName = '/usr/bin/nvidia-container-runtime'
+        SystemdCgroup = true
+
+    [containerd.runtimes.runc]
+      runtime_type = 'io.containerd.runc.v2'
+
+      [containerd.runtimes.runc.options]
+        SystemdCgroup = true
+`
+	testMergeConfig(t, []string{runcRuntime, nvidiaRuntime}, expected, "io.containerd.grpc.v1.cri")
+
+	// Merging a third config that customizes only the default_runtime_name should result in mostly identical result
+	runcDefault := `
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      default_runtime_name = "runc"
+`
+	// This will then be the only difference in our expected TOML
+	expected2 := strings.Replace(expected, "default_runtime_name = 'nvidia'", "default_runtime_name = 'runc'", 1)
+
+	testMergeConfig(t, []string{runcRuntime, nvidiaRuntime, runcDefault}, expected2, "io.containerd.grpc.v1.cri")
+
+	// Mixing up the order will again result in 'nvidia' being the default runtime
+	testMergeConfig(t, []string{runcRuntime, runcDefault, nvidiaRuntime}, expected, "io.containerd.grpc.v1.cri")
+}
+
+func TestMergingPluginsWithTwoCriRuntimeWithPodAnnotationsDropInConfigs(t *testing.T) {
+	runc1 := `
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
+    cni_conf_dir = "/foo"
+    pod_annotations = ["a", "b", "c"]
+`
+	runc2 := `
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+    runtime_type = "io.containerd.runc.v2"
+    cni_conf_dir = "/bar"
+    pod_annotations = ["d", "e", "f"]
+`
+	expected := `
+[containerd]
+  [containerd.runtimes]
+    [containerd.runtimes.runc]
+      cni_conf_dir = '/bar'
+      pod_annotations = ['d', 'e', 'f']
+      runtime_type = 'io.containerd.runc.v2'
+`
+	testMergeConfig(t, []string{runc1, runc2}, expected, "io.containerd.grpc.v1.cri")
+
+	// The other way around: runc1 over runc2
+	expected = `
+[containerd]
+  [containerd.runtimes]
+    [containerd.runtimes.runc]
+      cni_conf_dir = '/foo'
+      pod_annotations = ['a', 'b', 'c']
+      runtime_type = 'io.containerd.runc.v2'
+`
+	testMergeConfig(t, []string{runc2, runc1}, expected, "io.containerd.grpc.v1.cri")
+}
+
 func testMergeConfig(t *testing.T, inputs []string, expected string, comparePlugin string) {
 	tempDir := t.TempDir()
 	var result Config
