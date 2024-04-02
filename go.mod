@@ -141,3 +141,7 @@ replace (
 	github.com/urfave/cli => github.com/urfave/cli v1.22.1
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200224152610-e50cd9704f63
 )
+
+// Workaround for indirect dependency no longer being available.
+// https://github.com/containerd/containerd/issues/9969
+exclude github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f
