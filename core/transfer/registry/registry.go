@@ -28,6 +28,7 @@ import (
 	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
@@ -42,37 +43,73 @@ func init() {
 	plugins.Register(&transfertypes.OCIRegistry{}, &OCIRegistry{})
 }
 
+type registryOpts struct {
+	headers http.Header
+	creds   CredentialHelper
+	hostDir string
+}
+
+// Opt sets registry-related configurations.
+type Opt func(o *registryOpts) error
+
+// WithHeaders configures HTTP request header fields sent by the resolver.
+func WithHeaders(headers http.Header) Opt {
+	return func(o *registryOpts) error {
+		o.headers = headers
+		return nil
+	}
+}
+
+// WithCredentials configures a helper that provides credentials for a host.
+func WithCredentials(creds CredentialHelper) Opt {
+	return func(o *registryOpts) error {
+		o.creds = creds
+		return nil
+	}
+}
+
+// WithHostDir specifies the host configuration directory.
+func WithHostDir(hostDir string) Opt {
+	return func(o *registryOpts) error {
+		o.hostDir = hostDir
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
-func NewOCIRegistry(ref string, headers http.Header, creds CredentialHelper) *OCIRegistry {
-	// Create an authorizer
-	var aopts []docker.AuthorizerOpt
-	if creds != nil {
+func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
+	var ropts registryOpts
+	for _, o := range opts {
+		if err := o(&ropts); err != nil {
+			return nil, err
+		}
+	}
+	hostOptions := config.HostOptions{}
+	if ropts.hostDir != "" {
+		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
+	}
+	if ropts.creds != nil {
 		// TODO: Support bearer
-		aopts = append(aopts, docker.WithAuthCreds(func(host string) (string, string, error) {
-			c, err := creds.GetCredentials(context.Background(), ref, host)
+		hostOptions.Credentials = func(host string) (string, string, error) {
+			c, err := ropts.creds.GetCredentials(context.Background(), ref, host)
 			if err != nil {
 				return "", "", err
 			}
 
 			return c.Username, c.Secret, nil
-		}))
+		}
 	}
-
-	ropts := []docker.RegistryOpt{
-		docker.WithAuthorizer(docker.NewDockerAuthorizer(aopts...)),
-	}
-
-	// TODO: Apply local configuration, maybe dynamically create resolver when requested
 	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
-		Headers: headers,
+		Hosts:   config.ConfigureHosts(ctx, hostOptions),
+		Headers: ropts.headers,
 	})
 	return &OCIRegistry{
 		reference: ref,
-		headers:   headers,
-		creds:     creds,
+		headers:   ropts.headers,
+		creds:     ropts.creds,
 		resolver:  resolver,
-	}
+		hostDir:   ropts.hostDir,
+	}, nil
 }
 
 // From stream
@@ -95,6 +132,8 @@ type OCIRegistry struct {
 	creds   CredentialHelper
 
 	resolver remotes.Resolver
+
+	hostDir string
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
@@ -194,6 +233,7 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		}()
 		res.AuthStream = sid
 	}
+	res.HostDir = r.hostDir
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
 		Resolver:  res,
@@ -203,16 +243,16 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 }
 
 func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a typeurl.Any) error {
-	var (
-		s     transfertypes.OCIRegistry
-		ropts []docker.RegistryOpt
-		aopts []docker.AuthorizerOpt
-	)
+	var s transfertypes.OCIRegistry
 	if err := typeurl.UnmarshalTo(a, &s); err != nil {
 		return err
 	}
 
+	hostOptions := config.HostOptions{}
 	if s.Resolver != nil {
+		if s.Resolver.HostDir != "" {
+			hostOptions.HostDir = config.HostDirFromRoot(s.Resolver.HostDir)
+		}
 		if sid := s.Resolver.AuthStream; sid != "" {
 			stream, err := sm.Get(ctx, sid)
 			if err != nil {
@@ -222,26 +262,24 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 			r.creds = &credCallback{
 				stream: stream,
 			}
-			aopts = append(aopts, docker.WithAuthCreds(func(host string) (string, string, error) {
+			hostOptions.Credentials = func(host string) (string, string, error) {
 				c, err := r.creds.GetCredentials(context.Background(), s.Reference, host)
 				if err != nil {
 					return "", "", err
 				}
 
 				return c.Username, c.Secret, nil
-			}))
+			}
 		}
 		r.headers = http.Header{}
 		for k, v := range s.Resolver.Headers {
 			r.headers.Add(k, v)
 		}
 	}
-	authorizer := docker.NewDockerAuthorizer(aopts...)
-	ropts = append(ropts, docker.WithAuthorizer(authorizer))
 
 	r.reference = s.Reference
 	r.resolver = docker.NewResolver(docker.ResolverOptions{
-		Hosts:   docker.ConfigureDefaultRegistries(ropts...),
+		Hosts:   config.ConfigureHosts(ctx, hostOptions),
 		Headers: r.headers,
 	})
 
