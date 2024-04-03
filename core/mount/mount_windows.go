@@ -112,9 +112,11 @@ func (m *Mount) mount(target string) (retErr error) {
 	return nil
 }
 
-// ParentLayerPathsFlag is the options flag used to represent the JSON encoded
-// list of parent layers required to use the layer
-const ParentLayerPathsFlag = "parentLayerPaths="
+const (
+	// ParentLayerPathsFlag is the options flag used to represent the JSON encoded
+	// list of parent layers required to use the layer
+	ParentLayerPathsFlag = "parentLayerPaths="
+)
 
 // GetParentPaths of the mount
 func (m *Mount) GetParentPaths() ([]string, error) {
