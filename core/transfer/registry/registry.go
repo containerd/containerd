@@ -44,9 +44,10 @@ func init() {
 }
 
 type registryOpts struct {
-	headers http.Header
-	creds   CredentialHelper
-	hostDir string
+	headers       http.Header
+	creds         CredentialHelper
+	hostDir       string
+	defaultScheme string
 }
 
 // Opt sets registry-related configurations.
@@ -76,6 +77,14 @@ func WithHostDir(hostDir string) Opt {
 	}
 }
 
+// WithDefaultScheme specifies the default scheme for registry configuration
+func WithDefaultScheme(s string) Opt {
+	return func(o *registryOpts) error {
+		o.defaultScheme = s
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -99,16 +108,20 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 			return c.Username, c.Secret, nil
 		}
 	}
+	if ropts.defaultScheme != "" {
+		hostOptions.DefaultScheme = ropts.defaultScheme
+	}
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Hosts:   config.ConfigureHosts(ctx, hostOptions),
 		Headers: ropts.headers,
 	})
 	return &OCIRegistry{
-		reference: ref,
-		headers:   ropts.headers,
-		creds:     ropts.creds,
-		resolver:  resolver,
-		hostDir:   ropts.hostDir,
+		reference:     ref,
+		headers:       ropts.headers,
+		creds:         ropts.creds,
+		resolver:      resolver,
+		hostDir:       ropts.hostDir,
+		defaultScheme: ropts.defaultScheme,
 	}, nil
 }
 
@@ -134,6 +147,8 @@ type OCIRegistry struct {
 	resolver remotes.Resolver
 
 	hostDir string
+
+	defaultScheme string
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
@@ -234,6 +249,7 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		res.AuthStream = sid
 	}
 	res.HostDir = r.hostDir
+	res.DefaultScheme = r.defaultScheme
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
 		Resolver:  res,
@@ -252,6 +268,9 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 	if s.Resolver != nil {
 		if s.Resolver.HostDir != "" {
 			hostOptions.HostDir = config.HostDirFromRoot(s.Resolver.HostDir)
+		}
+		if s.Resolver.DefaultScheme != "" {
+			hostOptions.DefaultScheme = s.Resolver.DefaultScheme
 		}
 		if sid := s.Resolver.AuthStream; sid != "" {
 			stream, err := sm.Get(ctx, sid)
