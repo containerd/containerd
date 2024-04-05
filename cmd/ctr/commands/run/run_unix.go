@@ -465,8 +465,8 @@ func getNetNSPath(_ gocontext.Context, task containerd.Task) (string, error) {
 // It also provides a way to override the CDI spec file paths if required.
 func withStaticCDIRegistry() oci.SpecOpts {
 	return func(ctx gocontext.Context, _ oci.Client, _ *containers.Container, s *oci.Spec) error {
-		registry := cdi.GetRegistry(cdi.WithAutoRefresh(false))
-		if err := registry.Refresh(); err != nil {
+		_ = cdi.Configure(cdi.WithAutoRefresh(false))
+		if err := cdi.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
 			// For instance, a dynamically generated invalid CDI Spec file for
 			// any particular vendor shouldn't prevent injection of devices of
