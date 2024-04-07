@@ -732,6 +732,14 @@ func (f HTTPFallback) RoundTrip(r *http.Request) (*http.Response, error) {
 		plainHTTPRequest := *r
 		plainHTTPRequest.URL = &plainHTTPUrl
 
+		if r.Body != nil && r.GetBody != nil {
+			body, err := r.GetBody()
+			if err != nil {
+				return nil, err
+			}
+			plainHTTPRequest.Body = body
+		}
+
 		return f.RoundTripper.RoundTrip(&plainHTTPRequest)
 	}
 

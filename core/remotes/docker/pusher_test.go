@@ -17,7 +17,9 @@
 package docker
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +37,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
+	ocispecv "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
@@ -181,10 +184,55 @@ func tryUpload(ctx context.Context, t *testing.T, p dockerPusher, layerContent [
 		return err
 	}
 	defer cw.Close()
-	if _, err := cw.Write(layerContent); err != nil {
+	if err := content.Copy(ctx, cw, bytes.NewReader(layerContent), int64(len(layerContent)), desc.Digest); err != nil {
 		return err
 	}
-	return cw.Commit(ctx, 0, "")
+
+	cContent, err := json.Marshal(ocispec.Image{})
+	if err != nil {
+		return err
+	}
+	cdesc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageConfig,
+		Digest:    digest.FromBytes(cContent),
+		Size:      int64(len(cContent)),
+	}
+	cwc, err := p.Writer(ctx, content.WithRef("test-1-c"), content.WithDescriptor(cdesc))
+	if err != nil {
+		return err
+	}
+	defer cwc.Close()
+	if _, err := cwc.Write(cContent); err != nil {
+		return err
+	}
+	if err := content.Copy(ctx, cwc, bytes.NewReader(cContent), int64(len(cContent)), cdesc.Digest); err != nil {
+		return err
+	}
+
+	m := ocispec.Manifest{
+		Versioned: ocispecv.Versioned{SchemaVersion: 1},
+		MediaType: ocispec.MediaTypeImageManifest,
+		Config:    cdesc,
+		Layers:    []ocispec.Descriptor{desc},
+	}
+	mContent, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	mdesc := ocispec.Descriptor{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Digest:    digest.FromBytes(mContent),
+		Size:      int64(len(mContent)),
+	}
+	cwm, err := p.Writer(ctx, content.WithRef("test-1-m"), content.WithDescriptor(mdesc))
+	if err != nil {
+		return err
+	}
+	defer cwm.Close()
+	if err := content.Copy(ctx, cwm, bytes.NewReader(mContent), int64(len(mContent)), mdesc.Digest); err != nil {
+		return err
+	}
+	return nil
 }
 
 func samplePusher(t *testing.T) (dockerPusher, *uploadableMockRegistry, StatusTrackLocker, func()) {
