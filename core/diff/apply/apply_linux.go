@@ -97,9 +97,9 @@ func doSyncFs(file string) error {
 	}
 	defer fd.Close()
 
-	_, _, errno := unix.Syscall(unix.SYS_SYNCFS, fd.Fd(), 0, 0)
-	if errno != 0 {
-		return fmt.Errorf("failed to syncfs for %s: %w", file, errno)
+	err = unix.Syncfs(int(fd.Fd()))
+	if err != nil {
+		return fmt.Errorf("failed to syncfs for %s: %w", file, err)
 	}
 	return nil
 }
