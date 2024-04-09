@@ -193,7 +193,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", "", config, true)...)
+	specOpts = append(specOpts, annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...)
 
 	return c.runtimeSpec(id, "", specOpts...)
 }

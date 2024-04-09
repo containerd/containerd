@@ -75,10 +75,7 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		labels = map[string]string{}
 	)
 
-	sandboxImage := c.imageService.PinnedImage("sandbox")
-	if sandboxImage == "" {
-		sandboxImage = criconfig.DefaultSandboxImage
-	}
+	sandboxImage := c.getSandboxImageName()
 	// Ensure sandbox container image snapshot.
 	image, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
 	if err != nil {
@@ -320,4 +317,16 @@ func (c *Controller) ensureImageExists(ctx context.Context, ref string, config *
 		return nil, fmt.Errorf("failed to get image %q after pulling: %w", imageID, err)
 	}
 	return &newImage, nil
+}
+
+func (c *Controller) getSandboxImageName() string {
+	// returns the name of the sandbox image used to scope pod shared resources used by the pod's containers,
+	// if empty return the default sandbox image.
+	if c.imageService != nil {
+		sandboxImage := c.imageService.PinnedImage("sandbox")
+		if sandboxImage != "" {
+			return sandboxImage
+		}
+	}
+	return criconfig.DefaultSandboxImage
 }

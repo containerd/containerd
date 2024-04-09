@@ -81,8 +81,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	}
 
 	specOpts = append(specOpts, customopts.WithAnnotation(annotations.WindowsHostProcess, strconv.FormatBool(config.GetWindows().GetSecurityContext().GetHostProcess())))
+
 	specOpts = append(specOpts,
-		annotations.DefaultCRIAnnotations(id, "", "", config, true)...,
+		annotations.DefaultCRIAnnotations(id, "", c.getSandboxImageName(), config, true)...,
 	)
 
 	return c.runtimeSpec(id, "", specOpts...)
