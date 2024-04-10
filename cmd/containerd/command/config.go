@@ -130,6 +130,7 @@ func platformAgnosticDefaultConfig() *srvconfig.Config {
 		State:            defaults.DefaultStateDir,
 		DisabledPlugins:  []string{},
 		RequiredPlugins:  []string{},
+		Imports:          defaults.DefaultImports,
 		StreamProcessors: streamProcessors(),
 		Imports:          []string{defaults.DefaultConfigIncludePattern},
 		Plugins: map[string]any{
