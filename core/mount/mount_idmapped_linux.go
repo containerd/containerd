@@ -190,17 +190,13 @@ func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_usernsFD *os.File, r
 }
 
 func pidfdWaitid(pidFD *os.File) error {
-	// https://elixir.bootlin.com/linux/v5.4.258/source/include/uapi/linux/wait.h#L20
-	const PPidFD = 3
-
-	var e syscall.Errno
 	for {
-		_, _, e = syscall.Syscall6(syscall.SYS_WAITID, PPidFD, pidFD.Fd(), 0, syscall.WEXITED, 0, 0)
-		if e != syscall.EINTR {
-			break
+		err := unix.Waitid(unix.P_PIDFD, int(pidFD.Fd()), nil, unix.WEXITED, nil)
+		if err == unix.EINTR {
+			continue
 		}
+		return err
 	}
-	return e
 }
 
 var (
