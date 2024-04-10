@@ -190,13 +190,9 @@ func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_usernsFD *os.File, r
 }
 
 func pidfdWaitid(pidFD *os.File) error {
-	for {
-		err := unix.Waitid(unix.P_PIDFD, int(pidFD.Fd()), nil, unix.WEXITED, nil)
-		if err == unix.EINTR {
-			continue
-		}
-		return err
-	}
+	return sys.IgnoringEINTR(func() error {
+		return unix.Waitid(unix.P_PIDFD, int(pidFD.Fd()), nil, unix.WEXITED, nil)
+	})
 }
 
 var (
