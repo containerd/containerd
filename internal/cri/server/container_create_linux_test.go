@@ -2051,8 +2051,7 @@ containerEdits:
 			}
 			require.NoError(t, err)
 
-			reg := cdi.GetRegistry()
-			err = reg.Configure(cdi.WithSpecDirs(cdiDir))
+			err = cdi.Configure(cdi.WithSpecDirs(cdiDir))
 			require.NoError(t, err)
 
 			injectFun := customopts.WithCDI(test.annotations, test.cdiDevices)
