@@ -25,10 +25,6 @@ import (
 	_ "github.com/Microsoft/hcsshim/test/functional/manifest" // For rsrc_amd64.syso
 )
 
-const (
-	defaultAddress = `\\.\pipe\containerd-containerd-test`
-)
-
 var (
 	defaultRoot           = filepath.Join(os.Getenv("programfiles"), "containerd", "root-test")
 	defaultState          = filepath.Join(os.Getenv("programfiles"), "containerd", "state-test")
