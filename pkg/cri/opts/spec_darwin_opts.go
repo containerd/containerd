@@ -58,7 +58,7 @@ func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra
 
 		// Sort mounts in number of parts. This ensures that high level mounts don't
 		// shadow other mounts.
-		sort.Sort(orderedMounts(mounts))
+		sort.Stable(orderedMounts(mounts))
 
 		// Copy all mounts from default mounts, except for
 		// - mounts overridden by supplied mount;
