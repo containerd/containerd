@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	"github.com/containerd/containerd/v2/pkg/shim"
+	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
@@ -67,23 +68,31 @@ func (e *epoller) Close() error {
 
 // Run the epoll loop
 func (e *epoller) Run(ctx context.Context) {
-	var events [128]unix.EpollEvent
+	var (
+		n      int
+		err    error
+		events [128]unix.EpollEvent
+	)
 	for {
-		select {
-		case <-ctx.Done():
-			e.Close()
-			return
-		default:
-			n, err := unix.EpollWait(e.fd, events[:], -1)
-			if err != nil {
-				if err == unix.EINTR {
-					continue
-				}
-				log.G(ctx).WithError(err).Error("cgroups: epoll wait")
+		err = sys.IgnoringEINTR(func() error {
+			select {
+			case <-ctx.Done():
+				e.Close()
+				return ctx.Err()
+			default:
+				n, err = unix.EpollWait(e.fd, events[:], -1)
+				return err
 			}
-			for i := 0; i < n; i++ {
-				e.process(ctx, uintptr(events[i].Fd))
+		})
+		if err != nil {
+			if err == context.DeadlineExceeded || err == context.Canceled {
+				return
 			}
+			log.G(ctx).WithError(err).Error("cgroups: epoll wait")
+		}
+
+		for i := 0; i < n; i++ {
+			e.process(ctx, uintptr(events[i].Fd))
 		}
 	}
 }
