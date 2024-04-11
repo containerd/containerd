@@ -24,6 +24,7 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	transferapi "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/log"
@@ -64,7 +65,18 @@ func (iis *ImageImportStream) Import(ctx context.Context, store content.Store) (
 	if iis.forceCompress {
 		opts = append(opts, archive.WithImportCompression())
 	}
-	return archive.ImportIndex(ctx, store, iis.stream, opts...)
+
+	r := iis.stream
+	if iis.mediaType == "" {
+		d, err := compression.DecompressStream(iis.stream)
+		if err != nil {
+			return ocispec.Descriptor{}, err
+		}
+		defer d.Close()
+		r = d
+	}
+
+	return archive.ImportIndex(ctx, store, r, opts...)
 }
 
 func (iis *ImageImportStream) MarshalAny(ctx context.Context, sm streaming.StreamCreator) (typeurl.Any, error) {
