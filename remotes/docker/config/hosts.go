@@ -20,6 +20,7 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -392,6 +393,14 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 	// Parse hosts array
 	for _, host := range orderedHosts {
 		config := c.HostConfigs[host]
+
+		// Decode any escaped characters in the table key.
+		// This allows for URLs that contain characters that are not valid in table keys.
+		// For example, RFC2732 IPv6 literal host addresses.
+		var decodedHost string
+		if err := json.Unmarshal([]byte(`"`+host+`"`), &decodedHost); err == nil {
+			host = decodedHost
+		}
 
 		parsed, err := parseHostConfig(host, baseDir, config)
 		if err != nil {
