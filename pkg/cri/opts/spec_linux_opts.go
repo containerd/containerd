@@ -65,7 +65,7 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 
 		// Sort mounts in number of parts. This ensures that high level mounts don't
 		// shadow other mounts.
-		sort.Sort(orderedMounts(mounts))
+		sort.Stable(orderedMounts(mounts))
 
 		// Mount cgroup into the container as readonly, which inherits docker's behavior.
 		s.Mounts = append(s.Mounts, runtimespec.Mount{
