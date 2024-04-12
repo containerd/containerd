@@ -1,21 +1,12 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otlptracehttp // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 
 import (
 	"crypto/tls"
+	"net/http"
+	"net/url"
 	"time"
 
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/otlpconfig"
@@ -25,6 +16,11 @@ import (
 // Compression describes the compression used for payloads sent to the
 // collector.
 type Compression otlpconfig.Compression
+
+// HTTPTransportProxyFunc is a function that resolves which URL to use as proxy for a given request.
+// This type is compatible with http.Transport.Proxy and can be used to set a custom proxy function
+// to the OTLP HTTP client.
+type HTTPTransportProxyFunc func(*http.Request) (*url.URL, error)
 
 const (
 	// NoCompression tells the driver to send payloads without
@@ -71,7 +67,7 @@ func (w wrappedOption) applyHTTPOption(cfg otlpconfig.Config) otlpconfig.Config 
 // take precedence.
 //
 // By default, if an environment variable is not set, and this option is not
-// passed, "localhost:4317" will be used.
+// passed, "localhost:4318" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpoint(endpoint string) Option {
@@ -91,7 +87,7 @@ func WithEndpoint(endpoint string) Option {
 // If an invalid URL is provided, the default value will be kept.
 //
 // By default, if an environment variable is not set, and this option is not
-// passed, "localhost:4317" will be used.
+// passed, "localhost:4318" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpointURL(u string) Option {
@@ -142,4 +138,11 @@ func WithTimeout(duration time.Duration) Option {
 // error for a total of 1 minute.
 func WithRetry(rc RetryConfig) Option {
 	return wrappedOption{otlpconfig.WithRetry(retry.Config(rc))}
+}
+
+// WithProxy sets the Proxy function the client will use to determine the
+// proxy to use for an HTTP request. If this option is not used, the client
+// will use [http.ProxyFromEnvironment].
+func WithProxy(pf HTTPTransportProxyFunc) Option {
+	return wrappedOption{otlpconfig.WithProxy(otlpconfig.HTTPTransportProxyFunc(pf))}
 }
