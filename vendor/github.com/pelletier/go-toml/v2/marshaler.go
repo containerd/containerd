@@ -1025,6 +1025,10 @@ func (enc *Encoder) encodeSliceAsArrayTable(b []byte, ctx encoderCtx, v reflect.
 
 	scratch = enc.commented(ctx.commented, scratch)
 
+	if enc.indentTables {
+		scratch = enc.indent(ctx.indent, scratch)
+	}
+
 	scratch = append(scratch, "[["...)
 
 	for i, k := range ctx.parentKey {
