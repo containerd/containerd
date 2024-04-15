@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
@@ -430,7 +431,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig, "")
 			assert.Equal(t, tt.expectSnapshotter, snapshotter)
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -478,7 +479,7 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			named, err := docker.ParseDockerRef(test.ref)
 			assert.NoError(t, err)
-			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
+			repoDigest, repoTag := images.GetRepoDigestAndTag(named, digest, test.schema1)
 			assert.Equal(t, test.expectedRepoDigest, repoDigest)
 			assert.Equal(t, test.expectedRepoTag, repoTag)
 		})

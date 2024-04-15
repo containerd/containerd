@@ -34,6 +34,6 @@ func (ts *localTransferService) tag(ctx context.Context, ig transfer.ImageGetter
 		return err
 	}
 
-	_, err = is.Store(ctx, img.Target, ts.images)
+	_, err = is.Store(ctx, img.Target, ts.images, ts.content)
 	return err
 }

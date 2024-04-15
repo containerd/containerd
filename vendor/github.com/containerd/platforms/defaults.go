@@ -18,7 +18,7 @@ package platforms
 
 // DefaultString returns the default string specifier for the platform.
 func DefaultString() string {
-	return Format(DefaultSpec())
+	return FormatAll(DefaultSpec())
 }
 
 // DefaultStrict returns strict form of Default.

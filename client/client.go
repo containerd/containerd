@@ -54,6 +54,7 @@ import (
 	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/dialer"
+	ctrdlabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/protobuf"
@@ -484,6 +485,9 @@ func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
 	if err != nil {
 		return nil, err
 	}
+	// TODO(kiashok): change this to NewImageWithPlatform as default platform
+	// matcher might not be the right one to use with image pull per runtime class
+	// feature.
 	return NewImage(c, i), nil
 }
 
@@ -493,9 +497,22 @@ func (c *Client) ListImages(ctx context.Context, filters ...string) ([]Image, er
 	if err != nil {
 		return nil, err
 	}
-	images := make([]Image, len(imgs))
-	for i, img := range imgs {
-		images[i] = NewImage(c, img)
+
+	// With image pull per runtime class feature, an image can now exist
+	// for different platforms. Therefore, look at the image platform label
+	// and set the platform matcher for the image accordingly.
+	var listOfPlatformsForImage []string
+	var images []Image
+	for _, img := range imgs {
+		for key, value := range img.Labels {
+			if strings.HasPrefix(key, ctrdlabels.PlatformLabelPrefix) {
+				listOfPlatformsForImage = append(listOfPlatformsForImage, value)
+			}
+		}
+
+		for _, platform := range listOfPlatformsForImage {
+			images = append(images, NewImageWithPlatform(c, img, platforms.Only(platforms.MustParse(platform))))
+		}
 	}
 	return images, nil
 }
