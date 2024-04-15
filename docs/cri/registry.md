@@ -5,8 +5,14 @@ This document describes the method to configure the image registry for `containe
 > **_NOTE:_** registry.mirrors and registry.configs as previously described in this document
 > have been DEPRECATED. As described in [the cri config](./config.md#registry-configuration) you
 > should now use the following configuration
++ Before containerd 2.0
 ```toml
 [plugins."io.containerd.grpc.v1.cri".registry]
+   config_path = "/etc/containerd/certs.d"
+```
++ In containerd 2.0
+```toml
+[plugins."io.containerd.cri.v1.images".registry]
    config_path = "/etc/containerd/certs.d"
 ```
 
@@ -20,6 +26,7 @@ This document describes the method to configure the image registry for `containe
 To configure a credential for a specific registry, create/modify the
 `/etc/containerd/config.toml` as follows:
 
++ Before containerd 2.0
 ```toml
 # explicitly use v2 config format
 version = 2
@@ -27,6 +34,19 @@ version = 2
 # The registry host has to be a domain name or IP. Port number is also
 # needed if the default HTTPS or HTTP port is not used.
 [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+  username = ""
+  password = ""
+  auth = ""
+  identitytoken = ""
+```
++ In containerd 2.0
+```toml
+# explicitly use v3 config format
+version = 3
+
+# The registry host has to be a domain name or IP. Port number is also
+# needed if the default HTTPS or HTTP port is not used.
+[plugins."io.containerd.cri.v1.images".registry.configs."gcr.io".auth]
   username = ""
   password = ""
   auth = ""
@@ -75,7 +95,7 @@ Now that you know you can access your GCR from your terminal, it is now time to 
 Edit the containerd config (default location is at `/etc/containerd/config.toml`)
 to add your JSON key for `gcr.io` domain image pull
 requests:
-
++ Before containerd 2.0
 ```toml
 version = 2
 
@@ -87,6 +107,21 @@ version = 2
       endpoint = ["https://gcr.io"]
   [plugins."io.containerd.grpc.v1.cri".registry.configs]
     [plugins."io.containerd.grpc.v1.cri".registry.configs."gcr.io".auth]
+      username = "_json_key"
+      password = 'paste output from jq'
+```
++ In containerd 2.0
+```toml
+version = 3
+
+[plugins."io.containerd.cri.v1.images".registry]
+  [plugins."io.containerd.cri.v1.images".registry.mirrors]
+    [plugins."io.containerd.cri.v1.images".registry.mirrors."docker.io"]
+      endpoint = ["https://registry-1.docker.io"]
+    [plugins."io.containerd.cri.v1.images".registry.mirrors."gcr.io"]
+      endpoint = ["https://gcr.io"]
+  [plugins."io.containerd.cri.v1.images".registry.configs]
+    [plugins."io.containerd.cri.v1.images".registry.configs."gcr.io".auth]
       username = "_json_key"
       password = 'paste output from jq'
 ```
