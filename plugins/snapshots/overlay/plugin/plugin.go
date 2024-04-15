@@ -92,7 +92,7 @@ func init() {
 				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaOnlyRemapIDs)
 			}
 
-			ic.Meta.Exports["root"] = root
+			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return overlay.NewSnapshotter(root, oOpts...)
 		},
 	})
