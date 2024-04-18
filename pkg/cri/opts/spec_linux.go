@@ -176,8 +176,7 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 			return nil
 		}
 
-		registry := cdi.GetRegistry()
-		if err = registry.Refresh(); err != nil {
+		if err = cdi.Refresh(); err != nil {
 			// We don't consider registry refresh failure a fatal error.
 			// For instance, a dynamically generated invalid CDI Spec file for
 			// any particular vendor shouldn't prevent injection of devices of
@@ -186,7 +185,7 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
 		}
 
-		if _, err := registry.InjectDevices(s, devices...); err != nil {
+		if _, err := cdi.InjectDevices(s, devices...); err != nil {
 			return fmt.Errorf("CDI device injection failed: %w", err)
 		}
 
