@@ -6,8 +6,8 @@ require (
 	dario.cat/mergo v1.0.0
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0
-	github.com/Microsoft/go-winio v0.6.1
-	github.com/Microsoft/hcsshim v0.12.2
+	github.com/Microsoft/go-winio v0.6.2
+	github.com/Microsoft/hcsshim v0.12.3
 	github.com/checkpoint-restore/checkpointctl v1.1.0
 	github.com/checkpoint-restore/go-criu/v7 v7.1.0
 	github.com/containerd/btrfs/v2 v2.0.0
@@ -127,7 +127,6 @@ require (
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
