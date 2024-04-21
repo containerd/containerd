@@ -1,4 +1,4 @@
-// Copyright 2016 CNI authors
+// Copyright 2022 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || solaris
-// +build darwin dragonfly freebsd linux netbsd openbsd solaris
+package ns
 
-package invoke
+import "github.com/containernetworking/cni/pkg/types"
 
-// Valid file extensions for plugin executables.
-var ExecutableFileExtensions = []string{""}
+func CheckNetNS(nsPath string) (bool, *types.Error) {
+	return false, nil
+}
