@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -38,7 +39,7 @@ var usageCommand = &cli.Command{
 	Action: func(context *cli.Context) error {
 		var ref = context.Args().First()
 		if ref == "" {
-			return fmt.Errorf("please provide an image reference to mount")
+			return errors.New("please provide an image reference to mount")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

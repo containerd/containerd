@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,10 +57,10 @@ When you are done, use the unmount command.
 			target = context.Args().Get(1)
 		)
 		if ref == "" {
-			return fmt.Errorf("please provide an image reference to mount")
+			return errors.New("please provide an image reference to mount")
 		}
 		if target == "" {
-			return fmt.Errorf("please provide a target path to mount to")
+			return errors.New("please provide a target path to mount to")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

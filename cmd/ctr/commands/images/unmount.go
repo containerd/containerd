@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -42,7 +43,7 @@ var unmountCommand = &cli.Command{
 			target = context.Args().First()
 		)
 		if target == "" {
-			return fmt.Errorf("please provide a target path to unmount from")
+			return errors.New("please provide a target path to unmount from")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

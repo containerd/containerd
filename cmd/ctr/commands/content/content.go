@@ -581,7 +581,7 @@ var (
 func edit(context *cli.Context, rd io.Reader) (_ io.ReadCloser, retErr error) {
 	editor := context.String("editor")
 	if editor == "" {
-		return nil, fmt.Errorf("editor is required")
+		return nil, errors.New("editor is required")
 	}
 
 	tmp, err := os.CreateTemp(os.Getenv("XDG_RUNTIME_DIR"), "edit-")

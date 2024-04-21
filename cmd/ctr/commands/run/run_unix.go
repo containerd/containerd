@@ -210,7 +210,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		privileged := context.Bool("privileged")
 		privilegedWithoutHostDevices := context.Bool("privileged-without-host-devices")
 		if privilegedWithoutHostDevices && !privileged {
-			return nil, fmt.Errorf("can't use 'privileged-without-host-devices' without 'privileged' specified")
+			return nil, errors.New("can't use 'privileged-without-host-devices' without 'privileged' specified")
 		}
 		if privileged {
 			if privilegedWithoutHostDevices {
@@ -243,7 +243,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if caps := context.StringSlice("cap-add"); len(caps) > 0 {
 			for _, cap := range caps {
 				if !strings.HasPrefix(cap, "CAP_") {
-					return nil, fmt.Errorf("capabilities must be specified with 'CAP_' prefix")
+					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}
 			opts = append(opts, oci.WithAddedCapabilities(caps))
@@ -252,7 +252,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		if caps := context.StringSlice("cap-drop"); len(caps) > 0 {
 			for _, cap := range caps {
 				if !strings.HasPrefix(cap, "CAP_") {
-					return nil, fmt.Errorf("capabilities must be specified with 'CAP_' prefix")
+					return nil, errors.New("capabilities must be specified with 'CAP_' prefix")
 				}
 			}
 			opts = append(opts, oci.WithDroppedCapabilities(caps))
@@ -261,7 +261,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 		seccompProfile := context.String("seccomp-profile")
 
 		if !context.Bool("seccomp") && seccompProfile != "" {
-			return nil, fmt.Errorf("seccomp must be set to true, if using a custom seccomp-profile")
+			return nil, errors.New("seccomp must be set to true, if using a custom seccomp-profile")
 		}
 
 		if context.Bool("seccomp") {
@@ -278,7 +278,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 
 		if s := context.String("apparmor-profile"); len(s) > 0 {
 			if len(context.String("apparmor-default-profile")) > 0 {
-				return nil, fmt.Errorf("apparmor-profile conflicts with apparmor-default-profile")
+				return nil, errors.New("apparmor-profile conflicts with apparmor-default-profile")
 			}
 			opts = append(opts, apparmor.WithProfile(s))
 		}
