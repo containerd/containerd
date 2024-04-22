@@ -24,8 +24,6 @@ import (
 	"time"
 
 	"github.com/containerd/log"
-
-	netutils "k8s.io/utils/net"
 )
 
 func (c *criService) portForward(ctx context.Context, id string, port int32, stream io.ReadWriter) error {
@@ -44,21 +42,14 @@ func (c *criService) portForward(ctx context.Context, id string, port int32, str
 	} else {
 		// HPCs use the host networking namespace.
 		// Therefore, dial to localhost.
-		podIP = "127.0.0.1"
+		podIP = "localhost"
 	}
 
 	err = func() error {
 		var conn net.Conn
-		if netutils.IsIPv4String(podIP) {
-			conn, err = net.Dial("tcp4", fmt.Sprintf("%s:%d", podIP, port))
-			if err != nil {
-				return fmt.Errorf("failed to connect to %s:%d for pod %q: %v", podIP, port, id, err)
-			}
-		} else {
-			conn, err = net.Dial("tcp6", fmt.Sprintf("%s:%d", podIP, port))
-			if err != nil {
-				return fmt.Errorf("failed to connect to %s:%d for pod %q: %v", podIP, port, id, err)
-			}
+		conn, err = net.Dial("tcp", net.JoinHostPort(podIP, fmt.Sprintf("%d", port)))
+		if err != nil {
+			return fmt.Errorf("failed to connect to %s:%d for pod %q: %v", podIP, port, id, err)
 		}
 		log.G(ctx).Debugf("Connection to ip %s and port %d was successful", podIP, port)
 
