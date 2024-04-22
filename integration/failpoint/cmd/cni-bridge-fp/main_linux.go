@@ -53,7 +53,12 @@ type failpointConf struct {
 }
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "bridge with failpoint support")
+	funcs := skel.CNIFuncs{
+		Add:   cmdAdd,
+		Del:   cmdDel,
+		Check: cmdCheck,
+	}
+	skel.PluginMainFuncs(funcs, version.All, "bridge with failpoint support")
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
