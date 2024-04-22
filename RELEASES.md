@@ -343,3 +343,4 @@ The deprecated features are shown in the following table:
 | config.toml `version = 1`                                            | containerd v1.5     | containerd v2.0            | Use config.toml `version = 2`     |
 | Built-in `aufs` snapshotter                                          | containerd v1.5     | containerd v2.0            | Use `overlayfs` snapshotter       |
 | `cri-containerd-*.tar.gz` release bundles                            | containerd v1.6     | containerd v2.0            | Use `containerd-*.tar.gz` bundles |
+| config.toml OTEL configuration                                       | containerd v1.6.29  | containerd v2.0            | Use OTEL/OTLP env variables       |
