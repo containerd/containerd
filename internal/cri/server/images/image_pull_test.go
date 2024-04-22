@@ -378,29 +378,29 @@ func TestDefaultScheme(t *testing.T) {
 //}
 
 func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
-	defaultSnashotter := "native"
+	defaultSnapshotter := "native"
 	runtimeSnapshotter := "devmapper"
 	tests := []struct {
-		desc              string
-		podSandboxConfig  *runtime.PodSandboxConfig
-		expectSnapshotter string
-		expectErr         bool
+		desc                string
+		podSandboxConfig    *runtime.PodSandboxConfig
+		expectedSnapshotter string
+		expectedErr         bool
 	}{
 		{
-			desc:              "should return default snapshotter for nil podSandboxConfig",
-			expectSnapshotter: defaultSnashotter,
+			desc:                "should return default snapshotter for nil podSandboxConfig",
+			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
-			desc:              "should return default snapshotter for nil podSandboxConfig.Annotations",
-			podSandboxConfig:  &runtime.PodSandboxConfig{},
-			expectSnapshotter: defaultSnashotter,
+			desc:                "should return default snapshotter for nil podSandboxConfig.Annotations",
+			podSandboxConfig:    &runtime.PodSandboxConfig{},
+			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
 			desc: "should return default snapshotter for empty podSandboxConfig.Annotations",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: make(map[string]string),
 			},
-			expectSnapshotter: defaultSnashotter,
+			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
 			desc: "should return default snapshotter for runtime not found",
@@ -409,30 +409,30 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 					annotations.RuntimeHandler: "runtime-not-exists",
 				},
 			},
-			expectSnapshotter: defaultSnashotter,
+			expectedSnapshotter: defaultSnapshotter,
 		},
 		{
 			desc: "should return snapshotter provided in podSandboxConfig.Annotations",
 			podSandboxConfig: &runtime.PodSandboxConfig{
 				Annotations: map[string]string{
-					annotations.RuntimeHandler: "exiting-runtime",
+					annotations.RuntimeHandler: "existing-runtime",
 				},
 			},
-			expectSnapshotter: runtimeSnapshotter,
+			expectedSnapshotter: runtimeSnapshotter,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			cri, _ := newTestCRIService()
-			cri.config.Snapshotter = defaultSnashotter
-			cri.runtimePlatforms["exiting-runtime"] = ImagePlatform{
+			cri.config.Snapshotter = defaultSnapshotter
+			cri.runtimePlatforms["existing-runtime"] = ImagePlatform{
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
 			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
-			assert.Equal(t, tt.expectSnapshotter, snapshotter)
-			if tt.expectErr {
+			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
+			if tt.expectedErr {
 				assert.Error(t, err)
 			}
 		})
