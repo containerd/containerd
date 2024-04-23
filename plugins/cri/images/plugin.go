@@ -176,6 +176,33 @@ func configMigration(ctx context.Context, configVersion int, pluginConfigs map[s
 	return nil
 }
 func migrateConfig(dst, src map[string]interface{}) {
+	var pinnedImages map[string]interface{}
+	if v, ok := dst["pinned_images"]; ok {
+		pinnedImages = v.(map[string]interface{})
+	} else {
+		pinnedImages = map[string]interface{}{}
+	}
+
+	if simage, ok := src["sandbox_image"]; ok {
+		pinnedImages["sandbox"] = simage
+	}
+	if len(pinnedImages) > 0 {
+		dst["pinned_images"] = pinnedImages
+	}
+
+	for _, key := range []string{
+		"registry",
+		"image_decryption",
+		"max_concurrent_downloads",
+		"image_pull_progress_timeout",
+		"image_pull_with_sync_fs",
+		"stats_collect_period",
+	} {
+		if val, ok := src[key]; ok {
+			dst[key] = val
+		}
+	}
+
 	containerdConf, ok := src["containerd"]
 	if !ok {
 		return
@@ -205,39 +232,12 @@ func migrateConfig(dst, src map[string]interface{}) {
 		dst["runtime_platform"] = runtimePlatforms
 	}
 
-	var pinnedImages map[string]interface{}
-	if v, ok := dst["pinned_images"]; ok {
-		pinnedImages = v.(map[string]interface{})
-	} else {
-		pinnedImages = map[string]interface{}{}
-	}
-
-	if simage, ok := src["sandbox_image"]; ok {
-		pinnedImages["sandbox"] = simage
-	}
-	if len(pinnedImages) > 0 {
-		dst["pinned_images"] = pinnedImages
-	}
-
 	for _, key := range []string{
 		"snapshotter",
 		"disable_snapshot_annotations",
 		"discard_unpacked_layers",
 	} {
 		if val, ok := containerdConfMap[key]; ok {
-			dst[key] = val
-		}
-	}
-
-	for _, key := range []string{
-		"registry",
-		"image_decryption",
-		"max_concurrent_downloads",
-		"image_pull_progress_timeout",
-		"image_pull_with_sync_fs",
-		"stats_collect_period",
-	} {
-		if val, ok := src[key]; ok {
 			dst[key] = val
 		}
 	}
