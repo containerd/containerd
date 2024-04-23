@@ -57,6 +57,10 @@ profile {{.Name}} flags=(attach_disconnected,mediate_deleted) {
 {{if ge .Version 208096}}
   # Host (privileged) processes may send signals to container processes.
   signal (receive) peer=unconfined,
+  # runc may send signals to container processes.
+  signal (receive) peer=runc,
+  # crun may send signals to container processes.
+  signal (receive) peer=crun,
   # Manager may send signals to container processes.
   signal (receive) peer={{.DaemonProfile}},
   # Container processes may send signals amongst themselves.
