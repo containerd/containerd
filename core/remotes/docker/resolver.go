@@ -714,24 +714,39 @@ func IsLocalhost(host string) bool {
 	return ip.IsLoopback()
 }
 
-// HTTPFallback is an http.RoundTripper which allows fallback from https to http
-// for registry endpoints with configurations for both http and TLS, such as
-// defaulted localhost endpoints.
-type HTTPFallback struct {
-	http.RoundTripper
+// NewHTTPFallback returns http.RoundTripper which allows fallback from https to
+// http for registry endpoints with configurations for both http and TLS,
+// such as defaulted localhost endpoints.
+func NewHTTPFallback(transport http.RoundTripper) http.RoundTripper {
+	return &httpFallback{
+		super: transport,
+	}
 }
 
-func (f HTTPFallback) RoundTrip(r *http.Request) (*http.Response, error) {
-	resp, err := f.RoundTripper.RoundTrip(r)
-	var tlsErr tls.RecordHeaderError
-	if errors.As(err, &tlsErr) && string(tlsErr.RecordHeader[:]) == "HTTP/" {
-		// server gave HTTP response to HTTPS client
-		plainHTTPUrl := *r.URL
-		plainHTTPUrl.Scheme = "http"
+type httpFallback struct {
+	super http.RoundTripper
+	host  string
+}
 
-		plainHTTPRequest := *r
-		plainHTTPRequest.URL = &plainHTTPUrl
+func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
+	// only fall back if the same host had previously fell back
+	if f.host != r.URL.Host {
+		resp, err := f.super.RoundTrip(r)
+		if !isTLSError(err) {
+			return resp, err
+		}
+	}
 
+	plainHTTPUrl := *r.URL
+	plainHTTPUrl.Scheme = "http"
+
+	plainHTTPRequest := *r
+	plainHTTPRequest.URL = &plainHTTPUrl
+
+	if f.host != r.URL.Host {
+		f.host = r.URL.Host
+
+		// update body on the second attempt
 		if r.Body != nil && r.GetBody != nil {
 			body, err := r.GetBody()
 			if err != nil {
@@ -739,9 +754,22 @@ func (f HTTPFallback) RoundTrip(r *http.Request) (*http.Response, error) {
 			}
 			plainHTTPRequest.Body = body
 		}
-
-		return f.RoundTripper.RoundTrip(&plainHTTPRequest)
 	}
 
-	return resp, err
+	return f.super.RoundTrip(&plainHTTPRequest)
+}
+
+func isTLSError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var tlsErr tls.RecordHeaderError
+	if errors.As(err, &tlsErr) && string(tlsErr.RecordHeader[:]) == "HTTP/" {
+		return true
+	}
+	if strings.Contains(err.Error(), "TLS handshake timeout") {
+		return true
+	}
+
+	return false
 }
