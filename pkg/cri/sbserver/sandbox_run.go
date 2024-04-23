@@ -120,7 +120,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			RuntimeHandler: r.GetRuntimeHandler(),
 		},
 		sandboxstore.Status{
-			State: sandboxstore.StateUnknown,
+			State:     sandboxstore.StateUnknown,
+			CreatedAt: time.Now().UTC(),
 		},
 	)
 
