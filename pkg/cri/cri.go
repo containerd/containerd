@@ -50,6 +50,7 @@ func init() {
 			plugin.ServicePlugin,
 			plugin.NRIApiPlugin,
 			plugin.WarningPlugin,
+			plugin.SnapshotPlugin,
 		},
 		InitFn: initCRIService,
 	})

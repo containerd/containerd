@@ -38,6 +38,7 @@ import (
 	"github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -57,6 +58,7 @@ import (
 	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
+	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/services/warning"
@@ -454,6 +456,8 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			f func(*grpc.ClientConn) interface{}
 
 			address = pp.Address
+			p       v1.Platform
+			err     error
 		)
 
 		switch pp.Type {
@@ -477,12 +481,27 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 		default:
 			log.G(ctx).WithField("type", pp.Type).Warn("unknown proxy plugin type")
 		}
+		if pp.Platform != "" {
+			p, err = platforms.Parse(pp.Platform)
+			if err != nil {
+				log.G(ctx).WithError(err).WithField("plugin", name).Warn("skipping proxy platform with bad platform")
+			}
+		} else {
+			p = platforms.DefaultSpec()
+		}
+
+		exports := pp.Exports
+		if exports == nil {
+			exports = map[string]string{}
+		}
+		exports["address"] = address
 
 		plugin.Register(&plugin.Registration{
 			Type: t,
 			ID:   name,
 			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-				ic.Meta.Exports["address"] = address
+				ic.Meta.Exports = exports
+				ic.Meta.Platforms = append(ic.Meta.Platforms, p)
 				conn, err := clients.getClient(address)
 				if err != nil {
 					return nil, err
