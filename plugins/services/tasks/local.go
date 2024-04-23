@@ -157,10 +157,9 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	}
 
 	var (
-		checkpointPath  string
-		taskAPIAddress  string
-		taskAPIProtocol string
-		taskAPIVersion  uint32
+		checkpointPath string
+		taskAPIAddress string
+		taskAPIVersion uint32
 	)
 
 	if r.Options != nil {
@@ -170,7 +169,6 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		}
 		checkpointPath = taskOptions.CriuImagePath
 		taskAPIAddress = taskOptions.TaskApiAddress
-		taskAPIProtocol = taskOptions.TaskApiProtocol
 		taskAPIVersion = taskOptions.TaskApiVersion
 	}
 
@@ -212,7 +210,6 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		TaskOptions:    r.Options,
 		SandboxID:      container.SandboxID,
 		Address:        taskAPIAddress,
-		Protocol:       taskAPIProtocol,
 		Version:        taskAPIVersion,
 	}
 	if r.RuntimePath != "" {

@@ -5520,13 +5520,6 @@ file {
       type: TYPE_UINT32
       json_name: "version"
     }
-    field {
-      name: "protocol"
-      number: 7
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "protocol"
-    }
     nested_type {
       name: "LabelsEntry"
       field {
@@ -5730,13 +5723,6 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_UINT32
       json_name: "version"
-    }
-    field {
-      name: "protocol"
-      number: 10
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "protocol"
     }
     nested_type {
       name: "InfoEntry"

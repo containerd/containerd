@@ -81,15 +81,8 @@ file {
       json_name: "taskApiAddress"
     }
     field {
-      name: "task_api_protocol"
-      number: 13
-      label: LABEL_OPTIONAL
-      type: TYPE_STRING
-      json_name: "taskApiProtocol"
-    }
-    field {
       name: "task_api_version"
-      number: 14
+      number: 13
       label: LABEL_OPTIONAL
       type: TYPE_UINT32
       json_name: "taskApiVersion"

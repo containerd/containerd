@@ -164,16 +164,27 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 	// This container belongs to sandbox which supposed to be already started via sandbox API.
 	if opts.SandboxID != "" {
 		var params shimbinary.BootstrapParams
-		if opts.Address != "" && opts.Protocol != "" {
+		if opts.Address != "" {
+			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
+			// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
+			protocol, address, ok := strings.Cut(opts.Address, "+")
+			if !ok {
+				return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+					" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+			}
 			params = shimbinary.BootstrapParams{
 				Version:  int(opts.Version),
-				Address:  opts.Address,
-				Protocol: opts.Protocol,
+				Protocol: protocol,
+				Address:  address,
 			}
 		} else {
 			// For those sandbox we can not get endpoint,
 			// fallback to legacy implementation
-			p, restoreErr := m.restoreBootstrapParams(ctx, opts.SandboxID)
+			process, err := m.Get(ctx, opts.SandboxID)
+			if err != nil {
+				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+			}
+			p, restoreErr := restoreBootstrapParams(process.Bundle())
 			if restoreErr != nil {
 				return nil, fmt.Errorf("failed to get bootstrap "+
 					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
@@ -257,18 +268,6 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 
 	return shim, nil
-}
-
-func (m *ShimManager) restoreBootstrapParams(ctx context.Context, sandboxID string) (shimbinary.BootstrapParams, error) {
-	process, err := m.Get(ctx, sandboxID)
-	if err != nil {
-		return shimbinary.BootstrapParams{}, fmt.Errorf("can't find sandbox %s", sandboxID)
-	}
-	params, err := restoreBootstrapParams(filepath.Join(m.state, process.Namespace(), sandboxID))
-	if err != nil {
-		return shimbinary.BootstrapParams{}, err
-	}
-	return params, nil
 }
 
 // restoreBootstrapParams reads bootstrap.json to restore shim configuration.

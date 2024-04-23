@@ -52,7 +52,7 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 
 // WithTaskAPIEndpoint allow task service to manage a task through a given endpoint,
 // usually it is served inside a sandbox, and we can get it from sandbox status.
-func WithTaskAPIEndpoint(address, protocol string, version uint32) NewTaskOpts {
+func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
 		if info.Options == nil {
 			info.Options = &options.Options{}
@@ -62,7 +62,6 @@ func WithTaskAPIEndpoint(address, protocol string, version uint32) NewTaskOpts {
 			return errors.New("invalid runtime v2 options format")
 		}
 		opts.TaskApiAddress = address
-		opts.TaskApiProtocol = protocol
 		opts.TaskApiVersion = version
 		return nil
 	}

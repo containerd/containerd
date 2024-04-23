@@ -265,11 +265,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		return nil, fmt.Errorf("failed to start sandbox %q: %w", id, err)
 	}
 
-	if ctrl.Protocol != "" && ctrl.Address != "" {
+	if ctrl.Address != "" {
 		sandbox.Endpoint = sandboxstore.Endpoint{
-			Protocol: ctrl.Protocol,
-			Version:  ctrl.Version,
-			Address:  ctrl.Address,
+			Version: ctrl.Version,
+			Address: ctrl.Address,
 		}
 	}
 

@@ -52,13 +52,12 @@ type Sandbox struct {
 }
 
 type Endpoint struct {
-	Address  string
-	Protocol string
-	Version  uint32
+	Address string
+	Version uint32
 }
 
 func (e *Endpoint) IsValid() bool {
-	return e.Protocol != "" && e.Address != ""
+	return e.Address != ""
 }
 
 // NewSandbox creates an internally used sandbox type. This functions reminds

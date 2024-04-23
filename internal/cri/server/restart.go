@@ -127,7 +127,6 @@ func (c *criService) recover(ctx context.Context) error {
 				state = sandboxstore.StateNotReady
 			}
 		} else {
-			endpoint.Protocol = status.Protocol
 			endpoint.Version = status.Version
 			endpoint.Address = status.Address
 			if code, ok := runtime.PodSandboxState_value[status.State]; ok {

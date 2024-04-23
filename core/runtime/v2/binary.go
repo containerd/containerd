@@ -143,10 +143,12 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	if err := writeBootstrapParams(filepath.Join(b.bundle.Path, "bootstrap.json"), params); err != nil {
 		return nil, fmt.Errorf("failed to write bootstrap.json: %w", err)
 	}
-
+	// The address is in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>
+	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
 	return &shim{
 		bundle:  b.bundle,
 		client:  conn,
+		address: address,
 		version: params.Version,
 	}, nil
 }

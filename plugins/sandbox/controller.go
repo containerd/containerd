@@ -188,12 +188,11 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 		c.cleanupShim(ctx, sandboxID, svc)
 		return sandbox.ControllerInstance{}, fmt.Errorf("failed to start sandbox %s: %w", sandboxID, errdefs.FromGRPC(err))
 	}
-	address, protocol, version := shim.Endpoint()
+	address, version := shim.Endpoint()
 	return sandbox.ControllerInstance{
 		SandboxID: sandboxID,
 		Pid:       resp.GetPid(),
 		Address:   address,
-		Protocol:  protocol,
 		Version:   uint32(version),
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 	}, nil
@@ -309,7 +308,7 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 	if err != nil {
 		return sandbox.ControllerStatus{}, fmt.Errorf("unable to find sandbox %q", sandboxID)
 	}
-	address, protocol, version := shim.Endpoint()
+	address, version := shim.Endpoint()
 
 	return sandbox.ControllerStatus{
 		SandboxID: resp.GetSandboxID(),
@@ -320,7 +319,6 @@ func (c *controllerLocal) Status(ctx context.Context, sandboxID string, verbose 
 		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 		Address:   address,
-		Protocol:  protocol,
 		Version:   uint32(version),
 	}, nil
 }

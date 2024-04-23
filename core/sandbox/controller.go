@@ -118,7 +118,6 @@ type ControllerInstance struct {
 	Pid       uint32
 	CreatedAt time.Time
 	Address   string
-	Protocol  string
 	Version   uint32
 	Labels    map[string]string
 }
@@ -137,6 +136,5 @@ type ControllerStatus struct {
 	ExitedAt  time.Time
 	Extra     typeurl.Any
 	Address   string
-	Protocol  string
 	Version   uint32
 }

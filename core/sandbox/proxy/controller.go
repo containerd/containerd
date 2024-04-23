@@ -74,7 +74,6 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 		CreatedAt: resp.GetCreatedAt().AsTime(),
 		Labels:    resp.GetLabels(),
 		Address:   resp.GetAddress(),
-		Protocol:  resp.GetProtocol(),
 		Version:   resp.GetVersion(),
 	}, nil
 }
@@ -145,7 +144,6 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 		ExitedAt:  resp.GetExitedAt().AsTime(),
 		Extra:     resp.GetExtra(),
 		Address:   resp.GetAddress(),
-		Protocol:  resp.GetProtocol(),
 		Version:   resp.GetVersion(),
 	}, nil
 }

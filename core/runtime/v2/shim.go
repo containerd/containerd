@@ -113,9 +113,13 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		}
 	}()
 
+	// The address is in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>
+	address := fmt.Sprintf("%s+%s", params.Protocol, params.Address)
+
 	shim := &shim{
 		bundle:  bundle,
 		client:  conn,
+		address: address,
 		version: params.Version,
 	}
 
@@ -186,8 +190,8 @@ type ShimInstance interface {
 	// Delete will close the client and remove bundle from disk.
 	Delete(ctx context.Context) error
 	// Endpoint returns shim's endpoint information,
-	// including address, protocol and version.
-	Endpoint() (string, string, int)
+	// including address and version.
+	Endpoint() (string, int)
 }
 
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
@@ -360,11 +364,10 @@ func (gc *grpcConn) UserOnCloseWait(ctx context.Context) error {
 }
 
 type shim struct {
-	bundle   *Bundle
-	client   any
-	address  string
-	protocol string
-	version  int
+	bundle  *Bundle
+	client  any
+	address string
+	version int
 }
 
 var _ ShimInstance = (*shim)(nil)
@@ -374,8 +377,8 @@ func (s *shim) ID() string {
 	return s.bundle.ID
 }
 
-func (s *shim) Endpoint() (string, string, int) {
-	return s.address, s.protocol, s.version
+func (s *shim) Endpoint() (string, int) {
+	return s.address, s.version
 }
 
 func (s *shim) Namespace() string {
@@ -443,7 +446,7 @@ type shimTask struct {
 }
 
 func newShimTask(shim ShimInstance) (*shimTask, error) {
-	_, _, version := shim.Endpoint()
+	_, version := shim.Endpoint()
 	taskClient, err := NewTaskClient(shim.Client(), version)
 	if err != nil {
 		return nil, err

@@ -53,8 +53,6 @@ type CreateOpts struct {
 	SandboxID string
 	// Address is an optional Address for Task API server
 	Address string
-	// Protocol is an optional Protocol for Task API connection
-	Protocol string
 	// Version is an optional Version of the Task API
 	Version uint32
 }
