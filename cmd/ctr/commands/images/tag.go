@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/urfave/cli/v2"
@@ -51,10 +52,10 @@ var tagCommand = &cli.Command{
 			ref = context.Args().First()
 		)
 		if ref == "" {
-			return fmt.Errorf("please provide an image reference to tag from")
+			return errors.New("please provide an image reference to tag from")
 		}
 		if context.NArg() <= 1 {
-			return fmt.Errorf("please provide an image reference to tag to")
+			return errors.New("please provide an image reference to tag to")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

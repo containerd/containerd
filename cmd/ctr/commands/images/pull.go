@@ -18,6 +18,7 @@ package images
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -89,7 +90,7 @@ command. As part of this process, we do the following:
 			ref = context.Args().First()
 		)
 		if ref == "" {
-			return fmt.Errorf("please provide an image reference to pull")
+			return errors.New("please provide an image reference to pull")
 		}
 
 		client, ctx, cancel, err := commands.NewClient(context)

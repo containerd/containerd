@@ -17,6 +17,7 @@
 package images
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -211,7 +212,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		}
 		if context.Bool("skip-digest-for-named") {
 			if !context.Bool("digests") {
-				return fmt.Errorf("--skip-digest-for-named must be specified with --digests option")
+				return errors.New("--skip-digest-for-named must be specified with --digests option")
 			}
 			opts = append(opts, containerd.WithSkipDigestRef(func(name string) bool { return name != "" }))
 		}
@@ -237,7 +238,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 		if context.Bool("discard-unpacked-layers") {
 			if context.Bool("no-unpack") {
-				return fmt.Errorf("--discard-unpacked-layers and --no-unpack are incompatible options")
+				return errors.New("--discard-unpacked-layers and --no-unpack are incompatible options")
 			}
 			opts = append(opts, containerd.WithDiscardUnpackedLayers())
 		}
