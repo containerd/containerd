@@ -3,7 +3,7 @@ description: "Reusable action to install Go, so there is one place to bump Go ve
 inputs:
   go-version:
     required: true
-    default: "1.21.8"
+    default: "1.21.9"
     description: "Go version to install"
 
 runs:
