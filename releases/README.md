@@ -11,24 +11,31 @@ verified:
 
 1. Create release pull request with release notes and updated versions.
 
-   1. Compile release notes detailing features added since the last release and
+   1. Review all pull requests merged into the release. For any pull request
+      that should be highlighted in the release notes, add the appropriate
+      `impact/*` and `area/*` labels. Update the title to match the style used
+      in release notes. Normally the titles are short descriptions starting with
+      a present tense verb and optionally prepended with square brackets section
+      which usually includes release branch.
+
+   2. Compile release notes with summary of changes since the last release and
       add release template file to `releases/` directory. The template is defined
       by containerd's release tool but refer to previous release files for style
       and format help. Name the file using the version, for rc add an `-rc` suffix.
       When moving from rc to final, the rc file may just be renamed and updated.
       See [release-tool](https://github.com/containerd/release-tool)
 
-   2. Update the version file at `https://github.com/containerd/containerd/blob/main/version/version.go`
+   3. Update the version file at `https://github.com/containerd/containerd/blob/main/version/version.go`
 
-   3. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
+   4. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
 
-   4. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
+   5. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
       If it is not clear which email or name the contributor might want used in the release notes, reach
       out to the contributor for feedback. NOTE: real names should be used whenever possible. The file is
       maintained by manually adding entries to the file.
       - e.g. `Real Name <preferred@email.com> Other Name <other@email.com>`
 
-   5. Before opening the pull request, run the release tool using the new release notes.
+   6. Before opening the pull request, run the release tool using the new release notes.
       Ensure the output matches what is expected, including contributors, change log,
       dependencies, and visual elements such as spacing. If a contributor is duplicated,
       use the emails outputted by the release tool to update the mailmap then re-run. The
@@ -41,7 +48,8 @@ verified:
       expects tags to be formatted as `vx.y.z[-rc.n]`.
 
    2. Generate release notes (using a temp file may be helpful).
-      - e.g. `release-tool -l -d -n -t v1.0.0 ./releases/v1.0.0.toml > /tmp/v1.0.0-notes`
+      - e.g. `release-tool -r -g -d -n -t v1.0.0 ./releases/v1.0.0.toml > /tmp/v1.0.0-notes`
+      - if release notes are too long, such as for major/minor releases, add `--skip-commits` option
 
    3. Create tag using the generated release notes.
       - e.g. `git tag --cleanup=whitespace -s v1.0.0 -F /tmp/v1.0.0-notes`
