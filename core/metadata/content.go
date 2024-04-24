@@ -574,6 +574,13 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 
 	var innerErr error
 
+	// We pre-sync the in-flight writes to the disk.  This avoids the [subsequent fp.Sync() call]
+	// (https://github.com/containerd/containerd/blob/c4c3c6ea568ce0cfbcf754863abadeea37d77c8f/plugins/content/local/writer.go#L95)
+	// from taking too long (10s+) while holding the metadata database lock as in the following
+	// `update` transaction.  We intentionally ignore any error on Sync() because it will be
+	// handled by the subsequent `fp.Sync` anyway.
+	nw.Sync()
+
 	if err := update(ctx, nw.db, func(tx *bolt.Tx) error {
 		dgst, err := nw.commit(ctx, tx, size, expected, opts...)
 		if err != nil {
@@ -597,6 +604,13 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	}
 
 	return innerErr
+}
+
+func (nw *namespacedWriter) Sync() error {
+	if syncer, ok := nw.w.(content.Syncer); ok {
+		return syncer.Sync()
+	}
+	return nil
 }
 
 func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, error) {
