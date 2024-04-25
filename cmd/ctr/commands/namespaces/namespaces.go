@@ -173,8 +173,10 @@ var removeCommand = &cli.Command{
 					}
 					log.G(ctx).WithError(err).Errorf("unable to delete %v", target)
 					continue
+				} else {
+					log.G(ctx).WithError(err).Warnf("namespace %v not found", target)
+					continue
 				}
-
 			}
 
 			fmt.Println(target)
