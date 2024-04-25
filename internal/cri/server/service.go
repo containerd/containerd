@@ -409,9 +409,11 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if err != nil {
 		return nil, err
 	}
-	rr.Options, err = protobuf.MarshalAnyToProto(options)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
+	if options != nil {
+		rr.Options, err = protobuf.MarshalAnyToProto(options)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
+		}
 	}
 
 	infoResp, err := intro.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
