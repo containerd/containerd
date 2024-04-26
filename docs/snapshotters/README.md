@@ -11,7 +11,7 @@ Generic:
 - `native`: Native file copying driver. Akin to Docker/Moby's "vfs" driver.
 
 Block-based:
-- `blockfile`: A driver using raw block files for each snapshot. Block files are copied from a parent or base empty block file. Mounting requires a virtual machine or support for loopback mounts.
+- [`blockfile`](./blockfile.md): A driver using raw block files for each snapshot. Block files are copied from a parent or base empty block file. Mounting requires a virtual machine or support for loopback mounts.
 - `devmapper`: ext4/xfs device mapper. See [`devmapper.md`](./devmapper.md).
 
 Filesystem-specific:
