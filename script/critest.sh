@@ -20,6 +20,7 @@ report_dir=$1
 
 mkdir -p $report_dir
 BDIR="$(mktemp -d -p $PWD)"
+sudo chmod o+rx $BDIR
 
 function cleanup() {
     pkill containerd || true
