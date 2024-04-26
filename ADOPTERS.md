@@ -56,7 +56,7 @@ including the Balena project listed below.
 
 **_Deckhouse_** - [Deckhouse Kubernetes Platform](https://deckhouse.io/) from Flant allows you to manage Kubernetes clusters anywhere in a fully automatic and uniform fashion. It uses containerd as the default CRI runtime.
 
-**_[Actuated](https://actuated.dev)** - Actuated is a platform for running self-hosted CI in securely-isolated Firecracker VMs. Actuated uses containerd's image pulling facility to distribute and update the root filesystem for VMs for CI agents.
+**_[Actuated](https://actuated.dev)_** - Actuated is a platform for running self-hosted CI in securely-isolated Firecracker VMs. Actuated uses containerd's image pulling facility to distribute and update the root filesystem for VMs for CI agents.
 
 **_Other Projects_** - While the above list provides a cross-section of well known uses of containerd, the simplicity and clear API layer for containerd has inspired many smaller projects around providing simple container management platforms. Several examples of building higher layer functionality on top of the containerd base have come from various containerd community participants:
  - Michael Crosby's [boss](https://github.com/crosbymichael/boss) project,
