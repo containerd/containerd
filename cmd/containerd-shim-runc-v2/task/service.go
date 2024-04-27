@@ -24,15 +24,20 @@ import (
 	"os"
 	"sync"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/cgroups/v3"
+	"github.com/containerd/cgroups/v3/cgroup1"
+	"github.com/containerd/errdefs"
+	runcC "github.com/containerd/go-runc"
+	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	eventstypes "github.com/containerd/containerd/v2/api/events"
 	taskAPI "github.com/containerd/containerd/v2/api/runtime/task/v3"
+	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/api/types/task"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
@@ -49,11 +54,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/containerd/v2/protobuf"
 	ptypes "github.com/containerd/containerd/v2/protobuf/types"
-	"github.com/containerd/errdefs"
-	runcC "github.com/containerd/go-runc"
-	"github.com/containerd/log"
-	"github.com/containerd/ttrpc"
-	"github.com/containerd/typeurl/v2"
 )
 
 var (

@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -528,7 +529,7 @@ func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error
 		return nil
 	}
 
-	log.G(ctx).Info("using shim events streaming")
+	log.G(ctx).Debugf("using shim events streaming for task %s", shim.ID())
 
 	stream, err := shim.task.Events(context.Background(), nil)
 	if err != nil {
@@ -539,7 +540,10 @@ func (m *TaskManager) tryStreamEvents(ctx context.Context, shim *shimTask) error
 		for {
 			evt, err := stream.Recv()
 			if err != nil {
-				log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
+				if !errors.Is(err, io.EOF) {
+					log.G(ctx).WithError(err).Error("failed to receive shim event from stream")
+				}
+
 				break
 			}
 
