@@ -56,7 +56,7 @@ including the Balena project listed below.
 
 **_Deckhouse_** - [Deckhouse Kubernetes Platform](https://deckhouse.io/) from Flant allows you to manage Kubernetes clusters anywhere in a fully automatic and uniform fashion. It uses containerd as the default CRI runtime.
 
-**_[Actuated](https://actuated.dev)** - Actuated is a platform for running self-hosted CI in securely-isolated Firecracker VMs. Actuated uses containerd's image pulling facility to distribute and update the root filesystem for VMs for CI agents.
+**_[Actuated](https://actuated.dev)_** - Actuated is a platform for running self-hosted CI in securely-isolated Firecracker VMs. Actuated uses containerd's image pulling facility to distribute and update the root filesystem for VMs for CI agents.
 
 **_[Syself Autopilot](https://syself.com)** - Syself Autopilot is a simplified Kubernetes platform based on Cluster API that can run on various providers. Syself Autopilot uses containerd as the default CRI runtime.
 
