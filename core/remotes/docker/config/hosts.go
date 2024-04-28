@@ -284,6 +284,19 @@ func HostDirFromRoot(root string) func(string) (string, error) {
 	}
 }
 
+// HostsFromHostDir returns hosts based at the given hostDir
+func HostsFromHostDir(ctx context.Context, hostDir string) ([]string, error) {
+	hostconfigs, err := loadHostDir(ctx, hostDir)
+	if err != nil {
+		return nil, err
+	}
+	var hosts []string
+	for _, h := range hostconfigs {
+		hosts = append(hosts, h.host)
+	}
+	return hosts, nil
+}
+
 // hostDirectory converts ":port" to "_port_" in directory names
 func hostDirectory(host string) string {
 	idx := strings.LastIndex(host, ":")
