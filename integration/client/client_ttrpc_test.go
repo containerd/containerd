@@ -24,9 +24,9 @@ import (
 	v1 "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
 	apitypes "github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/ttrpcutil"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/ttrpc"
 	"github.com/stretchr/testify/assert"
 )

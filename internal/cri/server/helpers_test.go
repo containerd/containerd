@@ -32,8 +32,8 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/typeurl/v2"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

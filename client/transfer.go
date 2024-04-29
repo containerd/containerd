@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/proxy"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 )

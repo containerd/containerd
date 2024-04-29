@@ -30,7 +30,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"

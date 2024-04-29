@@ -41,10 +41,10 @@ import (
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/containerd/v2/protobuf"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )

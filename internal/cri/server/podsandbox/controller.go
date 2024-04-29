@@ -37,8 +37,8 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )

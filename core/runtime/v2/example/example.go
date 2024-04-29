@@ -23,10 +23,10 @@ import (
 
 	taskAPI "github.com/containerd/containerd/v2/api/runtime/task/v2"
 	apitypes "github.com/containerd/containerd/v2/api/types"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/plugins"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"

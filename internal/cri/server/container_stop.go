@@ -26,7 +26,7 @@ import (
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 

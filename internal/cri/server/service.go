@@ -53,8 +53,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf"
 )
 
 var kernelSupportsRRO bool

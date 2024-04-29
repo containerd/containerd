@@ -23,8 +23,8 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/protobuf"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

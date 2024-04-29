@@ -25,8 +25,8 @@ import (
 	"github.com/containerd/containerd/v2/api/types"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/ttrpcutil"
-	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 )

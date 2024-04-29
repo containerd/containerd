@@ -23,9 +23,9 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/core/introspection"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"

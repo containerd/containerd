@@ -24,8 +24,8 @@ import (
 
 	api "github.com/containerd/containerd/v2/api/services/content/v1"
 	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/protobuf"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"

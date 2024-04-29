@@ -32,7 +32,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 const (

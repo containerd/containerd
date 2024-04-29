@@ -24,7 +24,7 @@ import (
 
 	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 const (

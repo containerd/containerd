@@ -32,7 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl/v2"
