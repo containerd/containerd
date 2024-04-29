@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	gruntime "runtime"
+	"strings"
 
 	"github.com/containerd/containerd/v2/api/runtime/task/v2"
 	"github.com/containerd/containerd/v2/core/runtime"
@@ -125,7 +126,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 		f.Close()
 	}
 	// Save runtime binary path for restore.
-	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(b.bundle.Path, "shim-binary-path"), []byte(b.runtime), 0o600); err != nil {
 		return nil, err
 	}
 
@@ -152,7 +153,8 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 }
 
 func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
-	log.G(ctx).Info("cleaning up dead shim")
+	id := b.bundle.ID
+	log.G(ctx).WithField("id", id).Info("cleaning up dead shim")
 
 	// On Windows and FreeBSD, the current working directory of the shim should
 	// not be the bundle path during the delete operation. Instead, we invoke
@@ -182,7 +184,6 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 			Opts:         nil,
 			Args:         args,
 		})
-
 	if err != nil {
 		return nil, err
 	}
@@ -193,12 +194,17 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	cmd.Stdout = out
 	cmd.Stderr = errb
 	if err := cmd.Run(); err != nil {
-		log.G(ctx).WithField("cmd", cmd).WithError(err).Error("failed to delete")
-		return nil, fmt.Errorf("%s: %w", errb.String(), err)
+		s := strings.TrimSpace(errb.String())
+		log.G(ctx).WithFields(log.Fields{
+			"error":  err,
+			"cmd":    cmd,
+			"id":     id,
+			"stderr": s,
+		}).Error("failed to delete dead shim")
+		return nil, fmt.Errorf("%s: %w", s, err)
 	}
-	s := errb.String()
-	if s != "" {
-		log.G(ctx).Warnf("cleanup warnings %s", s)
+	if s := errb.String(); s != "" {
+		log.G(ctx).WithFields(log.Fields{"cmd": cmd, "id": id, "stderr": strings.TrimSpace(s)}).Warn("shim cleanup warnings")
 	}
 	var response task.DeleteResponse
 	if err := proto.Unmarshal(out.Bytes(), &response); err != nil {
