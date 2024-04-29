@@ -7351,6 +7351,38 @@ file {
   syntax: "proto3"
 }
 file {
+  name: "github.com/containerd/containerd/api/types/runtimeoptions/v1/api.proto"
+  package: "runtimeoptions.v1"
+  message_type {
+    name: "Options"
+    field {
+      name: "type_url"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "typeUrl"
+    }
+    field {
+      name: "config_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "configPath"
+    }
+    field {
+      name: "config_body"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BYTES
+      json_name: "configBody"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/v2/api/types/runtimeoptions/v1;runtimeoptions"
+  }
+  syntax: "proto3"
+}
+file {
   name: "github.com/containerd/containerd/api/types/transfer/imagestore.proto"
   package: "containerd.types.transfer"
   dependency: "github.com/containerd/containerd/api/types/platform.proto"

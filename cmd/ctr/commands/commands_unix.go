@@ -22,7 +22,7 @@ import (
 	"errors"
 
 	"github.com/containerd/containerd/v2/api/types/runc/options"
-	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"
+	runtimeoptions "github.com/containerd/containerd/v2/api/types/runtimeoptions/v1"
 	"github.com/urfave/cli/v2"
 )
 
