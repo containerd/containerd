@@ -31,8 +31,8 @@ func DefaultImageConfig() ImageConfig {
 		ImageDecryption: ImageDecryption{
 			KeyModel: KeyModelNode,
 		},
-		PinnedImages: map[string]string{
-			"sandbox": DefaultSandboxImage,
+		PinnedImages: PinnedImageInfo{
+			Sandbox: DefaultSandboxImage,
 		},
 		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 	}

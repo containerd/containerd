@@ -323,7 +323,7 @@ func (c *Controller) getSandboxImageName() string {
 	// returns the name of the sandbox image used to scope pod shared resources used by the pod's containers,
 	// if empty return the default sandbox image.
 	if c.imageService != nil {
-		sandboxImage := c.imageService.PinnedImage("sandbox")
+		sandboxImage := c.imageService.SandboxImage()
 		if sandboxImage != "" {
 			return sandboxImage
 		}

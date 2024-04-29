@@ -50,8 +50,8 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 }
 
 var testImageConfig = criconfig.ImageConfig{
-	PinnedImages: map[string]string{
-		"sandbox": testSandboxImage,
+	PinnedImages: criconfig.PinnedImageInfo{
+		Sandbox: testSandboxImage,
 	},
 }
 

@@ -254,6 +254,24 @@ type ImagePlatform struct {
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 }
 
+// PinnedImageInfo contains the pinned image information for all the requried images
+// of the cluster. This also enables mapping multiple images to a single usage key.
+type PinnedImageInfo struct {
+	// Pinned Image corresponding to the Sandbox Images of the cluster. This is a mandatory
+	// attribute to be set and should be the image that is used for the sandbox containers.
+	// Image name should be full names including domain and tag
+	Sandbox string `toml:"sandbox" json:"sandbox"`
+
+	// AdditionalImages contains the additional images that are required for the cluster.
+	// These are non Sandbox images mapped to the respective usage set as keys
+	// Image names should be full names including domain and tag
+	// Examples:
+	//  base:
+	// 	- "docker.io/library/ubuntu:20.04"
+	// 	- "docker.io/library/ubuntu:22.04"
+	AdditionalImages map[string][]string `toml:"additional_images" json:"additionalImages"`
+}
+
 type ImageConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
@@ -277,7 +295,7 @@ type ImageConfig struct {
 	//   "base": "docker.io/library/ubuntu:latest"
 	// Migrated from:
 	// (PluginConfig).SandboxImage string `toml:"sandbox_image" json:"sandboxImage"`
-	PinnedImages map[string]string `toml:"pinned_images" json:"pinned_images"`
+	PinnedImages PinnedImageInfo `toml:"pinned_images" json:"pinned_images"`
 
 	// RuntimePlatforms is map between the runtime and the image platform to
 	// use for that runtime. When resolving an image for a runtime, this
