@@ -24,7 +24,7 @@ import (
 	"sync"
 
 	"github.com/containerd/cgroups/v3/cgroup1"
-	eventstypes "github.com/containerd/containerd/v2/api/events"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/oom"
 	"github.com/containerd/containerd/v2/pkg/shim"

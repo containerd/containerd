@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/containerd/cgroups/v3"
-	"github.com/containerd/containerd/v2/api/types/runc/options"
+	"github.com/containerd/containerd/api/types/runc/options"
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/plugins"

@@ -19,7 +19,7 @@ package leases
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/leases/v1"
+	api "github.com/containerd/containerd/api/services/leases/v1"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"

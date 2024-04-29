@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 
-	task "github.com/containerd/containerd/v2/api/runtime/task/v3"
-	tasktypes "github.com/containerd/containerd/v2/api/types/task"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
+	tasktypes "github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"

@@ -24,8 +24,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	eventtypes "github.com/containerd/containerd/v2/api/events"
-	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	eventtypes "github.com/containerd/containerd/api/events"
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

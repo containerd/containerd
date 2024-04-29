@@ -22,8 +22,8 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/api/types/runc/options"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/errdefs"

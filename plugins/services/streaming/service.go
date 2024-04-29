@@ -20,7 +20,7 @@ import (
 	"errors"
 	"io"
 
-	api "github.com/containerd/containerd/v2/api/services/streaming/v1"
+	api "github.com/containerd/containerd/api/services/streaming/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"

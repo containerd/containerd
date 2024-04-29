@@ -27,7 +27,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"k8s.io/utils/clock"
 
-	eventtypes "github.com/containerd/containerd/v2/api/events"
+	eventtypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 )

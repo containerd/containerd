@@ -30,8 +30,8 @@ import (
 	rpc "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/status"
 
-	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	api "github.com/containerd/containerd/api/services/introspection/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

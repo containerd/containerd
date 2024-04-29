@@ -21,8 +21,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"

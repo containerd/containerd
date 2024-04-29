@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containerd/containerd/v2/api/types/runc/options"
+	"github.com/containerd/containerd/api/types/runc/options"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/urfave/cli/v2"

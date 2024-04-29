@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 	gruntime "runtime"
 
-	"github.com/containerd/containerd/v2/api/runtime/task/v2"
+	"github.com/containerd/containerd/api/runtime/task/v2"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

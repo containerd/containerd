@@ -21,8 +21,8 @@ package commands
 import (
 	"errors"
 
-	"github.com/containerd/containerd/v2/api/types/runc/options"
-	runtimeoptions "github.com/containerd/containerd/v2/api/types/runtimeoptions/v1"
+	"github.com/containerd/containerd/api/types/runc/options"
+	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/urfave/cli/v2"
 )
 

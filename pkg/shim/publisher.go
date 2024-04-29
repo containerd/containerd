@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	v1 "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	v1 "github.com/containerd/containerd/api/services/ttrpc/events/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

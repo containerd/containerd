@@ -19,7 +19,7 @@ package proxy
 import (
 	"context"
 
-	contentapi "github.com/containerd/containerd/v2/api/services/content/v1"
+	contentapi "github.com/containerd/containerd/api/services/content/v1"
 	digest "github.com/opencontainers/go-digest"
 )
 

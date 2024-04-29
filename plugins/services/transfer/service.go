@@ -19,9 +19,9 @@ package transfer
 import (
 	"context"
 
-	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
-	"github.com/containerd/containerd/v2/api/types"
-	transferTypes "github.com/containerd/containerd/v2/api/types/transfer"
+	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
+	"github.com/containerd/containerd/api/types"
+	transferTypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	tplugins "github.com/containerd/containerd/v2/core/transfer/plugins"

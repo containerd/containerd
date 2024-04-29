@@ -34,7 +34,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/opencontainers/go-digest"
 
-	_ "github.com/containerd/containerd/v2/api/types/runc/options"
+	_ "github.com/containerd/containerd/api/types/runc/options"
 	_ "github.com/containerd/containerd/v2/core/runtime/v2"
 	_ "github.com/containerd/containerd/v2/plugins/cri/images"
 	_ "github.com/containerd/containerd/v2/plugins/cri/runtime"

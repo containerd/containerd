@@ -21,8 +21,8 @@ import (
 	"io"
 	"os"
 
-	taskAPI "github.com/containerd/containerd/v2/api/runtime/task/v2"
-	apitypes "github.com/containerd/containerd/v2/api/types"
+	taskAPI "github.com/containerd/containerd/api/runtime/task/v2"
+	apitypes "github.com/containerd/containerd/api/types"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/shutdown"

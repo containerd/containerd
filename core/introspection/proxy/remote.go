@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"

@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/containerd/containerd/v2/api/services/events/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	api "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"

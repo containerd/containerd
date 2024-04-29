@@ -35,9 +35,9 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
-	task "github.com/containerd/containerd/v2/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/api/types"
+	eventstypes "github.com/containerd/containerd/api/events"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/identifiers"

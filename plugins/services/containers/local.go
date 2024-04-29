@@ -20,8 +20,8 @@ import (
 	"context"
 	"io"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
-	api "github.com/containerd/containerd/v2/api/services/containers/v1"
+	eventstypes "github.com/containerd/containerd/api/events"
+	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/metadata"

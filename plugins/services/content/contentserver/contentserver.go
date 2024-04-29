@@ -22,7 +22,7 @@ import (
 	"io"
 	"sync"
 
-	api "github.com/containerd/containerd/v2/api/services/content/v1"
+	api "github.com/containerd/containerd/api/services/content/v1"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"

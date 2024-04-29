@@ -17,7 +17,7 @@
 package runtime
 
 import (
-	"github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/api/events"
 	"github.com/containerd/log"
 )
 

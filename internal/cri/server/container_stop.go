@@ -23,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/v2/api/events"
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/protobuf"

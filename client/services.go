@@ -19,11 +19,11 @@ package client
 import (
 	"fmt"
 
-	containersapi "github.com/containerd/containerd/v2/api/services/containers/v1"
-	"github.com/containerd/containerd/v2/api/services/diff/v1"
-	imagesapi "github.com/containerd/containerd/v2/api/services/images/v1"
-	namespacesapi "github.com/containerd/containerd/v2/api/services/namespaces/v1"
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	containersapi "github.com/containerd/containerd/api/services/containers/v1"
+	"github.com/containerd/containerd/api/services/diff/v1"
+	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	namespacesapi "github.com/containerd/containerd/api/services/namespaces/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"

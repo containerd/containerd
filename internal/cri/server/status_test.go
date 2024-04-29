@@ -19,7 +19,7 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/v2/api/services/introspection/v1"
+	"github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )

@@ -19,7 +19,7 @@ package tasks
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/tasks/v1"
+	api "github.com/containerd/containerd/api/services/tasks/v1"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"

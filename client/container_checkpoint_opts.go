@@ -23,8 +23,8 @@ import (
 	"fmt"
 	"runtime"
 
-	tasks "github.com/containerd/containerd/v2/api/services/tasks/v1"
-	"github.com/containerd/containerd/v2/api/types/runc/options"
+	tasks "github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
