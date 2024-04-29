@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 
 	runhcsoptions "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
-	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	runcoptions "github.com/containerd/containerd/v2/api/types/runc/options"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	runtimeoptions "github.com/containerd/containerd/v2/pkg/runtimeoptions/v1"

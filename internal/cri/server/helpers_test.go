@@ -26,8 +26,8 @@ import (
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	runcoptions "github.com/containerd/containerd/v2/api/types/runc/options"
 	"github.com/containerd/containerd/v2/core/containers"
-	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"

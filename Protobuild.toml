@@ -12,10 +12,3 @@ generators = ["go"]
   # `/usr/local/include` to pickup the common install location of protobuf.
   # This is the default.
   after = ["/usr/local/include", "/usr/include"]
-
-[[descriptors]]
-prefix = "github.com/containerd/containerd/core/runtime/v2/runc/options"
-target = "core/runtime/v2/runc/options/next.pb.txt"
-ignore_files = [
-	"google/protobuf/descriptor.proto",
-]

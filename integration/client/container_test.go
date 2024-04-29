@@ -32,11 +32,11 @@ import (
 	"time"
 
 	apievents "github.com/containerd/containerd/v2/api/events"
+	"github.com/containerd/containerd/v2/api/types/runc/options"
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/images"
 	_ "github.com/containerd/containerd/v2/core/runtime"
-	"github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
