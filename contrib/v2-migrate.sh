@@ -58,7 +58,6 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/randutil/$1$2"github.com\/containerd\/containerd\/v2\/internal\/randutil/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/registrar/$1$2"github.com\/containerd\/containerd\/v2\/internal\/registrar/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/streaming/$1$2"github.com\/containerd\/containerd\/v2\/core\/streaming/g' $GOFILE
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/testutil/$1$2"github.com\/containerd\/containerd\/v2\/internal\/testutil/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/tomlext/$1$2"github.com\/containerd\/containerd\/v2\/internal\/tomlext/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/transfer/$1$2"github.com\/containerd\/containerd\/v2\/core\/transfer/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/truncindex/$1$2"github.com\/containerd\/containerd\/v2\/internal\/truncindex/g' $GOFILE
