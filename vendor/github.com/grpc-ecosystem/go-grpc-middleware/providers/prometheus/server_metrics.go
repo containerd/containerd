@@ -7,6 +7,7 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors"
 	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 // ServerMetrics represents a collection of metrics to be registered on a
@@ -81,7 +82,7 @@ func (m *ServerMetrics) Collect(ch chan<- prometheus.Metric) {
 // value, for all gRPC methods registered on a gRPC server. This is useful, to
 // ensure that all metrics exist when collecting and querying.
 // NOTE: This might add significant cardinality and might not be needed in future version of Prometheus (created timestamp).
-func (m *ServerMetrics) InitializeMetrics(server *grpc.Server) {
+func (m *ServerMetrics) InitializeMetrics(server reflection.ServiceInfoProvider) {
 	serviceInfo := server.GetServiceInfo()
 	for serviceName, info := range serviceInfo {
 		for _, mInfo := range info.Methods {
