@@ -36,7 +36,9 @@ function install_runc() {
 	TMPROOT=$(mktemp -d)
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
-	git checkout "${RUNC_VERSION}"
+	#git checkout "${RUNC_VERSION}"
+	git fetch origin pull/4211/head:pr/4211
+	git switch pr/4211
 	make BUILDTAGS='seccomp' runc
 	$SUDO make install
 	popd
