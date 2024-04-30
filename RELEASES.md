@@ -278,6 +278,36 @@ and new fields on messages may be added if they are optional.
 to the API by having a diff that the CI can run. These files are not intended to be
 consumed or used by clients.
 
+As of containerd 2.0, the API version diverges from the main containerd version.
+While containerd 2.0 is a _major_ version jump for containerd, the API will remain
+on 1.x to remain backwards compatible with prior releases and existing clients.
+The 2.0 release adds the API to a separate Go module which can remain as the
+`github.com/containerd/containerd/api` Go package and imported separately from the
+rest of containerd.
+
+The API minor version will continue to be incremented for each major and minor
+version release of containerd. However, the API is tagged directly out of the
+main branch with the minor version incrementing earlier in the next release cycle
+rather than at the end. This means that after the containerd 2.0 release, the next
+API change is tagged as `api/v1.9.0` prior to any containerd 2.1 release. The
+latest API version should be backported to all supported versions and patch
+releases for prior API versions should be avoided if possible.
+
+
+| Containerd Version | API Version at Release |
+|--------------------|------------------------|
+| v1.0               | 1.0                    |
+| v1.1               | 1.1                    |
+| v1.2               | 1.2                    |
+| v1.3               | 1.3                    |
+| v1.4               | 1.4                    |
+| v1.5               | 1.5                    |
+| v1.6               | 1.6                    |
+| v1.7               | 1.7                    |
+| v2.0               | 1.8                    |
+| next               | 1.9                    |
+
+
 ### Metrics API
 
 The metrics API that outputs prometheus style metrics will be versioned independently,
