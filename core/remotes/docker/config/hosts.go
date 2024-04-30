@@ -308,7 +308,7 @@ func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 
 	hosts, err := parseHostsFile(hostsDir, b)
 	if err != nil {
-		log.G(ctx).WithError(err).Error("failed to decode hosts.toml")
+		log.G(ctx).WithError(err).Errorf("failed to decode %s", filepath.Join(hostsDir, "hosts.toml"))
 		// Fallback to checking certificate files
 		return loadCertFiles(ctx, hostsDir)
 	}
