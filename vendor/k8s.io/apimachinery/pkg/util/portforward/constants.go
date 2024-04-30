@@ -14,5 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package remotecommand contains functions related to executing commands in and attaching to pods.
-package remotecommand // import "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+package portforward
+
+const (
+	PortForwardV1Name                    = "portforward.k8s.io"
+	WebsocketsSPDYTunnelingPrefix        = "SPDY/3.1+"
+	KubernetesSuffix                     = ".k8s.io"
+	WebsocketsSPDYTunnelingPortForwardV1 = WebsocketsSPDYTunnelingPrefix + PortForwardV1Name
+)
