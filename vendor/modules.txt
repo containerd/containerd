@@ -666,11 +666,11 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# k8s.io/api v0.29.2
-## explicit; go 1.21
+# k8s.io/api v0.30.0
+## explicit; go 1.22.0
 k8s.io/api/core/v1
-# k8s.io/apimachinery v0.29.2
-## explicit; go 1.21
+# k8s.io/apimachinery v0.30.0
+## explicit; go 1.22.0
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/resource
 k8s.io/apimachinery/pkg/apis/meta/v1
@@ -699,6 +699,7 @@ k8s.io/apimachinery/pkg/util/intstr
 k8s.io/apimachinery/pkg/util/json
 k8s.io/apimachinery/pkg/util/naming
 k8s.io/apimachinery/pkg/util/net
+k8s.io/apimachinery/pkg/util/portforward
 k8s.io/apimachinery/pkg/util/proxy
 k8s.io/apimachinery/pkg/util/remotecommand
 k8s.io/apimachinery/pkg/util/runtime
@@ -711,11 +712,11 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.29.2
-## explicit; go 1.21
+# k8s.io/apiserver v0.30.0
+## explicit; go 1.22.0
 k8s.io/apiserver/pkg/endpoints/responsewriter
-# k8s.io/client-go v0.29.2
-## explicit; go 1.21
+# k8s.io/client-go v0.30.0
+## explicit; go 1.22.0
 k8s.io/client-go/pkg/apis/clientauthentication
 k8s.io/client-go/pkg/apis/clientauthentication/install
 k8s.io/client-go/pkg/apis/clientauthentication/v1
@@ -736,8 +737,8 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.29.2
-## explicit; go 1.21
+# k8s.io/component-base v0.30.0
+## explicit; go 1.22.0
 k8s.io/component-base/logs/logreduction
 # k8s.io/cri-api v0.30.0
 ## explicit; go 1.22.0
@@ -752,8 +753,8 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-# k8s.io/kubelet v0.29.2
-## explicit; go 1.21
+# k8s.io/kubelet v0.30.0
+## explicit; go 1.22.0
 k8s.io/kubelet/pkg/cri/streaming
 k8s.io/kubelet/pkg/cri/streaming/portforward
 k8s.io/kubelet/pkg/cri/streaming/remotecommand
@@ -762,7 +763,6 @@ k8s.io/kubelet/pkg/cri/streaming/remotecommand
 k8s.io/utils/clock
 k8s.io/utils/clock/testing
 k8s.io/utils/exec
-k8s.io/utils/integer
 k8s.io/utils/internal/third_party/forked/golang/net
 k8s.io/utils/net
 k8s.io/utils/strings/slices
