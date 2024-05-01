@@ -213,7 +213,7 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
 
 ### Multiple Runtimes
 
-The following is an example partial configuraton with two runtimes:
+The following is an example partial configuration with two runtimes:
 
 ```toml
 [plugins]
