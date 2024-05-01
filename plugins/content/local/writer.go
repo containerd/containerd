@@ -206,3 +206,11 @@ func (w *writer) Truncate(size int64) error {
 	}
 	return w.fp.Truncate(0)
 }
+
+func (w *writer) Sync() error {
+	if w.fp != nil {
+		return w.fp.Sync()
+	}
+
+	return nil
+}

@@ -165,6 +165,11 @@ type Writer interface {
 	Truncate(size int64) error
 }
 
+type Syncer interface {
+	// Sync flushes the in-flight writes to the disk (when applicable)
+	Sync() error
+}
+
 // Opt is used to alter the mutable properties of content
 type Opt func(*Info) error
 
