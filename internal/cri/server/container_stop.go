@@ -26,6 +26,7 @@ import (
 	eventtypes "github.com/containerd/containerd/v2/api/events"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -36,13 +37,14 @@ import (
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
 func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainerRequest) (*runtime.StopContainerResponse, error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	// Get container config from container store.
 	container, err := c.containerStore.Get(r.GetContainerId())
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
-
+	span.SetAttributes(tracing.Attribute("container.id", container.ID))
 	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}
@@ -69,6 +71,8 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 
 // stopContainer stops a container based on the container metadata.
 func (c *criService) stopContainer(ctx context.Context, container containerstore.Container, timeout time.Duration) error {
+	span := tracing.SpanFromContext(ctx)
+	start := time.Now()
 	id := container.ID
 	sandboxID := container.SandboxID
 
@@ -192,6 +196,12 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	if err != nil {
 		return fmt.Errorf("an error occurs during waiting for container %q to be killed: %w", id, err)
 	}
+
+	span.AddEvent("container stopped",
+		tracing.Attribute("container.id", id),
+		tracing.Attribute("container.stop.duration", time.Since(start).String()),
+	)
+
 	return nil
 }
 
