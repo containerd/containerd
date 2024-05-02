@@ -58,4 +58,4 @@ do
     crictl --runtime-endpoint ${BDIR}/c.sock info && break || sleep 1
 done
 
-critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8
+critest --report-dir "$report_dir" --runtime-endpoint=unix:///${BDIR}/c.sock --parallel=8 "${EXTRA_CRITEST_OPTIONS:-""}"
