@@ -36,10 +36,8 @@ import (
 )
 
 type localTransferService struct {
-	leases    leases.Manager
-	content   content.Store
-	images    images.Store
-	verifiers map[string]imageverifier.ImageVerifier
+	content content.Store
+	images  images.Store
 	// limiter for upload
 	limiterU *semaphore.Weighted
 	// limiter for download operation
@@ -47,13 +45,11 @@ type localTransferService struct {
 	config   TransferConfig
 }
 
-func NewTransferService(lm leases.Manager, cs content.Store, is images.Store, vfs map[string]imageverifier.ImageVerifier, tc *TransferConfig) transfer.Transferrer {
+func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) transfer.Transferrer {
 	ts := &localTransferService{
-		leases:    lm,
-		content:   cs,
-		images:    is,
-		verifiers: vfs,
-		config:    *tc,
+		content: cs,
+		images:  is,
+		config:  tc,
 	}
 	if tc.MaxConcurrentUploadedLayers > 0 {
 		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
@@ -142,7 +138,10 @@ func (ts *localTransferService) withLease(ctx context.Context, opts ...leases.Op
 		return ctx, nop, nil
 	}
 
-	ls := ts.leases
+	ls := ts.config.Leases
+	if ls == nil {
+		return ctx, nop, nil
+	}
 
 	if len(opts) == 0 {
 		// Use default lease configuration if no options provided
@@ -164,6 +163,9 @@ func (ts *localTransferService) withLease(ctx context.Context, opts ...leases.Op
 }
 
 type TransferConfig struct {
+	// Leases manager is used to create leases during operations if none, exists
+	Leases leases.Manager
+
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
@@ -181,6 +183,9 @@ type TransferConfig struct {
 
 	// UnpackPlatforms are used to specify supported combination of platforms and snapshotters
 	UnpackPlatforms []unpack.Platform
+
+	// ImageVerifiers verify the image before saving into the image store.
+	Verifiers map[string]imageverifier.ImageVerifier
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string
