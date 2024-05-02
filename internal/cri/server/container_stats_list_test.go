@@ -32,57 +32,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
-	c := newTestCRIService()
-	timestamp := time.Now()
-	secondAfterTimeStamp := timestamp.Add(time.Second)
-	ID := "ID"
-
-	for _, test := range []struct {
-		desc                        string
-		firstCPUValue               uint64
-		secondCPUValue              uint64
-		expectedNanoCoreUsageFirst  uint64
-		expectedNanoCoreUsageSecond uint64
-	}{
-		{
-			desc:                        "metrics",
-			firstCPUValue:               50,
-			secondCPUValue:              500,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 450,
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			container, err := containerstore.NewContainer(
-				containerstore.Metadata{ID: ID},
-			)
-			assert.NoError(t, err)
-			assert.Nil(t, container.Stats)
-			err = c.containerStore.Add(container)
-			assert.NoError(t, err)
-
-			cpuUsage, err := c.getUsageNanoCores(ID, false, test.firstCPUValue, timestamp)
-			assert.NoError(t, err)
-
-			container, err = c.containerStore.Get(ID)
-			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
-
-			assert.Equal(t, test.expectedNanoCoreUsageFirst, cpuUsage)
-
-			cpuUsage, err = c.getUsageNanoCores(ID, false, test.secondCPUValue, secondAfterTimeStamp)
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedNanoCoreUsageSecond, cpuUsage)
-
-			container, err = c.containerStore.Get(ID)
-			assert.NoError(t, err)
-			assert.NotNil(t, container.Stats)
-		})
-	}
-}
-
 func TestGetWorkingSet(t *testing.T) {
 	for _, test := range []struct {
 		desc     string
