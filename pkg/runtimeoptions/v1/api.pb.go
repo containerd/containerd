@@ -32,8 +32,10 @@ type Options struct {
 	// ConfigPath specifies the filesystem location of the config file
 	// used by the runtime.
 	ConfigPath string `protobuf:"bytes,2,opt,name=config_path,json=configPath,proto3" json:"config_path,omitempty"`
-	// Blob specifies an in-memory TOML blob passed from containerd's configuration section
-	// for this runtime. This will be used if config_path is not specified.
+	// Blob specifies an in-memory blob passed from containerd's configuration section
+	// for this runtime. If the typeurl is specified, this will be a JSON blob which can be
+	// interpreted as the type represented by the typeurl. Otherwise, this will be a TOML
+	// blob. This will be used if config_path is not specified.
 	ConfigBody []byte `protobuf:"bytes,3,opt,name=config_body,json=configBody,proto3" json:"config_body,omitempty"`
 }
 
