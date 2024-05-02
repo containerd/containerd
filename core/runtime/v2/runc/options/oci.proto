@@ -29,6 +29,11 @@ message Options {
 	string criu_image_path = 10;
 	// criu work path
 	string criu_work_path = 11;
+	// task api address, can be a unix domain socket, or vsock address.
+	// it is in the form of ttrpc+unix://path/to/uds or grpc+vsock://<vsock cid>:<port>.
+	string task_api_address = 12;
+	// task api version, currently supported value is 2 and 3.
+	uint32 task_api_version = 13;
 }
 
 message CheckpointOptions {

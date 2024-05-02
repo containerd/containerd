@@ -163,18 +163,37 @@ func (m *ShimManager) ID() string {
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
 	// This container belongs to sandbox which supposed to be already started via sandbox API.
 	if opts.SandboxID != "" {
-		process, err := m.Get(ctx, opts.SandboxID)
-		if err != nil {
-			return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+		var params shimbinary.BootstrapParams
+		if opts.Address != "" {
+			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
+			// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
+			protocol, address, ok := strings.Cut(opts.Address, "+")
+			if !ok {
+				return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+					" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+			}
+			params = shimbinary.BootstrapParams{
+				Version:  int(opts.Version),
+				Protocol: protocol,
+				Address:  address,
+			}
+		} else {
+			// For those sandbox we can not get endpoint,
+			// fallback to legacy implementation
+			process, err := m.Get(ctx, opts.SandboxID)
+			if err != nil {
+				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
+			}
+			p, restoreErr := restoreBootstrapParams(process.Bundle())
+			if restoreErr != nil {
+				return nil, fmt.Errorf("failed to get bootstrap "+
+					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
+			}
+			params = p
 		}
 
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
-			return nil, err
-		}
-
-		params, err := restoreBootstrapParams(process.Bundle())
-		if err != nil {
 			return nil, err
 		}
 

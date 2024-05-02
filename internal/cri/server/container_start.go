@@ -118,6 +118,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	if ociRuntime.Path != "" {
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}
+
+	// append endpoint to the options so that task manager can get task api endpoint directly
+	endpoint := sandbox.Endpoint
+	if endpoint.IsValid() {
+		taskOpts = append(taskOpts,
+			containerd.WithTaskAPIEndpoint(endpoint.Address, endpoint.Version))
+	}
+
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)

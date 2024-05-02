@@ -5506,6 +5506,20 @@ file {
       type_name: ".containerd.services.sandbox.v1.ControllerStartResponse.LabelsEntry"
       json_name: "labels"
     }
+    field {
+      name: "address"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "address"
+    }
+    field {
+      name: "version"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "version"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
@@ -5695,6 +5709,20 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
       json_name: "extra"
+    }
+    field {
+      name: "address"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "address"
+    }
+    field {
+      name: "version"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "version"
     }
     nested_type {
       name: "InfoEntry"

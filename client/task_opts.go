@@ -50,6 +50,23 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 	}
 }
 
+// WithTaskAPIEndpoint allow task service to manage a task through a given endpoint,
+// usually it is served inside a sandbox, and we can get it from sandbox status.
+func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
+	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+		if info.Options == nil {
+			info.Options = &options.Options{}
+		}
+		opts, ok := info.Options.(*options.Options)
+		if !ok {
+			return errors.New("invalid runtime v2 options format")
+		}
+		opts.TaskApiAddress = address
+		opts.TaskApiVersion = version
+		return nil
+	}
+}
+
 // WithTaskCheckpoint allows a task to be created with live runtime and memory data from a
 // previous checkpoint. Additional software such as CRIU may be required to
 // restore a task from a checkpoint

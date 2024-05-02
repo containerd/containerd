@@ -113,6 +113,7 @@ func (c *criService) recover(ctx context.Context) error {
 		var (
 			state      = sandboxstore.StateUnknown
 			controller = c.client.SandboxController(sbx.Sandboxer)
+			endpoint   sandboxstore.Endpoint
 		)
 
 		status, err := controller.Status(ctx, sbx.ID, false)
@@ -126,6 +127,8 @@ func (c *criService) recover(ctx context.Context) error {
 				state = sandboxstore.StateNotReady
 			}
 		} else {
+			endpoint.Version = status.Version
+			endpoint.Address = status.Address
 			if code, ok := runtime.PodSandboxState_value[status.State]; ok {
 				if code == int32(runtime.PodSandboxState_SANDBOX_READY) {
 					state = sandboxstore.StateReady
@@ -137,6 +140,7 @@ func (c *criService) recover(ctx context.Context) error {
 
 		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
 		sb.Sandboxer = sbx.Sandboxer
+		sb.Endpoint = endpoint
 
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
