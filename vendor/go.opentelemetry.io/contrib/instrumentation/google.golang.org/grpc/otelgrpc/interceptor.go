@@ -48,7 +48,7 @@ var (
 )
 
 // UnaryClientInterceptor returns a grpc.UnaryClientInterceptor suitable
-// for use in a grpc.Dial call.
+// for use in a grpc.NewClient call.
 //
 // Deprecated: Use [NewClientHandler] instead.
 func UnaryClientInterceptor(opts ...Option) grpc.UnaryClientInterceptor {
@@ -185,7 +185,7 @@ func (w *clientStream) CloseSend() error {
 	return err
 }
 
-func wrapClientStream(ctx context.Context, s grpc.ClientStream, desc *grpc.StreamDesc, span trace.Span, cfg *config) *clientStream {
+func wrapClientStream(s grpc.ClientStream, desc *grpc.StreamDesc, span trace.Span, cfg *config) *clientStream {
 	return &clientStream{
 		ClientStream:  s,
 		span:          span,
@@ -208,7 +208,7 @@ func (w *clientStream) endSpan(err error) {
 }
 
 // StreamClientInterceptor returns a grpc.StreamClientInterceptor suitable
-// for use in a grpc.Dial call.
+// for use in a grpc.NewClient call.
 //
 // Deprecated: Use [NewClientHandler] instead.
 func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
@@ -259,7 +259,7 @@ func StreamClientInterceptor(opts ...Option) grpc.StreamClientInterceptor {
 			span.End()
 			return s, err
 		}
-		stream := wrapClientStream(ctx, s, desc, span, cfg)
+		stream := wrapClientStream(s, desc, span, cfg)
 		return stream, nil
 	}
 }
