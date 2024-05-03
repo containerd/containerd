@@ -24,7 +24,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/platforms"
 	pluginutils "github.com/containerd/plugin"

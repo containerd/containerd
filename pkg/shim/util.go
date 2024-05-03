@@ -34,8 +34,8 @@ import (
 
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/protobuf/proto"
-	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 )
 

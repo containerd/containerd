@@ -51,7 +51,7 @@ file {
     proto3_optional: true
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -166,7 +166,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -186,7 +186,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -282,7 +282,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -378,7 +378,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -464,7 +464,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
   }
   syntax: "proto3"
 }
@@ -538,7 +538,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -578,7 +578,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -850,7 +850,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/events;events"
+    go_package: "github.com/containerd/containerd/api/events;events"
     63300: 1
   }
   syntax: "proto3"
@@ -890,7 +890,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -926,7 +926,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -1344,7 +1344,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/runtime/sandbox/v1;sandbox"
+    go_package: "github.com/containerd/containerd/api/runtime/sandbox/v1;sandbox"
   }
   syntax: "proto3"
 }
@@ -1491,7 +1491,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/task"
+    go_package: "github.com/containerd/containerd/api/types/task"
   }
   syntax: "proto3"
 }
@@ -2206,7 +2206,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/runtime/task/v2;task"
+    go_package: "github.com/containerd/containerd/api/runtime/task/v2;task"
   }
   syntax: "proto3"
 }
@@ -2921,7 +2921,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/runtime/task/v3;task"
+    go_package: "github.com/containerd/containerd/api/runtime/task/v3;task"
   }
   syntax: "proto3"
 }
@@ -3251,7 +3251,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/containers/v1;containers"
+    go_package: "github.com/containerd/containerd/api/services/containers/v1;containers"
   }
   syntax: "proto3"
 }
@@ -3734,7 +3734,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/content/v1;content"
+    go_package: "github.com/containerd/containerd/api/services/content/v1;content"
   }
   syntax: "proto3"
 }
@@ -3794,7 +3794,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -3965,7 +3965,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/diff/v1;diff"
+    go_package: "github.com/containerd/containerd/api/services/diff/v1;diff"
   }
   syntax: "proto3"
 }
@@ -4012,7 +4012,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -4081,7 +4081,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/events/v1;events"
+    go_package: "github.com/containerd/containerd/api/services/events/v1;events"
   }
   syntax: "proto3"
 }
@@ -4323,7 +4323,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/images/v1;images"
+    go_package: "github.com/containerd/containerd/api/services/images/v1;images"
   }
   syntax: "proto3"
 }
@@ -4429,7 +4429,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -4696,7 +4696,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/introspection/v1;introspection"
+    go_package: "github.com/containerd/containerd/api/services/introspection/v1;introspection"
   }
   syntax: "proto3"
 }
@@ -4946,7 +4946,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/leases/v1;leases"
+    go_package: "github.com/containerd/containerd/api/services/leases/v1;leases"
   }
   syntax: "proto3"
 }
@@ -5126,7 +5126,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/namespaces/v1;namespaces"
+    go_package: "github.com/containerd/containerd/api/services/namespaces/v1;namespaces"
   }
   syntax: "proto3"
 }
@@ -5260,7 +5260,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types;types"
+    go_package: "github.com/containerd/containerd/api/types;types"
   }
   syntax: "proto3"
 }
@@ -5865,7 +5865,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/sandbox/v1;sandbox"
+    go_package: "github.com/containerd/containerd/api/services/sandbox/v1;sandbox"
   }
   syntax: "proto3"
 }
@@ -6379,7 +6379,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/snapshots/v1;snapshots"
+    go_package: "github.com/containerd/containerd/api/services/snapshots/v1;snapshots"
   }
   syntax: "proto3"
 }
@@ -6408,7 +6408,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/streaming/v1;streaming"
+    go_package: "github.com/containerd/containerd/api/services/streaming/v1;streaming"
   }
   syntax: "proto3"
 }
@@ -7053,7 +7053,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/tasks/v1;tasks"
+    go_package: "github.com/containerd/containerd/api/services/tasks/v1;tasks"
   }
   syntax: "proto3"
 }
@@ -7108,7 +7108,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/transfer/v1;transfer"
+    go_package: "github.com/containerd/containerd/api/services/transfer/v1;transfer"
   }
   syntax: "proto3"
 }
@@ -7137,7 +7137,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/ttrpc/events/v1;events"
+    go_package: "github.com/containerd/containerd/api/services/ttrpc/events/v1;events"
   }
   syntax: "proto3"
 }
@@ -7171,7 +7171,214 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/services/version/v1;version"
+    go_package: "github.com/containerd/containerd/api/services/version/v1;version"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/runc/options/oci.proto"
+  package: "containerd.runc.v1"
+  message_type {
+    name: "Options"
+    field {
+      name: "no_pivot_root"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "noPivotRoot"
+    }
+    field {
+      name: "no_new_keyring"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "noNewKeyring"
+    }
+    field {
+      name: "shim_cgroup"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "shimCgroup"
+    }
+    field {
+      name: "io_uid"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "ioUid"
+    }
+    field {
+      name: "io_gid"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "ioGid"
+    }
+    field {
+      name: "binary_name"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "binaryName"
+    }
+    field {
+      name: "root"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "root"
+    }
+    field {
+      name: "systemd_cgroup"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "systemdCgroup"
+    }
+    field {
+      name: "criu_image_path"
+      number: 10
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "criuImagePath"
+    }
+    field {
+      name: "criu_work_path"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "criuWorkPath"
+    }
+    field {
+      name: "task_api_address"
+      number: 12
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "taskApiAddress"
+    }
+    field {
+      name: "task_api_version"
+      number: 13
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "taskApiVersion"
+    }
+    reserved_range {
+      start: 8
+      end: 9
+    }
+  }
+  message_type {
+    name: "CheckpointOptions"
+    field {
+      name: "exit"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "exit"
+    }
+    field {
+      name: "open_tcp"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "openTcp"
+    }
+    field {
+      name: "external_unix_sockets"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "externalUnixSockets"
+    }
+    field {
+      name: "terminal"
+      number: 4
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "terminal"
+    }
+    field {
+      name: "file_locks"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "fileLocks"
+    }
+    field {
+      name: "empty_namespaces"
+      number: 6
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "emptyNamespaces"
+    }
+    field {
+      name: "cgroups_mode"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "cgroupsMode"
+    }
+    field {
+      name: "image_path"
+      number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "imagePath"
+    }
+    field {
+      name: "work_path"
+      number: 9
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "workPath"
+    }
+  }
+  message_type {
+    name: "ProcessDetails"
+    field {
+      name: "exec_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "execId"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/runc/options;options"
+  }
+  syntax: "proto3"
+}
+file {
+  name: "github.com/containerd/containerd/api/types/runtimeoptions/v1/api.proto"
+  package: "runtimeoptions.v1"
+  message_type {
+    name: "Options"
+    field {
+      name: "type_url"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "typeUrl"
+    }
+    field {
+      name: "config_path"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "configPath"
+    }
+    field {
+      name: "config_body"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_BYTES
+      json_name: "configBody"
+    }
+  }
+  options {
+    go_package: "github.com/containerd/containerd/api/types/runtimeoptions/v1;runtimeoptions"
   }
   syntax: "proto3"
 }
@@ -7312,7 +7519,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7391,7 +7598,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7446,7 +7653,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7601,7 +7808,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }
@@ -7629,7 +7836,7 @@ file {
     }
   }
   options {
-    go_package: "github.com/containerd/containerd/v2/api/types/transfer"
+    go_package: "github.com/containerd/containerd/api/types/transfer"
   }
   syntax: "proto3"
 }

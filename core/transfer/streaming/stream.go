@@ -26,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	transferapi "github.com/containerd/containerd/v2/api/types/transfer"
+	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"

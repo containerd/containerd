@@ -29,8 +29,8 @@ import (
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	runtimeAPI "github.com/containerd/containerd/v2/api/runtime/sandbox/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/mount"

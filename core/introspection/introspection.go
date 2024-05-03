@@ -19,7 +19,7 @@ package introspection
 import (
 	context "context"
 
-	api "github.com/containerd/containerd/v2/api/services/introspection/v1"
+	api "github.com/containerd/containerd/api/services/introspection/v1"
 )
 
 // Service defines the introspection service interface

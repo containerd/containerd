@@ -38,10 +38,10 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/containerd/v2/version"
 )
 

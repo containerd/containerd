@@ -17,10 +17,10 @@
 package containers
 
 import (
-	api "github.com/containerd/containerd/v2/api/services/containers/v1"
+	api "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/protobuf"
-	"github.com/containerd/containerd/v2/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/typeurl/v2"
 )
 

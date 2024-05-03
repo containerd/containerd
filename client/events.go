@@ -19,10 +19,10 @@ package client
 import (
 	"context"
 
-	eventsapi "github.com/containerd/containerd/v2/api/services/events/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	eventsapi "github.com/containerd/containerd/api/services/events/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 )

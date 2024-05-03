@@ -21,12 +21,12 @@ import (
 	"errors"
 	"io"
 
-	streamingapi "github.com/containerd/containerd/v2/api/services/streaming/v1"
-	transferapi "github.com/containerd/containerd/v2/api/services/transfer/v1"
+	streamingapi "github.com/containerd/containerd/api/services/streaming/v1"
+	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/proxy"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 )

@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/pkg/epoch"

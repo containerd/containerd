@@ -20,10 +20,10 @@ import (
 	"context"
 	"io"
 
-	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	protobuftypes "github.com/containerd/containerd/v2/protobuf/types"
+	protobuftypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 )
 

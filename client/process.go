@@ -23,9 +23,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 )
 

@@ -19,7 +19,7 @@ package proxy
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/errdefs"
 )

@@ -27,12 +27,12 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 
-	apitypes "github.com/containerd/containerd/v2/api/types"
+	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/internal/cleanup"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf/proto"
 )
 
 func init() {

@@ -17,7 +17,7 @@
 package process
 
 import (
-	google_protobuf "github.com/containerd/containerd/v2/protobuf/types"
+	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 // Mount holds filesystem mount configuration

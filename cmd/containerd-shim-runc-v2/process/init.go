@@ -33,8 +33,8 @@ import (
 
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/v2/core/mount"
+	google_protobuf "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/pkg/stdio"
-	google_protobuf "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
 	"github.com/containerd/log"

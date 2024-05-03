@@ -109,7 +109,6 @@ SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version
 # Project packages.
 PACKAGES=$(shell $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)
 API_PACKAGES=$(shell (cd api && $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration))
-NON_API_PACKAGES=$(shell $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration | grep -v "containerd/api")
 TEST_REQUIRES_ROOT_PACKAGES=$(filter \
     ${PACKAGES}, \
     $(shell \
@@ -178,12 +177,10 @@ protos: bin/protoc-gen-go-fieldpath
 	$(eval TMPDIR := $(shell mktemp -d))
 	@mv ${ROOTDIR}/vendor ${TMPDIR}
 	@(cd ${ROOTDIR}/api && PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${API_PACKAGES})
-	@(PATH="${ROOTDIR}/bin:${PATH}" protobuild --quiet ${NON_API_PACKAGES})
-	find v2 -name '*.pb.go' -exec sh -c 'f={}; mkdir -p $$(dirname "$${f#v2/}"); echo mv $$f $${f#v2/}; mv $$f $${f#v2/}' \;
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR} v2
-	go-fix-acronym -w -a '^Os' $(shell find api/ core/runtime/ -name '*.pb.go')
-	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ core/runtime/ -name '*.pb.go')
+	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
+	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -474,17 +471,18 @@ vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ d
 	@$(GO) mod tidy
 	@$(GO) mod vendor
 	@$(GO) mod verify
-	#@(cd ${ROOTDIR}/integration/client && ${GO} mod tidy)
+	@(cd ${ROOTDIR}/api && ${GO} mod tidy)
 
 verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@echo "$(WHALE) $@"
 	$(eval TMPDIR := $(shell mktemp -d))
 	@cp -R ${ROOTDIR} ${TMPDIR}
 	@(cd ${TMPDIR}/containerd && ${GO} mod tidy)
-	@(cd ${TMPDIR}/containerd/integration/client && ${GO} mod tidy)
+	@(cd ${TMPDIR}/containerd && ${GO} mod vendor)
+	@(cd ${TMPDIR}/containerd && ${GO} mod verify)
+	@(cd ${TMPDIR}/containerd/api && ${GO} mod tidy)
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
-	#@${ROOTDIR}/script/verify-go-modules.sh integration/client
 
 
 help: ## this help

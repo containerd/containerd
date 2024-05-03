@@ -23,7 +23,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	transferapi "github.com/containerd/containerd/v2/api/types/transfer"
+	transferapi "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/streaming"

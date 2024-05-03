@@ -34,7 +34,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
-	apitypes "github.com/containerd/containerd/v2/api/types"
+	apitypes "github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
@@ -53,8 +53,8 @@ import (
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf"
 )
 
 var kernelSupportsRRO bool

@@ -19,7 +19,7 @@ package content
 import (
 	"context"
 
-	eventstypes "github.com/containerd/containerd/v2/api/events"
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/metadata"

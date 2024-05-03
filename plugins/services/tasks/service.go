@@ -19,10 +19,10 @@ package tasks
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/tasks/v1"
+	api "github.com/containerd/containerd/api/services/tasks/v1"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"

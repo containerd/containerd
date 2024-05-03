@@ -19,9 +19,9 @@ package version
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/version/v1"
+	api "github.com/containerd/containerd/api/services/version/v1"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	ptypes "github.com/containerd/containerd/v2/protobuf/types"
 	ctrdversion "github.com/containerd/containerd/v2/version"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"

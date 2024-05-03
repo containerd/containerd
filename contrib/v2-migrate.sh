@@ -2,7 +2,7 @@
 set -e
 for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   #First migrate containerd imports to v2 module
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd(?!\/v2)(\/\S+)?"( \/\/.*)?$/$1$2"github.com\/containerd\/containerd\/v2$3"$4/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_\.a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd(?!\/v2|\/api)(\/\S+)?"( \/\/.*)?$/$1$2"github.com\/containerd\/containerd\/v2$3"$4/g' $GOFILE
 
   #Migrate moved packages
   perl -pi -e 's/([\t]|[ ]{2,8}|import )"github\.com\/containerd\/containerd\/v2"/$1containerd "github.com\/containerd\/containerd\/v2\/client"/g' $GOFILE
@@ -58,13 +58,16 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/randutil/$1$2"github.com\/containerd\/containerd\/v2\/internal\/randutil/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/registrar/$1$2"github.com\/containerd\/containerd\/v2\/internal\/registrar/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/streaming/$1$2"github.com\/containerd\/containerd\/v2\/core\/streaming/g' $GOFILE
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/testutil/$1$2"github.com\/containerd\/containerd\/v2\/internal\/testutil/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/tomlext/$1$2"github.com\/containerd\/containerd\/v2\/internal\/tomlext/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/transfer/$1$2"github.com\/containerd\/containerd\/v2\/core\/transfer/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/truncindex/$1$2"github.com\/containerd\/containerd\/v2\/internal\/truncindex/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/unpack/$1$2"github.com\/containerd\/containerd\/v2\/core\/unpack/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/metrics/$1$2"github.com\/containerd\/containerd\/v2\/core\/metrics/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/runtime/$1$2"github.com\/containerd\/containerd\/v2\/core\/runtime/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/core\/runtime\/v2\/runc\/options/$1$2"github.com\/containerd\/containerd\/api\/types\/runc\/options/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/runtimeoptions/$1$2"github.com\/containerd\/containerd\/v2\/types\/runtimeoptions/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/protobuf/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/protobuf/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/api/$1$2"github.com\/containerd\/containerd\/api/g' $GOFILE
 
   # Migrate packages split out to their own repository
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/platforms/$1$2"github.com\/containerd\/platforms/g' $GOFILE

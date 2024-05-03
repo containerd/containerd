@@ -20,7 +20,7 @@ import (
 	"context"
 	"sort"
 
-	runcoptions "github.com/containerd/containerd/v2/core/runtime/v2/runc/options"
+	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/systemd"
 	"github.com/containerd/log"

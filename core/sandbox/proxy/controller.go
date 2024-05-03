@@ -19,8 +19,8 @@ package proxy
 import (
 	"context"
 
-	api "github.com/containerd/containerd/v2/api/services/sandbox/v1"
-	"github.com/containerd/containerd/v2/api/types"
+	api "github.com/containerd/containerd/api/services/sandbox/v1"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/errdefs"

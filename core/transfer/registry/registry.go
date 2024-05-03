@@ -25,7 +25,7 @@ import (
 	"strings"
 	"sync"
 
-	transfertypes "github.com/containerd/containerd/v2/api/types/transfer"
+	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"

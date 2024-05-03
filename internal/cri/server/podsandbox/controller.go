@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/plugin/registry"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	eventtypes "github.com/containerd/containerd/v2/api/events"
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
@@ -37,8 +37,8 @@ import (
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 )
