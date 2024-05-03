@@ -56,7 +56,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 	}
 
 	// Verify image before pulling.
-	for vfName, vf := range ts.verifiers {
+	for vfName, vf := range ts.config.Verifiers {
 		log := log.G(ctx).WithFields(logrus.Fields{
 			"name":     name,
 			"digest":   desc.Digest.String(),

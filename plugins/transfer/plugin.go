@@ -57,23 +57,27 @@ func init() {
 				return nil, err
 			}
 			ms := m.(*metadata.DB)
+
+			var lc local.TransferConfig
+
 			l, err := ic.GetSingle(plugins.LeasePlugin)
 			if err != nil {
 				return nil, err
 			}
+			lc.Leases = l.(leases.Manager)
 
-			vfs := make(map[string]imageverifier.ImageVerifier)
 			vps, err := ic.GetByType(plugins.ImageVerifierPlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			for name, vp := range vps {
-				vfs[name] = vp.(imageverifier.ImageVerifier)
+			if len(vps) > 0 {
+				lc.Verifiers = make(map[string]imageverifier.ImageVerifier)
+				for name, vp := range vps {
+					lc.Verifiers[name] = vp.(imageverifier.ImageVerifier)
+				}
 			}
 
 			// Set configuration based on default or user input
-			var lc local.TransferConfig
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
 
@@ -140,7 +144,7 @@ func init() {
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
 
-			return local.NewTransferService(l.(leases.Manager), ms.ContentStore(), metadata.NewImageStore(ms), vfs, &lc), nil
+			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
 	})
 }
