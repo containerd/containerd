@@ -49,13 +49,13 @@ func setupDumpStacks(dump chan<- os.Signal) {
 	signal.Notify(dump, syscall.SIGUSR1)
 }
 
-func serveListener(path string) (net.Listener, error) {
+func serveListener(path string, fd uintptr) (net.Listener, error) {
 	var (
 		l   net.Listener
 		err error
 	)
 	if path == "" {
-		l, err = net.FileListener(os.NewFile(3, "socket"))
+		l, err = net.FileListener(os.NewFile(fd, "socket"))
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > socketPathLimit {

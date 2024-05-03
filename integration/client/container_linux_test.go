@@ -365,7 +365,7 @@ func TestShimDoesNotLeakSockets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := shim.SocketAddress(ctx, address, id)
+	s, err := shim.SocketAddress(ctx, address, id, false)
 	if err != nil {
 		t.Fatal(err)
 	}

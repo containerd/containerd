@@ -65,16 +65,7 @@ var pprofGoroutinesCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		debug := cliContext.Uint("debug")
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/goroutine?debug=%d", debug))
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return GoroutineProfile(cliContext, getPProfClient)
 	},
 }
 
@@ -89,16 +80,7 @@ var pprofHeapCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		debug := cliContext.Uint("debug")
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/heap?debug=%d", debug))
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return HeapProfile(cliContext, getPProfClient)
 	},
 }
 
@@ -119,17 +101,7 @@ var pprofProfileCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		seconds := cliContext.Duration("seconds").Seconds()
-		debug := cliContext.Uint("debug")
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v&debug=%d", seconds, debug))
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return CPUProfile(cliContext, getPProfClient)
 	},
 }
 
@@ -150,18 +122,7 @@ var pprofTraceCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		seconds := cliContext.Duration("seconds").Seconds()
-		debug := cliContext.Uint("debug")
-		uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v&debug=%d", seconds, debug)
-		output, err := httpGetRequest(client, uri)
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return TraceProfile(cliContext, getPProfClient)
 	},
 }
 
@@ -176,16 +137,7 @@ var pprofBlockCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		debug := cliContext.Uint("debug")
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/block?debug=%d", debug))
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return BlockProfile(cliContext, getPProfClient)
 	},
 }
 
@@ -200,27 +152,120 @@ var pprofThreadcreateCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		client := getPProfClient(cliContext)
-
-		debug := cliContext.Uint("debug")
-		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/threadcreate?debug=%d", debug))
-		if err != nil {
-			return err
-		}
-		defer output.Close()
-		_, err = io.Copy(os.Stdout, output)
-		return err
+		return ThreadcreateProfile(cliContext, getPProfClient)
 	},
 }
 
-func getPProfClient(cliContext *cli.Context) *http.Client {
+// Client is a func that returns a http client for a pprof server
+type Client func(cliContext *cli.Context) (*http.Client, error)
+
+// GoroutineProfile dumps goroutine stack dump
+func GoroutineProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	debug := cliContext.Uint("debug")
+	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/goroutine?debug=%d", debug))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+// HeapProfile dumps the heap profile
+func HeapProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	debug := cliContext.Uint("debug")
+	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/heap?debug=%d", debug))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+// CPUProfile dumps CPU profile
+func CPUProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	seconds := cliContext.Duration("seconds").Seconds()
+	debug := cliContext.Uint("debug")
+	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v&debug=%d", seconds, debug))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+// TraceProfile collects execution trace
+func TraceProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	seconds := cliContext.Duration("seconds").Seconds()
+	debug := cliContext.Uint("debug")
+	uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v&debug=%d", seconds, debug)
+	output, err := httpGetRequest(client, uri)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+// BlockProfile collects goroutine blocking profile
+func BlockProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	debug := cliContext.Uint("debug")
+	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/block?debug=%d", debug))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+// ThreadcreateProfile collects goroutine thread creating profile
+func ThreadcreateProfile(cliContext *cli.Context, clientFunc Client) error {
+	client, err := clientFunc(cliContext)
+	if err != nil {
+		return err
+	}
+	debug := cliContext.Uint("debug")
+	output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/threadcreate?debug=%d", debug))
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	_, err = io.Copy(os.Stdout, output)
+	return err
+}
+
+func getPProfClient(cliContext *cli.Context) (*http.Client, error) {
 	dialer := getPProfDialer(cliContext.String("debug-socket"))
 
 	tr := &http.Transport{
 		Dial: dialer.pprofDial,
 	}
 	client := &http.Client{Transport: tr}
-	return client
+	return client, nil
 }
 
 func httpGetRequest(client *http.Client, request string) (io.ReadCloser, error) {
