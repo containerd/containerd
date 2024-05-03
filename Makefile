@@ -149,7 +149,7 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test
+.PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test remove-replace clean-vendor
 .DEFAULT: default
 
 # Forcibly set the default goal to all, in case an include above brought in a rule definition.
@@ -180,6 +180,8 @@ protos: bin/protoc-gen-go-fieldpath
 	@mv ${TMPDIR}/vendor ${ROOTDIR}
 	@rm -rf ${TMPDIR}
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ runtime/ -name '*.pb.go')
+	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
+		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
 check-protos: protos ## check if protobufs needs to be generated again
 	@echo "$(WHALE) $@"
@@ -470,6 +472,10 @@ root-coverage: ## generate coverage profiles for unit tests that require root
 		fi; \
 	done )
 
+remove-replace:
+	@echo "$(WHALE) $@"
+	@$(GO) mod edit -dropreplace=github.com/containerd/containerd/api
+
 vendor: ## ensure all the go.mod/go.sum files are up-to-date including vendor/ directory
 	@echo "$(WHALE) $@"
 	@$(GO) mod tidy
@@ -488,6 +494,8 @@ verify-vendor: ## verify if all the go.mod/go.sum files are up-to-date
 	@diff -r -u -q ${ROOTDIR} ${TMPDIR}/containerd
 	@rm -rf ${TMPDIR}
 	@${ROOTDIR}/script/verify-go-modules.sh integration/client
+
+clean-vendor: remove-replace vendor
 
 
 help: ## this help
