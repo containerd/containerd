@@ -21,7 +21,6 @@ package process
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -32,7 +31,6 @@ import (
 
 	"github.com/containerd/errdefs"
 	runc "github.com/containerd/go-runc"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
@@ -41,8 +39,6 @@ const (
 	RuncRoot = "/run/containerd/runc"
 	// InitPidFile name of the file that contains the init pid
 	InitPidFile = "init.pid"
-	// configFile is the name of the runc config file
-	configFile = "config.json"
 )
 
 // safePid is a thread safe wrapper for pid.
@@ -187,24 +183,4 @@ func stateName(v interface{}) string {
 		return "stopped"
 	}
 	panic(fmt.Errorf("invalid state %v", v))
-}
-
-func readConfig(path string) (spec *specs.Spec, err error) {
-	cfg := filepath.Join(path, configFile)
-	f, err := os.Open(cfg)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("JSON specification file %s not found", cfg)
-		}
-		return nil, err
-	}
-	defer f.Close()
-
-	if err = json.NewDecoder(f).Decode(&spec); err != nil {
-		return nil, fmt.Errorf("failed to parse config: %w", err)
-	}
-	if spec == nil {
-		return nil, errors.New("config cannot be null")
-	}
-	return spec, nil
 }
