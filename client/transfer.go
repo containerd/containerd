@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 
-	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
 	streamproxy "github.com/containerd/containerd/v2/core/streaming/proxy"
 	"github.com/containerd/containerd/v2/core/transfer"
@@ -33,7 +32,7 @@ func (c *Client) Transfer(ctx context.Context, src interface{}, dest interface{}
 	}
 	defer done(ctx)
 
-	return proxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator()).Transfer(ctx, src, dest, opts...)
+	return proxy.NewTransferrer(c.conn, c.streamCreator()).Transfer(ctx, src, dest, opts...)
 }
 
 func (c *Client) streamCreator() streaming.StreamCreator {

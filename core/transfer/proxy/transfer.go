@@ -19,9 +19,12 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
@@ -29,23 +32,55 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 type proxyTransferrer struct {
-	client        transferapi.TransferClient
+	client        transferapi.TTRPCTransferService
 	streamCreator streaming.StreamCreator
 }
 
-// NewTransferrer returns a new transferrer which communicates over a GRPC
-// connection using the containerd transfer API
-func NewTransferrer(client transferapi.TransferClient, sc streaming.StreamCreator) transfer.Transferrer {
-	return &proxyTransferrer{
-		client:        client,
-		streamCreator: sc,
+// NewTransferrer returns a new transferrer which can communicate over a GRPC
+// or TTRPC connection using the containerd transfer API
+func NewTransferrer(client any, sc streaming.StreamCreator) transfer.Transferrer {
+	switch c := client.(type) {
+	case transferapi.TransferClient:
+		return &proxyTransferrer{
+			client:        convertClient{c},
+			streamCreator: sc,
+		}
+	case grpc.ClientConnInterface:
+		return &proxyTransferrer{
+			client:        convertClient{transferapi.NewTransferClient(c)},
+			streamCreator: sc,
+		}
+	case transferapi.TTRPCTransferService:
+		return &proxyTransferrer{
+			client:        c,
+			streamCreator: sc,
+		}
+	case *ttrpc.Client:
+		return &proxyTransferrer{
+			client:        transferapi.NewTTRPCTransferClient(c),
+			streamCreator: sc,
+		}
+	case transfer.Transferrer:
+		return c
+	default:
+		panic(fmt.Errorf("unsupported stream client %T: %w", client, errdefs.ErrNotImplemented))
 	}
+}
+
+type convertClient struct {
+	transferapi.TransferClient
+}
+
+func (c convertClient) Transfer(ctx context.Context, r *transferapi.TransferRequest) (*emptypb.Empty, error) {
+	return c.TransferClient.Transfer(ctx, r)
 }
 
 func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst interface{}, opts ...transfer.Opt) error {
