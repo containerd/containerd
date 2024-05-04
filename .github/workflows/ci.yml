@@ -491,6 +491,7 @@ jobs:
         if: always()
         run: |
           set -x
+          uname -a
           mount
           df
           losetup -l
@@ -559,6 +560,10 @@ jobs:
         run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
         run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+      - name: Kernel Message
+        if: always()
+        run: |
+          sudo BOX=$BOX vagrant ssh -c "dmesg -T -f kern"
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"

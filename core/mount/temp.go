@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/containerd/log"
 )
@@ -64,6 +66,16 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 		return fmt.Errorf("failed to mount %s: %w", root, uerr)
 	}
 	if err := f(root); err != nil {
+		data, _ := exec.Command("mount").CombinedOutput()
+		fmt.Println(string(data))
+		data, _ = exec.Command("ls", "-al", root).CombinedOutput()
+		fmt.Println(string(data))
+		data, _ = exec.Command("ls", "-al", filepath.Join(root, "boot")).CombinedOutput()
+		fmt.Println(string(data))
+		data, _ = exec.Command("sync").CombinedOutput()
+		fmt.Println(string(data))
+		data, _ = exec.Command("ls", "-al", root).CombinedOutput()
+		fmt.Println(string(data))
 		return fmt.Errorf("mount callback failed on %s: %w", root, err)
 	}
 	return nil

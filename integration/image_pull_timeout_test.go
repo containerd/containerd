@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -94,6 +95,10 @@ func testCRIImagePullTimeoutBySlowCommitWriter(t *testing.T) {
 
 	_, err = criService.PullImage(ctx, pullProgressTestImageName, nil, nil, "")
 	assert.NoError(t, err)
+	if err != nil {
+		data, _ := exec.Command("mount").CombinedOutput()
+		t.Logf("%v", string(data))
+	}
 }
 
 // testCRIImagePullTimeoutByHoldingContentOpenWriter tests that

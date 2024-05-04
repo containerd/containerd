@@ -193,6 +193,9 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 						return nil
 					}
 					if _, exists := unpackedPaths[path]; !exists {
+						if strings.Contains(path, "boot") {
+							log.G(ctx).Infof("deleted %v", path)
+						}
 						err := os.RemoveAll(path)
 						return err
 					}
@@ -302,7 +305,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		srcHdr := hdr
 
 		if err := createTarFile(ctx, path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to create tar file: %w", err)
 		}
 
 		// Directory mtimes must be handled at the end to avoid further
@@ -339,6 +342,13 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		if fi, err := os.Lstat(path); !(err == nil && fi.IsDir()) {
 			if err := mkdir(path, hdrInfo.Mode()); err != nil {
 				return err
+			}
+			if strings.Contains(path, "boot") {
+				log.G(ctx).Infof("mkdir %v", path)
+			}
+		} else {
+			if strings.Contains(path, "boot") {
+				log.G(ctx).Infof("existing %v", path)
 			}
 		}
 
