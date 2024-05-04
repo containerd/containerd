@@ -15,6 +15,8 @@
 #   limitations under the License.
 
 set -eu -o pipefail
+set -x
+env
 
 report_dir=$1
 
