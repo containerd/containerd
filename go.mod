@@ -13,7 +13,7 @@ require (
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.3
 	github.com/containerd/console v1.0.4
-	github.com/containerd/containerd/api v0.0.0
+	github.com/containerd/containerd/api v1.8.0-rc.0
 	github.com/containerd/continuity v0.4.3
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/fifo v1.1.0
@@ -141,6 +141,3 @@ require (
 	sigs.k8s.io/yaml v1.3.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v0.7.0 // indirect
 )
-
-// Use the relative local source of the github.com/containerd/containerd/api to build
-replace github.com/containerd/containerd/api => ./api
