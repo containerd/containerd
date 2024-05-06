@@ -36,6 +36,7 @@ package util
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -99,10 +100,16 @@ func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, add
 		return "", nil, err
 	}
 	if protocol != unixProtocol {
-		return "", nil, fmt.Errorf("only support unix socket endpoint")
+		return "", nil, errors.New("only support unix socket endpoint")
 	}
 
-	return addr, dial, nil
+	// Use passthrough as the scheme so it allows us to use our custom dialer:
+	//
+	// "grpc.Dial uses "passthrough" as the default name resolver for backward compatibility while grpc.NewClient
+	// uses "dns" as its default name resolver. This subtle difference is important to legacy systems that also
+	// specified a custom dialer and expected it to receive the target string directly."
+	// https://github.com/grpc/grpc-go/blob/master/Documentation/anti-patterns.md#the-wrong-way-grpcdial
+	return fmt.Sprintf("passthrough:///%s", addr), dial, nil
 }
 
 func dial(ctx context.Context, addr string) (net.Conn, error) {

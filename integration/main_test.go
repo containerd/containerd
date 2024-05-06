@@ -656,9 +656,7 @@ func RawRuntimeClient() (runtime.RuntimeServiceClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get dialer: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, addr,
+	conn, err := grpc.NewClient(addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(dialer),
 	)
