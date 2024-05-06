@@ -41,8 +41,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/containerd/containerd/v2/client"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -73,8 +71,17 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 		// This is the wrong error message and needs to be adapted once
 		// Kubernetes (the e2e_node/checkpoint) test has been changed to
 		// handle too old or missing CRIU error messages.
-		log.G(ctx).WithError(err).Errorf("Failed to checkpoint container %q", r.GetContainerId())
-		return nil, status.Errorf(codes.Unimplemented, "method CheckpointContainer not implemented")
+		errorMessage := fmt.Sprintf(
+			"CRIU binary not found or too old (<%d). Failed to checkpoint container %q",
+			podCriuVersion,
+			r.GetContainerId(),
+		)
+		log.G(ctx).WithError(err).Errorf(errorMessage)
+		return nil, fmt.Errorf(
+			"%s: %w",
+			errorMessage,
+			err,
+		)
 	}
 
 	container, err := c.containerStore.Get(r.GetContainerId())
