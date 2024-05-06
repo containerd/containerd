@@ -27,15 +27,18 @@ verified:
 
    3. Update the version file at `https://github.com/containerd/containerd/blob/main/version/version.go`
 
-   4. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
+   4. Ensure api replace statement is removed, run `make clean-vendor` and ensure
+      no api changes in vendor afterwards.
 
-   5. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
+   5. (major/minor release only) Update RELEASES.md to refer to the new release and dates.
+
+   6. Update the `.mailmap` files for commit authors which have multiple email addresses in the commit log.
       If it is not clear which email or name the contributor might want used in the release notes, reach
       out to the contributor for feedback. NOTE: real names should be used whenever possible. The file is
       maintained by manually adding entries to the file.
       - e.g. `Real Name <preferred@email.com> Other Name <other@email.com>`
 
-   6. Before opening the pull request, run the release tool using the new release notes.
+   7. Before opening the pull request, run the release tool using the new release notes.
       Ensure the output matches what is expected, including contributors, change log,
       dependencies, and visual elements such as spacing. If a contributor is duplicated,
       use the emails outputted by the release tool to update the mailmap then re-run. The
