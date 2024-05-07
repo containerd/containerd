@@ -14,22 +14,14 @@
    limitations under the License.
 */
 
-package server
-
-import (
-	"context"
-
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/otelttrpc"
-	"github.com/containerd/ttrpc"
-)
-
-func apply(_ context.Context, _ *srvconfig.Config) error {
-	return nil
-}
-
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(
-		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
-	)
-}
+/*
+package otelttrpc implements Opentelemetry instrumentation support for ttRPC.
+The package implements unary client and server interceptors for opentelemetry
+tracing instrumentation. The interceptors can be passed as ttrpc.ClientOpts
+and ttrpc.ServerOpt to ttRPC during client and server creation. The interceptors
+then automatically handle generating trace spans for all called and served
+unary method calls. If the rest of the code is properly set up to collect and
+export tracing data to opentelemetry, these spans should show up as part of the
+collected traces.
+*/
+package otelttrpc

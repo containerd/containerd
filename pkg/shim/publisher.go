@@ -43,8 +43,20 @@ type item struct {
 	count int
 }
 
+type publisherConfig struct {
+	ttrpcOpts []ttrpc.ClientOpts
+}
+
+type PublisherOpts func(*publisherConfig)
+
+func WithPublishTTRPCOpts(opts ...ttrpc.ClientOpts) PublisherOpts {
+	return func(cfg *publisherConfig) {
+		cfg.ttrpcOpts = append(cfg.ttrpcOpts, opts...)
+	}
+}
+
 // NewPublisher creates a new remote events publisher
-func NewPublisher(address string) (*RemoteEventsPublisher, error) {
+func NewPublisher(address string, opts ...PublisherOpts) (*RemoteEventsPublisher, error) {
 	client, err := ttrpcutil.NewClient(address)
 	if err != nil {
 		return nil, err

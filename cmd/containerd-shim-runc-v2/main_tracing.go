@@ -1,3 +1,5 @@
+//go:build shim_tracing
+
 /*
    Copyright The containerd Authors.
 
@@ -14,22 +16,6 @@
    limitations under the License.
 */
 
-package server
+package main
 
-import (
-	"context"
-
-	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
-	"github.com/containerd/otelttrpc"
-	"github.com/containerd/ttrpc"
-)
-
-func apply(_ context.Context, _ *srvconfig.Config) error {
-	return nil
-}
-
-func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(
-		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
-	)
-}
+import _ "github.com/containerd/containerd/v2/pkg/tracing/plugin"
