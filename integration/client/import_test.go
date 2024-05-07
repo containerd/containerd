@@ -370,9 +370,11 @@ func createContent(size int64, seed int64) ([]byte, digest.Digest) {
 
 func createConfig(osName, archName string) ([]byte, digest.Digest) {
 	image := ocispec.Image{
-		OS:           osName,
-		Architecture: archName,
-		Author:       "test",
+		Platform: ocispec.Platform{
+			OS:           osName,
+			Architecture: archName,
+		},
+		Author: "test",
 	}
 	b, _ := json.Marshal(image)
 
