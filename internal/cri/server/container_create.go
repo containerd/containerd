@@ -247,8 +247,15 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			sandboxConfig.GetLogDirectory(), config.GetLogPath())
 	}
 
-	containerIO, err := cio.NewContainerIO(id,
-		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+	var containerIO *cio.ContainerIO
+	switch ociRuntime.IOType {
+	case criconfig.IOTypeStreaming:
+		containerIO, err = cio.NewContainerIO(id,
+			cio.WithStreams(sandbox.Endpoint.Address, config.GetTty(), config.GetStdin()))
+	default:
+		containerIO, err = cio.NewContainerIO(id,
+			cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to create container io: %w", err)
 	}

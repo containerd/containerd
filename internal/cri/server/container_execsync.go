@@ -24,16 +24,17 @@ import (
 	"syscall"
 	"time"
 
-	containerd "github.com/containerd/containerd/v2/client"
-	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	"github.com/containerd/containerd/v2/internal/cri/util"
+	containerdio "github.com/containerd/containerd/v2/pkg/cio"
 	cioutil "github.com/containerd/containerd/v2/pkg/ioutil"
 )
 
@@ -159,10 +160,28 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 	log.G(ctx).Debugf("Generated exec id %q for container %q", execID, id)
 	volatileRootDir := c.getVolatileContainerRootDir(id)
 	var execIO *cio.ExecIO
+
 	process, err := task.Exec(ctx, execID, pspec,
 		func(id string) (containerdio.IO, error) {
-			var err error
-			execIO, err = cio.NewExecIO(id, volatileRootDir, opts.tty, opts.stdin != nil)
+			cntr, err := c.containerStore.Get(container.ID())
+			if err != nil {
+				return nil, fmt.Errorf("an error occurred when try to find container %q: %w", container.ID(), err)
+			}
+			sb, err := c.sandboxStore.Get(cntr.SandboxID)
+			if err != nil {
+				return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w", cntr.SandboxID, err)
+			}
+			ociRuntime, err := c.config.GetSandboxRuntime(sb.Config, sb.Metadata.RuntimeHandler)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+			}
+			switch ociRuntime.IOType {
+			case config.IOTypeStreaming:
+				execIO, err = cio.NewStreamExecIO(id, sb.Endpoint.Address, opts.tty, opts.stdin != nil)
+			default:
+				execIO, err = cio.NewFifoExecIO(id, volatileRootDir, opts.tty, opts.stdin != nil)
+			}
+
 			return execIO, err
 		},
 	)
