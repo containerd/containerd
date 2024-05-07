@@ -22,6 +22,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -173,22 +174,14 @@ func RemoveSocket(address string) error {
 // SocketEaddrinuse returns true if the provided error is caused by the
 // EADDRINUSE error number
 func SocketEaddrinuse(err error) bool {
-	netErr, ok := err.(*net.OpError)
-	if !ok {
-		return false
+	var netErr *net.OpError
+	if errors.As(err, &netErr) {
+		if netErr.Op != "listen" {
+			return false
+		}
+		return errors.Is(err, syscall.EADDRINUSE)
 	}
-	if netErr.Op != "listen" {
-		return false
-	}
-	syscallErr, ok := netErr.Err.(*os.SyscallError)
-	if !ok {
-		return false
-	}
-	errno, ok := syscallErr.Err.(syscall.Errno)
-	if !ok {
-		return false
-	}
-	return errno == syscall.EADDRINUSE
+	return false
 }
 
 // CanConnect returns true if the socket provided at the address
