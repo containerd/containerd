@@ -68,7 +68,7 @@ func init() {
 				oOpts = append(oOpts, overlay.WithMountOptions(config.MountOptions))
 			}
 
-			ic.Meta.Exports["root"] = root
+			ic.Meta.Exports[plugin.SnapshotterRootDir] = root
 			return overlay.NewSnapshotter(root, oOpts...)
 		},
 	})

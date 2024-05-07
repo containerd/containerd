@@ -92,6 +92,10 @@ const (
 	DeprecationsPlugin = "deprecations"
 )
 
+const (
+	SnapshotterRootDir = "root"
+)
+
 // Registration contains information for registering a plugin
 type Registration struct {
 	// Type of the plugin

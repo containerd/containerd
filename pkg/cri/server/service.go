@@ -17,7 +17,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -127,6 +129,11 @@ type criService struct {
 func NewCRIService(config criconfig.Config, client *containerd.Client, warn warning.Service) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
+
+	if client.SnapshotService(config.ContainerdConfig.Snapshotter) == nil {
+		return nil, fmt.Errorf("failed to find snapshotter %q", config.ContainerdConfig.Snapshotter)
+	}
+
 	c := &criService{
 		config:                      config,
 		client:                      client,
@@ -147,7 +154,11 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, warn warn
 		return nil, fmt.Errorf("failed to find snapshotter %q", c.config.ContainerdConfig.Snapshotter)
 	}
 
-	c.imageFSPath = imageFSPath(config.ContainerdRootDir, config.ContainerdConfig.Snapshotter)
+	c.imageFSPath = imageFSPath(
+		config.ContainerdRootDir,
+		config.ContainerdConfig.Snapshotter,
+		client,
+	)
 	logrus.Infof("Get image filesystem path %q", c.imageFSPath)
 
 	if err := c.initPlatform(); err != nil {
@@ -331,8 +342,40 @@ func (c *criService) register(s *grpc.Server) error {
 
 // imageFSPath returns containerd image filesystem path.
 // Note that if containerd changes directory layout, we also needs to change this.
-func imageFSPath(rootDir, snapshotter string) string {
-	return filepath.Join(rootDir, fmt.Sprintf("%s.%s", plugin.SnapshotPlugin, snapshotter))
+func imageFSPath(rootDir, snapshotter string, client *containerd.Client) string {
+	introspection := func() (string, error) {
+		filters := []string{fmt.Sprintf("type==%s, id==%s", plugin.SnapshotPlugin, snapshotter)}
+		in := client.IntrospectionService()
+
+		resp, err := in.Plugins(context.Background(), filters)
+		if err != nil {
+			return "", err
+		}
+
+		if len(resp.Plugins) <= 0 {
+			return "", fmt.Errorf("inspection service could not find snapshotter %s plugin", snapshotter)
+		}
+
+		sn := resp.Plugins[0]
+		if root, ok := sn.Exports[plugin.SnapshotterRootDir]; ok {
+			return root, nil
+		}
+		return "", errors.New("snapshotter does not export root path")
+	}
+
+	var imageFSPath string
+	path, err := introspection()
+	if err != nil {
+		logrus.WithError(err).WithField("snapshotter", snapshotter).Warn("snapshotter doesn't export root path")
+		imageFSPath = filepath.Join(
+			rootDir,
+			plugin.SnapshotPlugin.String()+"."+snapshotter,
+		)
+	} else {
+		imageFSPath = path
+	}
+
+	return imageFSPath
 }
 
 func loadOCISpec(filename string) (*oci.Spec, error) {
