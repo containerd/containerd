@@ -479,10 +479,17 @@ jobs:
         run: |
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
+      - name: Fix up for actuated
+        # https://github.com/containerd/containerd/pull/9920#issuecomment-2024823587
+        if: ${{ (matrix.os == 'actuated-arm64-4cpu-16gb') && (matrix.runc == 'crun') }}
+        run: |
+          echo "EXTRA_CRITEST_OPTIONS=--ginkgo.skip=runtime should support NamespaceMode_POD" >> $GITHUB_ENV
+
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
         run: |
+          env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
       # Log the status of this VM to investigate issues like
