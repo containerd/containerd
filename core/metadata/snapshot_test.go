@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
@@ -63,6 +64,32 @@ func newTestSnapshotter(ctx context.Context, root string) (snapshots.Snapshotter
 	}, nil
 }
 
+func snapshotLease(ctx context.Context, t *testing.T, db *DB, sn string) (context.Context, func(string) bool) {
+	lm := NewLeaseManager(db)
+	l, err := lm.Create(ctx, leases.WithRandomID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ltype := fmt.Sprintf("%s/%s", bucketKeyObjectSnapshots, sn)
+
+	t.Cleanup(func() {
+		lm.Delete(ctx, l)
+
+	})
+	return leases.WithLease(ctx, l.ID), func(id string) bool {
+		resources, err := lm.ListResources(ctx, l)
+		if err != nil {
+			t.Error(err)
+		}
+		for _, r := range resources {
+			if r.Type == ltype && r.ID == id {
+				return true
+			}
+		}
+		return false
+	}
+}
+
 func TestMetadata(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("snapshotter not implemented on windows")
@@ -76,27 +103,40 @@ func TestSnapshotterWithRef(t *testing.T) {
 	ctx, db := testDB(t, withSnapshotter("tmp", func(string) (snapshots.Snapshotter, error) {
 		return NewTmpSnapshotter(), nil
 	}))
-	sn := db.Snapshotter("tmp")
+	snapshotter := "tmp"
+	ctx1, leased1 := snapshotLease(ctx, t, db, snapshotter)
+	sn := db.Snapshotter(snapshotter)
 
+	key1 := "test1"
 	test1opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: "test1",
+			labelSnapshotRef: key1,
 		},
 	)
 
-	_, err := sn.Prepare(ctx, "test1-tmp", "", test1opt)
+	key1t := "test1-tmp"
+	_, err := sn.Prepare(ctx1, key1t, "", test1opt)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !leased1(key1t) {
+		t.Errorf("no lease for %q", key1t)
+	}
 
-	err = sn.Commit(ctx, "test1", "test1-tmp", test1opt)
+	err = sn.Commit(ctx1, key1, key1t, test1opt)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if !leased1(key1) {
+		t.Errorf("no lease for %q", key1)
+	}
+	if leased1(key1t) {
+		t.Errorf("lease should be removed for %q", key1t)
 	}
 
 	ctx2 := namespaces.WithNamespace(ctx, "testing2")
 
-	_, err = sn.Prepare(ctx2, "test1-tmp", "", test1opt)
+	_, err = sn.Prepare(ctx2, key1t, "", test1opt)
 	if err == nil {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
@@ -104,85 +144,111 @@ func TestSnapshotterWithRef(t *testing.T) {
 	}
 
 	// test1 should now be in the namespace
-	_, err = sn.Stat(ctx2, "test1")
+	_, err = sn.Stat(ctx2, key1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	key2t := "test2-tmp"
+	key2 := "test2"
 	test2opt := snapshots.WithLabels(
 		map[string]string{
-			labelSnapshotRef: "test2",
+			labelSnapshotRef: key2,
 		},
 	)
 
-	_, err = sn.Prepare(ctx2, "test2-tmp", "test1", test2opt)
+	_, err = sn.Prepare(ctx2, key2t, key1, test2opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// In original namespace, but not committed
-	_, err = sn.Prepare(ctx, "test2-tmp", "test1", test2opt)
+	_, err = sn.Prepare(ctx1, key2t, key1, test2opt)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !leased1(key2t) {
+		t.Errorf("no lease for %q", key2t)
+	}
+	if leased1(key2) {
+		t.Errorf("lease for %q should not exist yet", key2)
+	}
 
-	err = sn.Commit(ctx2, "test2", "test2-tmp", test2opt)
+	err = sn.Commit(ctx2, key2, key2t, test2opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// See note in Commit function for why
 	// this does not return ErrAlreadyExists
-	err = sn.Commit(ctx, "test2", "test2-tmp", test2opt)
+	err = sn.Commit(ctx1, key2, key2t, test2opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	ctx2, leased2 := snapshotLease(ctx2, t, db, snapshotter)
+	if leased2(key2) {
+		t.Errorf("new lease should not have previously created snapshots")
+	}
 	// This should error out, already exists in namespace
 	// despite mismatched parent
-	_, err = sn.Prepare(ctx2, "test2-tmp-again", "", test2opt)
+	key2ta := "test2-tmp-again"
+	_, err = sn.Prepare(ctx2, key2ta, "", test2opt)
 	if err == nil {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
 	}
+	if !leased2(key2) {
+		t.Errorf("no lease for %q", key2)
+	}
 
 	// In original namespace, but already exists
-	_, err = sn.Prepare(ctx, "test2-tmp-again", "test1", test2opt)
+	_, err = sn.Prepare(ctx, key2ta, key1, test2opt)
 	if err == nil {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
+	}
+	if leased1(key2ta) {
+		t.Errorf("should not have lease for non-existent snapshot %q", key2ta)
 	}
 
 	// Now try a third namespace
 
 	ctx3 := namespaces.WithNamespace(ctx, "testing3")
+	ctx3, leased3 := snapshotLease(ctx3, t, db, snapshotter)
 
 	// This should error out, matching parent not found
-	_, err = sn.Prepare(ctx3, "test2-tmp", "", test2opt)
+	_, err = sn.Prepare(ctx3, key2t, "", test2opt)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Remove, not going to use yet
-	err = sn.Remove(ctx3, "test2-tmp")
+	err = sn.Remove(ctx3, key2t)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = sn.Prepare(ctx3, "test2-tmp", "test1", test2opt)
+	_, err = sn.Prepare(ctx3, key2t, key1, test2opt)
 	if err == nil {
 		t.Fatal("expected not error")
 	} else if !errdefs.IsNotFound(err) {
 		t.Fatal(err)
 	}
+	if leased3(key1) {
+		t.Errorf("lease for %q should not have been created", key1)
+	}
 
-	_, err = sn.Prepare(ctx3, "test1-tmp", "", test1opt)
+	_, err = sn.Prepare(ctx3, key1t, "", test1opt)
 	if err == nil {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
+	}
+	if !leased3(key1) {
+		t.Errorf("no lease for %q", key1)
 	}
 
 	_, err = sn.Prepare(ctx3, "test2-tmp", "test1", test2opt)
@@ -190,6 +256,9 @@ func TestSnapshotterWithRef(t *testing.T) {
 		t.Fatal("expected already exists error")
 	} else if !errdefs.IsAlreadyExists(err) {
 		t.Fatal(err)
+	}
+	if !leased3(key2) {
+		t.Errorf("no lease for %q", key2)
 	}
 }
 
