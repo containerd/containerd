@@ -279,3 +279,14 @@ func dialHybridVsock(address string, timeout time.Duration) (net.Conn, error) {
 	}
 	return hybridVsockDialer(addr, port, timeout)
 }
+
+func cleanupSockets(ctx context.Context) {
+	if address, err := ReadAddress("address"); err == nil {
+		_ = RemoveSocket(address)
+	}
+	if len(socketFlag) > 0 {
+		_ = RemoveSocket("unix://" + socketFlag)
+	} else if address, err := SocketAddress(ctx, addressFlag, id); err == nil {
+		_ = RemoveSocket(address)
+	}
+}

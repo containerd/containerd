@@ -85,3 +85,9 @@ func AnonDialer(address string, timeout time.Duration) (net.Conn, error) {
 func RemoveSocket(address string) error {
 	return nil
 }
+
+func cleanupSockets(context.Context) {
+	if address, err := ReadAddress("address"); err == nil {
+		_ = RemoveSocket(address)
+	}
+}

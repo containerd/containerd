@@ -411,15 +411,14 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
 		if !errors.Is(err, shutdown.ErrShutdown) {
+			cleanupSockets(ctx)
 			return err
 		}
 	}
 
 	// NOTE: If the shim server is down(like oom killer), the address
 	// socket might be leaking.
-	if address, err := ReadAddress("address"); err == nil {
-		_ = RemoveSocket(address)
-	}
+	cleanupSockets(ctx)
 
 	select {
 	case <-sd.Done():
