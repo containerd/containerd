@@ -55,7 +55,7 @@ do
 done<<<$(go mod edit -json | jq -r '.Require[] | .Path +  " # " + .Version')
 while IFS='#' read -r key value
 do
-  map_replaces_2[$key]="$value"
+  [ "$key" = "" ] || map_replaces_2[$key]="$value"
 done<<<$(go mod edit -json | jq -r 'try .Replace[] | .Old.Path + " # " + .New.Path + " : " + .New.Version')
 popd > /dev/null
 
