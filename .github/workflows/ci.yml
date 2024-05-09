@@ -632,7 +632,7 @@ jobs:
     name: Report required job statuses
     runs-on: ubuntu-latest
     # List job dependencies which are required to pass status checks in order to be merged via merge queue.
-    needs: [linters, project, protos, binaries, integration-linux, integration-windows, integration-vagrant, tests-cri-in-userns, tests-mac-os]
+    needs: [linters, project, protos, binaries, integration-linux, integration-windows, tests-cri-in-userns, tests-mac-os]
     if: ${{ always() }}
     steps:
       - run: exit 1
