@@ -6,7 +6,7 @@ on:
 name: API Release
 
 env:
-  GO_VERSION: "1.22.2"
+  GO_VERSION: "1.22.3"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
