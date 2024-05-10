@@ -53,7 +53,7 @@ func (c *criService) startSandboxExitMonitor(ctx context.Context, id string, exi
 		case exitRes := <-exitCh:
 			exitStatus, exitedAt, err := exitRes.Result()
 			if err != nil {
-				log.L.WithError(err).Errorf("failed to get task exit status for %q", id)
+				log.L.WithError(err).Errorf("failed to get sandbox status for %q", id)
 				exitStatus = unknownExitCode
 				exitedAt = time.Now()
 			}

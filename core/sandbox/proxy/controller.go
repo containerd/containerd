@@ -18,6 +18,7 @@ package proxy
 
 import (
 	"context"
+	"time"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
@@ -119,9 +120,31 @@ func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string
 }
 
 func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (sandbox.ExitStatus, error) {
-	resp, err := s.client.Wait(ctx, &api.ControllerWaitRequest{SandboxID: sandboxID})
-	if err != nil {
-		return sandbox.ExitStatus{}, errdefs.FromGRPC(err)
+	// For remote sandbox controllers, the controller process may restart,
+	// we have to retry if the error indicates that it is the grpc disconnection.
+	var (
+		resp          *api.ControllerWaitResponse
+		err           error
+		retryInterval time.Duration = 128
+	)
+	for {
+		resp, err = s.client.Wait(ctx, &api.ControllerWaitRequest{SandboxID: sandboxID})
+		if err != nil {
+			grpcErr := errdefs.FromGRPC(err)
+			if !errdefs.IsUnavailable(grpcErr) {
+				return sandbox.ExitStatus{}, grpcErr
+			}
+			select {
+			case <-time.After(retryInterval * time.Millisecond):
+				if retryInterval < 4096 {
+					retryInterval = retryInterval << 1
+				}
+				continue
+			case <-ctx.Done():
+				return sandbox.ExitStatus{}, grpcErr
+			}
+		}
+		break
 	}
 
 	return sandbox.ExitStatus{
