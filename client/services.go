@@ -230,27 +230,3 @@ func WithInMemoryServices(ic *plugin.InitContext) Opt {
 		return nil
 	}
 }
-
-func WithInMemorySandboxControllers(ic *plugin.InitContext) Opt {
-	return func(c *clientOpts) error {
-		sc := make(map[string]sandbox.Controller)
-		sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
-		if err != nil {
-			return err
-		}
-		for name, p := range sandboxers {
-			sc[name] = p.(sandbox.Controller)
-		}
-
-		podSandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
-		if err != nil {
-			return err
-		}
-		for name, p := range podSandboxers {
-			sc[name] = p.(sandbox.Controller)
-		}
-
-		c.services.sandboxers = sc
-		return nil
-	}
-}
