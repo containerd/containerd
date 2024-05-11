@@ -211,3 +211,26 @@ func (s *Store) Delete(id string) {
 	s.idIndex.Delete(id)
 	delete(s.containers, id)
 }
+
+// UpdateContainerIO update container IO
+// useful when using StartContainer
+func (s *Store) UpdateContainerIO(id string, io *cio.ContainerIO) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	id, err := s.idIndex.Get(id)
+	if err != nil {
+		if err == truncindex.ErrNotExist {
+			err = errdefs.ErrNotFound
+		}
+		return err
+	}
+
+	if _, ok := s.containers[id]; !ok {
+		return errdefs.ErrNotFound
+	}
+
+	c := s.containers[id]
+	c.IO = io
+	s.containers[id] = c
+	return nil
+}

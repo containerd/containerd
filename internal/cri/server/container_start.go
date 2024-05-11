@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -99,6 +100,35 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}
 
+	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
+	if err = c.os.MkdirAll(volatileContainerRootDir, 0o755); err != nil {
+		return nil, fmt.Errorf("failed to create volatile container root directory %q: %w",
+			volatileContainerRootDir, err)
+	}
+	containerIO, err := cio.NewContainerIO(id,
+		cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container io: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if err := containerIO.Close(); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
+			}
+		}
+	}()
+	if _, err := os.Stat(cntr.IO.Config().Stdin); err != nil && os.IsNotExist(err) {
+		// cleanup old fifos tempdir
+		cntr.IO.Close()
+
+		cntr.IO = containerIO
+		// update container IO into container store
+		// OR, tempdir for fifos will be remained when handleContainerExit
+		if err := c.containerStore.UpdateContainerIO(cntr.ID, containerIO); err != nil {
+			return nil, fmt.Errorf("failed to update container io %q into store: %w", id, err)
+		}
+	}
+
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
@@ -172,6 +202,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	// Update container start timestamp.
 	if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
 		status.Pid = task.Pid()
+		status.FinishedAt = 0
 		status.StartedAt = time.Now().UnixNano()
 		return status, nil
 	}); err != nil {
@@ -198,7 +229,9 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 func setContainerStarting(container containerstore.Container) error {
 	return container.Status.Update(func(status containerstore.Status) (containerstore.Status, error) {
 		// Return error if container is not in created state.
-		if status.State() != runtime.ContainerState_CONTAINER_CREATED {
+		st := status.State()
+		if st != runtime.ContainerState_CONTAINER_CREATED &&
+			st != runtime.ContainerState_CONTAINER_EXITED {
 			return status, fmt.Errorf("container is in %s state", criContainerStateToString(status.State()))
 		}
 		// Do not start the container when there is a removal in progress.
