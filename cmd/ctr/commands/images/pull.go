@@ -106,20 +106,20 @@ command. As part of this process, we do the following:
 			}
 
 			var sopts []image.StoreOpt
+			p, err := platforms.ParseAll(context.StringSlice("platform"))
+			if err != nil {
+				return err
+			}
+
+			// Set unpack configuration
+			for _, platform := range p {
+				sopts = append(sopts, image.WithUnpack(platform, context.String("snapshotter")))
+			}
 			if !context.Bool("all-platforms") {
-				p, err := platforms.ParseAll(context.StringSlice("platform"))
-				if err != nil {
-					return err
-				}
 				if len(p) == 0 {
 					p = append(p, platforms.DefaultSpec())
 				}
 				sopts = append(sopts, image.WithPlatforms(p...))
-
-				// Set unpack configuration
-				for _, platform := range p {
-					sopts = append(sopts, image.WithUnpack(platform, context.String("snapshotter")))
-				}
 			}
 			// TODO: Support unpack for all platforms..?
 			// Pass in a *?
