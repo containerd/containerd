@@ -1,5 +1,26 @@
 CHANGES
 
+v1.1.8:
+  - Updated to containerd v1.6.23
+  - Sync'ed enc-ctr with ctr of containerd v1.6.23
+  - Updated to ocicrypt v1.1.8
+
+v1.1.7:
+  - Added support for zstd-compressed layers
+  - Update to ocicrypt v1.1.6 for zstd-related dependencies
+  - Update to containerd v1.6.8
+  - Sync'ed ctr-enc with upstream ctr changes to import command
+  - Add support for --all-platforms to encrypt command of ctr-enc
+
+v1.1.6:
+  - Update to ocicrypt v1.1.5 for yaml v3.0 dependency
+  - Update to containerd v1.6.6 for runc v1.1.2 dependency
+
+v1.1.5:
+  - Update to ocicrypt v1.1.4; sha256 is the default now for padding in OAEP
+    for pkcs11; Set OCICRYPT_OAEP_HASHALG=sha1 environment variable to force
+    sha1 usage, which is required for example for SoftHSM 2.6.1.
+
 v1.1.4:
   - Fixed issue in CheckAuthorization() callpath for images with a ManifestList
     - CVE-2022-24778

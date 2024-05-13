@@ -58,9 +58,9 @@ func isLocalPlatform(platform *ocispec.Platform) bool {
 }
 
 // IsEncryptedDiff returns true if mediaType is a known encrypted media type.
-func IsEncryptedDiff(ctx context.Context, mediaType string) bool {
+func IsEncryptedDiff(_ context.Context, mediaType string) bool {
 	switch mediaType {
-	case encocispec.MediaTypeLayerGzipEnc, encocispec.MediaTypeLayerEnc:
+	case encocispec.MediaTypeLayerZstdEnc, encocispec.MediaTypeLayerGzipEnc, encocispec.MediaTypeLayerEnc:
 		return true
 	}
 	return false
@@ -113,12 +113,16 @@ func encryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 		newDesc.MediaType = encocispec.MediaTypeLayerEnc
 	case encocispec.MediaTypeLayerGzipEnc:
 		newDesc.MediaType = encocispec.MediaTypeLayerGzipEnc
+	case encocispec.MediaTypeLayerZstdEnc:
+		newDesc.MediaType = encocispec.MediaTypeLayerZstdEnc
 	case encocispec.MediaTypeLayerEnc:
 		newDesc.MediaType = encocispec.MediaTypeLayerEnc
 
 	// TODO: Mediatypes to be added in ocispec
 	case ocispec.MediaTypeImageLayerGzip:
 		newDesc.MediaType = encocispec.MediaTypeLayerGzipEnc
+	case ocispec.MediaTypeImageLayerZstd:
+		newDesc.MediaType = encocispec.MediaTypeLayerZstdEnc
 	case ocispec.MediaTypeImageLayer:
 		newDesc.MediaType = encocispec.MediaTypeLayerEnc
 
@@ -145,6 +149,8 @@ func DecryptLayer(dc *encconfig.DecryptConfig, dataReader io.Reader, desc ocispe
 	switch desc.MediaType {
 	case encocispec.MediaTypeLayerGzipEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzip
+	case encocispec.MediaTypeLayerZstdEnc:
+		newDesc.MediaType = ocispec.MediaTypeImageLayerZstd
 	case encocispec.MediaTypeLayerEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
 	default:
@@ -170,6 +176,8 @@ func decryptLayer(cc *encconfig.CryptoConfig, dataReader content.ReaderAt, desc 
 	switch desc.MediaType {
 	case encocispec.MediaTypeLayerGzipEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2LayerGzip
+	case encocispec.MediaTypeLayerZstdEnc:
+		newDesc.MediaType = ocispec.MediaTypeImageLayerZstd
 	case encocispec.MediaTypeLayerEnc:
 		newDesc.MediaType = images.MediaTypeDockerSchema2Layer
 	default:
@@ -265,7 +273,7 @@ func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Rea
 }
 
 // Encrypt or decrypt all the Children of a given descriptor
-func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
+func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, _ *ocispec.Platform) (ocispec.Descriptor, bool, error) {
 	children, err := images.Children(ctx, cs, desc)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
@@ -284,7 +292,8 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 		case images.MediaTypeDockerSchema2Config, ocispec.MediaTypeImageConfig:
 			config = child
 		case images.MediaTypeDockerSchema2LayerGzip, images.MediaTypeDockerSchema2Layer,
-			ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer:
+			ocispec.MediaTypeImageLayerGzip, ocispec.MediaTypeImageLayer,
+			ocispec.MediaTypeImageLayerZstd:
 			if cryptoOp == cryptoOpEncrypt && lf(child) {
 				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
 				if err != nil {
@@ -295,7 +304,7 @@ func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descripto
 			} else {
 				newLayers = append(newLayers, child)
 			}
-		case encocispec.MediaTypeLayerGzipEnc, encocispec.MediaTypeLayerEnc:
+		case encocispec.MediaTypeLayerGzipEnc, encocispec.MediaTypeLayerZstdEnc, encocispec.MediaTypeLayerEnc:
 			// this one can be decrypted but also its recipients list changed
 			if lf(child) {
 				nl, err := cryptLayer(ctx, cs, child, cc, cryptoOp)
