@@ -23,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
+        os: [ubuntu-24.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
 
@@ -42,7 +42,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -70,7 +70,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     defaults:
@@ -104,7 +104,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -118,7 +118,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -190,7 +190,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-22.04, ubuntu-24.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
         go-version: ["1.22.4"]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
@@ -385,7 +385,7 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc, crun]
-        os: [ubuntu-22.04, actuated-arm64-4cpu-16gb]
+        os: [ubuntu-22.04, ubuntu-24.04, actuated-arm64-4cpu-16gb]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
 
@@ -519,7 +519,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -575,7 +575,7 @@ jobs:
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
