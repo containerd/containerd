@@ -18,7 +18,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/otel v1.19.0
 	go.opentelemetry.io/otel/sdk v1.19.0
-	golang.org/x/sys v0.13.0
+	golang.org/x/sys v0.16.0
 )
 
 require github.com/google/uuid v1.3.1
@@ -62,7 +62,7 @@ require (
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
 	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
