@@ -16,9 +16,11 @@
 
 package platforms
 
-// DefaultString returns the default string specifier for the platform.
+// DefaultString returns the default string specifier for the platform,
+// with [PR#6](https://github.com/containerd/platforms/pull/6) the result
+// may now also include the OSVersion from the provided platform specification.
 func DefaultString() string {
-	return Format(DefaultSpec())
+	return FormatAll(DefaultSpec())
 }
 
 // DefaultStrict returns strict form of Default.

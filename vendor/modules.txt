@@ -173,7 +173,7 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
-# github.com/containerd/platforms v0.1.1
+# github.com/containerd/platforms v0.2.0
 ## explicit; go 1.20
 github.com/containerd/platforms
 # github.com/containerd/plugin v0.1.0
