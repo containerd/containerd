@@ -18,7 +18,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/sys v0.16.0
+	golang.org/x/sys v0.18.0
 )
 
 require (
@@ -47,7 +47,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
