@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/square/go-jose.v2/json"
+	"github.com/go-jose/go-jose/v3/json"
 )
 
 // rawJSONWebSignature represents a raw JWS JSON object. Used for parsing/serializing.
@@ -75,7 +75,7 @@ type Signature struct {
 	original  *rawSignatureInfo
 }
 
-// ParseSigned parses a signed message in compact or full serialization format.
+// ParseSigned parses a signed message in compact or JWS JSON Serialization format.
 func ParseSigned(signature string) (*JSONWebSignature, error) {
 	signature = stripWhitespace(signature)
 	if strings.HasPrefix(signature, "{") {
@@ -88,7 +88,7 @@ func ParseSigned(signature string) (*JSONWebSignature, error) {
 // ParseDetached parses a signed message in compact serialization format with detached payload.
 func ParseDetached(signature string, payload []byte) (*JSONWebSignature, error) {
 	if payload == nil {
-		return nil, errors.New("square/go-jose: nil payload")
+		return nil, errors.New("go-jose/go-jose: nil payload")
 	}
 	return parseSignedCompact(stripWhitespace(signature), payload)
 }
@@ -151,7 +151,7 @@ func parseSignedFull(input string) (*JSONWebSignature, error) {
 // sanitized produces a cleaned-up JWS object from the raw JSON.
 func (parsed *rawJSONWebSignature) sanitized() (*JSONWebSignature, error) {
 	if parsed.Payload == nil {
-		return nil, fmt.Errorf("square/go-jose: missing payload in JWS message")
+		return nil, fmt.Errorf("go-jose/go-jose: missing payload in JWS message")
 	}
 
 	obj := &JSONWebSignature{
@@ -215,7 +215,7 @@ func (parsed *rawJSONWebSignature) sanitized() (*JSONWebSignature, error) {
 		// As per RFC 7515 Section 4.1.3, only public keys are allowed to be embedded.
 		jwk := signature.Header.JSONWebKey
 		if jwk != nil && (!jwk.Valid() || !jwk.IsPublic()) {
-			return nil, errors.New("square/go-jose: invalid embedded jwk, must be public key")
+			return nil, errors.New("go-jose/go-jose: invalid embedded jwk, must be public key")
 		}
 
 		obj.Signatures = append(obj.Signatures, signature)
@@ -260,7 +260,7 @@ func (parsed *rawJSONWebSignature) sanitized() (*JSONWebSignature, error) {
 		// As per RFC 7515 Section 4.1.3, only public keys are allowed to be embedded.
 		jwk := obj.Signatures[i].Header.JSONWebKey
 		if jwk != nil && (!jwk.Valid() || !jwk.IsPublic()) {
-			return nil, errors.New("square/go-jose: invalid embedded jwk, must be public key")
+			return nil, errors.New("go-jose/go-jose: invalid embedded jwk, must be public key")
 		}
 
 		// Copy value of sig
@@ -277,26 +277,26 @@ func (parsed *rawJSONWebSignature) sanitized() (*JSONWebSignature, error) {
 func parseSignedCompact(input string, payload []byte) (*JSONWebSignature, error) {
 	parts := strings.Split(input, ".")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("square/go-jose: compact JWS format must have three parts")
+		return nil, fmt.Errorf("go-jose/go-jose: compact JWS format must have three parts")
 	}
 
 	if parts[1] != "" && payload != nil {
-		return nil, fmt.Errorf("square/go-jose: payload is not detached")
+		return nil, fmt.Errorf("go-jose/go-jose: payload is not detached")
 	}
 
-	rawProtected, err := base64.RawURLEncoding.DecodeString(parts[0])
+	rawProtected, err := base64URLDecode(parts[0])
 	if err != nil {
 		return nil, err
 	}
 
 	if payload == nil {
-		payload, err = base64.RawURLEncoding.DecodeString(parts[1])
+		payload, err = base64URLDecode(parts[1])
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	signature, err := base64URLDecode(parts[2])
 	if err != nil {
 		return nil, err
 	}
@@ -314,15 +314,18 @@ func (obj JSONWebSignature) compactSerialize(detached bool) (string, error) {
 		return "", ErrNotSupported
 	}
 
-	serializedProtected := base64.RawURLEncoding.EncodeToString(mustSerializeJSON(obj.Signatures[0].protected))
-	payload := ""
-	signature := base64.RawURLEncoding.EncodeToString(obj.Signatures[0].Signature)
+	serializedProtected := mustSerializeJSON(obj.Signatures[0].protected)
 
+	var payload []byte
 	if !detached {
-		payload = base64.RawURLEncoding.EncodeToString(obj.payload)
+		payload = obj.payload
 	}
 
-	return fmt.Sprintf("%s.%s.%s", serializedProtected, payload, signature), nil
+	return base64JoinWithDots(
+		serializedProtected,
+		payload,
+		obj.Signatures[0].Signature,
+	), nil
 }
 
 // CompactSerialize serializes an object using the compact serialization format.

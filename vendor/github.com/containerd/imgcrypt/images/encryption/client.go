@@ -35,13 +35,13 @@ import (
 func WithDecryptedUnpack(data *imgcrypt.Payload) diff.ApplyOpt {
 	return func(_ context.Context, desc ocispec.Descriptor, c *diff.ApplyConfig) error {
 		data.Descriptor = desc
-		any, err := typeurl.MarshalAny(data)
+		anything, err := typeurl.MarshalAny(data)
 		if err != nil {
 			return fmt.Errorf("failed to marshal payload: %w", err)
 		}
 
 		for _, id := range imgcrypt.PayloadToolIDs {
-			setProcessorPayload(c, id, any)
+			setProcessorPayload(c, id, anything)
 		}
 		return nil
 	}

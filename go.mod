@@ -16,7 +16,7 @@ require (
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
 	github.com/containerd/go-runc v1.0.0
-	github.com/containerd/imgcrypt v1.1.7
+	github.com/containerd/imgcrypt v1.1.8
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.6.1
 	github.com/containerd/ttrpc v1.2.3
@@ -91,9 +91,10 @@ require (
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/typeurl v1.0.2 // indirect
-	github.com/containers/ocicrypt v1.1.6 // indirect
+	github.com/containers/ocicrypt v1.1.10 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -118,7 +119,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stefanberger/go-pkcs11uri v0.0.0-20201008174630-78d3cae3a980 // indirect
+	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 // indirect
@@ -136,7 +137,6 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/square/go-jose.v2 v2.5.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect

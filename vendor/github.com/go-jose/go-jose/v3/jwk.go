@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -34,9 +35,7 @@ import (
 	"reflect"
 	"strings"
 
-	"golang.org/x/crypto/ed25519"
-
-	"gopkg.in/square/go-jose.v2/json"
+	"github.com/go-jose/go-jose/v3/json"
 )
 
 // rawJSONWebKey represents a public or private key in JWK format, used for parsing/serializing.
@@ -63,14 +62,26 @@ type rawJSONWebKey struct {
 	Qi *byteBuffer `json:"qi,omitempty"`
 	// Certificates
 	X5c       []string `json:"x5c,omitempty"`
-	X5u       *url.URL `json:"x5u,omitempty"`
+	X5u       string   `json:"x5u,omitempty"`
 	X5tSHA1   string   `json:"x5t,omitempty"`
 	X5tSHA256 string   `json:"x5t#S256,omitempty"`
 }
 
-// JSONWebKey represents a public or private key in JWK format.
+// JSONWebKey represents a public or private key in JWK format. It can be
+// marshaled into JSON and unmarshaled from JSON.
 type JSONWebKey struct {
-	// Cryptographic key, can be a symmetric or asymmetric key.
+	// Key is the Go in-memory representation of this key. It must have one
+	// of these types:
+	//  - ed25519.PublicKey
+	//  - ed25519.PrivateKey
+	//  - *ecdsa.PublicKey
+	//  - *ecdsa.PrivateKey
+	//  - *rsa.PublicKey
+	//  - *rsa.PrivateKey
+	//  - []byte (a symmetric key)
+	//
+	// When marshaling this JSONWebKey into JSON, the "kty" header parameter
+	// will be automatically set based on the type of this field.
 	Key interface{}
 	// Key identifier, parsed from `kid` header.
 	KeyID string
@@ -110,7 +121,7 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 	case []byte:
 		raw, err = fromSymmetricKey(key)
 	default:
-		return nil, fmt.Errorf("square/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
 	}
 
 	if err != nil {
@@ -129,13 +140,13 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 	x5tSHA256Len := len(k.CertificateThumbprintSHA256)
 	if x5tSHA1Len > 0 {
 		if x5tSHA1Len != sha1.Size {
-			return nil, fmt.Errorf("square/go-jose: invalid SHA-1 thumbprint (must be %d bytes, not %d)", sha1.Size, x5tSHA1Len)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid SHA-1 thumbprint (must be %d bytes, not %d)", sha1.Size, x5tSHA1Len)
 		}
 		raw.X5tSHA1 = base64.RawURLEncoding.EncodeToString(k.CertificateThumbprintSHA1)
 	}
 	if x5tSHA256Len > 0 {
 		if x5tSHA256Len != sha256.Size {
-			return nil, fmt.Errorf("square/go-jose: invalid SHA-256 thumbprint (must be %d bytes, not %d)", sha256.Size, x5tSHA256Len)
+			return nil, fmt.Errorf("go-jose/go-jose: invalid SHA-256 thumbprint (must be %d bytes, not %d)", sha256.Size, x5tSHA256Len)
 		}
 		raw.X5tSHA256 = base64.RawURLEncoding.EncodeToString(k.CertificateThumbprintSHA256)
 	}
@@ -149,14 +160,16 @@ func (k JSONWebKey) MarshalJSON() ([]byte, error) {
 		expectedSHA256 := sha256.Sum256(k.Certificates[0].Raw)
 
 		if len(k.CertificateThumbprintSHA1) > 0 && !bytes.Equal(k.CertificateThumbprintSHA1, expectedSHA1[:]) {
-			return nil, errors.New("square/go-jose: invalid SHA-1 thumbprint, does not match cert chain")
+			return nil, errors.New("go-jose/go-jose: invalid SHA-1 thumbprint, does not match cert chain")
 		}
 		if len(k.CertificateThumbprintSHA256) > 0 && !bytes.Equal(k.CertificateThumbprintSHA256, expectedSHA256[:]) {
-			return nil, errors.New("square/go-jose: invalid or SHA-256 thumbprint, does not match cert chain")
+			return nil, errors.New("go-jose/go-jose: invalid or SHA-256 thumbprint, does not match cert chain")
 		}
 	}
 
-	raw.X5u = k.CertificatesURL
+	if k.CertificatesURL != nil {
+		raw.X5u = k.CertificatesURL.String()
+	}
 
 	return json.Marshal(raw)
 }
@@ -171,7 +184,7 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 
 	certs, err := parseCertificateChain(raw.X5c)
 	if err != nil {
-		return fmt.Errorf("square/go-jose: failed to unmarshal x5c field: %s", err)
+		return fmt.Errorf("go-jose/go-jose: failed to unmarshal x5c field: %s", err)
 	}
 
 	var key interface{}
@@ -211,7 +224,7 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		}
 	case "oct":
 		if certPub != nil {
-			return errors.New("square/go-jose: invalid JWK, found 'oct' (symmetric) key with cert chain")
+			return errors.New("go-jose/go-jose: invalid JWK, found 'oct' (symmetric) key with cert chain")
 		}
 		key, err = raw.symmetricKey()
 	case "OKP":
@@ -226,10 +239,10 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 				keyPub = key
 			}
 		} else {
-			err = fmt.Errorf("square/go-jose: unknown curve %s'", raw.Crv)
+			err = fmt.Errorf("go-jose/go-jose: unknown curve %s'", raw.Crv)
 		}
 	default:
-		err = fmt.Errorf("square/go-jose: unknown json web key type '%s'", raw.Kty)
+		err = fmt.Errorf("go-jose/go-jose: unknown json web key type '%s'", raw.Kty)
 	}
 
 	if err != nil {
@@ -238,19 +251,24 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 
 	if certPub != nil && keyPub != nil {
 		if !reflect.DeepEqual(certPub, keyPub) {
-			return errors.New("square/go-jose: invalid JWK, public keys in key and x5c fields to not match")
+			return errors.New("go-jose/go-jose: invalid JWK, public keys in key and x5c fields do not match")
 		}
 	}
 
 	*k = JSONWebKey{Key: key, KeyID: raw.Kid, Algorithm: raw.Alg, Use: raw.Use, Certificates: certs}
 
-	k.CertificatesURL = raw.X5u
+	if raw.X5u != "" {
+		k.CertificatesURL, err = url.Parse(raw.X5u)
+		if err != nil {
+			return fmt.Errorf("go-jose/go-jose: invalid JWK, x5u header is invalid URL: %w", err)
+		}
+	}
 
 	// x5t parameters are base64url-encoded SHA thumbprints
 	// See RFC 7517, Section 4.8, https://tools.ietf.org/html/rfc7517#section-4.8
-	x5tSHA1bytes, err := base64.RawURLEncoding.DecodeString(raw.X5tSHA1)
+	x5tSHA1bytes, err := base64URLDecode(raw.X5tSHA1)
 	if err != nil {
-		return errors.New("square/go-jose: invalid JWK, x5t header has invalid encoding")
+		return errors.New("go-jose/go-jose: invalid JWK, x5t header has invalid encoding")
 	}
 
 	// RFC 7517, Section 4.8 is ambiguous as to whether the digest output should be byte or hex,
@@ -260,7 +278,7 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 	if len(x5tSHA1bytes) == 2*sha1.Size {
 		hx, err := hex.DecodeString(string(x5tSHA1bytes))
 		if err != nil {
-			return fmt.Errorf("square/go-jose: invalid JWK, unable to hex decode x5t: %v", err)
+			return fmt.Errorf("go-jose/go-jose: invalid JWK, unable to hex decode x5t: %v", err)
 
 		}
 		x5tSHA1bytes = hx
@@ -268,15 +286,15 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 
 	k.CertificateThumbprintSHA1 = x5tSHA1bytes
 
-	x5tSHA256bytes, err := base64.RawURLEncoding.DecodeString(raw.X5tSHA256)
+	x5tSHA256bytes, err := base64URLDecode(raw.X5tSHA256)
 	if err != nil {
-		return errors.New("square/go-jose: invalid JWK, x5t#S256 header has invalid encoding")
+		return errors.New("go-jose/go-jose: invalid JWK, x5t#S256 header has invalid encoding")
 	}
 
 	if len(x5tSHA256bytes) == 2*sha256.Size {
 		hx256, err := hex.DecodeString(string(x5tSHA256bytes))
 		if err != nil {
-			return fmt.Errorf("square/go-jose: invalid JWK, unable to hex decode x5t#S256: %v", err)
+			return fmt.Errorf("go-jose/go-jose: invalid JWK, unable to hex decode x5t#S256: %v", err)
 		}
 		x5tSHA256bytes = hx256
 	}
@@ -286,10 +304,10 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 	x5tSHA1Len := len(k.CertificateThumbprintSHA1)
 	x5tSHA256Len := len(k.CertificateThumbprintSHA256)
 	if x5tSHA1Len > 0 && x5tSHA1Len != sha1.Size {
-		return errors.New("square/go-jose: invalid JWK, x5t header is of incorrect size")
+		return errors.New("go-jose/go-jose: invalid JWK, x5t header is of incorrect size")
 	}
 	if x5tSHA256Len > 0 && x5tSHA256Len != sha256.Size {
-		return errors.New("square/go-jose: invalid JWK, x5t#S256 header is of incorrect size")
+		return errors.New("go-jose/go-jose: invalid JWK, x5t#S256 header is of incorrect size")
 	}
 
 	// If certificate chain *and* thumbprints are set, verify correctness.
@@ -299,11 +317,11 @@ func (k *JSONWebKey) UnmarshalJSON(data []byte) (err error) {
 		sha256sum := sha256.Sum256(leaf.Raw)
 
 		if len(k.CertificateThumbprintSHA1) > 0 && !bytes.Equal(sha1sum[:], k.CertificateThumbprintSHA1) {
-			return errors.New("square/go-jose: invalid JWK, x5c thumbprint does not match x5t value")
+			return errors.New("go-jose/go-jose: invalid JWK, x5c thumbprint does not match x5t value")
 		}
 
 		if len(k.CertificateThumbprintSHA256) > 0 && !bytes.Equal(sha256sum[:], k.CertificateThumbprintSHA256) {
-			return errors.New("square/go-jose: invalid JWK, x5c thumbprint does not match x5t#S256 value")
+			return errors.New("go-jose/go-jose: invalid JWK, x5c thumbprint does not match x5t#S256 value")
 		}
 	}
 
@@ -332,7 +350,7 @@ func (s *JSONWebKeySet) Key(kid string) []JSONWebKey {
 
 const rsaThumbprintTemplate = `{"e":"%s","kty":"RSA","n":"%s"}`
 const ecThumbprintTemplate = `{"crv":"%s","kty":"EC","x":"%s","y":"%s"}`
-const edThumbprintTemplate = `{"crv":"%s","kty":"OKP",x":"%s"}`
+const edThumbprintTemplate = `{"crv":"%s","kty":"OKP","x":"%s"}`
 
 func ecThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 	coordLength := curveSize(curve)
@@ -342,7 +360,7 @@ func ecThumbprintInput(curve elliptic.Curve, x, y *big.Int) (string, error) {
 	}
 
 	if len(x.Bytes()) > coordLength || len(y.Bytes()) > coordLength {
-		return "", errors.New("square/go-jose: invalid elliptic key (too large)")
+		return "", errors.New("go-jose/go-jose: invalid elliptic key (too large)")
 	}
 
 	return fmt.Sprintf(ecThumbprintTemplate, crv,
@@ -359,7 +377,7 @@ func rsaThumbprintInput(n *big.Int, e int) (string, error) {
 func edThumbprintInput(ed ed25519.PublicKey) (string, error) {
 	crv := "Ed25519"
 	if len(ed) > 32 {
-		return "", errors.New("square/go-jose: invalid elliptic key (too large)")
+		return "", errors.New("go-jose/go-jose: invalid elliptic key (too large)")
 	}
 	return fmt.Sprintf(edThumbprintTemplate, crv,
 		newFixedSizeBuffer(ed, 32).base64()), nil
@@ -383,8 +401,10 @@ func (k *JSONWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 		input, err = rsaThumbprintInput(key.N, key.E)
 	case ed25519.PrivateKey:
 		input, err = edThumbprintInput(ed25519.PublicKey(key[32:]))
+	case OpaqueSigner:
+		return key.Public().Thumbprint(hash)
 	default:
-		return nil, fmt.Errorf("square/go-jose: unknown key type '%s'", reflect.TypeOf(key))
+		return nil, fmt.Errorf("go-jose/go-jose: unknown key type '%s'", reflect.TypeOf(key))
 	}
 
 	if err != nil {
@@ -392,7 +412,7 @@ func (k *JSONWebKey) Thumbprint(hash crypto.Hash) ([]byte, error) {
 	}
 
 	h := hash.New()
-	h.Write([]byte(input))
+	_, _ = h.Write([]byte(input))
 	return h.Sum(nil), nil
 }
 
@@ -406,7 +426,7 @@ func (k *JSONWebKey) IsPublic() bool {
 	}
 }
 
-// Public creates JSONWebKey with corresponding publik key if JWK represents asymmetric private key.
+// Public creates JSONWebKey with corresponding public key if JWK represents asymmetric private key.
 func (k *JSONWebKey) Public() JSONWebKey {
 	if k.IsPublic() {
 		return *k
@@ -463,7 +483,7 @@ func (k *JSONWebKey) Valid() bool {
 
 func (key rawJSONWebKey) rsaPublicKey() (*rsa.PublicKey, error) {
 	if key.N == nil || key.E == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid RSA key, missing n/e values")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA key, missing n/e values")
 	}
 
 	return &rsa.PublicKey{
@@ -498,29 +518,29 @@ func (key rawJSONWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 	case "P-521":
 		curve = elliptic.P521()
 	default:
-		return nil, fmt.Errorf("square/go-jose: unsupported elliptic curve '%s'", key.Crv)
+		return nil, fmt.Errorf("go-jose/go-jose: unsupported elliptic curve '%s'", key.Crv)
 	}
 
 	if key.X == nil || key.Y == nil {
-		return nil, errors.New("square/go-jose: invalid EC key, missing x/y values")
+		return nil, errors.New("go-jose/go-jose: invalid EC key, missing x/y values")
 	}
 
 	// The length of this octet string MUST be the full size of a coordinate for
 	// the curve specified in the "crv" parameter.
 	// https://tools.ietf.org/html/rfc7518#section-6.2.1.2
 	if curveSize(curve) != len(key.X.data) {
-		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for x")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC public key, wrong length for x")
 	}
 
 	if curveSize(curve) != len(key.Y.data) {
-		return nil, fmt.Errorf("square/go-jose: invalid EC public key, wrong length for y")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC public key, wrong length for y")
 	}
 
 	x := key.X.bigInt()
 	y := key.Y.bigInt()
 
 	if !curve.IsOnCurve(x, y) {
-		return nil, errors.New("square/go-jose: invalid EC key, X/Y are not on declared curve")
+		return nil, errors.New("go-jose/go-jose: invalid EC key, X/Y are not on declared curve")
 	}
 
 	return &ecdsa.PublicKey{
@@ -532,7 +552,7 @@ func (key rawJSONWebKey) ecPublicKey() (*ecdsa.PublicKey, error) {
 
 func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJSONWebKey, error) {
 	if pub == nil || pub.X == nil || pub.Y == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid EC key (nil, or X/Y missing)")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC key (nil, or X/Y missing)")
 	}
 
 	name, err := curveName(pub.Curve)
@@ -546,7 +566,7 @@ func fromEcPublicKey(pub *ecdsa.PublicKey) (*rawJSONWebKey, error) {
 	yBytes := pub.Y.Bytes()
 
 	if len(xBytes) > size || len(yBytes) > size {
-		return nil, fmt.Errorf("square/go-jose: invalid EC key (X/Y too large)")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC key (X/Y too large)")
 	}
 
 	key := &rawJSONWebKey{
@@ -569,7 +589,7 @@ func (key rawJSONWebKey) edPrivateKey() (ed25519.PrivateKey, error) {
 	}
 
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("square/go-jose: invalid Ed25519 private key, missing %s value(s)", strings.Join(missing, ", "))
+		return nil, fmt.Errorf("go-jose/go-jose: invalid Ed25519 private key, missing %s value(s)", strings.Join(missing, ", "))
 	}
 
 	privateKey := make([]byte, ed25519.PrivateKeySize)
@@ -581,7 +601,7 @@ func (key rawJSONWebKey) edPrivateKey() (ed25519.PrivateKey, error) {
 
 func (key rawJSONWebKey) edPublicKey() (ed25519.PublicKey, error) {
 	if key.X == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid Ed key, missing x value")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid Ed key, missing x value")
 	}
 	publicKey := make([]byte, ed25519.PublicKeySize)
 	copy(publicKey[0:32], key.X.bytes())
@@ -605,7 +625,7 @@ func (key rawJSONWebKey) rsaPrivateKey() (*rsa.PrivateKey, error) {
 	}
 
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("square/go-jose: invalid RSA private key, missing %s value(s)", strings.Join(missing, ", "))
+		return nil, fmt.Errorf("go-jose/go-jose: invalid RSA private key, missing %s value(s)", strings.Join(missing, ", "))
 	}
 
 	rv := &rsa.PrivateKey{
@@ -675,34 +695,34 @@ func (key rawJSONWebKey) ecPrivateKey() (*ecdsa.PrivateKey, error) {
 	case "P-521":
 		curve = elliptic.P521()
 	default:
-		return nil, fmt.Errorf("square/go-jose: unsupported elliptic curve '%s'", key.Crv)
+		return nil, fmt.Errorf("go-jose/go-jose: unsupported elliptic curve '%s'", key.Crv)
 	}
 
 	if key.X == nil || key.Y == nil || key.D == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid EC private key, missing x/y/d values")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, missing x/y/d values")
 	}
 
 	// The length of this octet string MUST be the full size of a coordinate for
 	// the curve specified in the "crv" parameter.
 	// https://tools.ietf.org/html/rfc7518#section-6.2.1.2
 	if curveSize(curve) != len(key.X.data) {
-		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for x")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, wrong length for x")
 	}
 
 	if curveSize(curve) != len(key.Y.data) {
-		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for y")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, wrong length for y")
 	}
 
 	// https://tools.ietf.org/html/rfc7518#section-6.2.2.1
 	if dSize(curve) != len(key.D.data) {
-		return nil, fmt.Errorf("square/go-jose: invalid EC private key, wrong length for d")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key, wrong length for d")
 	}
 
 	x := key.X.bigInt()
 	y := key.Y.bigInt()
 
 	if !curve.IsOnCurve(x, y) {
-		return nil, errors.New("square/go-jose: invalid EC key, X/Y are not on declared curve")
+		return nil, errors.New("go-jose/go-jose: invalid EC key, X/Y are not on declared curve")
 	}
 
 	return &ecdsa.PrivateKey{
@@ -722,7 +742,7 @@ func fromEcPrivateKey(ec *ecdsa.PrivateKey) (*rawJSONWebKey, error) {
 	}
 
 	if ec.D == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid EC private key")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid EC private key")
 	}
 
 	raw.D = newFixedSizeBuffer(ec.D.Bytes(), dSize(ec.PublicKey.Curve))
@@ -740,7 +760,7 @@ func dSize(curve elliptic.Curve) int {
 	bitLen := order.BitLen()
 	size := bitLen / 8
 	if bitLen%8 != 0 {
-		size = size + 1
+		size++
 	}
 	return size
 }
@@ -754,7 +774,39 @@ func fromSymmetricKey(key []byte) (*rawJSONWebKey, error) {
 
 func (key rawJSONWebKey) symmetricKey() ([]byte, error) {
 	if key.K == nil {
-		return nil, fmt.Errorf("square/go-jose: invalid OCT (symmetric) key, missing k value")
+		return nil, fmt.Errorf("go-jose/go-jose: invalid OCT (symmetric) key, missing k value")
 	}
 	return key.K.bytes(), nil
+}
+
+func tryJWKS(key interface{}, headers ...Header) interface{} {
+	var jwks JSONWebKeySet
+
+	switch jwksType := key.(type) {
+	case *JSONWebKeySet:
+		jwks = *jwksType
+	case JSONWebKeySet:
+		jwks = jwksType
+	default:
+		return key
+	}
+
+	var kid string
+	for _, header := range headers {
+		if header.KeyID != "" {
+			kid = header.KeyID
+			break
+		}
+	}
+
+	if kid == "" {
+		return key
+	}
+
+	keys := jwks.Key(kid)
+	if len(keys) == 0 {
+		return key
+	}
+
+	return keys[0].Key
 }

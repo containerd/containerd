@@ -1,5 +1,10 @@
 CHANGES
 
+v1.1.8:
+  - Updated to containerd v1.6.23
+  - Sync'ed enc-ctr with ctr of containerd v1.6.23
+  - Updated to ocicrypt v1.1.8
+
 v1.1.7:
   - Added support for zstd-compressed layers
   - Update to ocicrypt v1.1.6 for zstd-related dependencies

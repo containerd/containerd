@@ -11,16 +11,6 @@ linters:
     - unused
     - misspell
 
-run:
-  skip-dirs:
-    - cmd/ctr/commands/run
-    - cmd/ctr/commands/images
-    - cmd\\ctr\\commands\\run
-    - cmd\\ctr\\commands\\images
-  skip-files:
-    - cmd/ctr/commands/commands.go
-    - cmd\\ctr\\commands\\commands.go
-
 linters-settings:
   depguard:
     rules:
@@ -29,3 +19,17 @@ linters-settings:
           - $all
         deny:
           - pkg: "io/ioutil"
+
+  revive:
+    severity: error
+    rules:
+      - name: indent-error-flow
+        severity: warning
+        disabled: false
+
+      - name: error-strings
+        disabled: false
+
+  staticcheck:
+    # Suppress reports of deprecated packages
+    checks: ["-SA1019"]
