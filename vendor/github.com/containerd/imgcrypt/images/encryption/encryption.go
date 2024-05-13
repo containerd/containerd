@@ -58,7 +58,7 @@ func isLocalPlatform(platform *ocispec.Platform) bool {
 }
 
 // IsEncryptedDiff returns true if mediaType is a known encrypted media type.
-func IsEncryptedDiff(ctx context.Context, mediaType string) bool {
+func IsEncryptedDiff(_ context.Context, mediaType string) bool {
 	switch mediaType {
 	case encocispec.MediaTypeLayerZstdEnc, encocispec.MediaTypeLayerGzipEnc, encocispec.MediaTypeLayerEnc:
 		return true
@@ -273,7 +273,7 @@ func ingestReader(ctx context.Context, cs content.Ingester, ref string, r io.Rea
 }
 
 // Encrypt or decrypt all the Children of a given descriptor
-func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, thisPlatform *ocispec.Platform) (ocispec.Descriptor, bool, error) {
+func cryptChildren(ctx context.Context, cs content.Store, desc ocispec.Descriptor, cc *encconfig.CryptoConfig, lf LayerFilter, cryptoOp cryptoOp, _ *ocispec.Platform) (ocispec.Descriptor, bool, error) {
 	children, err := images.Children(ctx, cs, desc)
 	if err != nil {
 		if errdefs.IsNotFound(err) {

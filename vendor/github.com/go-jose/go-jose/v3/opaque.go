@@ -17,7 +17,7 @@
 package jose
 
 // OpaqueSigner is an interface that supports signing payloads with opaque
-// private key(s). Private key operations preformed by implementors may, for
+// private key(s). Private key operations performed by implementers may, for
 // example, occur in a hardware module. An OpaqueSigner may rotate signing keys
 // transparently to the user of this interface.
 type OpaqueSigner interface {
@@ -121,7 +121,7 @@ func (oke *opaqueKeyEncrypter) encryptKey(cek []byte, alg KeyAlgorithm) (recipie
 	return oke.encrypter.encryptKey(cek, alg)
 }
 
-//OpaqueKeyDecrypter is an interface that supports decrypting keys with an opaque key.
+// OpaqueKeyDecrypter is an interface that supports decrypting keys with an opaque key.
 type OpaqueKeyDecrypter interface {
 	DecryptKey(encryptedKey []byte, header Header) ([]byte, error)
 }
