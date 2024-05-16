@@ -369,6 +369,17 @@ version = 2
       # See https://github.com/containerd/containerd/issues/6657 for context.
       snapshotter = ""
 
+      # sandboxer is the sandbox controller for the runtime.
+      # The default sandbox controller is the podsandbox controller, which create a "pause" container as a sandbox.
+      # We can create our own "shim" sandbox controller by implementing the sandbox api defined in runtime/sandbox/v1/sandbox.proto in our shim, and specifiy the sandboxer to "shim" here.
+      # We can also run a grpc or ttrpc server to serve the sandbox controller API defined in services/sandbox/v1/sandbox.proto, and define a ProxyPlugin of "sandbox" type, and specify the name of the ProxyPlugin here.
+      sandboxer = ""
+
+      # io_type is the way containerd get stdin/stdout/stderr from container or the execed process.
+      # The default value is "fifo", in which containerd will create a set of named pipes and transfer io by them.
+      # Currently the value of "streaming" is supported, in this way, sandbox should serve streaming api defined in services/streaming/v1/streaming.proto, and containerd will connect to sandbox's endpoint and create a set of streams to it, as channels to transfer io of container or process.
+      io_type = ""
+
       # 'plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options' is options specific to
       # "io.containerd.runc.v1" and "io.containerd.runc.v2". Its corresponding options type is:
       #   https://github.com/containerd/containerd/blob/v1.3.2/runtime/v2/runc/options/oci.pb.go#L26 .

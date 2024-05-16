@@ -55,6 +55,17 @@ func NewFifoExecIO(id, root string, tty, stdin bool) (*ExecIO, error) {
 }
 
 // NewStreamExecIO creates exec io with streaming.
+// The stream address is in format of `protocol://address?stream_id=xyz`.
+// It allocates ExecID-stdin, ExecID-stdout and ExecID-stderr as streaming IDs.
+// For example, that advertiser address of shim is `ttrpc+unix:///run/demo.sock` and exec ID is `app`.
+// There are three streams if stdin is enabled and TTY is disabled.
+//
+//   - Stdin: ttrpc+unix:///run/demo.sock?stream_id=app-stdin
+//   - Stdout: ttrpc+unix:///run/demo.sock?stream_id=app-stdout
+//   - stderr: ttrpc+unix:///run/demo.sock?stream_id=app-stderr
+//
+// The streaming IDs will be used as unique key to establish stream tunnel.
+// And it should support reconnection with the same streaming ID if containerd restarts.
 func NewStreamExecIO(id, address string, tty, stdin bool) (*ExecIO, error) {
 	fifos, err := newStreams(address, id, tty, stdin)
 	if err != nil {

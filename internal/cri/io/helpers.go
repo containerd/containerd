@@ -105,13 +105,13 @@ func newStreams(address, id string, tty, stdin bool) (*cio.FIFOSet, error) {
 	fifos := cio.NewFIFOSet(cio.Config{}, func() error { return nil })
 	if stdin {
 		streamID := id + "-stdin"
-		fifos.Stdin = fmt.Sprintf("%s/streaming?id=%s", address, streamID)
+		fifos.Stdin = fmt.Sprintf("%s?streaming_id=%s", address, streamID)
 	}
 	stdoutStreamID := id + "-stdout"
-	fifos.Stdout = fmt.Sprintf("%s/streaming?id=%s", address, stdoutStreamID)
+	fifos.Stdout = fmt.Sprintf("%s?streaming_id=%s", address, stdoutStreamID)
 	if !tty {
 		stderrStreamID := id + "-stderr"
-		fifos.Stderr = fmt.Sprintf("%s/streaming?id=%s", address, stderrStreamID)
+		fifos.Stderr = fmt.Sprintf("%s?streaming_id=%s", address, stderrStreamID)
 	}
 	fifos.Terminal = tty
 	return fifos, nil
@@ -209,6 +209,8 @@ func openOutputStream(ctx context.Context, url string) (io.ReadCloser, error) {
 }
 
 func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error) {
+	// urlStr should be in the form of:
+	// <ttrpc|grpc>+<unix|vsock|hvsock>://<uds-path|vsock-cid:vsock-port|uds-path:hvsock-port>?streaming_id=<stream-id>
 	u, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("address url parse error: %v", err)
@@ -221,12 +223,7 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 			" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
 	}
 
-	if u.Path != "streaming" {
-		// TODO, support connect stream other than streaming api
-		return nil, fmt.Errorf("only <address>/streaming?id=xxx supported")
-	}
-
-	id := u.Query().Get("id")
+	id := u.Query().Get("streaming_id")
 	if id == "" {
 		return nil, fmt.Errorf("no stream id in url queries")
 	}
