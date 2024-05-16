@@ -77,6 +77,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
 			NetworkPluginSetupSerially: false,
 			NetworkPluginConfTemplate:  "",
+			UseInternalLoopback:        false,
 		},
 		ContainerdConfig: ContainerdConfig{
 			DefaultRuntimeName: "runc",

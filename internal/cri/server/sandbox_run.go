@@ -455,7 +455,12 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	if netPlugin == nil {
 		return errors.New("cni config not initialized")
 	}
-
+	if c.config.UseInternalLoopback {
+		err := c.bringUpLoopback(path)
+		if err != nil {
+			return fmt.Errorf("unable to set lo to up: %w", err)
+		}
+	}
 	opts, err := cniNamespaceOpts(id, config)
 	if err != nil {
 		return fmt.Errorf("get cni namespace options: %w", err)

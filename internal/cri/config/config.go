@@ -185,6 +185,8 @@ type CniConfig struct {
 	// * ipv6 - select the first ipv6 address
 	// * cni - use the order returned by the CNI plugins, returning the first IP address from the results
 	IPPreference string `toml:"ip_pref" json:"ipPref"`
+	// UseInternalLoopback specifies if we use the CNI loopback plugin or internal mechanism to set lo to up
+	UseInternalLoopback bool `toml:"use_internal_loopback" json:"useInternalLoopback"`
 }
 
 // Mirror contains the config related to the registry mirror
