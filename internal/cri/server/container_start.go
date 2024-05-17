@@ -117,10 +117,14 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			}
 		}
 	}()
-	if _, err := os.Stat(cntr.IO.Config().Stdin); err != nil && os.IsNotExist(err) {
-		// cleanup old fifos tempdir
-		cntr.IO.Close()
-
+	if cntr.IO != nil {
+		if _, err := os.Stat(cntr.IO.Config().Stdin); err != nil && os.IsNotExist(err) {
+			// cleanup old fifos tempdir
+			cntr.IO.Close()
+			cntr.IO = nil
+		}
+	}
+	if cntr.IO == nil {
 		cntr.IO = containerIO
 		// update container IO into container store
 		// OR, tempdir for fifos will be remained when handleContainerExit
