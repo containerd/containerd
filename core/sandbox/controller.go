@@ -111,6 +111,20 @@ type Controller interface {
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Metrics queries the sandbox for metrics.
 	Metrics(ctx context.Context, sandboxID string) (*types.Metric, error)
+	// UpdateResource updates the resources in sandbox for task create/delete/update.
+	// sandbox resources should be updated in the following 5 cases:
+	// 1. when we create a task in the sandbox, we will set the op to ResourceOp_ADD,
+	//	  and set all the information of the task including oci spec, rootfs, and io files.
+	// 2. when we delete a task in the sandbox, we will set the op to ResourceOp_REMOVE,
+	//    and set the TaskID in resources as the task id
+	// 3. when we update resource of a task, we will set the op to ResourceOp_UPDATE,
+	//    and set the TaskID to the task id, and the Spec in resource to updated resources.
+	// 4. when we exec a process in a task, we will set the op to ResourceOp_ADD,
+	//    and set TaskID to task id, ExecID to process id, Spec to process spec,
+	//    and the io files of the process.
+	// 5. when we remove a process in a task, we will set the op to ResourceOp_REMOVE,
+	//    and set TaskID to task id and ExecID to process id
+	UpdateResource(ctx context.Context, sandboxID string, op types.ResourceOp, resource *types.TaskResource) error
 }
 
 type ControllerInstance struct {

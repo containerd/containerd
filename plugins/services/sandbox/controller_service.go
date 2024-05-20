@@ -42,16 +42,25 @@ func init() {
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
 			plugins.SandboxControllerPlugin,
+			plugins.SandboxControllerPluginV2,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
+			sc := make(map[string]sandbox.Controller)
+
 			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			sc := make(map[string]sandbox.Controller)
 			for name, p := range sandboxers {
+				sc[name] = p.(sandbox.Controller)
+			}
+
+			sandboxersV2, err := ic.GetByType(plugins.SandboxControllerPluginV2)
+			if err != nil {
+				return nil, err
+			}
+			for name, p := range sandboxersV2 {
 				sc[name] = p.(sandbox.Controller)
 			}
 
@@ -223,4 +232,19 @@ func (s *controllerService) Metrics(ctx context.Context, req *api.ControllerMetr
 	return &api.ControllerMetricsResponse{
 		Metrics: metrics,
 	}, nil
+}
+
+func (s *controllerService) UpdateResource(
+	ctx context.Context,
+	req *api.ControllerUpdateResourceRequest) (*api.ControllerUpdateResourceResponse, error) {
+	log.G(ctx).WithField("req", req).Debug("sandbox update resource")
+	ctrl, err := s.getController(req.Sandboxer)
+	if err != nil {
+		return nil, errdefs.ToGRPC(err)
+	}
+	err = ctrl.UpdateResource(ctx, req.GetSandboxID(), req.Op, req.Resource)
+	if err != nil {
+		return &api.ControllerUpdateResourceResponse{}, errdefs.ToGRPC(err)
+	}
+	return &api.ControllerUpdateResourceResponse{}, nil
 }
