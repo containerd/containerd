@@ -443,6 +443,8 @@ version = 2
     # * ipv6 - select the first ipv6 address
     # * cni - use the order returned by the CNI plugins, returning the first IP address from the results
     ip_pref = "ipv4"
+    # use_internal_loopback specifies if we use the CNI loopback plugin or internal mechanism to set lo to up
+    use_internal_loopback = false
 
   # 'plugins."io.containerd.grpc.v1.cri".image_decryption' contains config related
   # to handling decryption of encrypted container images.
