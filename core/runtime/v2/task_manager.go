@@ -35,6 +35,7 @@ import (
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/internal/cleanup"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
@@ -247,7 +248,12 @@ func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.
 		return nil
 	}
 
-	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime})
+	topts := opts.TaskOptions
+	if topts == nil || topts.GetValue() == nil {
+		topts = opts.RuntimeOptions
+	}
+
+	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime, Options: protobuf.FromAny(topts)})
 	if err != nil {
 		return fmt.Errorf("runtime info: %w", err)
 	}
