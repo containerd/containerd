@@ -467,10 +467,10 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 		m.dirtyCS = false
 	}
 
+	c.finish(ctx, &wg)
+
 	stats.MetaD = time.Since(t1)
 	m.wlock.Unlock()
-
-	c.finish(ctx)
 
 	wg.Wait()
 
