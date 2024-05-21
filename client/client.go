@@ -21,10 +21,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/resolver"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -79,6 +82,14 @@ func init() {
 	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
 	typeurl.Register(&features.Features{}, prefix, "opencontainers/runtime-spec", major, "features", "Features")
+
+	if runtime.GOOS == "windows" {
+		// After bumping GRPC to 1.64, Windows tests started failing with: "name resolver error: produced zero addresses".
+		// This is happening because grpc.NewClient uses DNS resolver by default, which apparently not what we want
+		// when using socket paths on Windows.
+		// Using a workaround from https://github.com/grpc/grpc-go/issues/1786#issuecomment-2119088770
+		resolver.SetDefaultScheme("passthrough")
+	}
 }
 
 // New returns a new containerd client that is connected to the containerd
