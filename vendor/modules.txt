@@ -6,7 +6,7 @@ dario.cat/mergo
 # github.com/AdaLogics/go-fuzz-headers v0.0.0-20210715213245-6c3934b029d8
 ## explicit; go 1.13
 github.com/AdaLogics/go-fuzz-headers
-# github.com/Microsoft/go-winio v0.5.2
+# github.com/Microsoft/go-winio v0.5.3
 ## explicit; go 1.13
 github.com/Microsoft/go-winio
 github.com/Microsoft/go-winio/backuptar
