@@ -272,6 +272,8 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+        inputs:
+          go-verison: 1.22.3
 
       - uses: actions/checkout@v4
         with:
