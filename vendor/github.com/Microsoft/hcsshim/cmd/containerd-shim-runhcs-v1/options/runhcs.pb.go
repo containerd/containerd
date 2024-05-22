@@ -10,6 +10,7 @@ import (
 	github_com_gogo_protobuf_types "github.com/gogo/protobuf/types"
 	io "io"
 	math "math"
+	math_bits "math/bits"
 	reflect "reflect"
 	strings "strings"
 	time "time"
@@ -25,7 +26,7 @@ var _ = time.Kitchen
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
+const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
 type Options_DebugType int32
 
@@ -162,7 +163,7 @@ func (m *Options) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 		return xxx_messageInfo_Options.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -211,7 +212,7 @@ func (m *ProcessDetails) XXX_Marshal(b []byte, deterministic bool) ([]byte, erro
 		return xxx_messageInfo_ProcessDetails.Marshal(b, m, deterministic)
 	} else {
 		b = b[:cap(b)]
-		n, err := m.MarshalTo(b)
+		n, err := m.MarshalToSizedBuffer(b)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +309,7 @@ var fileDescriptor_b643df6839c75082 = []byte{
 func (m *Options) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -316,131 +317,144 @@ func (m *Options) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *Options) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *Options) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if m.Debug {
-		dAtA[i] = 0x8
-		i++
-		if m.Debug {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
-	if m.DebugType != 0 {
-		dAtA[i] = 0x10
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.DebugType))
+	if m.IoRetryTimeoutInSec != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.IoRetryTimeoutInSec))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x88
 	}
-	if len(m.RegistryRoot) > 0 {
-		dAtA[i] = 0x1a
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.RegistryRoot)))
-		i += copy(dAtA[i:], m.RegistryRoot)
+	if len(m.LogLevel) > 0 {
+		i -= len(m.LogLevel)
+		copy(dAtA[i:], m.LogLevel)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.LogLevel)))
+		i--
+		dAtA[i] = 0x1
+		i--
+		dAtA[i] = 0x82
 	}
-	if len(m.SandboxImage) > 0 {
-		dAtA[i] = 0x22
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.SandboxImage)))
-		i += copy(dAtA[i:], m.SandboxImage)
-	}
-	if len(m.SandboxPlatform) > 0 {
-		dAtA[i] = 0x2a
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.SandboxPlatform)))
-		i += copy(dAtA[i:], m.SandboxPlatform)
-	}
-	if m.SandboxIsolation != 0 {
-		dAtA[i] = 0x30
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.SandboxIsolation))
-	}
-	if len(m.BootFilesRootPath) > 0 {
-		dAtA[i] = 0x3a
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.BootFilesRootPath)))
-		i += copy(dAtA[i:], m.BootFilesRootPath)
-	}
-	if m.VmProcessorCount != 0 {
-		dAtA[i] = 0x40
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.VmProcessorCount))
-	}
-	if m.VmMemorySizeInMb != 0 {
-		dAtA[i] = 0x48
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.VmMemorySizeInMb))
-	}
-	if len(m.GPUVHDPath) > 0 {
-		dAtA[i] = 0x52
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.GPUVHDPath)))
-		i += copy(dAtA[i:], m.GPUVHDPath)
-	}
-	if m.ScaleCpuLimitsToSandbox {
-		dAtA[i] = 0x58
-		i++
-		if m.ScaleCpuLimitsToSandbox {
-			dAtA[i] = 1
-		} else {
-			dAtA[i] = 0
-		}
-		i++
-	}
-	if m.DefaultContainerScratchSizeInGb != 0 {
-		dAtA[i] = 0x60
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.DefaultContainerScratchSizeInGb))
-	}
-	if m.DefaultVmScratchSizeInGb != 0 {
-		dAtA[i] = 0x68
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.DefaultVmScratchSizeInGb))
+	if len(m.NCProxyAddr) > 0 {
+		i -= len(m.NCProxyAddr)
+		copy(dAtA[i:], m.NCProxyAddr)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.NCProxyAddr)))
+		i--
+		dAtA[i] = 0x7a
 	}
 	if m.ShareScratch {
-		dAtA[i] = 0x70
-		i++
+		i--
 		if m.ShareScratch {
 			dAtA[i] = 1
 		} else {
 			dAtA[i] = 0
 		}
-		i++
+		i--
+		dAtA[i] = 0x70
 	}
-	if len(m.NCProxyAddr) > 0 {
-		dAtA[i] = 0x7a
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.NCProxyAddr)))
-		i += copy(dAtA[i:], m.NCProxyAddr)
+	if m.DefaultVmScratchSizeInGb != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.DefaultVmScratchSizeInGb))
+		i--
+		dAtA[i] = 0x68
 	}
-	if len(m.LogLevel) > 0 {
-		dAtA[i] = 0x82
-		i++
-		dAtA[i] = 0x1
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.LogLevel)))
-		i += copy(dAtA[i:], m.LogLevel)
+	if m.DefaultContainerScratchSizeInGb != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.DefaultContainerScratchSizeInGb))
+		i--
+		dAtA[i] = 0x60
 	}
-	if m.IoRetryTimeoutInSec != 0 {
-		dAtA[i] = 0x88
-		i++
-		dAtA[i] = 0x1
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.IoRetryTimeoutInSec))
+	if m.ScaleCpuLimitsToSandbox {
+		i--
+		if m.ScaleCpuLimitsToSandbox {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x58
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if len(m.GPUVHDPath) > 0 {
+		i -= len(m.GPUVHDPath)
+		copy(dAtA[i:], m.GPUVHDPath)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.GPUVHDPath)))
+		i--
+		dAtA[i] = 0x52
 	}
-	return i, nil
+	if m.VmMemorySizeInMb != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.VmMemorySizeInMb))
+		i--
+		dAtA[i] = 0x48
+	}
+	if m.VmProcessorCount != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.VmProcessorCount))
+		i--
+		dAtA[i] = 0x40
+	}
+	if len(m.BootFilesRootPath) > 0 {
+		i -= len(m.BootFilesRootPath)
+		copy(dAtA[i:], m.BootFilesRootPath)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.BootFilesRootPath)))
+		i--
+		dAtA[i] = 0x3a
+	}
+	if m.SandboxIsolation != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.SandboxIsolation))
+		i--
+		dAtA[i] = 0x30
+	}
+	if len(m.SandboxPlatform) > 0 {
+		i -= len(m.SandboxPlatform)
+		copy(dAtA[i:], m.SandboxPlatform)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.SandboxPlatform)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.SandboxImage) > 0 {
+		i -= len(m.SandboxImage)
+		copy(dAtA[i:], m.SandboxImage)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.SandboxImage)))
+		i--
+		dAtA[i] = 0x22
+	}
+	if len(m.RegistryRoot) > 0 {
+		i -= len(m.RegistryRoot)
+		copy(dAtA[i:], m.RegistryRoot)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.RegistryRoot)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.DebugType != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.DebugType))
+		i--
+		dAtA[i] = 0x10
+	}
+	if m.Debug {
+		i--
+		if m.Debug {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
 }
 
 func (m *ProcessDetails) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
-	n, err := m.MarshalTo(dAtA)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
 	if err != nil {
 		return nil, err
 	}
@@ -448,74 +462,84 @@ func (m *ProcessDetails) Marshal() (dAtA []byte, err error) {
 }
 
 func (m *ProcessDetails) MarshalTo(dAtA []byte) (int, error) {
-	var i int
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *ProcessDetails) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
 	_ = i
 	var l int
 	_ = l
-	if len(m.ImageName) > 0 {
-		dAtA[i] = 0xa
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.ImageName)))
-		i += copy(dAtA[i:], m.ImageName)
-	}
-	dAtA[i] = 0x12
-	i++
-	i = encodeVarintRunhcs(dAtA, i, uint64(github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt)))
-	n1, err := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CreatedAt, dAtA[i:])
-	if err != nil {
-		return 0, err
-	}
-	i += n1
-	if m.KernelTime_100Ns != 0 {
-		dAtA[i] = 0x18
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.KernelTime_100Ns))
-	}
-	if m.MemoryCommitBytes != 0 {
-		dAtA[i] = 0x20
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryCommitBytes))
-	}
-	if m.MemoryWorkingSetPrivateBytes != 0 {
-		dAtA[i] = 0x28
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryWorkingSetPrivateBytes))
-	}
-	if m.MemoryWorkingSetSharedBytes != 0 {
-		dAtA[i] = 0x30
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryWorkingSetSharedBytes))
-	}
-	if m.ProcessID != 0 {
-		dAtA[i] = 0x38
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.ProcessID))
-	}
-	if m.UserTime_100Ns != 0 {
-		dAtA[i] = 0x40
-		i++
-		i = encodeVarintRunhcs(dAtA, i, uint64(m.UserTime_100Ns))
+	if m.XXX_unrecognized != nil {
+		i -= len(m.XXX_unrecognized)
+		copy(dAtA[i:], m.XXX_unrecognized)
 	}
 	if len(m.ExecID) > 0 {
-		dAtA[i] = 0x4a
-		i++
+		i -= len(m.ExecID)
+		copy(dAtA[i:], m.ExecID)
 		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.ExecID)))
-		i += copy(dAtA[i:], m.ExecID)
+		i--
+		dAtA[i] = 0x4a
 	}
-	if m.XXX_unrecognized != nil {
-		i += copy(dAtA[i:], m.XXX_unrecognized)
+	if m.UserTime_100Ns != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.UserTime_100Ns))
+		i--
+		dAtA[i] = 0x40
 	}
-	return i, nil
+	if m.ProcessID != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.ProcessID))
+		i--
+		dAtA[i] = 0x38
+	}
+	if m.MemoryWorkingSetSharedBytes != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryWorkingSetSharedBytes))
+		i--
+		dAtA[i] = 0x30
+	}
+	if m.MemoryWorkingSetPrivateBytes != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryWorkingSetPrivateBytes))
+		i--
+		dAtA[i] = 0x28
+	}
+	if m.MemoryCommitBytes != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.MemoryCommitBytes))
+		i--
+		dAtA[i] = 0x20
+	}
+	if m.KernelTime_100Ns != 0 {
+		i = encodeVarintRunhcs(dAtA, i, uint64(m.KernelTime_100Ns))
+		i--
+		dAtA[i] = 0x18
+	}
+	n1, err1 := github_com_gogo_protobuf_types.StdTimeMarshalTo(m.CreatedAt, dAtA[i-github_com_gogo_protobuf_types.SizeOfStdTime(m.CreatedAt):])
+	if err1 != nil {
+		return 0, err1
+	}
+	i -= n1
+	i = encodeVarintRunhcs(dAtA, i, uint64(n1))
+	i--
+	dAtA[i] = 0x12
+	if len(m.ImageName) > 0 {
+		i -= len(m.ImageName)
+		copy(dAtA[i:], m.ImageName)
+		i = encodeVarintRunhcs(dAtA, i, uint64(len(m.ImageName)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
 }
 
 func encodeVarintRunhcs(dAtA []byte, offset int, v uint64) int {
+	offset -= sovRunhcs(v)
+	base := offset
 	for v >= 1<<7 {
 		dAtA[offset] = uint8(v&0x7f | 0x80)
 		v >>= 7
 		offset++
 	}
 	dAtA[offset] = uint8(v)
-	return offset + 1
+	return base
 }
 func (m *Options) Size() (n int) {
 	if m == nil {
@@ -628,14 +652,7 @@ func (m *ProcessDetails) Size() (n int) {
 }
 
 func sovRunhcs(x uint64) (n int) {
-	for {
-		n++
-		x >>= 7
-		if x == 0 {
-			break
-		}
-	}
-	return n
+	return (math_bits.Len64(x|1) + 6) / 7
 }
 func sozRunhcs(x uint64) (n int) {
 	return sovRunhcs(uint64((x << 1) ^ uint64((int64(x) >> 63))))
@@ -673,7 +690,7 @@ func (this *ProcessDetails) String() string {
 	}
 	s := strings.Join([]string{`&ProcessDetails{`,
 		`ImageName:` + fmt.Sprintf("%v", this.ImageName) + `,`,
-		`CreatedAt:` + strings.Replace(strings.Replace(this.CreatedAt.String(), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
+		`CreatedAt:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.CreatedAt), "Timestamp", "types.Timestamp", 1), `&`, ``, 1) + `,`,
 		`KernelTime_100Ns:` + fmt.Sprintf("%v", this.KernelTime_100Ns) + `,`,
 		`MemoryCommitBytes:` + fmt.Sprintf("%v", this.MemoryCommitBytes) + `,`,
 		`MemoryWorkingSetPrivateBytes:` + fmt.Sprintf("%v", this.MemoryWorkingSetPrivateBytes) + `,`,
@@ -1146,10 +1163,7 @@ func (m *Options) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRunhcs
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRunhcs
 			}
 			if (iNdEx + skippy) > l {
@@ -1411,10 +1425,7 @@ func (m *ProcessDetails) Unmarshal(dAtA []byte) error {
 			if err != nil {
 				return err
 			}
-			if skippy < 0 {
-				return ErrInvalidLengthRunhcs
-			}
-			if (iNdEx + skippy) < 0 {
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
 				return ErrInvalidLengthRunhcs
 			}
 			if (iNdEx + skippy) > l {
@@ -1433,6 +1444,7 @@ func (m *ProcessDetails) Unmarshal(dAtA []byte) error {
 func skipRunhcs(dAtA []byte) (n int, err error) {
 	l := len(dAtA)
 	iNdEx := 0
+	depth := 0
 	for iNdEx < l {
 		var wire uint64
 		for shift := uint(0); ; shift += 7 {
@@ -1464,10 +1476,8 @@ func skipRunhcs(dAtA []byte) (n int, err error) {
 					break
 				}
 			}
-			return iNdEx, nil
 		case 1:
 			iNdEx += 8
-			return iNdEx, nil
 		case 2:
 			var length int
 			for shift := uint(0); ; shift += 7 {
@@ -1488,55 +1498,30 @@ func skipRunhcs(dAtA []byte) (n int, err error) {
 				return 0, ErrInvalidLengthRunhcs
 			}
 			iNdEx += length
-			if iNdEx < 0 {
-				return 0, ErrInvalidLengthRunhcs
-			}
-			return iNdEx, nil
 		case 3:
-			for {
-				var innerWire uint64
-				var start int = iNdEx
-				for shift := uint(0); ; shift += 7 {
-					if shift >= 64 {
-						return 0, ErrIntOverflowRunhcs
-					}
-					if iNdEx >= l {
-						return 0, io.ErrUnexpectedEOF
-					}
-					b := dAtA[iNdEx]
-					iNdEx++
-					innerWire |= (uint64(b) & 0x7F) << shift
-					if b < 0x80 {
-						break
-					}
-				}
-				innerWireType := int(innerWire & 0x7)
-				if innerWireType == 4 {
-					break
-				}
-				next, err := skipRunhcs(dAtA[start:])
-				if err != nil {
-					return 0, err
-				}
-				iNdEx = start + next
-				if iNdEx < 0 {
-					return 0, ErrInvalidLengthRunhcs
-				}
-			}
-			return iNdEx, nil
+			depth++
 		case 4:
-			return iNdEx, nil
+			if depth == 0 {
+				return 0, ErrUnexpectedEndOfGroupRunhcs
+			}
+			depth--
 		case 5:
 			iNdEx += 4
-			return iNdEx, nil
 		default:
 			return 0, fmt.Errorf("proto: illegal wireType %d", wireType)
 		}
+		if iNdEx < 0 {
+			return 0, ErrInvalidLengthRunhcs
+		}
+		if depth == 0 {
+			return iNdEx, nil
+		}
 	}
-	panic("unreachable")
+	return 0, io.ErrUnexpectedEOF
 }
 
 var (
-	ErrInvalidLengthRunhcs = fmt.Errorf("proto: negative length found during unmarshaling")
-	ErrIntOverflowRunhcs   = fmt.Errorf("proto: integer overflow")
+	ErrInvalidLengthRunhcs        = fmt.Errorf("proto: negative length found during unmarshaling")
+	ErrIntOverflowRunhcs          = fmt.Errorf("proto: integer overflow")
+	ErrUnexpectedEndOfGroupRunhcs = fmt.Errorf("proto: unexpected end of group")
 )

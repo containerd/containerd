@@ -3,7 +3,7 @@ module github.com/containerd/containerd/integration/client
 go 1.19
 
 require (
-	github.com/Microsoft/hcsshim v0.9.10
+	github.com/Microsoft/hcsshim v0.9.11
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups v1.0.4
 	// the actual version of containerd is replaced with the code at the root of this repository
@@ -23,7 +23,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
-	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/Microsoft/go-winio v0.5.3 // indirect
 	github.com/cilium/ebpf v0.7.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect

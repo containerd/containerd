@@ -3,6 +3,7 @@ package runhcs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,6 +35,11 @@ func getCommandPath() string {
 	pathi := runhcsPath.Load()
 	if pathi == nil {
 		path, err := exec.LookPath(command)
+		if err != nil {
+			if errors.Is(err, exec.ErrDot) {
+				err = nil
+			}
+		}
 		if err != nil {
 			// LookPath only finds current directory matches based on the
 			// callers current directory but the caller is not likely in the
