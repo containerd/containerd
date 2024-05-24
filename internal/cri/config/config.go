@@ -269,6 +269,11 @@ type ImageConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 
+	// DisableImagePullWithTransferService disables image pull using transfer service, i.e. use client.Pull to pull images
+	// By default it is set to false, i.e. use transfer service to pull image
+	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+	DisableImagePullWithTransferService bool `toml:"disable_image_pull_with_transfer_service" json:"disableImagePullWithTransferService"`
+
 	// DisableSnapshotAnnotations disables to pass additional annotations (image
 	// related information) to snapshotters. These annotations are required by
 	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
@@ -395,7 +400,6 @@ type RuntimeConfig struct {
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
