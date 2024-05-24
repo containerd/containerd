@@ -181,10 +181,14 @@ func (c *CRIImageService) ImageFSPaths() map[string]string {
 	return c.imageFSPaths
 }
 
+func (r *CRIImageService) SandboxImage() string {
+	return r.config.PinnedImages.Sandbox
+}
+
 // PinnedImage is used to lookup a pinned image by name.
 // Most often used to get the "sandbox" image.
-func (c *CRIImageService) PinnedImage(name string) string {
-	return c.config.PinnedImages[name]
+func (c *CRIImageService) PinnedImage(name string) []string {
+	return c.config.PinnedImages.AdditionalImages[name]
 }
 
 // GRPCService returns a new CRI Image Service grpc server.

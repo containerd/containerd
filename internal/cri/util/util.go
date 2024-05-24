@@ -44,3 +44,12 @@ func NamespacedContext() context.Context {
 func WithNamespace(ctx context.Context) context.Context {
 	return namespaces.WithNamespace(ctx, constants.K8sContainerdNamespace)
 }
+
+func ArrayHasElement(array []string, element string) bool {
+	for _, e := range array {
+		if e == element {
+			return true
+		}
+	}
+	return false
+}

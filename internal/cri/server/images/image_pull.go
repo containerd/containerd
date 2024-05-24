@@ -46,6 +46,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -348,8 +349,12 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 // getLabels get image labels to be added on CRI image
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
-	for _, pinned := range c.config.PinnedImages {
-		if pinned == name {
+	if name == c.config.PinnedImages.Sandbox {
+		labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
+	}
+
+	for _, pinned := range c.config.PinnedImages.AdditionalImages {
+		if util.ArrayHasElement(pinned, name) {
 			labels[crilabels.PinnedImageLabelKey] = crilabels.PinnedImageLabelValue
 		}
 	}
