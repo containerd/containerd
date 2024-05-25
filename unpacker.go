@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/containerd/pkg/cleanup"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/snapshots"
@@ -190,7 +191,7 @@ func (u *unpacker) unpack(
 		}
 
 		// Abort the snapshot if commit does not happen
-		abort := func() {
+		abort := func(ctx context.Context) {
 			if err := sn.Remove(ctx, key); err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to cleanup %q", key)
 			}
@@ -215,9 +216,11 @@ func (u *unpacker) unpack(
 
 		select {
 		case <-ctx.Done():
+			cleanup.Do(ctx, abort)
 			return ctx.Err()
 		case err := <-fetchErr:
 			if err != nil {
+				cleanup.Do(ctx, abort)
 				return err
 			}
 		case <-fetchC[i-fetchOffset]:
@@ -225,16 +228,16 @@ func (u *unpacker) unpack(
 
 		diff, err := a.Apply(ctx, desc, mounts, u.config.ApplyOpts...)
 		if err != nil {
-			abort()
+			cleanup.Do(ctx, abort)
 			return fmt.Errorf("failed to extract layer %s: %w", diffIDs[i], err)
 		}
 		if diff.Digest != diffIDs[i] {
-			abort()
+			cleanup.Do(ctx, abort)
 			return fmt.Errorf("wrong diff id calculated on extraction %q", diffIDs[i])
 		}
 
 		if err = sn.Commit(ctx, chainID, key, opts...); err != nil {
-			abort()
+			cleanup.Do(ctx, abort)
 			if errdefs.IsAlreadyExists(err) {
 				return nil
 			}
