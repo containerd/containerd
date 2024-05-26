@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	_ "github.com/containerd/containerd/metrics" // import containerd build info
 	"github.com/containerd/containerd/mount"
@@ -36,6 +35,7 @@ import (
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/sys"
 	"github.com/containerd/containerd/version"
+	"github.com/containerd/errdefs"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"
 )

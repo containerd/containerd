@@ -24,10 +24,10 @@ import (
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/runtime"
 	shim "github.com/containerd/containerd/runtime/v1/shim/v1"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/ttrpc"
 )
 

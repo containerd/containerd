@@ -20,13 +20,13 @@ import (
 	"context"
 	"sync"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/errdefs"
 
 	"github.com/hashicorp/go-multierror"
 )

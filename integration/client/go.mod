@@ -7,11 +7,13 @@ require (
 	github.com/Microsoft/hcsshim v0.11.5
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.2
-	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
+	github.com/containerd/containerd v1.7.17 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/continuity v0.4.2
+	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.2.4
 	github.com/containerd/typeurl/v2 v2.1.1
+	github.com/google/uuid v1.3.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/opencontainers/runtime-spec v1.1.0
@@ -20,8 +22,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.19.0
 	golang.org/x/sys v0.18.0
 )
-
-require github.com/google/uuid v1.3.1
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
@@ -62,8 +62,8 @@ require (
 	golang.org/x/net v0.23.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
+	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
