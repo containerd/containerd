@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/images"
@@ -54,6 +53,7 @@ import (
 	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
+	"github.com/containerd/errdefs"
 )
 
 var (

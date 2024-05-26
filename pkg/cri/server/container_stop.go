@@ -23,10 +23,10 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/errdefs"
 
 	"github.com/moby/sys/signal"
 	"golang.org/x/net/context"

@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/archive"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/userns"
+	"github.com/containerd/errdefs"
 )
 
 func apply(ctx context.Context, mounts []mount.Mount, r io.Reader) error {

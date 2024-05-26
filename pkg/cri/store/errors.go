@@ -16,7 +16,7 @@
 
 package store
 
-import "github.com/containerd/containerd/errdefs"
+import "github.com/containerd/errdefs"
 
 var (
 	// ErrAlreadyExist is the error returned when data added in the store

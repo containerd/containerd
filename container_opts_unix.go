@@ -27,8 +27,8 @@ import (
 	"syscall"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/image-spec/identity"
 )
 

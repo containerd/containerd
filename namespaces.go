@@ -21,8 +21,8 @@ import (
 	"strings"
 
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/gogo/protobuf/types"
 )
 

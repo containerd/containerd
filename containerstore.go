@@ -23,7 +23,7 @@ import (
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

@@ -19,8 +19,8 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/errdefs"
 
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

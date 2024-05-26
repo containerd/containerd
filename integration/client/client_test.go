@@ -28,7 +28,6 @@ import (
 
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/log"
@@ -37,6 +36,7 @@ import (
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/sirupsen/logrus"

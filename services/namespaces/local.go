@@ -22,12 +22,12 @@ import (
 
 	eventstypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/errdefs"
 	ptypes "github.com/gogo/protobuf/types"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
