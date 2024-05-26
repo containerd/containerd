@@ -25,11 +25,11 @@ import (
 	"text/tabwriter"
 
 	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/errdefs"
 	"github.com/urfave/cli"
 )
 

@@ -26,12 +26,12 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/pkg/kmutex"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
+	"github.com/containerd/errdefs"
 )
 
 type localTransferService struct {

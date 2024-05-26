@@ -22,12 +22,12 @@ import (
 
 	api "github.com/containerd/containerd/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/api/services/ttrpc/events/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/ttrpc"
 	"google.golang.org/grpc"
 )

@@ -20,11 +20,11 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/leases/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/errdefs"
 	"google.golang.org/grpc"
 )
 

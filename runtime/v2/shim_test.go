@@ -21,8 +21,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
 	client "github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/containerd/errdefs"
 )
 
 func TestParseStartResponse(t *testing.T) {

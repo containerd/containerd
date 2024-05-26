@@ -24,8 +24,8 @@ import (
 	"fmt"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/errdefs"
 	google_protobuf "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/errdefs"
 )
 
 type deletedState struct {

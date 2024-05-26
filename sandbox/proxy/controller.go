@@ -20,9 +20,9 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/sandbox"
+	"github.com/containerd/errdefs"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 

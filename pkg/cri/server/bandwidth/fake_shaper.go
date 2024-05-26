@@ -33,7 +33,7 @@ limitations under the License.
 package bandwidth
 
 import (
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 )

@@ -21,8 +21,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd/errdefs"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
+	"github.com/containerd/errdefs"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

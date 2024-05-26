@@ -26,7 +26,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/pkg/streaming"
@@ -34,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/plugins"
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/errdefs"
 )
 
 func init() {

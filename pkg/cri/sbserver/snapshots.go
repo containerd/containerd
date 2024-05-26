@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/errdefs"
 	snapshot "github.com/containerd/containerd/snapshots"
+	"github.com/containerd/errdefs"
 	"github.com/sirupsen/logrus"
 
 	snapshotstore "github.com/containerd/containerd/pkg/cri/store/snapshot"

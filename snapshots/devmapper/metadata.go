@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
 

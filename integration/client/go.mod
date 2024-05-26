@@ -7,11 +7,13 @@ require (
 	github.com/Microsoft/hcsshim v0.11.5
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.2
-	github.com/containerd/containerd v1.7.0 // see replace; the actual version of containerd is replaced with the code at the root of this repository
+	github.com/containerd/containerd v1.7.17 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/continuity v0.4.2
+	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/ttrpc v1.2.4
 	github.com/containerd/typeurl/v2 v2.1.1
+	github.com/google/uuid v1.3.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0
 	github.com/opencontainers/runtime-spec v1.1.0
@@ -21,8 +23,6 @@ require (
 	golang.org/x/sys v0.18.0
 )
 
-require github.com/google/uuid v1.3.1
-
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/AdamKorcz/go-118-fuzz-build v0.0.0-20230306123547-8075edf89bb0 // indirect
@@ -30,7 +30,6 @@ require (
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
