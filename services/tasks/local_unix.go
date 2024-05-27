@@ -21,9 +21,9 @@ package tasks
 import (
 	"errors"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
+	"github.com/containerd/log"
 )
 
 var tasksServiceRequires = []plugin.Type{

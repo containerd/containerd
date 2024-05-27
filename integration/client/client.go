@@ -24,8 +24,8 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/log/logtest"
 )
 
 const (

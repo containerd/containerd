@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/nri"
@@ -36,6 +35,7 @@ import (
 	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services/warning"
+	"github.com/containerd/log"
 )
 
 // Register CRI service plugin

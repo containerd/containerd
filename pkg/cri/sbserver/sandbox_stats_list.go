@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/containerd/containerd/log"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/hashicorp/go-multierror"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
