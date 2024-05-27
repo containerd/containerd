@@ -23,8 +23,8 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 

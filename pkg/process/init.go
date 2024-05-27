@@ -31,11 +31,11 @@ import (
 	"time"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/stdio"
 	"github.com/containerd/fifo"
 	runc "github.com/containerd/go-runc"
+	"github.com/containerd/log"
 	google_protobuf "github.com/gogo/protobuf/types"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"

@@ -25,8 +25,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/net/context"

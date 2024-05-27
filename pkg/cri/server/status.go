@@ -22,7 +22,7 @@ import (
 	goruntime "runtime"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	ptypes "github.com/gogo/protobuf/types"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

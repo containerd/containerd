@@ -25,9 +25,9 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"

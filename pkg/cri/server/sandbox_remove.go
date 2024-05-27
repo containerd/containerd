@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"

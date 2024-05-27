@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/plugin"
 	shimapi "github.com/containerd/containerd/runtime/v2/task"
 	"github.com/containerd/containerd/version"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/gogo/protobuf/proto"
 	"github.com/sirupsen/logrus"

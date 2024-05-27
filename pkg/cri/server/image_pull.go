@@ -31,7 +31,6 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	crilabels "github.com/containerd/containerd/pkg/cri/labels"
 	snpkg "github.com/containerd/containerd/pkg/snapshotters"
 	distribution "github.com/containerd/containerd/reference/docker"
@@ -40,6 +39,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
+	"github.com/containerd/log"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/net/context"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

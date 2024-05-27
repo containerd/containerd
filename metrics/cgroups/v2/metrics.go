@@ -24,10 +24,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metrics/cgroups/common"
 	v2 "github.com/containerd/containerd/metrics/types/v2"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/log"
 	"github.com/containerd/typeurl"
 	"github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"

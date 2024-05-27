@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/leases"
-	"github.com/containerd/containerd/log"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
 	"github.com/containerd/containerd/pkg/cri/server"
@@ -42,6 +41,7 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 )
 
 // Register CRI service plugin

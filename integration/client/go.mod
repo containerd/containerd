@@ -10,6 +10,7 @@ require (
 	github.com/containerd/continuity v0.3.0
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/go-runc v1.0.0
+	github.com/containerd/log v0.1.0
 	github.com/containerd/ttrpc v1.1.2
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/protobuf v1.3.2
@@ -27,7 +28,6 @@ require (
 	github.com/cilium/ebpf v0.7.0 // indirect
 	github.com/containerd/console v1.0.3 // indirect
 	github.com/containerd/fifo v1.0.0 // indirect
-	github.com/containerd/log v0.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
