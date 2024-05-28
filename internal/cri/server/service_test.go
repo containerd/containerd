@@ -22,6 +22,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/go-cni"
 	"github.com/containerd/platforms"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -62,7 +63,7 @@ func (f *fakeSandboxService) SandboxStatus(ctx context.Context, sandboxer string
 	return sandbox.ControllerStatus{}, errdefs.ErrNotImplemented
 }
 
-func (f *fakeSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (platforms.Platform, error) {
+func (f *fakeSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
 }
 
@@ -80,7 +81,7 @@ func (f fakeSandboxController) Start(ctx context.Context, sandboxID string) (san
 	return sandbox.ControllerInstance{}, errdefs.ErrNotImplemented
 }
 
-func (f fakeSandboxController) Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error) {
+func (f fakeSandboxController) Platform(_ctx context.Context, _sandboxID string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
 }
 

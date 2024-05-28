@@ -28,8 +28,8 @@ import (
 
 	"github.com/containerd/go-cni"
 	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
@@ -79,7 +79,7 @@ type sandboxService interface {
 	StopSandbox(ctx context.Context, sandboxer, sandboxID string, opts ...sandbox.StopOpt) error
 	ShutdownSandbox(ctx context.Context, sandboxer string, sandboxID string) error
 	SandboxStatus(ctx context.Context, sandboxer string, sandboxID string, verbose bool) (sandbox.ControllerStatus, error)
-	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (platforms.Platform, error)
+	SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error)
 	SandboxController(sandboxer string) (sandbox.Controller, error)
 }
 

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/platforms"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
@@ -94,10 +94,10 @@ func (c *criSandboxService) SandboxStatus(ctx context.Context, sandboxer string,
 	return ctrl.Status(ctx, sandboxID, verbose)
 }
 
-func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (platforms.Platform, error) {
+func (c *criSandboxService) SandboxPlatform(ctx context.Context, sandboxer string, sandboxID string) (imagespec.Platform, error) {
 	ctrl, err := c.SandboxController(sandboxer)
 	if err != nil {
-		return platforms.Platform{}, err
+		return imagespec.Platform{}, err
 	}
 	return ctrl.Platform(ctx, sandboxID)
 }

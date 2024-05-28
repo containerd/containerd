@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/platforms"
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -44,7 +45,7 @@ type imageClient interface {
 
 type ImagePlatform struct {
 	Snapshotter string
-	Platform    platforms.Platform
+	Platform    imagespec.Platform
 }
 
 type CRIImageService struct {
