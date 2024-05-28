@@ -28,8 +28,11 @@ var tempMountLocation = getTempDir()
 
 // WithTempMount mounts the provided mounts to a temp dir, and pass the temp dir to f.
 // The mounts are valid during the call to the f.
-// The volatile option of overlayfs doesn't allow to mount again using the same upper / work dirs. Since it's a temp mount, avoid using that option here if found.
 // Finally we will unmount and remove the temp dir regardless of the result of f.
+//
+// NOTE: The volatile option of overlayfs doesn't allow to mount again using the
+// same upper / work dirs. Since it's a temp mount, avoid using that option here
+// if found.
 func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
 	root, uerr := os.MkdirTemp(tempMountLocation, "containerd-mount")
 	if uerr != nil {
@@ -60,7 +63,7 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 		}
 	}()
 
-	if uerr = All(removeVolatileTempMount(mounts), root); uerr != nil {
+	if uerr = All(RemoveVolatileOption(mounts), root); uerr != nil {
 		return fmt.Errorf("failed to mount %s: %w", root, uerr)
 	}
 	if err := f(root); err != nil {
@@ -69,12 +72,15 @@ func WithTempMount(ctx context.Context, mounts []Mount, f func(root string) erro
 	return nil
 }
 
-// removeVolatileTempMount The volatile option of overlayfs doesn't allow to mount again using the
-// same upper / work dirs. Since it's a temp mount, avoid using that
-// option here. Reference: https://docs.kernel.org/filesystems/overlayfs.html#volatile-mount
+// RemoveVolatileOption copies and remove the volatile option for overlay
+// type, since overlayfs doesn't allow to mount again using the same upper/work
+// dirs.
+//
+// REF: https://docs.kernel.org/filesystems/overlayfs.html#volatile-mount
+//
 // TODO: Make this logic conditional once the kernel supports reusing
 // overlayfs volatile mounts.
-func removeVolatileTempMount(mounts []Mount) []Mount {
+func RemoveVolatileOption(mounts []Mount) []Mount {
 	var out []Mount
 	for i, m := range mounts {
 		if m.Type != "overlay" {
