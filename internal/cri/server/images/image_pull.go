@@ -32,6 +32,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/imgcrypt"
+	"github.com/containerd/imgcrypt/images/encryption"
 	"github.com/containerd/log"
 	distribution "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -48,7 +51,6 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
 )
 
 // For image management:
@@ -583,15 +585,15 @@ func newTransport() *http.Transport {
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
 // Temporarily removed for v2 upgrade
-//func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-//	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
-//		ltdd := imgcrypt.Payload{}
-//		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-//		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
-//		return []containerd.RemoteOpt{opt}
-//	}
-//	return nil
-//}
+func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
+	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
+		ltdd := imgcrypt.Payload{}
+		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
+		return []containerd.RemoteOpt{opt}
+	}
+	return nil
+}
 
 const (
 	// defaultPullProgressReportInterval represents that how often the
