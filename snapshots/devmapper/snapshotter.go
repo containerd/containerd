@@ -28,12 +28,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/devmapper/dmsetup"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 	exec "golang.org/x/sys/execabs"

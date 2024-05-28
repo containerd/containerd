@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/gc"
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
 )
 

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/defaults"
-	"github.com/containerd/containerd/log"
 	_ "github.com/containerd/containerd/metrics" // import containerd build info
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/services/server"
@@ -37,6 +36,7 @@ import (
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/containerd/version"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/grpclog"

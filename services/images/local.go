@@ -29,13 +29,13 @@ import (
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 func init() {

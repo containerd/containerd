@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"golang.org/x/net/context"
 

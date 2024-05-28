@@ -22,8 +22,8 @@ import (
 	"strconv"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/log"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/urfave/cli"
 )

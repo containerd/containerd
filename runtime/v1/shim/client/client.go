@@ -34,11 +34,11 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/log"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
 	"github.com/sirupsen/logrus"

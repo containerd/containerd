@@ -29,8 +29,8 @@ import (
 
 	"github.com/vishvananda/netlink"
 
-	"github.com/containerd/containerd/log"
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	"github.com/containerd/log"
 )
 
 func (c *criService) podSandboxStats(

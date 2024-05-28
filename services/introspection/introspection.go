@@ -20,8 +20,8 @@ import (
 	context "context"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	ptypes "github.com/gogo/protobuf/types"
 )
 
