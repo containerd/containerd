@@ -26,8 +26,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/log"
 	"github.com/hashicorp/go-multierror"
 	bolt "go.etcd.io/bbolt"
 )

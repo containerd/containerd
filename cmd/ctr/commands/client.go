@@ -22,10 +22,10 @@ import (
 	"strconv"
 
 	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/epoch"
 	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/log"
 	"github.com/urfave/cli"
 )
 

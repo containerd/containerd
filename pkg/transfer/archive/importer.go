@@ -27,9 +27,9 @@ import (
 	"github.com/containerd/containerd/archive/compression"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/images/archive"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/streaming"
 	tstreaming "github.com/containerd/containerd/pkg/transfer/streaming"
+	"github.com/containerd/log"
 )
 
 type ImportOpt func(*ImageImportStream)

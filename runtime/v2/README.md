@@ -351,7 +351,7 @@ If a shim does not or cannot implement an rpc call, it MUST return a `github.com
 
 A fifo on unix or named pipe on Windows will be provided to the shim.
 It can be located inside the `cwd` of the shim named "log".
-The shims can use the existing `github.com/containerd/containerd/log` package to log debug messages.
+The shims can use the existing `github.com/containerd/log` package to log debug messages.
 Messages will automatically be output in the containerd's daemon logs with the correct fields and runtime set.
 
 #### ttrpc

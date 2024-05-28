@@ -32,9 +32,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/pelletier/go-toml"
 )
 
