@@ -28,7 +28,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/reference"
@@ -36,6 +35,7 @@ import (
 	"github.com/containerd/containerd/remotes/docker/schema1"
 	remoteerrors "github.com/containerd/containerd/remotes/errors"
 	"github.com/containerd/containerd/version"
+	"github.com/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"

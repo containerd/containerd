@@ -22,7 +22,6 @@ import (
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/deprecation"
@@ -30,6 +29,7 @@ import (
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/containerd/errdefs"
 	ptypes "github.com/gogo/protobuf/types"
 	"google.golang.org/grpc"
 )

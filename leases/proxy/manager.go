@@ -20,8 +20,8 @@ import (
 	"context"
 
 	leasesapi "github.com/containerd/containerd/api/services/leases/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
+	"github.com/containerd/errdefs"
 )
 
 type proxyManager struct {

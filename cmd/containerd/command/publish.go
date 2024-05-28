@@ -25,9 +25,9 @@ import (
 	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/dialer"
+	"github.com/containerd/errdefs"
 	"github.com/gogo/protobuf/types"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc"

@@ -21,7 +21,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 )
 
 func TestCPUVariant(t *testing.T) {

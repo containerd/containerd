@@ -25,7 +25,7 @@ import (
 	"fmt"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/errdefs"
 	google_protobuf "github.com/gogo/protobuf/types"
 )
 
