@@ -24,7 +24,6 @@ import (
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime"
 	v2 "github.com/containerd/containerd/runtime/v2"
@@ -32,6 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -178,18 +178,18 @@ func (c *controllerLocal) Start(ctx context.Context, sandboxID string) (sandbox.
 	}, nil
 }
 
-func (c *controllerLocal) Platform(ctx context.Context, sandboxID string) (platforms.Platform, error) {
+func (c *controllerLocal) Platform(ctx context.Context, sandboxID string) (imagespec.Platform, error) {
 	svc, err := c.getSandbox(ctx, sandboxID)
 	if err != nil {
-		return platforms.Platform{}, err
+		return imagespec.Platform{}, err
 	}
 
 	response, err := svc.Platform(ctx, &runtimeAPI.PlatformRequest{SandboxID: sandboxID})
 	if err != nil {
-		return platforms.Platform{}, fmt.Errorf("failed to get sandbox platform: %w", errdefs.FromGRPC(err))
+		return imagespec.Platform{}, fmt.Errorf("failed to get sandbox platform: %w", errdefs.FromGRPC(err))
 	}
 
-	var platform platforms.Platform
+	var platform imagespec.Platform
 	if p := response.GetPlatform(); p != nil {
 		platform.OS = p.OS
 		platform.Architecture = p.Architecture
