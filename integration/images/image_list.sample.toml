@@ -1,6 +1,6 @@
 alpine = "docker.io/library/alpine:latest"
 busybox = "docker.io/library/busybox:latest"
-pause = "registry.k8s.io/pause:3.9"
+pause = "registry.k8s.io/pause:3.10"
 VolumeCopyUp = "ghcr.io/containerd/volume-copy-up:2.1"
 VolumeOwnership = "ghcr.io/containerd/volume-ownership:2.1"
 ArgsEscaped = "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0"
