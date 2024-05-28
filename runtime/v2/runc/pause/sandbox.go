@@ -22,10 +22,11 @@ import (
 	"context"
 	"runtime"
 
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/ttrpc"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/pkg/shutdown"
 
 	api "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/plugin"
@@ -107,4 +108,8 @@ func (p *pauseService) PingSandbox(ctx context.Context, req *api.PingRequest) (*
 
 func (p *pauseService) ShutdownSandbox(ctx context.Context, request *api.ShutdownSandboxRequest) (*api.ShutdownSandboxResponse, error) {
 	return &api.ShutdownSandboxResponse{}, nil
+}
+
+func (p *pauseService) SandboxMetrics(ctx context.Context, request *api.SandboxMetricsRequest) (*api.SandboxMetricsResponse, error) {
+	return &api.SandboxMetricsResponse{}, nil
 }
