@@ -241,7 +241,7 @@ func TestVolumeMounts(t *testing.T) {
 
 	for _, test := range []struct {
 		desc              string
-		platform          platforms.Platform
+		platform          imagespec.Platform
 		criMounts         []*runtime.Mount
 		usernsEnabled     bool
 		imageVolumes      map[string]struct{}
@@ -293,7 +293,7 @@ func TestVolumeMounts(t *testing.T) {
 		},
 		{
 			desc:     "should make relative paths absolute on Linux",
-			platform: platforms.Platform{OS: "linux"},
+			platform: imagespec.Platform{OS: "linux"},
 			imageVolumes: map[string]struct{}{
 				"./test-volume-1":     {},
 				"C:/test-volume-2":    {},
@@ -309,7 +309,7 @@ func TestVolumeMounts(t *testing.T) {
 		},
 		{
 			desc:          "should include mappings for image volumes on Linux",
-			platform:      platforms.Platform{OS: "linux"},
+			platform:      imagespec.Platform{OS: "linux"},
 			usernsEnabled: true,
 			imageVolumes: map[string]struct{}{
 				"/test-volume-1/": {},
@@ -323,7 +323,7 @@ func TestVolumeMounts(t *testing.T) {
 		},
 		{
 			desc:          "should NOT include mappings for image volumes on Linux if !userns",
-			platform:      platforms.Platform{OS: "linux"},
+			platform:      imagespec.Platform{OS: "linux"},
 			usernsEnabled: false,
 			imageVolumes: map[string]struct{}{
 				"/test-volume-1/": {},
@@ -336,7 +336,7 @@ func TestVolumeMounts(t *testing.T) {
 		},
 		{
 			desc:          "should convert rel imageVolume paths to abs paths and add userns mappings",
-			platform:      platforms.Platform{OS: "linux"},
+			platform:      imagespec.Platform{OS: "linux"},
 			usernsEnabled: true,
 			imageVolumes: map[string]struct{}{
 				"test-volume-1/":       {},

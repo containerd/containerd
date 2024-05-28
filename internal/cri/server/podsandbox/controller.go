@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	eventtypes "github.com/containerd/containerd/api/events"
@@ -134,7 +135,7 @@ type Controller struct {
 
 var _ sandbox.Controller = (*Controller)(nil)
 
-func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (platforms.Platform, error) {
+func (c *Controller) Platform(_ctx context.Context, _sandboxID string) (imagespec.Platform, error) {
 	return platforms.DefaultSpec(), nil
 }
 

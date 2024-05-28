@@ -351,7 +351,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
 	var uidMappings, gidMappings []*runtime.IDMapping
 	if platform.OS == "linux" {
 		if usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
@@ -399,7 +399,7 @@ func (c *criService) volumeMounts(platform platforms.Platform, containerRootDir 
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, platform platforms.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := util.NamespacedContext()
 	container := &containers.Container{ID: id}
@@ -482,7 +482,7 @@ func generateUserString(username string, uid, gid *runtime.Int64Value) (string, 
 // runtime information (rootfs mounted), or platform specific checks with
 // no defined workaround (yet) to specify for other platforms.
 func (c *criService) platformSpecOpts(
-	platform platforms.Platform,
+	platform imagespec.Platform,
 	config *runtime.ContainerConfig,
 	imageConfig *imagespec.ImageConfig,
 ) ([]oci.SpecOpts, error) {
@@ -529,7 +529,7 @@ func (c *criService) platformSpecOpts(
 
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
-	platform platforms.Platform,
+	platform imagespec.Platform,
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
