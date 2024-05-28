@@ -12,7 +12,7 @@ require (
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd/api v0.0.0
+	github.com/containerd/containerd/api v1.8.0-rc.2
 	github.com/containerd/continuity v0.4.2
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/fifo v1.1.0
@@ -71,7 +71,7 @@ require (
 	golang.org/x/sync v0.3.0
 	golang.org/x/sys v0.18.0
 	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.33.0
 	k8s.io/api v0.26.2
@@ -149,5 +149,3 @@ require (
 // Workaround for indirect dependency no longer being available.
 // https://github.com/containerd/containerd/issues/9969
 exclude github.com/mitchellh/osext v0.0.0-20151018003038-5e2d6d41470f
-
-replace github.com/containerd/containerd/api => ./api

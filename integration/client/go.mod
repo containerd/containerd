@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/containerd v1.7.17 // see replace; the actual version of containerd is replaced with the code at the root of this repository
-	github.com/containerd/containerd/api v0.0.0
+	github.com/containerd/containerd/api v1.8.0-rc.2
 	github.com/containerd/continuity v0.4.2
 	github.com/containerd/errdefs v0.1.0
 	github.com/containerd/go-runc v1.0.0
@@ -64,7 +64,7 @@ require (
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20230920204549-e6e6cdab5c13 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/grpc v1.59.0 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
