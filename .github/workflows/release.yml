@@ -156,3 +156,4 @@ jobs:
           body_path: ./builds/containerd-release-notes/release-notes.md
           files: |
             builds/release-tars-**/*
+          make_latest: false
