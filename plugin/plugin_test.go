@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/services"
+	"github.com/containerd/plugin"
 )
 
 func registerClear() {
@@ -32,7 +33,7 @@ func mockPluginFilter(*Registration) bool {
 	return false
 }
 
-var tasksServiceRequires = []Type{
+var tasksServiceRequires = []plugin.Type{
 	RuntimePlugin,
 	RuntimePluginV2,
 	MetadataPlugin,
@@ -58,35 +59,35 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.NamespacesService,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "namespaces",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "content",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "containers",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.ContainersService,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
@@ -97,42 +98,42 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "leases",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			LeasePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: LeasePlugin,
 		ID:   "manager",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "diff",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.DiffService,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			DiffPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.SnapshotsService,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "snapshots",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
@@ -143,40 +144,40 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "images",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GCPlugin,
 		ID:   "scheduler",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: RuntimePluginV2,
 		ID:   "task",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "tasks",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type:     GRPCPlugin,
 		ID:       "introspection",
-		Requires: []Type{"*"},
+		Requires: []plugin.Type{"*"},
 	})
 	Register(&Registration{
 		Type: ServicePlugin,
 		ID:   services.ContentService,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
@@ -191,20 +192,20 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: GRPCPlugin,
 		ID:   "cri",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 	})
 	Register(&Registration{
 		Type: RuntimePlugin,
 		ID:   "linux",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
 	Register(&Registration{
 		Type: InternalPlugin,
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ServicePlugin,
 		},
 		ID: "restart",
@@ -212,7 +213,7 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: DiffPlugin,
 		ID:   "walking",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			MetadataPlugin,
 		},
 	})
@@ -231,7 +232,7 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: MetadataPlugin,
 		ID:   "bolt",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			ContentPlugin,
 			SnapshotPlugin,
 		},
@@ -245,7 +246,7 @@ func TestContainerdPlugin(t *testing.T) {
 	Register(&Registration{
 		Type: InternalPlugin,
 		ID:   "tracing",
-		Requires: []Type{
+		Requires: []plugin.Type{
 			TracingProcessorPlugin,
 		},
 	})
@@ -313,7 +314,7 @@ func TestPluginGraph(t *testing.T) {
 				{
 					Type: "grpc",
 					ID:   "introspection",
-					Requires: []Type{
+					Requires: []plugin.Type{
 						"*",
 					},
 				},
@@ -333,7 +334,7 @@ func TestPluginGraph(t *testing.T) {
 				{
 					Type: "service",
 					ID:   "container",
-					Requires: []Type{
+					Requires: []plugin.Type{
 						"metadata",
 					},
 				},
@@ -352,7 +353,7 @@ func TestPluginGraph(t *testing.T) {
 				{
 					Type: "metadata",
 					ID:   "bolt",
-					Requires: []Type{
+					Requires: []plugin.Type{
 						"content",
 						"snapshotter",
 					},

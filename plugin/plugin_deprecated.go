@@ -17,8 +17,12 @@
 package plugin
 
 import (
+	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/dynamic"
 )
+
+// Type is the type of the plugin
+type Type = plugin.Type
 
 // Load loads all plugins at the provided path into containerd.
 //

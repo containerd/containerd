@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+
+	"github.com/containerd/plugin"
 )
 
 var (
@@ -44,21 +46,16 @@ func IsSkipPlugin(err error) bool {
 	return errors.Is(err, ErrSkipPlugin)
 }
 
-// Type is the type of the plugin
-type Type string
-
-func (t Type) String() string { return string(t) }
-
 // Registration contains information for registering a plugin
 type Registration struct {
 	// Type of the plugin
-	Type Type
+	Type plugin.Type
 	// ID of the plugin
 	ID string
 	// Config specific to the plugin
 	Config interface{}
 	// Requires is a list of plugins that the registered plugin requires to be available
-	Requires []Type
+	Requires []plugin.Type
 
 	// InitFn is called when initializing a plugin. The registration and
 	// context are passed in. The init function may modify the registration to
