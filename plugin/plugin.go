@@ -49,65 +49,6 @@ type Type string
 
 func (t Type) String() string { return string(t) }
 
-const (
-	// InternalPlugin implements an internal plugin to containerd
-	InternalPlugin Type = "io.containerd.internal.v1"
-	// RuntimePlugin implements a runtime
-	RuntimePlugin Type = "io.containerd.runtime.v1"
-	// RuntimePluginV2 implements a runtime v2
-	RuntimePluginV2 Type = "io.containerd.runtime.v2"
-	// ServicePlugin implements a internal service
-	ServicePlugin Type = "io.containerd.service.v1"
-	// GRPCPlugin implements a grpc service
-	GRPCPlugin Type = "io.containerd.grpc.v1"
-	// TTRPCPlugin implements a ttrpc shim service
-	TTRPCPlugin Type = "io.containerd.ttrpc.v1"
-	// SnapshotPlugin implements a snapshotter
-	SnapshotPlugin Type = "io.containerd.snapshotter.v1"
-	// TaskMonitorPlugin implements a task monitor
-	TaskMonitorPlugin Type = "io.containerd.monitor.v1"
-	// DiffPlugin implements a differ
-	DiffPlugin Type = "io.containerd.differ.v1"
-	// MetadataPlugin implements a metadata store
-	MetadataPlugin Type = "io.containerd.metadata.v1"
-	// ContentPlugin implements a content store
-	ContentPlugin Type = "io.containerd.content.v1"
-	// GCPlugin implements garbage collection policy
-	GCPlugin Type = "io.containerd.gc.v1"
-	// EventPlugin implements event handling
-	EventPlugin Type = "io.containerd.event.v1"
-	// LeasePlugin implements lease manager
-	LeasePlugin Type = "io.containerd.lease.v1"
-	// Streaming implements a stream manager
-	StreamingPlugin Type = "io.containerd.streaming.v1"
-	// TracingProcessorPlugin implements a open telemetry span processor
-	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
-	// NRIApiPlugin implements the NRI adaptation interface for containerd.
-	NRIApiPlugin Type = "io.containerd.nri.v1"
-	// TransferPlugin implements a transfer service
-	TransferPlugin Type = "io.containerd.transfer.v1"
-	// SandboxStorePlugin implements a sandbox store
-	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
-	// SandboxControllerPlugin implements a sandbox controller
-	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
-	// WarningPlugin implements a warning service
-	WarningPlugin Type = "io.containerd.warning.v1"
-)
-
-const (
-	// RuntimeLinuxV1 is the legacy linux runtime
-	RuntimeLinuxV1 = "io.containerd.runtime.v1.linux"
-	// RuntimeRuncV1 is the runc runtime that supports a single container
-	RuntimeRuncV1 = "io.containerd.runc.v1"
-	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
-	RuntimeRuncV2      = "io.containerd.runc.v2"
-	DeprecationsPlugin = "deprecations"
-)
-
-const (
-	SnapshotterRootDir = "root"
-)
-
 // Registration contains information for registering a plugin
 type Registration struct {
 	// Type of the plugin
