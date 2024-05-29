@@ -26,10 +26,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/platforms"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -350,32 +351,32 @@ func TestDefaultScheme(t *testing.T) {
 }
 
 // Temporarily remove for v2 upgrade
-//func TestEncryptedImagePullOpts(t *testing.T) {
-//	for _, test := range []struct {
-//		desc         string
-//		keyModel     string
-//		expectedOpts int
-//	}{
-//		{
-//			desc:         "node key model should return one unpack opt",
-//			keyModel:     criconfig.KeyModelNode,
-//			expectedOpts: 1,
-//		},
-//		{
-//			desc:         "no key model selected should default to node key model",
-//			keyModel:     "",
-//			expectedOpts: 0,
-//		},
-//	} {
-//		test := test
-//		t.Run(test.desc, func(t *testing.T) {
-//			c, _ := newTestCRIService()
-//			c.config.ImageDecryption.KeyModel = test.keyModel
-//			got := len(c.encryptedImagesPullOpts())
-//			assert.Equal(t, test.expectedOpts, got)
-//		})
-//	}
-//}
+func TestEncryptedImagePullOpts(t *testing.T) {
+	for _, test := range []struct {
+		desc         string
+		keyModel     string
+		expectedOpts int
+	}{
+		{
+			desc:         "node key model should return one unpack opt",
+			keyModel:     criconfig.KeyModelNode,
+			expectedOpts: 1,
+		},
+		{
+			desc:         "no key model selected should default to node key model",
+			keyModel:     "",
+			expectedOpts: 0,
+		},
+	} {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			c.config.ImageDecryption.KeyModel = test.keyModel
+			got := len(c.encryptedImagesPullOpts())
+			assert.Equal(t, test.expectedOpts, got)
+		})
+	}
+}
 
 func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	defaultSnapshotter := "native"

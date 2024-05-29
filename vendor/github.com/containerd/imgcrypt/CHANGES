@@ -1,0 +1,63 @@
+CHANGES
+
+v1.1.10:
+  - Updated to ocicrypt v1.1.10
+  - Added test cases with JKW EC key and added 2 more RSA keys
+  - Sync'ed enc-ctr with ctr of containerd v1.6.30
+  - Updated dependencies
+
+v1.1.9:
+  - Updated to ocicrypt v1.1.9
+  - Updated dependencies
+
+v1.1.8:
+  - Updated to containerd v1.6.23
+  - Sync'ed enc-ctr with ctr of containerd v1.6.23
+  - Updated to ocicrypt v1.1.8
+
+v1.1.7:
+  - Added support for zstd-compressed layers
+  - Update to ocicrypt v1.1.6 for zstd-related dependencies
+  - Update to containerd v1.6.8
+  - Sync'ed ctr-enc with upstream ctr changes to import command
+  - Add support for --all-platforms to encrypt command of ctr-enc
+
+v1.1.6:
+  - Update to ocicrypt v1.1.5 for yaml v3.0 dependency
+  - Update to containerd v1.6.6 for runc v1.1.2 dependency
+
+v1.1.5:
+  - Update to ocicrypt v1.1.4; sha256 is the default now for padding in OAEP
+    for pkcs11; Set OCICRYPT_OAEP_HASHALG=sha1 environment variable to force
+    sha1 usage, which is required for example for SoftHSM 2.6.1.
+
+v1.1.4:
+  - Fixed issue in CheckAuthorization() callpath for images with a ManifestList
+    - CVE-2022-24778
+    - Fix: https://github.com/containerd/imgcrypt/commit/6fdd9818a4d8142107b7ecd767d839c9707700d9
+    - Added test case covering this
+  - Updated to ocicrypt 1.1.3
+  - Updated to containerd 1.6.1
+
+v1.1.3:
+  - Release v1.1.3 addresses issue #62 due to re-tagging of v1.1.2
+  - docs: update referenced containerd project branch to main
+  - Update linter to match containerd repo
+  - Update CI golang version
+  - Updated to containerd 1.5.8
+
+v1.1.2:
+  - Decouple CreateCryptoConfig() from github.com/urfave/cli
+  - Updated to containerd 1.5.7
+  - Implemented ConvertFunc for image en- and decryption
+  - Replace pkg/errors with errors package
+  - Updated to ocicrypt 1.1.2
+  - Sync'ed ctr-enc with ctr of containerd-1.5.0
+
+v1.1.1:
+  - rebased on ocicrypt 1.1.1
+
+v1.1.0:
+  - rebased on ocicrypt 1.1.0
+  - added pkcs11 support; experimental
+  - added keyprovider support
