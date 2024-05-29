@@ -21,11 +21,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/containerd/plugin"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/plugin"
 )
 
 // InitContext is used for plugin initialization
@@ -41,7 +39,7 @@ type InitContext struct {
 	// deprecated: will be removed in 2.0, use plugin.EventType
 	Events *exchange.Exchange
 
-	Meta *Meta // plugins can fill in metadata at init.
+	Meta *plugin.Meta // plugins can fill in metadata at init.
 
 	plugins *Set
 }
@@ -52,7 +50,7 @@ func NewContext(ctx context.Context, r *Registration, plugins *Set, root, state 
 		Context: ctx,
 		Root:    filepath.Join(root, r.URI()),
 		State:   filepath.Join(state, r.URI()),
-		Meta: &Meta{
+		Meta: &plugin.Meta{
 			Exports: map[string]string{},
 		},
 		plugins: plugins,
@@ -64,19 +62,11 @@ func (i *InitContext) Get(t plugin.Type) (interface{}, error) {
 	return i.plugins.Get(t)
 }
 
-// Meta contains information gathered from the registration and initialization
-// process.
-type Meta struct {
-	Platforms    []ocispec.Platform // platforms supported by plugin
-	Exports      map[string]string  // values exported by plugin
-	Capabilities []string           // feature switches for plugin
-}
-
 // Plugin represents an initialized plugin, used with an init context.
 type Plugin struct {
 	Registration *Registration // registration, as initialized
 	Config       interface{}   // config, as initialized
-	Meta         *Meta
+	Meta         *plugin.Meta
 
 	instance interface{}
 	err      error // will be set if there was an error initializing the plugin

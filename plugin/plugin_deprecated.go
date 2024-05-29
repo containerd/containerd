@@ -46,6 +46,10 @@ func IsSkipPlugin(err error) bool {
 // Type is the type of the plugin
 type Type = plugin.Type
 
+// Meta contains information gathered from the registration and initialization
+// process.
+type Meta = plugin.Meta
+
 // Load loads all plugins at the provided path into containerd.
 //
 // Load is currently only implemented on non-static, non-gccgo builds for amd64
