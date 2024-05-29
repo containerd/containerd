@@ -17,34 +17,11 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/containerd/plugin"
 )
-
-var (
-	// ErrNoType is returned when no type is specified
-	ErrNoType = errors.New("plugin: no type")
-	// ErrNoPluginID is returned when no id is specified
-	ErrNoPluginID = errors.New("plugin: no id")
-	// ErrIDRegistered is returned when a duplicate id is already registered
-	ErrIDRegistered = errors.New("plugin: id already registered")
-	// ErrSkipPlugin is used when a plugin is not initialized and should not be loaded,
-	// this allows the plugin loader differentiate between a plugin which is configured
-	// not to load and one that fails to load.
-	ErrSkipPlugin = errors.New("skip plugin")
-
-	// ErrInvalidRequires will be thrown if the requirements for a plugin are
-	// defined in an invalid manner.
-	ErrInvalidRequires = errors.New("invalid requires")
-)
-
-// IsSkipPlugin returns true if the error is skipping the plugin
-func IsSkipPlugin(err error) bool {
-	return errors.Is(err, ErrSkipPlugin)
-}
 
 // Registration contains information for registering a plugin
 type Registration struct {
@@ -93,10 +70,10 @@ func Register(r *Registration) {
 	defer register.Unlock()
 
 	if r.Type == "" {
-		panic(ErrNoType)
+		panic(plugin.ErrNoType)
 	}
 	if r.ID == "" {
-		panic(ErrNoPluginID)
+		panic(plugin.ErrNoPluginID)
 	}
 	if err := checkUnique(r); err != nil {
 		panic(err)
@@ -104,7 +81,7 @@ func Register(r *Registration) {
 
 	for _, requires := range r.Requires {
 		if requires == "*" && len(r.Requires) != 1 {
-			panic(ErrInvalidRequires)
+			panic(plugin.ErrInvalidRequires)
 		}
 	}
 
@@ -114,7 +91,7 @@ func Register(r *Registration) {
 func checkUnique(r *Registration) error {
 	for _, registered := range register.r {
 		if r.URI() == registered.URI() {
-			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
+			return fmt.Errorf("%s: %w", r.URI(), plugin.ErrIDRegistered)
 		}
 	}
 	return nil

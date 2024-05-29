@@ -26,7 +26,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/platforms"
-	pluginutils "github.com/containerd/containerd/plugin"
+	pluginutils "github.com/containerd/plugin"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 	"google.golang.org/grpc/codes"

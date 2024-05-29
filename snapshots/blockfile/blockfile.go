@@ -25,11 +25,11 @@ import (
 	"runtime"
 
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/storage"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
+	"github.com/containerd/plugin"
 )
 
 // viewHookHelper is only used in test for recover the filesystem.

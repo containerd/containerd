@@ -21,6 +21,28 @@ import (
 	"github.com/containerd/plugin/dynamic"
 )
 
+var (
+	// ErrNoType is returned when no type is specified
+	ErrNoType = plugin.ErrNoType
+	// ErrNoPluginID is returned when no id is specified
+	ErrNoPluginID = plugin.ErrNoPluginID
+	// ErrIDRegistered is returned when a duplicate id is already registered
+	ErrIDRegistered = plugin.ErrIDRegistered
+	// ErrSkipPlugin is used when a plugin is not initialized and should not be loaded,
+	// this allows the plugin loader differentiate between a plugin which is configured
+	// not to load and one that fails to load.
+	ErrSkipPlugin = plugin.ErrSkipPlugin
+
+	// ErrInvalidRequires will be thrown if the requirements for a plugin are
+	// defined in an invalid manner.
+	ErrInvalidRequires = plugin.ErrInvalidRequires
+)
+
+// IsSkipPlugin returns true if the error is skipping the plugin
+func IsSkipPlugin(err error) bool {
+	return plugin.IsSkipPlugin(err)
+}
+
 // Type is the type of the plugin
 type Type = plugin.Type
 
