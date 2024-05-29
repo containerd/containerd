@@ -16,7 +16,7 @@
    limitations under the License.
 */
 
-package plugin
+package dynamic
 
 // loadPlugins is not supported;
 //

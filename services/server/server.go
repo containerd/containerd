@@ -34,6 +34,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/plugin/dynamic"
 	"github.com/containerd/ttrpc"
 	"github.com/docker/go-metrics"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -432,7 +433,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	if count, err := plugin.Load(path); err != nil {
+	if count, err := dynamic.Load(path); err != nil {
 		return nil, err
 	} else if count > 0 || config.PluginDir != "" {
 		config.PluginDir = path
