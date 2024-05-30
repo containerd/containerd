@@ -25,8 +25,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
+	"syscall"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -35,10 +42,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -732,7 +735,7 @@ func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
 	// only fall back if the same host had previously fell back
 	if f.host != r.URL.Host {
 		resp, err := f.super.RoundTrip(r)
-		if !isTLSError(err) {
+		if !isTLSError(err) && !isPortError(err, r.URL.Host) {
 			return resp, err
 		}
 	}
@@ -768,6 +771,18 @@ func isTLSError(err error) bool {
 		return true
 	}
 	if strings.Contains(err.Error(), "TLS handshake timeout") {
+		return true
+	}
+
+	return false
+}
+
+func isPortError(err error, host string) bool {
+	if errors.Is(err, syscall.ECONNREFUSED) || os.IsTimeout(err) {
+		if _, port, _ := net.SplitHostPort(host); port != "" {
+			// Port is specified, will not retry on different port with scheme change
+			return false
+		}
 		return true
 	}
 

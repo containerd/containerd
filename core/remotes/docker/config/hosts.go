@@ -30,11 +30,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
 	tomlu "github.com/pelletier/go-toml/v2/unstable"
+
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
 
 // UpdateClientFunc is a function that lets you to amend http Client behavior used by registry clients.
@@ -250,7 +251,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			// the request twice or consuming the request body.
 			if host.scheme == "http" && explicitTLS {
 				_, port, _ := net.SplitHostPort(host.host)
-				if port != "" && port != "80" {
+				if port != "80" {
 					log.G(ctx).WithField("host", host.host).Info("host will try HTTPS first since it is configured for HTTP with a TLS configuration, consider changing host to HTTPS or removing unused TLS configuration")
 					host.scheme = "https"
 					rhosts[i].Client.Transport = docker.NewHTTPFallback(rhosts[i].Client.Transport)
