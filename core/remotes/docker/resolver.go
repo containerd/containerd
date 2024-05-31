@@ -28,7 +28,6 @@ import (
 	"os"
 	"path"
 	"strings"
-	"syscall"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -778,7 +777,7 @@ func isTLSError(err error) bool {
 }
 
 func isPortError(err error, host string) bool {
-	if errors.Is(err, syscall.ECONNREFUSED) || os.IsTimeout(err) {
+	if isConnError(err) || os.IsTimeout(err) {
 		if _, port, _ := net.SplitHostPort(host); port != "" {
 			// Port is specified, will not retry on different port with scheme change
 			return false
