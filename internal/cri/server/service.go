@@ -107,6 +107,8 @@ type ImageService interface {
 	LocalResolve(refOrID string) (imagestore.Image, error)
 
 	ImageFSPaths() map[string]string
+
+	ImageConfig() criconfig.ImageConfig
 }
 
 // criService implements CRIService.

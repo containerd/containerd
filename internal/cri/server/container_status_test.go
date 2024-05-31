@@ -293,6 +293,8 @@ func (s *fakeImageService) PullImage(context.Context, string, func(string) (stri
 	return "", errors.New("not implemented")
 }
 
+func (c *fakeImageService) ImageConfig() criconfig.ImageConfig { return criconfig.ImageConfig{} }
+
 func patchExceptedWithState(expected *runtime.ContainerStatus, state runtime.ContainerState) {
 	expected.State = state
 	switch state {

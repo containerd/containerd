@@ -31,6 +31,9 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+// ManifestDigestLabel is a label which contains manifest digest.
+const ManifestDigestLabel = "io.containerd.manifest-digest"
+
 // Image provides the model for how containerd views container images.
 type Image struct {
 	// Name of the image.
@@ -189,6 +192,13 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 				}
 			}
+
+			// Given that manifest descriptor is not returned, we depend on two annotations to get the digest of this manifest.
+			annotations := manifest.Annotations
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[ManifestDigestLabel] = desc.Digest.String()
 
 			m = append(m, platformManifest{
 				p: desc.Platform,
