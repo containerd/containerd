@@ -158,7 +158,13 @@ func (p *progressPusher) WrapHandler(h images.Handler) images.Handler {
 func (p *progressPusher) Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error) {
 	ref := remotes.MakeRefKey(ctx, d)
 	p.status.add(ref, d)
-	cw, err := p.Pusher.Push(ctx, d)
+	var cw content.Writer
+	var err error
+	if cs, ok := p.Pusher.(content.Ingester); ok {
+		cw, err = content.OpenWriter(ctx, cs, content.WithRef(ref), content.WithDescriptor(d))
+	} else {
+		cw, err = p.Pusher.Push(ctx, d)
+	}
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			p.progress.MarkExists(d)
