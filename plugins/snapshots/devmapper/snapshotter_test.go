@@ -145,9 +145,10 @@ func TestMultipleXfsMounts(t *testing.T) {
 
 	poolName := fmt.Sprintf("containerd-snapshotter-suite-pool-%d", time.Now().Nanosecond())
 	config := &Config{
-		RootPath:       t.TempDir(),
-		PoolName:       poolName,
-		BaseImageSize:  "16Mb",
+		RootPath: t.TempDir(),
+		PoolName: poolName,
+		// Size for xfs volume is kept at 300Mb because xfsprogs 5.19.0 (>=ubuntu 24.04) enforces a minimum volume size
+		BaseImageSize:  "300Mb",
 		FileSystemType: "xfs",
 	}
 	snapshotter, closer, err := createSnapshotter(ctx, t, config)
