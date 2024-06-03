@@ -26,6 +26,7 @@ import (
 	"slices"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
@@ -33,6 +34,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 
 	apitypes "github.com/containerd/containerd/api/types"
+
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -41,6 +43,12 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 )
 
+// TaskConfig for the runtime task manager
+type TaskConfig struct {
+	// Supported platforms
+	Platforms []string `toml:"platforms"`
+}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.RuntimePluginV2,
@@ -48,8 +56,19 @@ func init() {
 		Requires: []plugin.Type{
 			plugins.ShimPlugin,
 		},
+		Config: &TaskConfig{
+			Platforms: defaultPlatforms(),
+		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimManagerI, err := ic.GetByID(plugins.ShimPlugin, "shim")
+			config := ic.Config.(*TaskConfig)
+
+			supportedPlatforms, err := platforms.ParseAll(config.Platforms)
+			if err != nil {
+				return nil, err
+			}
+			ic.Meta.Platforms = supportedPlatforms
+
+			shimManagerI, err := ic.GetSingle(plugins.ShimPlugin)
 			if err != nil {
 				return nil, err
 			}

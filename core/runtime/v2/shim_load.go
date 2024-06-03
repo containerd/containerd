@@ -154,7 +154,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 			runtime:      runtime,
 			address:      m.containerdAddress,
 			ttrpcAddress: m.containerdTTRPCAddress,
-			schedCore:    m.schedCore,
+			env:          m.env,
 		})
 	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
 	shim, err := loadShimTask(ctx, bundle, func() {

@@ -49,7 +49,7 @@ func init() {
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			shimPlugin, err := ic.GetByID(plugins.ShimPlugin, "shim")
+			shimPlugin, err := ic.GetSingle(plugins.ShimPlugin)
 			if err != nil {
 				return nil, err
 			}
