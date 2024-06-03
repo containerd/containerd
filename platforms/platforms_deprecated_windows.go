@@ -30,6 +30,7 @@ func getWindowsOsVersion() string {
 	return fmt.Sprintf("%d.%d.%d", major, minor, build)
 }
 
+// Deprecated: this function is deprecated, and removed in github.com/containerd/platforms
 func GetOsVersion(osVersionPrefix string) osversion.OSVersion {
 	parts := strings.Split(osVersionPrefix, ".")
 	if len(parts) < 3 {

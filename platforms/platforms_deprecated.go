@@ -22,33 +22,47 @@ import (
 )
 
 // Platform is a type alias for convenience, so there is no need to import image-spec package everywhere.
+//
+// Deprecated: use [specs.Platform].
 type Platform = specs.Platform
 
 // DefaultSpec returns the current platform's default platform specification.
+//
+// Deprecated: use [platforms.DefaultSpec].
 func DefaultSpec() specs.Platform {
 	return platforms.DefaultSpec()
 }
 
 // Default returns the default matcher for the platform.
+//
+// Deprecated: use [platforms.Default].
 func Default() platforms.MatchComparer {
 	return platforms.Default()
 }
 
 // DefaultString returns the default string specifier for the platform.
+//
+// Deprecated: use [platforms.DefaultString].
 func DefaultString() string {
 	return platforms.Format(platforms.DefaultSpec()) // For 1.7 continue using the old format without os-version included.
 }
 
 // DefaultStrict returns strict form of Default.
+//
+// Deprecated: use [platforms.DefaultStrict].
 func DefaultStrict() MatchComparer {
 	return platforms.DefaultStrict()
 }
 
 // MatchComparer is able to match and compare platforms to
 // filter and sort platforms.
+//
+// Deprecated: use [platforms.MatchComparer].
 type MatchComparer = platforms.MatchComparer
 
 // Matcher matches platforms specifications, provided by an image or runtime.
+//
+// Deprecated: use [platforms.Matcher].
 type Matcher = platforms.Matcher
 
 // NewMatcher returns a simple matcher based on the provided platform
@@ -59,6 +73,8 @@ type Matcher = platforms.Matcher
 // functionality.
 //
 // Applications should opt to use `Match` over directly parsing specifiers.
+//
+// Deprecated: use [platforms.NewMatcher].
 func NewMatcher(platform specs.Platform) platforms.Matcher {
 	return platforms.NewMatcher(platform)
 }
@@ -71,17 +87,23 @@ func NewMatcher(platform specs.Platform) platforms.Matcher {
 // value will be matched against the known set of operating systems, then fall
 // back to the known set of architectures. The missing component will be
 // inferred based on the local environment.
+//
+// Deprecated: use [platforms.Parse].
 func Parse(specifier string) (specs.Platform, error) {
 	return platforms.Parse(specifier)
 }
 
 // MustParse is like Parses but panics if the specifier cannot be parsed.
 // Simplifies initialization of global variables.
+//
+// Deprecated: use [platforms.MustParse].
 func MustParse(specifier string) specs.Platform {
 	return platforms.MustParse(specifier)
 }
 
 // Format returns a string specifier from the provided platform specification.
+//
+// Deprecated: use [platforms.Format].
 func Format(platform specs.Platform) string {
 	return platforms.Format(platform)
 }
@@ -90,6 +112,8 @@ func Format(platform specs.Platform) string {
 //
 // For example, if "Aarch64" is encountered, we change it to "arm64" or if
 // "x86_64" is encountered, it becomes "amd64".
+//
+// Deprecated: use [platforms.Normalize].
 func Normalize(platform specs.Platform) specs.Platform {
 	return platforms.Normalize(platform)
 }
@@ -101,6 +125,8 @@ func Normalize(platform specs.Platform) specs.Platform {
 // For arm/v7, will also match arm/v6 and arm/v5
 // For arm/v6, will also match arm/v5
 // For amd64, will also match 386
+//
+// Deprecated: use [platforms.Only].
 func Only(platform specs.Platform) platforms.MatchComparer {
 	return platforms.Only(platform)
 }
@@ -113,26 +139,38 @@ func Only(platform specs.Platform) platforms.MatchComparer {
 //
 // OnlyStrict matches non-canonical forms.
 // So, "arm64" matches "arm/64/v8".
+//
+// Deprecated: use [platforms.OnlyStrict].
 func OnlyStrict(platform specs.Platform) platforms.MatchComparer {
 	return platforms.OnlyStrict(platform)
 }
 
 // Ordered returns a platform MatchComparer which matches any of the platforms
 // but orders them in order they are provided.
+//
+// Deprecated: use [platforms.Ordered].
 func Ordered(platform ...specs.Platform) platforms.MatchComparer {
 	return platforms.Ordered(platform...)
 }
 
 // Any returns a platform MatchComparer which matches any of the platforms
 // with no preference for ordering.
+//
+// Deprecated: use [platforms.Any].
 func Any(platform ...specs.Platform) platforms.MatchComparer {
 	return platforms.Any(platform...)
 }
 
 // All is a platform MatchComparer which matches all platforms
 // with preference for ordering.
+//
+// Deprecated: use [platforms.All].
 var All = platforms.All
 
+// GetWindowsOsVersion returns the version of Windows of the local system,
+// it returns an empty string on other platforms.
+//
+// Deprecated: this function is deprecated, and removed in github.com/containerd/platforms
 func GetWindowsOsVersion() string {
 	return getWindowsOsVersion()
 }
