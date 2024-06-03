@@ -23,7 +23,7 @@ import (
 
 	. "github.com/containerd/containerd"
 	"github.com/containerd/containerd/integration/images"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 )
 
 var (

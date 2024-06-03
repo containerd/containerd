@@ -23,9 +23,9 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/btrfs"
+	"github.com/containerd/platforms"
 )
 
 // Config represents configuration for the btrfs plugin.
