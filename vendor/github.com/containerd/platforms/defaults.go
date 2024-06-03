@@ -16,26 +16,14 @@
 
 package platforms
 
-import (
-	"testing"
-
-	specs "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/require"
-)
-
-func TestNormalize(t *testing.T) {
-	require.Equal(t, DefaultSpec(), Normalize(DefaultSpec()))
+// DefaultString returns the default string specifier for the platform,
+// with [PR#6](https://github.com/containerd/platforms/pull/6) the result
+// may now also include the OSVersion from the provided platform specification.
+func DefaultString() string {
+	return FormatAll(DefaultSpec())
 }
 
-func TestFallbackOnOSVersion(t *testing.T) {
-	p := specs.Platform{
-		OS:           "windows",
-		Architecture: "amd64",
-		OSVersion:    "99.99.99.99",
-	}
-
-	other := specs.Platform{OS: p.OS, Architecture: p.Architecture}
-
-	m := NewMatcher(p)
-	require.True(t, m.Match(other))
+// DefaultStrict returns strict form of Default.
+func DefaultStrict() MatchComparer {
+	return OnlyStrict(DefaultSpec())
 }

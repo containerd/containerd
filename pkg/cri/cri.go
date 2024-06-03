@@ -32,10 +32,10 @@ import (
 	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/server"
 	nriservice "github.com/containerd/containerd/pkg/nri"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 // Register CRI service plugin
