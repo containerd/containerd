@@ -23,5 +23,5 @@ import (
 )
 
 func defaultPlatforms() []string {
-	return []string{platforms.DefaultString()}
+	return []string{platforms.Format(platforms.DefaultSpec())} // For 1.7 continue using the old format without os-version included.
 }

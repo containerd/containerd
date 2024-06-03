@@ -110,7 +110,7 @@ type RemoteOpt func(*Client, *RemoteContext) error
 // content for
 func WithPlatform(platform string) RemoteOpt {
 	if platform == "" {
-		platform = platforms.DefaultString()
+		platform = platforms.Format(platforms.DefaultSpec()) // For 1.7 continue using the old format without os-version included.
 	}
 	return func(_ *Client, c *RemoteContext) error {
 		for _, p := range c.Platforms {

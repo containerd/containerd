@@ -49,7 +49,7 @@ var defaultSpecCommand = cli.Command{
 		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
-		platform := platforms.DefaultString()
+		platform := platforms.Format(platforms.DefaultSpec()) // For 1.7 continue using the old format without os-version included.
 		if plat := context.String("platform"); plat != "" {
 			platform = plat
 		}

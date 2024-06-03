@@ -36,7 +36,7 @@ func Default() platforms.MatchComparer {
 
 // DefaultString returns the default string specifier for the platform.
 func DefaultString() string {
-	return platforms.DefaultString()
+	return platforms.Format(platforms.DefaultSpec()) // For 1.7 continue using the old format without os-version included.
 }
 
 // DefaultStrict returns strict form of Default.
