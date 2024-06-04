@@ -217,7 +217,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
-        go-version: ["1.21.10", "1.22.3"]
+        go-version: ["1.21.11", "1.22.4"]
     steps:
       - name: Install dependencies
         if: matrix.os == 'ubuntu-20.04' || matrix.os == 'actuated-arm64-4cpu-16gb'
