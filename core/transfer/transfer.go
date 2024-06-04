@@ -100,6 +100,11 @@ type ImageUnpacker interface {
 	UnpackPlatforms() []UnpackConfiguration
 }
 
+// ImagePlatformsGetter is type which returns configured platforms.
+type ImagePlatformsGetter interface {
+	Platforms() []ocispec.Platform
+}
+
 // UnpackConfiguration specifies the platform and snapshotter to use for resolving
 // the unpack Platform, if snapshotter is not specified the platform default will
 // be used.
