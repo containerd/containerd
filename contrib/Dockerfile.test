@@ -29,7 +29,7 @@
 #   docker run --privileged containerd-test
 # ------------------------------------------------------------------------------
 
-ARG GOLANG_VERSION=1.22.3
+ARG GOLANG_VERSION=1.22.4
 ARG GOLANG_IMAGE=golang
 
 FROM ${GOLANG_IMAGE}:${GOLANG_VERSION} AS golang

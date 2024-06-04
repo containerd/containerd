@@ -38,8 +38,8 @@ function install_runc() {
 	# https://github.com/opencontainers/runc/issues/4233
 	GO121DIR="${TMPROOT}"/go121
 	mkdir -p "${GO121DIR}"
-	GOBIN="${GO121DIR}" go install golang.org/dl/go1.21.9@latest
-	GO121="${GO121DIR}"/go1.21.9
+	GOBIN="${GO121DIR}" go install golang.org/dl/go1.21.11@latest
+	GO121="${GO121DIR}"/go1.21.11
 	$GO121 download
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
