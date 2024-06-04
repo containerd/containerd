@@ -102,6 +102,8 @@ message UpdateSandboxRequest {
 	map<string, string> annotations = 3;
 }
 
+message UpdateSandboxResponse {}
+
 message WaitSandboxRequest {
 	string sandbox_id = 1;
 }
@@ -110,8 +112,6 @@ message WaitSandboxResponse {
 	uint32 exit_status = 1;
 	google.protobuf.Timestamp exited_at = 2;
 }
-
-message UpdateSandboxResponse {}
 
 message SandboxStatusRequest {
 	string sandbox_id = 1;

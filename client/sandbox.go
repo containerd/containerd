@@ -153,7 +153,7 @@ func (c *Client) NewSandbox(ctx context.Context, sandboxID string, opts ...NewSa
 	}, nil
 }
 
-// LoadSandbox laods existing sandbox metadata object using the id
+// LoadSandbox loads existing sandbox metadata object using the id
 func (c *Client) LoadSandbox(ctx context.Context, id string) (Sandbox, error) {
 	sandbox, err := c.SandboxStore().Get(ctx, id)
 	if err != nil {
