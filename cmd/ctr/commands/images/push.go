@@ -112,7 +112,14 @@ var pushCommand = &cli.Command{
 			if err != nil {
 				return err
 			}
-			is := image.NewStore(local)
+			var p []ocispec.Platform
+			if pss := context.StringSlice("platform"); len(pss) > 0 {
+				p, err = platforms.ParseAll(pss)
+				if err != nil {
+					return fmt.Errorf("invalid platform %v: %w", pss, err)
+				}
+			}
+			is := image.NewStore(local, image.WithPlatforms(p...))
 
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()

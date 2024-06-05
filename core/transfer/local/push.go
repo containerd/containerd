@@ -33,22 +33,12 @@ import (
 )
 
 func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGetter, p transfer.ImagePusher, tops *transfer.Config) error {
-	/*
-		// TODO: Platform matching
-		if pushCtx.PlatformMatcher == nil {
-			if len(pushCtx.Platforms) > 0 {
-				ps, err := platforms.ParseAll(pushCtx.Platforms)
-				if err != nil {
-					return err
-				}
-				pushCtx.PlatformMatcher = platforms.Any(ps...)
-			} else {
-				pushCtx.PlatformMatcher = platforms.All
-			}
-		}
-	*/
 	matcher := platforms.All
-	// Filter push
+	if ipg, ok := ig.(transfer.ImagePlatformsGetter); ok {
+		if ps := ipg.Platforms(); len(ps) > 0 {
+			matcher = platforms.Any(ps...)
+		}
+	}
 
 	img, err := ig.Get(ctx, ts.images)
 	if err != nil {
