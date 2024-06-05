@@ -132,6 +132,10 @@ command. As part of this process, we do the following:
 			} else if !context.Bool("skip-metadata") {
 				sopts = append(sopts, image.WithAllMetadata)
 			}
+			labels := context.StringSlice("label")
+			if len(labels) > 0 {
+				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
+			}
 
 			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir"))}
 			if context.Bool("plain-http") {
