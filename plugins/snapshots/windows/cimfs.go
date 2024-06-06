@@ -33,7 +33,6 @@ import (
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/computestorage"
 	"github.com/Microsoft/hcsshim/pkg/cimfs"
-	cimlayer "github.com/Microsoft/hcsshim/pkg/ociwclayer/cim"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
@@ -52,6 +51,7 @@ const (
 	templateVHDName            = "blank.vhdx"
 	vhdMaxSizeInBytes   uint64 = 10 * 1024 * 1024 * 1024 // 10 GB
 	vhdBlockSizeInBytes uint32 = 1 * 1024 * 1024         // 1 MB
+	labelSnapshotRef           = "containerd.io/snapshot.ref"
 )
 
 // Composite image FileSystem (CimFS) is a new read-only filesystem (similar to overlayFS on Linux) created
@@ -95,35 +95,29 @@ func NewCimFSSnapshotter(root string) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("failed to init base scratch VHD: %w", err)
 	}
 
+	if err = os.MkdirAll(filepath.Join(baseSn.info.HomeDir, "cim-layers"), 0755); err != nil {
+		return nil, err
+	}
+
 	return &cimFSSnapshotter{
 		windowsBaseSnapshotter: baseSn,
 		cimDir:                 filepath.Join(baseSn.info.HomeDir, "cim-layers"),
 	}, nil
 }
 
-// getCimLayerPath returns the path of the cim file for the given snapshot. Note that this function doesn't
+// getLayerCimPath returns the path of the cim file for the given snapshot. Note that this function doesn't
 // actually check if the cim layer exists it simply does string manipulation to generate the path isCimLayer
 // can be used to verify if it is actually a cim layer.
-func getCimLayerPath(cimDir, snID string) string {
-	return filepath.Join(cimDir, (snID + ".cim"))
+func (s *cimFSSnapshotter) getLayerCimPath(snID string) string {
+	return filepath.Join(s.cimDir, (snID + ".cim"))
 }
 
-// isCimLayer checks if the snapshot referred by the given key is actually a cim layer.  With CimFS
-// snapshotter all the read-only (i.e image) layers are stored in the cim format while we still use VHDs for
-// scratch layers.
-func (s *cimFSSnapshotter) isCimLayer(ctx context.Context, key string) (bool, error) {
-	id, _, _, err := storage.GetInfo(ctx, key)
-	if err != nil {
-		return false, fmt.Errorf("get snapshot info: %w", err)
+func (s *cimFSSnapshotter) parentIDsToCimPaths(parentIDs []string) []string {
+	cimPaths := make([]string, 0, len(parentIDs))
+	for _, id := range parentIDs {
+		cimPaths = append(cimPaths, s.getLayerCimPath(id))
 	}
-	snCimPath := getCimLayerPath(s.cimDir, id)
-	if _, err := os.Stat(snCimPath); err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return cimPaths
 }
 
 func (s *cimFSSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
@@ -138,15 +132,14 @@ func (s *cimFSSnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 	}
 	defer t.Rollback()
 
-	id, _, _, err := storage.GetInfo(ctx, key)
+	id, info, _, err := storage.GetInfo(ctx, key)
 	if err != nil {
 		return snapshots.Usage{}, fmt.Errorf("failed to get snapshot info: %w", err)
 	}
 
-	if ok, err := s.isCimLayer(ctx, key); err != nil {
-		return snapshots.Usage{}, err
-	} else if ok {
-		cimUsage, err := cimfs.GetCimUsage(ctx, getCimLayerPath(s.cimDir, id))
+	if info.Kind == snapshots.KindCommitted {
+		// Committed MUST be a cimfs layer
+		cimUsage, err := cimfs.GetCimUsage(ctx, s.getLayerCimPath(id))
 		if err != nil {
 			return snapshots.Usage{}, err
 		}
@@ -219,7 +212,7 @@ func (s *cimFSSnapshotter) Remove(ctx context.Context, key string) error {
 		return fmt.Errorf("%w: %s", errdefs.ErrFailedPrecondition, err)
 	}
 
-	if err := cimlayer.DestroyCimLayer(s.getSnapshotDir(ID)); err != nil {
+	if err := cimfs.DestroyCim(ctx, s.getLayerCimPath(ID)); err != nil {
 		// Must be cleaned up, any "rm-*" could be removed if no active transactions
 		log.G(ctx).WithError(err).WithField("ID", ID).Warnf("failed to cleanup cim files")
 	}
@@ -232,7 +225,13 @@ func (s *cimFSSnapshotter) Remove(ctx context.Context, key string) error {
 }
 
 func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string, opts []snapshots.Opt) (_ []mount.Mount, err error) {
-	var newSnapshot storage.Snapshot
+	var (
+		newSnapshot  storage.Snapshot
+		snapshotInfo snapshots.Info
+	)
+	for _, o := range opts {
+		o(&snapshotInfo)
+	}
 	err = s.ms.WithTransaction(ctx, true, func(ctx context.Context) (retErr error) {
 		newSnapshot, err = storage.CreateSnapshot(ctx, kind, key, parent, opts...)
 		if err != nil {
@@ -251,7 +250,10 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 			}
 		}()
 
-		if strings.Contains(key, snapshots.UnpackKeyPrefix) {
+		// If we are unpacking an image, unpacker already knows the chain ID for
+		// this snapshot and it includes that in the labels. Check that to decide
+		// if we are unpacking an image.
+		if _, ok := snapshotInfo.Labels[labelSnapshotRef]; ok {
 			// IO/disk space optimization: Do nothing
 			//
 			// We only need one sandbox.vhdx for the container. Skip making one for this
@@ -266,10 +268,6 @@ func (s *cimFSSnapshotter) createSnapshot(ctx context.Context, kind snapshots.Ki
 		}
 
 		parentLayerPaths := s.parentIDsToParentPaths(newSnapshot.ParentIDs)
-		var snapshotInfo snapshots.Info
-		for _, o := range opts {
-			o(&snapshotInfo)
-		}
 
 		sizeInBytes, err := getRequestedScratchSize(ctx, snapshotInfo)
 		if err != nil {
@@ -327,19 +325,30 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 
 	source := s.getSnapshotDir(sn.ID)
 	parentLayerPaths := s.parentIDsToParentPaths(sn.ParentIDs)
+	layerCimPaths := s.parentIDsToCimPaths(sn.ParentIDs)
 
 	mountType := "CimFS"
 
 	// error is not checked here, as a string array will never fail to Marshal
 	parentLayersJSON, _ := json.Marshal(parentLayerPaths)
 	parentLayersOption := mount.ParentLayerPathsFlag + string(parentLayersJSON)
+	parentCimLayersJSON, _ := json.Marshal(layerCimPaths)
+	parentCimLayersOption := ParentLayerCimPathsFlag + string(parentCimLayersJSON)
 
 	options := []string{
 		roFlag,
 	}
 	if len(sn.ParentIDs) != 0 {
 		options = append(options, parentLayersOption)
+		options = append(options, parentCimLayersOption)
 	}
+	// if this is an image layer being extracted include a cim path in which the layer
+	// will be extracted.
+	if strings.Contains(key, snapshots.UnpackKeyPrefix) {
+		cimPathOption := s.getLayerCimPath(sn.ID)
+		options = append(options, LayerCimPathFlag+cimPathOption)
+	}
+
 	mounts := []mount.Mount{
 		{
 			Source:  source,
@@ -347,7 +356,6 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 			Options: options,
 		},
 	}
-
 	return mounts
 }
 
@@ -425,4 +433,56 @@ func createScratchVHDs(ctx context.Context, path string) (err error) {
 		return fmt.Errorf("failed to grant vm group access to %s: %w", diffVHDPath, err)
 	}
 	return nil
+}
+
+const (
+	// LayerCimPathFlag is the option flag used to represent the path at which a layer CIM must be stored. This
+	// flag is only included if an image layer is being extracted onto the snapshot i.e the snapshot key has an
+	// UnpackKeyPrefix.
+	LayerCimPathFlag = "cimpath="
+
+	// Similar to ParentLayerPathsFlag this is the optinos flag used to represent the JSON encoded list of
+	// parent layer CIMs
+	ParentLayerCimPathsFlag = "parentCimPaths="
+)
+
+// getOptionByPrefix finds an option that has the provided prefix, cuts the prefix from
+// that option string and return the remaining string. Boolean return is set to true if an
+// option is found with the given prefix. It is set to false otherwise.
+func getOptionByPrefix(m *mount.Mount, prefix string) (string, bool) {
+	for _, option := range m.Options {
+		val, found := strings.CutPrefix(option, prefix)
+		if found {
+			return val, true
+		}
+	}
+	return "", false
+}
+
+// gets the paths of the parent cims of this mount
+func GetParentCimPaths(m *mount.Mount) ([]string, error) {
+	if m.Type != "CimFS" {
+		return nil, fmt.Errorf("invalid mount type: '%s'", m.Type)
+	}
+	var parentCimPaths []string
+	val, found := getOptionByPrefix(m, ParentLayerCimPathsFlag)
+	if !found {
+		return nil, fmt.Errorf("parent cim paths not found")
+	}
+	err := json.Unmarshal([]byte(val), &parentCimPaths)
+	return parentCimPaths, err
+}
+
+// Only applies to a snapshot created for image extraction, for such a snapshot provides the
+// path to a cim in which image layer will be extracted.
+func GetCimPath(m *mount.Mount) (string, error) {
+	if m.Type != "CimFS" {
+		return "", fmt.Errorf("invalid mount type: '%s'", m.Type)
+	}
+	cimPath, found := getOptionByPrefix(m, LayerCimPathFlag)
+	if !found {
+		return "", fmt.Errorf("cim path not found")
+	}
+	return cimPath, nil
+
 }
