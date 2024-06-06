@@ -510,6 +510,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]*plugin.Regis
 			InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 				ic.Meta.Exports = exports
 				ic.Meta.Platforms = append(ic.Meta.Platforms, p)
+				ic.Meta.Capabilities = pp.Capabilities
 				conn, err := clients.getClient(address)
 				if err != nil {
 					return nil, err

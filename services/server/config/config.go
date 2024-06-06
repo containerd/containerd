@@ -170,10 +170,11 @@ type CgroupConfig struct {
 
 // ProxyPlugin provides a proxy plugin configuration
 type ProxyPlugin struct {
-	Type     string            `toml:"type"`
-	Address  string            `toml:"address"`
-	Platform string            `toml:"platform"`
-	Exports  map[string]string `toml:"exports"`
+	Type         string            `toml:"type"`
+	Address      string            `toml:"address"`
+	Platform     string            `toml:"platform"`
+	Exports      map[string]string `toml:"exports"`
+	Capabilities []string          `toml:"capabilities"`
 }
 
 // Decode unmarshals a plugin specific configuration by plugin id
