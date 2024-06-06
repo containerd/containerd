@@ -516,8 +516,14 @@ jobs:
         # Currently crun is disabled to decrease CI flakiness.
         # We can enable crun again when we get a better CI infra.
         runc: [runc]
-        # Fedora is for testing cgroup v2 functionality, Rocky Linux is for testing on an enterprise-grade environment
-        box: ["fedora/37-cloud-base", "rockylinux/8"]
+        box:
+          - fedora/39-cloud-base
+          # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
+          # The image was changed from rockylinux/8 to almalinux/8,
+          # as the former one no longer works:
+          # https://github.com/containerd/containerd/pull/10297
+          - almalinux/8
+          - rockylinux/9@4.0.0
     env:
       GOTEST: gotestsum --
       BOX: ${{ matrix.box }}
