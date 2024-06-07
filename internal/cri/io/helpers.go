@@ -20,24 +20,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
-	"time"
 
-	"github.com/containerd/ttrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	streamingapi "github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/core/streaming/proxy"
-	"github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
 // AttachOptions specifies how to attach to a container.
@@ -183,14 +174,6 @@ func openStdin(ctx context.Context, url string) (io.WriteCloser, error) {
 	return openStdinStream(ctx, url)
 }
 
-func openStdinStream(ctx context.Context, url string) (io.WriteCloser, error) {
-	stream, err := openStream(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-	return streaming.WriteByteStream(ctx, stream), nil
-}
-
 func openOutput(ctx context.Context, url string) (io.ReadCloser, error) {
 	ok := strings.Contains(url, "://")
 	if !ok {
@@ -198,65 +181,4 @@ func openOutput(ctx context.Context, url string) (io.ReadCloser, error) {
 	}
 
 	return openOutputStream(ctx, url)
-}
-
-func openOutputStream(ctx context.Context, url string) (io.ReadCloser, error) {
-	stream, err := openStream(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-	return streaming.ReadByteStream(ctx, stream), nil
-}
-
-func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error) {
-	// urlStr should be in the form of:
-	// <ttrpc|grpc>+<unix|vsock|hvsock>://<uds-path|vsock-cid:vsock-port|uds-path:hvsock-port>?streaming_id=<stream-id>
-	u, err := url.Parse(urlStr)
-	if err != nil {
-		return nil, fmt.Errorf("address url parse error: %v", err)
-	}
-	// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
-	// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
-	protocol, scheme, ok := strings.Cut(u.Scheme, "+")
-	if !ok {
-		return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-			" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
-	}
-
-	id := u.Query().Get("streaming_id")
-	if id == "" {
-		return nil, fmt.Errorf("no stream id in url queries")
-	}
-	realAddress := fmt.Sprintf("%s://%s/%s", scheme, u.Host, u.Path)
-	conn, err := shim.AnonReconnectDialer(realAddress, 100*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect the stream %v", err)
-	}
-	var stream streamingapi.Stream
-
-	switch protocol {
-	case "ttrpc":
-		c := ttrpc.NewClient(conn)
-		streamCreator := proxy.NewStreamCreator(c)
-		stream, err = streamCreator.Create(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		return stream, nil
-
-	case "grpc":
-		gopts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-		conn, err := grpc.NewClient(realAddress, gopts...)
-		if err != nil {
-			return nil, err
-		}
-		streamCreator := proxy.NewStreamCreator(conn)
-		stream, err = streamCreator.Create(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		return stream, nil
-	default:
-		return nil, fmt.Errorf("protocol not supported")
-	}
 }
