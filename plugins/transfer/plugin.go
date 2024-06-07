@@ -19,6 +19,10 @@ package transfer
 import (
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/leases"
@@ -26,9 +30,6 @@ import (
 	"github.com/containerd/containerd/pkg/transfer/local"
 	"github.com/containerd/containerd/pkg/unpack"
 	"github.com/containerd/containerd/plugin"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/pkg/transfer/archive"
@@ -93,10 +94,13 @@ func init() {
 				} else {
 					for name, plugin := range diffPlugins {
 						var matched bool
-						for _, p := range plugin.Meta.Platforms {
-							if target.Match(p) {
+						for _, dp := range plugin.Meta.Platforms {
+							if target.Match(dp) {
 								matched = true
+							} else {
+								log.G(ic.Context).WithField("target", p).WithField("differ_platform", dp).WithField("differ", name).Info("Differ not used do to platform mismatch")
 							}
+
 						}
 						if !matched {
 							continue
