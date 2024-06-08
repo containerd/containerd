@@ -128,16 +128,6 @@ func Path(named reference.Named) (name string) {
 	return reference.Path(named)
 }
 
-// SplitHostname splits a named reference into a
-// hostname and name string. If no valid hostname is
-// found, the hostname is empty and the full value
-// is returned as name
-//
-// Deprecated: Use [reference.Domain] or [reference.Path].
-func SplitHostname(named reference.Named) (string, string) {
-	return reference.SplitHostname(named)
-}
-
 // Parse parses s and returns a syntactically valid Reference.
 // If an error was encountered it is returned, along with a nil Reference.
 //
