@@ -528,6 +528,11 @@ jobs:
       matrix:
         box:
           - fedora/39-cloud-base
+          # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
+          # The image was changed from rockylinux/8 to almalinux/8,
+          # as the former one no longer works:
+          # https://github.com/containerd/containerd/pull/10297
+          - almalinux/8
           - rockylinux/9@4.0.0
     env:
       BOX: ${{ matrix.box }}
