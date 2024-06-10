@@ -116,7 +116,9 @@ type UnpackConfiguration struct {
 type ProgressFunc func(Progress)
 
 type Config struct {
-	Progress ProgressFunc
+	Progress                    ProgressFunc
+	MaxConcurrentDownloads      int
+	MaxConcurrentUploadedLayers int
 }
 
 type Opt func(*Config)
@@ -124,6 +126,18 @@ type Opt func(*Config)
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
+	}
+}
+
+func WithMaxConcurrentDownloads(i int) Opt {
+	return func(opts *Config) {
+		opts.MaxConcurrentDownloads = i
+	}
+}
+
+func WithMaxConcurrentUploadedLayers(i int) Opt {
+	return func(opts *Config) {
+		opts.MaxConcurrentUploadedLayers = i
 	}
 }
 

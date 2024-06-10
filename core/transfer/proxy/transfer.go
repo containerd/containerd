@@ -130,6 +130,8 @@ func (p *proxyTransferrer) Transfer(ctx context.Context, src interface{}, dst in
 			}
 		}()
 	}
+	apiOpts.MaxConcurrentDownloads = uint32(o.MaxConcurrentDownloads)
+	apiOpts.MaxConcurrentUploadedLayers = uint32(o.MaxConcurrentUploadedLayers)
 	asrc, err := p.marshalAny(ctx, src)
 	if err != nil {
 		return err

@@ -124,7 +124,11 @@ var pushCommand = &cli.Command{
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
-			return client.Transfer(ctx, is, reg, transfer.WithProgress(pf))
+			tOpts := []transfer.Opt{transfer.WithProgress(pf)}
+			if context.IsSet("max-concurrent-uploaded-layers") {
+				tOpts = append(tOpts, transfer.WithMaxConcurrentUploadedLayers(context.Int("max-concurrent-uploaded-layers")))
+			}
+			return client.Transfer(ctx, is, reg, tOpts...)
 		}
 
 		if manifest := context.String("manifest"); manifest != "" {

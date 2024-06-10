@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 )
 
 func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGetter, p transfer.ImagePusher, tops *transfer.Config) error {
@@ -92,7 +93,11 @@ func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGette
 			wrapper = pushCtx.HandlerWrapper
 		}
 	*/
-	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, ts.limiterU, matcher, wrapper); err != nil {
+	limiterU := ts.limiterU
+	if tops.MaxConcurrentUploadedLayers > 0 {
+		limiterU = semaphore.NewWeighted(int64(tops.MaxConcurrentUploadedLayers))
+	}
+	if err := remotes.PushContent(ctx, pusher, img.Target, ts.content, limiterU, matcher, wrapper); err != nil {
 		return err
 	}
 	if tops.Progress != nil {

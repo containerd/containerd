@@ -7098,6 +7098,20 @@ file {
       type: TYPE_STRING
       json_name: "progressStream"
     }
+    field {
+      name: "max_concurrent_downloads"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "maxConcurrentDownloads"
+    }
+    field {
+      name: "max_concurrent_uploaded_layers"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_UINT32
+      json_name: "maxConcurrentUploadedLayers"
+    }
   }
   service {
     name: "Transfer"

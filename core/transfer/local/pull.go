@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -191,8 +192,12 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 				}
 			}
 
-			if ts.limiterD != nil {
-				uopts = append(uopts, unpack.WithLimiter(ts.limiterD))
+			limiterD := ts.limiterD
+			if tops.MaxConcurrentDownloads > 0 {
+				limiterD = semaphore.NewWeighted(int64(tops.MaxConcurrentDownloads))
+			}
+			if limiterD != nil {
+				uopts = append(uopts, unpack.WithLimiter(limiterD))
 			}
 
 			if ts.config.DuplicationSuppressor != nil {

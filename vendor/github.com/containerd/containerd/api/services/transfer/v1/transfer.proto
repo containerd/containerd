@@ -35,5 +35,7 @@ message TransferRequest {
 
 message TransferOptions {
 	string progress_stream = 1;
+	uint32 max_concurrent_downloads = 2;
+	uint32 max_concurrent_uploaded_layers = 3;
 	// Progress min interval
 }

@@ -150,7 +150,11 @@ command. As part of this process, we do the following:
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
-			return client.Transfer(ctx, reg, is, transfer.WithProgress(pf))
+			tOpts := []transfer.Opt{transfer.WithProgress(pf)}
+			if context.IsSet("max-concurrent-downloads") {
+				tOpts = append(tOpts, transfer.WithMaxConcurrentDownloads(context.Int("max-concurrent-downloads")))
+			}
+			return client.Transfer(ctx, reg, is, tOpts...)
 		}
 
 		ctx, done, err := client.WithLease(ctx)

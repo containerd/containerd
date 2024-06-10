@@ -118,6 +118,10 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 
 			transferOpts = append(transferOpts, transfer.WithProgress(pf))
 		}
+		transferOpts = append(transferOpts,
+			transfer.WithMaxConcurrentDownloads(int(req.Options.MaxConcurrentDownloads)),
+			transfer.WithMaxConcurrentUploadedLayers(int(req.Options.MaxConcurrentUploadedLayers)),
+		)
 	}
 	src, err := s.convertAny(ctx, req.Source)
 	if err != nil {
