@@ -115,6 +115,12 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		defer cancel()
 
 		if !context.Bool("local") {
+			unsupportedFlags := []string{"discard-unpacked-layers"}
+			for _, s := range unsupportedFlags {
+				if context.IsSet(s) {
+					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
+				}
+			}
 			var opts []image.StoreOpt
 			prefix := context.String("base-name")
 			var overwrite bool
