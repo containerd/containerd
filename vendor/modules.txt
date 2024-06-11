@@ -144,7 +144,7 @@ github.com/containerd/nri/pkg/net/multiplex
 github.com/containerd/nri/pkg/runtime-tools/generate
 github.com/containerd/nri/pkg/stub
 github.com/containerd/nri/types/v1
-# github.com/containerd/platforms v0.2.0
+# github.com/containerd/platforms v0.2.1
 ## explicit; go 1.20
 github.com/containerd/platforms
 # github.com/containerd/ttrpc v1.2.4
