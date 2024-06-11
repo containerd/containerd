@@ -22,7 +22,7 @@ require (
 	github.com/containerd/imgcrypt v1.1.12-0.20240528203804-3ca09a2db5cd
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.6.1
-	github.com/containerd/platforms v0.2.0
+	github.com/containerd/platforms v0.2.1
 	github.com/containerd/plugin v0.1.0
 	github.com/containerd/ttrpc v1.2.4
 	github.com/containerd/typeurl/v2 v2.1.1
