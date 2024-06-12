@@ -528,6 +528,85 @@ jobs:
             ${{github.workspace}}/report/*.xml
             ${{github.workspace}}/report/*.log
 
+  integration-vagrant:
+    name: Vagrant integration
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        box:
+          - fedora/39-cloud-base
+          # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
+          # The image was changed from rockylinux/8 to almalinux/8,
+          # as the former one no longer works:
+          # https://github.com/containerd/containerd/pull/10297
+          - almalinux/8
+          - rockylinux/9@4.0.0
+    env:
+      BOX: ${{ matrix.box }}
+
+    steps:
+      - name: Show the host info
+        run: |
+          set -x
+          uname -a
+          cat /etc/os-release
+          cat /proc/cpuinfo
+          free -mt
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: /root/.vagrant.d
+          key: vagrant-${{ matrix.box }}
+      - name: Set up vagrant
+        run: |
+          # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
+          # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant
+          sudo systemctl enable --now libvirtd
+          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo vagrant plugin install vagrant-libvirt
+      - name: Boot VM
+        run: sudo BOX=$BOX vagrant up --no-tty
+      - name: test-integration
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+      - name: test-cri-integration
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+      - name: test-cri
+        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+
+  tests-cri-in-userns:
+    name: "CRI-in-UserNS"
+
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    needs: [project, linters, protos, man]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up cgroup v2 delegation
+        run: |
+          sudo mkdir -p /etc/systemd/system/user@.service.d
+          cat <<EOF | sudo tee /etc/systemd/system/user@.service.d/delegate.conf
+          [Service]
+          Delegate=cpu cpuset io memory pids
+          EOF
+          sudo systemctl daemon-reload
+      - name: Build cri-in-userns image
+        run: podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+      - name: Run cri-in-userns image
+        # Rootless Podman is used for testing CRI-in-UserNS
+        # (We could use rootless Docker or rootless nerdctl, but we are using Podman here because it is preinstalled)
+        run: podman run --rm --privileged cri-in-userns
+
   tests-mac-os:
     name: MacOS unit tests
     runs-on: macos-12
