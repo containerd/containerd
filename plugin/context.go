@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/plugin"
 )
 
 // InitContext is used for plugin initialization
@@ -40,7 +39,7 @@ type InitContext struct {
 	// deprecated: will be removed in 2.0, use plugin.EventType
 	Events *exchange.Exchange
 
-	Meta *Meta // plugins can fill in metadata at init.
+	Meta *plugin.Meta // plugins can fill in metadata at init.
 
 	plugins *Set
 }
@@ -51,7 +50,7 @@ func NewContext(ctx context.Context, r *Registration, plugins *Set, root, state 
 		Context: ctx,
 		Root:    filepath.Join(root, r.URI()),
 		State:   filepath.Join(state, r.URI()),
-		Meta: &Meta{
+		Meta: &plugin.Meta{
 			Exports: map[string]string{},
 		},
 		plugins: plugins,
@@ -59,23 +58,15 @@ func NewContext(ctx context.Context, r *Registration, plugins *Set, root, state 
 }
 
 // Get returns the first plugin by its type
-func (i *InitContext) Get(t Type) (interface{}, error) {
+func (i *InitContext) Get(t plugin.Type) (interface{}, error) {
 	return i.plugins.Get(t)
-}
-
-// Meta contains information gathered from the registration and initialization
-// process.
-type Meta struct {
-	Platforms    []ocispec.Platform // platforms supported by plugin
-	Exports      map[string]string  // values exported by plugin
-	Capabilities []string           // feature switches for plugin
 }
 
 // Plugin represents an initialized plugin, used with an init context.
 type Plugin struct {
 	Registration *Registration // registration, as initialized
 	Config       interface{}   // config, as initialized
-	Meta         *Meta
+	Meta         *plugin.Meta
 
 	instance interface{}
 	err      error // will be set if there was an error initializing the plugin
@@ -100,13 +91,13 @@ func (p *Plugin) Instance() (interface{}, error) {
 // ordered, initialization set of plugins for a containerd instance.
 type Set struct {
 	ordered     []*Plugin // order of initialization
-	byTypeAndID map[Type]map[string]*Plugin
+	byTypeAndID map[plugin.Type]map[string]*Plugin
 }
 
 // NewPluginSet returns an initialized plugin set
 func NewPluginSet() *Set {
 	return &Set{
-		byTypeAndID: make(map[Type]map[string]*Plugin),
+		byTypeAndID: make(map[plugin.Type]map[string]*Plugin),
 	}
 }
 
@@ -135,7 +126,7 @@ func (ps *Set) Get(t Type) (interface{}, error) {
 }
 
 // GetByID returns the plugin of the given type and ID
-func (ps *Set) GetByID(t Type, id string) (*Plugin, error) {
+func (ps *Set) GetByID(t plugin.Type, id string) (*Plugin, error) {
 	typSet, ok := ps.byTypeAndID[t]
 	if !ok || len(typSet) == 0 {
 		return nil, fmt.Errorf("no plugins registered for %s: %w", t, errdefs.ErrNotFound)
@@ -163,7 +154,7 @@ func (i *InitContext) GetAll() []*Plugin {
 }
 
 // GetByID returns the plugin of the given type and ID
-func (i *InitContext) GetByID(t Type, id string) (interface{}, error) {
+func (i *InitContext) GetByID(t plugin.Type, id string) (interface{}, error) {
 	ps, err := i.GetByType(t)
 	if err != nil {
 		return nil, err
@@ -176,7 +167,7 @@ func (i *InitContext) GetByID(t Type, id string) (interface{}, error) {
 }
 
 // GetByType returns all plugins with the specific type.
-func (i *InitContext) GetByType(t Type) (map[string]*Plugin, error) {
+func (i *InitContext) GetByType(t plugin.Type) (map[string]*Plugin, error) {
 	p, ok := i.plugins.byTypeAndID[t]
 	if !ok {
 		return nil, fmt.Errorf("no plugins registered for %s: %w", t, errdefs.ErrNotFound)

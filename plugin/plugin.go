@@ -17,107 +17,22 @@
 package plugin
 
 import (
-	"errors"
 	"fmt"
 	"sync"
-)
 
-var (
-	// ErrNoType is returned when no type is specified
-	ErrNoType = errors.New("plugin: no type")
-	// ErrNoPluginID is returned when no id is specified
-	ErrNoPluginID = errors.New("plugin: no id")
-	// ErrIDRegistered is returned when a duplicate id is already registered
-	ErrIDRegistered = errors.New("plugin: id already registered")
-	// ErrSkipPlugin is used when a plugin is not initialized and should not be loaded,
-	// this allows the plugin loader differentiate between a plugin which is configured
-	// not to load and one that fails to load.
-	ErrSkipPlugin = errors.New("skip plugin")
-
-	// ErrInvalidRequires will be thrown if the requirements for a plugin are
-	// defined in an invalid manner.
-	ErrInvalidRequires = errors.New("invalid requires")
-)
-
-// IsSkipPlugin returns true if the error is skipping the plugin
-func IsSkipPlugin(err error) bool {
-	return errors.Is(err, ErrSkipPlugin)
-}
-
-// Type is the type of the plugin
-type Type string
-
-func (t Type) String() string { return string(t) }
-
-const (
-	// InternalPlugin implements an internal plugin to containerd
-	InternalPlugin Type = "io.containerd.internal.v1"
-	// RuntimePlugin implements a runtime
-	RuntimePlugin Type = "io.containerd.runtime.v1"
-	// RuntimePluginV2 implements a runtime v2
-	RuntimePluginV2 Type = "io.containerd.runtime.v2"
-	// ServicePlugin implements a internal service
-	ServicePlugin Type = "io.containerd.service.v1"
-	// GRPCPlugin implements a grpc service
-	GRPCPlugin Type = "io.containerd.grpc.v1"
-	// TTRPCPlugin implements a ttrpc shim service
-	TTRPCPlugin Type = "io.containerd.ttrpc.v1"
-	// SnapshotPlugin implements a snapshotter
-	SnapshotPlugin Type = "io.containerd.snapshotter.v1"
-	// TaskMonitorPlugin implements a task monitor
-	TaskMonitorPlugin Type = "io.containerd.monitor.v1"
-	// DiffPlugin implements a differ
-	DiffPlugin Type = "io.containerd.differ.v1"
-	// MetadataPlugin implements a metadata store
-	MetadataPlugin Type = "io.containerd.metadata.v1"
-	// ContentPlugin implements a content store
-	ContentPlugin Type = "io.containerd.content.v1"
-	// GCPlugin implements garbage collection policy
-	GCPlugin Type = "io.containerd.gc.v1"
-	// EventPlugin implements event handling
-	EventPlugin Type = "io.containerd.event.v1"
-	// LeasePlugin implements lease manager
-	LeasePlugin Type = "io.containerd.lease.v1"
-	// Streaming implements a stream manager
-	StreamingPlugin Type = "io.containerd.streaming.v1"
-	// TracingProcessorPlugin implements a open telemetry span processor
-	TracingProcessorPlugin Type = "io.containerd.tracing.processor.v1"
-	// NRIApiPlugin implements the NRI adaptation interface for containerd.
-	NRIApiPlugin Type = "io.containerd.nri.v1"
-	// TransferPlugin implements a transfer service
-	TransferPlugin Type = "io.containerd.transfer.v1"
-	// SandboxStorePlugin implements a sandbox store
-	SandboxStorePlugin Type = "io.containerd.sandbox.store.v1"
-	// SandboxControllerPlugin implements a sandbox controller
-	SandboxControllerPlugin Type = "io.containerd.sandbox.controller.v1"
-	// WarningPlugin implements a warning service
-	WarningPlugin Type = "io.containerd.warning.v1"
-)
-
-const (
-	// RuntimeLinuxV1 is the legacy linux runtime
-	RuntimeLinuxV1 = "io.containerd.runtime.v1.linux"
-	// RuntimeRuncV1 is the runc runtime that supports a single container
-	RuntimeRuncV1 = "io.containerd.runc.v1"
-	// RuntimeRuncV2 is the runc runtime that supports multiple containers per shim
-	RuntimeRuncV2      = "io.containerd.runc.v2"
-	DeprecationsPlugin = "deprecations"
-)
-
-const (
-	SnapshotterRootDir = "root"
+	"github.com/containerd/plugin"
 )
 
 // Registration contains information for registering a plugin
 type Registration struct {
 	// Type of the plugin
-	Type Type
+	Type plugin.Type
 	// ID of the plugin
 	ID string
 	// Config specific to the plugin
 	Config interface{}
 	// Requires is a list of plugins that the registered plugin requires to be available
-	Requires []Type
+	Requires []plugin.Type
 
 	// InitFn is called when initializing a plugin. The registration and
 	// context are passed in. The init function may modify the registration to
@@ -149,30 +64,16 @@ var register = struct {
 	r []*Registration
 }{}
 
-// Load loads all plugins at the provided path into containerd
-func Load(path string) (count int, err error) {
-	defer func() {
-		if v := recover(); v != nil {
-			rerr, ok := v.(error)
-			if !ok {
-				rerr = fmt.Errorf("%s", v)
-			}
-			err = rerr
-		}
-	}()
-	return loadPlugins(path)
-}
-
 // Register allows plugins to register
 func Register(r *Registration) {
 	register.Lock()
 	defer register.Unlock()
 
 	if r.Type == "" {
-		panic(ErrNoType)
+		panic(plugin.ErrNoType)
 	}
 	if r.ID == "" {
-		panic(ErrNoPluginID)
+		panic(plugin.ErrNoPluginID)
 	}
 	if err := checkUnique(r); err != nil {
 		panic(err)
@@ -180,7 +81,7 @@ func Register(r *Registration) {
 
 	for _, requires := range r.Requires {
 		if requires == "*" && len(r.Requires) != 1 {
-			panic(ErrInvalidRequires)
+			panic(plugin.ErrInvalidRequires)
 		}
 	}
 
@@ -190,7 +91,7 @@ func Register(r *Registration) {
 func checkUnique(r *Registration) error {
 	for _, registered := range register.r {
 		if r.URI() == registered.URI() {
-			return fmt.Errorf("%s: %w", r.URI(), ErrIDRegistered)
+			return fmt.Errorf("%s: %w", r.URI(), plugin.ErrIDRegistered)
 		}
 	}
 	return nil
