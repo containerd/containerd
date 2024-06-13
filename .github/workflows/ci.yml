@@ -523,7 +523,6 @@ jobs:
           # as the former one no longer works:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
-          - rockylinux/9@4.0.0
     env:
       GOTEST: gotestsum --
       BOX: ${{ matrix.box }}
