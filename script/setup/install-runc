@@ -34,18 +34,11 @@ function install_runc() {
 	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
 
 	TMPROOT=$(mktemp -d)
-	# runc is incompatible with Go 1.22 on glibc-based distros
-	# https://github.com/opencontainers/runc/issues/4233
-	GO121DIR="${TMPROOT}"/go121
-	mkdir -p "${GO121DIR}"
-	GOBIN="${GO121DIR}" go install golang.org/dl/go1.21.11@latest
-	GO121="${GO121DIR}"/go1.21.11
-	$GO121 download
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
-	make GO=$GO121 BUILDTAGS='seccomp' runc
-	$SUDO make GO=$GO121 install
+	make BUILDTAGS='seccomp' runc
+	$SUDO make install
 	popd
 	rm -fR "${TMPROOT}"
 }
