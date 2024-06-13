@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
+	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
@@ -142,7 +143,10 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					Type: runtimespec.IPCNamespace,
 				})
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "0")
-				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
+				if !userns.RunningInUserNS() {
+					assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
+				}
+
 			},
 		},
 		{
