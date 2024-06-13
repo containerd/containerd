@@ -22,7 +22,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/unpack"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 )
 
 func TestGetSupportedPlatform(t *testing.T) {

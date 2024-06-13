@@ -24,8 +24,8 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/urfave/cli"
 )
@@ -46,7 +46,7 @@ When you are done, use the unmount command.
 		cli.StringFlag{
 			Name:  "platform",
 			Usage: "Mount the image for the specified platform",
-			Value: platforms.DefaultString(),
+			Value: platforms.Format(platforms.DefaultSpec()), // For 1.7 continue using the old format without os-version included.
 		},
 	),
 	Action: func(context *cli.Context) (retErr error) {
