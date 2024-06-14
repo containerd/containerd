@@ -28,6 +28,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -728,11 +729,16 @@ func NewHTTPFallback(transport http.RoundTripper) http.RoundTripper {
 type httpFallback struct {
 	super http.RoundTripper
 	host  string
+	mu    sync.Mutex
 }
 
 func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
+	f.mu.Lock()
+	fallback := f.host == r.URL.Host
+	f.mu.Unlock()
+
 	// only fall back if the same host had previously fell back
-	if f.host != r.URL.Host {
+	if !fallback {
 		resp, err := f.super.RoundTrip(r)
 		if !isTLSError(err) && !isPortError(err, r.URL.Host) {
 			return resp, err
@@ -745,8 +751,12 @@ func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
 	plainHTTPRequest := *r
 	plainHTTPRequest.URL = &plainHTTPUrl
 
-	if f.host != r.URL.Host {
-		f.host = r.URL.Host
+	if !fallback {
+		f.mu.Lock()
+		if f.host != r.URL.Host {
+			f.host = r.URL.Host
+		}
+		f.mu.Unlock()
 
 		// update body on the second attempt
 		if r.Body != nil && r.GetBody != nil {
