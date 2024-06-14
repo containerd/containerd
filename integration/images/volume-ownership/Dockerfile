@@ -15,4 +15,5 @@
 FROM ubuntu
 RUN mkdir -p /test_dir && \
     chown -R nobody:nogroup /test_dir
+# NOTE: The volume is required by ../../container_volume_linux_test.go#TestRunContainerWithVolatileOption.
 VOLUME /test_dir
