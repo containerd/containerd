@@ -60,7 +60,7 @@ func (h *LogrusHook) Fire(entry *logrus.Entry) error {
 func logrusDataToAttrs(data logrus.Fields) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, len(data))
 	for k, v := range data {
-		attrs = append(attrs, any(k, v))
+		attrs = append(attrs, keyValue(k, v))
 	}
 	return attrs
 }
