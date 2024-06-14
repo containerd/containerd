@@ -27,6 +27,7 @@ import (
 	"time"
 
 	remoteserrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
 )
@@ -95,6 +96,10 @@ type OAuthTokenResponse struct {
 
 // FetchTokenWithOAuth fetches a token using a POST request
 func FetchTokenWithOAuth(ctx context.Context, client *http.Client, headers http.Header, clientID string, to TokenOptions) (*OAuthTokenResponse, error) {
+	c := *client
+	client = &c
+	tracing.UpdateHTTPClient(client, tracing.Name("remotes.docker.resolver", "FetchTokenWithOAuth"))
+
 	form := url.Values{}
 	if len(to.Scopes) > 0 {
 		form.Set("scope", strings.Join(to.Scopes, " "))
@@ -161,6 +166,10 @@ type FetchTokenResponse struct {
 
 // FetchToken fetches a token using a GET request
 func FetchToken(ctx context.Context, client *http.Client, headers http.Header, to TokenOptions) (*FetchTokenResponse, error) {
+	c := *client
+	client = &c
+	tracing.UpdateHTTPClient(client, tracing.Name("remotes.docker.resolver", "FetchToken"))
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, to.Realm, nil)
 	if err != nil {
 		return nil, err
