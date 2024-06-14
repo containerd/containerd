@@ -19,6 +19,7 @@ package tracing
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -99,14 +100,16 @@ func (s *Span) SetAttributes(kv ...attribute.KeyValue) {
 	s.otelSpan.SetAttributes(kv...)
 }
 
+const spanDelimiter = "."
+
 // Name sets the span name by joining a list of strings in dot separated format.
 func Name(names ...string) string {
-	return makeSpanName(names...)
+	return strings.Join(names, spanDelimiter)
 }
 
 // Attribute takes a key value pair and returns attribute.KeyValue type.
-func Attribute(k string, v interface{}) attribute.KeyValue {
-	return any(k, v)
+func Attribute(k string, v any) attribute.KeyValue {
+	return keyValue(k, v)
 }
 
 // HTTPStatusCodeAttributes generates attributes of the HTTP namespace as specified by the OpenTelemetry
