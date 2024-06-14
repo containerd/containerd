@@ -59,7 +59,7 @@ func (h *LogrusHook) Fire(entry *log.Entry) error {
 		return nil
 	}
 
-	if !span.SpanContext().IsValid() || !span.IsRecording() {
+	if !span.IsRecording() || !span.SpanContext().IsValid() {
 		return nil
 	}
 
