@@ -74,7 +74,8 @@ func descriptorCount(t *testing.T) int {
 	// Go 1.23 introduced a new internal file descriptor type "pidfd"
 	// that we don't want to count towards the total file descriptors in
 	// use by the process. This retains the behavior of previous Go
-	// versions. See https://go.dev/issues/62654.
+	// versions.
+	// See https://go.dev/issues/62654.
 	//
 	// Once the proposal to check for internal file descriptors is
 	// accepted, we can use that instead to detect internal fds in use
