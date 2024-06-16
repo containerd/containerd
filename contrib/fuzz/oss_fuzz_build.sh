@@ -20,6 +20,9 @@ set -x
 
 IFS=$'\n'
 
+INSTRUMENTATION_URL="https://github.com/AdamKorcz/instrumentation"
+COMMIT_HASH="a0052d5b1e2db77ee978890722212230fe86c910" # May 2024 commit
+
 compile_fuzzers() {
     local regex=$1
     local compile_fuzzer=$2
@@ -38,7 +41,10 @@ compile_fuzzers() {
 }
 
 # This is from https://github.com/AdamKorcz/instrumentation
+git clone --depth=1 "$INSTRUMENTATION_URL"
 cd $SRC/instrumentation
+git checkout "$COMMIT_HASH" # Introduce versioning 
+
 go run main.go --target_dir $SRC/containerd/images
 
 apt-get update && apt-get install -y wget
