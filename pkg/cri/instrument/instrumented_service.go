@@ -21,11 +21,11 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/services/warning"
 	runtime_alpha "github.com/containerd/containerd/third_party/k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"

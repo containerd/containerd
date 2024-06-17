@@ -21,8 +21,8 @@ import (
 	"github.com/containerd/containerd/diff/apply"
 	"github.com/containerd/containerd/diff/walking"
 	"github.com/containerd/containerd/metadata"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/platforms"
 )
 
 func init() {

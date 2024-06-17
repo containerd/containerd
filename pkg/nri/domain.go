@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	nri "github.com/containerd/nri/pkg/adaptation"
 	"github.com/sirupsen/logrus"
 )

@@ -31,7 +31,6 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
@@ -40,6 +39,7 @@ import (
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 func init() {

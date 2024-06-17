@@ -22,7 +22,7 @@ import (
 	"path"
 	"sync"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 
 	"github.com/containerd/containerd/version"

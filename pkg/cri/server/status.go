@@ -23,8 +23,8 @@ import (
 	goruntime "runtime"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/log"
 	ptypes "github.com/containerd/containerd/protobuf/types"
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 

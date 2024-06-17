@@ -20,10 +20,11 @@ package plugin
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/snapshots/devmapper"
+	"github.com/containerd/platforms"
 )
 
 func init() {
@@ -40,7 +41,7 @@ func init() {
 			}
 
 			if config.PoolName == "" {
-				return nil, errors.New("devmapper not configured")
+				return nil, fmt.Errorf("devmapper not configured: %w", plugin.ErrSkipPlugin)
 			}
 
 			if config.RootPath == "" {

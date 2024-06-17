@@ -26,13 +26,13 @@ import (
 	gruntime "runtime"
 
 	"github.com/containerd/containerd/api/runtime/task/v2"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/protobuf/proto"
 	"github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
+	"github.com/containerd/log"
 )
 
 type shimBinaryConfig struct {

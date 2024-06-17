@@ -31,9 +31,9 @@ import (
 	"github.com/containerd/containerd/pkg/streaming"
 	"github.com/containerd/containerd/pkg/transfer"
 	"github.com/containerd/containerd/pkg/transfer/plugins"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/remotes"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 )
 
 func init() {

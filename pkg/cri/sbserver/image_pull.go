@@ -41,16 +41,16 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdimages "github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	crilabels "github.com/containerd/containerd/pkg/cri/labels"
 	snpkg "github.com/containerd/containerd/pkg/snapshotters"
-	distribution "github.com/containerd/containerd/reference/docker"
 	"github.com/containerd/containerd/remotes/docker"
 	"github.com/containerd/containerd/remotes/docker/config"
 	"github.com/containerd/containerd/tracing"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	distribution "github.com/distribution/reference"
 )
 
 // For image management:

@@ -34,12 +34,12 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/events"
-	"github.com/containerd/containerd/log"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	v1 "github.com/containerd/containerd/runtime/v1"
 	"github.com/containerd/containerd/runtime/v1/shim"
 	shimapi "github.com/containerd/containerd/runtime/v1/shim/v1"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"golang.org/x/sys/unix"
 )

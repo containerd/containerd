@@ -44,7 +44,7 @@ import (
 	"github.com/containerd/containerd/pkg/transfer"
 	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
 	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 	"github.com/google/uuid"
 
 	digest "github.com/opencontainers/go-digest"

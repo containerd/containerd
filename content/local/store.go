@@ -29,9 +29,9 @@ import (
 
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 
 	"github.com/opencontainers/go-digest"

@@ -33,9 +33,9 @@ import (
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
 	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/oci"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+	"github.com/containerd/log"
 )
 
 // Linux dependent OCI spec opts.

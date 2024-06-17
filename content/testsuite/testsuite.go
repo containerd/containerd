@@ -29,9 +29,9 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/log/logtest"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log/logtest"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"

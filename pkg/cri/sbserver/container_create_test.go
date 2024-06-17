@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	ostesting "github.com/containerd/containerd/pkg/os/testing"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -220,7 +220,7 @@ func TestVolumeMounts(t *testing.T) {
 	testContainerRootDir := "test-container-root"
 	for desc, test := range map[string]struct {
 		criMounts         []*runtime.Mount
-		platform          platforms.Platform
+		platform          imagespec.Platform
 		imageVolumes      map[string]struct{}
 		expectedMountDest []string
 	}{
@@ -265,7 +265,7 @@ func TestVolumeMounts(t *testing.T) {
 			},
 		},
 		"should make relative paths absolute on Linux": {
-			platform: platforms.Platform{OS: "linux"},
+			platform: imagespec.Platform{OS: "linux"},
 			imageVolumes: map[string]struct{}{
 				"./test-volume-1":     {},
 				"C:/test-volume-2":    {},

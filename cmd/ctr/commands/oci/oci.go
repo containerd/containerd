@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/oci"
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 )
 
 // Command is the parent for all OCI related tools under 'oci'
@@ -49,7 +49,7 @@ var defaultSpecCommand = cli.Command{
 		ctx, cancel := commands.AppContext(context)
 		defer cancel()
 
-		platform := platforms.DefaultString()
+		platform := platforms.Format(platforms.DefaultSpec()) // For 1.7 continue using the old format without os-version included.
 		if plat := context.String("platform"); plat != "" {
 			platform = plat
 		}

@@ -25,7 +25,7 @@ import (
 	"github.com/intel/goresctrl/pkg/blockio"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/containerd/containerd/log"
+	"github.com/containerd/log"
 )
 
 var (

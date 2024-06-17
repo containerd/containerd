@@ -24,7 +24,6 @@ import (
 
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
@@ -34,6 +33,7 @@ import (
 	"github.com/containerd/containerd/services/warning"
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 func init() {

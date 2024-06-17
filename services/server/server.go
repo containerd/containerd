@@ -54,16 +54,16 @@ import (
 	"github.com/containerd/containerd/diff"
 	diffproxy "github.com/containerd/containerd/diff/proxy"
 	"github.com/containerd/containerd/events/exchange"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
-	"github.com/containerd/containerd/platforms"
 	"github.com/containerd/containerd/plugin"
 	srvconfig "github.com/containerd/containerd/services/server/config"
 	"github.com/containerd/containerd/services/warning"
 	ssproxy "github.com/containerd/containerd/snapshots/proxy"
 	"github.com/containerd/containerd/sys"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.

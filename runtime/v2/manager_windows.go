@@ -17,12 +17,12 @@
 package v2
 
 import (
-	"github.com/containerd/containerd/platforms"
+	"github.com/containerd/platforms"
 )
 
 func defaultPlatforms() []string {
 	return []string{
-		platforms.DefaultString(),
+		platforms.Format(platforms.DefaultSpec()), // For 1.7 continue using the old format without os-version included.
 		"linux/amd64",
 	}
 }

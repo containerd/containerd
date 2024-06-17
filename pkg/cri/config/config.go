@@ -23,9 +23,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/deprecation"
 	"github.com/containerd/containerd/plugin"
+	"github.com/containerd/log"
 )
 
 const (

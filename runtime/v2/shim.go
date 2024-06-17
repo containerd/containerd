@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/identifiers"
-	"github.com/containerd/containerd/log"
 	"github.com/containerd/containerd/pkg/dialer"
 	"github.com/containerd/containerd/pkg/timeout"
 	"github.com/containerd/containerd/protobuf"
@@ -47,6 +46,7 @@ import (
 	"github.com/containerd/containerd/runtime"
 	client "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 const (
