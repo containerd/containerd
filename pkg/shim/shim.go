@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 )
 
 // Publisher for events
@@ -171,12 +170,9 @@ func setRuntime() {
 
 func setLogger(ctx context.Context, id string) (context.Context, error) {
 	l := log.G(ctx)
-	l.Logger.SetFormatter(&logrus.TextFormatter{
-		TimestampFormat: log.RFC3339NanoFixed,
-		FullTimestamp:   true,
-	})
+	_ = log.SetFormat(log.TextFormat)
 	if debugFlag {
-		l.Logger.SetLevel(log.DebugLevel)
+		_ = log.SetLevel("debug")
 	}
 	f, err := openLog(ctx, id)
 	if err != nil {

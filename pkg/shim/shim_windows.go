@@ -23,8 +23,8 @@ import (
 	"os"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
-	"github.com/sirupsen/logrus"
 )
 
 func setupSignals(config Config) (chan os.Signal, error) {
@@ -46,11 +46,11 @@ func serveListener(path string) (net.Listener, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
-func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
+func reap(ctx context.Context, logger *log.Entry, signals chan os.Signal) error {
 	return errdefs.ErrNotImplemented
 }
 
-func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
+func handleExitSignals(ctx context.Context, logger *log.Entry, cancel context.CancelFunc) {
 }
 
 func openLog(ctx context.Context, _ string) (io.Writer, error) {
