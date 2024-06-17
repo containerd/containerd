@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/sirupsen/logrus"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -57,28 +56,28 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 	// Verify image before pulling.
 	for vfName, vf := range ts.config.Verifiers {
-		log := log.G(ctx).WithFields(logrus.Fields{
+		logger := log.G(ctx).WithFields(log.Fields{
 			"name":     name,
 			"digest":   desc.Digest.String(),
 			"verifier": vfName,
 		})
-		log.Debug("Verifying image pull")
+		logger.Debug("Verifying image pull")
 
 		jdg, err := vf.VerifyImage(ctx, name, desc)
 		if err != nil {
-			log.WithError(err).Error("No judgement received from verifier")
+			logger.WithError(err).Error("No judgement received from verifier")
 			return fmt.Errorf("blocking pull of %v with digest %v: image verifier %v returned error: %w", name, desc.Digest.String(), vfName, err)
 		}
-		log = log.WithFields(logrus.Fields{
+		logger = logger.WithFields(log.Fields{
 			"ok":     jdg.OK,
 			"reason": jdg.Reason,
 		})
 
 		if !jdg.OK {
-			log.Warn("Image verifier blocked pull")
+			logger.Warn("Image verifier blocked pull")
 			return fmt.Errorf("image verifier %s blocked pull of %v with digest %v for reason: %v", vfName, name, desc.Digest.String(), jdg.Reason)
 		}
-		log.Debug("Image verifier allowed pull")
+		logger.Debug("Image verifier allowed pull")
 	}
 
 	// TODO: Handle already exists
@@ -89,7 +88,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		tops.Progress(transfer.Progress{
 			Event: "fetching image content",
 			Name:  name,
-			//Digest: img.Target.Digest.String(),
+			// Digest: img.Target.Digest.String(),
 		})
 	}
 
@@ -114,7 +113,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 	ctx, cancel := context.WithCancel(ctx)
 	if tops.Progress != nil {
-		progressTracker = NewProgressTracker(name, "downloading") //Pass in first name as root
+		progressTracker = NewProgressTracker(name, "downloading") // Pass in first name as root
 		go progressTracker.HandleProgress(ctx, tops.Progress, NewContentStatusTracker(store))
 		defer progressTracker.Wait()
 	}
