@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/userns"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -253,11 +253,11 @@ func doPrepareIDMappedOverlay(lowerDirs []string, usernsFd int) (tmpLowerDirs []
 	cleanUp := func() {
 		for _, lowerDir := range tmpLowerDirs {
 			if err := unix.Unmount(lowerDir, 0); err != nil {
-				logrus.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
+				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
 			}
 		}
 		if terr := os.RemoveAll(filepath.Clean(filepath.Join(tmpLowerDirs[0], ".."))); terr != nil {
-			logrus.WithError(terr).Warnf("failed to remove temporary overlay lowerdir's")
+			log.L.WithError(terr).Warnf("failed to remove temporary overlay lowerdir's")
 		}
 	}
 	for i, lowerDir := range lowerDirs {
