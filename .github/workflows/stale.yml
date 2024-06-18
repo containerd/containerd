@@ -6,13 +6,16 @@ on:
     paths:
       - '.github/workflows/stale.yml'
 
-permissions:
-  issues: write
-  pull-requests: write
+permissions: read-all
 
 jobs:
   stale:
     runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+      pull-requests: write
+
     steps:
       - uses: actions/stale@v9
         # All stale bot options: https://github.com/actions/stale#all-options
