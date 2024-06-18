@@ -56,12 +56,15 @@ func (w wrappedOption) applyHTTPOption(cfg otlpconfig.Config) otlpconfig.Config 
 	return w.ApplyHTTPOption(cfg)
 }
 
-// WithEndpoint sets the target endpoint the Exporter will connect to.
+// WithEndpoint sets the target endpoint (host and port) the Exporter will
+// connect to. The provided endpoint should resemble "example.com:4318" (no
+// scheme or path).
 //
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
 // value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
+// will take precedence. Note, both environment variables include the full
+// scheme and path, while WithEndpoint sets only the host and port.
 //
 // If both this option and WithEndpointURL are used, the last used option will
 // take precedence.
@@ -74,9 +77,10 @@ func WithEndpoint(endpoint string) Option {
 	return wrappedOption{otlpconfig.WithEndpoint(endpoint)}
 }
 
-// WithEndpointURL sets the target endpoint URL the Exporter will connect to.
+// WithEndpointURL sets the target endpoint URL (scheme, host, port, path) the
+// Exporter will connect to.
 //
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
 // value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // will take precedence.
