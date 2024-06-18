@@ -1011,7 +1011,8 @@ func (l *loggingT) exit(err error) {
 		logExitFunc(err)
 		return
 	}
-	l.flushAll()
+	files := l.flushAll()
+	l.syncAll(files)
 	OsExit(2)
 }
 
@@ -1223,23 +1224,37 @@ func StartFlushDaemon(interval time.Duration) {
 // lockAndFlushAll is like flushAll but locks l.mu first.
 func (l *loggingT) lockAndFlushAll() {
 	l.mu.Lock()
-	l.flushAll()
+	files := l.flushAll()
 	l.mu.Unlock()
+	// Some environments are slow when syncing and holding the lock might cause contention.
+	l.syncAll(files)
 }
 
-// flushAll flushes all the logs and attempts to "sync" their data to disk.
+// flushAll flushes all the logs
 // l.mu is held.
-func (l *loggingT) flushAll() {
+func (l *loggingT) flushAll() []flushSyncWriter {
+	files := make([]flushSyncWriter, 0, severity.NumSeverity)
 	// Flush from fatal down, in case there's trouble flushing.
 	for s := severity.FatalLog; s >= severity.InfoLog; s-- {
 		file := l.file[s]
 		if file != nil {
 			_ = file.Flush() // ignore error
-			_ = file.Sync()  // ignore error
 		}
+		files = append(files, file)
 	}
 	if logging.loggerOptions.flush != nil {
 		logging.loggerOptions.flush()
+	}
+	return files
+}
+
+// syncAll attempts to "sync" their data to disk.
+func (l *loggingT) syncAll(files []flushSyncWriter) {
+	// Flush from fatal down, in case there's trouble flushing.
+	for _, file := range files {
+		if file != nil {
+			_ = file.Sync() // ignore error
+		}
 	}
 }
 
