@@ -39,7 +39,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
 	github.com/intel/goresctrl v0.7.0
-	github.com/klauspost/compress v1.17.8
+	github.com/klauspost/compress v1.17.9
 	github.com/mdlayher/vsock v1.2.1
 	github.com/minio/sha256-simd v1.0.1
 	github.com/moby/locker v1.0.1
