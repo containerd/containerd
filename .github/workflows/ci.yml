@@ -375,7 +375,7 @@ jobs:
   integration-linux:
     name: Linux Integration
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
     needs: [project, linters, protos, man]
 
     strategy:
@@ -488,6 +488,22 @@ jobs:
         run: |
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
+
+      - name: Install tools
+        # The GitHub Actions image already has buildah and podman included. Not the
+        # ubuntu-24.04-arm images. buildah and podman  is needed to convert the
+        # Kubernetes checkpoint archive to an OCI image.
+        # See contrib/checkpoint/checkpoint-restore-cri-test.sh
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y buildah podman
+
+      - name: Checkpoint/Restore via CRI
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          env
+          sudo -E PATH=$PATH ./contrib/checkpoint/checkpoint-restore-cri-test.sh
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969

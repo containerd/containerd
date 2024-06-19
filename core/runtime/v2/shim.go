@@ -33,6 +33,7 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
+	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
@@ -45,6 +46,8 @@ import (
 
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/archive"
+	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
@@ -584,6 +587,50 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	_, err := s.task.Create(ctx, request)
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
+	}
+
+	if opts.RestoreFromPath {
+		// Unpack rootfs-diff.tar if it exists.
+		// This needs to happen between the 'Create()' from above and before the 'Start()' from below.
+		rootfsDiff := filepath.Join(opts.Checkpoint, "..", crmetadata.RootFsDiffTar)
+
+		_, err = os.Stat(rootfsDiff)
+		if err == nil {
+			rootfsDiffTar, err := os.Open(rootfsDiff)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open rootfs-diff archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+			defer func(f *os.File) {
+				if err := f.Close(); err != nil {
+					log.G(ctx).Errorf("Unable to close file %s: %q", f.Name(), err)
+				}
+			}(rootfsDiffTar)
+
+			decompressed, err := compression.DecompressStream(rootfsDiffTar)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress archive %s for import: %w", rootfsDiffTar.Name(), err)
+			}
+
+			rootfs := filepath.Join(s.Bundle(), "rootfs")
+			_, err = archive.Apply(
+				ctx,
+				rootfs,
+				decompressed,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("unpacking of rootfs-diff archive %s into %s failed: %w", rootfsDiffTar.Name(), rootfs, err)
+			}
+			log.G(ctx).Debugf("Unpacked checkpoint in %s", rootfs)
+		}
+		// (adrianreber): This is unclear to me. But it works (and it is necessary).
+		// This is probably connected to my misunderstanding why
+		// restoring a container goes through Create().
+		log.G(ctx).Infof("About to start with opts.Checkpoint %s", opts.Checkpoint)
+		err = s.Start(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return s, nil
