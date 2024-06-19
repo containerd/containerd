@@ -41,9 +41,10 @@ compile_fuzzers() {
 }
 
 # This is from https://github.com/AdamKorcz/instrumentation
-git clone --depth=1 "$INSTRUMENTATION_URL"
+git clone "$INSTRUMENTATION_URL"
 cd $SRC/instrumentation
-git checkout "$COMMIT_HASH" # Introduce versioning 
+# Introduce version
+git checkout "$COMMIT_HASH"
 
 go run main.go --target_dir $SRC/containerd/images
 
