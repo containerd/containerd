@@ -25,6 +25,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/imageverifier"
 	_ "github.com/containerd/containerd/v2/plugins/leases"
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
+	_ "github.com/containerd/containerd/v2/plugins/mount"
 	_ "github.com/containerd/containerd/v2/plugins/nri"
 	_ "github.com/containerd/containerd/v2/plugins/restart"
 	_ "github.com/containerd/containerd/v2/plugins/sandbox"
