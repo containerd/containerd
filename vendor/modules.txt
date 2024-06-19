@@ -77,6 +77,8 @@ github.com/checkpoint-restore/checkpointctl/lib
 ## explicit; go 1.20
 github.com/checkpoint-restore/go-criu/v7
 github.com/checkpoint-restore/go-criu/v7/rpc
+github.com/checkpoint-restore/go-criu/v7/stats
+github.com/checkpoint-restore/go-criu/v7/utils
 # github.com/cilium/ebpf v0.16.0
 ## explicit; go 1.21
 github.com/cilium/ebpf
@@ -865,6 +867,7 @@ k8s.io/klog/v2/internal/sloghandler
 k8s.io/kubelet/pkg/cri/streaming
 k8s.io/kubelet/pkg/cri/streaming/portforward
 k8s.io/kubelet/pkg/cri/streaming/remotecommand
+k8s.io/kubelet/pkg/types
 # k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 ## explicit; go 1.18
 k8s.io/utils/clock
