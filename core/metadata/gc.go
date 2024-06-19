@@ -53,6 +53,8 @@ const (
 	resourceEnd
 	// ResourceStream specifies a stream
 	ResourceStream
+	// ResourceMount specifies a mount
+	ResourceMount
 )
 
 const (
