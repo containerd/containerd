@@ -24,7 +24,7 @@ require (
 	github.com/containerd/nri v0.6.1
 	github.com/containerd/platforms v0.2.1
 	github.com/containerd/plugin v0.1.0
-	github.com/containerd/ttrpc v1.2.4
+	github.com/containerd/ttrpc v1.2.5
 	github.com/containerd/typeurl/v2 v2.1.1
 	github.com/containernetworking/cni v1.2.0
 	github.com/containernetworking/plugins v1.4.1
