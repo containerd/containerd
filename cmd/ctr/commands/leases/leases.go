@@ -54,12 +54,12 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the blob digest",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			filters = context.Args().Slice()
-			quiet   = context.Bool("quiet")
+			filters = cliContext.Args().Slice()
+			quiet   = cliContext.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -117,9 +117,9 @@ var createCommand = &cli.Command{
 			Value:   24 * time.Hour,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		var labelstr = context.Args().Slice()
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		var labelstr = cliContext.Args().Slice()
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -136,10 +136,10 @@ var createCommand = &cli.Command{
 			opts = append(opts, leases.WithLabels(labels))
 		}
 
-		if id := context.String("id"); id != "" {
+		if id := cliContext.String("id"); id != "" {
 			opts = append(opts, leases.WithID(id))
 		}
-		if exp := context.Duration("expires"); exp > 0 {
+		if exp := cliContext.Duration("expires"); exp > 0 {
 			opts = append(opts, leases.WithExpiration(exp))
 		}
 
@@ -166,19 +166,19 @@ var deleteCommand = &cli.Command{
 			Usage: "Synchronously remove leases and all unreferenced resources",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		var lids = context.Args().Slice()
+	Action: func(cliContext *cli.Context) error {
+		var lids = cliContext.Args().Slice()
 		if len(lids) == 0 {
-			return cli.ShowSubcommandHelp(context)
+			return cli.ShowSubcommandHelp(cliContext)
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
 		ls := client.LeasesService()
-		sync := context.Bool("sync")
+		sync := cliContext.Bool("sync")
 		for i, lid := range lids {
 			var opts []leases.DeleteOpt
 			if sync && i == len(lids)-1 {

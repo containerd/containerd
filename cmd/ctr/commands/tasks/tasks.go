@@ -17,13 +17,13 @@
 package tasks
 
 import (
-	gocontext "context"
+	"context"
 
 	"github.com/urfave/cli/v2"
 )
 
 type resizer interface {
-	Resize(ctx gocontext.Context, w, h uint32) error
+	Resize(ctx context.Context, w, h uint32) error
 }
 
 // Command is the cli command for managing tasks

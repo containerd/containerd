@@ -29,9 +29,9 @@ import (
 var Command = &cli.Command{
 	Name:  "version",
 	Usage: "Print the client and server versions",
-	Action: func(context *cli.Context) error {
-		if context.NArg() != 0 {
-			return fmt.Errorf("extra arguments: %v", context.Args())
+	Action: func(cliContext *cli.Context) error {
+		if cliContext.NArg() != 0 {
+			return fmt.Errorf("extra arguments: %v", cliContext.Args())
 		}
 
 		fmt.Println("Client:")
@@ -39,7 +39,7 @@ var Command = &cli.Command{
 		fmt.Println("  Revision:", version.Revision)
 		fmt.Println("  Go version:", version.GoVersion)
 		fmt.Println("")
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}

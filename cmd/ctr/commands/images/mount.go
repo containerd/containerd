@@ -51,10 +51,10 @@ When you are done, use the unmount command.
 			Value: platforms.DefaultString(),
 		},
 	),
-	Action: func(context *cli.Context) (retErr error) {
+	Action: func(cliContext *cli.Context) (retErr error) {
 		var (
-			ref    = context.Args().First()
-			target = context.Args().Get(1)
+			ref    = cliContext.Args().First()
+			target = cliContext.Args().Get(1)
 		)
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
@@ -63,13 +63,13 @@ When you are done, use the unmount command.
 			return errors.New("please provide a target path to mount to")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := context.String("snapshotter")
+		snapshotter := cliContext.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = defaults.DefaultSnapshotter
 		}
@@ -89,7 +89,7 @@ When you are done, use the unmount command.
 			}
 		}()
 
-		ps := context.String("platform")
+		ps := cliContext.String("platform")
 		p, err := platforms.Parse(ps)
 		if err != nil {
 			return fmt.Errorf("unable to parse platform %s: %w", ps, err)
@@ -115,7 +115,7 @@ When you are done, use the unmount command.
 		s := client.SnapshotService(snapshotter)
 
 		var mounts []mount.Mount
-		if context.Bool("rw") {
+		if cliContext.Bool("rw") {
 			mounts, err = s.Prepare(ctx, target, chainID)
 		} else {
 			mounts, err = s.View(ctx, target, chainID)
@@ -131,12 +131,12 @@ When you are done, use the unmount command.
 
 		if err := mount.All(mounts, target); err != nil {
 			if err := s.Remove(ctx, target); err != nil && !errdefs.IsNotFound(err) {
-				fmt.Fprintln(context.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
+				fmt.Fprintln(cliContext.App.ErrWriter, "Error cleaning up snapshot after mount error:", err)
 			}
 			return err
 		}
 
-		fmt.Fprintln(context.App.Writer, target)
+		fmt.Fprintln(cliContext.App.Writer, target)
 		return nil
 	},
 }

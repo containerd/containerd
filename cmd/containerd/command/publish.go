@@ -17,7 +17,7 @@
 package command
 
 import (
-	gocontext "context"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -49,9 +49,9 @@ var publishCommand = &cli.Command{
 			Usage: "Topic of the event",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		ctx := namespaces.WithNamespace(gocontext.Background(), context.String("namespace"))
-		topic := context.String("topic")
+	Action: func(cliContext *cli.Context) error {
+		ctx := namespaces.WithNamespace(context.Background(), cliContext.String("namespace"))
+		topic := cliContext.String("topic")
 		if topic == "" {
 			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)
 		}
@@ -59,7 +59,7 @@ var publishCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		client, err := connectEvents(context.String("address"))
+		client, err := connectEvents(cliContext.String("address"))
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func connectEvents(address string) (eventsapi.EventsClient, error) {
 	return eventsapi.NewEventsClient(conn), nil
 }
 
-func connect(address string, d func(gocontext.Context, string) (net.Conn, error)) (*grpc.ClientConn, error) {
+func connect(address string, d func(context.Context, string) (net.Conn, error)) (*grpc.ClientConn, error) {
 	backoffConfig := backoff.DefaultConfig
 	backoffConfig.MaxDelay = 3 * time.Second
 	connParams := grpc.ConnectParams{
@@ -106,7 +106,7 @@ func connect(address string, d func(gocontext.Context, string) (net.Conn, error)
 		grpc.FailOnNonTempDialError(true),
 		grpc.WithConnectParams(connParams),
 	}
-	ctx, cancel := gocontext.WithTimeout(gocontext.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
 	if err != nil {

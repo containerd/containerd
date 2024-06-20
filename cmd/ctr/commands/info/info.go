@@ -30,8 +30,8 @@ type Info struct {
 var Command = &cli.Command{
 	Name:  "info",
 	Usage: "Print the server info",
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}

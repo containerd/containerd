@@ -22,9 +22,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func deleteOpts(context *cli.Context) []namespaces.DeleteOpts {
+func deleteOpts(cliContext *cli.Context) []namespaces.DeleteOpts {
 	var delOpts []namespaces.DeleteOpts
-	if context.Bool("cgroup") {
+	if cliContext.Bool("cgroup") {
 		delOpts = append(delOpts, opts.WithNamespaceCgroupDeletion)
 	}
 	return delOpts

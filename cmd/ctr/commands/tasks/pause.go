@@ -25,13 +25,13 @@ var pauseCommand = &cli.Command{
 	Name:      "pause",
 	Usage:     "Pause an existing container",
 	ArgsUsage: "CONTAINER",
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		container, err := client.LoadContainer(ctx, context.Args().First())
+		container, err := client.LoadContainer(ctx, cliContext.Args().First())
 		if err != nil {
 			return err
 		}

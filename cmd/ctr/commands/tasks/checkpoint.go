@@ -44,12 +44,12 @@ var checkpointCommand = &cli.Command{
 			Usage: "Path to criu work files and logs",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+	Action: func(cliContext *cli.Context) error {
+		id := cliContext.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(context, containerd.WithDefaultRuntime(context.String("runtime")))
+		client, ctx, cancel, err := commands.NewClient(cliContext, containerd.WithDefaultRuntime(cliContext.String("runtime")))
 		if err != nil {
 			return err
 		}
@@ -66,12 +66,12 @@ var checkpointCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		opts := []containerd.CheckpointTaskOpts{withCheckpointOpts(info.Runtime.Name, context)}
+		opts := []containerd.CheckpointTaskOpts{withCheckpointOpts(info.Runtime.Name, cliContext)}
 		checkpoint, err := task.Checkpoint(ctx, opts...)
 		if err != nil {
 			return err
 		}
-		if context.String("image-path") == "" {
+		if cliContext.String("image-path") == "" {
 			fmt.Println(checkpoint.Name())
 		}
 		return nil
@@ -79,17 +79,17 @@ var checkpointCommand = &cli.Command{
 }
 
 // withCheckpointOpts only suitable for runc runtime now
-func withCheckpointOpts(rt string, context *cli.Context) containerd.CheckpointTaskOpts {
+func withCheckpointOpts(rt string, cliContext *cli.Context) containerd.CheckpointTaskOpts {
 	return func(r *containerd.CheckpointTaskInfo) error {
-		imagePath := context.String("image-path")
-		workPath := context.String("work-path")
+		imagePath := cliContext.String("image-path")
+		workPath := cliContext.String("work-path")
 
 		if r.Options == nil {
 			r.Options = &options.CheckpointOptions{}
 		}
 		opts, _ := r.Options.(*options.CheckpointOptions)
 
-		if context.Bool("exit") {
+		if cliContext.Bool("exit") {
 			opts.Exit = true
 		}
 		if imagePath != "" {

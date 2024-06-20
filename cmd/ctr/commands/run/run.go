@@ -17,7 +17,7 @@
 package run
 
 import (
-	gocontext "context"
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -39,11 +39,11 @@ import (
 	"github.com/containerd/log"
 )
 
-func withMounts(context *cli.Context) oci.SpecOpts {
-	return func(ctx gocontext.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
+func withMounts(cliContext *cli.Context) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, container *containers.Container, s *specs.Spec) error {
 		mounts := make([]specs.Mount, 0)
 		dests := make([]string, 0)
-		for _, mount := range context.StringSlice("mount") {
+		for _, mount := range cliContext.StringSlice("mount") {
 			m, err := parseMountFlag(mount)
 			if err != nil {
 				return err
@@ -131,27 +131,27 @@ var Command = &cli.Command{
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
 				commands.ContainerFlags...)...)...)...),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
 			err error
 			id  string
 			ref string
 
-			rm        = context.Bool("rm")
-			tty       = context.Bool("tty")
-			detach    = context.Bool("detach")
-			config    = context.IsSet("config")
-			enableCNI = context.Bool("cni")
+			rm        = cliContext.Bool("rm")
+			tty       = cliContext.Bool("tty")
+			detach    = cliContext.Bool("detach")
+			config    = cliContext.IsSet("config")
+			enableCNI = cliContext.Bool("cni")
 		)
 
 		if config {
-			id = context.Args().First()
-			if context.NArg() > 1 {
+			id = cliContext.Args().First()
+			if cliContext.NArg() > 1 {
 				return errors.New("with spec config file, only container id should be provided")
 			}
 		} else {
-			id = context.Args().Get(1)
-			ref = context.Args().First()
+			id = cliContext.Args().Get(1)
+			ref = cliContext.Args().First()
 
 			if ref == "" {
 				return errors.New("image ref must be provided")
@@ -164,13 +164,13 @@ var Command = &cli.Command{
 			return errors.New("flags --detach and --rm cannot be specified together")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		container, err := NewContainer(ctx, client, context)
+		container, err := NewContainer(ctx, client, cliContext)
 		if err != nil {
 			return err
 		}
@@ -196,9 +196,9 @@ var Command = &cli.Command{
 			}
 		}
 
-		opts := tasks.GetNewTaskOpts(context)
-		ioOpts := []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
-		task, err := tasks.NewTask(ctx, client, container, context.String("checkpoint"), con, context.Bool("null-io"), context.String("log-uri"), ioOpts, opts...)
+		opts := tasks.GetNewTaskOpts(cliContext)
+		ioOpts := []cio.Opt{cio.WithFIFODir(cliContext.String("fifo-dir"))}
+		task, err := tasks.NewTask(ctx, client, container, cliContext.String("checkpoint"), con, cliContext.Bool("null-io"), cliContext.String("log-uri"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
@@ -221,8 +221,8 @@ var Command = &cli.Command{
 				return err
 			}
 		}
-		if context.IsSet("pid-file") {
-			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
+		if cliContext.IsSet("pid-file") {
+			if err := commands.WritePidFile(cliContext.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}

@@ -59,16 +59,16 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Exports content from all platforms",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var convertOpts []converter.Opt
-		srcRef := context.Args().Get(0)
-		targetRef := context.Args().Get(1)
+		srcRef := cliContext.Args().Get(0)
+		targetRef := cliContext.Args().Get(1)
 		if srcRef == "" || targetRef == "" {
 			return errors.New("src and target image need to be specified")
 		}
 
-		if !context.Bool("all-platforms") {
-			if pss := context.StringSlice("platform"); len(pss) > 0 {
+		if !cliContext.Bool("all-platforms") {
+			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
 				all, err := platforms.ParseAll(pss)
 				if err != nil {
 					return err
@@ -79,15 +79,15 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			}
 		}
 
-		if context.Bool("uncompress") {
+		if cliContext.Bool("uncompress") {
 			convertOpts = append(convertOpts, converter.WithLayerConvertFunc(uncompress.LayerConvertFunc))
 		}
 
-		if context.Bool("oci") {
+		if cliContext.Bool("oci") {
 			convertOpts = append(convertOpts, converter.WithDockerToOCI(true))
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(context.App.Writer, newImg.Target.Digest.String())
+		fmt.Fprintln(cliContext.App.Writer, newImg.Target.Digest.String())
 		return nil
 	},
 }

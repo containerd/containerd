@@ -85,46 +85,46 @@ command. As part of this process, we do the following:
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
 	),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			ref = context.Args().First()
+			ref = cliContext.Args().First()
 		)
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		if !context.Bool("local") {
+		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
-				if context.IsSet(s) {
+				if cliContext.IsSet(s) {
 					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
 				}
 			}
 
-			ch, err := commands.NewStaticCredentials(ctx, context, ref)
+			ch, err := commands.NewStaticCredentials(ctx, cliContext, ref)
 			if err != nil {
 				return err
 			}
 
 			var sopts []image.StoreOpt
-			p, err := platforms.ParseAll(context.StringSlice("platform"))
+			p, err := platforms.ParseAll(cliContext.StringSlice("platform"))
 			if err != nil {
 				return err
 			}
 
 			// Set unpack configuration
 			for _, platform := range p {
-				sopts = append(sopts, image.WithUnpack(platform, context.String("snapshotter")))
+				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
 			}
-			if !context.Bool("all-platforms") {
+			if !cliContext.Bool("all-platforms") {
 				if len(p) == 0 {
 					p = append(p, platforms.DefaultSpec())
 				}
@@ -133,21 +133,21 @@ command. As part of this process, we do the following:
 			// TODO: Support unpack for all platforms..?
 			// Pass in a *?
 
-			if context.Bool("metadata-only") {
+			if cliContext.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
 				// Any with an empty set is None
 				// TODO: Specify way to specify not default platform
 				// config.PlatformMatcher = platforms.Any()
-			} else if !context.Bool("skip-metadata") {
+			} else if !cliContext.Bool("skip-metadata") {
 				sopts = append(sopts, image.WithAllMetadata)
 			}
-			labels := context.StringSlice("label")
+			labels := cliContext.StringSlice("label")
 			if len(labels) > 0 {
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
-			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir"))}
-			if context.Bool("plain-http") {
+			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(cliContext.String("hosts-dir"))}
+			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
@@ -169,7 +169,7 @@ command. As part of this process, we do the following:
 		defer done(ctx)
 
 		// TODO: Handle this locally via transfer config
-		config, err := content.NewFetchConfig(ctx, context)
+		config, err := content.NewFetchConfig(ctx, cliContext)
 		if err != nil {
 			return err
 		}
@@ -184,13 +184,13 @@ command. As part of this process, we do the following:
 		// TODO: Show unpack status
 
 		var p []ocispec.Platform
-		if context.Bool("all-platforms") {
+		if cliContext.Bool("all-platforms") {
 			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
 			if err != nil {
 				return fmt.Errorf("unable to resolve image platforms: %w", err)
 			}
 		} else {
-			p, err = platforms.ParseAll(context.StringSlice("platform"))
+			p, err = platforms.ParseAll(cliContext.StringSlice("platform"))
 			if err != nil {
 				return err
 			}
@@ -203,11 +203,11 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
+			err = i.Unpack(ctx, cliContext.String("snapshotter"))
 			if err != nil {
 				return err
 			}
-			if context.Bool("print-chainid") {
+			if cliContext.Bool("print-chainid") {
 				diffIDs, err := i.RootFS(ctx)
 				if err != nil {
 					return err

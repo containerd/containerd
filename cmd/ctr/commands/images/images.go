@@ -70,12 +70,12 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the image refs",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			filters = context.Args().Slice()
-			quiet   = context.Bool("quiet")
+			filters = cliContext.Args().Slice()
+			quiet   = cliContext.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -154,12 +154,12 @@ var setLabelsCommand = &cli.Command{
 			Usage:   "Replace all labels",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			replaceAll   = context.Bool("replace-all")
-			name, labels = commands.ObjectWithLabelArgs(context)
+			replaceAll   = cliContext.Bool("replace-all")
+			name, labels = commands.ObjectWithLabelArgs(cliContext)
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -214,12 +214,12 @@ var checkCommand = &cli.Command{
 			Usage:   "Print only the ready image refs (fully downloaded and unpacked)",
 		},
 	}, commands.SnapshotterFlags...),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
 			exitErr error
-			quiet   = context.Bool("quiet")
+			quiet   = cliContext.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -227,7 +227,7 @@ var checkCommand = &cli.Command{
 
 		var contentStore = client.ContentStore()
 
-		args := context.Args().Slice()
+		args := cliContext.Args().Slice()
 		imageList, err := client.ListImages(ctx, args...)
 		if err != nil {
 			return fmt.Errorf("failed listing images: %w", err)
@@ -287,7 +287,7 @@ var checkCommand = &cli.Command{
 				size = "-"
 			}
 
-			unpacked, err := image.IsUnpacked(ctx, context.String("snapshotter"))
+			unpacked, err := image.IsUnpacked(ctx, cliContext.String("snapshotter"))
 			if err != nil {
 				if exitErr == nil {
 					exitErr = fmt.Errorf("unable to check unpack for %v: %w", image.Name(), err)
@@ -328,8 +328,8 @@ var removeCommand = &cli.Command{
 			Usage: "Synchronously remove image and all associated resources",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -338,9 +338,9 @@ var removeCommand = &cli.Command{
 			exitErr    error
 			imageStore = client.ImageService()
 		)
-		for i, target := range context.Args().Slice() {
+		for i, target := range cliContext.Args().Slice() {
 			var opts []images.DeleteOpt
-			if context.Bool("sync") && i == context.NArg()-1 {
+			if cliContext.Bool("sync") && i == cliContext.NArg()-1 {
 				opts = append(opts, images.SynchronousDelete())
 			}
 			if err := imageStore.Delete(ctx, target, opts...); err != nil {
@@ -373,14 +373,14 @@ var pruneCommand = &cli.Command{
 	},
 	// adapted from `nerdctl`:
 	// https://github.com/containerd/nerdctl/blob/272dc9c29fc1434839d3ec63194d7efa24d7c0ef/cmd/nerdctl/image_prune.go#L86
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		all := context.Bool("all")
+		all := cliContext.Bool("all")
 		if !all {
 			log.G(ctx).Warn("No images pruned. `image prune` requires --all to be specified.")
 			// NOP

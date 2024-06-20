@@ -19,7 +19,7 @@
 package shim
 
 import (
-	gocontext "context"
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -81,13 +81,13 @@ var Command = &cli.Command{
 var startCommand = &cli.Command{
 	Name:  "start",
 	Usage: "Start a container with a task",
-	Action: func(context *cli.Context) error {
-		service, err := getTaskService(context)
+	Action: func(cliContext *cli.Context) error {
+		service, err := getTaskService(cliContext)
 		if err != nil {
 			return err
 		}
-		_, err = service.Start(gocontext.Background(), &task.StartRequest{
-			ID: context.Args().First(),
+		_, err = service.Start(context.Background(), &task.StartRequest{
+			ID: cliContext.Args().First(),
 		})
 		return err
 	},
@@ -96,13 +96,13 @@ var startCommand = &cli.Command{
 var deleteCommand = &cli.Command{
 	Name:  "delete",
 	Usage: "Delete a container with a task",
-	Action: func(context *cli.Context) error {
-		service, err := getTaskService(context)
+	Action: func(cliContext *cli.Context) error {
+		service, err := getTaskService(cliContext)
 		if err != nil {
 			return err
 		}
-		r, err := service.Delete(gocontext.Background(), &task.DeleteRequest{
-			ID: context.Args().First(),
+		r, err := service.Delete(context.Background(), &task.DeleteRequest{
+			ID: cliContext.Args().First(),
 		})
 		if err != nil {
 			return err
@@ -115,13 +115,13 @@ var deleteCommand = &cli.Command{
 var stateCommand = &cli.Command{
 	Name:  "state",
 	Usage: "Get the state of all the processes of the task",
-	Action: func(context *cli.Context) error {
-		service, err := getTaskService(context)
+	Action: func(cliContext *cli.Context) error {
+		service, err := getTaskService(cliContext)
 		if err != nil {
 			return err
 		}
-		r, err := service.State(gocontext.Background(), &task.StateRequest{
-			ID: context.String("id"),
+		r, err := service.State(context.Background(), &task.StateRequest{
+			ID: cliContext.String("id"),
 		})
 		if err != nil {
 			return err
@@ -155,28 +155,28 @@ var execCommand = &cli.Command{
 			Usage: "Runtime spec",
 		},
 	),
-	Action: func(context *cli.Context) error {
-		service, err := getTaskService(context)
+	Action: func(cliContext *cli.Context) error {
+		service, err := getTaskService(cliContext)
 		if err != nil {
 			return err
 		}
 		var (
-			id  = context.Args().First()
-			ctx = gocontext.Background()
+			id  = cliContext.Args().First()
+			ctx = context.Background()
 		)
 
 		if id == "" {
 			return errors.New("exec id must be provided")
 		}
 
-		tty := context.Bool("tty")
-		wg, err := prepareStdio(context.String("stdin"), context.String("stdout"), context.String("stderr"), tty)
+		tty := cliContext.Bool("tty")
+		wg, err := prepareStdio(cliContext.String("stdin"), cliContext.String("stdout"), cliContext.String("stderr"), tty)
 		if err != nil {
 			return err
 		}
 
 		// read spec file and extract Any object
-		spec, err := os.ReadFile(context.String("spec"))
+		spec, err := os.ReadFile(cliContext.String("spec"))
 		if err != nil {
 			return err
 		}
@@ -191,9 +191,9 @@ var execCommand = &cli.Command{
 				TypeUrl: url,
 				Value:   spec,
 			},
-			Stdin:    context.String("stdin"),
-			Stdout:   context.String("stdout"),
-			Stderr:   context.String("stderr"),
+			Stdin:    cliContext.String("stdin"),
+			Stdout:   cliContext.String("stdout"),
+			Stderr:   cliContext.String("stderr"),
 			Terminal: tty,
 		}
 		if _, err := service.Exec(ctx, rq); err != nil {
@@ -206,7 +206,7 @@ var execCommand = &cli.Command{
 			return err
 		}
 		fmt.Printf("exec running with pid %d\n", r.Pid)
-		if context.Bool("attach") {
+		if cliContext.Bool("attach") {
 			log.L.Info("attaching")
 			if tty {
 				current := console.Current()
@@ -232,19 +232,19 @@ var execCommand = &cli.Command{
 	},
 }
 
-func getTaskService(context *cli.Context) (task.TTRPCTaskService, error) {
-	id := context.String("id")
+func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
+	id := cliContext.String("id")
 	if id == "" {
 		return nil, fmt.Errorf("container id must be specified")
 	}
-	ns := context.String("namespace")
+	ns := cliContext.String("namespace")
 
 	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
 	// compatible it
 	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
 	// this should not error, ctr always get a default ns
-	ctx := namespaces.WithNamespace(gocontext.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, context.String("address"), id)
+	ctx := namespaces.WithNamespace(context.Background(), ns)
+	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id)
 	s2 = strings.TrimPrefix(s2, "unix://")
 
 	for _, socket := range []string{s2, "\x00" + s1} {

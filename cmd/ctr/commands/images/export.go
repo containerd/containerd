@@ -66,17 +66,17 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			Usage: "Run export locally rather than through transfer API",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			out        = context.Args().First()
-			images     = context.Args().Tail()
+			out        = cliContext.Args().First()
+			images     = cliContext.Args().Tail()
 			exportOpts = []archive.ExportOpt{}
 		)
 		if out == "" || len(images) == 0 {
 			return errors.New("please provide both an output filename and an image reference to export")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -93,12 +93,12 @@ When '--all-platforms' is given all images in a manifest list must be available.
 		}
 		defer w.Close()
 
-		if !context.Bool("local") {
+		if !cliContext.Bool("local") {
 			pf, done := ProgressHandler(ctx, os.Stdout)
 			defer done()
 
 			exportOpts := []tarchive.ExportOpt{}
-			if pss := context.StringSlice("platform"); len(pss) > 0 {
+			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
 				for _, ps := range pss {
 					p, err := platforms.Parse(ps)
 					if err != nil {
@@ -107,15 +107,15 @@ When '--all-platforms' is given all images in a manifest list must be available.
 					exportOpts = append(exportOpts, tarchive.WithPlatform(p))
 				}
 			}
-			if context.Bool("all-platforms") {
+			if cliContext.Bool("all-platforms") {
 				exportOpts = append(exportOpts, tarchive.WithAllPlatforms)
 			}
 
-			if context.Bool("skip-manifest-json") {
+			if cliContext.Bool("skip-manifest-json") {
 				exportOpts = append(exportOpts, tarchive.WithSkipCompatibilityManifest)
 			}
 
-			if context.Bool("skip-non-distributable") {
+			if cliContext.Bool("skip-non-distributable") {
 				exportOpts = append(exportOpts, tarchive.WithSkipNonDistributableBlobs)
 			}
 
@@ -131,7 +131,7 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			)
 		}
 
-		if pss := context.StringSlice("platform"); len(pss) > 0 {
+		if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
 			all, err := platforms.ParseAll(pss)
 			if err != nil {
 				return err
@@ -141,15 +141,15 @@ When '--all-platforms' is given all images in a manifest list must be available.
 			exportOpts = append(exportOpts, archive.WithPlatform(platforms.DefaultStrict()))
 		}
 
-		if context.Bool("all-platforms") {
+		if cliContext.Bool("all-platforms") {
 			exportOpts = append(exportOpts, archive.WithAllPlatforms())
 		}
 
-		if context.Bool("skip-manifest-json") {
+		if cliContext.Bool("skip-manifest-json") {
 			exportOpts = append(exportOpts, archive.WithSkipDockerManifest())
 		}
 
-		if context.Bool("skip-non-distributable") {
+		if cliContext.Bool("skip-non-distributable") {
 			exportOpts = append(exportOpts, archive.WithSkipNonDistributableBlobs())
 		}
 

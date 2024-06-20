@@ -54,16 +54,16 @@ var runCommand = &cli.Command{
 			Value: defaults.DefaultRuntime,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		if context.NArg() != 2 {
-			return cli.ShowSubcommandHelp(context)
+	Action: func(cliContext *cli.Context) error {
+		if cliContext.NArg() != 2 {
+			return cli.ShowSubcommandHelp(cliContext)
 		}
 		var (
-			id      = context.Args().Get(1)
-			runtime = context.String("runtime")
+			id      = cliContext.Args().Get(1)
+			runtime = cliContext.String("runtime")
 		)
 
-		spec, err := os.ReadFile(context.Args().First())
+		spec, err := os.ReadFile(cliContext.Args().First())
 		if err != nil {
 			return fmt.Errorf("failed to read sandbox config: %w", err)
 		}
@@ -73,7 +73,7 @@ var runCommand = &cli.Command{
 			return fmt.Errorf("failed to parse sandbox config: %w", err)
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -107,8 +107,8 @@ var listCommand = &cli.Command{
 			Usage: "The list of filters to apply when querying sandboxes from the store",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ var listCommand = &cli.Command{
 
 		var (
 			writer  = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
-			filters = context.StringSlice("filters")
+			filters = cliContext.StringSlice("filters")
 		)
 
 		defer func() {
@@ -155,16 +155,16 @@ var removeCommand = &cli.Command{
 			Usage:   "Ignore shutdown errors when removing sandbox",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		force := context.Bool("force")
+		force := cliContext.Bool("force")
 
-		for _, id := range context.Args().Slice() {
+		for _, id := range cliContext.Args().Slice() {
 			sandbox, err := client.LoadSandbox(ctx, id)
 			if err != nil {
 				log.G(ctx).WithError(err).Errorf("failed to load sandbox %s", id)

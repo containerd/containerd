@@ -81,16 +81,16 @@ Most of this is experimental and there are few leaps to make this work.`,
 			Usage: "Pull all metadata including manifests and configs",
 		},
 	),
-	Action: func(clicontext *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			ref = clicontext.Args().First()
+			ref = cliContext.Args().First()
 		)
-		client, ctx, cancel, err := commands.NewClient(clicontext)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		config, err := NewFetchConfig(ctx, clicontext)
+		config, err := NewFetchConfig(ctx, cliContext)
 		if err != nil {
 			return err
 		}
@@ -121,42 +121,42 @@ type FetchConfig struct {
 }
 
 // NewFetchConfig returns the default FetchConfig from cli flags
-func NewFetchConfig(ctx context.Context, clicontext *cli.Context) (*FetchConfig, error) {
-	resolver, err := commands.GetResolver(ctx, clicontext)
+func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig, error) {
+	resolver, err := commands.GetResolver(ctx, cliContext)
 	if err != nil {
 		return nil, err
 	}
 	config := &FetchConfig{
 		Resolver:  resolver,
-		Labels:    clicontext.StringSlice("label"),
-		TraceHTTP: clicontext.Bool("http-trace"),
+		Labels:    cliContext.StringSlice("label"),
+		TraceHTTP: cliContext.Bool("http-trace"),
 	}
-	if !clicontext.Bool("debug") {
+	if !cliContext.Bool("debug") {
 		config.ProgressOutput = os.Stdout
 	}
-	if !clicontext.Bool("all-platforms") {
-		p := clicontext.StringSlice("platform")
+	if !cliContext.Bool("all-platforms") {
+		p := cliContext.StringSlice("platform")
 		if len(p) == 0 {
 			p = append(p, platforms.DefaultString())
 		}
 		config.Platforms = p
 	}
 
-	if clicontext.Bool("metadata-only") {
+	if cliContext.Bool("metadata-only") {
 		config.AllMetadata = true
 		// Any with an empty set is None
 		config.PlatformMatcher = platforms.Any()
-	} else if !clicontext.Bool("skip-metadata") {
+	} else if !cliContext.Bool("skip-metadata") {
 		config.AllMetadata = true
 	}
 
-	if clicontext.IsSet("max-concurrent-downloads") {
-		mcd := clicontext.Int("max-concurrent-downloads")
+	if cliContext.IsSet("max-concurrent-downloads") {
+		mcd := cliContext.Int("max-concurrent-downloads")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloads(mcd))
 	}
 
-	if clicontext.IsSet("max-concurrent-uploaded-layers") {
-		mcu := clicontext.Int("max-concurrent-uploaded-layers")
+	if cliContext.IsSet("max-concurrent-uploaded-layers") {
+		mcu := cliContext.Int("max-concurrent-uploaded-layers")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))
 	}
 

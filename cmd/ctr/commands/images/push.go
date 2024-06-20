@@ -17,7 +17,7 @@
 package images
 
 import (
-	gocontext "context"
+	"context"
 	"errors"
 	"fmt"
 	"net/http/httptrace"
@@ -78,35 +78,35 @@ var pushCommand = &cli.Command{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
 	}),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			ref   = context.Args().First()
-			local = context.Args().Get(1)
-			debug = context.Bool("debug")
+			ref   = cliContext.Args().First()
+			local = cliContext.Args().Get(1)
+			debug = cliContext.Bool("debug")
 			desc  ocispec.Descriptor
 		)
 		if ref == "" {
 			return errors.New("please provide a remote image reference to push")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		if !context.Bool("local") {
+		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{
 				"manifest", "manifest-type", "max-concurrent-uploaded-layers", "allow-non-distributable-blobs",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
-				if context.IsSet(s) {
+				if cliContext.IsSet(s) {
 					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
 				}
 			}
 
-			ch, err := commands.NewStaticCredentials(ctx, context, ref)
+			ch, err := commands.NewStaticCredentials(ctx, cliContext, ref)
 			if err != nil {
 				return err
 			}
@@ -114,8 +114,8 @@ var pushCommand = &cli.Command{
 			if local == "" {
 				local = ref
 			}
-			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(context.String("hosts-dir"))}
-			if context.Bool("plain-http") {
+			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(cliContext.String("hosts-dir"))}
+			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
@@ -123,7 +123,7 @@ var pushCommand = &cli.Command{
 				return err
 			}
 			var p []ocispec.Platform
-			if pss := context.StringSlice("platform"); len(pss) > 0 {
+			if pss := cliContext.StringSlice("platform"); len(pss) > 0 {
 				p, err = platforms.ParseAll(pss)
 				if err != nil {
 					return fmt.Errorf("invalid platform %v: %w", pss, err)
@@ -137,12 +137,12 @@ var pushCommand = &cli.Command{
 			return client.Transfer(ctx, is, reg, transfer.WithProgress(pf))
 		}
 
-		if manifest := context.String("manifest"); manifest != "" {
+		if manifest := cliContext.String("manifest"); manifest != "" {
 			desc.Digest, err = digest.Parse(manifest)
 			if err != nil {
 				return fmt.Errorf("invalid manifest digest: %w", err)
 			}
-			desc.MediaType = context.String("manifest-type")
+			desc.MediaType = cliContext.String("manifest-type")
 		} else {
 			if local == "" {
 				local = ref
@@ -153,7 +153,7 @@ var pushCommand = &cli.Command{
 			}
 			desc = img.Target
 
-			if pss := context.StringSlice("platform"); len(pss) == 1 {
+			if pss := cliContext.StringSlice("platform"); len(pss) == 1 {
 				p, err := platforms.Parse(pss[0])
 				if err != nil {
 					return fmt.Errorf("invalid platform %q: %w", pss[0], err)
@@ -175,10 +175,10 @@ var pushCommand = &cli.Command{
 			}
 		}
 
-		if context.Bool("http-trace") {
+		if cliContext.Bool("http-trace") {
 			ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
 		}
-		resolver, err := commands.GetResolver(ctx, context)
+		resolver, err := commands.GetResolver(ctx, cliContext)
 		if err != nil {
 			return err
 		}
@@ -194,8 +194,8 @@ var pushCommand = &cli.Command{
 
 			log.G(ctx).WithField("image", ref).WithField("digest", desc.Digest).Debug("pushing")
 
-			jobHandler := images.HandlerFunc(func(ctx gocontext.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-				if !context.Bool("allow-non-distributable-blobs") && images.IsNonDistributable(desc.MediaType) {
+			jobHandler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+				if !cliContext.Bool("allow-non-distributable-blobs") && images.IsNonDistributable(desc.MediaType) {
 					return nil, nil
 				}
 				ongoing.add(remotes.MakeRefKey(ctx, desc))
@@ -203,7 +203,7 @@ var pushCommand = &cli.Command{
 			})
 
 			handler := jobHandler
-			if !context.Bool("allow-non-distributable-blobs") {
+			if !cliContext.Bool("allow-non-distributable-blobs") {
 				handler = remotes.SkipNonDistributableBlobs(handler)
 			}
 
@@ -212,8 +212,8 @@ var pushCommand = &cli.Command{
 				containerd.WithImageHandler(handler),
 			}
 
-			if context.IsSet("max-concurrent-uploaded-layers") {
-				mcu := context.Int("max-concurrent-uploaded-layers")
+			if cliContext.IsSet("max-concurrent-uploaded-layers") {
+				mcu := cliContext.Int("max-concurrent-uploaded-layers")
 				ropts = append(ropts, containerd.WithMaxConcurrentUploadedLayers(mcu))
 			}
 
