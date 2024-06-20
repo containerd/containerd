@@ -50,9 +50,15 @@ const (
 	otlpTracesEndpointEnv = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
 	otlpProtocolEnv       = "OTEL_EXPORTER_OTLP_PROTOCOL"
 	otlpTracesProtocolEnv = "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"
+	otlpInsecureEnv       = "OTEL_EXPORTER_OTLP_INSECURE"
+	otlpTracesInsecureEnv = "OTEL_EXPORTER_OTLP_TRACES_INSECURE"
 
-	otelTracesExporterEnv = "OTEL_TRACES_EXPORTER"
-	otelServiceNameEnv    = "OTEL_SERVICE_NAME"
+	otelTracesExporterEnv   = "OTEL_TRACES_EXPORTER"
+	otelServiceNameEnv      = "OTEL_SERVICE_NAME"
+	otelTracesSamplerEnv    = "OTEL_TRACES_SAMPLER"
+	otelTracesSamplerArgEnv = "OTEL_TRACES_SAMPLER_ARG"
+
+	traceIDRatioSampler = "traceidratio"
 )
 
 func init() {
@@ -64,6 +70,7 @@ func init() {
 			if err := warnOTLPConfig(ic); err != nil {
 				return nil, err
 			}
+			convertOTLPToEnv(ic)
 			if err := checkDisabled(); err != nil {
 				return nil, err
 			}
@@ -91,6 +98,7 @@ func init() {
 			if err := warnTraceConfig(ic); err != nil {
 				return nil, err
 			}
+			convertToTracesEnv(ic)
 			if err := checkDisabled(); err != nil {
 				return nil, err
 			}
@@ -133,6 +141,35 @@ type OTLPConfig struct {
 type TraceConfig struct {
 	ServiceName        string  `toml:"service_name,omitempty"`
 	TraceSamplingRatio float64 `toml:"sampling_ratio,omitempty"`
+}
+
+func convertOTLPToEnv(ic *plugin.InitContext) {
+	cfg := ic.Config.(*OTLPConfig)
+
+	if cfg.Endpoint != "" && os.Getenv(otlpEndpointEnv) == "" && os.Getenv(otlpTracesEndpointEnv) == "" {
+		os.Setenv(otlpEndpointEnv, cfg.Endpoint)
+	}
+
+	if cfg.Protocol != "" && os.Getenv(otlpProtocolEnv) == "" && os.Getenv(otlpTracesProtocolEnv) == "" {
+		os.Setenv(otlpProtocolEnv, cfg.Protocol)
+	}
+
+	if cfg.Insecure && os.Getenv(otlpInsecureEnv) == "" && os.Getenv(otlpTracesInsecureEnv) == "" {
+		os.Setenv(otlpInsecureEnv, "true")
+	}
+}
+
+func convertToTracesEnv(ic *plugin.InitContext) {
+	cfg := ic.Config.(*TraceConfig)
+
+	if cfg.ServiceName != "" && os.Getenv(otelServiceNameEnv) == "" {
+		os.Setenv(otelServiceNameEnv, cfg.ServiceName)
+	}
+
+	if cfg.TraceSamplingRatio > 0 && os.Getenv(otelTracesSamplerArgEnv) == "" && os.Getenv(otelTracesSamplerEnv) == "" {
+		os.Setenv(otelTracesSamplerEnv, traceIDRatioSampler)
+		os.Setenv(otelTracesSamplerArgEnv, strconv.FormatFloat(cfg.TraceSamplingRatio, 'f', -1, 64))
+	}
 }
 
 func checkDisabled() error {
