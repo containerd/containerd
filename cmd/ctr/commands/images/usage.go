@@ -36,19 +36,19 @@ var usageCommand = &cli.Command{
 	Usage:     "Display usage of snapshots for a given image ref",
 	ArgsUsage: "[flags] <ref>",
 	Flags:     commands.SnapshotterFlags,
-	Action: func(context *cli.Context) error {
-		var ref = context.Args().First()
+	Action: func(cliContext *cli.Context) error {
+		var ref = cliContext.Args().First()
 		if ref == "" {
 			return errors.New("please provide an image reference to mount")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		snapshotter := context.String("snapshotter")
+		snapshotter := cliContext.String("snapshotter")
 		if snapshotter == "" {
 			snapshotter = defaults.DefaultSnapshotter
 		}

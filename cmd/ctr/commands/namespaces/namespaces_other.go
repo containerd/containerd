@@ -23,6 +23,6 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func deleteOpts(context *cli.Context) []namespaces.DeleteOpts {
+func deleteOpts(cliContext *cli.Context) []namespaces.DeleteOpts {
 	return nil
 }

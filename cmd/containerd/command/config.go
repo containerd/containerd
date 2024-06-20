@@ -17,7 +17,7 @@
 package command
 
 import (
-	gocontext "context"
+	"context"
 	"os"
 	"path/filepath"
 
@@ -33,7 +33,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-func outputConfig(ctx gocontext.Context, config *srvconfig.Config) error {
+func outputConfig(ctx context.Context, config *srvconfig.Config) error {
 	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
@@ -86,17 +86,17 @@ var configCommand = &cli.Command{
 		{
 			Name:  "default",
 			Usage: "See the output of the default config",
-			Action: func(context *cli.Context) error {
-				return outputConfig(gocontext.Background(), defaultConfig())
+			Action: func(cliContext *cli.Context) error {
+				return outputConfig(context.Background(), defaultConfig())
 			},
 		},
 		{
 			Name:  "dump",
 			Usage: "See the output of the final main config with imported in subconfig files",
-			Action: func(context *cli.Context) error {
+			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := gocontext.Background()
-				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
+				ctx := context.Background()
+				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 
@@ -106,10 +106,10 @@ var configCommand = &cli.Command{
 		{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
-			Action: func(context *cli.Context) error {
+			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := gocontext.Background()
-				if err := srvconfig.LoadConfig(ctx, context.String("config"), config); err != nil && !os.IsNotExist(err) {
+				ctx := context.Background()
+				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
 

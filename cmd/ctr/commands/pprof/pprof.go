@@ -64,10 +64,10 @@ var pprofGoroutinesCommand = &cli.Command{
 			Value: 2,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		debug := context.Uint("debug")
+		debug := cliContext.Uint("debug")
 		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/goroutine?debug=%d", debug))
 		if err != nil {
 			return err
@@ -88,10 +88,10 @@ var pprofHeapCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		debug := context.Uint("debug")
+		debug := cliContext.Uint("debug")
 		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/heap?debug=%d", debug))
 		if err != nil {
 			return err
@@ -118,11 +118,11 @@ var pprofProfileCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		seconds := context.Duration("seconds").Seconds()
-		debug := context.Uint("debug")
+		seconds := cliContext.Duration("seconds").Seconds()
+		debug := cliContext.Uint("debug")
 		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/profile?seconds=%v&debug=%d", seconds, debug))
 		if err != nil {
 			return err
@@ -149,11 +149,11 @@ var pprofTraceCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		seconds := context.Duration("seconds").Seconds()
-		debug := context.Uint("debug")
+		seconds := cliContext.Duration("seconds").Seconds()
+		debug := cliContext.Uint("debug")
 		uri := fmt.Sprintf("/debug/pprof/trace?seconds=%v&debug=%d", seconds, debug)
 		output, err := httpGetRequest(client, uri)
 		if err != nil {
@@ -175,10 +175,10 @@ var pprofBlockCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		debug := context.Uint("debug")
+		debug := cliContext.Uint("debug")
 		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/block?debug=%d", debug))
 		if err != nil {
 			return err
@@ -199,10 +199,10 @@ var pprofThreadcreateCommand = &cli.Command{
 			Value: 0,
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client := getPProfClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client := getPProfClient(cliContext)
 
-		debug := context.Uint("debug")
+		debug := cliContext.Uint("debug")
 		output, err := httpGetRequest(client, fmt.Sprintf("/debug/pprof/threadcreate?debug=%d", debug))
 		if err != nil {
 			return err
@@ -213,8 +213,8 @@ var pprofThreadcreateCommand = &cli.Command{
 	},
 }
 
-func getPProfClient(context *cli.Context) *http.Client {
-	dialer := getPProfDialer(context.String("debug-socket"))
+func getPProfClient(cliContext *cli.Context) *http.Client {
+	dialer := getPProfDialer(cliContext.String("debug-socket"))
 
 	tr := &http.Transport{
 		Dial: dialer.pprofDial,
