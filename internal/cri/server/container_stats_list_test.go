@@ -420,13 +420,17 @@ func TestListContainerStats(t *testing.T) {
 			if tt.before != nil {
 				tt.before()
 			}
-			got, err := c.toCRIContainerStats(tt.args.ctx, tt.args.stats, tt.args.containers)
+			css, err := c.toContainerStats(tt.args.ctx, tt.args.stats, tt.args.containers)
 			if tt.after != nil {
 				tt.after()
 			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ListContainerStats() error = %v, wantErr %v", err, tt.wantErr)
 				return
+			}
+			var got *runtime.ListContainerStatsResponse
+			if err == nil {
+				got = c.toCRIContainerStats(css)
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ListContainerStats() = %v, want %v", got, tt.want)
