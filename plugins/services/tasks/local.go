@@ -172,6 +172,14 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 		taskAPIVersion = taskOptions.TaskApiVersion
 	}
 
+	// For a restore via CRI.
+	if r.Checkpoint != nil && r.Checkpoint.Annotations != nil {
+		ann, ok := r.Checkpoint.Annotations["criRestoreFromDirectory"]
+		if ok {
+			checkpointPath = ann
+		}
+	}
+
 	// jump get checkpointPath from checkpoint image
 	if checkpointPath == "" && r.Checkpoint != nil {
 		checkpointPath, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
@@ -196,6 +204,7 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 			return nil, err
 		}
 	}
+
 	opts := runtime.CreateOpts{
 		Spec: container.Spec,
 		IO: runtime.IO{

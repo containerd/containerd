@@ -580,6 +580,16 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		return nil, errdefs.FromGRPC(err)
 	}
 
+	if opts.Checkpoint != "" {
+		// (adrianreber): This is unclear to me. But it works (and it is necessary).
+		// This is probably connected to my misunderstanding why
+		// restoring a container goes through Create().
+		err = s.Start(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return s, nil
 }
 

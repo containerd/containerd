@@ -1,0 +1,47 @@
+{
+	"metadata": {
+		"name": "podsandbox-sleep"
+	},
+	"image": {
+		"image": "quay.io/crio/fedora-crio-ci:latest"
+	},
+	"command": [
+		  "/bin/sleep", "6000"
+	],
+	"args": [
+                "6000"
+	],
+	"working_dir": "/",
+	"envs": [
+		{
+			"key": "PATH",
+			"value": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		},
+		{
+			"key": "GLIBC_TUNABLES",
+			"value": "glibc.pthread.rseq=0"
+		}
+	],
+	"annotations": {
+		"pod": "podsandbox"
+	},
+	"log_path": "",
+	"stdin": false,
+	"stdin_once": false,
+	"tty": false,
+	"linux": {
+		"security_context": {
+			"namespace_options": {
+				"pid": 1
+			},
+			"readonly_rootfs": false
+		},
+		"resources": {
+			"cpu_period": 10000,
+			"cpu_quota": 20000,
+			"cpu_shares": 512,
+			"oom_score_adj": 30,
+			"memory_limit_in_bytes": 268435456
+		}
+	}
+}

@@ -77,13 +77,15 @@ github.com/cenkalti/backoff/v4
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
-# github.com/checkpoint-restore/checkpointctl v1.2.0
+# github.com/checkpoint-restore/checkpointctl v1.2.1
 ## explicit; go 1.21
 github.com/checkpoint-restore/checkpointctl/lib
 # github.com/checkpoint-restore/go-criu/v7 v7.1.0
 ## explicit; go 1.18
 github.com/checkpoint-restore/go-criu/v7
 github.com/checkpoint-restore/go-criu/v7/rpc
+github.com/checkpoint-restore/go-criu/v7/stats
+github.com/checkpoint-restore/go-criu/v7/utils
 # github.com/cilium/ebpf v0.11.0
 ## explicit; go 1.19
 github.com/cilium/ebpf
@@ -830,6 +832,7 @@ k8s.io/klog/v2/internal/sloghandler
 k8s.io/kubelet/pkg/cri/streaming
 k8s.io/kubelet/pkg/cri/streaming/portforward
 k8s.io/kubelet/pkg/cri/streaming/remotecommand
+k8s.io/kubelet/pkg/types
 # k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 ## explicit; go 1.18
 k8s.io/utils/clock
