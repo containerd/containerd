@@ -55,7 +55,6 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
@@ -898,7 +897,7 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 	}
 	var err error
 	if runtimeOptions != nil {
-		rr.Options, err = protobuf.MarshalAnyToProto(runtimeOptions)
+		rr.Options, err = typeurl.MarshalAnyToProto(runtimeOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
 		}

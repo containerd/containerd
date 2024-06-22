@@ -111,7 +111,7 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	evt, err := protobuf.MarshalAnyToProto(event)
+	evt, err := typeurl.MarshalAnyToProto(event)
 	if err != nil {
 		return err
 	}

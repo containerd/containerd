@@ -120,7 +120,7 @@ func toProto(env *events.Envelope) *types.Envelope {
 		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
-		Event:     protobuf.FromAny(env.Event),
+		Event:     typeurl.FromAny(env.Event),
 	}
 }
 

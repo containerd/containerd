@@ -48,7 +48,7 @@ func TestContainersList(t *testing.T) {
 	ctx, db := testEnv(t)
 	store := NewContainerStore(NewDB(db, nil, nil))
 	spec := &specs.Spec{}
-	encoded, err := protobuf.MarshalAnyToProto(spec)
+	encoded, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
@@ -178,11 +178,11 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 		spec    = &specs.Spec{}
 	)
 
-	encoded, err := protobuf.MarshalAnyToProto(spec)
+	encoded, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	spec.Annotations = map[string]string{"updated": "true"}
-	encodedUpdated, err := protobuf.MarshalAnyToProto(spec)
+	encodedUpdated, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	for _, testcase := range []struct {
