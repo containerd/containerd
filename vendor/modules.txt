@@ -816,7 +816,7 @@ k8s.io/component-base/logs/logreduction
 ## explicit; go 1.22.0
 k8s.io/cri-api/pkg/apis/runtime/v1
 k8s.io/cri-api/pkg/errors
-# k8s.io/klog/v2 v2.120.1
+# k8s.io/klog/v2 v2.130.0
 ## explicit; go 1.18
 k8s.io/klog/v2
 k8s.io/klog/v2/internal/buffer
