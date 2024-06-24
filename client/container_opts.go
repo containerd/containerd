@@ -321,7 +321,7 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		}
 
 		var err error
-		c.Spec, err = protobuf.MarshalAnyToProto(s)
+		c.Spec, err = typeurl.MarshalAnyToProto(s)
 		return err
 	}
 }

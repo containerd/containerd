@@ -151,7 +151,7 @@ func (t *mockStatT) Namespace() string {
 
 func (t *mockStatT) Stats(context.Context) (*types.Any, error) {
 	if t.isV1 {
-		return protobuf.MarshalAnyToProto(&v1types.Metrics{})
+		return typeurl.MarshalAnyToProto(&v1types.Metrics{})
 	}
-	return protobuf.MarshalAnyToProto(&v2types.Metrics{})
+	return typeurl.MarshalAnyToProto(&v2types.Metrics{})
 }

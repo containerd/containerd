@@ -122,6 +122,9 @@ func TypeURL(v interface{}) (string, error) {
 
 // Is returns true if the type of the Any is the same as v.
 func Is(any Any, v interface{}) bool {
+	if any == nil {
+		return false
+	}
 	// call to check that v is a pointer
 	tryDereference(v)
 	url, err := TypeURL(v)

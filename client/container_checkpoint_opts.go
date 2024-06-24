@@ -54,7 +54,7 @@ func WithCheckpointImage(ctx context.Context, client *Client, c *containers.Cont
 
 // WithCheckpointTask includes the running task
 func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
-	opt, err := protobuf.MarshalAnyToProto(copts)
+	opt, err := typeurl.MarshalAnyToProto(copts)
 	if err != nil {
 		return nil
 	}
@@ -96,7 +96,7 @@ func WithCheckpointTask(ctx context.Context, client *Client, c *containers.Conta
 // WithCheckpointRuntime includes the container runtime info
 func WithCheckpointRuntime(ctx context.Context, client *Client, c *containers.Container, index *imagespec.Index, copts *options.CheckpointOptions) error {
 	if c.Runtime.Options != nil && c.Runtime.Options.GetValue() != nil {
-		opt := protobuf.FromAny(c.Runtime.Options)
+		opt := typeurl.FromAny(c.Runtime.Options)
 		data, err := proto.Marshal(opt)
 		if err != nil {
 			return err

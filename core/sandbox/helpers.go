@@ -27,20 +27,20 @@ import (
 func ToProto(sandbox *Sandbox) *types.Sandbox {
 	extensions := make(map[string]*gogo_types.Any)
 	for k, v := range sandbox.Extensions {
-		extensions[k] = protobuf.FromAny(v)
+		extensions[k] = typeurl.FromAny(v)
 	}
 	return &types.Sandbox{
 		SandboxID: sandbox.ID,
 		Runtime: &types.Sandbox_Runtime{
 			Name:    sandbox.Runtime.Name,
-			Options: protobuf.FromAny(sandbox.Runtime.Options),
+			Options: typeurl.FromAny(sandbox.Runtime.Options),
 		},
 		Sandboxer:  sandbox.Sandboxer,
 		Labels:     sandbox.Labels,
 		CreatedAt:  protobuf.ToTimestamp(sandbox.CreatedAt),
 		UpdatedAt:  protobuf.ToTimestamp(sandbox.UpdatedAt),
 		Extensions: extensions,
-		Spec:       protobuf.FromAny(sandbox.Spec),
+		Spec:       typeurl.FromAny(sandbox.Spec),
 	}
 }
 
