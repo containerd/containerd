@@ -182,7 +182,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
 
-	fetcher, err := rCtx.Resolver.Fetcher(ctx, name, rCtx.fetcherOptions()...)
+	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}

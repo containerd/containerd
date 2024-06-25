@@ -276,9 +276,19 @@ const (
 )
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
-	parallelism := int64(r.config.MaxConcurrentFetchPerDownload)
-	chunkSize := int64(r.config.ConcurrentFetchChunksSizeMB)
-	chunkSize = chunkSize * mB
+	parallelism := int64(1)
+	if r.config.MaxConcurrentDownloads > 0 {
+		parallelism = int64(r.config.MaxConcurrentDownloads)
+	}
+	if r.config.MaxConcurrentDownloadsPerLayer > 0 && r.config.MaxConcurrentDownloadsPerLayer < r.config.MaxConcurrentDownloads {
+		parallelism = int64(r.config.MaxConcurrentDownloadsPerLayer)
+	}
+	if r.config.Limiter != nil {
+		if err := r.config.Limiter.Acquire(ctx, parallelism); err != nil {
+			return nil, err
+		}
+	}
+	chunkSize := int64(r.config.ConcurrentFetchChunksSizeMB) * mB
 
 	if mediatype == "" {
 		req.header.Set("Accept", "*/*")
@@ -296,6 +306,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 
 	resp, err := req.doWithRetries(ctx, nil)
 	if err != nil {
+		if r.config.Limiter != nil {
+			r.config.Limiter.Release(parallelism)
+		}
 		return nil, err
 	}
 	defer func() {
@@ -309,7 +322,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// really distinguish between a 206 and a 200. In the case of 200, we
 		// can discard the bytes, hiding the seek behavior from the
 		// implementation.
-
+		if r.config.Limiter != nil {
+			r.config.Limiter.Release(parallelism)
+		}
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
 		}
@@ -323,6 +338,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	if offset > 0 {
 		if cr != "" {
 			if !strings.HasPrefix(cr, fmt.Sprintf("bytes %d-", offset)) {
+				if r.config.Limiter != nil {
+					r.config.Limiter.Release(parallelism)
+				}
 				return nil, fmt.Errorf("unhandled content range in response: %v", cr)
 			}
 		} else {
@@ -334,14 +352,21 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			// Could use buffer pool here but this case should be rare
 			n, err := io.Copy(io.Discard, io.LimitReader(resp.Body, offset))
 			if err != nil {
+				if r.config.Limiter != nil {
+					r.config.Limiter.Release(parallelism)
+				}
 				return nil, fmt.Errorf("failed to discard to offset: %w", err)
 			}
 			if n != offset {
+				r.config.Limiter.Release(parallelism)
 				return nil, errors.New("unable to discard to offset")
 			}
 
 			// content range ignored, we can't do concurrent fetches here.
-			parallelism = 0
+			if parallelism > 1 && r.config.Limiter != nil {
+				r.config.Limiter.Release(parallelism - 1)
+			}
+			parallelism = 1
 		}
 	}
 
@@ -361,8 +386,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// the content in parallel. This will make download of bigger bodies
 		// faster, at the cost of parallelism more requests and max
 		// ~(max_parallelism * goroutine footprint) memory usage. The goroutine
-		// footprint should be: the goroutine stack + 32 * 1024 bytes (of
-		// buffer).
+		// footprint should be: the goroutine stack + copy buffer size
 		numChunks := remaining / chunkSize
 		if numChunks*chunkSize < remaining {
 			numChunks++
@@ -382,6 +406,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		for p := int64(0); p < parallelism; p++ {
 			// start parallel download workers
 			go func() {
+				if r.config.Limiter != nil {
+					defer r.config.Limiter.Release(1)
+				}
 				for i := range queue { // first in first out
 					select {
 					case <-stopChan:
@@ -420,6 +447,14 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			}()
 		}
 		body = io.NopCloser(io.MultiReader(readers...))
+	} else if r.config.Limiter != nil {
+		if parallelism > 1 {
+			r.config.Limiter.Release(parallelism - 1)
+		}
+		body = &fnOnClose{
+			BeforeClose: func() { r.config.Limiter.Release(1) },
+			ReadCloser:  body,
+		}
 	}
 	for i := len(encoding) - 1; i >= 0; i-- {
 		algorithm := strings.ToLower(encoding[i])
@@ -446,3 +481,16 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 
 	return body, nil
 }
+
+type fnOnClose struct {
+	BeforeClose func()
+	io.ReadCloser
+}
+
+// Close implements io.ReadCloser.
+func (f *fnOnClose) Close() error {
+	f.BeforeClose()
+	return f.ReadCloser.Close()
+}
+
+var _ io.ReadCloser = &fnOnClose{}
