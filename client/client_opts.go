@@ -239,22 +239,6 @@ func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	}
 }
 
-// WithMaxConcurrentFetchPerDownload sets max concurrent download limit.
-func WithMaxConcurrentFetchPerDownload(max int) RemoteOpt {
-	return func(_ *Client, c *RemoteContext) error {
-		c.MaxConcurrentFetchPerDownload = max
-		return nil
-	}
-}
-
-// WithConcurrentFetchChunksSizeMB sets max concurrent download limit.
-func WithConcurrentFetchChunksSizeMB(max int) RemoteOpt {
-	return func(_ *Client, c *RemoteContext) error {
-		c.ConcurrentFetchChunksSizeMB = max
-		return nil
-	}
-}
-
 // WithMaxConcurrentUploadedLayers sets max concurrent uploaded layer limit.
 func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {

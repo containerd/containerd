@@ -306,14 +306,6 @@ type ImageConfig struct {
 	// TODO: Migrate to transfer service
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 
-	// MaxConcurrentFetchPerDownload is the max number of connection we can have
-	// per Download. Anything lower than 1 means 1.
-	MaxConcurrentFetchPerDownload int `toml:"max_concurrent_fetch_per_download" json:"maxConcurrentFetchPerDownload"`
-
-	// ConcurrentFetchChunkSizes is the size of chunks used when
-	// max_concurrent_fetch_per_download > 1
-	ConcurrentFetchChunksSizeMB int `toml:"concurrent_fetch_chunks_size_mb" json:"concurrentFetchChunkSizeMB"`
-
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
 	// be reset whatever a new byte has been read. If timeout, the image

@@ -32,11 +32,13 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestFetcherOpen(t *testing.T) {
@@ -136,9 +138,13 @@ func TestFetcherOpenParallel(t *testing.T) {
 		},
 		transfer.FetcherConfig{},
 	}
-	cfgConcurency := func(parallelism, chunkSizeMB int) {
+
+	cfgConcurency := func(maxConcurrentDls, maxDLPerLayer, chunkSizeMB int) {
+		f.config.MaxConcurrentDownloads = maxConcurrentDls
 		f.config.ConcurrentFetchChunksSizeMB = chunkSizeMB
-		f.config.MaxConcurrentFetchPerDownload = parallelism
+		f.config.MaxConcurrentDownloadsPerLayer = maxDLPerLayer
+		limiter := semaphore.NewWeighted(int64(maxConcurrentDls))
+		f.config.Limiter = limiter
 	}
 
 	ignoreContentRange := false
@@ -161,9 +167,10 @@ func TestFetcherOpenParallel(t *testing.T) {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if failTimeoutOnceAfter > 0 && rng[0].start > failTimeoutOnceAfter {
+		timeoutOnceAfter := atomic.LoadInt64(&failTimeoutOnceAfter)
+		if timeoutOnceAfter > 0 && rng[0].start > timeoutOnceAfter {
+			atomic.StoreInt64(&failTimeoutOnceAfter, 0)
 			rw.WriteHeader(http.StatusRequestTimeout)
-			failTimeoutOnceAfter = 0
 			return
 		}
 
@@ -221,7 +228,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	}
 
-	cfgConcurency(10, 1)
+	cfgConcurency(10, 3, 1)
 	checkReader(0)
 
 	checkReader(25)
@@ -247,7 +254,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	forceRange = nil
 
 	// check retrying a request in the middle
-	failTimeoutOnceAfter = 2 * mB
+	atomic.StoreInt64(&failTimeoutOnceAfter, 1*mB)
 	checkReader(20)
 
 	failAfter = 1
