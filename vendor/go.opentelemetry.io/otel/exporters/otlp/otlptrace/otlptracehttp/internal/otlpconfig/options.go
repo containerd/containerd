@@ -256,6 +256,9 @@ func NewGRPCOption(fn func(cfg Config) Config) GRPCOption {
 
 // Generic Options
 
+// WithEndpoint configures the trace host and port only; endpoint should
+// resemble "example.com" or "localhost:4317". To configure the scheme and path,
+// use WithEndpointURL.
 func WithEndpoint(endpoint string) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		cfg.Traces.Endpoint = endpoint
@@ -263,6 +266,8 @@ func WithEndpoint(endpoint string) GenericOption {
 	})
 }
 
+// WithEndpointURL configures the trace scheme, host, port, and path; the
+// provided value should resemble "https://example.com:4318/v1/traces".
 func WithEndpointURL(v string) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		u, err := url.Parse(v)
