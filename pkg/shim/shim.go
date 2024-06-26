@@ -20,10 +20,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"flag"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -121,6 +124,7 @@ var (
 	id                   string
 	namespaceFlag        string
 	socketFlag           string
+	debugSocketFlag      string
 	bundlePath           string
 	addressFlag          string
 	containerdBinaryFlag string
@@ -143,6 +147,7 @@ func parseFlags() {
 	flag.StringVar(&namespaceFlag, "namespace", "", "namespace that owns the shim")
 	flag.StringVar(&id, "id", "", "id of the task")
 	flag.StringVar(&socketFlag, "socket", "", "socket path to serve")
+	flag.StringVar(&debugSocketFlag, "debug-socket", "", "debug socket path to serve")
 	flag.StringVar(&bundlePath, "bundle", "", "path to the bundle if not workdir")
 
 	flag.StringVar(&addressFlag, "address", "", "grpc address back to main containerd")
@@ -435,7 +440,7 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 		return err
 	}
 
-	l, err := serveListener(socketFlag)
+	l, err := serveListener(socketFlag, 3)
 	if err != nil {
 		return err
 	}
@@ -445,6 +450,13 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 			log.G(ctx).WithError(err).Fatal("containerd-shim: ttrpc server failure")
 		}
 	}()
+
+	if debugFlag {
+		if err := serveDebug(ctx); err != nil {
+			return err
+		}
+	}
+
 	logger := log.G(ctx).WithFields(log.Fields{
 		"pid":       os.Getpid(),
 		"path":      path,
@@ -458,6 +470,31 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 
 	go handleExitSignals(ctx, logger, shutdown)
 	return reap(ctx, logger, signals)
+}
+
+func serveDebug(ctx context.Context) error {
+	l, err := serveListener(debugSocketFlag, 4)
+	if err != nil {
+		return err
+	}
+	go func() {
+		defer l.Close()
+		m := http.NewServeMux()
+		m.Handle("/debug/vars", expvar.Handler())
+		m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+		m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+		m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+		m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+		m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+		srv := &http.Server{
+			Handler:           m,
+			ReadHeaderTimeout: 5 * time.Minute,
+		}
+		if err := srv.Serve(l); err != nil && !errors.Is(err, net.ErrClosed) {
+			log.G(ctx).WithError(err).Fatal("containerd-shim: pprof endpoint failure")
+		}
+	}()
+	return nil
 }
 
 func dumpStacks(logger *log.Entry) {

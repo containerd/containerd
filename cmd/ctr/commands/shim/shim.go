@@ -75,6 +75,7 @@ var Command = &cli.Command{
 		execCommand,
 		startCommand,
 		stateCommand,
+		pprofCommand,
 	},
 }
 
@@ -244,7 +245,7 @@ func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
 	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
 	// this should not error, ctr always get a default ns
 	ctx := namespaces.WithNamespace(context.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id)
+	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
 	s2 = strings.TrimPrefix(s2, "unix://")
 
 	for _, socket := range []string{s2, "\x00" + s1} {

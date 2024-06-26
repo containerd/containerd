@@ -42,7 +42,7 @@ func subreaper() error {
 func setupDumpStacks(dump chan<- os.Signal) {
 }
 
-func serveListener(path string) (net.Listener, error) {
+func serveListener(path string, fd uintptr) (net.Listener, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 
