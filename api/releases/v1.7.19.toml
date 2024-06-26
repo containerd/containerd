@@ -1,0 +1,18 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+sub_path = "api"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v1.7.18"
+
+pre_release = false
+
+preface = """\
+The first dedicated release for the containerd 1.7 API. This release is
+separately tagged from the main 1.7.x releases after the v1.7.18
+release but follows the versioning.
+"""
