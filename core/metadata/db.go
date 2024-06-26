@@ -27,14 +27,15 @@ import (
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/log"
+	bolt "go.etcd.io/bbolt"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/log"
-	bolt "go.etcd.io/bbolt"
 )
 
 const (
@@ -80,7 +81,7 @@ type dbOptions struct {
 // while proxying data shared across namespaces to backend
 // datastores for content and snapshots.
 type DB struct {
-	db *bolt.DB
+	db Transactor
 	ss map[string]*snapshotter
 	cs *contentStore
 
@@ -115,7 +116,7 @@ type DB struct {
 
 // NewDB creates a new metadata database using the provided
 // bolt database, content store, and snapshotters.
-func NewDB(db *bolt.DB, cs content.Store, ss map[string]snapshots.Snapshotter, opts ...DBOpt) *DB {
+func NewDB(db Transactor, cs content.Store, ss map[string]snapshots.Snapshotter, opts ...DBOpt) *DB {
 	m := &DB{
 		db:      db,
 		ss:      make(map[string]*snapshotter, len(ss)),
