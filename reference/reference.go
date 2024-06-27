@@ -135,8 +135,12 @@ func (r Spec) Hostname() string {
 // Digest returns the digest portion of the reference spec. This may be a
 // partial or invalid digest, which may be used to lookup a complete digest.
 func (r Spec) Digest() digest.Digest {
-	_, dgst := SplitObject(r.Object)
-	return dgst
+	i := strings.Index(r.Object, "@")
+
+	if i < 0 {
+		return ""
+	}
+	return digest.Digest(r.Object[i+1:])
 }
 
 // String returns the normalized string for the ref.
