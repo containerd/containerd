@@ -157,9 +157,9 @@ func (r Spec) String() string {
 // Either may be empty and it is the callers job to validate them
 // appropriately.
 func SplitObject(obj string) (tag string, dgst digest.Digest) {
-	parts := strings.SplitAfterN(obj, "@", 2)
-	if len(parts) < 2 {
-		return parts[0], ""
+	if i := strings.Index(obj, "@"); i >= 0 {
+		// Offset by one so preserve the "@" in the tag returned.
+		return obj[:i+1], digest.Digest(obj[i+1:])
 	}
-	return parts[0], digest.Digest(parts[1])
+	return obj, ""
 }
