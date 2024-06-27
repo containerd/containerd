@@ -192,3 +192,33 @@ func TestReferenceParser(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkSplitObject(b *testing.B) {
+	inputs := []string{
+		"",
+		"@",
+		"docker.io@",
+		"@digest",
+		"docker.io/library/redis:foo?fooo=asdf",
+		"docker.io/library/redis:foo@sha256:abcdef?fooo=asdf",
+		"docker.io/library/redis@sha256:abcdef?fooo=asdf",
+		"docker.io/library/redis:obj@abcdef?fooo=asdf",
+		"localhost:5000/library/redis:obj@abcdef?fooo=asdf",
+		"/docker.io/library/redis:obj@abcdef?fooo=asdf",
+		"docker.io/library/redis?fooo=asdf",
+		"sub-dom1.foo.com/bar/baz/quux:latest",
+		"sub-dom1.foo.com/bar/baz/quux:some-long-tag",
+		"b.gcr.io/test.example.com/my-app:test.example.com",
+		"xn--n3h.com/myimage:xn--n3h.com", // ☃.com in punycode
+		"xn--7o8h.com/myimage:xn--7o8h.com@sha512:fffffff",
+		"http://xn--7o8h.com/myimage:xn--7o8h.com@sha512:fffffff",
+	}
+
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		for _, input := range inputs {
+			_, _ = SplitObject(input)
+		}
+	}
+}
