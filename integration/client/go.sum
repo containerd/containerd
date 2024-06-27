@@ -118,8 +118,8 @@ github.com/Microsoft/hcsshim v0.8.15/go.mod h1:x38A4YbHbdxJtc0sF6oIz+RG0npwSCAvn
 github.com/Microsoft/hcsshim v0.8.20/go.mod h1:+w2gRZ5ReXQhFOrvSQeNfhrYB/dg3oDwTOcER2fw4I4=
 github.com/Microsoft/hcsshim v0.9.6/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
 github.com/Microsoft/hcsshim v0.9.10/go.mod h1:7pLA8lDk46WKDWlVsENo92gC0XFa8rbKfyFRBqxEbCc=
-github.com/Microsoft/hcsshim v0.9.11 h1:uTbPpycWDEBAttWphYW59GPPQ1EFmaLgQabWKCuzPj4=
-github.com/Microsoft/hcsshim v0.9.11/go.mod h1:qAiPvMgZoM0wpkVg6qMdSEu+1VtI6/qHOOPkTGt8ftQ=
+github.com/Microsoft/hcsshim v0.9.12 h1:0Wgl1fRF4WmBuqP6EnHk2w3m7CCCumD/KUumZxp7vKg=
+github.com/Microsoft/hcsshim v0.9.12/go.mod h1:qAiPvMgZoM0wpkVg6qMdSEu+1VtI6/qHOOPkTGt8ftQ=
 github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1 h1:pVKfKyPkXna29XlGjxSr9J0A7vNucOUHZ/2ClcTWalw=
 github.com/Microsoft/hcsshim/test v0.0.0-20210408205431-da33ecd607e1/go.mod h1:Cmvnhlie15Ha2UYrJs9EhgSx76Bq9RV2FgfEiT78GhI=
 github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46/go.mod h1:3wb06e3pkSAbeQ52E9H9iFoQsEEwGN64994WTCIhntQ=
