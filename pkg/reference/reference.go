@@ -168,6 +168,8 @@ func (r Spec) String() string {
 //	t, d := SplitObject("docker.io/library/ubuntu:latest@sha256:deadbeef")
 //	fmt.Println(t) // docker.io/library/ubuntu:latest@
 //	fmt.Println(d) // sha256:deadbeef
+//
+// Deprecated: use [Parse] and [Spec.Digest] instead.
 func SplitObject(obj string) (tag string, dgst digest.Digest) {
 	if i := strings.Index(obj, "@"); i >= 0 {
 		// Offset by one so preserve the "@" in the tag returned.
