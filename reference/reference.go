@@ -18,7 +18,6 @@ package reference
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"path"
 	"regexp"
@@ -146,10 +145,10 @@ func (r Spec) String() string {
 		return r.Locator
 	}
 	if r.Object[:1] == "@" {
-		return fmt.Sprintf("%v%v", r.Locator, r.Object)
+		return r.Locator + r.Object
 	}
 
-	return fmt.Sprintf("%v:%v", r.Locator, r.Object)
+	return r.Locator + ":" + r.Object
 }
 
 // SplitObject provides two parts of the object spec, delimited by an `@`
