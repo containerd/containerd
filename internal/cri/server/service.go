@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubelet/pkg/cri/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
@@ -50,6 +51,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
+	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
@@ -164,7 +166,7 @@ type CRIServiceOptions struct {
 
 	StreamingConfig streaming.Config
 
-	NRI *nri.API
+	NRI nriservice.API
 
 	// SandboxControllers is a map of all the loaded sandbox controllers
 	SandboxControllers map[string]sandbox.Controller
@@ -236,7 +238,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		}
 	}
 
-	c.nri = options.NRI
+	c.nri = nri.NewAPI(options.NRI, &criImplementation{c})
 
 	c.runtimeHandlers, err = c.introspectRuntimeHandlers(ctx)
 	if err != nil {
@@ -297,7 +299,7 @@ func (c *criService) Run(ready func()) error {
 	}()
 
 	// register CRI domain with NRI
-	if err := c.nri.Register(&criImplementation{c}); err != nil {
+	if err := c.nri.Register(); err != nil {
 		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
 	}
 
