@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -81,7 +82,7 @@ func (c *criService) recover(ctx context.Context) error {
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded sandbox %+v", sb)
-			if err := c.sandboxStore.Add(sb); err != nil {
+			if err := c.sandboxStore.Add(sb); err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
 				return fmt.Errorf("failed to add sandbox %q to store: %w", sandbox.ID(), err)
 			}
 			if err := c.sandboxNameIndex.Reserve(sb.Name, sb.ID); err != nil {
@@ -100,12 +101,18 @@ func (c *criService) recover(ctx context.Context) error {
 		return fmt.Errorf("failed to list sandboxes from API: %w", err)
 	}
 	for _, sbx := range storedSandboxes {
-		if _, err := c.sandboxStore.Get(sbx.ID); err == nil {
+		sb, err := c.sandboxStore.Get(sbx.ID)
+
+		// For user namespace containers networking is setup AFTER the OCI runtime runs, so we don't save
+		// the IP information to disk for the underlying container itself. The sandboxes in the sandbox store
+		// should have this info saved however.
+		exists := err == nil
+		if exists && sb.IP != "" {
 			continue
 		}
 
 		metadata := sandboxstore.Metadata{}
-		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
+		err = sbx.GetExtension(podsandbox.MetadataKey, &metadata)
 		if err != nil {
 			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
 		}
@@ -138,15 +145,20 @@ func (c *criService) recover(ctx context.Context) error {
 			}
 		}
 
-		sb := sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
+		sb = sandboxstore.NewSandbox(metadata, sandboxstore.Status{State: state})
 		sb.Sandboxer = sbx.Sandboxer
 		sb.Endpoint = endpoint
 
 		// Load network namespace.
 		sb.NetNS = getNetNS(&metadata)
-
-		if err := c.sandboxStore.Add(sb); err != nil {
-			return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
+		if exists {
+			if err := c.sandboxStore.Update(sb); err != nil {
+				return fmt.Errorf("failed to update stored sandbox %q in store: %w", sbx.ID, err)
+			}
+		} else {
+			if err := c.sandboxStore.Add(sb); err != nil {
+				return fmt.Errorf("failed to add stored sandbox %q to store: %w", sbx.ID, err)
+			}
 		}
 	}
 
