@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/pkg/cri/sbserver/podsandbox"
 	"github.com/containerd/containerd/pkg/cri/streaming"
 	"github.com/containerd/containerd/pkg/kmutex"
+	nriservice "github.com/containerd/containerd/pkg/nri"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
 	"github.com/containerd/containerd/services/warning"
@@ -128,7 +129,7 @@ type criService struct {
 }
 
 // NewCRIService returns a new instance of CRIService
-func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.API, warn warning.Service) (CRIService, error) {
+func NewCRIService(config criconfig.Config, client *containerd.Client, nriservice nriservice.API, warn warning.Service) (CRIService, error) {
 	var err error
 	labels := label.NewStore()
 	c := &criService{
@@ -197,7 +198,7 @@ func NewCRIService(config criconfig.Config, client *containerd.Client, nri *nri.
 	c.sandboxControllers[criconfig.ModePodSandbox] = podsandbox.New(config, client, c.sandboxStore, c.os, c, c.baseOCISpecs)
 	c.sandboxControllers[criconfig.ModeShim] = client.SandboxController()
 
-	c.nri = nri
+	c.nri = nri.NewAPI(nriservice, &criImplementation{c})
 
 	return c, nil
 }
@@ -281,7 +282,7 @@ func (c *criService) Run(ready func()) error {
 	}()
 
 	// register CRI domain with NRI
-	if err := c.nri.Register(&criImplementation{c}); err != nil {
+	if err := c.nri.Register(); err != nil {
 		return fmt.Errorf("failed to set up NRI for CRI service: %w", err)
 	}
 
