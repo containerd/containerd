@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/fsverity"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
@@ -62,8 +63,9 @@ type LabelStore interface {
 // Store can generally support multi-reader, single-writer ingest of data,
 // including resumable ingest.
 type store struct {
-	root string
-	ls   LabelStore
+	root               string
+	ls                 LabelStore
+	integritySupported bool
 }
 
 // NewStore returns a local content store
@@ -81,9 +83,12 @@ func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
 		return nil, err
 	}
 
+	supported, _ := fsverity.IsSupported(root)
+
 	return &store{
-		root: root,
-		ls:   ls,
+		root:               root,
+		ls:                 ls,
+		integritySupported: supported,
 	}, nil
 }
 
