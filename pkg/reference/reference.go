@@ -154,24 +154,3 @@ func (r Spec) String() string {
 
 	return r.Locator + ":" + r.Object
 }
-
-// SplitObject provides two parts of the object spec, delimited by an "@"
-// symbol. It does not perform any validation on correctness of the values
-// returned, and it's the callers' responsibility to validate the result.
-//
-// If an "@" delimiter is found, it returns the part *including* the "@"
-// delimiter as "tag", and the part after the "@" as digest.
-//
-// The example below produces "docker.io/library/ubuntu:latest@" and
-// "sha256:deadbeef";
-//
-//	t, d := SplitObject("docker.io/library/ubuntu:latest@sha256:deadbeef")
-//	fmt.Println(t) // docker.io/library/ubuntu:latest@
-//	fmt.Println(d) // sha256:deadbeef
-func SplitObject(obj string) (tag string, dgst digest.Digest) {
-	if i := strings.Index(obj, "@"); i >= 0 {
-		// Offset by one so preserve the "@" in the tag returned.
-		return obj[:i+1], digest.Digest(obj[i+1:])
-	}
-	return obj, ""
-}
