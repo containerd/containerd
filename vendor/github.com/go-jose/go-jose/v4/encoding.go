@@ -27,7 +27,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/go-jose/go-jose/v3/json"
+	"github.com/go-jose/go-jose/v4/json"
 )
 
 // Helper function to serialize known-good objects.
@@ -106,10 +106,7 @@ func inflate(input []byte) ([]byte, error) {
 	output := new(bytes.Buffer)
 	reader := flate.NewReader(bytes.NewBuffer(input))
 
-	maxCompressedSize := 10 * int64(len(input))
-	if maxCompressedSize < 250000 {
-		maxCompressedSize = 250000
-	}
+	maxCompressedSize := max(250_000, 10*int64(len(input)))
 
 	limit := maxCompressedSize + 1
 	n, err := io.CopyN(output, reader, limit)
@@ -167,7 +164,7 @@ func (b *byteBuffer) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	decoded, err := base64URLDecode(encoded)
+	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
 		return err
 	}
@@ -195,12 +192,6 @@ func (b byteBuffer) bigInt() *big.Int {
 
 func (b byteBuffer) toInt() int {
 	return int(b.bigInt().Int64())
-}
-
-// base64URLDecode is implemented as defined in https://www.rfc-editor.org/rfc/rfc7515.html#appendix-C
-func base64URLDecode(value string) ([]byte, error) {
-	value = strings.TrimRight(value, "=")
-	return base64.RawURLEncoding.DecodeString(value)
 }
 
 func base64EncodeLen(sl []byte) int {

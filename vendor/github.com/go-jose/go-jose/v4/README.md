@@ -1,17 +1,9 @@
 # Go JOSE
 
-### Versions
-
-[Version 4](https://github.com/go-jose/go-jose)
-([branch](https://github.com/go-jose/go-jose/),
-[doc](https://pkg.go.dev/github.com/go-jose/go-jose/v4), [releases](https://github.com/go-jose/go-jose/releases)) is the current stable version:
-
-    import "github.com/go-jose/go-jose/v4"
-
-The old [square/go-jose](https://github.com/square/go-jose) repo contains the prior v1 and v2 versions, which
-are deprecated.
-
-### Summary
+[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v4.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v4)
+[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v4/jwt.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v4/jwt)
+[![license](https://img.shields.io/badge/license-apache_2.0-blue.svg?style=flat)](https://raw.githubusercontent.com/go-jose/go-jose/master/LICENSE)
+[![test](https://img.shields.io/github/checks-status/go-jose/go-jose/v4)](https://github.com/go-jose/go-jose/actions)
 
 Package jose aims to provide an implementation of the Javascript Object Signing
 and Encryption set of standards. This includes support for JSON Web Encryption,
@@ -42,6 +34,20 @@ standard library which uses case-sensitive matching for member names (instead
 of [case-insensitive matching](https://www.ietf.org/mail-archive/web/json/current/msg03763.html)).
 This is to avoid differences in interpretation of messages between go-jose and
 libraries in other languages.
+
+### Versions
+
+[Version 4](https://github.com/go-jose/go-jose)
+([branch](https://github.com/go-jose/go-jose/tree/main),
+[doc](https://pkg.go.dev/github.com/go-jose/go-jose/v4), [releases](https://github.com/go-jose/go-jose/releases)) is the current stable version:
+
+    import "github.com/go-jose/go-jose/v4"
+
+The old [square/go-jose](https://github.com/square/go-jose) repo contains the prior v1 and v2 versions, which
+are still useable but not actively developed anymore.
+
+Version 3, in this repo, is still receiving security fixes but not functionality
+updates.
 
 ### Supported algorithms
 
@@ -98,11 +104,11 @@ allows attaching a key id.
 
 ## Examples
 
-[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v3.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v3)
-[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v3/jwt.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v3/jwt)
+[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v4.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v4)
+[![godoc](https://pkg.go.dev/badge/github.com/go-jose/go-jose/v4/jwt.svg)](https://pkg.go.dev/github.com/go-jose/go-jose/v4/jwt)
 
 Examples can be found in the Godoc
 reference for this package. The
-[`jose-util`](https://github.com/go-jose/go-jose/tree/v3/jose-util)
+[`jose-util`](https://github.com/go-jose/go-jose/tree/v4/jose-util)
 subdirectory also contains a small command-line utility which might be useful
 as an example as well.
