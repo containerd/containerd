@@ -32,7 +32,6 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	"github.com/containerd/containerd/v2/internal/cri/instrument"
-	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
 	"github.com/containerd/containerd/v2/plugins"
@@ -212,7 +211,7 @@ func (c criGRPCServerWithTCP) RegisterTCP(s *grpc.Server) error {
 }
 
 // Get the NRI plugin, and set up our NRI API for it.
-func getNRIAPI(ic *plugin.InitContext) *nri.API {
+func getNRIAPI(ic *plugin.InitContext) nriservice.API {
 	const (
 		pluginType = plugins.NRIApiPlugin
 		pluginName = "nri"
@@ -234,8 +233,7 @@ func getNRIAPI(ic *plugin.InitContext) *nri.API {
 	}
 
 	log.G(ctx).Info("using experimental NRI integration - disable nri plugin to prevent this")
-
-	return nri.NewAPI(api)
+	return api
 }
 
 func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controller, error) {

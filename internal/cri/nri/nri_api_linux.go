@@ -46,9 +46,10 @@ type API struct {
 	nri nri.API
 }
 
-func NewAPI(nri nri.API) *API {
+func NewAPI(nri nri.API, cri CRIImplementation) *API {
 	return &API{
 		nri: nri,
+		cri: cri,
 	}
 }
 
@@ -58,12 +59,11 @@ func (a *API) IsDisabled() bool {
 
 func (a *API) IsEnabled() bool { return !a.IsDisabled() }
 
-func (a *API) Register(cri CRIImplementation) error {
+func (a *API) Register() error {
 	if a.IsDisabled() {
 		return nil
 	}
 
-	a.cri = cri
 	nri.RegisterDomain(a)
 
 	return a.nri.Start()

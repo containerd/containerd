@@ -37,11 +37,11 @@ import (
 type API struct {
 }
 
-func NewAPI(nri.API) *API {
+func NewAPI(nri.API, CRIImplementation) *API {
 	return nil
 }
 
-func (a *API) Register(CRIImplementation) error {
+func (a *API) Register() error {
 	return nil
 }
 
