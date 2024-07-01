@@ -32,12 +32,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/internal/randutil"
-	"github.com/containerd/containerd/v2/pkg/fsverity"
 	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
