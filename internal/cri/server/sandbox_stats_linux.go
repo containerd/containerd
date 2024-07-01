@@ -84,40 +84,20 @@ func (c *criService) podSandboxStats(
 			}
 		}
 
+		listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
+		css, err := c.listContainerStats(ctx, listContainerStatsRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to obtain container stats during podSandboxStats call: %w", err)
+		}
 		var pidCount uint64
-		for _, cntr := range c.containerStore.List() {
-			if cntr.SandboxID != sandbox.ID {
-				continue
-			}
-
-			state := cntr.Status.Get().State()
-			if state != runtime.ContainerState_CONTAINER_RUNNING {
-				continue
-			}
-
-			task, err := cntr.Container.Task(ctx, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			processes, err := task.Pids(ctx)
-			if err != nil {
-				return nil, err
-			}
-			pidCount += uint64(len(processes))
-
+		for _, cs := range css {
+			pidCount += cs.pids
+			podSandboxStats.Linux.Containers = append(podSandboxStats.Linux.Containers, cs.stats)
 		}
 		podSandboxStats.Linux.Process = &runtime.ProcessUsage{
 			Timestamp:    timestamp.UnixNano(),
 			ProcessCount: &runtime.UInt64Value{Value: pidCount},
 		}
-
-		listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: meta.ID}}
-		resp, err := c.ListContainerStats(ctx, listContainerStatsRequest)
-		if err != nil {
-			return nil, fmt.Errorf("failed to obtain container stats during podSandboxStats call: %w", err)
-		}
-		podSandboxStats.Linux.Containers = resp.GetStats()
 	}
 
 	return podSandboxStats, nil
