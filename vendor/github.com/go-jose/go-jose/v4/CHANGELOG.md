@@ -45,12 +45,6 @@ token".
 
 [1]: https://i.blackhat.com/BH-US-23/Presentations/US-23-Tervoort-Three-New-Attacks-Against-JSON-Web-Tokens.pdf
 
-# v3.0.3
-
-## Fixed
-
- - Limit decompression output size to prevent a DoS. Backport from v4.0.1.
-
 # v3.0.2
 
 ## Fixed

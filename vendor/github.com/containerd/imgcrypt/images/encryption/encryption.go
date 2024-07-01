@@ -500,7 +500,7 @@ func GetImageDecryptConverter(cc *encconfig.CryptoConfig, lf LayerFilter) conver
 func CheckAuthorization(ctx context.Context, cs content.Store, desc ocispec.Descriptor, dc *encconfig.DecryptConfig) error {
 	cc := encconfig.InitDecryption(dc.Parameters)
 
-	lf := func(desc ocispec.Descriptor) bool {
+	lf := func(_ ocispec.Descriptor) bool {
 		return true
 	}
 

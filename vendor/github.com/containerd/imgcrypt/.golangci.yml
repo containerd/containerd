@@ -5,19 +5,19 @@ linters:
     - unconvert
     - gofmt
     - goimports
+    - govet
     - revive
     - ineffassign
-    - vet
     - unused
     - misspell
 
-run:
-  skip-dirs:
+issue:
+  exclude-dirs:
     - cmd/ctr/commands/run
     - cmd/ctr/commands/images
     - cmd\\ctr\\commands\\run
     - cmd\\ctr\\commands\\images
-  skip-files:
+  exclude-files:
     - cmd/ctr/commands/commands.go
     - cmd\\ctr\\commands\\commands.go
 
