@@ -111,6 +111,9 @@ type Controller interface {
 	Shutdown(ctx context.Context, sandboxID string) error
 	// Metrics queries the sandbox for metrics.
 	Metrics(ctx context.Context, sandboxID string) (*types.Metric, error)
+	// Update changes a part of sandbox, such as extensions/annotations/labels/spec of
+	// Sandbox object, controllers may have to update the running sandbox according to the changes.
+	Update(ctx context.Context, sandboxID string, sandbox Sandbox, fields ...string) error
 }
 
 type ControllerInstance struct {

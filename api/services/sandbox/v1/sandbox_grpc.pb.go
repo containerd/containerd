@@ -260,6 +260,7 @@ type ControllerClient interface {
 	Status(ctx context.Context, in *ControllerStatusRequest, opts ...grpc.CallOption) (*ControllerStatusResponse, error)
 	Shutdown(ctx context.Context, in *ControllerShutdownRequest, opts ...grpc.CallOption) (*ControllerShutdownResponse, error)
 	Metrics(ctx context.Context, in *ControllerMetricsRequest, opts ...grpc.CallOption) (*ControllerMetricsResponse, error)
+	Update(ctx context.Context, in *ControllerUpdateRequest, opts ...grpc.CallOption) (*ControllerUpdateResponse, error)
 }
 
 type controllerClient struct {
@@ -342,6 +343,15 @@ func (c *controllerClient) Metrics(ctx context.Context, in *ControllerMetricsReq
 	return out, nil
 }
 
+func (c *controllerClient) Update(ctx context.Context, in *ControllerUpdateRequest, opts ...grpc.CallOption) (*ControllerUpdateResponse, error) {
+	out := new(ControllerUpdateResponse)
+	err := c.cc.Invoke(ctx, "/containerd.services.sandbox.v1.Controller/Update", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ControllerServer is the server API for Controller service.
 // All implementations must embed UnimplementedControllerServer
 // for forward compatibility
@@ -354,6 +364,7 @@ type ControllerServer interface {
 	Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error)
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
+	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
 	mustEmbedUnimplementedControllerServer()
 }
 
@@ -384,6 +395,9 @@ func (UnimplementedControllerServer) Shutdown(context.Context, *ControllerShutdo
 }
 func (UnimplementedControllerServer) Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Metrics not implemented")
+}
+func (UnimplementedControllerServer) Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Update not implemented")
 }
 func (UnimplementedControllerServer) mustEmbedUnimplementedControllerServer() {}
 
@@ -542,6 +556,24 @@ func _Controller_Metrics_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Controller_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControllerUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ControllerServer).Update(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/containerd.services.sandbox.v1.Controller/Update",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ControllerServer).Update(ctx, req.(*ControllerUpdateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Controller_ServiceDesc is the grpc.ServiceDesc for Controller service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -580,6 +612,10 @@ var Controller_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Metrics",
 			Handler:    _Controller_Metrics_Handler,
+		},
+		{
+			MethodName: "Update",
+			Handler:    _Controller_Update_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

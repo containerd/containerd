@@ -116,6 +116,7 @@ type TTRPCControllerService interface {
 	Status(context.Context, *ControllerStatusRequest) (*ControllerStatusResponse, error)
 	Shutdown(context.Context, *ControllerShutdownRequest) (*ControllerShutdownResponse, error)
 	Metrics(context.Context, *ControllerMetricsRequest) (*ControllerMetricsResponse, error)
+	Update(context.Context, *ControllerUpdateRequest) (*ControllerUpdateResponse, error)
 }
 
 func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerService) {
@@ -176,6 +177,13 @@ func RegisterTTRPCControllerService(srv *ttrpc.Server, svc TTRPCControllerServic
 					return nil, err
 				}
 				return svc.Metrics(ctx, &req)
+			},
+			"Update": func(ctx context.Context, unmarshal func(interface{}) error) (interface{}, error) {
+				var req ControllerUpdateRequest
+				if err := unmarshal(&req); err != nil {
+					return nil, err
+				}
+				return svc.Update(ctx, &req)
 			},
 		},
 	})
@@ -250,6 +258,14 @@ func (c *ttrpccontrollerClient) Shutdown(ctx context.Context, req *ControllerShu
 func (c *ttrpccontrollerClient) Metrics(ctx context.Context, req *ControllerMetricsRequest) (*ControllerMetricsResponse, error) {
 	var resp ControllerMetricsResponse
 	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Metrics", req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *ttrpccontrollerClient) Update(ctx context.Context, req *ControllerUpdateRequest) (*ControllerUpdateResponse, error) {
+	var resp ControllerUpdateResponse
+	if err := c.client.Call(ctx, "containerd.services.sandbox.v1.Controller", "Update", req, &resp); err != nil {
 		return nil, err
 	}
 	return &resp, nil
