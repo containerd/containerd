@@ -27,11 +27,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/fsverity"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/internal/fsverity"
+	"github.com/containerd/containerd/v2/pkg/filters"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
