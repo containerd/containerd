@@ -254,12 +254,22 @@ func LogURI(uri *url.URL) Creator {
 
 // TerminalLogURI provides the raw logging URI
 // as well as sets the terminal option to true.
-func TerminalLogURI(uri *url.URL) Creator {
+func TerminalLogURI(uri *url.URL, setStderr ...bool) Creator {
 	return func(_ string) (IO, error) {
+		res := uri.String()
+
+		// Default value for Stderr is an ampty string
+		// Windows HCSShim requires that stderr is an empty string when using terminal.
+		// https://github.com/microsoft/hcsshim/blob/200feabd854da69f615a598ed6a1263ce9531676/cmd/containerd-shim-runhcs-v1/service_internal.go#L127
+		stderr := ""
+		if len(setStderr) > 0 && setStderr[0] {
+			stderr = res
+		}
+
 		return &logURI{
 			config: Config{
-				Stdout:   uri.String(),
-				Stderr:   uri.String(),
+				Stdout:   res,
+				Stderr:   stderr,
 				Terminal: true,
 			},
 		}, nil
@@ -286,7 +296,7 @@ func BinaryIO(binary string, args map[string]string) Creator {
 
 // TerminalBinaryIO forwards container STDOUT|STDERR directly to a logging binary
 // It also sets the terminal option to true
-func TerminalBinaryIO(binary string, args map[string]string) Creator {
+func TerminalBinaryIO(binary string, args map[string]string, setStderr ...bool) Creator {
 	return func(_ string) (IO, error) {
 		uri, err := LogURIGenerator("binary", binary, args)
 		if err != nil {
@@ -294,10 +304,19 @@ func TerminalBinaryIO(binary string, args map[string]string) Creator {
 		}
 
 		res := uri.String()
+
+		// Default value for Stderr is an ampty string
+		// Windows HCSShim requires that stderr is an empty string when using terminal.
+		// https://github.com/microsoft/hcsshim/blob/200feabd854da69f615a598ed6a1263ce9531676/cmd/containerd-shim-runhcs-v1/service_internal.go#L127
+		stderr := ""
+		if len(setStderr) > 0 && setStderr[0] {
+			stderr = res
+		}
+
 		return &logURI{
 			config: Config{
 				Stdout:   res,
-				Stderr:   res,
+				Stderr:   stderr,
 				Terminal: true,
 			},
 		}, nil
