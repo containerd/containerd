@@ -358,6 +358,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
+	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
+	}
+
+	// Save sandbox metadata to store
+	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+	}
+
 	// TODO: get rid of this. sandbox object should no longer have Container field.
 	if ociRuntime.Sandboxer == string(criconfig.ModePodSandbox) {
 		container, err := c.client.LoadContainer(ctx, id)

@@ -109,6 +109,18 @@ func (s *Store) Add(sb Sandbox) error {
 	return nil
 }
 
+// Update an existing sandbox in the store. Returns errdefs.ErrNotFound if the sandbox
+// doesn't exist.
+func (s *Store) Update(sb Sandbox) error {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	if _, ok := s.sandboxes[sb.ID]; !ok {
+		return errdefs.ErrNotFound
+	}
+	s.sandboxes[sb.ID] = sb
+	return nil
+}
+
 // Get returns the sandbox with specified id.
 // Returns errdefs.ErrNotFound if the sandbox doesn't exist.
 func (s *Store) Get(id string) (Sandbox, error) {
