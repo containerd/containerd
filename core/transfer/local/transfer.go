@@ -40,6 +40,8 @@ type localTransferService struct {
 	images  images.Store
 	// limiter for upload
 	limiterU *semaphore.Weighted
+	// limiter for operations during download
+	limiterOperationD *semaphore.Weighted
 	// limiter for download operation
 	limiterD *semaphore.Weighted
 	config   TransferConfig
@@ -54,8 +56,17 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	if tc.MaxConcurrentUploadedLayers > 0 {
 		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
 	}
+	if tc.MaxConcurrentDownloadsPerLayer > 0 {
+		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadsPerLayer))
+	}
+	if tc.MaxConcurrentDownloadOperations > 0 {
+		ts.limiterOperationD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadOperations))
+	}
 	if tc.MaxConcurrentDownloads > 0 {
 		ts.limiterD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloads))
+	} else {
+		// default to 3 dl at a time
+		ts.limiterD = semaphore.NewWeighted(int64(3))
 	}
 	return ts
 }
@@ -168,6 +179,17 @@ type TransferConfig struct {
 
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int
+	// MaxConcurrentDownloadOperations is the max number operation happening
+	// during a pull. An operation can be a layer download, a layer unpack, or a
+	// move after a layer has been unpacked.
+	MaxConcurrentDownloadOperations int
+	// ConcurrentFetchChunkSizes is the size of chunks used when
+	// max_concurrent_fetch_per_download > 1 for pull.
+	ConcurrentFetchChunksSizeMB int
+	// MaxConcurrentDownloadsPerLayer is the max concurrent download per layer,
+	// for pull
+	MaxConcurrentDownloadsPerLayer int
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int
 

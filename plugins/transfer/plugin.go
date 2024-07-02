@@ -79,6 +79,10 @@ func init() {
 
 			// Set configuration based on default or user input
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
+			lc.MaxConcurrentDownloadOperations = config.MaxConcurrentDownloadOperations
+			lc.ConcurrentFetchChunksSizeMB = config.ConcurrentFetchChunksSizeMB
+			lc.MaxConcurrentDownloadsPerLayer = config.MaxConcurrentDownloadsPerLayer
+
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
 
 			// If UnpackConfiguration is not defined, set the default.
@@ -153,6 +157,20 @@ type transferConfig struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
 
+	// MaxConcurrentDownloadsPerLayer is the max concurent download per layer
+	// for a pull. 1 means a layer will be donloaded with one connection. 0
+	// means no limit, the upper limit will then be `max_concurrent_downloads`.
+	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer"`
+
+	// MaxConcurrentDownloadOperations is the max number of operations hapenning at the
+	// same time. An operation can be the download, unpacking or moving of a
+	// layer, it can also be another internal containerd operation.
+	MaxConcurrentDownloadOperations int `toml:"max_concurrent_download_operations"`
+
+	// ConcurrentFetchChunkSizes is the size of chunks, only used when
+	// max_concurrent_downloads_per_layer is not 1.
+	ConcurrentFetchChunksSizeMB int `toml:"concurrent_fetch_chunks_size_mb"`
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
 
@@ -176,7 +194,10 @@ type unpackConfiguration struct {
 
 func defaultConfig() *transferConfig {
 	return &transferConfig{
-		MaxConcurrentDownloads:      3,
-		MaxConcurrentUploadedLayers: 3,
+		MaxConcurrentDownloads:          9,
+		MaxConcurrentDownloadsPerLayer:  3,
+		MaxConcurrentDownloadOperations: 3,
+		ConcurrentFetchChunksSizeMB:     32,
+		MaxConcurrentUploadedLayers:     3,
 	}
 }

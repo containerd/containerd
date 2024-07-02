@@ -21,6 +21,7 @@ import (
 	"io"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -37,7 +38,7 @@ type ImageResolver interface {
 type ImageFetcher interface {
 	ImageResolver
 
-	Fetcher(ctx context.Context, ref string) (Fetcher, error)
+	Fetcher(ctx context.Context, ref string, opts ...FetcherOpt) (Fetcher, error)
 }
 
 type ImagePusher interface {
@@ -124,6 +125,48 @@ type Opt func(*Config)
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
+	}
+}
+
+type FetcherConfig struct {
+	MaxConcurrentDownloads         int
+	MaxConcurrentDownloadsPerLayer int
+	ConcurrentFetchChunksSizeMB    int
+	Limiter                        *semaphore.Weighted
+}
+
+type FetcherOpt func(*FetcherConfig)
+
+type FetcherOpts []FetcherOpt
+
+func (opts FetcherOpts) Config() (cfg FetcherConfig) {
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return
+}
+
+func WithConcurrentFetchChunksSizeMB(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.ConcurrentFetchChunksSizeMB = max
+	}
+}
+
+func WithMaxConcurrentDownloads(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.MaxConcurrentDownloads = max
+	}
+}
+
+func WithMaxConcurrentDownloadsPerLayer(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.MaxConcurrentDownloadsPerLayer = max
+	}
+}
+
+func WithLimiter(limiter *semaphore.Weighted) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.Limiter = limiter
 	}
 }
 
