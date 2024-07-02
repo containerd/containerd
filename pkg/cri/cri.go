@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	"github.com/containerd/containerd/pkg/cri/constants"
-	"github.com/containerd/containerd/pkg/cri/nri"
 	"github.com/containerd/containerd/pkg/cri/sbserver"
 	"github.com/containerd/containerd/pkg/cri/server"
 	nriservice "github.com/containerd/containerd/pkg/nri"
@@ -145,7 +144,7 @@ func setGLogLevel() error {
 }
 
 // Get the NRI plugin, and set up our NRI API for it.
-func getNRIAPI(ic *plugin.InitContext) *nri.API {
+func getNRIAPI(ic *plugin.InitContext) nriservice.API {
 	const (
 		pluginType = plugin.NRIApiPlugin
 		pluginName = "nri"
@@ -168,5 +167,5 @@ func getNRIAPI(ic *plugin.InitContext) *nri.API {
 
 	log.G(ctx).Info("using experimental NRI integration - disable nri plugin to prevent this")
 
-	return nri.NewAPI(api)
+	return api
 }
