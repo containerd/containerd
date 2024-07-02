@@ -20,8 +20,10 @@ package process
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -68,5 +70,28 @@ func TestNewBinaryIOCleanup(t *testing.T) {
 func descriptorCount(t *testing.T) int {
 	t.Helper()
 	files, _ := os.ReadDir("/proc/self/fd")
+
+	// Go 1.23 introduced a new internal file descriptor type "pidfd"
+	// that we don't want to count towards the total file descriptors in
+	// use by the process. This retains the behavior of previous Go
+	// versions.
+	// See https://go.dev/issues/62654.
+	//
+	// Once the proposal to check for internal file descriptors is
+	// accepted, we can use that instead to detect internal fds in use
+	// by the Go runtime.
+	// See https://go.dev/issues/67639.
+	for i, file := range files {
+		sym, err := os.Readlink(fmt.Sprintf("/proc/self/fd/%s", file.Name()))
+		if err != nil {
+			// ignore fds that cannot be followed.
+			continue
+		}
+
+		if strings.HasPrefix(sym, "pidfd:") {
+			files = append(files[:i], files[i+1:]...)
+		}
+	}
+
 	return len(files)
 }
