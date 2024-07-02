@@ -30,7 +30,11 @@ import (
 )
 
 // ErrNotADevice denotes that a file is not a valid linux device.
-var ErrNotADevice = errors.New("not a device node")
+type errNotADevice struct{ path string }
+
+func (e *errNotADevice) Error() string {
+	return fmt.Sprintf("not a device node: %s", e.path)
+}
 
 // Testing dependencies
 var (
@@ -98,7 +102,8 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 		default:
 			device, err := DeviceFromPath(filepath.Join(path, f.Name()))
 			if err != nil {
-				if err == ErrNotADevice {
+				var notADeviceError *errNotADevice
+				if errors.As(err, &notADeviceError) {
 					continue
 				}
 				if os.IsNotExist(err) {
@@ -165,7 +170,7 @@ func DeviceFromPath(path string) (*specs.LinuxDevice, error) {
 	case unix.S_IFIFO:
 		devType = fifoDevice
 	default:
-		return nil, ErrNotADevice
+		return nil, &errNotADevice{path: path}
 	}
 	fm := os.FileMode(mode &^ unix.S_IFMT)
 	return &specs.LinuxDevice{
