@@ -17,5 +17,6 @@
 package diff
 
 var defaultDifferConfig = &config{
-	Order: []string{"windows", "windows-lcow"},
+	Order:  []string{"windows", "windows-lcow"},
+	SyncFs: false,
 }
