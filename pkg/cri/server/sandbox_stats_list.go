@@ -18,7 +18,9 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/containerd/ttrpc"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/errdefs"
@@ -42,6 +44,8 @@ func (c *criService) ListPodSandboxStats(
 		switch {
 		case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
 			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, this is likely a transient error: %v", err)
+		case errors.Is(err, ttrpc.ErrClosed):
+			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, connection closed: %v", err)
 		case err != nil:
 			errs = multierror.Append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
 		default:
