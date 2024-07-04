@@ -54,12 +54,12 @@ func (s *safePid) get() int {
 }
 
 // TODO(mlaventure): move to runc package?
-func getLastRuntimeError(r *runc.Runc) (string, error) {
-	if r.Log == "" {
+func getLastRuntimeError(logFile string) (string, error) {
+	if logFile == "" {
 		return "", nil
 	}
 
-	f, err := os.OpenFile(r.Log, os.O_RDONLY, 0400)
+	f, err := os.OpenFile(logFile, os.O_RDONLY, 0400)
 	if err != nil {
 		return "", err
 	}
