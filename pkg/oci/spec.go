@@ -115,22 +115,20 @@ func ApplyOpts(ctx context.Context, client Client, c *containers.Container, s *S
 	return nil
 }
 
+// defaultUnixCaps is the set of the default caps.
+// The following caps are disabled by default since containerd v2.0:
+// MKNOD, NET_RAW, SETFCAP, SYS_CHROOT, AUDIT_WRITE.
 func defaultUnixCaps() []string {
 	return []string{
 		"CAP_CHOWN",
 		"CAP_DAC_OVERRIDE",
 		"CAP_FSETID",
 		"CAP_FOWNER",
-		"CAP_MKNOD",
-		"CAP_NET_RAW",
 		"CAP_SETGID",
 		"CAP_SETUID",
-		"CAP_SETFCAP",
 		"CAP_SETPCAP",
 		"CAP_NET_BIND_SERVICE",
-		"CAP_SYS_CHROOT",
 		"CAP_KILL",
-		"CAP_AUDIT_WRITE",
 	}
 }
 
