@@ -22,9 +22,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -37,9 +39,17 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/fifo"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
+	"golang.org/x/sys/unix"
 )
+
+type RuntimeLog struct {
+	Level string
+	Msg   string
+	Time  time.Time
+}
 
 // NewContainer returns a new runc container
 func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTaskRequest) (_ *Container, retErr error) {
@@ -119,9 +129,10 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		return nil, fmt.Errorf("failed to mount rootfs component: %w", err)
 	}
 
+	runtimeLog := filepath.Join(r.Bundle, "runtime.fifo")
 	p, err := newInit(
 		ctx,
-		r.Bundle,
+		runtimeLog,
 		filepath.Join(r.Bundle, "work"),
 		ns,
 		platform,
@@ -132,6 +143,29 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
+
+	f, err := fifo.OpenFifo(ctx, runtimeLog, unix.O_RDWR|unix.O_CREAT|unix.O_NONBLOCK, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("open runc shim log pipe: %w", err)
+	}
+	go func() {
+		defer f.Close()
+		var runtimeLog RuntimeLog
+		dec := json.NewDecoder(f)
+		for err = nil; err == nil; {
+			if err = dec.Decode(&runtimeLog); err != nil && err != io.EOF {
+				log.G(ctx).Errorf("decode err:%w", err)
+				break
+			}
+			if runtimeLog.Level == "error" {
+				err := writeFile(runtimeLog, filepath.Join(r.Bundle, "log.json"))
+				if err != nil {
+					log.G(ctx).WithError(err).Error("write runtime log")
+				}
+			}
+			log.G(ctx).Errorf("runtime log err:%s", runtimeLog.Msg)
+		}
+	}()
 	if err := p.Create(ctx, config); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
@@ -213,9 +247,9 @@ func WriteRuntime(path, runtime string) error {
 	return os.WriteFile(filepath.Join(path, "runtime"), []byte(runtime), 0600)
 }
 
-func newInit(ctx context.Context, path, workDir, namespace string, platform stdio.Platform,
+func newInit(ctx context.Context, file, workDir, namespace string, platform stdio.Platform,
 	r *process.CreateConfig, options *options.Options, rootfs string) (*process.Init, error) {
-	runtime := process.NewRunc(options.Root, path, namespace, options.BinaryName, options.SystemdCgroup)
+	runtime := process.NewRunc(options.Root, file, namespace, options.BinaryName, options.SystemdCgroup)
 	p := process.New(r.ID, runtime, stdio.Stdio{
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
@@ -509,4 +543,17 @@ func (c *Container) HasPid(pid int) bool {
 		}
 	}
 	return false
+}
+
+func writeFile(log RuntimeLog, path string) error {
+	logFile, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("Error open file %s %w", path, err)
+	}
+	defer logFile.Close()
+	encoder := json.NewEncoder(logFile)
+	if err := encoder.Encode(log); err != nil {
+		return fmt.Errorf("Error writing to file %s %w", path, err)
+	}
+	return nil
 }
