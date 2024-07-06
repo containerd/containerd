@@ -22,9 +22,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 )
 
 func TestLeases(t *testing.T) {
@@ -54,7 +56,7 @@ func TestLeases(t *testing.T) {
 
 	for _, tc := range testCases {
 		if err := db.Update(func(tx *bolt.Tx) error {
-			lease, err := lm.Create(WithTransactionContext(ctx, tx), leases.WithID(tc.ID))
+			lease, err := lm.Create(boltutil.WithTransaction(ctx, tx), leases.WithID(tc.ID))
 			if err != nil {
 				if tc.CreateErr != nil && errors.Is(err, tc.CreateErr) {
 					return nil
@@ -139,7 +141,7 @@ func TestLeasesList(t *testing.T) {
 	// Insert all
 	if err := db.Update(func(tx *bolt.Tx) error {
 		for _, opts := range testset {
-			_, err := lm.Create(WithTransactionContext(ctx, tx), opts...)
+			_, err := lm.Create(boltutil.WithTransaction(ctx, tx), opts...)
 			if err != nil {
 				return err
 			}
@@ -359,7 +361,7 @@ func TestLeaseResource(t *testing.T) {
 	idxList := make(map[leases.Resource]bool)
 	for i, tc := range testCases {
 		if err := db.Update(func(tx *bolt.Tx) error {
-			err0 := lm.AddResource(WithTransactionContext(ctx, tx), tc.lease, tc.resource)
+			err0 := lm.AddResource(boltutil.WithTransaction(ctx, tx), tc.lease, tc.resource)
 			if !errors.Is(err0, tc.err) {
 				return fmt.Errorf("expect error (%v), but got (%v)", tc.err, err0)
 			}
