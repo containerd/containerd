@@ -25,10 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
@@ -37,6 +33,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
+	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 func init() {
@@ -71,7 +73,7 @@ func TestContainersList(t *testing.T) {
 
 		if err := db.Update(func(tx *bolt.Tx) error {
 			now := time.Now()
-			result, err := store.Create(WithTransactionContext(ctx, tx), *testset[id])
+			result, err := store.Create(boltutil.WithTransaction(ctx, tx), *testset[id])
 			if err != nil {
 				return err
 			}
