@@ -23,11 +23,11 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -251,7 +251,7 @@ func runProcessMetricTest(tc struct {
 }
 
 func toProto(metric any) *anypb.Any {
-	data, err := protobuf.MarshalAnyToProto(metric)
+	data, err := typeurl.MarshalAnyToProto(metric)
 	if err != nil {
 		panic("failed to marshal proto: " + err.Error())
 	}

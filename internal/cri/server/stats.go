@@ -24,11 +24,11 @@ import (
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/log"
 )
@@ -44,7 +44,7 @@ type metricMonitor struct {
 func newMetricMonitor(c *criService) *metricMonitor {
 	return &metricMonitor{
 		c:                c,
-		collectionPeriod: 10 * time.Second,
+		collectionPeriod: time.Duration(c.config.StatsMetricsPeriod) * time.Second,
 	}
 }
 
@@ -54,7 +54,7 @@ func (m *metricMonitor) Start() {
 		for {
 			err := m.collect()
 			if err != nil {
-				log.L.Warnf("Failed to collect stat: %v", err)
+				log.L.Warnf("Failed to collect stats: %v", err)
 			}
 			time.Sleep(m.collectionPeriod)
 		}
@@ -72,7 +72,7 @@ func (m *metricMonitor) collect() error {
 
 	resp, err := m.c.client.TaskService().Metrics(ctrdutil.WithNamespace(context.Background()), req)
 	if err != nil {
-		return fmt.Errorf("failed to get stat: %v", err)
+		return fmt.Errorf("failed to get stats: %v", err)
 	}
 	for _, stat := range resp.Metrics {
 		err := m.processMetric(stat, sandboxes)

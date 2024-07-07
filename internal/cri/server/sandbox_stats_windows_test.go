@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func Test_criService_podSandboxStats(t *testing.T) {
@@ -43,6 +44,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	for _, test := range []struct {
 		desc                   string
 		metrics                map[string]*wstats.Statistics
+		metricsPeriod          int
 		sandbox                sandboxstore.Sandbox
 		containers             []containerstore.Container
 		expectedPodStats       *expectedStats
@@ -257,6 +259,38 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectError: false,
 		},
 		{
+			desc: "pod sandbox with nil stats still works (hostprocess container scenario)",
+			metrics: map[string]*wstats.Statistics{
+				"c1": {
+					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+				},
+				"s1": nil,
+			},
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200, 0),
+			containers: []containerstore.Container{
+				newContainer("c1", running, &stats.ContainerStats{
+					Timestamp:            initialStatsTimestamp,
+					UsageCoreNanoSeconds: 200,
+					UsageNanoCores:       200,
+				}),
+			},
+			expectedPodStats: &expectedStats{
+				UsageCoreNanoSeconds: 400,
+				UsageNanoCores:       200,
+				WorkingSetBytes:      20,
+				CommitMemoryBytes:    20,
+			},
+			expectedContainerStats: []expectedStats{
+				{
+					UsageCoreNanoSeconds: 400,
+					UsageNanoCores:       200,
+					WorkingSetBytes:      20,
+					CommitMemoryBytes:    20,
+				},
+			},
+			expectError: false,
+		},
+		{
 			desc: "pod sandbox with empty stats still works (hostprocess container scenario)",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
@@ -317,6 +351,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			c.config.StatsMetricsPeriod = test.metricsPeriod
 			actualPodStats, actualContainerStats, err := c.toPodSandboxStats(test.sandbox, test.metrics, test.containers, currentStatsTimestamp)
 			if test.expectError {
 				assert.NotNil(t, err)
@@ -393,4 +428,171 @@ var exitedInvalid = containerstore.Status{
 
 var running = containerstore.Status{
 	StartedAt: time.Now().UnixNano(),
+}
+
+func Test_criService_saveSandBoxMetrics(t *testing.T) {
+
+	timestamp := time.Now()
+	containerID := "c1"
+	sandboxID := "s1"
+	for _, test := range []struct {
+		desc                   string
+		sandboxStats           *runtime.PodSandboxStats
+		expectError            bool
+		expectedSandboxvalue   *stats.ContainerStats
+		expectedContainervalue *stats.ContainerStats
+	}{
+		{
+			desc:                 "if sandboxstats is nil then skip ",
+			sandboxStats:         nil,
+			expectError:          false,
+			expectedSandboxvalue: nil,
+		},
+		{
+			desc: "if sandboxstats.windows is nil then skip",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: nil,
+			},
+			expectError:          false,
+			expectedSandboxvalue: nil,
+		},
+		{
+			desc: "if sandboxstats.windows.cpu is nil then skip",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: &runtime.WindowsPodSandboxStats{
+					Cpu: nil,
+				},
+			},
+			expectError:          false,
+			expectedSandboxvalue: nil,
+		},
+		{
+			desc: "if sandboxstats.windows.cpu.UsageCoreNanoSeconds is nil then skip",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: &runtime.WindowsPodSandboxStats{
+					Cpu: &runtime.WindowsCpuUsage{
+						UsageCoreNanoSeconds: nil,
+					},
+				},
+			},
+			expectError:          false,
+			expectedSandboxvalue: nil,
+		},
+		{
+			desc: "Stats for containers that have cpu nil are skipped",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: &runtime.WindowsPodSandboxStats{
+					Cpu: &runtime.WindowsCpuUsage{
+						Timestamp:            timestamp.UnixNano(),
+						UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 100},
+					},
+					Containers: []*runtime.WindowsContainerStats{
+						{
+							Attributes: &runtime.ContainerAttributes{Id: containerID},
+							Cpu:        nil,
+						},
+					},
+				},
+			},
+			expectError: false,
+			expectedSandboxvalue: &stats.ContainerStats{
+				Timestamp:            timestamp,
+				UsageCoreNanoSeconds: 100,
+			},
+			expectedContainervalue: nil,
+		},
+		{
+			desc: "Stats for containers that have UsageCoreNanoSeconds nil are skipped",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: &runtime.WindowsPodSandboxStats{
+					Cpu: &runtime.WindowsCpuUsage{
+						Timestamp:            timestamp.UnixNano(),
+						UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 100},
+					},
+					Containers: []*runtime.WindowsContainerStats{
+						{
+							Attributes: &runtime.ContainerAttributes{Id: containerID},
+							Cpu: &runtime.WindowsCpuUsage{
+								Timestamp:            timestamp.UnixNano(),
+								UsageCoreNanoSeconds: nil},
+						},
+					},
+				},
+			},
+			expectError: false,
+			expectedSandboxvalue: &stats.ContainerStats{
+				Timestamp:            timestamp,
+				UsageCoreNanoSeconds: 100,
+			},
+			expectedContainervalue: nil,
+		},
+		{
+			desc: "Stats are updated for sandbox and containers",
+			sandboxStats: &runtime.PodSandboxStats{
+				Windows: &runtime.WindowsPodSandboxStats{
+					Cpu: &runtime.WindowsCpuUsage{
+						Timestamp:            timestamp.UnixNano(),
+						UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 100},
+					},
+					Containers: []*runtime.WindowsContainerStats{
+						{
+							Attributes: &runtime.ContainerAttributes{Id: containerID},
+							Cpu: &runtime.WindowsCpuUsage{
+								Timestamp:            timestamp.UnixNano(),
+								UsageCoreNanoSeconds: &runtime.UInt64Value{Value: 50},
+							},
+						},
+					},
+				},
+			},
+			expectError: false,
+			expectedSandboxvalue: &stats.ContainerStats{
+				Timestamp:            timestamp,
+				UsageCoreNanoSeconds: 100,
+			},
+			expectedContainervalue: &stats.ContainerStats{
+				Timestamp:            timestamp,
+				UsageCoreNanoSeconds: 50,
+			},
+		},
+	} {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			c := newTestCRIService()
+			c.sandboxStore.Add(sandboxstore.Sandbox{
+				Metadata: sandboxstore.Metadata{ID: sandboxID},
+			})
+
+			c.containerStore.Add(containerstore.Container{
+				Metadata: containerstore.Metadata{ID: containerID},
+			})
+
+			err := c.saveSandBoxMetrics(sandboxID, test.sandboxStats)
+
+			if test.expectError {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+
+			sandbox, err := c.sandboxStore.Get(sandboxID)
+			assert.Nil(t, err)
+
+			if test.expectedSandboxvalue != nil {
+				assert.Equal(t, test.expectedSandboxvalue.Timestamp.UnixNano(), sandbox.Stats.Timestamp.UnixNano())
+				assert.Equal(t, test.expectedSandboxvalue.UsageCoreNanoSeconds, sandbox.Stats.UsageCoreNanoSeconds)
+			} else {
+				assert.Nil(t, sandbox.Stats)
+			}
+
+			container, err := c.containerStore.Get(containerID)
+			assert.Nil(t, err)
+			if test.expectedContainervalue != nil {
+				assert.Equal(t, test.expectedContainervalue.Timestamp.UnixNano(), container.Stats.Timestamp.UnixNano())
+				assert.Equal(t, test.expectedContainervalue.UsageCoreNanoSeconds, container.Stats.UsageCoreNanoSeconds)
+			} else {
+				assert.Nil(t, container.Stats)
+			}
+		})
+	}
 }

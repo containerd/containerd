@@ -43,6 +43,17 @@ func (c *criService) ListContainerStats(
 	ctx context.Context,
 	in *runtime.ListContainerStatsRequest,
 ) (*runtime.ListContainerStatsResponse, error) {
+	css, err := c.listContainerStats(ctx, in)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch containers and stats: %w", err)
+	}
+	return c.toCRIContainerStats(css), nil
+}
+
+func (c *criService) listContainerStats(
+	ctx context.Context,
+	in *runtime.ListContainerStatsRequest,
+) ([]containerStats, error) {
 	request, containers, err := c.buildTaskMetricsRequest(in)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build metrics request: %w", err)
@@ -149,13 +160,21 @@ func (c *criService) toContainerStats(
 			return nil, fmt.Errorf("failed to decode container metrics for %q: %w", cntr.ID, err)
 		}
 
-		if cs.stats.Cpu != nil && cs.stats.Cpu.UsageCoreNanoSeconds != nil {
-			// this is a calculated value and should be computed for all OSes
-			nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.stats.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.stats.Cpu.Timestamp))
-			if err != nil {
-				return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+		if cs.stats.Cpu != nil {
+			// check if stats metrics has scheduled collection enabled
+			// otherwise request at runtime.
+			if c.config.StatsMetricsPeriod == 0 && cs.stats.Cpu.UsageCoreNanoSeconds != nil {
+				nanoUsage, err := c.getUsageNanoCores(cntr.Metadata.ID, false, cs.stats.Cpu.UsageCoreNanoSeconds.Value, time.Unix(0, cs.stats.Cpu.Timestamp))
+				if err != nil {
+					return nil, fmt.Errorf("failed to get usage nano cores, containerID: %s: %w", cntr.Metadata.ID, err)
+				}
+				cs.stats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
+			} else if cntr.Stats != nil {
+				// this is a calculated value and should be computed for all OSes, calculated value every 10s
+				cs.stats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: cntr.Stats.UsageNanoCores}
+				cs.stats.Cpu.UsageCoreNanoSeconds = &runtime.UInt64Value{Value: cntr.Stats.UsageCoreNanoSeconds}
+				cs.stats.Cpu.Timestamp = cntr.Stats.Timestamp.UnixNano()
 			}
-			cs.stats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoUsage}
 		}
 		css = append(css, cs)
 	}
@@ -319,10 +338,11 @@ func (c *criService) windowsContainerMetrics(
 		if err != nil {
 			return containerStats{}, fmt.Errorf("failed to extract container metrics: %w", err)
 		}
-		wstats := s.(*wstats.Statistics).GetWindows()
+		wstats := data.(*wstats.Statistics).GetWindows()
 		if wstats == nil {
 			return containerStats{}, errors.New("windows stats is empty")
 		}
+
 		if wstats.Processor != nil {
 			cs.Cpu = &runtime.CpuUsage{
 				Timestamp:            (protobuf.FromTimestamp(wstats.Timestamp)).UnixNano(),
@@ -373,7 +393,12 @@ func (c *criService) linuxContainerMetrics(
 	if stats != nil {
 		data, err := convertMetric(stats)
 		if err != nil {
-			return nil, err
+			return containerStats{}, err
+		}
+
+		switch {
+		case typeurl.Is(stats.Data, (*cg2.Metrics)(nil)):
+			pids = data.(*cg2.Metrics).GetPids().GetCurrent()
 		}
 
 		cpuStats, err := c.cpuContainerStats(data, protobuf.FromTimestamp(stats.Timestamp))
@@ -382,14 +407,11 @@ func (c *criService) linuxContainerMetrics(
 		}
 		cs.Cpu = cpuStats
 
-		memoryStats, err := c.memoryContainerStats(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
+		memoryStats, err := c.memoryContainerStats(data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
 			return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		cs.Memory = memoryStats
-		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
-		}
 	}
 
 	return containerStats{&cs, pids}, nil
@@ -472,7 +494,7 @@ func (c *criService) cpuContainerStats(stats interface{}, timestamp time.Time) (
 	return nil, nil
 }
 
-func (c *criService) memoryContainerStats(ID string, stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
+func (c *criService) memoryContainerStats(stats interface{}, timestamp time.Time) (*runtime.MemoryUsage, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
 		if metrics.Memory != nil && metrics.Memory.Usage != nil {

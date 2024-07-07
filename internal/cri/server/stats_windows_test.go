@@ -21,8 +21,8 @@ import (
 	"time"
 
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
-	"github.com/containerd/containerd/v2/api/types"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 func TestProcessMetricWindows(t *testing.T) {

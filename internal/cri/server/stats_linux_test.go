@@ -19,7 +19,7 @@ package server
 import (
 	"testing"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"

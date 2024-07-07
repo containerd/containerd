@@ -21,7 +21,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 )
 
 func (m *metricMonitor) extractStats(sandboxes map[string]struct{}, stat *types.Metric) (any, error) {
