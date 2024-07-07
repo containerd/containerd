@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/atomicfile"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/ttrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -47,6 +48,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
 )
 
 const (
@@ -272,7 +274,11 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 			}
 		}()
 
-		return ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose)), nil
+		return ttrpc.NewClient(
+			conn,
+			ttrpc.WithOnClose(onClose),
+			ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
+		), nil
 	case "grpc":
 		ctx, cancel := context.WithTimeout(ctx, time.Second*100)
 		defer cancel()
@@ -280,6 +286,8 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithBlock(),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),   //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()), //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
 		}
 		return grpcDialContext(ctx, params.Address, onClose, gopts...)
 	default:

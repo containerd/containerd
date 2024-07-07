@@ -43,6 +43,7 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
@@ -248,7 +249,9 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-	publisher, err := NewPublisher(ttrpcAddress)
+	publisher, err := NewPublisher(ttrpcAddress, WithPublishTTRPCOpts(
+		ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
+	))
 	if err != nil {
 		return err
 	}
@@ -397,6 +400,8 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	if len(ttrpcServices) == 0 {
 		return fmt.Errorf("required that ttrpc service")
 	}
+
+	ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, otelttrpc.UnaryServerInterceptor())
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
 	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
