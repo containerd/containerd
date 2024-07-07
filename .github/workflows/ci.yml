@@ -527,7 +527,7 @@ jobs:
       fail-fast: false
       matrix:
         box:
-          - fedora/39-cloud-base
+          - fedora/40-cloud-base
           # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
           # The image was changed from rockylinux/8 to almalinux/8,
           # as the former one no longer works:
