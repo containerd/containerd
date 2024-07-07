@@ -24,11 +24,11 @@ import (
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/v2/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/services/tasks/v1"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"github.com/containerd/containerd/v2/protobuf"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 
-	"github.com/containerd/containerd/v2/api/types"
+	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/log"
 )
@@ -44,7 +44,7 @@ type metricMonitor struct {
 func newMetricMonitor(c *criService) *metricMonitor {
 	return &metricMonitor{
 		c:                c,
-		collectionPeriod: 10 * time.Second,
+		collectionPeriod: time.Duration(c.config.StatsMetricsPeriod) * time.Second,
 	}
 }
 

@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
@@ -83,6 +84,10 @@ func (c *criService) podSandboxStats(
 	podSandboxStats.Windows.Process = &runtime.WindowsProcessUsage{
 		Timestamp:    timestamp.UnixNano(),
 		ProcessCount: &runtime.UInt64Value{Value: pidCount},
+	}
+
+	if c.config.StatsMetricsPeriod == 0 {
+		c.saveSandBoxMetrics(podSandboxStats.Attributes.Id, podSandboxStats)
 	}
 
 	return podSandboxStats, nil
@@ -151,14 +156,19 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		}
 
 		// Calculate NanoCores for container
-		if containerStats.Cpu != nil {
-			containerNanoCores := uint64(0)
-			if cntr.Stats != nil {
-				containerNanoCores = cntr.Stats.UsageNanoCores
-			}
 
-			containerNanoCoreTotal += containerNanoCores
-			containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: containerNanoCores}
+		if containerStats.Cpu != nil {
+			if c.config.StatsMetricsPeriod == 0 && containerStats.Cpu.UsageCoreNanoSeconds != nil {
+				nanoCoreUsage := getUsageNanoCores(containerStats.Cpu.UsageCoreNanoSeconds.Value, cntr.Stats, containerStats.Cpu.Timestamp)
+				containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+			} else {
+				containerNanoCores := uint64(0)
+				if cntr.Stats != nil {
+					containerNanoCores = cntr.Stats.UsageNanoCores
+				}
+				containerNanoCoreTotal += containerNanoCores
+				containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: containerNanoCores}
+			}
 		}
 
 		// On Windows we need to add up all the podStatsData to get the Total for the Pod as there isn't something
@@ -193,15 +203,20 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 
 	// Calculate NanoCores for pod after adding containers cpu including the pods cpu
 	if podRuntimeStats.Cpu != nil {
-		sandboxNanoCores := uint64(0)
-		if sandbox.Stats != nil {
-			sandboxNanoCores = sandbox.Stats.UsageNanoCores
+		if c.config.StatsMetricsPeriod == 0 && podRuntimeStats.Cpu.UsageCoreNanoSeconds != nil {
+			nanoCoreUsage := getUsageNanoCores(podRuntimeStats.Cpu.UsageCoreNanoSeconds.Value, sandbox.Stats, podRuntimeStats.Cpu.Timestamp)
+			podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+		} else {
+			sandboxNanoCores := uint64(0)
+			if sandbox.Stats != nil {
+				sandboxNanoCores = sandbox.Stats.UsageNanoCores
+			}
+			// There is not a cgroup equivalent on windows where we can get the total cpu usage for the pod
+			// The sandbox container stats are for the "sandbox" container only
+			// To get the total for the pod we need to add the sandbox container stats to the total of the containers
+			// This could possibly change when internal/cri/server/podsandbox/sandbox_stats.go is implemented
+			podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: sandboxNanoCores + containerNanoCoreTotal}
 		}
-		// There is not a cgroup equivalent on windows where we can get the total cpu usage for the pod
-		// The sandbox container stats are for the "sandbox" container only
-		// To get the total for the pod we need to add the sandbox container stats to the total of the containers
-		// This could possibly change when internal/cri/server/podsandbox/sandbox_stats.go is implemented
-		podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: sandboxNanoCores + containerNanoCoreTotal}
 	}
 
 	return podRuntimeStats, windowsContainerStats, nil
@@ -322,6 +337,22 @@ func (c *criService) convertToCRIStats(stats *wstats.Statistics) (*runtime.Windo
 	return &cs, nil
 }
 
+func getUsageNanoCores(usageCoreNanoSeconds uint64, oldStats *stats.ContainerStats, newtimestamp int64) uint64 {
+	if oldStats == nil {
+		return 0
+	}
+
+	nanoSeconds := newtimestamp - oldStats.Timestamp.UnixNano()
+
+	// zero or negative interval
+	if nanoSeconds <= 0 {
+		return 0
+	}
+
+	return uint64(float64(usageCoreNanoSeconds-oldStats.UsageCoreNanoSeconds) /
+		float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
+}
+
 func windowsNetworkUsage(ctx context.Context, sandbox sandboxstore.Sandbox, timestamp time.Time) *runtime.WindowsNetworkUsage {
 	eps, err := hcn.GetNamespaceEndpointIds(sandbox.NetNSPath)
 	if err != nil {
@@ -354,6 +385,42 @@ func windowsNetworkUsage(ctx context.Context, sandbox sandboxstore.Sandbox, time
 	}
 
 	return networkUsage
+}
+
+func (c *criService) saveSandBoxMetrics(sandboxID string, sandboxStats *runtime.PodSandboxStats) error {
+	// we may not have stats since container hasn't started yet so skip saving to cache
+	if sandboxStats == nil || sandboxStats.Windows == nil || sandboxStats.Windows.Cpu == nil ||
+		sandboxStats.Windows.Cpu.UsageCoreNanoSeconds == nil {
+		return nil
+	}
+
+	newStats := &stats.ContainerStats{
+		UsageCoreNanoSeconds: sandboxStats.Windows.Cpu.UsageCoreNanoSeconds.Value,
+		Timestamp:            time.Unix(0, sandboxStats.Windows.Cpu.Timestamp),
+	}
+	err := c.sandboxStore.UpdateContainerStats(sandboxID, newStats)
+	if err != nil {
+		return err
+	}
+
+	// We queried the stats when getting sandbox stats.  We need to save the query to cache
+	for _, cntr := range sandboxStats.Windows.Containers {
+		// we may not have stats since container hasn't started yet so skip saving to cache
+		if cntr == nil || cntr.Cpu == nil || cntr.Cpu.UsageCoreNanoSeconds == nil {
+			return nil
+		}
+
+		newStats := &stats.ContainerStats{
+			UsageCoreNanoSeconds: cntr.Cpu.UsageCoreNanoSeconds.Value,
+			Timestamp:            time.Unix(0, cntr.Cpu.Timestamp),
+		}
+		err = c.containerStore.UpdateContainerStats(cntr.Attributes.Id, newStats)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *criService) getSandboxPidCount(ctx context.Context, sandbox sandboxstore.Sandbox) (uint64, error) {

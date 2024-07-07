@@ -409,6 +409,9 @@ type RuntimeConfig struct {
 	// IgnoreDeprecationWarnings is the list of the deprecation IDs (such as "io.containerd.deprecation/pull-schema-1-image")
 	// that should be ignored for checking "ContainerdHasNoDeprecationWarnings" condition.
 	IgnoreDeprecationWarnings []string `toml:"ignore_deprecation_warnings" json:"ignoreDeprecationWarnings"`
+
+	// StatsMetricsPeriod is the period (in seconds) of containersm metrics stats collection.
+	StatsMetricsPeriod int `toml:"stats_metrics_period" json:"statsMetricsPeriod"`
 }
 
 // X509KeyPairStreaming contains the x509 configuration for streaming

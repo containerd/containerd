@@ -290,8 +290,10 @@ func (c *criService) Run(ready func()) error {
 		}()
 	}
 
-	log.L.Info("Starting metric cache provider")
-	c.metricMonitor.Start()
+	if c.config.StatsMetricsPeriod > 0 {
+		log.L.Info("Starting metric cache provider")
+		c.metricMonitor.Start()
+	}
 
 	// Start streaming server.
 	log.L.Info("Start streaming server")
