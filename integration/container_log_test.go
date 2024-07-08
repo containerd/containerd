@@ -44,7 +44,7 @@ func TestContainerLogWithoutTailingNewLine(t *testing.T) {
 		containerName = "test-container"
 	)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create a container with log path")
 	cnConfig := ContainerConfig(
@@ -92,7 +92,7 @@ func TestLongContainerLog(t *testing.T) {
 		containerName = "test-container"
 	)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create a container with log path")
 	config, err := CRIConfig()

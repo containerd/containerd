@@ -235,9 +235,11 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 			}
 			platformMatcher = platforms.OnlyStrict(platSpec)
 			opts = append(opts, containerd.WithImportPlatform(platformMatcher))
+		} else if cliContext.Bool("all-platforms") {
+			opts = append(opts, containerd.WithAllPlatforms(cliContext.Bool("all-platforms")))
+		} else {
+			opts = append(opts, containerd.WithImportPlatform(platforms.Only(platforms.DefaultSpec())))
 		}
-
-		opts = append(opts, containerd.WithAllPlatforms(cliContext.Bool("all-platforms")))
 
 		if cliContext.Bool("discard-unpacked-layers") {
 			if cliContext.Bool("no-unpack") {

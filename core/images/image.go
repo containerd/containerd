@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -29,6 +30,14 @@ import (
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+const (
+	GcSnapshotLabel   string = "containerd.io/gc.ref.snapshot"
+	GcExpirationLabel string = "containerd.io/gc.expire"
+	GcImageLabel      string = "containerd.io/gc.ref.image"
+	RootImageLabel    string = "containerd.io/root-image"
+	SnapshotInfoLabel string = "containerd.io/snapshot"
 )
 
 // Image provides the model for how containerd views container images.
@@ -137,6 +146,18 @@ type platformManifest struct {
 	m *ocispec.Manifest
 }
 
+func validateAndReadBlob(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]byte, error) {
+	p, err := content.ReadBlob(ctx, provider, desc)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateMediaType(p, desc.MediaType); err != nil {
+		return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+	}
+	return p, nil
+}
+
 // Manifest resolves a manifest from the image for the given platform.
 //
 // When a manifest descriptor inside of a manifest index does not have
@@ -159,18 +180,14 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if IsManifestType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, provider, desc)
+			p, err := validateAndReadBlob(ctx, provider, desc)
 			if err != nil {
-				return nil, err
-			}
-
-			if err := validateMediaType(p, desc.MediaType); err != nil {
-				return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+				return nil, fmt.Errorf("failed to validateAndReadBlob with err %v", err)
 			}
 
 			var manifest ocispec.Manifest
 			if err := json.Unmarshal(p, &manifest); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unmarshal with err %v", err)
 			}
 
 			if desc.Digest != image.Digest && platform != nil {
@@ -181,7 +198,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 				if desc.Platform == nil {
 					imagePlatform, err := ConfigPlatform(ctx, provider, manifest.Config)
 					if err != nil {
-						return nil, err
+						return nil, fmt.Errorf("failed to configPlatform() with err %v", err)
 					}
 					if !platform.Match(imagePlatform) {
 						return nil, nil
@@ -197,18 +214,14 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 			return nil, nil
 		} else if IsIndexType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, provider, desc)
+			p, err := validateAndReadBlob(ctx, provider, desc)
 			if err != nil {
-				return nil, err
-			}
-
-			if err := validateMediaType(p, desc.MediaType); err != nil {
-				return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+				return nil, fmt.Errorf("failed to validateAndReadBlob with err %v", err)
 			}
 
 			var idx ocispec.Index
 			if err := json.Unmarshal(p, &idx); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unmarshal with err %v", err)
 			}
 
 			if platform == nil {
@@ -241,7 +254,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		}
 		return nil, fmt.Errorf("unexpected media type %v for %v: %w", desc.MediaType, desc.Digest, errdefs.ErrNotFound)
 	}), image); err != nil {
-		return ocispec.Manifest{}, err
+		return ocispec.Manifest{}, fmt.Errorf("failed to last err %v", err)
 	}
 
 	if len(m) == 0 {
@@ -249,7 +262,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		if wasIndex {
 			err = fmt.Errorf("no match for platform in manifest %v: %w", image.Digest, errdefs.ErrNotFound)
 		}
-		return ocispec.Manifest{}, err
+		return ocispec.Manifest{}, fmt.Errorf("failed to last2 with err %v", err)
 	}
 	return *m[0].m, nil
 }
@@ -437,4 +450,92 @@ func ConfigPlatform(ctx context.Context, provider content.Provider, configDesc o
 		return ocispec.Platform{}, err
 	}
 	return platforms.Normalize(imagePlatform), nil
+}
+
+// UnpackedImageInfo is used to fetch details
+// of an unpacked image by walking from the root
+// index down to the configDesc.
+type UnpackedImageInfo struct {
+	ConfigDigest digest.Digest
+	Platform     ocispec.Platform
+	Snapshot     string
+	SnapshotID   string
+}
+
+// getPlatform returns the platform from given if not empty.
+func getPlatform(desc ocispec.Descriptor) ocispec.Platform {
+	if desc.Platform != nil {
+		return *desc.Platform
+	}
+	return ocispec.Platform{}
+}
+
+// getImageInfoFromManifest returns the platform and snapshot information from the manifest for the given image.
+func getImageInfoFromManifest(
+	ctx context.Context,
+	cs content.Store,
+	target ocispec.Descriptor,
+) (UnpackedImageInfo, error) {
+	if !IsManifestType(target.MediaType) {
+		return UnpackedImageInfo{}, nil
+	}
+	p, err := validateAndReadBlob(ctx, cs, target)
+	if err != nil {
+		return UnpackedImageInfo{}, err
+	}
+	var manifest ocispec.Manifest
+	if err := json.Unmarshal(p, &manifest); err != nil {
+		return UnpackedImageInfo{}, fmt.Errorf("failed to unmarshal manifest: %v", err)
+	}
+
+	configDigest := manifest.Config.Digest
+	contentInfo, err := cs.Info(ctx, configDigest)
+	if err != nil {
+		return UnpackedImageInfo{}, errdefs.ErrNotFound
+	}
+	labels := contentInfo.Labels
+	platform := getPlatform(target)
+	imgInfo := UnpackedImageInfo{
+		ConfigDigest: configDigest,
+		Platform:     platform,
+	}
+	for key, val := range labels {
+		if strings.HasPrefix(key, GcSnapshotLabel+".") {
+			imgInfo.SnapshotID = val
+			imgInfo.Snapshot = strings.TrimPrefix(key, GcSnapshotLabel+".")
+			return imgInfo, nil
+		} else if strings.HasPrefix(key, SnapshotInfoLabel+".") {
+			imgInfo.SnapshotID = val
+			imgInfo.Snapshot = strings.TrimPrefix(key, SnapshotInfoLabel+".")
+			return imgInfo, nil
+		}
+	}
+	return UnpackedImageInfo{}, fmt.Errorf("valid snapshot not found for image")
+}
+
+// GetUnpackedImageInfo finds the platform and snapshotter used to unpack the given target image
+func GetUnpackedImageInfo(
+	ctx context.Context,
+	cs content.Store,
+	target ocispec.Descriptor,
+) (UnpackedImageInfo, error) {
+	if !IsIndexType(target.MediaType) {
+		return UnpackedImageInfo{}, nil
+	}
+
+	children, err := Children(ctx, cs, target)
+	if err != nil {
+		return UnpackedImageInfo{}, err
+	}
+	for _, desc := range children {
+		if desc.Platform == nil {
+			continue
+		}
+		imgInfo, err := getImageInfoFromManifest(ctx, cs, desc)
+		if err != nil {
+			continue
+		}
+		return imgInfo, nil
+	}
+	return UnpackedImageInfo{}, fmt.Errorf("no valid manifest found")
 }

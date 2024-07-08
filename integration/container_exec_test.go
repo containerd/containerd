@@ -41,7 +41,7 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 		containerName = "test-container-exec"
 	)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create a container")
 	cnConfig := ContainerConfig(

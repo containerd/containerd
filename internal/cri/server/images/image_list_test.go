@@ -32,7 +32,7 @@ func TestListImages(t *testing.T) {
 	_, c := newTestCRIService()
 	imagesInStore := []imagestore.Image{
 		{
-			ID:      "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-1",
 			References: []string{
 				"gcr.io/library/busybox:latest",
@@ -46,7 +46,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:      "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-2",
 			References: []string{
 				"gcr.io/library/alpine:latest",
@@ -60,7 +60,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:      "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-3",
 			References: []string{
 				"gcr.io/library/ubuntu:latest",
@@ -81,6 +81,7 @@ func TestListImages(t *testing.T) {
 			RepoDigests: []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(1000),
 			Username:    "root",
+			Spec:        &runtime.ImageSpec{Image: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 		},
 		{
 			Id:          "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -88,6 +89,7 @@ func TestListImages(t *testing.T) {
 			RepoDigests: []string{"gcr.io/library/alpine@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(2000),
 			Uid:         &runtime.Int64Value{Value: 1234},
+			Spec:        &runtime.ImageSpec{Image: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 		},
 		{
 			Id:          "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -95,6 +97,7 @@ func TestListImages(t *testing.T) {
 			RepoDigests: []string{"gcr.io/library/ubuntu@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"},
 			Size_:       uint64(3000),
 			Username:    "nobody",
+			Spec:        &runtime.ImageSpec{Image: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 		},
 	}
 

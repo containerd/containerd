@@ -25,6 +25,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+	"github.com/davecgh/go-spew/spew"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/opencontainers/selinux/go-selinux"
+	"github.com/opencontainers/selinux/go-selinux/label"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -37,16 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/log"
 	"github.com/containerd/platforms"
-	"github.com/containerd/typeurl/v2"
-	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/opencontainers/selinux/go-selinux"
-	"github.com/opencontainers/selinux/go-selinux/label"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func init() {
@@ -125,7 +126,8 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			return true, nil
 		}
 		// Check if this is an OCI checkpoint image
-		imageID, err := c.checkIfCheckpointOCIImage(ctx, config.GetImage().GetImage())
+		img := config.GetImage()
+		imageID, err := c.checkIfCheckpointOCIImage(ctx, img.GetImage(), sandbox.RuntimeHandler)
 		if err != nil {
 			return false, fmt.Errorf("failed to check if this is a checkpoint image: %w", err)
 		}
@@ -163,13 +165,14 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Prepare container image snapshot. For container, the image should have
 	// been pulled before creating the container, so do not ensure the image.
-	image, err := c.LocalResolve(config.GetImage().GetImage())
+	img := config.GetImage()
+	image, err := c.LocalResolve(img.GetImage(), img.GetRuntimeHandler())
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve image %q: %w", config.GetImage().GetImage(), err)
 	}
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.Key.ID, err)
 	}
 
 	span.SetAttributes(
@@ -182,7 +185,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			containerID:           id,
 			sandbox:               &sandbox,
 			sandboxID:             sandboxID,
-			imageID:               image.ID,
+			imageID:               image.Key.ID,
 			containerConfig:       config,
 			imageConfig:           &image.ImageSpec.Config,
 			podSandboxConfig:      sandboxConfig,

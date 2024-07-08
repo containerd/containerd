@@ -36,7 +36,7 @@ func TestTruncIndex(t *testing.T) {
 	t.Logf("Pull an image")
 	var appImage = images.Get(images.BusyBox)
 
-	imgID := EnsureImageExists(t, appImage)
+	imgID := EnsureImageExists(t, appImage, *runtimeHandler)
 	imgTruncID := genTruncIndex(imgID)
 
 	t.Logf("Get image status by truncindex, truncID: %s", imgTruncID)

@@ -108,7 +108,7 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 				containerMountPath = filepath.Clean("C:" + containerMountPath)
 			}
 
-			EnsureImageExists(t, testImage)
+			EnsureImageExists(t, testImage, *runtimeHandler)
 
 			t.Log("Create a container with a symlink volume mount")
 			cnConfig := ContainerConfig(

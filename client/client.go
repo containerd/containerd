@@ -67,6 +67,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
@@ -459,7 +460,8 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	if err != nil {
 		return images.Image{}, err
 	}
-	return c.createNewImage(ctx, img)
+
+	return c.CreateNewImage(ctx, img)
 }
 
 // Push uploads the provided content to a remote resource
@@ -515,12 +517,25 @@ func (c *Client) Push(ctx context.Context, ref string, desc ocispec.Descriptor, 
 }
 
 // GetImage returns an existing image
+// TODO(kep 4216): Change function to use NewImageWithPlatform() as NewImage() always
+// uses host platform matcher
 func (c *Client) GetImage(ctx context.Context, ref string) (Image, error) {
 	i, err := c.ImageService().Get(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 	return NewImage(c, i), nil
+}
+
+func (c *Client) GetImageWithPlatform(ctx context.Context, ref string, platform imagespec.Platform) (Image, error) {
+	i, err := c.ImageService().Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if platform.OS == "" && platform.Architecture == "" {
+		platform = platforms.DefaultSpec()
+	}
+	return NewImageWithPlatform(c, i, platforms.Only(platform)), nil
 }
 
 // ListImages returns all existing images

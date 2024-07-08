@@ -428,7 +428,7 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 				Platform:    platforms.DefaultSpec(),
 				Snapshotter: runtimeSnapshotter,
 			}
-			snapshotter, err := cri.snapshotterFromPodSandboxConfig(context.Background(), "test-image", tt.podSandboxConfig)
+			snapshotter, _, err := cri.snapshotterFromPodSandboxConfig(context.Background(), tt.podSandboxConfig, "")
 			assert.Equal(t, tt.expectedSnapshotter, snapshotter)
 			if tt.expectedErr {
 				assert.Error(t, err)
@@ -487,7 +487,7 @@ func TestImageGetLabels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			criService.config.PinnedImages = tt.pinnedImages
-			labels := criService.getLabels(context.Background(), tt.pullImageName)
+			labels := criService.getLabels(tt.pullImageName)
 			assert.Equal(t, tt.expectedLabel, labels)
 
 		})

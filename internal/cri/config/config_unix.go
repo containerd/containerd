@@ -20,7 +20,12 @@ package config
 
 import (
 	"github.com/containerd/containerd/v2/defaults"
+	"github.com/containerd/platforms"
 	"github.com/pelletier/go-toml/v2"
+)
+
+const (
+	defaultRuntimeName = "runc"
 )
 
 func defaultNetworkPluginBinDirs() []string {
@@ -41,6 +46,15 @@ func DefaultImageConfig() ImageConfig {
 		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 		ImagePullWithSyncFs:      false,
 		StatsCollectPeriod:       10,
+	}
+}
+
+func GetDefaultRuntimePlatforms() map[string]ImagePlatform {
+	return map[string]ImagePlatform{
+		defaultRuntimeName: {
+			Snapshotter: defaults.DefaultSnapshotter,
+			Platform:    platforms.FormatAll(platforms.DefaultSpec()),
+		},
 	}
 }
 
@@ -84,7 +98,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 			UseInternalLoopback:        false,
 		},
 		ContainerdConfig: ContainerdConfig{
-			DefaultRuntimeName: "runc",
+			DefaultRuntimeName: defaultRuntimeName,
 			Runtimes: map[string]Runtime{
 				"runc": {
 					Type:      "io.containerd.runc.v2",

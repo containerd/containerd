@@ -35,7 +35,7 @@ func TestContainerLifecycleWithoutImageRef(t *testing.T) {
 		containerName = "test-container"
 	)
 
-	img := EnsureImageExists(t, testImage)
+	img := EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create test container")
 	cnConfig := ContainerConfig(

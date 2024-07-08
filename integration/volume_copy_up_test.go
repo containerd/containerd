@@ -59,7 +59,7 @@ func TestVolumeCopyUp(t *testing.T) {
 	t.Logf("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "volume-copy-up")
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Logf("Create a container with volume-copy-up test image")
 	cnConfig := ContainerConfig(
@@ -179,7 +179,7 @@ func TestVolumeOwnership(t *testing.T) {
 	t.Logf("Create a sandbox")
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "volume-ownership")
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Logf("Create a container with volume-ownership test image")
 	cnConfig := ContainerConfig(

@@ -236,6 +236,7 @@ func removeContainer(ctx context.Context, t *testing.T, client runtime.RuntimeSe
 
 // This test checks if create/stop and remove pods and containers work as expected
 func TestCreateContainer(t *testing.T) {
+	// time.Sleep(30 * time.Second)
 	testImage, err := getTestImage()
 	if err != nil {
 		t.Skip("skipping test, error: ", err)
@@ -261,7 +262,7 @@ func TestCreateContainer(t *testing.T) {
 	t.Cleanup(func() { removePodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
 	t.Cleanup(func() { stopPodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, "runhcs-wcow-process")
 
 	t.Log("Create a container")
 	createCtrRequest := &runtime.CreateContainerRequest{

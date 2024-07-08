@@ -25,6 +25,7 @@ import (
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,11 +39,13 @@ const (
 
 // newTestCRIService creates a fake criService for test.
 func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
+	platformList := map[string]imagespec.Platform{}
+	platformList[testContainerdConfig.DefaultRuntimeName] = platforms.DefaultSpec()
 	service := &CRIImageService{
 		config:           testImageConfig,
 		runtimePlatforms: map[string]ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
+		imageStore:       imagestore.NewStore(nil, nil, testContainerdConfig.DefaultRuntimeName, platformList),
 		snapshotStore:    snapshotstore.NewStore(),
 	}
 
@@ -55,9 +58,14 @@ var testImageConfig = criconfig.ImageConfig{
 	},
 }
 
+var defaultRuntimeName = "test-runtime"
+var testContainerdConfig = criconfig.ContainerdConfig{
+	DefaultRuntimeName: defaultRuntimeName,
+}
+
 func TestLocalResolve(t *testing.T) {
 	image := imagestore.Image{
-		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",
+		Key:     imagestore.ImageIDKey{ID: "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799", RuntimeHandler: ""},
 		ChainID: "test-chain-id-1",
 		References: []string{
 			"docker.io/library/busybox:latest",
@@ -85,11 +93,11 @@ func TestLocalResolve(t *testing.T) {
 		"docker.io/library/busybox:latest",
 		"docker.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
 	} {
-		img, err := c.LocalResolve(ref)
+		img, err := c.LocalResolve(ref, "")
 		assert.NoError(t, err)
 		assert.Equal(t, image, img)
 	}
-	img, err := c.LocalResolve("randomid")
+	img, err := c.LocalResolve("randomid", "")
 	assert.Equal(t, errdefs.IsNotFound(err), true)
 	assert.Equal(t, imagestore.Image{}, img)
 }
