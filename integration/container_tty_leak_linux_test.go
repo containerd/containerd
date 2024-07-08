@@ -39,7 +39,7 @@ func TestContainerTTYLeakAfterExit(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-tty-leak-after-exit")
 
 	testImage := images.Get(images.BusyBox)
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	var testcases = []struct {
 		name  string
