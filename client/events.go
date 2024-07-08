@@ -53,7 +53,7 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 	}
 	req := &eventsapi.PublishRequest{
 		Topic: topic,
-		Event: protobuf.FromAny(evt),
+		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := e.client.Publish(ctx, req); err != nil {
 		return errdefs.FromGRPC(err)
@@ -67,7 +67,7 @@ func (e *eventRemote) Forward(ctx context.Context, envelope *events.Envelope) er
 			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
-			Event:     protobuf.FromAny(envelope.Event),
+			Event:     typeurl.MarshalProto(envelope.Event),
 		},
 	}
 	if _, err := e.client.Forward(ctx, req); err != nil {

@@ -152,7 +152,7 @@ func (r *remoteContainers) Delete(ctx context.Context, id string) error {
 func containerToProto(container *containers.Container) *containersapi.Container {
 	extensions := make(map[string]*ptypes.Any)
 	for k, v := range container.Extensions {
-		extensions[k] = protobuf.FromAny(v)
+		extensions[k] = typeurl.MarshalProto(v)
 	}
 	return &containersapi.Container{
 		ID:     container.ID,
@@ -160,9 +160,9 @@ func containerToProto(container *containers.Container) *containersapi.Container 
 		Image:  container.Image,
 		Runtime: &containersapi.Container_Runtime{
 			Name:    container.Runtime.Name,
-			Options: protobuf.FromAny(container.Runtime.Options),
+			Options: typeurl.MarshalProto(container.Runtime.Options),
 		},
-		Spec:        protobuf.FromAny(container.Spec),
+		Spec:        typeurl.MarshalProto(container.Spec),
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
 		Extensions:  extensions,

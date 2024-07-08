@@ -41,13 +41,13 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/errdefs"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	"golang.org/x/sys/unix"
 )
@@ -342,7 +342,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 		}
 	}
 	if opts != nil {
-		info.Options, err = protobuf.MarshalAnyToProto(opts)
+		info.Options, err = typeurl.MarshalAnyToProto(opts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal %T: %w", opts, err)
 		}
@@ -362,7 +362,7 @@ func (m manager) Info(ctx context.Context, optionsR io.Reader) (*types.RuntimeIn
 		log.G(ctx).WithError(err).Debug("Failed to get the runtime features. The runc binary does not implement `runc features` command?")
 	}
 	if features != nil {
-		info.Features, err = protobuf.MarshalAnyToProto(features)
+		info.Features, err = typeurl.MarshalAnyToProto(features)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal %T: %w", features, err)
 		}

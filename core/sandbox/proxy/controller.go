@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -206,17 +207,17 @@ func (s *remoteSandboxController) Update(
 }
 
 func toAPISandbox(sb sandbox.Sandbox) (types.Sandbox, error) {
-	options, err := protobuf.MarshalAnyToProto(sb.Runtime.Options)
+	options, err := typeurl.MarshalAnyToProto(sb.Runtime.Options)
 	if err != nil {
 		return types.Sandbox{}, err
 	}
-	spec, err := protobuf.MarshalAnyToProto(sb.Spec)
+	spec, err := typeurl.MarshalAnyToProto(sb.Spec)
 	if err != nil {
 		return types.Sandbox{}, err
 	}
 	extensions := make(map[string]*anypb.Any)
 	for k, v := range sb.Extensions {
-		pb, err := protobuf.MarshalAnyToProto(v)
+		pb, err := typeurl.MarshalAnyToProto(v)
 		if err != nil {
 			return types.Sandbox{}, err
 		}

@@ -24,7 +24,6 @@ import (
 
 	streamingapi "github.com/containerd/containerd/api/services/streaming/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
@@ -82,7 +81,7 @@ func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Strea
 	if err != nil {
 		return nil, err
 	}
-	err = stream.Send(protobuf.FromAny(a))
+	err = stream.Send(typeurl.MarshalProto(a))
 	if err != nil {
 		if !errors.Is(err, io.EOF) {
 			err = errdefs.FromGRPC(err)
@@ -108,7 +107,7 @@ type clientStream struct {
 }
 
 func (cs *clientStream) Send(a typeurl.Any) (err error) {
-	err = cs.s.Send(protobuf.FromAny(a))
+	err = cs.s.Send(typeurl.MarshalProto(a))
 	if !errors.Is(err, io.EOF) {
 		err = errdefs.FromGRPC(err)
 	}

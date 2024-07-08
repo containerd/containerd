@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
@@ -48,7 +47,7 @@ func TestContainersList(t *testing.T) {
 	ctx, db := testEnv(t)
 	store := NewContainerStore(NewDB(db, nil, nil))
 	spec := &specs.Spec{}
-	encoded, err := protobuf.MarshalAnyToProto(spec)
+	encoded, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	testset := map[string]*containers.Container{}
@@ -178,11 +177,11 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 		spec    = &specs.Spec{}
 	)
 
-	encoded, err := protobuf.MarshalAnyToProto(spec)
+	encoded, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	spec.Annotations = map[string]string{"updated": "true"}
-	encodedUpdated, err := protobuf.MarshalAnyToProto(spec)
+	encodedUpdated, err := typeurl.MarshalAnyToProto(spec)
 	require.NoError(t, err)
 
 	for _, testcase := range []struct {

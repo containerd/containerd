@@ -526,7 +526,7 @@ func (s *service) Pids(ctx context.Context, r *taskAPI.PidsRequest) (*taskAPI.Pi
 				d := &options.ProcessDetails{
 					ExecID: p.ID(),
 				}
-				a, err := protobuf.MarshalAnyToProto(d)
+				a, err := typeurl.MarshalAnyToProto(d)
 				if err != nil {
 					return nil, fmt.Errorf("failed to marshal process %d info: %w", pid, err)
 				}
@@ -654,7 +654,7 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 		return nil, err
 	}
 	return &taskAPI.StatsResponse{
-		Stats: protobuf.FromAny(data),
+		Stats: typeurl.MarshalProto(data),
 	}, nil
 }
 

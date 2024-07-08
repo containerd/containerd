@@ -24,11 +24,10 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -54,7 +53,7 @@ func (r *diffRemote) Apply(ctx context.Context, desc ocispec.Descriptor, mounts 
 
 	payloads := make(map[string]*ptypes.Any)
 	for k, v := range config.ProcessorPayloads {
-		payloads[k] = protobuf.FromAny(v)
+		payloads[k] = typeurl.MarshalProto(v)
 	}
 
 	req := &diffapi.ApplyRequest{

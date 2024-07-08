@@ -22,7 +22,6 @@ import (
 
 	api "github.com/containerd/containerd/api/services/streaming/v1"
 	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
@@ -92,7 +91,7 @@ func (s *service) Stream(srv api.Streaming_StreamServer) error {
 	}
 
 	// Send response packet after registering stream
-	if err := srv.Send(protobuf.FromAny(emptyResponse)); err != nil {
+	if err := srv.Send(typeurl.MarshalProto(emptyResponse)); err != nil {
 		return err
 	}
 
@@ -111,7 +110,7 @@ type serviceStream struct {
 }
 
 func (ss *serviceStream) Send(a typeurl.Any) (err error) {
-	err = errdefs.FromGRPC(ss.s.Send(protobuf.FromAny(a)))
+	err = errdefs.FromGRPC(ss.s.Send(typeurl.MarshalProto(a)))
 	if !errors.Is(err, io.EOF) {
 		err = errdefs.FromGRPC(err)
 	}

@@ -37,7 +37,6 @@ import (
 
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/internal/cleanup"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
@@ -272,7 +271,7 @@ func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.
 		topts = opts.RuntimeOptions
 	}
 
-	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime, Options: protobuf.FromAny(topts)})
+	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime, Options: typeurl.MarshalProto(topts)})
 	if err != nil {
 		return fmt.Errorf("runtime info: %w", err)
 	}
