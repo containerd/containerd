@@ -36,7 +36,11 @@ import (
 // TODO(random-liu): We should change CRI to distinguish image id and image spec. (See
 // kubernetes/kubernetes#46255)
 func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatusRequest) (*runtime.ImageStatusResponse, error) {
-	image, err := c.LocalResolve(r.GetImage().GetImage())
+	runtimeHandler := r.Image.GetRuntimeHandler()
+	if runtimeHandler == "" {
+		runtimeHandler = c.defaultRuntimeName
+	}
+	image, err := c.LocalResolve(r.GetImage().GetImage(), runtimeHandler)
 	if err != nil {
 		if errdefs.IsNotFound(err) {
 			// return empty without error when image not found.
@@ -44,6 +48,7 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 		}
 		return nil, fmt.Errorf("can not resolve %q locally: %w", r.GetImage().GetImage(), err)
 	}
+
 	// TODO(random-liu): [P0] Make sure corresponding snapshot exists. What if snapshot
 	// doesn't exist?
 
@@ -63,11 +68,12 @@ func (c *CRIImageService) ImageStatus(ctx context.Context, r *runtime.ImageStatu
 func toCRIImage(image imagestore.Image) *runtime.Image {
 	repoTags, repoDigests := util.ParseImageReferences(image.References)
 	runtimeImage := &runtime.Image{
-		Id:          image.ID,
+		Id:          image.Key.ID,
 		RepoTags:    repoTags,
 		RepoDigests: repoDigests,
 		Size_:       uint64(image.Size),
 		Pinned:      image.Pinned,
+		Spec:        &runtime.ImageSpec{Image: image.Key.ID, RuntimeHandler: image.Key.RuntimeHandler},
 	}
 	uid, username := getUserFromImage(image.ImageSpec.Config.User)
 	if uid != nil {

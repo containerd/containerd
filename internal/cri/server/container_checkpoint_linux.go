@@ -100,7 +100,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	}
 
 	imageRef := container.ImageRef
-	image, err := c.GetImage(imageRef)
+	image, err := c.GetImage(imageRef, c.config.DefaultRuntimeName)
 	if err != nil {
 		return nil, fmt.Errorf("getting container image failed: %w", err)
 	}

@@ -24,7 +24,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -42,7 +41,7 @@ func newTestCRIService() (*CRIImageService, *GRPCCRIImageService) {
 		config:           testImageConfig,
 		runtimePlatforms: map[string]ImagePlatform{},
 		imageFSPaths:     map[string]string{"overlayfs": testImageFSPath},
-		imageStore:       imagestore.NewStore(nil, nil, platforms.Default()),
+		imageStore:       imagestore.NewStore(nil, nil, "", nil),
 		snapshotStore:    snapshotstore.NewStore(),
 	}
 

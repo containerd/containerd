@@ -20,7 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -29,6 +31,11 @@ import (
 	"github.com/containerd/platforms"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+)
+
+const (
+	gcSnapshotLabel   string = "containerd.io/gc.ref.snapshot"
+	snapshotInfoLabel string = "containerd.io/snapshot-info"
 )
 
 // Image provides the model for how containerd views container images.
@@ -137,6 +144,98 @@ type platformManifest struct {
 	m *ocispec.Manifest
 }
 
+// getInfoFromManifest returns the platform and snapshot information from the manifest for the given image.
+func getInfoFromManifest(ctx context.Context, cs content.Store, target ocispec.Descriptor) (configDigest digest.Digest, platform ocispec.Platform, snapshot string, snapshotID string, err error) {
+	snapshot = ""
+	if IsManifestType(target.MediaType) {
+		// Read the manifest list blob
+		p, err := validateAndReadBlob(ctx, cs, target)
+		if err != nil {
+			return "", ocispec.Platform{}, "", "", err
+		}
+
+		var manifest ocispec.Manifest
+		if err := json.Unmarshal(p, &manifest); err != nil {
+			return "", ocispec.Platform{}, "", "", fmt.Errorf("failed to unmarshal manifest: %v", err)
+		}
+
+		configDigest := manifest.Config.Digest
+		contentInfo, err := cs.Info(ctx, configDigest)
+		if err != nil {
+			return "", ocispec.Platform{}, "", "", errdefs.ErrNotFound
+		}
+		labels := contentInfo.Labels
+		for key := range labels {
+			if strings.HasPrefix(key, gcSnapshotLabel) {
+				snapshot = strings.TrimPrefix(key, gcSnapshotLabel+".")
+				snapshotID = labels[key]
+				platform = *target.Platform
+				break
+			} else if strings.HasPrefix(key, snapshotInfoLabel) {
+				snapshot = strings.TrimPrefix(key, snapshotInfoLabel+".")
+				snapshotID = labels[key]
+				platform = *target.Platform
+				break
+			}
+		}
+		err = nil
+		if snapshot == "" {
+			err = fmt.Errorf("valid snapshot not found for image")
+		}
+		return configDigest, platform, snapshot, snapshotID, err
+	}
+	return configDigest, platform, snapshot, snapshotID, nil
+}
+
+// FindImagePlatformAndSnapshotter finds the platform and snapshotter used to unpack the given target image
+func FindImagePlatformAndSnapshotter(ctx context.Context, cs content.Store, target ocispec.Descriptor) (digest.Digest, ocispec.Platform, string, string, error) {
+	var lastError error
+	if IsIndexType(target.MediaType) {
+		// read the manifest list blob
+		p, err := validateAndReadBlob(ctx, cs, target)
+		if err != nil {
+			return "", ocispec.Platform{}, "", "", err
+		}
+
+		var idx ocispec.Index
+		if err := json.Unmarshal(p, &idx); err != nil {
+			return "", ocispec.Platform{}, "", "", err
+		}
+
+		for _, manifestDesc := range idx.Manifests {
+			manifestPlatform := manifestDesc.Platform
+			if manifestPlatform == nil {
+				// skip if no platform found in the manifest so default runtimehandler can be used
+				continue
+			}
+
+			configDigest, platform, snapshot, snapshotID, err := getInfoFromManifest(ctx, cs, manifestDesc)
+			if err != nil {
+				lastError = err
+				continue
+			}
+			// Check if platform is empty
+			if reflect.DeepEqual(platform, ocispec.Platform{}) {
+				platform = *manifestPlatform
+			}
+			return configDigest, platform, snapshot, snapshotID, nil
+		}
+	}
+	return "", ocispec.Platform{}, "", "", lastError
+}
+
+func validateAndReadBlob(ctx context.Context, provider content.Provider, desc ocispec.Descriptor) ([]byte, error) {
+	p, err := content.ReadBlob(ctx, provider, desc)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateMediaType(p, desc.MediaType); err != nil {
+		return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+	}
+	return p, nil
+}
+
 // Manifest resolves a manifest from the image for the given platform.
 //
 // When a manifest descriptor inside of a manifest index does not have
@@ -159,18 +258,14 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 	if err := Walk(ctx, HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		if IsManifestType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, provider, desc)
+			p, err := validateAndReadBlob(ctx, provider, desc)
 			if err != nil {
-				return nil, err
-			}
-
-			if err := validateMediaType(p, desc.MediaType); err != nil {
-				return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+				return nil, fmt.Errorf("failed to validateAndReadBlob with err %v", err)
 			}
 
 			var manifest ocispec.Manifest
 			if err := json.Unmarshal(p, &manifest); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unmarshal with err %v", err)
 			}
 
 			if desc.Digest != image.Digest && platform != nil {
@@ -181,7 +276,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 				if desc.Platform == nil {
 					imagePlatform, err := ConfigPlatform(ctx, provider, manifest.Config)
 					if err != nil {
-						return nil, err
+						return nil, fmt.Errorf("failed to configPlatform() with err %v", err)
 					}
 					if !platform.Match(imagePlatform) {
 						return nil, nil
@@ -197,18 +292,14 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 
 			return nil, nil
 		} else if IsIndexType(desc.MediaType) {
-			p, err := content.ReadBlob(ctx, provider, desc)
+			p, err := validateAndReadBlob(ctx, provider, desc)
 			if err != nil {
-				return nil, err
-			}
-
-			if err := validateMediaType(p, desc.MediaType); err != nil {
-				return nil, fmt.Errorf("manifest: invalid desc %s: %w", desc.Digest, err)
+				return nil, fmt.Errorf("failed to validateAndReadBlob with err %v", err)
 			}
 
 			var idx ocispec.Index
 			if err := json.Unmarshal(p, &idx); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unmarshal with err %v", err)
 			}
 
 			if platform == nil {
@@ -241,7 +332,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		}
 		return nil, fmt.Errorf("unexpected media type %v for %v: %w", desc.MediaType, desc.Digest, errdefs.ErrNotFound)
 	}), image); err != nil {
-		return ocispec.Manifest{}, err
+		return ocispec.Manifest{}, fmt.Errorf("failed to last err %v", err)
 	}
 
 	if len(m) == 0 {
@@ -249,7 +340,7 @@ func Manifest(ctx context.Context, provider content.Provider, image ocispec.Desc
 		if wasIndex {
 			err = fmt.Errorf("no match for platform in manifest %v: %w", image.Digest, errdefs.ErrNotFound)
 		}
-		return ocispec.Manifest{}, err
+		return ocispec.Manifest{}, fmt.Errorf("failed to last2 with err %v", err)
 	}
 	return *m[0].m, nil
 }

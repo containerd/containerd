@@ -30,46 +30,43 @@ import (
 // be used for CRI. It may try to recover images which are not ready
 // but will only log errors, not return any.
 func (c *CRIImageService) CheckImages(ctx context.Context) error {
-	// TODO: Move way from `client.ListImages` to directly using image store
-	cImages, err := c.client.ListImages(ctx)
+	imageList, err := c.images.List(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to list images: %w", err)
 	}
 
-	// TODO: Support all snapshotter
-	snapshotter := c.config.Snapshotter
 	var wg sync.WaitGroup
-	for _, i := range cImages {
+	for _, i := range imageList {
 		wg.Add(1)
 		i := i
+
 		go func() {
 			defer wg.Done()
-			// TODO: Check platform/snapshot combination. Snapshot check should come first
-			ok, _, _, _, err := images.Check(ctx, i.ContentStore(), i.Target(), platforms.Default())
+			// Check if image name is a tuple of (ref, runtimeHandler). If it is not,
+			// use the default runtime handler
+			ref, runtimeHandler := RuntimeHandlerFromImageName(i.Name)
+			if runtimeHandler != "" {
+			} else {
+				runtimeHandler = c.defaultRuntimeName
+			}
+
+			platformForRuntimeHandler := platforms.MustParse(c.config.RuntimePlatforms[runtimeHandler].Platform)
+			ok, _, _, _, err := images.Check(ctx, c.content, i.Target, platforms.Only(platformForRuntimeHandler))
 			if err != nil {
-				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", i.Name())
+				// TODO: Should we delete this image from containerd store?
+				log.G(ctx).WithError(err).Errorf("Failed to check image content readiness for %q", ref)
 				return
 			}
 			if !ok {
-				log.G(ctx).Warnf("The image content readiness for %q is not ok", i.Name())
+				// TODO: Should we delete this image from containerd store?
+				log.G(ctx).Warnf("The image content readiness for %q is not ok", ref)
 				return
 			}
-			// Checking existence of top-level snapshot for each image being recovered.
-			// TODO: This logic should be done elsewhere and owned by the image service
-			unpacked, err := i.IsUnpacked(ctx, snapshotter)
-			if err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to check whether image is unpacked for image %s", i.Name())
+			if err := c.UpdateImage(ctx, i.Name); err != nil {
+				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", ref)
 				return
 			}
-			if !unpacked {
-				log.G(ctx).Warnf("The image %s is not unpacked.", i.Name())
-				// TODO(random-liu): Consider whether we should try unpack here.
-			}
-			if err := c.UpdateImage(ctx, i.Name()); err != nil {
-				log.G(ctx).WithError(err).Warnf("Failed to update reference for image %q", i.Name())
-				return
-			}
-			log.G(ctx).Debugf("Loaded image %q", i.Name())
+			log.G(ctx).Debugf("Loaded image %q", ref)
 		}()
 	}
 	wg.Wait()

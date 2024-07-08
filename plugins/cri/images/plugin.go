@@ -104,6 +104,7 @@ func init() {
 				// Try a root in the same parent as this plugin
 				snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+defaultSnapshotter)
 			}
+			options.DefaultRuntimeName = criconfig.DefaultRuntimeConfig().ContainerdConfig.DefaultRuntimeName
 			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", snapshotRoot, defaultSnapshotter)
 
