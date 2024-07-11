@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 )
 
@@ -120,7 +121,7 @@ func toProto(env *events.Envelope) *types.Envelope {
 		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
-		Event:     protobuf.FromAny(env.Event),
+		Event:     typeurl.MarshalProto(env.Event),
 	}
 }
 

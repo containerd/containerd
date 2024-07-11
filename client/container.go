@@ -32,7 +32,6 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl/v2"
@@ -288,7 +287,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		if err != nil {
 			return nil, err
 		}
-		request.Options = protobuf.FromAny(o)
+		request.Options = typeurl.MarshalProto(o)
 	}
 	t := &task{
 		client: c.client,

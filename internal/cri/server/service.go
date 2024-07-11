@@ -55,7 +55,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
 )
 
@@ -398,7 +397,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if r.Type != plugins.RuntimeRuncV2 {
 		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
 			plugins.RuntimeRuncV2, r.Type)
-		// For other runtimes, protobuf.MarshalAnyToProto will cause nil panic during typeurl dereference
+		// For other runtimes, typeurl.MarshalAnyToProto will cause nil panic during typeurl dereference
 	}
 
 	rr := &apitypes.RuntimeRequest{
@@ -412,7 +411,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 		return nil, err
 	}
 	if options != nil {
-		rr.Options, err = protobuf.MarshalAnyToProto(options)
+		rr.Options, err = typeurl.MarshalAnyToProto(options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal %T: %w", options, err)
 		}

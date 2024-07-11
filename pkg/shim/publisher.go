@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/ttrpcutil"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
 )
 
 const (
@@ -111,7 +112,7 @@ func (l *RemoteEventsPublisher) Publish(ctx context.Context, topic string, event
 	if err != nil {
 		return err
 	}
-	evt, err := protobuf.MarshalAnyToProto(event)
+	evt, err := typeurl.MarshalAnyToProto(event)
 	if err != nil {
 		return err
 	}

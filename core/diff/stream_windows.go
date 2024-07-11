@@ -29,7 +29,6 @@ import (
 
 	"github.com/Microsoft/go-winio"
 
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -44,7 +43,7 @@ func NewBinaryProcessor(ctx context.Context, imt, rmt string, stream StreamProce
 	cmd.Env = append(cmd.Env, env...)
 
 	if payload != nil {
-		pb := protobuf.FromAny(payload)
+		pb := typeurl.MarshalProto(payload)
 		data, err := proto.Marshal(pb)
 		if err != nil {
 			return nil, err

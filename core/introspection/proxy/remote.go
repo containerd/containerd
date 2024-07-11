@@ -22,10 +22,10 @@ import (
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/v2/core/introspection"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -79,7 +79,7 @@ func (i *introspectionRemote) Server(ctx context.Context) (*api.ServerResponse, 
 func (i *introspectionRemote) PluginInfo(ctx context.Context, pluginType, id string, options any) (resp *api.PluginInfoResponse, err error) {
 	var optionsPB *anypb.Any
 	if options != nil {
-		optionsPB, err = protobuf.MarshalAnyToProto(options)
+		optionsPB, err = typeurl.MarshalAnyToProto(options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal runtime requst: %w", err)
 		}
