@@ -19,7 +19,20 @@ set -eu -o pipefail
 report_dir=$1
 
 mkdir -p $report_dir
+
+function traverse_path() {
+    local path=$1
+    cd "$path"
+    sudo chmod go+rx "$PWD"
+
+    while [ $PWD != "/" ]; do
+	sudo chmod go+x "$PWD/../"
+	cd ..
+    done
+}
+
 BDIR="$(mktemp -d -p $PWD)"
+traverse_path "$BDIR"
 
 function cleanup() {
     pkill containerd || true
