@@ -16,26 +16,36 @@
  *
  */
 
-package grpc
+// Package pickfirst contains the pick_first load balancing policy.
+package pickfirst
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
+	"google.golang.org/grpc/grpclog"
+	"google.golang.org/grpc/internal"
 	internalgrpclog "google.golang.org/grpc/internal/grpclog"
-	"google.golang.org/grpc/internal/grpcrand"
 	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/serviceconfig"
 )
 
+func init() {
+	balancer.Register(pickfirstBuilder{})
+	internal.ShuffleAddressListForTesting = func(n int, swap func(i, j int)) { rand.Shuffle(n, swap) }
+}
+
+var logger = grpclog.Component("pick-first-lb")
+
 const (
-	// PickFirstBalancerName is the name of the pick_first balancer.
-	PickFirstBalancerName = "pick_first"
-	logPrefix             = "[pick-first-lb %p] "
+	// Name is the name of the pick_first balancer.
+	Name      = "pick_first"
+	logPrefix = "[pick-first-lb %p] "
 )
 
 type pickfirstBuilder struct{}
@@ -47,14 +57,14 @@ func (pickfirstBuilder) Build(cc balancer.ClientConn, opt balancer.BuildOptions)
 }
 
 func (pickfirstBuilder) Name() string {
-	return PickFirstBalancerName
+	return Name
 }
 
 type pfConfig struct {
 	serviceconfig.LoadBalancingConfig `json:"-"`
 
 	// If set to true, instructs the LB policy to shuffle the order of the list
-	// of addresses received from the name resolver before attempting to
+	// of endpoints received from the name resolver before attempting to
 	// connect to them.
 	ShuffleAddressList bool `json:"shuffleAddressList"`
 }
@@ -93,9 +103,14 @@ func (b *pickfirstBalancer) ResolverError(err error) {
 	})
 }
 
+type Shuffler interface {
+	ShuffleAddressListForTesting(n int, swap func(i, j int))
+}
+
+func ShuffleAddressListForTesting(n int, swap func(i, j int)) { rand.Shuffle(n, swap) }
+
 func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState) error {
-	addrs := state.ResolverState.Addresses
-	if len(addrs) == 0 {
+	if len(state.ResolverState.Addresses) == 0 && len(state.ResolverState.Endpoints) == 0 {
 		// The resolver reported an empty address list. Treat it like an error by
 		// calling b.ResolverError.
 		if b.subConn != nil {
@@ -107,20 +122,47 @@ func (b *pickfirstBalancer) UpdateClientConnState(state balancer.ClientConnState
 		b.ResolverError(errors.New("produced zero addresses"))
 		return balancer.ErrBadResolverState
 	}
-
 	// We don't have to guard this block with the env var because ParseConfig
 	// already does so.
 	cfg, ok := state.BalancerConfig.(pfConfig)
 	if state.BalancerConfig != nil && !ok {
 		return fmt.Errorf("pickfirst: received illegal BalancerConfig (type %T): %v", state.BalancerConfig, state.BalancerConfig)
 	}
-	if cfg.ShuffleAddressList {
-		addrs = append([]resolver.Address{}, addrs...)
-		grpcrand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
-	}
 
 	if b.logger.V(2) {
 		b.logger.Infof("Received new config %s, resolver state %s", pretty.ToJSON(cfg), pretty.ToJSON(state.ResolverState))
+	}
+
+	var addrs []resolver.Address
+	if endpoints := state.ResolverState.Endpoints; len(endpoints) != 0 {
+		// Perform the optional shuffling described in gRFC A62. The shuffling will
+		// change the order of endpoints but not touch the order of the addresses
+		// within each endpoint. - A61
+		if cfg.ShuffleAddressList {
+			endpoints = append([]resolver.Endpoint{}, endpoints...)
+			internal.ShuffleAddressListForTesting.(func(int, func(int, int)))(len(endpoints), func(i, j int) { endpoints[i], endpoints[j] = endpoints[j], endpoints[i] })
+		}
+
+		// "Flatten the list by concatenating the ordered list of addresses for each
+		// of the endpoints, in order." - A61
+		for _, endpoint := range endpoints {
+			// "In the flattened list, interleave addresses from the two address
+			// families, as per RFC-8304 section 4." - A61
+			// TODO: support the above language.
+			addrs = append(addrs, endpoint.Addresses...)
+		}
+	} else {
+		// Endpoints not set, process addresses until we migrate resolver
+		// emissions fully to Endpoints. The top channel does wrap emitted
+		// addresses with endpoints, however some balancers such as weighted
+		// target do not forwarrd the corresponding correct endpoints down/split
+		// endpoints properly. Once all balancers correctly forward endpoints
+		// down, can delete this else conditional.
+		addrs = state.ResolverState.Addresses
+		if cfg.ShuffleAddressList {
+			addrs = append([]resolver.Address{}, addrs...)
+			rand.Shuffle(len(addrs), func(i, j int) { addrs[i], addrs[j] = addrs[j], addrs[i] })
+		}
 	}
 
 	if b.subConn != nil {
