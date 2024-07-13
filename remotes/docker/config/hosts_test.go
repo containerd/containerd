@@ -208,6 +208,43 @@ ca = "/etc/path/default"
 	}
 }
 
+func TestParseHostFileWithoutHostTree(t *testing.T) {
+	const testtoml = `
+server = "https://test-default.registry"
+ca = "/etc/path/default"
+host = "test"
+`
+
+	expected := []hostConfig{{
+		scheme:       "https",
+		path:         "/v2",
+		capabilities: allCaps,
+		host:         "test-default.registry",
+		caCerts:      []string{"/etc/path/default"},
+	}}
+
+	hosts, err := parseHostsFile("", []byte(testtoml))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer func() {
+		if t.Failed() {
+			t.Log("HostConfigs...\nActual:\n" + printHostConfig(hosts) + "Expected:\n" + printHostConfig(expected))
+		}
+	}()
+
+	if len(hosts) != len(expected) {
+		t.Fatalf("Unexpected number of hosts %d, expected %d", len(hosts), len(expected))
+	}
+
+	for i := range hosts {
+		if !compareHostConfig(hosts[i], expected[i]) {
+			t.Fatalf("Mismatch at host %d", i)
+		}
+	}
+}
+
 func TestLoadCertFiles(t *testing.T) {
 	dir := t.TempDir()
 

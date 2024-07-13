@@ -528,7 +528,11 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 
 // getSortedHosts returns the list of hosts as they defined in the file.
 func getSortedHosts(root *toml.Tree) ([]string, error) {
-	iter, ok := root.Get("host").(*toml.Tree)
+	tree := root.Get("host")
+	if tree == nil {
+		return nil, nil
+	}
+	iter, ok := tree.(*toml.Tree)
 	if !ok {
 		return nil, errors.New("invalid `host` tree")
 	}
