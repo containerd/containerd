@@ -22,16 +22,39 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+func setupUserNSPod(t *testing.T) {
+	supportsUserNs := supportsUserNS() && supportsIDMap(defaultRoot) && supportsRuncIDMap() == nil
+	if !supportsUserNs {
+		t.Log("host or runtime doesn't support userns, skipping pod setup")
+		return
+	}
+
+	t.Log("adding userns pods for containerd restart test")
+
+	containerID := uint32(0)
+	hostID := uint32(65536)
+	size := uint32(65536)
+
+	sOpts := []PodSandboxOpts{WithPodUserNs(containerID, hostID, size)}
+	sbCfg := PodSandboxConfig("sandbox_ready_userns", "sandbox_ready_userns", sOpts...)
+	_, err := runtimeService.RunPodSandbox(sbCfg, *runtimeHandler)
+	assert.NoError(t, err)
+}
 
 func TestContainerdRestartSandboxRecover(t *testing.T) {
 	sbStatuses := map[string]runtime.PodSandboxState{
 		// Sandbox with unknown status will be NotReady when returned from ListPodSandbox
-		"sandbox_unknown":   runtime.PodSandboxState_SANDBOX_NOTREADY,
-		"sandbox_not_ready": runtime.PodSandboxState_SANDBOX_NOTREADY,
-		"sandbox_ready":     runtime.PodSandboxState_SANDBOX_READY,
+		"sandbox_unknown":      runtime.PodSandboxState_SANDBOX_NOTREADY,
+		"sandbox_not_ready":    runtime.PodSandboxState_SANDBOX_NOTREADY,
+		"sandbox_ready":        runtime.PodSandboxState_SANDBOX_READY,
+		"sandbox_ready_userns": runtime.PodSandboxState_SANDBOX_READY,
 	}
+
+	setupUserNSPod(t)
 
 	sbReadyConfig := PodSandboxConfig("sandbox_ready", "sandbox_ready")
 	_, err := runtimeService.RunPodSandbox(sbReadyConfig, *runtimeHandler)
@@ -67,6 +90,17 @@ func TestContainerdRestartSandboxRecover(t *testing.T) {
 			foundUnkownSb = true
 		}
 		if status, ok := sbStatuses[sb.Metadata.Name]; ok {
+			// See: https://github.com/containerd/containerd/issues/10363
+			//
+			// Test that sandbox IP is still present after restart.
+			if sb.State == runtime.PodSandboxState_SANDBOX_READY {
+				status, _, err := SandboxInfo(sb.Id)
+				require.NoError(t, err)
+
+				assert.NotNil(t, status.Network)
+				assert.NotEmpty(t, status.Network.Ip)
+			}
+
 			assert.Equal(t, status, sb.State)
 			err = runtimeService.StopPodSandbox(sb.Id)
 			assert.NoError(t, err)
