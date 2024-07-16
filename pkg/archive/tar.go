@@ -666,7 +666,7 @@ func (cw *ChangeWriter) HandleChange(k fs.ChangeKind, p string, f os.FileInfo, e
 
 			n, err := copyBuffered(context.TODO(), cw.tw, file)
 			if err != nil {
-				return fmt.Errorf("failed to copy: %w", err)
+				return fmt.Errorf("failed to copy: %v: %w", source, err)
 			}
 			if n != hdr.Size {
 				return errors.New("short write copying file")
