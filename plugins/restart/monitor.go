@@ -44,13 +44,8 @@ func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ContainerMonitorPlugin,
 		Requires: []plugin.Type{
-			// Explicitly list all the plugins in InMemoryServices as dependencies
-			// to avoid plugins loading issue in case that plugin hasn't been loaded yet.
 			plugins.EventPlugin,
-			plugins.LeasePlugin,
-			plugins.SandboxStorePlugin,
 			plugins.ServicePlugin,
-			plugins.TransferPlugin,
 		},
 		ID: "restart",
 		Config: &Config{

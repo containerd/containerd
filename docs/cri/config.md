@@ -185,6 +185,7 @@ version = 3
     image_pull_progress_timeout = '5m0s'
     image_pull_with_sync_fs = false
     stats_collect_period = 10
+    use_local_image_pull = false
 
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10'
@@ -416,20 +417,6 @@ version = 2
   # For more details about CDI configuration please refer to
   # https://tags.cncf.io/container-device-interface#containerd-configuration
   cdi_spec_dirs = ["/etc/cdi", "/var/run/cdi"]
-
-	# image_pull_progress_timeout is the maximum duration that there is no
-	# image data read from image registry in the open connection. It will
-	# be reset whatever a new byte has been read. If timeout, the image
-	# pulling will be cancelled. A zero value means there is no timeout.
-	#
-	# The string is in the golang duration format, see:
-	#   https://golang.org/pkg/time/#ParseDuration
-  image_pull_progress_timeout = "1m0s"
-
-  # disable_image_pull_with_transfer_service disables image pull using transfer service, i.e. use client.Pull to pull images
-	# By default it is set to false, i.e. use transfer service to pull images
-  # When transfer service is used to pull images, pull releted configs, like max_concurrent_downloads and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
-  disable_image_pull_with_transfer_service = false
 
   # drain_exec_sync_io_timeout is the maximum duration to wait for ExecSync API'
   # IO EOF event after exec init process exits. A zero value means there is no
