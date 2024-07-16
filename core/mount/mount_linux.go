@@ -28,8 +28,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/log"
+	"github.com/moby/sys/user/userns"
 	"golang.org/x/sys/unix"
 )
 

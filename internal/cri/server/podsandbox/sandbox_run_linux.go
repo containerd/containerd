@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/moby/sys/user/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -32,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,

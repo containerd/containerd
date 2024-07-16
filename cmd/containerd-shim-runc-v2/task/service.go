@@ -24,6 +24,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/moby/sys/user/userns"
+
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -44,7 +46,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/shutdown"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
-	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/errdefs"
 	runcC "github.com/containerd/go-runc"
 	"github.com/containerd/log"

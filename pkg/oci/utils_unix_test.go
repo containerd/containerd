@@ -25,9 +25,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/moby/sys/user/userns"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func cleanupTest() {

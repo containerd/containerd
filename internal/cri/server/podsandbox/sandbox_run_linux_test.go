@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/moby/sys/user/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -33,7 +34,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
-	"github.com/containerd/containerd/v2/pkg/userns"
 )
 
 func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
