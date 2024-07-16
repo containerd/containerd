@@ -168,7 +168,7 @@ type transferConfig struct {
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
 
-	// UnpackConfiguration is used only when CheckPlatformSupported is true
+	// CheckPlatformSupported enables platform check specified in UnpackConfiguration
 	CheckPlatformSupported bool `toml:"check_platform_supported"`
 
 	// UnpackConfiguration is used to read config from toml
