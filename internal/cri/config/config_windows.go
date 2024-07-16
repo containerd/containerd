@@ -38,8 +38,7 @@ func DefaultImageConfig() ImageConfig {
 		PinnedImages: map[string]string{
 			"sandbox": DefaultSandboxImage,
 		},
-		ImagePullProgressTimeout:            defaultImagePullProgressTimeoutDuration.String(),
-		DisableImagePullWithTransferService: false,
+		ImagePullProgressTimeout: defaultImagePullProgressTimeoutDuration.String(),
 	}
 }
 
