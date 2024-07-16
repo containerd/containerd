@@ -127,7 +127,7 @@ func TestRestartMonitor(t *testing.T) {
 	configTOML := fmt.Sprintf(`
 version = 3
 [plugins]
-  [plugins."io.containerd.internal.v1.restart"]
+  [plugins."io.containerd.monitor.container.v1.restart"]
 	  interval = "%s"
 `, interval.String())
 	client, _, cleanup := newDaemonWithConfig(t, configTOML)
