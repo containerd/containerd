@@ -491,5 +491,6 @@ func initLocalCRIImageService(client *containerd.Client, tmpDir string, registry
 		Content:          client.ContentStore(),
 		Images:           client.ImageService(),
 		Client:           client,
+		Transferrer:      client.TransferService(),
 	})
 }

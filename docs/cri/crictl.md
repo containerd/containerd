@@ -264,7 +264,9 @@ $ crictl info
       "disableSnapshotAnnotations": true,
       "discardUnpackedLayers": false,
       "ignoreBlockIONotEnabledErrors": false,
-      "ignoreRdtNotEnabledErrors": false
+      "ignoreRdtNotEnabledErrors": false,
+      "useLocalImagePull": false
+
     },
     "cni": {
       "binDir": "/opt/cni/bin",

@@ -20,12 +20,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -44,12 +44,10 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
-	ctrimages "github.com/containerd/containerd/v2/cmd/ctr/commands/images"
 	"github.com/containerd/containerd/v2/core/diff"
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
-	"github.com/containerd/containerd/v2/core/transfer"
 	transferimage "github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
@@ -186,34 +184,8 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	)
 	labels := c.getLabels(ctx, ref)
 
-	// Pull image using transfer service
-	if !c.config.DisableImagePullWithTransferService {
-		log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
-		var sopts []transferimage.StoreOpt
-
-		sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
-		sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
-		sopts = append(sopts, transferimage.WithImageLabels(labels))
-
-		ch := newcriCredentials(ctx, ref, credentials)
-		reg := registry.NewOCIRegistry(ref, nil, ch)
-		is := transferimage.NewStore(ref, sopts...)
-
-		pf, done := ctrimages.ProgressHandler(ctx, os.Stdout)
-		defer done()
-		// Todo handle progress
-		err = c.transferrer.Transfer(ctx, reg, is, transfer.WithProgress(pf))
-		if err != nil {
-			return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
-		}
-
-		// Image should be pulled, unpacked and present in containerd image store at this moment
-		image, err = c.client.GetImage(ctx, ref)
-		if err != nil {
-			return "", fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
-		}
-
-	} else { // pull image with client.Pull()
+	// Use client.Pull to pull the image if UseLocalImagePull is set
+	if c.config.UseLocalImagePull {
 		log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
 		pullOpts := []containerd.RemoteOpt{
 			containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
@@ -247,6 +219,38 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		pcancel()
 		if err != nil {
 			return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		}
+		span.AddEvent("Pull and unpack image complete")
+	} else { // Use transfer service by default
+		log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+		// Set image store opts
+		var sopts []transferimage.StoreOpt
+		sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
+		sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
+		sopts = append(sopts, transferimage.WithImageLabels(labels))
+		// Set registry opts
+		var registryOpts []registry.Opt
+		registryOpts = append(registryOpts, registry.WithResolver(resolver))
+		reg, err := registry.NewOCIRegistry(ctx, ref, registryOpts...)
+		if err != nil {
+			return "", fmt.Errorf("failed to initialize OCI registry: %w", err)
+		}
+		is := transferimage.NewStore(ref, sopts...)
+
+		if c.transferrer == nil {
+			return "", errors.New("no transferrer configured in CRI image service")
+		}
+		pullReporter.start(pctx)
+		err = c.transferrer.Transfer(pctx, reg, is)
+		pcancel()
+		if err != nil {
+			return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		}
+
+		// Image should be pulled, unpacked and present in containerd image store at this moment
+		image, err = c.client.GetImage(ctx, ref)
+		if err != nil {
+			return "", fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
 		}
 		span.AddEvent("Pull and unpack image complete")
 	}
@@ -837,31 +841,4 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	}
 
 	return snapshotter, nil
-}
-
-type criCredentials struct {
-	ref         string
-	credentials func(string) (string, string, error)
-}
-
-func newcriCredentials(ctx context.Context, ref string, credentials func(string) (string, string, error)) registry.CredentialHelper {
-	return &criCredentials{
-		ref:         ref,
-		credentials: credentials,
-	}
-}
-
-// GetCredentials gets credential from criCredentials makes criCredentials a registry.CredentialHelper
-func (cc *criCredentials) GetCredentials(ctx context.Context, ref string, host string) (registry.Credentials, error) {
-	if ref == cc.ref {
-		username, secret, err := cc.credentials(host)
-		if err != nil {
-			return registry.Credentials{
-				Host:     host,
-				Username: username,
-				Secret:   secret,
-			}, nil
-		}
-	}
-	return registry.Credentials{}, nil
 }

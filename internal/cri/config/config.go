@@ -269,11 +269,6 @@ type ImageConfig struct {
 	// Snapshotter is the snapshotter used by containerd.
 	Snapshotter string `toml:"snapshotter" json:"snapshotter"`
 
-	// DisableImagePullWithTransferService disables image pull using transfer service, i.e. use client.Pull to pull images
-	// By default it is set to false, i.e. use transfer service to pull image
-	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
-	DisableImagePullWithTransferService bool `toml:"disable_image_pull_with_transfer_service" json:"disableImagePullWithTransferService"`
-
 	// DisableSnapshotAnnotations disables to pass additional annotations (image
 	// related information) to snapshotters. These annotations are required by
 	// stargz snapshotter (https://github.com/containerd/stargz-snapshotter).
@@ -327,6 +322,12 @@ type ImageConfig struct {
 
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// disables image pull using transfer service, i.e. uses client.Pull to pull images
+	// By default it is set to false, i.e. use transfer service to pull image
+	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
+	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
