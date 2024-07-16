@@ -93,6 +93,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 			return nil, err
 		}
 	}
+
 	hostOptions := config.HostOptions{}
 	if ropts.hostDir != "" {
 		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
@@ -111,10 +112,12 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	if ropts.defaultScheme != "" {
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Hosts:   config.ConfigureHosts(ctx, hostOptions),
 		Headers: ropts.headers,
 	})
+
 	return &OCIRegistry{
 		reference:     ref,
 		headers:       ropts.headers,
