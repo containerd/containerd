@@ -360,6 +360,80 @@ options timeout:1
 				},
 			},
 		},
+		"should create empty /etc/resolv.conf if DNSOptions is empty": {
+			dnsConfig: &runtime.DNSConfig{},
+			ipcMode:   runtime.NamespaceMode_NODE,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "Hostname",
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte(realhostname + "\n"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						[]byte{},
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name:      "Stat",
+					Arguments: []interface{}{"/dev/shm"},
+				},
+			},
+		},
+		"should copy host /etc/resolv.conf if DNSOptions is not set": {
+			dnsConfig: nil,
+			ipcMode:   runtime.NamespaceMode_NODE,
+			expectedCalls: []ostesting.CalledDetail{
+				{
+					Name: "Hostname",
+				},
+				{
+					Name: "WriteFile",
+					Arguments: []interface{}{
+						filepath.Join(testRootDir, sandboxesDir, testID, "hostname"),
+						[]byte(realhostname + "\n"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						"/etc/hosts",
+						filepath.Join(testRootDir, sandboxesDir, testID, "hosts"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name: "CopyFile",
+					Arguments: []interface{}{
+						filepath.Join("/etc/resolv.conf"),
+						filepath.Join(testRootDir, sandboxesDir, testID, "resolv.conf"),
+						os.FileMode(0644),
+					},
+				},
+				{
+					Name:      "Stat",
+					Arguments: []interface{}{"/dev/shm"},
+				},
+			},
+		},
 		"should create sandbox shm when ipc namespace mode is not NODE": {
 			ipcMode: runtime.NamespaceMode_POD,
 			expectedCalls: []ostesting.CalledDetail{
