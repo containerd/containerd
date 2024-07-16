@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/pkg/cap"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/continuity/fs/fstest"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -215,6 +216,91 @@ sys:x:3:root,bin,adm
 	}
 }
 
+// withAllKnownCaps sets all known capabilities.
+// This function differs from the exported function
+// by also setting inheritable capabilities.
+func withAllKnownCaps(s *specs.Spec) error {
+	caps := cap.Known()
+	if err := WithCapabilities(caps)(context.Background(), nil, nil, s); err != nil {
+		return err
+	}
+	s.Process.Capabilities.Inheritable = caps
+	return nil
+}
+
+func TestSetCaps(t *testing.T) {
+	t.Parallel()
+
+	var s specs.Spec
+
+	// Add base set of capabilities
+	if err := WithCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+	} {
+		if !capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d does not contain added cap", i)
+		}
+		if len(cl) != 1 {
+			t.Errorf("cap list %d does not have only 1 cap", i)
+		}
+	}
+	if len(s.Process.Capabilities.Inheritable) != 0 {
+		t.Errorf("inheritable cap list is not empty")
+	}
+
+	// Add all caps then overwrite with single cap
+	if err := withAllKnownCaps(&s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if !capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d does not contain added cap", i)
+		}
+		if len(cl) != 1 {
+			t.Errorf("cap list %d does not have only 1 cap", i)
+		}
+	}
+
+	// Add all caps, drop single cap, then overwrite with single cap
+	if err := withAllKnownCaps(&s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+	} {
+		if !capsContain(cl, "CAP_CHOWN") {
+			t.Errorf("cap list %d does not contain added cap", i)
+		}
+		if len(cl) != 1 {
+			t.Errorf("cap list %d does not have only 1 cap", i)
+		}
+	}
+	if len(s.Process.Capabilities.Inheritable) != 0 {
+		t.Errorf("inheritable cap list is not empty")
+	}
+}
+
 func TestAddCaps(t *testing.T) {
 	t.Parallel()
 
@@ -232,6 +318,9 @@ func TestAddCaps(t *testing.T) {
 			t.Errorf("cap list %d does not contain added cap", i)
 		}
 	}
+	if len(s.Process.Capabilities.Inheritable) != 0 {
+		t.Errorf("inheritable cap list is not empty")
+	}
 }
 
 func TestDropCaps(t *testing.T) {
@@ -239,7 +328,7 @@ func TestDropCaps(t *testing.T) {
 
 	var s specs.Spec
 
-	if err := WithAllKnownCapabilities(context.Background(), nil, nil, &s); err != nil {
+	if err := withAllKnownCaps(&s); err != nil {
 		t.Fatal(err)
 	}
 	if err := WithDroppedCapabilities([]string{"CAP_CHOWN"})(context.Background(), nil, nil, &s); err != nil {
@@ -250,6 +339,7 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
 	} {
 		if capsContain(cl, "CAP_CHOWN") {
 			t.Errorf("cap list %d contains dropped cap", i)
@@ -257,7 +347,7 @@ func TestDropCaps(t *testing.T) {
 	}
 
 	// Add all capabilities back and drop a different cap.
-	if err := WithAllKnownCapabilities(context.Background(), nil, nil, &s); err != nil {
+	if err := withAllKnownCaps(&s); err != nil {
 		t.Fatal(err)
 	}
 	if err := WithDroppedCapabilities([]string{"CAP_FOWNER"})(context.Background(), nil, nil, &s); err != nil {
@@ -268,6 +358,7 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
 	} {
 		if capsContain(cl, "CAP_FOWNER") {
 			t.Errorf("cap list %d contains dropped cap", i)
@@ -288,6 +379,25 @@ func TestDropCaps(t *testing.T) {
 		s.Process.Capabilities.Bounding,
 		s.Process.Capabilities.Effective,
 		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
+	} {
+		if len(cl) != 0 {
+			t.Errorf("cap list %d is not empty", i)
+		}
+	}
+
+	// Add all capabilities back and drop all
+	if err := withAllKnownCaps(&s); err != nil {
+		t.Fatal(err)
+	}
+	if err := WithCapabilities(nil)(context.Background(), nil, nil, &s); err != nil {
+		t.Fatal(err)
+	}
+	for i, cl := range [][]string{
+		s.Process.Capabilities.Bounding,
+		s.Process.Capabilities.Effective,
+		s.Process.Capabilities.Permitted,
+		s.Process.Capabilities.Inheritable,
 	} {
 		if len(cl) != 0 {
 			t.Errorf("cap list %d is not empty", i)
