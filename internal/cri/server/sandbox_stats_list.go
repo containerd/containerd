@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/errdefs"
@@ -34,20 +35,33 @@ func (c *criService) ListPodSandboxStats(
 	r *runtime.ListPodSandboxStatsRequest,
 ) (*runtime.ListPodSandboxStatsResponse, error) {
 	sandboxes := c.sandboxesForListPodSandboxStatsRequest(r)
+	stats, errs := make([]*runtime.PodSandboxStats, len(sandboxes)), make([]error, len(sandboxes))
 
-	var errs []error
+	var wg sync.WaitGroup
+	for i, sandbox := range sandboxes {
+		i := i
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sandboxStats, err := c.podSandboxStats(ctx, sandbox)
+			switch {
+			case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
+				log.G(ctx).WithField("podsandboxid", sandbox.ID).WithError(err).Debug("failed to get pod sandbox stats, this is likely a transient error")
+			case errors.Is(err, ttrpc.ErrClosed):
+				log.G(ctx).WithField("podsandboxid", sandbox.ID).WithError(err).Debug("failed to get pod sandbox stats, connection closed")
+			case err != nil:
+				errs[i] = fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err)
+			default:
+				stats[i] = sandboxStats
+			}
+		}()
+	}
+	wg.Wait()
+
 	podSandboxStats := new(runtime.ListPodSandboxStatsResponse)
-	for _, sandbox := range sandboxes {
-		sandboxStats, err := c.podSandboxStats(ctx, sandbox)
-		switch {
-		case errdefs.IsUnavailable(err), errdefs.IsNotFound(err):
-			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, this is likely a transient error: %v", err)
-		case errors.Is(err, ttrpc.ErrClosed):
-			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, connection closed: %v", err)
-		case err != nil:
-			errs = append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
-		default:
-			podSandboxStats.Stats = append(podSandboxStats.Stats, sandboxStats)
+	for _, stat := range stats {
+		if stat != nil {
+			podSandboxStats.Stats = append(podSandboxStats.Stats, stat)
 		}
 	}
 
