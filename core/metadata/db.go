@@ -50,7 +50,7 @@ const (
 	// dbVersion represents updates to the schema
 	// version which are additions and compatible with
 	// prior version of the same schema.
-	dbVersion = 3
+	dbVersion = 4
 )
 
 // DBOpt configures how we set up the DB

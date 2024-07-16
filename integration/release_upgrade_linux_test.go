@@ -50,7 +50,7 @@ type beforeUpgradeHookFunc func(*testing.T)
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
 	previousReleaseBinDir := t.TempDir()
-	downloadPreviousReleaseBinary(t, previousReleaseBinDir)
+	downloadPreviousLatestReleaseBinary(t, previousReleaseBinDir)
 
 	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
@@ -73,7 +73,7 @@ func runUpgradeTestCase(
 
 		t.Log("Starting the previous release's containerd")
 		previousCtrdBinPath := filepath.Join(previousReleaseBinDir, "bin", "containerd")
-		previousProc := newCtrdProc(t, previousCtrdBinPath, workDir)
+		previousProc := newCtrdProc(t, previousCtrdBinPath, workDir, nil)
 
 		ctrdLogPath := previousProc.logPath()
 		t.Cleanup(func() {
@@ -107,7 +107,7 @@ func runUpgradeTestCase(
 		currentReleaseCtrdDefaultConfig(t, workDir)
 
 		t.Log("Starting the current release's containerd")
-		currentProc := newCtrdProc(t, "containerd", workDir)
+		currentProc := newCtrdProc(t, "containerd", workDir, nil)
 		require.NoError(t, currentProc.isReady())
 		t.Cleanup(func() {
 			t.Log("Cleanup all the pods")
@@ -658,7 +658,7 @@ func (p *ctrdProc) criImageService(t *testing.T) cri.ImageManagerService {
 }
 
 // newCtrdProc is to start containerd process.
-func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string) *ctrdProc {
+func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string) *ctrdProc {
 	p := &ctrdProc{workDir: ctrdWorkDir}
 
 	var args []string
@@ -673,6 +673,7 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string) *ctrdProc {
 	t.Cleanup(func() { f.Close() })
 
 	cmd := exec.Command(ctrdBin, args...)
+	cmd.Env = append(os.Environ(), envs...)
 	cmd.Stdout = f
 	cmd.Stderr = f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
