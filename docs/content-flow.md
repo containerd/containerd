@@ -16,11 +16,12 @@ Content exists in several areas in the containerd lifecycle:
 * containerd content store, under containerd's local storage space, for example, on a standard Linux installation at `/var/lib/containerd/io.containerd.content.v1.content`
 * snapshots, under containerd's local storage space, for example, on a standard Linux installation at `/var/lib/containerd/io.containerd.snapshotter.v1.<type>`. For an overlayfs snapshotter, that would be at `/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs`
 
+A container needs a mountable, and often mutable, filesystem to run. This filesystem is created from the content in the content store.
 In order to create a container, the following must occur:
 
-1. The image and all its content must be loaded into the content store. This normally happens via download from the OCI registry, but you can load content in directly as well.
-1. Committed snapshots must be created from each layer of content for the image.
-1. An active snapshot must be created on top of the final layer of content for the image.
+1. The image and all its content must be loaded into the local content store. This normally happens via download from the OCI registry, but you can load content in directly as well. This content is in the same format as in the registry.
+1. The layers from the image must be read and applied to a filesystem, creating what is known as a "committed snapshot". This is repeated for each layer in order. This process is known as "unpacking".
+1. A final mutable mountable filesystem, an "active snapshot", must be created on top of the final layer of content for the image.
 
 A container now can be created, with its root filesystem as the active snapshot.
 
@@ -351,11 +352,16 @@ they aren't there, they won't be removed.
 
 ### Snapshots
 
-The content in the content store is immutable, but also in formats that often are unusable. For example,
-most container layers are in a tar-gzip format. One cannot simply mount a tar-gzip file. Even if one could,
-we want to leave our immutable content not only unchanged, but unchangeable, even by accident, i.e. immutable.
+The content in the content store is unusable directly by containers.
 
-In order to use it, we create snapshots of the content.
+First, it is immutable, which makes it difficult for containers to use as a container filesystem.
+Second, the format itself often is unusable directly. For example,
+most container layers are in a tar-gzip format, with each tar-gzip file representing a single layer to be applied on top of the previous layers.
+One cannot simply mount a tar-gzip file. Even if one could, one would need to apply the changes from each layer on top of the previous.
+Third, some content layer media-types, like the standard container layer, include not only normal file additions and modifications,
+but removals. None of this can be used directly by a container, which requires a normal filesystem mount.
+
+In order to use the content for an image, we create snapshots of the content.
 
 The process is as follows:
 
@@ -364,6 +370,9 @@ The process is as follows:
 1. The snapshotter commits the snapshot after the diff has been applied. This is now a "committed" snapshot.
 1. The committed snapshot is used as the parent for the next layer.
 
+containerd ships with several built-in snapshotters, the default of which is `overlayfs`. You can choose a different snapshotter for each unpack
+of an image and creating a container. See [snapshotters](./snapshotters/README.md) and [PLUGINS](./PLUGINS.md).
+
 Returning to our example, each layer will have a corresponding immutable snapshot layer. Recalling that
 our example has 6 layers, we expect to see 6 committed snapshots. The output has been sorted to make viewing
 easier; it matches the layers from the content store and manifest itself.
@@ -371,13 +380,32 @@ easier; it matches the layers from the content store and manifest itself.
 ```console
 $ ctr snapshot ls
 KEY                                                                     PARENT                                                                  KIND
-sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c                                                                         Committed
-sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c Committed
-sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 Committed
-sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca Committed
-sha256:bc8b010e53c5f20023bd549d082c74ef8bfc237dc9bbccea2e0552e52bc5fcb1 sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 Committed
 sha256:33bd296ab7f37bdacff0cb4a5eb671bcb3a141887553ec4157b1e64d6641c1cd sha256:bc8b010e53c5f20023bd549d082c74ef8bfc237dc9bbccea2e0552e52bc5fcb1 Committed
+sha256:bc8b010e53c5f20023bd549d082c74ef8bfc237dc9bbccea2e0552e52bc5fcb1 sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 Committed
+sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca Committed
+sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 Committed
+sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c Committed
+sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c                                                                         Committed
 ```
+
+If we look in the snapshot directory, which is specific to each snapshotter, we see the snapshots themselves.
+
+```bash
+# cd /var/lib/containerd
+# ls io.containerd.snapshotter.v1.overlayfs/snapshots/
+1  2  3  4  5  6
+```
+
+There are 6 snapshots, each corresponding to one listed from `ctr snapshot ls`, above. The directories themselves contain the actual content:
+
+```bash
+# ls io.containerd.snapshotter.v1.overlayfs/snapshots/1/fs
+bin  boot  dev  etc  home  lib  lib64  media  mnt  opt  proc  root  run  sbin  srv  sys  tmp  usr  var
+# ls io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs
+etc  var
+```
+
+These are the unpacked and applied contents of the first and second layers.
 
 #### Parents
 
@@ -425,9 +453,29 @@ With the above in place, we know how to create an active snapshot that is useful
 need to [Prepare()](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter) the active snapshot,
 passing it an ID and the parent, in this case the top layer of committed snapshots.
 
+We can see this by creating two containers from the same image. Both will create active snapshots on top of the top committed
+snapshot. However, we expect to see only 2 new snapshots, each active. The committed snapshots are unchanged, as they are reused.
+
+```console
+# ctr container create docker.io/library/redis:5.0.6 redis1
+# ctr container create docker.io/library/redis:5.0.6 redis2
+ctr snapshot ls
+KEY                                                                     PARENT                                                                  KIND
+redis1                                                                  sha256:33bd296ab7f37bdacff0cb4a5eb671bcb3a141887553ec4157b1e64d6641c1cd Active
+redis2                                                                  sha256:33bd296ab7f37bdacff0cb4a5eb671bcb3a141887553ec4157b1e64d6641c1cd Active
+sha256:33bd296ab7f37bdacff0cb4a5eb671bcb3a141887553ec4157b1e64d6641c1cd sha256:bc8b010e53c5f20023bd549d082c74ef8bfc237dc9bbccea2e0552e52bc5fcb1 Committed
+sha256:bc8b010e53c5f20023bd549d082c74ef8bfc237dc9bbccea2e0552e52bc5fcb1 sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 Committed
+sha256:aa4b58e6ece416031ce00869c5bf4b11da800a397e250de47ae398aea2782294 sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca Committed
+sha256:a8f09c4919857128b1466cc26381de0f9d39a94171534f63859a662d50c396ca sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 Committed
+sha256:2ae5fa95c0fce5ef33fbb87a7e2f49f2a56064566a37a83b97d3f668c10b43d6 sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c Committed
+sha256:d0fe97fa8b8cefdffcef1d62b65aba51a6c87b6679628a2b50fc6a7a579f764c                                                                         Committed```
+
+The same 6 committed layers exist, but only 2 new active snapshots are created, one for each container. Both have the parent of the top committed snapshot,
+`sha256:33bd296ab7f37bdacff0cb4a5eb671bcb3a141887553ec4157b1e64d6641c1cd`.
+
 Thus, the steps are:
 
 1. Get the content into the content store, either via [Pull()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.Pull), or via loading it in the [content.Store API](https://godoc.org/github.com/containerd/containerd/v2/content#Store)
-1. Unpack the image to create committed snapshots for each layer, using [image.Unpack()](https://godoc.org/github.com/containerd/containerd/v2/client#Image). Alternatively, if you use [Pull()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.Pull), you can pass it an option to unpack when pulling, using [WithPullUnpack()](https://godoc.org/github.com/containerd/containerd/v2/client#WithPullUnpack)
+1. Unpack the image to create committed snapshots for each layer, using [image.Unpack()](https://godoc.org/github.com/containerd/containerd/v2/client#Image). Alternatively, if you use [Pull()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.Pull), you can pass it an option to unpack when pulling, using [WithPullUnpack()](https://godoc.org/github.com/containerd/containerd/v2/client#WithPullUnpack).
 1. Create an active snapshot using [Prepare()](https://godoc.org/github.com/containerd/containerd/v2/snapshots#Snapshotter). You can skip this step if you plan on creating a container, as you can pass it as an option to the next step.
 1. Create a container using [NewContainer()](https://godoc.org/github.com/containerd/containerd/v2/client#Client.NewContainer), optionally telling it to create a snapshot with [WithNewSnapshot()](https://godoc.org/github.com/containerd/containerd/v2/client#WithNewSnapshot)
