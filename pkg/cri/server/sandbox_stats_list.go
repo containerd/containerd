@@ -20,9 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/go-runc"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -38,6 +38,7 @@ func (c *criService) ListPodSandboxStats(
 	sandboxes := c.sandboxesForListPodSandboxStatsRequest(r)
 
 	var errs *multierror.Error
+	var exitErr *runc.ExitError
 	podSandboxStats := new(runtime.ListPodSandboxStatsResponse)
 	for _, sandbox := range sandboxes {
 		sandboxStats, err := c.podSandboxStats(ctx, sandbox)
@@ -46,6 +47,10 @@ func (c *criService) ListPodSandboxStats(
 			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, this is likely a transient error: %v", err)
 		case errors.Is(err, ttrpc.ErrClosed):
 			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, connection closed: %v", err)
+		case errors.Is(err, errdefs.ErrUnknown):
+			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, unknown error: %v", err)
+		case errors.As(err, &exitErr):
+			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, command exit: %v", err)
 		case err != nil:
 			errs = multierror.Append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
 		default:
