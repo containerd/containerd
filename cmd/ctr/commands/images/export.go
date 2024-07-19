@@ -119,9 +119,9 @@ When '--all-platforms' is given all images in a manifest list must be available.
 				exportOpts = append(exportOpts, tarchive.WithSkipNonDistributableBlobs)
 			}
 
-			storeOpts := []image.StoreOpt{}
-			for _, img := range images {
-				storeOpts = append(storeOpts, image.WithExtraReference(img))
+			storeOpts := make([]image.StoreOpt, len(images))
+			for i, img := range images {
+				storeOpts[i] = image.WithExtraReference(img)
 			}
 
 			return client.Transfer(ctx,
