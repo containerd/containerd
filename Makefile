@@ -97,14 +97,13 @@ ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
 endif
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
-
+GO_STATIC ?= -extldflags "-static"
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
+SHIM_GO_LDFLAGS := ${GO_LDFLAGS} ${GO_STATIC} '
 ifneq ($(STATIC),)
-	GO_LDFLAGS += -extldflags "-static"
+	GO_LDFLAGS+=${GO_STATIC}
 endif
 GO_LDFLAGS+='
-
-SHIM_GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) -extldflags "-static" $(EXTRA_LDFLAGS)'
 
 # Project packages.
 PACKAGES=$(shell $(GO) list ${GO_TAGS} ./... | grep -v /vendor/ | grep -v /integration)
