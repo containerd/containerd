@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/containerd/go-cni"
@@ -97,13 +98,14 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			}
 			log.L.Debugf("receiving change event from cni conf dir: %s", event)
 
-			lerr := syncer.netPlugin.Load(syncer.loadOpts...)
-			if lerr != nil {
-				log.L.WithError(lerr).
-					Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)
+			if isValidFile(event.Name) {
+				lerr := syncer.netPlugin.Load(syncer.loadOpts...)
+				if lerr != nil {
+					log.L.WithError(lerr).
+						Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)
+				}
+				syncer.updateLastStatus(lerr)
 			}
-			syncer.updateLastStatus(lerr)
-
 		case err := <-syncer.watcher.Errors:
 			if err != nil {
 				log.L.WithError(err).Error("failed to continue sync cni conf change")
@@ -130,4 +132,9 @@ func (syncer *cniNetConfSyncer) updateLastStatus(err error) {
 // stop stops watcher in the syncLoop.
 func (syncer *cniNetConfSyncer) stop() error {
 	return syncer.watcher.Close()
+}
+
+func isValidFile(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	return ext == ".conflist" || ext == ".json" || ext == ".conf"
 }
