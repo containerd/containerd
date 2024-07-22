@@ -274,9 +274,9 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	if err != nil {
 		return nil, err
 	}
-	var out []Container
-	for _, container := range r {
-		out = append(out, containerFromRecord(c, container))
+	out := make([]Container, len(r))
+	for i, container := range r {
+		out[i] = containerFromRecord(c, container)
 	}
 	return out, nil
 }
@@ -519,9 +519,9 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 	}
 	defer done(ctx)
 
-	copts := []NewContainerOpts{}
-	for _, o := range opts {
-		copts = append(copts, o(ctx, id, c, checkpoint, index))
+	copts := make([]NewContainerOpts, len(opts))
+	for i, o := range opts {
+		copts[i] = o(ctx, id, c, checkpoint, index)
 	}
 
 	ctr, err := c.NewContainer(ctx, id, copts...)

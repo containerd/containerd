@@ -1098,9 +1098,9 @@ func getSupplementalGroupsFromPath(root string, filter func(user.Group) bool) ([
 		// if there are no additional groups; just return an empty set
 		return []uint32{}, nil
 	}
-	addlGids := []uint32{}
-	for _, grp := range groups {
-		addlGids = append(addlGids, uint32(grp.Gid))
+	addlGids := make([]uint32, len(groups))
+	for i, grp := range groups {
+		addlGids[i] = uint32(grp.Gid)
 	}
 	return addlGids, nil
 }
