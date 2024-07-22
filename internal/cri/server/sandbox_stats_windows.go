@@ -86,7 +86,9 @@ func (c *criService) podSandboxStats(
 		ProcessCount: &runtime.UInt64Value{Value: pidCount},
 	}
 
-	c.saveSandBoxMetrics(podSandboxStats.Attributes.Id, podSandboxStats)
+	if c.config.StatsMetricsPeriod == 0 {
+		c.saveSandBoxMetrics(podSandboxStats.Attributes.Id, podSandboxStats)
+	}
 
 	return podSandboxStats, nil
 }
@@ -132,6 +134,7 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		return nil, nil, fmt.Errorf("failed to covert container metrics for sandbox with id %s: %w", sandbox.ID, err)
 	}
 
+	containerNanoCoreTotal := uint64(0)
 	windowsContainerStats := make([]*runtime.WindowsContainerStats, 0, len(statsMap))
 	for _, cntr := range containers {
 		containerMetric := statsMap[cntr.ID]
@@ -153,9 +156,19 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 		}
 
 		// Calculate NanoCores for container
-		if containerStats.Cpu != nil && containerStats.Cpu.UsageCoreNanoSeconds != nil {
-			nanoCoreUsage := getUsageNanoCores(containerStats.Cpu.UsageCoreNanoSeconds.Value, cntr.Stats, containerStats.Cpu.Timestamp)
-			containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+
+		if containerStats.Cpu != nil {
+			if c.config.StatsMetricsPeriod == 0 && containerStats.Cpu.UsageCoreNanoSeconds != nil {
+				nanoCoreUsage := getUsageNanoCores(containerStats.Cpu.UsageCoreNanoSeconds.Value, cntr.Stats, containerStats.Cpu.Timestamp)
+				containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+			} else {
+				containerNanoCores := uint64(0)
+				if cntr.Stats != nil {
+					containerNanoCores = cntr.Stats.UsageNanoCores
+				}
+				containerNanoCoreTotal += containerNanoCores
+				containerStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: containerNanoCores}
+			}
 		}
 
 		// On Windows we need to add up all the podStatsData to get the Total for the Pod as there isn't something
@@ -189,9 +202,21 @@ func (c *criService) toPodSandboxStats(sandbox sandboxstore.Sandbox, statsMap ma
 	}
 
 	// Calculate NanoCores for pod after adding containers cpu including the pods cpu
-	if podRuntimeStats.Cpu != nil && podRuntimeStats.Cpu.UsageCoreNanoSeconds != nil {
-		nanoCoreUsage := getUsageNanoCores(podRuntimeStats.Cpu.UsageCoreNanoSeconds.Value, sandbox.Stats, podRuntimeStats.Cpu.Timestamp)
-		podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+	if podRuntimeStats.Cpu != nil {
+		if c.config.StatsMetricsPeriod == 0 && podRuntimeStats.Cpu.UsageCoreNanoSeconds != nil {
+			nanoCoreUsage := getUsageNanoCores(podRuntimeStats.Cpu.UsageCoreNanoSeconds.Value, sandbox.Stats, podRuntimeStats.Cpu.Timestamp)
+			podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: nanoCoreUsage}
+		} else {
+			sandboxNanoCores := uint64(0)
+			if sandbox.Stats != nil {
+				sandboxNanoCores = sandbox.Stats.UsageNanoCores
+			}
+			// There is not a cgroup equivalent on windows where we can get the total cpu usage for the pod
+			// The sandbox container stats are for the "sandbox" container only
+			// To get the total for the pod we need to add the sandbox container stats to the total of the containers
+			// This could possibly change when internal/cri/server/podsandbox/sandbox_stats.go is implemented
+			podRuntimeStats.Cpu.UsageNanoCores = &runtime.UInt64Value{Value: sandboxNanoCores + containerNanoCoreTotal}
+		}
 	}
 
 	return podRuntimeStats, windowsContainerStats, nil
