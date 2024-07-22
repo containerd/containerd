@@ -1,5 +1,11 @@
 CHANGES
 
+v1.2.0-rc1:
+  - Updated to ocicrypt v1.2.0
+  - Updated to containerd v2.0.0-rc.3
+  - Updated other dependencies
+  - Tests: Fixes to work with later version of containerd
+
 v1.1.10:
   - Updated to ocicrypt v1.1.10
   - Added test cases with JKW EC key and added 2 more RSA keys
