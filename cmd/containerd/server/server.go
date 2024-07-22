@@ -587,7 +587,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
 	}
 
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+	conn, err := grpc.NewClient(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}

@@ -245,14 +245,8 @@ func openStream(ctx context.Context, urlStr string) (streamingapi.Stream, error)
 		return stream, nil
 
 	case "grpc":
-		ctx, cancel := context.WithTimeout(ctx, time.Second*100)
-		defer cancel()
-
-		gopts := []grpc.DialOption{
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
-		}
-		conn, err := grpc.DialContext(ctx, realAddress, gopts...)
+		gopts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+		conn, err := grpc.NewClient(realAddress, gopts...)
 		if err != nil {
 			return nil, err
 		}

@@ -275,14 +275,10 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 
 		return ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose)), nil
 	case "grpc":
-		ctx, cancel := context.WithTimeout(ctx, time.Second*100)
-		defer cancel()
-
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
 		}
-		return grpcDialContext(ctx, params.Address, onClose, gopts...)
+		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
 		return nil, fmt.Errorf("unexpected protocol: %q", params.Protocol)
 	}
@@ -292,7 +288,6 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 // so we can have something similar to ttrpc.WithOnClose to have
 // a callback run when the connection is severed or explicitly closed.
 func grpcDialContext(
-	ctx context.Context,
 	address string,
 	onClose func(),
 	gopts ...grpc.DialOption,
@@ -316,7 +311,7 @@ func grpcDialContext(
 	conn.Close()
 
 	target := dialer.DialAddress(address)
-	client, err := grpc.DialContext(ctx, target, gopts...)
+	client, err := grpc.NewClient(target, gopts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GRPC connection: %w", err)
 	}
