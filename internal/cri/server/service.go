@@ -156,6 +156,8 @@ type criService struct {
 	sandboxService sandboxService
 	// runtimeHandlers contains runtime handler info
 	runtimeHandlers []*runtime.RuntimeHandler
+	// runtimeFeatures container runtime features info
+	runtimeFeatures *runtime.RuntimeFeatures
 }
 
 type CRIServiceOptions struct {
@@ -242,6 +244,10 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	c.runtimeHandlers, err = c.introspectRuntimeHandlers(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to introspect runtime handlers: %w", err)
+	}
+
+	c.runtimeFeatures = &runtime.RuntimeFeatures{
+		SupplementalGroupsPolicy: true,
 	}
 
 	return c, c, nil
