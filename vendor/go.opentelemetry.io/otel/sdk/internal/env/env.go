@@ -22,7 +22,7 @@ const (
 	BatchSpanProcessorMaxQueueSizeKey = "OTEL_BSP_MAX_QUEUE_SIZE"
 	// BatchSpanProcessorMaxExportBatchSizeKey is the maximum batch size (i.e.
 	// 512). Note: it must be less than or equal to
-	// EnvBatchSpanProcessorMaxQueueSize.
+	// BatchSpanProcessorMaxQueueSize.
 	BatchSpanProcessorMaxExportBatchSizeKey = "OTEL_BSP_MAX_EXPORT_BATCH_SIZE"
 
 	// AttributeValueLengthKey is the maximum allowed attribute value size.

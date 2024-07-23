@@ -53,12 +53,15 @@ func WithInsecure() Option {
 	return wrappedOption{otlpconfig.WithInsecure()}
 }
 
-// WithEndpoint sets the target endpoint the Exporter will connect to.
+// WithEndpoint sets the target endpoint (host and port) the Exporter will
+// connect to. The provided endpoint should resemble "example.com:4317" (no
+// scheme or path).
 //
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
+// value will be used. If both environment variables are set,
+// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT will take precedence. If an environment
+// variable is set, and this option is passed, this option will take precedence.
 //
 // If both this option and WithEndpointURL are used, the last used option will
 // take precedence.
@@ -71,12 +74,15 @@ func WithEndpoint(endpoint string) Option {
 	return wrappedOption{otlpconfig.WithEndpoint(endpoint)}
 }
 
-// WithEndpointURL sets the target endpoint URL the Exporter will connect to.
+// WithEndpointURL sets the target endpoint URL (scheme, host, port, path)
+// the Exporter will connect to. The provided endpoint URL should resemble
+// "https://example.com:4318/v1/traces".
 //
-// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
 // environment variable is set, and this option is not passed, that variable
-// value will be used. If both are set, OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
-// will take precedence.
+// value will be used. If both environment variables are set,
+// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT will take precedence. If an environment
+// variable is set, and this option is passed, this option will take precedence.
 //
 // If both this option and WithEndpoint are used, the last used option will
 // take precedence.
@@ -84,7 +90,7 @@ func WithEndpoint(endpoint string) Option {
 // If an invalid URL is provided, the default value will be kept.
 //
 // By default, if an environment variable is not set, and this option is not
-// passed, "localhost:4317" will be used.
+// passed, "https://localhost:4317/v1/traces" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpointURL(u string) Option {

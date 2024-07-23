@@ -291,7 +291,7 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 				retErr = err
 			} else {
 				// Poor man's list of errors
-				retErr = fmt.Errorf("%v; %v", retErr, err)
+				retErr = fmt.Errorf("%w; %w", retErr, err)
 			}
 		}
 	}
