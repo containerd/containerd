@@ -105,6 +105,8 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 						Errorf("failed to reload cni configuration after receiving fs change event(%s)", event)
 				}
 				syncer.updateLastStatus(lerr)
+			} else {
+				log.L.Debugf("not recognized file extension: %s", event)
 			}
 		case err := <-syncer.watcher.Errors:
 			if err != nil {
@@ -134,6 +136,8 @@ func (syncer *cniNetConfSyncer) stop() error {
 	return syncer.watcher.Close()
 }
 
+// isValidFile only allows 'valid' file extensions that are loaded from go-cni.
+// https://github.com/containerd/go-cni/blob/1c1be5e9ea864c9bc1651909ae13e1e555b4098d/opts.go#L213
 func isValidFile(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	return ext == ".conflist" || ext == ".json" || ext == ".conf"
