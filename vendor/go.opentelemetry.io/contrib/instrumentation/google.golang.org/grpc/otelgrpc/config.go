@@ -4,6 +4,8 @@
 package otelgrpc // import "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 import (
+	"google.golang.org/grpc/stats"
+
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -20,18 +22,26 @@ const (
 	GRPCStatusCodeKey = attribute.Key("rpc.grpc.status_code")
 )
 
-// Filter is a predicate used to determine whether a given request in
-// interceptor info should be traced. A Filter must return true if
+// InterceptorFilter is a predicate used to determine whether a given request in
+// interceptor info should be instrumented. A InterceptorFilter must return true if
 // the request should be traced.
-type Filter func(*InterceptorInfo) bool
+//
+// Deprecated: Use stats handlers instead.
+type InterceptorFilter func(*InterceptorInfo) bool
+
+// Filter is a predicate used to determine whether a given request in
+// should be instrumented by the attached RPC tag info.
+// A Filter must return true if the request should be instrumented.
+type Filter func(*stats.RPCTagInfo) bool
 
 // config is a group of options for this instrumentation.
 type config struct {
-	Filter           Filter
-	Propagators      propagation.TextMapPropagator
-	TracerProvider   trace.TracerProvider
-	MeterProvider    metric.MeterProvider
-	SpanStartOptions []trace.SpanStartOption
+	Filter            Filter
+	InterceptorFilter InterceptorFilter
+	Propagators       propagation.TextMapPropagator
+	TracerProvider    trace.TracerProvider
+	MeterProvider     metric.MeterProvider
+	SpanStartOptions  []trace.SpanStartOption
 
 	ReceivedEvent bool
 	SentEvent     bool
@@ -152,15 +162,30 @@ func (o tracerProviderOption) apply(c *config) {
 // WithInterceptorFilter returns an Option to use the request filter.
 //
 // Deprecated: Use stats handlers instead.
-func WithInterceptorFilter(f Filter) Option {
+func WithInterceptorFilter(f InterceptorFilter) Option {
 	return interceptorFilterOption{f: f}
 }
 
 type interceptorFilterOption struct {
-	f Filter
+	f InterceptorFilter
 }
 
 func (o interceptorFilterOption) apply(c *config) {
+	if o.f != nil {
+		c.InterceptorFilter = o.f
+	}
+}
+
+// WithFilter returns an Option to use the request filter.
+func WithFilter(f Filter) Option {
+	return filterOption{f: f}
+}
+
+type filterOption struct {
+	f Filter
+}
+
+func (o filterOption) apply(c *config) {
 	if o.f != nil {
 		c.Filter = o.f
 	}

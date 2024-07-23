@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -204,10 +205,15 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 		WriteHeader: func(httpsnoop.WriteHeaderFunc) httpsnoop.WriteHeaderFunc {
 			return rww.WriteHeader
 		},
+		Flush: func(httpsnoop.FlushFunc) httpsnoop.FlushFunc {
+			return rww.Flush
+		},
 	})
 
-	labeler := &Labeler{}
-	ctx = injectLabeler(ctx, labeler)
+	labeler, found := LabelerFromContext(ctx)
+	if !found {
+		ctx = ContextWithLabeler(ctx, labeler)
+	}
 
 	next.ServeHTTP(w, r.WithContext(ctx))
 
@@ -225,9 +231,10 @@ func (h *middleware) serveHTTP(w http.ResponseWriter, r *http.Request, next http
 	if rww.statusCode > 0 {
 		attributes = append(attributes, semconv.HTTPStatusCode(rww.statusCode))
 	}
-	o := metric.WithAttributes(attributes...)
-	h.requestBytesCounter.Add(ctx, bw.read.Load(), o)
-	h.responseBytesCounter.Add(ctx, rww.written, o)
+	o := metric.WithAttributeSet(attribute.NewSet(attributes...))
+	addOpts := []metric.AddOption{o} // Allocate vararg slice once.
+	h.requestBytesCounter.Add(ctx, bw.read.Load(), addOpts...)
+	h.responseBytesCounter.Add(ctx, rww.written, addOpts...)
 
 	// Use floating point division here for higher precision (instead of Millisecond method).
 	elapsedTime := float64(time.Since(requestStartTime)) / float64(time.Millisecond)

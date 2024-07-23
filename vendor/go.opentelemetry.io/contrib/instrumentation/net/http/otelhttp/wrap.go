@@ -87,3 +87,13 @@ func (w *respWriterWrapper) WriteHeader(statusCode int) {
 	}
 	w.ResponseWriter.WriteHeader(statusCode)
 }
+
+func (w *respWriterWrapper) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
