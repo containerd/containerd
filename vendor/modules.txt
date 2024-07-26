@@ -364,9 +364,10 @@ github.com/moby/sys/signal
 # github.com/moby/sys/symlink v0.3.0
 ## explicit; go 1.17
 github.com/moby/sys/symlink
-# github.com/moby/sys/user v0.1.0
-## explicit; go 1.17
+# github.com/moby/sys/user v0.2.0
+## explicit; go 1.21
 github.com/moby/sys/user
+github.com/moby/sys/user/userns
 # github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 ## explicit
 github.com/modern-go/concurrent

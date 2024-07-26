@@ -24,11 +24,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/moby/sys/user/userns"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
-	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )
