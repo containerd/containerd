@@ -138,7 +138,7 @@ func (syncer *cniNetConfSyncer) stop() error {
 
 // isValidFile only allows 'valid' file extensions that are loaded from go-cni.
 // https://github.com/containerd/go-cni/blob/1c1be5e9ea864c9bc1651909ae13e1e555b4098d/opts.go#L213
-func isValidFile(filename string) bool {
+func isValidFileExtension(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
 	return ext == ".conflist" || ext == ".json" || ext == ".conf"
 }
