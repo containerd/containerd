@@ -98,7 +98,7 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			}
 			log.L.Debugf("receiving change event from cni conf dir: %s", event)
 
-			if isValidFile(event.Name) {
+			if isValidFileExtension(event.Name) {
 				lerr := syncer.netPlugin.Load(syncer.loadOpts...)
 				if lerr != nil {
 					log.L.WithError(lerr).
@@ -136,7 +136,7 @@ func (syncer *cniNetConfSyncer) stop() error {
 	return syncer.watcher.Close()
 }
 
-// isValidFile only allows 'valid' file extensions that are loaded from go-cni.
+// isValidFileExtension only allows 'valid' file extensions that are loaded from go-cni.
 // https://github.com/containerd/go-cni/blob/1c1be5e9ea864c9bc1651909ae13e1e555b4098d/opts.go#L213
 func isValidFileExtension(filename string) bool {
 	ext := strings.ToLower(filepath.Ext(filename))
