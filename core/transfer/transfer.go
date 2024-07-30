@@ -20,8 +20,9 @@ import (
 	"context"
 	"io"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
@@ -128,11 +129,43 @@ func WithProgress(f ProgressFunc) Opt {
 	}
 }
 
+// Progress is used to represent a particular progress event or incremental
+// update for the provided named object. The parents represent the names of
+// the objects which initiated the progress for the provided named object.
+// The name and what object it represents is determined by the implementation.
+type Progress struct {
+	Event    string
+	Name     string
+	Parents  []string
+	Progress int64
+	Total    int64
+	Desc     *ocispec.Descriptor // since containerd v2.0
+}
+
+////
+// Layer fetch config
+////
+
+const defaultLayerParallelism = int64(1)
+
 type FetcherConfig struct {
 	MaxConcurrentDownloads         int
 	MaxConcurrentDownloadsPerLayer int
 	ConcurrentFetchChunksSizeMB    int
 	Limiter                        *semaphore.Weighted
+}
+
+func (cfg FetcherConfig) Parallelism() int64 {
+	// parallel layer fetching remains off when MaxConcurrentDownloadsPerLayer
+	// is set to 0. This could be changed in the future if/when the feature is
+	// successful and widely adopted.
+	if cfg.MaxConcurrentDownloads <= 0 || cfg.MaxConcurrentDownloadsPerLayer <= 0 {
+		return defaultLayerParallelism
+	}
+	if cfg.MaxConcurrentDownloadsPerLayer > 0 && cfg.MaxConcurrentDownloadsPerLayer < cfg.MaxConcurrentDownloads {
+		return int64(cfg.MaxConcurrentDownloadsPerLayer)
+	}
+	return int64(cfg.MaxConcurrentDownloads)
 }
 
 type FetcherOpt func(*FetcherConfig)
@@ -168,17 +201,4 @@ func WithLimiter(limiter *semaphore.Weighted) FetcherOpt {
 	return func(opts *FetcherConfig) {
 		opts.Limiter = limiter
 	}
-}
-
-// Progress is used to represent a particular progress event or incremental
-// update for the provided named object. The parents represent the names of
-// the objects which initiated the progress for the provided named object.
-// The name and what object it represents is determined by the implementation.
-type Progress struct {
-	Event    string
-	Name     string
-	Parents  []string
-	Progress int64
-	Total    int64
-	Desc     *ocispec.Descriptor // since containerd v2.0
 }

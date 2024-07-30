@@ -273,22 +273,18 @@ const (
 	tB
 	pB
 	eB
+
+	// When under this size, a layer will not be fetched using parallel requets
+	minimumSizeForParallelDL = 1 * mB
 )
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
-	parallelism := int64(1)
-	if r.config.MaxConcurrentDownloads > 0 {
-		parallelism = int64(r.config.MaxConcurrentDownloads)
-	}
-	if r.config.MaxConcurrentDownloadsPerLayer > 0 && r.config.MaxConcurrentDownloadsPerLayer < r.config.MaxConcurrentDownloads {
-		parallelism = int64(r.config.MaxConcurrentDownloadsPerLayer)
-	}
+	parallelism, chunkSize := r.config.Parallelism(), int64(r.config.ConcurrentFetchChunksSizeMB)*mB
 	if r.config.Limiter != nil {
 		if err := r.config.Limiter.Acquire(ctx, parallelism); err != nil {
 			return nil, err
 		}
 	}
-	chunkSize := int64(r.config.ConcurrentFetchChunksSizeMB) * mB
 
 	if mediatype == "" {
 		req.header.Set("Accept", "*/*")
@@ -358,7 +354,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 				return nil, fmt.Errorf("failed to discard to offset: %w", err)
 			}
 			if n != offset {
-				r.config.Limiter.Release(parallelism)
+				if r.config.Limiter != nil {
+					r.config.Limiter.Release(parallelism)
+				}
 				return nil, errors.New("unable to discard to offset")
 			}
 
@@ -375,13 +373,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		return r == ' ' || r == '\t' || r == ','
 	})
 
-	minimumSizeForParallelDL := 1 * mB
-	if chunkSize > minimumSizeForParallelDL {
-		minimumSizeForParallelDL = chunkSize
-	}
 	totalSize, _ := strconv.ParseInt(resp.Header.Get("content-length"), 10, 0)
 	remaining := totalSize - offset
-	if parallelism > 1 && remaining > minimumSizeForParallelDL && req.body == nil {
+	if parallelism > 1 && chunkSize > 0 && remaining > minimumSizeForParallelDL && req.body == nil {
 		// If we have a content length, we can use multiple requests to fetch
 		// the content in parallel. This will make download of bigger bodies
 		// faster, at the cost of parallelism more requests and max
@@ -426,7 +420,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 					reqClone := req.clone()
 					reqClone.header.Set("range", fmt.Sprintf("bytes=%d-", offset+i*chunkSize))
 					nresp, err := reqClone.doWithRetries(ctx, nil)
-					if nresp.StatusCode > 299 {
+					if nresp != nil && nresp.StatusCode > 299 {
 						err = fmt.Errorf("unexpected status code %v: %s", reqClone.String(), nresp.Status)
 					}
 					if err != nil {
