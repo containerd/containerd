@@ -269,10 +269,7 @@ version = 2
 
   [plugins."io.containerd.transfer.v1.local"]
     config_path = ""
-    max_concurrent_downloads = 9
-    max_concurrent_downloads_per_layer = 3
-    max_concurrent_download_operations = 3
-    concurrent_fetch_chunks_size_mb = 32
+    max_concurrent_downloads = 3
     max_concurrent_uploaded_layers = 3
 
     # In 2.0, the default unpack config is applied when not specified

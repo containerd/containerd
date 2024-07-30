@@ -56,9 +56,6 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	if tc.MaxConcurrentUploadedLayers > 0 {
 		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
 	}
-	if tc.MaxConcurrentDownloadsPerLayer > 0 {
-		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadsPerLayer))
-	}
 	if tc.MaxConcurrentDownloadOperations > 0 {
 		ts.limiterOperationD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadOperations))
 	}

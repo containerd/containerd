@@ -159,7 +159,8 @@ type transferConfig struct {
 
 	// MaxConcurrentDownloadsPerLayer is the max concurent download per layer
 	// for a pull. 1 means a layer will be donloaded with one connection. 0
-	// means no limit, the upper limit will then be `max_concurrent_downloads`.
+	// means parallel layer fetching will be turned off, which is the default
+	// behaviour.
 	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer"`
 
 	// MaxConcurrentDownloadOperations is the max number of operations hapenning at the
@@ -194,10 +195,7 @@ type unpackConfiguration struct {
 
 func defaultConfig() *transferConfig {
 	return &transferConfig{
-		MaxConcurrentDownloads:          9,
-		MaxConcurrentDownloadsPerLayer:  3,
-		MaxConcurrentDownloadOperations: 3,
-		ConcurrentFetchChunksSizeMB:     32,
-		MaxConcurrentUploadedLayers:     3,
+		MaxConcurrentDownloads:      3,
+		MaxConcurrentUploadedLayers: 3,
 	}
 }
