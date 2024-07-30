@@ -34,8 +34,15 @@ import (
 func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandboxRequest) (*runtime.StopPodSandboxResponse, error) {
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
-		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
-			r.GetPodSandboxId(), err)
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w",
+				r.GetPodSandboxId(), err)
+		}
+
+		// The StopPodSandbox RPC is idempotent, and must not return an error
+		// if all relevant resources have already been reclaimed. Ref:
+		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L45-L46
+		return &runtime.StopPodSandboxResponse{}, nil
 	}
 
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
