@@ -63,7 +63,7 @@ const (
 	snapshotInfoLabel string = "containerd.io/snapshot-info"
 )
 
-var CtrdImageNameWithRuntimeHandler string = "%s,%s"
+var ctrdImageNameWithRuntimeHandler = "%s,%s"
 
 // For image management:
 // 1) We have an in-memory metadata index to:
@@ -193,18 +193,12 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	)
 
 	defer pcancel()
-	snapshotter, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
+	snapshotter, platformForImagePull, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
 
-	// Get which platform the image needs to be pulled for
-	platformForImagePull, err := c.platformForImagePullFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
-	if err != nil {
-		return "", fmt.Errorf("failed to get platform information for pulling %v", ref)
-	}
-
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+	log.G(ctx).Debugf("PullImage %q with snapshotter %s, platformForImagePull %v", ref, snapshotter, platformForImagePull)
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
@@ -442,7 +436,7 @@ func (c *CRIImageService) updateCacheWithValidRuntimeHandlers(ctx context.Contex
 			continue
 		}
 
-		refNameWithRuntimeHandler := fmt.Sprintf(CtrdImageNameWithRuntimeHandler, ref, runtimeHandler)
+		refNameWithRuntimeHandler := fmt.Sprintf(ctrdImageNameWithRuntimeHandler, ref, runtimeHandler)
 		_, err := c.client.GetImage(ctx, refNameWithRuntimeHandler)
 		if err != nil {
 			if !errdefs.IsNotFound(err) {
@@ -946,72 +940,44 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-// Given that runtime information is not passed from PullImageRequest, we depend on an experimental annotation
-// passed from pod sandbox config to get the runtimeHandler. The annotation key is specified in configuration.
-// Once we know the runtime, try to override default snapshotter if it is set for this runtime.
-// See https://github.com/containerd/containerd/issues/6657
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig, runtimeHandler string) (string, error) {
-	snapshotter := c.config.Snapshotter
-	if s == nil || s.Annotations == nil {
-		return snapshotter, nil
+func (c *CRIImageService) getInfoFromRuntimePlatforms(runtimeHandler string) (string, imagespec.Platform, error) {
+	if c.runtimePlatforms == nil {
+		return "", imagespec.Platform{}, fmt.Errorf("no CRIImageService.runtimePlatforms defined")
 	}
-
-	// TODO(kiashok): honor the new CRI runtime handler field added to v0.29.0
-	// for image pull per runtime class support.
-	if runtimeHandler != "" {
-		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok && imagePlatform.Snapshotter != snapshotter {
-			return imagePlatform.Snapshotter, nil
-		} else {
-			return "", fmt.Errorf("invalid runtime handler %v", runtimeHandler)
-		}
+	if _, ok := c.runtimePlatforms[runtimeHandler]; !ok {
+		return "", imagespec.Platform{}, fmt.Errorf("invalid runtimehandler")
 	}
-	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
-	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
-	if !ok {
-		return snapshotter, nil
-	}
-
-	// TODO: Ensure error is returned if runtime not found?
-	if c.runtimePlatforms != nil {
-		if p, ok := c.runtimePlatforms[runtimeHandler]; ok && p.Snapshotter != snapshotter {
-			snapshotter = p.Snapshotter
-			log.G(ctx).Infof("experimental: PullImage %q for runtime %s, using snapshotter %s", imageRef, runtimeHandler, snapshotter)
-		}
-	}
-
-	return snapshotter, nil
+	imagePlatform := c.runtimePlatforms[runtimeHandler]
+	return imagePlatform.Snapshotter, imagePlatform.Platform, nil
 }
 
-// Gets the platform to use for image pull based on runtimeHandler passed from CRI.
-// If CRI runtime handler is empty, we attempt to check if annotations.RuntimeHandler
-// annotation was set for the pod. Else, the default platform for the host is returned.
-func (c *CRIImageService) platformForImagePullFromPodSandboxConfig(ctx context.Context, imageRef string,
-	s *runtime.PodSandboxConfig, runtimeHandler string) (imagespec.Platform, error) {
+// RuntimeHandler information is passed through PullImageRequest from cri-api v0.29.0.
+// Therefore, attempt to read the snapshot and runtimeHandler information from PullImageRequest
+// and if one was not specified, try to look for appropriate annotation key. If none are found,
+// return default values for snapshotter and runtime handler.
+func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
+	s *runtime.PodSandboxConfig, runtimeHandlerFromCRI string) (string, imagespec.Platform, error) {
+	snapshotter := c.config.Snapshotter
 	platform := platforms.DefaultSpec()
 
-	if runtimeHandler != "" {
-		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
-			return imagePlatform.Platform, nil
-		} else {
-			return imagespec.Platform{}, fmt.Errorf("invalid runtime handler %v", runtimeHandler)
-		}
+	// Honor the CRI runtime handler field passed through PullImageRequest.
+	// If the runtimeHandler is valid, we have to pass both snapshotter and
+	// platform defined in c.RuntimePlatforms. If either of the fields
+	// in c.RuntimPlatforms[runtimehandler] are empty, fallback to using the
+	// default snapshotter and platform.
+	if runtimeHandlerFromCRI != "" {
+		return c.getInfoFromRuntimePlatforms(runtimeHandlerFromCRI)
+	}
+
+	if s == nil || s.Annotations == nil {
+		return snapshotter, platform, nil
 	}
 
 	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
-	if s == nil || s.Annotations == nil {
-		return platform, nil
-	}
-
 	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
-	if !ok {
-		return platform, nil
+	if ok {
+		return c.getInfoFromRuntimePlatforms(runtimeHandler)
 	}
 
-	if c.runtimePlatforms != nil {
-		if imagePlatform, ok := c.runtimePlatforms[runtimeHandler]; ok {
-			return imagePlatform.Platform, nil
-		}
-	}
-	return platform, nil
+	return snapshotter, platform, nil
 }
