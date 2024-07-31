@@ -45,7 +45,7 @@ type RefKey struct {
 	RuntimeHandler string
 }
 
-type ImageIDKey struct {
+type ImageIDKey struct { //revive:disable // type name will be used as image.ImageIDKey by other packages, and that stutters
 	// Id of the image. Normally the digest of image config.
 	ID string
 	// RuntimeHandler used for pulling this image
@@ -113,7 +113,7 @@ type store struct {
 	pinnedRefs map[string]sets.Set[RefKey]
 }
 
-var newImageNameFormat string = "%s,%s"
+var newImageNameFormat = "%s,%s"
 
 // NewStore creates an image store.
 func NewStore(img Getter, provider content.InfoReaderProvider, defaultRuntimeName string, platforms map[string]imagespec.Platform) *Store {
@@ -309,7 +309,11 @@ func (s *store) add(img Image) error {
 		}
 	}
 
-	if len(s.digestReferences[img.Key.ID]) == 0 {
+	if s.digestReferences == nil {
+		s.digestReferences = make(map[string]sets.Set[ImageIDKey])
+	}
+
+	if refs := (s.digestReferences[img.Key.ID]); refs == nil {
 		s.digestReferences[img.Key.ID] = sets.New(img.Key)
 	} else {
 		s.digestReferences[img.Key.ID].Insert(img.Key)
