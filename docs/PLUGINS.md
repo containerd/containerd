@@ -262,12 +262,24 @@ If you want to get the configuration combined with your configuration, run `cont
 
 ##### Version header
 
-containerd has two configuration versions:
-- Version 2 (Recommended): Introduced in containerd 1.3.
-- Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
+containerd has several configuration versions:
+- Version 3 (Recommended for containerd 2.x): Introduced in containerd 2.0.
+  Several plugin IDs have changed in this version.
+- Version 2 (Recommended for containerd 1.x): Introduced in containerd 1.3.
+  Still supported in containerd v2.x.
+  Plugin IDs are changed to have prefixes like "io.containerd.".
+- Version 1: Introduced in containerd 1.0. Removed in containerd 2.0.
 
-A configuration with Version 2 must have `version = 2` header, and must have
+A configuration for Version 2 or 3 must specify the version `version = 2` or `version = 3` in the header, and must have
 fully qualified plugin IDs in the `[plugins]` section:
+```toml
+version = 3
+
+[plugins]
+  [plugins.'io.containerd.monitor.task.v1.cgroups']
+    no_prometheus = false
+```
+
 ```toml
 version = 2
 
