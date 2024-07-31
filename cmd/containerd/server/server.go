@@ -88,6 +88,15 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
 		return err
 	}
+	if config.State != defaults.DefaultStateDir {
+		// XXX: socketRoot in pkg/shim is hard-coded to the default state directory.
+		// See https://github.com/containerd/containerd/issues/10502#issuecomment-2249268582 for why it's set up that way.
+		// The default fifo directory in pkg/cio is also configured separately and defaults to the default state directory instead of the configured state directory.
+		// Make sure the default state directory is created with the correct permissions.
+		if err := sys.MkdirAllWithACL(defaults.DefaultStateDir, 0o711); err != nil {
+			return err
+		}
+	}
 
 	if config.TempDir != "" {
 		if err := sys.MkdirAllWithACL(config.TempDir, 0o711); err != nil {
