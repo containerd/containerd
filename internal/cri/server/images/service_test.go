@@ -58,9 +58,9 @@ var testImageConfig = criconfig.ImageConfig{
 	},
 }
 
-var defaultRuntimeNameForTest string = "test-runtime"
+var defaultRuntimeName = "test-runtime"
 var testContainerdConfig = criconfig.ContainerdConfig{
-	DefaultRuntimeName: defaultRuntimeNameForTest,
+	DefaultRuntimeName: defaultRuntimeName,
 }
 
 func TestLocalResolve(t *testing.T) {
