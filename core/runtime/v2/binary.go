@@ -104,7 +104,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 	// copy the shim's logs to containerd's output
 	go func() {
 		defer f.Close()
-		_, err := io.Copy(os.Stderr, f)
+		_, err := io.CopyBuffer(os.Stderr, f, make([]byte, 1024))
 		// To prevent flood of error messages, the expected error
 		// should be reset, like os.ErrClosed or os.ErrNotExist, which
 		// depends on platform.

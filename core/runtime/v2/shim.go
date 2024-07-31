@@ -82,7 +82,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 	// copy the shim's logs to containerd's output
 	go func() {
 		defer f.Close()
-		_, err := io.Copy(os.Stderr, f)
+		_, err := io.CopyBuffer(os.Stderr, f, make([]byte, 1024))
 		// To prevent flood of error messages, the expected error
 		// should be reset, like os.ErrClosed or os.ErrNotExist, which
 		// depends on platform.
