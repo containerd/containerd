@@ -70,7 +70,7 @@ func getContainerStatusTestData(t *testing.T) (*containerstore.Metadata, contain
 		CreatedAt: createdAt,
 	}
 	image := &imagestore.Image{
-		ID: imageID,
+		Key: imagestore.ImageIDKey{ID: imageID, RuntimeHandler: ""},
 		References: []string{
 			"gcr.io/library/busybox:latest",
 			"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",

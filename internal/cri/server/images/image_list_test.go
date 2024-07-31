@@ -32,7 +32,7 @@ func TestListImages(t *testing.T) {
 	_, c := newTestCRIService()
 	imagesInStore := []imagestore.Image{
 		{
-			ID:      "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-1",
 			References: []string{
 				"gcr.io/library/busybox:latest",
@@ -46,7 +46,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:      "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-2",
 			References: []string{
 				"gcr.io/library/alpine:latest",
@@ -60,7 +60,7 @@ func TestListImages(t *testing.T) {
 			},
 		},
 		{
-			ID:      "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:     imagestore.ImageIDKey{ID: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID: "test-chainid-3",
 			References: []string{
 				"gcr.io/library/ubuntu:latest",
