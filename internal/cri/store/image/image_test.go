@@ -31,25 +31,25 @@ import (
 func TestInternalStore(t *testing.T) {
 	images := []Image{
 		{
-			ID:         "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:        ImageIDKey{ID: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID:    "test-chain-id-1",
 			References: []string{"containerd.io/ref-1"},
 			Size:       10,
 		},
 		{
-			ID:         "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:        ImageIDKey{ID: "sha256:2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			ChainID:    "test-chain-id-2abcd",
 			References: []string{"containerd.io/ref-2abcd"},
 			Size:       20,
 		},
 		{
-			ID:         "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:        ImageIDKey{ID: "sha256:3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			References: []string{"containerd.io/ref-4a333"},
 			ChainID:    "test-chain-id-4a333",
 			Size:       30,
 		},
 		{
-			ID:         "sha256:4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+			Key:        ImageIDKey{ID: "sha256:4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 			References: []string{"containerd.io/ref-4abcd"},
 			ChainID:    "test-chain-id-4abcd",
 			Size:       40,
@@ -59,9 +59,9 @@ func TestInternalStore(t *testing.T) {
 	genTruncIndex := func(normalName string) string { return normalName[:(len(normalName)+1)/2] }
 
 	s := &store{
-		images:     make(map[string]Image),
+		images:     make(map[ImageIDKey]Image),
 		digestSet:  digestset.NewSet(),
-		pinnedRefs: make(map[string]sets.Set[string]),
+		pinnedRefs: make(map[string]sets.Set[RefKey]),
 	}
 
 	t.Logf("should be able to add image")
@@ -72,24 +72,24 @@ func TestInternalStore(t *testing.T) {
 
 	t.Logf("should be able to get image")
 	for _, v := range images {
-		truncID := genTruncIndex(v.ID)
-		got, err := s.get(truncID)
-		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.ID)
+		truncID := genTruncIndex(v.Key.ID)
+		got, err := s.get(truncID, "")
+		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.Key.ID)
 		assert.Equal(v, got)
 	}
 
 	t.Logf("should be able to get image by truncated imageId without algorithm")
 	for _, v := range images {
-		truncID := genTruncIndex(v.ID[strings.Index(v.ID, ":")+1:])
-		got, err := s.get(truncID)
-		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.ID)
+		truncID := genTruncIndex(v.Key.ID[strings.Index(v.Key.ID, ":")+1:])
+		got, err := s.get(truncID, "")
+		assert.NoError(err, "truncID:%s, fullID:%s", truncID, v.Key.ID)
 		assert.Equal(v, got)
 	}
 
 	t.Logf("should not be able to get image by ambiguous prefix")
 	ambiguousPrefixs := []string{"sha256", "sha256:"}
 	for _, v := range ambiguousPrefixs {
-		_, err := s.get(v)
+		_, err := s.get(v, "")
 		assert.NotEqual(nil, err)
 	}
 
@@ -99,7 +99,7 @@ func TestInternalStore(t *testing.T) {
 
 	imageNum := len(images)
 	for _, v := range images {
-		truncID := genTruncIndex(v.ID)
+		truncID := genTruncIndex(v.Key.ID)
 		oldRef := v.References[0]
 		newRef := oldRef + "new"
 
@@ -108,7 +108,7 @@ func TestInternalStore(t *testing.T) {
 		newImg.References = []string{newRef}
 		err := s.add(newImg)
 		assert.NoError(err)
-		got, err := s.get(truncID)
+		got, err := s.get(truncID, "")
 		assert.NoError(err)
 		assert.Len(got.References, 2)
 		assert.Contains(got.References, oldRef, newRef)
@@ -116,20 +116,20 @@ func TestInternalStore(t *testing.T) {
 		t.Logf("should not be able to add duplicated references")
 		err = s.add(newImg)
 		assert.NoError(err)
-		got, err = s.get(truncID)
+		got, err = s.get(truncID, "")
 		assert.NoError(err)
 		assert.Len(got.References, 2)
 		assert.Contains(got.References, oldRef, newRef)
 
 		t.Logf("should be able to delete image references")
-		s.delete(truncID, oldRef)
-		got, err = s.get(truncID)
+		s.delete(truncID, RefKey{Ref: oldRef, RuntimeHandler: ""})
+		got, err = s.get(truncID, "")
 		assert.NoError(err)
 		assert.Equal([]string{newRef}, got.References)
 
 		t.Logf("should be able to delete image")
-		s.delete(truncID, newRef)
-		got, err = s.get(truncID)
+		s.delete(truncID, RefKey{Ref: newRef, RuntimeHandler: ""})
+		got, err = s.get(truncID, "")
 		assert.Equal(errdefs.ErrNotFound, err)
 		assert.Equal(Image{}, got)
 
@@ -142,14 +142,14 @@ func TestInternalStore(t *testing.T) {
 func TestInternalStorePinnedImage(t *testing.T) {
 	assert := assertlib.New(t)
 	s := &store{
-		images:     make(map[string]Image),
+		images:     make(map[ImageIDKey]Image),
 		digestSet:  digestset.NewSet(),
-		pinnedRefs: make(map[string]sets.Set[string]),
+		pinnedRefs: make(map[string]sets.Set[RefKey]),
 	}
 
 	ref1 := "containerd.io/ref-1"
 	image := Image{
-		ID:         "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		Key:        ImageIDKey{ID: "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", RuntimeHandler: ""},
 		ChainID:    "test-chain-id-1",
 		References: []string{ref1},
 		Size:       10,
@@ -157,60 +157,60 @@ func TestInternalStorePinnedImage(t *testing.T) {
 
 	t.Logf("add unpinned image ref, image should be unpinned")
 	assert.NoError(s.add(image))
-	i, err := s.get(image.ID)
+	i, err := s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
 
 	t.Logf("add pinned image ref, image should be pinned")
 	ref2 := "containerd.io/ref-2"
 	image.References = []string{ref2}
 	image.Pinned = true
 	assert.NoError(s.add(image))
-	i, err = s.get(image.ID)
+	i, err = s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
-	assert.True(s.isPinned(image.ID, ref2))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	assert.True(s.isPinned(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
 
 	t.Logf("pin unpinned image ref, image should be pinned, all refs should be pinned")
-	assert.NoError(s.pin(image.ID, ref1))
-	i, err = s.get(image.ID)
+	assert.NoError(s.pin(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	i, err = s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.True(s.isPinned(image.ID, ref1))
-	assert.True(s.isPinned(image.ID, ref2))
+	assert.True(s.isPinned(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	assert.True(s.isPinned(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
 
 	t.Logf("unpin one of image refs, image should be pinned")
-	assert.NoError(s.unpin(image.ID, ref2))
-	i, err = s.get(image.ID)
+	assert.NoError(s.unpin(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
+	i, err = s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.True(i.Pinned)
-	assert.True(s.isPinned(image.ID, ref1))
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.True(s.isPinned(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
 
 	t.Logf("unpin the remaining one image ref, image should be unpinned")
-	assert.NoError(s.unpin(image.ID, ref1))
-	i, err = s.get(image.ID)
+	assert.NoError(s.unpin(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	i, err = s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref1))
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
 
 	t.Logf("pin one of image refs, then delete this, image should be unpinned")
-	assert.NoError(s.pin(image.ID, ref1))
-	s.delete(image.ID, ref1)
-	i, err = s.get(image.ID)
+	assert.NoError(s.pin(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""}))
+	s.delete(image.Key.ID, RefKey{Ref: ref1, RuntimeHandler: ""})
+	i, err = s.get(image.Key.ID, "")
 	assert.NoError(err)
 	assert.False(i.Pinned)
-	assert.False(s.isPinned(image.ID, ref2))
+	assert.False(s.isPinned(image.Key.ID, RefKey{Ref: ref2, RuntimeHandler: ""}))
 }
 
 func TestImageStore(t *testing.T) {
 	id := "sha256:1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	newID := "sha256:9923456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	image := Image{
-		ID:         id,
+		Key:        ImageIDKey{ID: id, RuntimeHandler: ""},
 		ChainID:    "test-chain-id-1",
 		References: []string{"containerd.io/ref-1"},
 		Size:       10,
@@ -235,14 +235,14 @@ func TestImageStore(t *testing.T) {
 		"new ref for an existing image": {
 			ref: "containerd.io/ref-2",
 			image: &Image{
-				ID:         id,
+				Key:        ImageIDKey{ID: id, RuntimeHandler: ""},
 				ChainID:    "test-chain-id-1",
 				References: []string{"containerd.io/ref-2"},
 				Size:       10,
 			},
 			expected: []Image{
 				{
-					ID:         id,
+					Key:        ImageIDKey{ID: id, RuntimeHandler: ""},
 					ChainID:    "test-chain-id-1",
 					References: []string{"containerd.io/ref-1", "containerd.io/ref-2"},
 					Size:       10,
@@ -252,7 +252,7 @@ func TestImageStore(t *testing.T) {
 		"new ref for a new image": {
 			ref: "containerd.io/ref-2",
 			image: &Image{
-				ID:         newID,
+				Key:        ImageIDKey{ID: newID, RuntimeHandler: ""},
 				ChainID:    "test-chain-id-2",
 				References: []string{"containerd.io/ref-2"},
 				Size:       20,
@@ -260,7 +260,7 @@ func TestImageStore(t *testing.T) {
 			expected: []Image{
 				image,
 				{
-					ID:         newID,
+					Key:        ImageIDKey{ID: newID, RuntimeHandler: ""},
 					ChainID:    "test-chain-id-2",
 					References: []string{"containerd.io/ref-2"},
 					Size:       20,
@@ -270,14 +270,14 @@ func TestImageStore(t *testing.T) {
 		"existing ref point to a new image": {
 			ref: "containerd.io/ref-1",
 			image: &Image{
-				ID:         newID,
+				Key:        ImageIDKey{ID: newID, RuntimeHandler: ""},
 				ChainID:    "test-chain-id-2",
 				References: []string{"containerd.io/ref-1"},
 				Size:       20,
 			},
 			expected: []Image{
 				{
-					ID:         newID,
+					Key:        ImageIDKey{ID: newID, RuntimeHandler: ""},
 					ChainID:    "test-chain-id-2",
 					References: []string{"containerd.io/ref-1"},
 					Size:       20,
@@ -293,23 +293,23 @@ func TestImageStore(t *testing.T) {
 		t.Run(desc, func(t *testing.T) {
 			s, err := NewFakeStore([]Image{image})
 			assert.NoError(err)
-			assert.NoError(s.update(test.ref, test.image))
+			assert.NoError(s.update(RefKey{Ref: test.ref, RuntimeHandler: ""}, test.image))
 
 			assert.Len(s.List(), len(test.expected))
 			for _, expect := range test.expected {
-				got, err := s.Get(expect.ID)
+				got, err := s.Get(expect.Key.ID, "")
 				assert.NoError(err)
 				equal(got, expect)
 				for _, ref := range expect.References {
-					id, err := s.Resolve(ref)
+					id, err := s.Resolve(ref, "")
 					assert.NoError(err)
-					assert.Equal(expect.ID, id)
+					assert.Equal(expect.Key.ID, id)
 				}
 			}
 
 			if test.image == nil {
 				// Shouldn't be able to index by removed ref.
-				id, err := s.Resolve(test.ref)
+				id, err := s.Resolve(test.ref, "")
 				assert.Equal(errdefs.ErrNotFound, err)
 				assert.Empty(id)
 			}
