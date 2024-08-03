@@ -17,6 +17,8 @@ env:
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
+  id-token: write
+  attestations: write
 
 jobs:
   check:
@@ -131,6 +133,10 @@ jobs:
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
+      - name: Attest Artifacts
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: src/github.com/containerd/containerd/releases/release-tars-${{env.PLATFORM_CLEAN}}.tar.gz*
 
   release:
     name: Create containerd Release
