@@ -535,7 +535,7 @@ func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string 
 
 // toCNIBandWidth converts CRI annotations to CNI bandwidth.
 func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
-	ingress, egress, err := bandwidth.ExtractPodBandwidthResources(annotations)
+	ingress, egress, ingressBurst, egressBurst, err := bandwidth.ExtractPodBandwidthResources(annotations)
 	if err != nil {
 		return nil, fmt.Errorf("reading pod bandwidth annotations: %w", err)
 	}
@@ -554,6 +554,20 @@ func toCNIBandWidth(annotations map[string]string) (*cni.BandWidth, error) {
 	if egress != nil {
 		bandWidth.EgressRate = uint64(egress.Value())
 		bandWidth.EgressBurst = math.MaxUint32
+	}
+
+	if ingressBurst != nil {
+		if uint64(ingressBurst.Value()) > uint64(ingress.Value()) {
+			bandWidth.IngressBurst = uint64(ingressBurst.Value())
+		}
+		log.L.Warnf("ingress burst %d is larger than ingress rate %d, using default ingress burst", uint64(ingressBurst.Value()), uint64(ingress.Value()))
+	}
+
+	if egressBurst != nil {
+		if uint64(egressBurst.Value()) > uint64(egress.Value()) {
+			bandWidth.EgressBurst = uint64(egressBurst.Value())
+		}
+		log.L.Warnf("egress burst %d is larger than egress rate %d, using default egress burst", uint64(egressBurst.Value()), uint64(egress.Value()))
 	}
 
 	return bandWidth, nil
