@@ -35,7 +35,7 @@ import (
 // defined.
 func AppContext(cliContext *cli.Context) (context.Context, context.CancelFunc) {
 	var (
-		ctx       = context.Background()
+		ctx       = cliContext.Context
 		timeout   = cliContext.Duration("timeout")
 		namespace = cliContext.String("namespace")
 		cancel    context.CancelFunc
