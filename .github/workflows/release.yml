@@ -17,8 +17,6 @@ env:
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
-  id-token: write
-  attestations: write
 
 jobs:
   check:
@@ -133,16 +131,14 @@ jobs:
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
-      - name: Attest Artifacts
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: src/github.com/containerd/containerd/releases/release-tars-${{env.PLATFORM_CLEAN}}.tar.gz*
 
   release:
     name: Create containerd Release
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [build, check]
@@ -163,3 +159,7 @@ jobs:
           files: |
             builds/release-tars-**/*
           make_latest: false
+      - name: Attest Artifacts
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: ./builds/release-tars-**/*.tar.gz
