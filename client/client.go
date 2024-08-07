@@ -732,7 +732,7 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
+	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
 }
 
 // VersionService returns the underlying VersionClient
@@ -911,7 +911,7 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 
 	s := c.IntrospectionService()
 
-	resp, err := s.PluginInfo(ctx, string(plugins.RuntimePluginV2), "task", rr)
+	resp, err := s.PluginInfo(ctx, string(plugins.ShimPlugin), "manager", rr)
 	if err != nil {
 		return nil, err
 	}
