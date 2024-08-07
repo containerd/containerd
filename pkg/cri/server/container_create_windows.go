@@ -64,8 +64,6 @@ func (c *criService) containerSpec(
 		specOpts = append(specOpts, oci.WithProcessCwd(config.GetWorkingDir()))
 	} else if imageConfig.WorkingDir != "" {
 		specOpts = append(specOpts, oci.WithProcessCwd(imageConfig.WorkingDir))
-	} else if cntrHpc {
-		specOpts = append(specOpts, oci.WithProcessCwd(`C:\hpc`))
 	}
 
 	if config.GetTty() {
