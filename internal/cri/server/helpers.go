@@ -156,9 +156,10 @@ func criContainerStateToString(state runtime.ContainerState) string {
 func (c *criService) toContainerdImage(ctx context.Context, image imagestore.Image) (containerd.Image, error) {
 	// image should always have at least one reference.
 	if len(image.References) == 0 {
-		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
+		return nil, fmt.Errorf("invalid image with no reference %q", image.Key.ID)
 	}
-	return c.client.GetImage(ctx, image.References[0])
+	platform := c.PlatformForRuntimeHandler(image.Key.RuntimeHandler)
+	return c.client.GetImageWithPlatform(ctx, image.References[0], platform)
 }
 
 // getUserFromImage gets uid or user name of the image user.
