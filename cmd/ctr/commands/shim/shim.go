@@ -67,7 +67,7 @@ var Command = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "id",
-			Usage: "Container id",
+			Usage: "shim ID",
 		},
 	},
 	Subcommands: []*cli.Command{
@@ -115,14 +115,26 @@ var deleteCommand = &cli.Command{
 
 var stateCommand = &cli.Command{
 	Name:  "state",
-	Usage: "Get the state of all the processes of the task",
+	Usage: "Get the state of all main process of the task",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "task-id",
+			Aliases: []string{"t"},
+			Usage:   "task ID",
+		},
+	},
 	Action: func(cliContext *cli.Context) error {
 		service, err := getTaskService(cliContext)
 		if err != nil {
 			return err
 		}
+		id := cliContext.String("task-id")
+		if id == "" {
+			id = cliContext.String("id")
+		}
+
 		r, err := service.State(context.Background(), &task.StateRequest{
-			ID: cliContext.String("id"),
+			ID: id,
 		})
 		if err != nil {
 			return err
