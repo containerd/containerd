@@ -26,6 +26,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/metadata"
 	_ "github.com/containerd/containerd/v2/plugins/nri"
 	_ "github.com/containerd/containerd/v2/plugins/restart"
+	_ "github.com/containerd/containerd/v2/plugins/rootquota"
 	_ "github.com/containerd/containerd/v2/plugins/sandbox"
 	_ "github.com/containerd/containerd/v2/plugins/services/containers"
 	_ "github.com/containerd/containerd/v2/plugins/services/content"
