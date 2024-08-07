@@ -3,8 +3,8 @@
   become: true
   tasks:
     - include_vars: vars/vars.yaml # Contains tasks variables for installer
-    - include_tasks: tasks/bootstrap_ubuntu.yaml # Contains tasks bootstrap components for ubuntu systems
-      when: ansible_distribution == "Ubuntu"
+    - include_tasks: tasks/bootstrap_debian_ubuntu.yaml # Contains tasks bootstrap components for debian/ubuntu systems
+      when: ansible_os_family == "Debian"
     - include_tasks: tasks/bootstrap_centos.yaml # Contains tasks bootstrap components for centos systems
       when: ansible_distribution == "CentOS"
     - include_tasks: tasks/k8s.yaml # Contains tasks kubernetes component installation
@@ -31,17 +31,17 @@
         name: net.ipv4.ip_forward
         value: 1
 
-    - name: "Check kubelet args in kubelet config (Ubuntu)"
-      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /etc/systemd/system/kubelet.service.d/10-kubeadm.conf || true
+    - name: "Check kubelet args in kubelet config ({{ ansible_distribution }})"
+      shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf || true
       register: check_args
-      when: ansible_distribution == "Ubuntu"
+      when: ansible_os_family == "Debian"
 
-    - name: "Add runtime args in kubelet conf (Ubuntu)"
+    - name: "Add runtime args in kubelet conf ({{ ansible_distribution }})"
       lineinfile:
-        dest: "/etc/systemd/system/kubelet.service.d/10-kubeadm.conf"
+        dest: "/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf"
         line: "Environment=\"KUBELET_EXTRA_ARGS= --runtime-cgroups=/system.slice/containerd.service --container-runtime=remote --runtime-request-timeout=15m --container-runtime-endpoint=unix:///run/containerd/containerd.sock\""
         insertafter: '\[Service\]'
-      when: ansible_distribution == "Ubuntu" and check_args.stdout == ""
+      when: ansible_os_family == "Debian" and check_args.stdout == ""
 
     - name: "Check kubelet args in kubelet config (CentOS)"
       shell: grep "^Environment=\"KUBELET_EXTRA_ARGS=" /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf || true
