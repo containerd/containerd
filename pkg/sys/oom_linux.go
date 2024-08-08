@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 )
 

@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
