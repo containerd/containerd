@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd/pkg/cap"
-	"github.com/containerd/containerd/pkg/userns"
 	cni "github.com/containerd/go-cni"
+	"github.com/moby/sys/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/sirupsen/logrus"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
