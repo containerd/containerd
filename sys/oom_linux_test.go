@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

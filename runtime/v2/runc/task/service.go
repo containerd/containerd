@@ -24,7 +24,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
