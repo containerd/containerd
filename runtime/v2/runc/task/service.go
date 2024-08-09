@@ -24,6 +24,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/moby/sys/userns"
+
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
@@ -37,7 +39,6 @@ import (
 	"github.com/containerd/containerd/pkg/process"
 	"github.com/containerd/containerd/pkg/shutdown"
 	"github.com/containerd/containerd/pkg/stdio"
-	"github.com/containerd/containerd/pkg/userns"
 	"github.com/containerd/containerd/protobuf"
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime/v2/runc"
