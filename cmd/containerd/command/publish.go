@@ -50,7 +50,7 @@ var publishCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), cliContext.String("namespace"))
+		ctx := namespaces.WithNamespace(cliContext.Context, cliContext.String("namespace"))
 		topic := cliContext.String("topic")
 		if topic == "" {
 			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)

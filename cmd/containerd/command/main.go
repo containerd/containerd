@@ -123,7 +123,7 @@ can be used and modified as necessary as a custom configuration.`
 			start       = time.Now()
 			signals     = make(chan os.Signal, 2048)
 			serverC     = make(chan *server.Server, 1)
-			ctx, cancel = context.WithCancel(context.Background())
+			ctx, cancel = context.WithCancel(cliContext.Context)
 			config      = defaultConfig()
 		)
 
