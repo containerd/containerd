@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 func TestNewBinaryIO(t *testing.T) {
@@ -48,6 +49,25 @@ func TestNewBinaryIO(t *testing.T) {
 	after := descriptorCount(t)
 	if before != after-1 { // one descriptor must be closed from shim logger side
 		t.Fatalf("some descriptors weren't closed (%d != %d -1)", before, after)
+	}
+}
+
+func TestNewAttachableBinaryIO(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	uri, _ := url.Parse("attachablebinary:///bin/echo?test")
+
+	before := descriptorCount(t)
+
+	_, err := NewAttachableBinary(ctx, "1", uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	after := descriptorCount(t)
+	if after != before+9 {
+		t.Fatalf("descriptors weren't created correctly (%d != %d -1)", before, after)
 	}
 }
 
