@@ -1116,6 +1116,8 @@ func TestUserNamespaces(t *testing.T) {
 	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
 	// see #1373 and runc#1572
 	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })
+	t.Run("WritableRootFSMultipleIDMaps", func(t *testing.T) { testMultiIDMappedUserNamespaces(t, false) })
+	t.Run("ReadonlyRootFSMultipleIDMaps", func(t *testing.T) { testMultiIDMappedUserNamespaces(t, true) })
 }
 
 func checkUserNS(t *testing.T) {
@@ -1170,6 +1172,113 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 		opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 2000)}, opts...)
 	} else {
 		opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 2000)}, opts...)
+	}
+
+	container, err := client.NewContainer(ctx, id, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx, WithSnapshotCleanup)
+
+	copts := &options.Options{
+		IoUid: 1000,
+		IoGid: 2000,
+	}
+
+	task, err := container.NewTask(ctx, cio.NewCreator(cio.WithStdio), func(_ context.Context, client *Client, r *TaskInfo) error {
+		r.Options = copts
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if pid := task.Pid(); pid < 1 {
+		t.Errorf("invalid task pid %d", pid)
+	}
+	if err := task.Start(ctx); err != nil {
+		t.Error(err)
+		task.Delete(ctx)
+		return
+	}
+	status := <-statusC
+	code, _, err := status.Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 7 {
+		t.Errorf("expected status 7 from wait but received %d", code)
+	}
+	deleteStatus, err := task.Delete(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ec := deleteStatus.ExitCode(); ec != 7 {
+		t.Errorf("expected status 7 from delete but received %d", ec)
+	}
+}
+
+func testMultiIDMappedUserNamespaces(t *testing.T, readonlyRootFS bool) {
+	checkUserNS(t)
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = strings.Replace(t.Name(), "/", "-", -1)
+	)
+	defer cancel()
+
+	image, err = client.Pull(ctx, testUserNSImage, WithPullUnpack)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uidmaps := []specs.LinuxIDMapping{
+		{
+			ContainerID: 0,
+			HostID:      0,
+			Size:        405,
+		},
+		{
+			ContainerID: 405,
+			HostID:      1000,
+			Size:        10000,
+		},
+	}
+	gidmaps := []specs.LinuxIDMapping{
+		{
+			ContainerID: 0,
+			HostID:      0,
+			Size:        100,
+		},
+		{
+			ContainerID: 100,
+			HostID:      2000,
+			Size:        10000,
+		},
+	}
+
+	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
+		withExitStatus(7),
+		oci.WithUserID(405), // run task as guest user
+		oci.WithUserNamespace(uidmaps, gidmaps),
+	)}
+	if readonlyRootFS {
+		opts = append([]NewContainerOpts{WithUserNSRemappedSnapshotView(id, image, uidmaps, gidmaps)}, opts...)
+	} else {
+		opts = append([]NewContainerOpts{WithUserNSRemappedSnapshot(id, image, uidmaps, gidmaps)}, opts...)
 	}
 
 	container, err := client.NewContainer(ctx, id, opts...)
