@@ -88,7 +88,8 @@ func descriptorCount(t *testing.T) int {
 			continue
 		}
 
-		if strings.HasPrefix(sym, "pidfd:") {
+		if strings.Contains(sym, "pidfd") {
+			// Either pidfd:[70517] or anon_inode:[pidfd] (on Linux 5.4)
 			files = append(files[:i], files[i+1:]...)
 		}
 	}
