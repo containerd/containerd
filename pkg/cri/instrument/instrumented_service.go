@@ -105,13 +105,13 @@ func (in *instrumentedAlphaService) checkInitialized(ctx context.Context) error 
 
 // emitUsageWarning emits a warning when v1alpha2 cri-api is called.
 func (in *instrumentedAlphaService) emitUsageWarning(ctx context.Context) {
-	// Only emit the warning the first time an v1alpha2 api is called
+	// Only log the warning the first time an v1alpha2 api is called
 	in.emitWarning.Do(func() {
 		log.G(ctx).Warning("CRI API v1alpha2 is deprecated since containerd v1.7 and removed in containerd v2.0. Use CRI API v1 instead.")
-		if in.warn != nil {
-			in.warn.Emit(ctx, deprecation.CRIAPIV1Alpha2)
-		}
 	})
+	if in.warn != nil {
+		in.warn.Emit(ctx, deprecation.CRIAPIV1Alpha2)
+	}
 }
 
 func (in *instrumentedService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandboxRequest) (res *runtime.RunPodSandboxResponse, err error) {
