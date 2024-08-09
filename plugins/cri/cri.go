@@ -48,6 +48,7 @@ func init() {
 		ID:   "cri",
 		Requires: []plugin.Type{
 			plugins.CRIServicePlugin,
+			plugins.PodSandboxPlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.NRIApiPlugin,
 			plugins.EventPlugin,
@@ -118,7 +119,6 @@ func initCRIService(ic *plugin.InitContext) (interface{}, error) {
 		containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 		containerd.WithDefaultPlatform(platforms.Default()),
 		containerd.WithInMemoryServices(ic),
-		containerd.WithInMemorySandboxControllers(ic),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd client: %w", err)
@@ -237,12 +237,20 @@ func getNRIAPI(ic *plugin.InitContext) nriservice.API {
 }
 
 func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controller, error) {
+	sc := make(map[string]sandbox.Controller)
 	sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
 	if err != nil {
 		return nil, err
 	}
-	sc := make(map[string]sandbox.Controller)
 	for name, p := range sandboxers {
+		sc[name] = p.(sandbox.Controller)
+	}
+
+	podSandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
+	if err != nil {
+		return nil, err
+	}
+	for name, p := range podSandboxers {
 		sc[name] = p.(sandbox.Controller)
 	}
 	return sc, nil
