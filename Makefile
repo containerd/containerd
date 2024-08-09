@@ -351,6 +351,8 @@ install-cri-deps: $(BINARIES)
 	@$(INSTALL) -D -m 755 bin/* ${CRIDIR}/usr/local/bin
 	@$(INSTALL) -d ${CRIDIR}/opt/containerd/cluster
 	@cp -r contrib/gce ${CRIDIR}/opt/containerd/cluster/
+	@$(INSTALL) -d ${CRIDIR}/etc/modules-load.d
+	@$(INSTALL) -m 644 containerd-modules-load.conf ${CRIDIR}/etc/modules-load.d/containerd.conf
 	@$(INSTALL) -d ${CRIDIR}/etc/systemd/system
 	@$(INSTALL) -m 644 containerd.service ${CRIDIR}/etc/systemd/system
 	echo "CONTAINERD_VERSION: '$(VERSION:v%=%)'" | tee ${CRIDIR}/opt/containerd/cluster/version
