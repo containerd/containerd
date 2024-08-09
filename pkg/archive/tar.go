@@ -29,7 +29,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 
 	"github.com/containerd/containerd/v2/pkg/archive/tarheader"
 	"github.com/containerd/containerd/v2/pkg/epoch"

@@ -19,7 +19,7 @@ package server
 import (
 	"fmt"
 
-	"github.com/moby/sys/user/userns"
+	"github.com/moby/sys/userns"
 	"github.com/opencontainers/selinux/go-selinux"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
