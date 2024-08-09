@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
@@ -271,6 +272,7 @@ func (c *criService) execInternal(ctx context.Context, container containerd.Cont
 // this case, the CRI plugin will still have a goroutine waiting for the exec process
 // to exit and log the exit code, but dockershim won't.
 func (c *criService) execInContainer(ctx context.Context, id string, opts execOptions) (*uint32, error) {
+	span := tracing.SpanFromContext(ctx)
 	// Get container from our container store.
 	cntr, err := c.containerStore.Get(id)
 
@@ -278,6 +280,7 @@ func (c *criService) execInContainer(ctx context.Context, id string, opts execOp
 		return nil, fmt.Errorf("failed to find container %q in store: %w", id, err)
 	}
 	id = cntr.ID
+	span.SetAttributes(tracing.Attribute("container.id", id))
 
 	state := cntr.Status.Get().State()
 	if state != runtime.ContainerState_CONTAINER_RUNNING {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
@@ -30,6 +31,7 @@ import (
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
@@ -44,6 +46,7 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	}
 	// Use the full sandbox id.
 	id := sandbox.ID
+	span.SetAttributes(tracing.Attribute("sandbox.id", id))
 
 	// If the sandbox is still running, not ready, or in an unknown state, forcibly stop it.
 	// Even if it's in a NotReady state, this will close its network namespace, if open.
@@ -109,6 +112,10 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	c.sandboxNameIndex.ReleaseByKey(id)
 
 	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
+
+	span.AddEvent("pod sandbox removed",
+		tracing.Attribute("sandbox.remove.duration", time.Since(start).String()),
+	)
 
 	return &runtime.RemovePodSandboxResponse{}, nil
 }
