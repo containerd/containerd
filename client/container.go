@@ -32,6 +32,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl/v2"
@@ -140,6 +141,10 @@ func (c *container) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (c *container) SetLabels(ctx context.Context, labels map[string]string) (map[string]string, error) {
+	ctx, span := tracing.StartSpan(ctx, "container.SetLabels",
+		tracing.WithAttribute("container.id", c.id),
+	)
+	defer span.End()
 	container := containers.Container{
 		ID:     c.id,
 		Labels: labels,
@@ -175,6 +180,10 @@ func (c *container) Spec(ctx context.Context) (*oci.Spec, error) {
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
 func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
+	ctx, span := tracing.StartSpan(ctx, "container.Delete",
+		tracing.WithAttribute("container.id", c.id),
+	)
+	defer span.End()
 	if _, err := c.loadTask(ctx, nil); err == nil {
 		return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
 	}
@@ -211,6 +220,8 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 }
 
 func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {
+	ctx, span := tracing.StartSpan(ctx, "container.NewTask")
+	defer span.End()
 	i, err := ioCreate(c.id)
 	if err != nil {
 		return nil, err
@@ -298,16 +309,28 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("task.container.id", request.ContainerID),
+		tracing.Attribute("task.request.options", request.Options.String()),
+		tracing.Attribute("task.runtime.name", info.runtime),
+	)
 	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {
 		return nil, errdefs.FromGRPC(err)
 	}
+
+	span.AddEvent("task created",
+		tracing.Attribute("task.process.id", int(response.Pid)),
+	)
 	t.pid = response.Pid
 	return t, nil
 }
 
 func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) error {
 	// fetch the current container config before updating it
+	ctx, span := tracing.StartSpan(ctx, "container.Update")
+	defer span.End()
 	r, err := c.get(ctx)
 	if err != nil {
 		return err

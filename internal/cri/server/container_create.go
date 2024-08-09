@@ -45,6 +45,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/platforms"
 )
 
@@ -55,6 +56,7 @@ func init() {
 
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
@@ -72,7 +74,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxID  = cstatus.SandboxID
 		sandboxPid = cstatus.Pid
 	)
-
+	span.SetAttributes(
+		tracing.Attribute("sandbox.id", sandboxID),
+		tracing.Attribute("sandbox.pid", sandboxPid),
+	)
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
@@ -87,6 +92,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute("container.id", id),
+		tracing.Attribute("container.name", name),
+	)
 	defer func() {
 		// Release the name if the function returns with an error.
 		if retErr != nil {
@@ -112,7 +121,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
-
+	span.SetAttributes(
+		tracing.Attribute("container.image.ref", containerdImage.Name()),
+	)
 	start := time.Now()
 
 	// Create container root directory.
@@ -345,6 +356,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)
 
+	span.AddEvent("container created",
+		tracing.Attribute("container.create.duration", time.Since(start).String()),
+	)
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
 }
 
