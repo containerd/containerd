@@ -1,6 +1,8 @@
 module github.com/containerd/containerd
 
-go 1.19
+go 1.21
+
+toolchain go1.22.5
 
 require (
 	dario.cat/mergo v1.0.0
@@ -29,7 +31,7 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.4.0
-	github.com/emicklei/go-restful/v3 v3.10.1
+	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/gogo/googleapis v1.4.0
 	github.com/gogo/protobuf v1.3.2
@@ -69,14 +71,14 @@ require (
 	golang.org/x/sys v0.18.0
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.33.0
-	k8s.io/api v0.22.5
-	k8s.io/apimachinery v0.22.5
+	k8s.io/api v0.29.7
+	k8s.io/apimachinery v0.29.7
 	k8s.io/apiserver v0.22.5
-	k8s.io/client-go v0.22.5
+	k8s.io/client-go v0.29.7
 	k8s.io/component-base v0.22.5
 	k8s.io/cri-api v0.25.0
-	k8s.io/klog/v2 v2.30.0
-	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b
+	k8s.io/klog/v2 v2.110.1
+	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
 require (
@@ -96,6 +98,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -105,6 +108,7 @@ require (
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -124,14 +128,15 @@ require (
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
+	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
 // When updating replace rules, make sure to also update the rules in integration/client/go.mod and api/go.mod

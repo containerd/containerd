@@ -27,9 +27,10 @@ import (
 )
 
 var (
-	// ReallyCrash controls the behavior of HandleCrash and now defaults
-	// true. It's still exposed so components can optionally set to false
-	// to restore prior behavior.
+	// ReallyCrash controls the behavior of HandleCrash and defaults to
+	// true. It's exposed so components can optionally set to false
+	// to restore prior behavior. This flag is mostly used for tests to validate
+	// crash conditions.
 	ReallyCrash = true
 )
 
@@ -125,14 +126,17 @@ type rudimentaryErrorBackoff struct {
 // OnError will block if it is called more often than the embedded period time.
 // This will prevent overly tight hot error loops.
 func (r *rudimentaryErrorBackoff) OnError(error) {
+	now := time.Now() // start the timer before acquiring the lock
 	r.lastErrorTimeLock.Lock()
-	defer r.lastErrorTimeLock.Unlock()
-	d := time.Since(r.lastErrorTime)
-	if d < r.minPeriod {
-		// If the time moves backwards for any reason, do nothing
-		time.Sleep(r.minPeriod - d)
-	}
+	d := now.Sub(r.lastErrorTime)
 	r.lastErrorTime = time.Now()
+	r.lastErrorTimeLock.Unlock()
+
+	// Do not sleep with the lock held because that causes all callers of HandleError to block.
+	// We only want the current goroutine to block.
+	// A negative or zero duration causes time.Sleep to return immediately.
+	// If the time moves backwards for any reason, do nothing.
+	time.Sleep(r.minPeriod - d)
 }
 
 // GetCaller returns the caller of the function that calls it.
@@ -141,7 +145,7 @@ func GetCaller() string {
 	runtime.Callers(3, pc[:])
 	f := runtime.FuncForPC(pc[0])
 	if f == nil {
-		return fmt.Sprintf("Unable to find caller")
+		return "Unable to find caller"
 	}
 	return f.Name()
 }
