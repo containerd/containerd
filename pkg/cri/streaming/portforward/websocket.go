@@ -48,7 +48,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/httplog"
-	"k8s.io/apiserver/pkg/util/wsstream"
+
+	"github.com/containerd/containerd/pkg/cri/streaming/wsstream"
 )
 
 const (
