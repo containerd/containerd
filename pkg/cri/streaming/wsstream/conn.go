@@ -27,8 +27,6 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/portforward"
-	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
 )
@@ -312,17 +310,24 @@ func (conn *Conn) Close() error {
 	return conn.closeNonThreadSafe()
 }
 
+const (
+	StreamProtocolV5Name          = "v5.channel.k8s.io"
+	WebsocketsSPDYTunnelingPrefix = "SPDY/3.1+"
+	KubernetesSuffix              = ".k8s.io"
+	StreamClose                   = 255
+)
+
 // protocolSupportsStreamClose returns true if the passed protocol
 // supports the stream close signal (currently only V5 remotecommand);
 // false otherwise.
 func protocolSupportsStreamClose(protocol string) bool {
-	return protocol == remotecommand.StreamProtocolV5Name
+	return protocol == StreamProtocolV5Name
 }
 
 // protocolSupportsWebsocketTunneling returns true if the passed protocol
 // is a tunneled Kubernetes spdy protocol; false otherwise.
 func protocolSupportsWebsocketTunneling(protocol string) bool {
-	return strings.HasPrefix(protocol, portforward.WebsocketsSPDYTunnelingPrefix) && strings.HasSuffix(protocol, portforward.KubernetesSuffix)
+	return strings.HasPrefix(protocol, WebsocketsSPDYTunnelingPrefix) && strings.HasSuffix(protocol, KubernetesSuffix)
 }
 
 // handle implements a websocket handler.
@@ -343,7 +348,7 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		if len(data) == 0 {
 			continue
 		}
-		if supportsStreamClose && data[0] == remotecommand.StreamClose {
+		if supportsStreamClose && data[0] == StreamClose {
 			if len(data) != 2 {
 				klog.Errorf("Single channel byte should follow stream close signal. Got %d bytes", len(data)-1)
 				break
