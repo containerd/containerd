@@ -31,7 +31,6 @@ import (
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
@@ -41,7 +40,7 @@ import (
 
 type dockerFetcher struct {
 	*dockerBase
-	config transfer.FetcherConfig
+	config remotes.FetcherConfig
 }
 
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {

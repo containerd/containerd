@@ -91,17 +91,17 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			// Digest: img.Target.Digest.String(),
 		})
 	}
-	opts := []transfer.FetcherOpt{
-		transfer.WithLimiter(ts.limiterD),
+	opts := []remotes.FetcherOpt{
+		remotes.WithLimiter(ts.limiterD),
 	}
 	if ts.config.MaxConcurrentDownloads > 0 {
-		opts = append(opts, transfer.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads))
+		opts = append(opts, remotes.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads))
 	}
 	if ts.config.MaxConcurrentDownloadsPerLayer > 0 {
-		opts = append(opts, transfer.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer))
+		opts = append(opts, remotes.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer))
 	}
 	if ts.config.ConcurrentFetchChunksSizeMB > 0 {
-		opts = append(opts, transfer.WithConcurrentFetchChunksSizeMB(ts.config.ConcurrentFetchChunksSizeMB))
+		opts = append(opts, remotes.WithConcurrentFetchChunksSizeMB(ts.config.ConcurrentFetchChunksSizeMB))
 	}
 	fetcher, err := ir.Fetcher(ctx, name, opts...)
 	if err != nil {

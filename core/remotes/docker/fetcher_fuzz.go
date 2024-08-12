@@ -27,7 +27,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/remotes"
 )
 
 func FuzzFetcher(data []byte) int {
@@ -52,7 +52,7 @@ func FuzzFetcher(data []byte) int {
 		&dockerBase{
 			repository: "nonempty",
 		},
-		transfer.FetcherConfig{},
+		remotes.FetcherConfig{},
 	}
 	host := RegistryHost{
 		Client: s.Client(),

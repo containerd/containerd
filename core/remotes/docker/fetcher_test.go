@@ -35,7 +35,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/semaphore"
@@ -64,7 +64,7 @@ func TestFetcherOpen(t *testing.T) {
 		&dockerBase{
 			repository: "nonempty",
 		},
-		transfer.FetcherConfig{},
+		remotes.FetcherConfig{},
 	}
 
 	host := RegistryHost{
@@ -136,7 +136,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 		&dockerBase{
 			repository: "nonempty",
 		},
-		transfer.FetcherConfig{},
+		remotes.FetcherConfig{},
 	}
 
 	cfgConcurency := func(maxConcurrentDls, maxDLPerLayer, chunkSizeMB int) {
@@ -386,7 +386,7 @@ func TestContentEncoding(t *testing.T) {
 				&dockerBase{
 					repository: "nonempty",
 				},
-				transfer.FetcherConfig{},
+				remotes.FetcherConfig{},
 			}
 
 			host := RegistryHost{
@@ -491,7 +491,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 				&dockerBase{
 					repository: "ns",
 				},
-				transfer.FetcherConfig{},
+				remotes.FetcherConfig{},
 			}
 
 			host := RegistryHost{
