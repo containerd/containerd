@@ -452,7 +452,7 @@ github.com/syndtr/gocapability/capability
 # github.com/tchap/go-patricia/v2 v2.3.1
 ## explicit; go 1.16
 github.com/tchap/go-patricia/v2/patricia
-# github.com/urfave/cli/v2 v2.27.3
+# github.com/urfave/cli/v2 v2.27.4
 ## explicit; go 1.18
 github.com/urfave/cli/v2
 # github.com/vishvananda/netlink v1.2.1-beta.2
