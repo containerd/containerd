@@ -101,8 +101,9 @@ func TestAlphaCRIWarning(t *testing.T) {
 	c.Version(ctx, &v1alpha2.VersionRequest{})
 	c.Status(ctx, &v1alpha2.StatusRequest{})
 
-	// Only emit the warning the first time an v1alpha2 api is called.
+	// Emit warnings both times an v1alpha2 api is called.
 	expectedWarnings := []deprecation.Warning{
+		deprecation.CRIAPIV1Alpha2,
 		deprecation.CRIAPIV1Alpha2,
 	}
 	assert.Equal(t, expectedWarnings, ws.GetWarnings())
