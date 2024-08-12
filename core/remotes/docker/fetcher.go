@@ -297,7 +297,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		// Note: "Accept-Ranges: bytes" cannot be trusted as some endpoints
 		// will return the header without supporting the range. The content
 		// range must always be checked.
-		req.header.Set("range", fmt.Sprintf("bytes=%d-", offset))
+		req.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
 
 	resp, err := req.doWithRetries(ctx, nil)
@@ -330,7 +330,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 		return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
 	}
-	cr := resp.Header.Get("content-range")
+	cr := resp.Header.Get("Content-Range")
 	if offset > 0 {
 		if cr != "" {
 			if !strings.HasPrefix(cr, fmt.Sprintf("bytes %d-", offset)) {
@@ -369,11 +369,11 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	}
 
 	body := resp.Body
-	encoding := strings.FieldsFunc(resp.Header.Get("content-encoding"), func(r rune) bool {
+	encoding := strings.FieldsFunc(resp.Header.Get("Content-Encoding"), func(r rune) bool {
 		return r == ' ' || r == '\t' || r == ','
 	})
 
-	totalSize, _ := strconv.ParseInt(resp.Header.Get("content-length"), 10, 0)
+	totalSize, _ := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 0)
 	remaining := totalSize - offset
 	if parallelism > 1 && chunkSize > 0 && remaining > minimumSizeForParallelDL && req.body == nil {
 		// If we have a content length, we can use multiple requests to fetch
@@ -418,7 +418,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 						continue
 					}
 					reqClone := req.clone()
-					reqClone.header.Set("range", fmt.Sprintf("bytes=%d-", offset+i*chunkSize))
+					reqClone.header.Set("Range", fmt.Sprintf("bytes=%d-", offset+i*chunkSize))
 					nresp, err := reqClone.doWithRetries(ctx, nil)
 					if nresp != nil && nresp.StatusCode > 299 {
 						err = fmt.Errorf("unexpected status code %v: %s", reqClone.String(), nresp.Status)
@@ -481,7 +481,8 @@ type fnOnClose struct {
 	io.ReadCloser
 }
 
-// Close implements io.ReadCloser.
+// Close calls the BeforeClose function before closing the underlying
+// ReadCloser.
 func (f *fnOnClose) Close() error {
 	f.BeforeClose()
 	return f.ReadCloser.Close()
