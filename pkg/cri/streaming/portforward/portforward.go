@@ -37,10 +37,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/containerd/containerd/pkg/cri/streaming/internal/wsstream"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/containerd/containerd/pkg/cri/streaming/wsstream"
 )
 
 // PortForwarder knows how to forward content from a data stream to/from a port

@@ -37,10 +37,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/containerd/containerd/pkg/cri/streaming/internal/wsstream"
+
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/server/httplog"
-
-	"github.com/containerd/containerd/pkg/cri/streaming/wsstream"
 )
 
 const (

@@ -41,6 +41,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/containerd/containerd/pkg/cri/streaming/internal/wsstream"
+
 	api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -51,8 +53,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	"k8s.io/klog/v2"
-
-	"github.com/containerd/containerd/pkg/cri/streaming/wsstream"
 )
 
 // Options contains details about which streams are required for
