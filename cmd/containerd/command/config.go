@@ -87,7 +87,8 @@ var configCommand = &cli.Command{
 			Name:  "default",
 			Usage: "See the output of the default config",
 			Action: func(cliContext *cli.Context) error {
-				return outputConfig(context.Background(), defaultConfig())
+				ctx := cliContext.Context
+				return outputConfig(ctx, defaultConfig())
 			},
 		},
 		{
@@ -95,7 +96,7 @@ var configCommand = &cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := context.Background()
+				ctx := cliContext.Context
 				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
@@ -108,7 +109,7 @@ var configCommand = &cli.Command{
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := context.Background()
+				ctx := cliContext.Context
 				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
