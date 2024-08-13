@@ -1,4 +1,20 @@
 /*
+   Copyright The containerd Authors.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+/*
 Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,15 +37,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"golang.org/x/net/websocket"
-	"k8s.io/klog/v2"
 
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 )
+
+const WebSocketProtocolHeader = "Sec-Websocket-Protocol"
 
 // The Websocket subprotocol "channel.k8s.io" prepends each binary message with a byte indicating
 // the channel number (zero indexed) the message was sent on. Messages in both directions should
@@ -77,18 +95,47 @@ const (
 	ReadWriteChannel
 )
 
-var (
-	// connectionUpgradeRegex matches any Connection header value that includes upgrade
-	connectionUpgradeRegex = regexp.MustCompile("(^|.*,\\s*)upgrade($|\\s*,)")
-)
-
 // IsWebSocketRequest returns true if the incoming request contains connection upgrade headers
 // for WebSockets.
 func IsWebSocketRequest(req *http.Request) bool {
 	if !strings.EqualFold(req.Header.Get("Upgrade"), "websocket") {
 		return false
 	}
-	return connectionUpgradeRegex.MatchString(strings.ToLower(req.Header.Get("Connection")))
+	return httpstream.IsUpgradeRequest(req)
+}
+
+// IsWebSocketRequestWithStreamCloseProtocol returns true if the request contains headers
+// identifying that it is requesting a websocket upgrade with a remotecommand protocol
+// version that supports the "CLOSE" signal; false otherwise.
+func IsWebSocketRequestWithStreamCloseProtocol(req *http.Request) bool {
+	if !IsWebSocketRequest(req) {
+		return false
+	}
+	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
+	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
+		if protocolSupportsStreamClose(strings.TrimSpace(requestedProtocol)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsWebSocketRequestWithTunnelingProtocol returns true if the request contains headers
+// identifying that it is requesting a websocket upgrade with a tunneling protocol;
+// false otherwise.
+func IsWebSocketRequestWithTunnelingProtocol(req *http.Request) bool {
+	if !IsWebSocketRequest(req) {
+		return false
+	}
+	requestedProtocols := strings.TrimSpace(req.Header.Get(WebSocketProtocolHeader))
+	for _, requestedProtocol := range strings.Split(requestedProtocols, ",") {
+		if protocolSupportsWebsocketTunneling(strings.TrimSpace(requestedProtocol)) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // IgnoreReceives reads from a WebSocket until it is closed, then returns. If timeout is set, the
@@ -172,15 +219,46 @@ func (conn *Conn) SetIdleTimeout(duration time.Duration) {
 	conn.timeout = duration
 }
 
+// SetWriteDeadline sets a timeout on writing to the websocket connection. The
+// passed "duration" identifies how far into the future the write must complete
+// by before the timeout fires.
+func (conn *Conn) SetWriteDeadline(duration time.Duration) {
+	conn.ws.SetWriteDeadline(time.Now().Add(duration)) //nolint:errcheck
+}
+
 // Open the connection and create channels for reading and writing. It returns
 // the selected subprotocol, a slice of channels and an error.
 func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.ReadWriteCloser, error) {
+	// serveHTTPComplete is channel that is closed/selected when "websocket#ServeHTTP" finishes.
+	serveHTTPComplete := make(chan struct{})
+	// Ensure panic in spawned goroutine is propagated into the parent goroutine.
+	panicChan := make(chan any, 1)
 	go func() {
-		defer runtime.HandleCrash()
-		defer conn.Close()
+		// If websocket server returns, propagate panic if necessary. Otherwise,
+		// signal HTTPServe finished by closing "serveHTTPComplete".
+		defer func() {
+			if p := recover(); p != nil {
+				panicChan <- p
+			} else {
+				close(serveHTTPComplete)
+			}
+		}()
 		websocket.Server{Handshake: conn.handshake, Handler: conn.handle}.ServeHTTP(w, req)
 	}()
-	<-conn.ready
+
+	// In normal circumstances, "websocket.Server#ServeHTTP" calls "initialize" which closes
+	// "conn.ready" and then blocks until serving is complete.
+	select {
+	case <-conn.ready:
+		klog.V(8).Infof("websocket server initialized--serving")
+	case <-serveHTTPComplete:
+		// websocket server returned before completing initialization; cleanup and return error.
+		conn.closeNonThreadSafe() //nolint:errcheck
+		return "", nil, fmt.Errorf("websocket server finished before becoming ready")
+	case p := <-panicChan:
+		panic(p)
+	}
+
 	rwc := make([]io.ReadWriteCloser, len(conn.channels))
 	for i := range conn.channels {
 		rwc[i] = conn.channels[i]
@@ -229,20 +307,50 @@ func (conn *Conn) resetTimeout() {
 	}
 }
 
-// Close is only valid after Open has been called
-func (conn *Conn) Close() error {
-	<-conn.ready
+// closeNonThreadSafe cleans up by closing streams and the websocket
+// connection *without* waiting for the "ready" channel.
+func (conn *Conn) closeNonThreadSafe() error {
 	for _, s := range conn.channels {
 		s.Close()
 	}
-	conn.ws.Close()
-	return nil
+	var err error
+	if conn.ws != nil {
+		err = conn.ws.Close()
+	}
+	return err
+}
+
+// Close is only valid after Open has been called
+func (conn *Conn) Close() error {
+	<-conn.ready
+	return conn.closeNonThreadSafe()
+}
+
+const (
+	StreamProtocolV5Name          = "v5.channel.k8s.io"
+	WebsocketsSPDYTunnelingPrefix = "SPDY/3.1+"
+	KubernetesSuffix              = ".k8s.io"
+	StreamClose                   = 255
+)
+
+// protocolSupportsStreamClose returns true if the passed protocol
+// supports the stream close signal (currently only V5 remotecommand);
+// false otherwise.
+func protocolSupportsStreamClose(protocol string) bool {
+	return protocol == StreamProtocolV5Name
+}
+
+// protocolSupportsWebsocketTunneling returns true if the passed protocol
+// is a tunneled Kubernetes spdy protocol; false otherwise.
+func protocolSupportsWebsocketTunneling(protocol string) bool {
+	return strings.HasPrefix(protocol, WebsocketsSPDYTunnelingPrefix) && strings.HasSuffix(protocol, KubernetesSuffix)
 }
 
 // handle implements a websocket handler.
 func (conn *Conn) handle(ws *websocket.Conn) {
-	defer conn.Close()
 	conn.initialize(ws)
+	defer conn.Close()
+	supportsStreamClose := protocolSupportsStreamClose(conn.selectedProtocol)
 
 	for {
 		conn.resetTimeout()
@@ -256,6 +364,21 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 		if len(data) == 0 {
 			continue
 		}
+		if supportsStreamClose && data[0] == StreamClose {
+			if len(data) != 2 {
+				klog.Errorf("Single channel byte should follow stream close signal. Got %d bytes", len(data)-1)
+				break
+			} else {
+				channel := data[1]
+				if int(channel) >= len(conn.channels) {
+					klog.Errorf("Close is targeted for a channel %d that is not valid, possible protocol error", channel)
+					break
+				}
+				klog.V(4).Infof("Received half-close signal from client; close %d stream", channel)
+				conn.channels[channel].Close() // After first Close, other closes are noop.
+			}
+			continue
+		}
 		channel := data[0]
 		if conn.codec == base64Codec {
 			channel = channel - '0'
@@ -266,7 +389,7 @@ func (conn *Conn) handle(ws *websocket.Conn) {
 			continue
 		}
 		if _, err := conn.channels[channel].DataFromSocket(data); err != nil {
-			klog.Errorf("Unable to write frame to %d: %v\n%s", channel, err, string(data))
+			klog.Errorf("Unable to write frame (%d bytes) to %d: %v", len(data), channel, err)
 			continue
 		}
 	}
