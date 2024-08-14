@@ -150,52 +150,33 @@ make STATIC=1
 
 # Via Docker container
 
-The following instructions assume you are at the parent directory of containerd source directory.
+> [!NOTE]
+> The following instructions assume you are at the **parent** directory of containerd source directory.
 
 ## Build containerd in a container
 
-You can build `containerd` via a Linux-based Docker container.
-You can build an image from this `Dockerfile`:
+You can build `containerd` via a Linux-based Docker container using the [Docker official `golang` image](https://hub.docker.com/_/golang/)
 
-```dockerfile
-FROM golang
-```
-
-Let's suppose that you built an image called `containerd/build`. From the
-containerd source root directory you can run the following command:
+From the **parent** directory of `containerd`'s cloned repo you can run the following command:
 
 ```sh
 docker run -it \
-    -v ${PWD}/containerd:/go/src/github.com/containerd/containerd \
-    -e GOPATH=/go \
-    -w /go/src/github.com/containerd/containerd containerd/build sh
+    -v ${PWD}/containerd:/src/containerd \
+    -w /src/containerd golang
 ```
 
-This mounts `containerd` repository
+This mounts the `containerd` repository inside the image at `/src/containerd` and, by default, runs a shell at that directory.
 
-You are now ready to [build](#build-containerd):
-
-```sh
-make && make install
-```
+Now, you are now ready to follow the [build instructions](#build-containerd):
 
 ## Build containerd and runc in a container
 
 To have complete core container runtime, you will need both `containerd` and `runc`. It is possible to build both of these via Docker container.
 
-You can use `git` to checkout `runc`:
+You can clone `runc` in the same parent directory where you cloned `containerd` and you should clone [the latest stable version of `runc`](https://github.com/opencontainers/runc/releases), e.g. v1.1.13:
 
 ```sh
-git clone https://github.com/opencontainers/runc
-```
-
-We can build an image from this `Dockerfile`:
-
-```sh
-FROM golang
-
-RUN apt-get update && \
-    apt-get install -y libseccomp-dev
+git clone --branch <RELEASE_TAG> https://github.com/opencontainers/runc
 ```
 
 In our Docker container we will build `runc` build, which includes
@@ -206,34 +187,64 @@ do not require external libraries at build time). Refer to [RUNC.md](docs/RUNC.m
 in the docs directory to for details about building runc, and to learn about
 supported versions of `runc` as used by containerd.
 
-Let's suppose you build an image called `containerd/build` from the above Dockerfile. You can run the following command:
+Since we need [`libseccomp-dev`](https://packages.debian.org/stable/libseccomp-dev) installed as a dependency, we will need a custom Docker image derived from the official `golang` image. You can use the following `Dockerfile` to build your custom image:
 
 ```sh
-docker run -it --privileged \
-    -v /var/lib/containerd \
-    -v ${PWD}/runc:/go/src/github.com/opencontainers/runc \
-    -v ${PWD}/containerd:/go/src/github.com/containerd/containerd \
-    -e GOPATH=/go \
-    -w /go/src/github.com/containerd/containerd containerd/build sh
+FROM golang
+
+RUN apt-get update && \
+    apt-get install -y libseccomp-dev
+```
+
+Let's suppose you've built an image named `containerd/build` from the above `Dockerfile`.
+
+You can run the following command:
+
+```sh
+docker run -it \
+    -v ${PWD}/containerd:/src/containerd \
+    -v ${PWD}/runc:/src/runc \
+    -w /src/containerd \
+    containerd/build
 ```
 
 This mounts both `runc` and `containerd` repositories in our Docker container.
 
-From within our Docker container let's build `containerd`:
+From within the Docker container, let's build `containerd`:
 
 ```sh
-cd /go/src/github.com/containerd/containerd
 make && make install
 ```
 
-These binaries can be found in the `./bin` directory in your host.
-`make install` will move the binaries in your `$PATH`.
+You can check the installed binaries with:
+
+```sh
+$ which containerd
+/usr/local/bin/containerd
+
+$ containerd --version
+containerd github.com/containerd/containerd/v2 v2.0.0-rc.3-195-gf5d5407c2 f5d5407c2ff12865653a9a132d5783196be82763
+```
 
 Next, let's build `runc`:
 
 ```sh
-cd /go/src/github.com/opencontainers/runc
+cd /src/runc
 make && make install
+```
+
+You can check the installed binaries with:
+
+```sh
+$ which runc
+/usr/local/sbin/runc
+
+$ runc --version
+runc version 1.1.13
+commit: v1.1.13-0-g58aa9203
+spec: 1.0.2-dev
+go: go1.23.0
+libseccomp: 2.5.4
 ```
 
 For further details about building runc, refer to [RUNC.md](docs/RUNC.md) in the
