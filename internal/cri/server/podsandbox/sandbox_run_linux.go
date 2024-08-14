@@ -58,13 +58,9 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	specOpts = append(specOpts, oci.WithProcessArgs(append(imageConfig.Entrypoint, imageConfig.Cmd...)...))
 
 	// Set cgroups parent.
-	if c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDisabledCgroups)
-	} else {
-		if config.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
-			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
-		}
+	if config.GetLinux().GetCgroupParent() != "" {
+		cgroupsPath := getCgroupsPath(config.GetLinux().GetCgroupParent(), id)
+		specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 	}
 
 	// When cgroup parent is not set, containerd-shim will create container in a child cgroup
@@ -174,9 +170,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 
 	// Note: LinuxSandboxSecurityContext does not currently provide an apparmor profile
 
-	if !c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
-	}
+	specOpts = append(specOpts, customopts.WithDefaultSandboxShares)
 
 	if res := config.GetLinux().GetResources(); res != nil {
 		specOpts = append(specOpts,

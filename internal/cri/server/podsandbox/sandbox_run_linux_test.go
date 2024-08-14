@@ -758,20 +758,5 @@ options timeout:1
 	}
 }
 
-func TestSandboxDisableCgroup(t *testing.T) {
-	config, imageConfig, _ := getRunPodSandboxTestData()
-	c := newControllerService()
-	c.config.DisableCgroup = true
-	spec, err := c.sandboxContainerSpec("test-id", config, imageConfig, "test-cni", []string{})
-	require.NoError(t, err)
-
-	t.Log("resource limit should not be set")
-	assert.Nil(t, spec.Linux.Resources.Memory)
-	assert.Nil(t, spec.Linux.Resources.CPU)
-
-	t.Log("cgroup path should be empty")
-	assert.Empty(t, spec.Linux.CgroupsPath)
-}
-
 // TODO(random-liu): [P1] Add unit test for different error cases to make sure
 // the function cleans up on error properly.

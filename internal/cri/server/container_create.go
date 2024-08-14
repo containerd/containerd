@@ -761,14 +761,10 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithRootFSReadonly())
 	}
 
-	if c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDisabledCgroups)
-	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
-		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
-			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
-		}
+	specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
+	if sandboxConfig.GetLinux().GetCgroupParent() != "" {
+		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
+		specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()

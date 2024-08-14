@@ -1343,22 +1343,6 @@ func TestHostname(t *testing.T) {
 	}
 }
 
-func TestDisableCgroup(t *testing.T) {
-	containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
-	ociRuntime := config.Runtime{}
-	c := newTestCRIService()
-	c.config.DisableCgroup = true
-	spec, err := c.buildContainerSpec(currentPlatform, "test-id", "sandbox-id", 1234, "", "container-name", testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
-	require.NoError(t, err)
-
-	t.Log("resource limit should not be set")
-	assert.Nil(t, spec.Linux.Resources.Memory)
-	assert.Nil(t, spec.Linux.Resources.CPU)
-
-	t.Log("cgroup path should be empty")
-	assert.Empty(t, spec.Linux.CgroupsPath)
-}
-
 func TestGenerateUserString(t *testing.T) {
 	type testcase struct {
 		// the name of the test case
