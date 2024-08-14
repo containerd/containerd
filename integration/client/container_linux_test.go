@@ -24,7 +24,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -488,13 +487,6 @@ func getLogDirPath(runtimeVersion, id string) string {
 func TestContainerAttach(t *testing.T) {
 	t.Parallel()
 
-	if runtime.GOOS == "windows" {
-		// On windows, closing the write side of the pipe closes the read
-		// side, sending an EOF to it and preventing reopening it.
-		// Hence this test will always fails on windows
-		t.Skip("invalid logic on windows")
-	}
-
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -667,13 +659,6 @@ func testContainerUser(t *testing.T, userstr, expectedOutput string) {
 func TestContainerAttachProcess(t *testing.T) {
 	t.Parallel()
 
-	if runtime.GOOS == "windows" {
-		// On windows, closing the write side of the pipe closes the read
-		// side, sending an EOF to it and preventing reopening it.
-		// Hence this test will always fails on windows
-		t.Skip("invalid logic on windows")
-	}
-
 	client, err := newClient(t, address)
 	if err != nil {
 		t.Fatal(err)
@@ -790,13 +775,6 @@ func TestContainerAttachProcess(t *testing.T) {
 
 func TestContainerLoadUnexistingProcess(t *testing.T) {
 	t.Parallel()
-
-	if runtime.GOOS == "windows" {
-		// On windows, closing the write side of the pipe closes the read
-		// side, sending an EOF to it and preventing reopening it.
-		// Hence this test will always fails on windows
-		t.Skip("invalid logic on windows")
-	}
 
 	client, err := newClient(t, address)
 	if err != nil {
