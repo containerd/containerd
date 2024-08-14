@@ -22,6 +22,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -290,14 +291,14 @@ func TestDockerFetcherOpen(t *testing.T) {
 		{
 			name:           "should return just status if the registry request fails and does not return a docker error",
 			mockedStatus:   500,
-			mockedErr:      fmt.Errorf("Non-docker error"),
+			mockedErr:      errors.New("Non-docker error"),
 			want:           nil,
 			wantErr:        true,
 			wantPlainError: true,
 		}, {
 			name:           "should return StatusRequestTimeout after 5 retries",
 			mockedStatus:   http.StatusRequestTimeout,
-			mockedErr:      fmt.Errorf(http.StatusText(http.StatusRequestTimeout)),
+			mockedErr:      errors.New(http.StatusText(http.StatusRequestTimeout)),
 			want:           nil,
 			wantErr:        true,
 			wantPlainError: true,
@@ -305,7 +306,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 		}, {
 			name:           "should return StatusTooManyRequests after 5 retries",
 			mockedStatus:   http.StatusTooManyRequests,
-			mockedErr:      fmt.Errorf(http.StatusText(http.StatusTooManyRequests)),
+			mockedErr:      errors.New(http.StatusText(http.StatusTooManyRequests)),
 			want:           nil,
 			wantErr:        true,
 			wantPlainError: true,
