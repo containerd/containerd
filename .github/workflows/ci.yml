@@ -34,7 +34,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v4
         with:
           only-new-issues: true
-          version: v1.56.1
+          version: v1.60.1
           skip-cache: true
           args: --timeout=8m
 
@@ -192,7 +192,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
-        go-version: ["1.21.13", "1.22.6"]
+        go-version: ["1.22.6", "1.23.0"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-go
