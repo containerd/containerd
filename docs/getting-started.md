@@ -41,11 +41,18 @@ Users of such distributions may have to install containerd from the source or a 
 
 
 ##### systemd
+
 If you intend to start containerd via systemd, you should also download the `containerd.service` unit file from
-https://raw.githubusercontent.com/containerd/containerd/main/containerd.service into `/usr/local/lib/systemd/system/containerd.service`,
+https://raw.githubusercontent.com/containerd/containerd/main/containerd.service into `/etc/systemd/system/containerd.service`,
+(for package managers into `/usr/lib/systemd/system/containerd.service`)
+In most cases the containerd service needs the loaded `overlay` kernel module.
+For make the loading persistent (after system restart) you should also download the modprobe conf file
+https://raw.githubusercontent.com/containerd/containerd/main/containerd-modules-load.conf into `/etc/modules-load.d/containerd`,
+(for package managers into `/usr/lib/modules-load.d/containerd.conf`)
 and run the following commands:
 
 ```bash
+modprobe overlay
 systemctl daemon-reload
 systemctl enable --now containerd
 ```
