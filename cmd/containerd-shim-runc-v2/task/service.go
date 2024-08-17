@@ -23,8 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/moby/sys/userns"
+	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -51,6 +50,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"github.com/moby/sys/userns"
 )
 
 var (
@@ -122,8 +122,7 @@ type service struct {
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
-
-	shutdown shutdown.Service
+	shutdown        shutdown.Service
 }
 
 type containerProcess struct {
@@ -173,57 +172,15 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		if p != nil {
 			pid = p.Pid()
 		}
-
-		_, init := p.(*process.Init)
 		s.lifecycleMu.Lock()
-
-		var initExits []runcC.Exit
-		var initCps []containerProcess
-		if !init {
-			s.pendingExecs[c]--
-
-			initPid := c.Pid()
-			iExits, initExited := exits[initPid]
-			if initExited && s.pendingExecs[c] == 0 {
-				// c's init process has exited before handleStarted was called and
-				// this is the last pending exec process start - we need to process
-				// the exit for the init process after processing this exec, so:
-				// - delete c from the s.pendingExecs map
-				// - keep the exits for the init pid to process later (after we process
-				// this exec's exits)
-				// - get the necessary containerProcesses for the init process (that we
-				// need to process the exits), and remove them from s.running (which we skipped
-				// doing in processExits).
-				delete(s.pendingExecs, c)
-				initExits = iExits
-				var skipped []containerProcess
-				for _, initPidCp := range s.running[initPid] {
-					if initPidCp.Container == c {
-						initCps = append(initCps, initPidCp)
-					} else {
-						skipped = append(skipped, initPidCp)
-					}
-				}
-				if len(skipped) == 0 {
-					delete(s.running, initPid)
-				} else {
-					s.running[initPid] = skipped
-				}
-			}
-		}
-
 		ees, exited := exits[pid]
 		delete(s.exitSubscribers, &exits)
 		exits = nil
 		if pid == 0 || exited {
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
+				s.pendingExecs[c]--
 				s.handleProcessExit(ee, c, p)
-			}
-			for _, eee := range initExits {
-				for _, cp := range initCps {
-					s.handleProcessExit(eee, cp.Container, cp.Process)
-				}
 			}
 		} else {
 			// Process start was successful, add to `s.running`.
@@ -677,28 +634,25 @@ func (s *service) processExits() {
 		// Handle the exit for a created/started process. If there's more than
 		// one, assume they've all exited. One of them will be the correct
 		// process.
-		var cps, skipped []containerProcess
-		for _, cp := range s.running[e.Pid] {
-			_, init := cp.Process.(*process.Init)
-			if init && s.pendingExecs[cp.Container] != 0 {
-				// This exit relates to a container for which we have pending execs. In
-				// order to ensure order between execs and the init process for a given
-				// container, skip processing this exit here and let the `handleStarted`
-				// closure for the pending exec publish it.
-				skipped = append(skipped, cp)
-			} else {
-				cps = append(cps, cp)
-			}
-		}
-		if len(skipped) > 0 {
-			s.running[e.Pid] = skipped
-		} else {
-			delete(s.running, e.Pid)
-		}
+		cps := s.running[e.Pid]
+		delete(s.running, e.Pid)
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
-			s.handleProcessExit(e, cp.Container, cp.Process)
+			cp := cp
+			e := e
+			_, init := cp.Process.(*process.Init)
+			if init {
+				go func() {
+					for s.pendingExecs[cp.Container] != 0 {
+						time.Sleep(time.Millisecond * 50)
+					}
+					s.handleProcessExit(e, cp.Container, cp.Process)
+				}()
+			} else {
+				s.pendingExecs[cp.Container]--
+				s.handleProcessExit(e, cp.Container, cp.Process)
+			}
 		}
 	}
 }
