@@ -124,6 +124,7 @@ type service struct {
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
 	shutdown shutdown.Service
+	initExit bool
 }
 
 type containerProcess struct {
@@ -299,7 +300,9 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
-
+	if s.initExit {
+		return nil, fmt.Errorf("container %s init process has already exited", container.ID)
+	}
 	var cinit *runc.Container
 	s.lifecycleMu.Lock()
 	if r.ExecID == "" {
@@ -680,6 +683,9 @@ func (s *service) processExits() {
 		var cps, skipped []containerProcess
 		for _, cp := range s.running[e.Pid] {
 			_, init := cp.Process.(*process.Init)
+			if init {
+				s.initExit = true
+			}
 			if init && s.pendingExecs[cp.Container] != 0 {
 				// This exit relates to a container for which we have pending execs. In
 				// order to ensure order between execs and the init process for a given
