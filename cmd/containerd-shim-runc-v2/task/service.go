@@ -23,8 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
-	"github.com/moby/sys/userns"
+	"time"
 
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
@@ -51,6 +50,7 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
+	"github.com/moby/sys/userns"
 )
 
 var (
@@ -74,15 +74,16 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 	}
 	go ep.Run(ctx)
 	s := &service{
-		context:         ctx,
-		events:          make(chan interface{}, 128),
-		ec:              reaper.Default.Subscribe(),
-		ep:              ep,
-		shutdown:        sd,
-		containers:      make(map[string]*runc.Container),
-		running:         make(map[int][]containerProcess),
-		pendingExecs:    make(map[*runc.Container]int),
-		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
+		context:          ctx,
+		events:           make(chan interface{}, 128),
+		ec:               reaper.Default.Subscribe(),
+		ep:               ep,
+		shutdown:         sd,
+		containers:       make(map[string]*runc.Container),
+		running:          make(map[int][]containerProcess),
+		pendingExecs:     make(map[*runc.Container]int),
+		exitSubscribers:  make(map[*map[int][]runcC.Exit]struct{}),
+		initExitedSented: make(map[string]struct{}),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -123,7 +124,9 @@ type service struct {
 	// lifecycleMu.
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
 
-	shutdown shutdown.Service
+	initExitedSentMu sync.Mutex
+	initExitedSented map[string]struct{}
+	shutdown         shutdown.Service
 }
 
 type containerProcess struct {
@@ -209,6 +212,13 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 				} else {
 					s.running[initPid] = skipped
 				}
+			} else if initExited {
+				initExits = iExits
+				for _, initPidCp := range s.running[initPid] {
+					if initPidCp.Container == c {
+						initCps = append(initCps, initPidCp)
+					}
+				}
 			}
 		}
 
@@ -220,11 +230,6 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 			for _, ee := range ees {
 				s.handleProcessExit(ee, c, p)
 			}
-			for _, eee := range initExits {
-				for _, cp := range initCps {
-					s.handleProcessExit(eee, cp.Container, cp.Process)
-				}
-			}
 		} else {
 			// Process start was successful, add to `s.running`.
 			s.running[pid] = append(s.running[pid], containerProcess{
@@ -233,6 +238,25 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 			})
 			s.lifecycleMu.Unlock()
 		}
+
+		go func() {
+			for s.pendingExecs[c] != 0 {
+				time.Sleep(time.Millisecond * 50)
+			}
+
+			for _, eee := range initExits {
+				for _, cp := range initCps {
+					s.initExitedSentMu.Lock()
+					_, sented := s.initExitedSented[cp.Container.ID]
+					if !sented {
+						s.handleProcessExit(eee, cp.Container, cp.Process)
+						s.initExitedSented[cp.Container.ID] = struct{}{}
+					}
+					s.initExitedSentMu.Unlock()
+				}
+			}
+
+		}()
 	}
 
 	cleanup = func() {
