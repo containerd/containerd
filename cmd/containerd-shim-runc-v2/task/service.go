@@ -218,11 +218,12 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		if pid == 0 || exited {
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
-				s.handleProcessExit(ee, c, p)
+				p.SetExited(ee.Status)
+				s.sendProcessExit(ee, c, p)
 			}
 			for _, eee := range initExits {
 				for _, cp := range initCps {
-					s.handleProcessExit(eee, cp.Container, cp.Process)
+					s.sendProcessExit(eee, cp.Container, cp.Process)
 				}
 			}
 		} else {
@@ -659,8 +660,25 @@ func (s *service) Stats(ctx context.Context, r *taskAPI.StatsRequest) (*taskAPI.
 	}, nil
 }
 
+func (s *service) handleProcessExit(e runcC.Exit) {
+	for _, cp := range s.running[e.Pid] {
+		// Ensure all children are killed
+		if ip, init := cp.Process.(*process.Init); init {
+			if runc.ShouldKillAllOnExit(s.context, cp.Container.Bundle) {
+				log.G(s.context).Infof("kill init's (pid %d) children in container %s", e.Pid, cp.Container.ID)
+				if err := ip.KillAll(s.context); err != nil {
+					log.G(s.context).WithError(err).WithField("id", ip.ID()).
+						Error("failed to kill init's children")
+				}
+			}
+		}
+		cp.Process.SetExited(e.Status)
+	}
+}
+
 func (s *service) processExits() {
 	for e := range s.ec {
+		s.handleProcessExit(e)
 		// While unlikely, it is not impossible for a container process to exit
 		// and have its PID be recycled for a new container process before we
 		// have a chance to process the first exit. As we have no way to tell
@@ -698,7 +716,7 @@ func (s *service) processExits() {
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
-			s.handleProcessExit(e, cp.Container, cp.Process)
+			s.sendProcessExit(e, cp.Container, cp.Process)
 		}
 	}
 }
@@ -708,18 +726,7 @@ func (s *service) send(evt interface{}) {
 }
 
 // s.mu must be locked when calling handleProcessExit
-func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
-	if ip, ok := p.(*process.Init); ok {
-		// Ensure all children are killed
-		if runc.ShouldKillAllOnExit(s.context, c.Bundle) {
-			if err := ip.KillAll(s.context); err != nil {
-				log.G(s.context).WithError(err).WithField("id", ip.ID()).
-					Error("failed to kill init's children")
-			}
-		}
-	}
-
-	p.SetExited(e.Status)
+func (s *service) sendProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
 		ID:          p.ID(),
