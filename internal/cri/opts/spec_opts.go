@@ -301,6 +301,23 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 	}
 }
 
+// WithNamespacePath updates namespace with existing path.
+func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		if s.Linux == nil {
+			return fmt.Errorf("Linux spec is required")
+		}
+
+		for i, ns := range s.Linux.Namespaces {
+			if ns.Type == t {
+				s.Linux.Namespaces[i].Path = nsPath
+				return nil
+			}
+		}
+		return fmt.Errorf("no such namespace %s", t)
+	}
+}
+
 // WithPodNamespaces sets the pod namespaces for the container
 func WithPodNamespaces(config *runtime.LinuxContainerSecurityContext, sandboxPid uint32, targetPid uint32, uids, gids []runtimespec.LinuxIDMapping) oci.SpecOpts {
 	namespaces := config.GetNamespaceOptions()
