@@ -220,11 +220,6 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 			for _, ee := range ees {
 				s.handleProcessExit(ee, c, p)
 			}
-			for _, eee := range initExits {
-				for _, cp := range initCps {
-					s.handleProcessExit(eee, cp.Container, cp.Process)
-				}
-			}
 		} else {
 			// Process start was successful, add to `s.running`.
 			s.running[pid] = append(s.running[pid], containerProcess{
@@ -232,6 +227,15 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 				Process:   p,
 			})
 			s.lifecycleMu.Unlock()
+		}
+		// Regardless of whether the process successfully started or not, if it's
+		// the last pending exec and we have exits for it's init process, we need
+		// to send them - otherwise, if we missed/dropped an exit for the exec, we
+		// won't send the exit for the init.
+		for _, eee := range initExits {
+			for _, cp := range initCps {
+				s.handleProcessExit(eee, cp.Container, cp.Process)
+			}
 		}
 	}
 
