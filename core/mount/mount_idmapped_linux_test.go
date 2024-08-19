@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 
@@ -28,6 +29,34 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent1(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(1)
+	}
+}
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent10(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(10)
+	}
+}
+
+func benchmarkBatchRunGetUsernsFD(n int) {
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			fd, err := getUsernsFD(testUIDMaps, testGIDMaps)
+			if err != nil {
+				panic(err)
+			}
+			fd.Close()
+		}()
+	}
+	wg.Wait()
+}
 
 var (
 	testUIDMaps = []syscall.SysProcIDMap{
