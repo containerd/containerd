@@ -87,6 +87,9 @@ PKG=github.com/containerd/containerd/v2
 COMMANDS=ctr containerd containerd-stress
 MANPAGES=ctr.8 containerd.8 containerd-config.8 containerd-config.toml.5
 
+# Optional override for the User-Agent. Leave empty to use the default ("containerd/<Version>").
+CONTAINERD_USER_AGENT ?=
+
 ifdef BUILDTAGS
     GO_BUILDTAGS = ${BUILDTAGS}
 endif
@@ -106,6 +109,10 @@ GO_LD_X = \
 	-X $(PKG)/version.Version=$(VERSION) \
 	-X $(PKG)/version.Revision=$(REVISION) \
 	-X $(PKG)/version.Package=$(PACKAGE)
+
+ifneq ($(strip $(CONTAINERD_USER_AGENT)),)
+GO_LD_X += -X "$(PKG)/version.UserAgentOverride=$(CONTAINERD_USER_AGENT)"
+endif
 
 GO_LDFLAGS=-ldflags '$(GO_LD_X) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
