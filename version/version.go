@@ -32,6 +32,17 @@ var (
 
 	// GoVersion is Go tree's version.
 	GoVersion = runtime.Version()
+
+	// UserAgent is the default User-Agent header for http-requests such as
+	// authenticating and pulling images from registries using the
+	// core/remotes/docker package. This variable is filled in at linking
+	// time, and users of containerd as a go module must set this variable
+	// to a value matching their product, following the guidelines outlined
+	// in [RFC9110, section 10.1.5], or to configure the User-Agent header
+	// through other means.
+	//
+	// [RFC9110, section 10.1.5]: https://httpwg.org/specs/rfc9110.html#field.user-agent
+	UserAgent = "containerd/2.0.0-rc.3+unknown"
 )
 
 // ConfigVersion is the current highest supported configuration version.
