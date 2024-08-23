@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/moby/sys/userns"
 
@@ -83,6 +84,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		running:         make(map[int][]containerProcess),
 		pendingExecs:    make(map[*runc.Container]int),
 		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
+		initChildPid:    make(map[string][]childPid),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -122,8 +124,13 @@ type service struct {
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
+	initChildPid    map[string][]childPid
+	shutdown        shutdown.Service
+}
 
-	shutdown shutdown.Service
+type childPid struct {
+	pid         int
+	eventSented bool
 }
 
 type containerProcess struct {
@@ -174,44 +181,7 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 			pid = p.Pid()
 		}
 
-		_, init := p.(*process.Init)
 		s.lifecycleMu.Lock()
-
-		var initExits []runcC.Exit
-		var initCps []containerProcess
-		if !init {
-			s.pendingExecs[c]--
-
-			initPid := c.Pid()
-			iExits, initExited := exits[initPid]
-			if initExited && s.pendingExecs[c] == 0 {
-				// c's init process has exited before handleStarted was called and
-				// this is the last pending exec process start - we need to process
-				// the exit for the init process after processing this exec, so:
-				// - delete c from the s.pendingExecs map
-				// - keep the exits for the init pid to process later (after we process
-				// this exec's exits)
-				// - get the necessary containerProcesses for the init process (that we
-				// need to process the exits), and remove them from s.running (which we skipped
-				// doing in processExits).
-				delete(s.pendingExecs, c)
-				initExits = iExits
-				var skipped []containerProcess
-				for _, initPidCp := range s.running[initPid] {
-					if initPidCp.Container == c {
-						initCps = append(initCps, initPidCp)
-					} else {
-						skipped = append(skipped, initPidCp)
-					}
-				}
-				if len(skipped) == 0 {
-					delete(s.running, initPid)
-				} else {
-					s.running[initPid] = skipped
-				}
-			}
-		}
-
 		ees, exited := exits[pid]
 		delete(s.exitSubscribers, &exits)
 		exits = nil
@@ -219,11 +189,6 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
 				s.handleProcessExit(ee, c, p)
-			}
-			for _, eee := range initExits {
-				for _, cp := range initCps {
-					s.handleProcessExit(eee, cp.Container, cp.Process)
-				}
 			}
 		} else {
 			// Process start was successful, add to `s.running`.
@@ -260,7 +225,6 @@ func (s *service) Create(ctx context.Context, r *taskAPI.CreateTaskRequest) (_ *
 	if err != nil {
 		return nil, err
 	}
-
 	s.containers[r.ID] = container
 
 	s.send(&eventstypes.TaskCreate{
@@ -299,7 +263,6 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	if err != nil {
 		return nil, err
 	}
-
 	var cinit *runc.Container
 	s.lifecycleMu.Lock()
 	if r.ExecID == "" {
@@ -316,6 +279,12 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		handleStarted(container, p)
 		return nil, errdefs.ToGRPC(err)
 	}
+
+	cPid := childPid{
+		pid:         p.Pid(),
+		eventSented: false,
+	}
+	s.initChildPid[container.ID] = append(s.initChildPid[container.ID], cPid)
 
 	switch r.ExecID {
 	case "":
@@ -680,6 +649,7 @@ func (s *service) processExits() {
 		var cps, skipped []containerProcess
 		for _, cp := range s.running[e.Pid] {
 			_, init := cp.Process.(*process.Init)
+
 			if init && s.pendingExecs[cp.Container] != 0 {
 				// This exit relates to a container for which we have pending execs. In
 				// order to ensure order between execs and the init process for a given
@@ -717,16 +687,47 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 					Error("failed to kill init's children")
 			}
 		}
-	}
+		// Wait for all children processes exited events are sented.
+		for childProcessExitedNotSented(s.initChildPid, c.ID) > 0 {
+			time.Sleep(time.Millisecond * 20)
+		}
 
-	p.SetExited(e.Status)
-	s.send(&eventstypes.TaskExit{
-		ContainerID: c.ID,
-		ID:          p.ID(),
-		Pid:         uint32(e.Pid),
-		ExitStatus:  uint32(e.Status),
-		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
-	})
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
+	} else {
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
+		var indexDelete int
+		for index, childPid := range s.initChildPid[c.ID] {
+			cpid := childPid
+			if cpid.pid == p.Pid() {
+				indexDelete = index
+			}
+		}
+		s.initChildPid[c.ID] = append(s.initChildPid[c.ID][:indexDelete], s.initChildPid[c.ID][indexDelete+1:]...)
+	}
+}
+
+func childProcessExitedNotSented(initChildPid map[string][]childPid, ID string) int {
+	notSentCount := 0
+	for _, childPid := range initChildPid[ID] {
+		if !childPid.eventSented {
+			notSentCount = notSentCount + 1
+		}
+	}
+	return notSentCount
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
