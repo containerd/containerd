@@ -118,6 +118,12 @@ type service struct {
 	lifecycleMu  sync.Mutex
 	running      map[int][]containerProcess // pid -> running process, guarded by lifecycleMu
 	pendingExecs map[*runc.Container]int    // container -> num pending execs, guarded by lifecycleMu
+	// container -> execs can be started, guarded by lifecycleMu.
+	// Execs can be started if the container's init process (read: pid, not [process.Init])
+	// has been started and not yet reaped by the shim.
+	// Note that this flag gets updated before the container's [process.Init.Status]
+	// is transitioned to "stopped".
+	execable map[*runc.Container]bool
 	// Subscriptions to exits for PIDs. Adding/deleting subscriptions and
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
@@ -231,6 +237,9 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 				Container: c,
 				Process:   p,
 			})
+			if init {
+				s.execable[c] = true
+			}
 			s.lifecycleMu.Unlock()
 		}
 	}
@@ -305,6 +314,10 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	if r.ExecID == "" {
 		cinit = container
 	} else {
+		if !s.execable[container] {
+			s.lifecycleMu.Unlock()
+			return nil, errdefs.ToGRPCf(errdefs.ErrFailedPrecondition, "container %s init process is not running", container.ID)
+		}
 		s.pendingExecs[container]++
 	}
 	handleStarted, cleanup := s.preStart(cinit)
@@ -680,6 +693,9 @@ func (s *service) processExits() {
 		var cps, skipped []containerProcess
 		for _, cp := range s.running[e.Pid] {
 			_, init := cp.Process.(*process.Init)
+			if init {
+				delete(s.execable, cp.Container)
+			}
 			if init && s.pendingExecs[cp.Container] != 0 {
 				// This exit relates to a container for which we have pending execs. In
 				// order to ensure order between execs and the init process for a given
