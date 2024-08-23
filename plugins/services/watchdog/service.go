@@ -32,12 +32,14 @@ import (
 func init() {
 	registry.Register(&plugin.Registration{
 		Type:     plugins.WatchdogPlugin,
-		ID:       "software-watchdog",
+		ID:       "systemd-watchdog",
 		Requires: []plugin.Type{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			if runtime.GOOS != "linux" {
 				return nil, fmt.Errorf("host does not support watchdog: %w", plugin.ErrSkipPlugin)
 			}
+			// system manager sets the WATCHDOG_USEC variable
+			// https://0pointer.de/blog/projects/watchdog.html
 			watchdogUsec := os.Getenv("WATCHDOG_USEC")
 			fmt.Println("WATCHDOG_USEC:", watchdogUsec)
 			if watchdogUsec == "" {
@@ -49,7 +51,7 @@ func init() {
 			}
 			watchdogInterval := time.Duration(watchdogInt/2) * time.Microsecond
 			// Start a Go routine to periodically notify systemd
-			notifySystemd(watchdogInterval)
+			go notifyWatchdog(watchdogInterval)
 			return &service{}, nil
 		},
 	})
@@ -58,17 +60,23 @@ func init() {
 type service struct {
 }
 
-func notifySystemd(interval time.Duration) {
-	go func() {
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
+func notifyWatchdog(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-		for range ticker.C {
-			ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
-			if err != nil {
-				fmt.Println("WATCHDOG ERRROR - ", err)
-			}
-			fmt.Println("Sent watchdog notification -", ack)
+	for range ticker.C {
+		ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
+		if err != nil {
+			fmt.Println("Failed to notify systemd watchdog - ", err)
 		}
-	}()
+		fmt.Println("Sent watchdog notification -", ack)
+	}
+}
+
+func NotifyReady(){
+	ack, err := daemon.SdNotify(false, daemon.SdNotifyReady)
+	if err != nil {
+		fmt.Println("Failed to notify systemd ready - ", err)
+	}
+	fmt.Println("Notified systemd ready - ", ack)
 }
