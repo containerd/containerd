@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/moby/sys/userns"
 
@@ -83,6 +84,7 @@ func NewTaskService(ctx context.Context, publisher shim.Publisher, sd shutdown.S
 		running:         make(map[int][]containerProcess),
 		pendingExecs:    make(map[*runc.Container]int),
 		exitSubscribers: make(map[*map[int][]runcC.Exit]struct{}),
+		initChildPid:    make(map[string][]childPid),
 	}
 	go s.processExits()
 	runcC.Monitor = reaper.Default
@@ -122,8 +124,13 @@ type service struct {
 	// dereferencing the subscription pointers must only be done while holding
 	// lifecycleMu.
 	exitSubscribers map[*map[int][]runcC.Exit]struct{}
+	initChildPid    map[string][]childPid
+	shutdown        shutdown.Service
+}
 
-	shutdown shutdown.Service
+type childPid struct {
+	pid         int
+	eventSented bool
 }
 
 type containerProcess struct {
@@ -316,6 +323,12 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 		handleStarted(container, p)
 		return nil, errdefs.ToGRPC(err)
 	}
+
+	cPid := childPid{
+		pid:         p.Pid(),
+		eventSented: false,
+	}
+	s.initChildPid[container.ID] = append(s.initChildPid[container.ID], cPid)
 
 	switch r.ExecID {
 	case "":
@@ -717,16 +730,47 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 					Error("failed to kill init's children")
 			}
 		}
-	}
+		// Wait for all children processes exited events are sented.
+		for childProcessExitedNotSented(s.initChildPid, c.ID) > 0 {
+			time.Sleep(time.Millisecond * 20)
+		}
 
-	p.SetExited(e.Status)
-	s.send(&eventstypes.TaskExit{
-		ContainerID: c.ID,
-		ID:          p.ID(),
-		Pid:         uint32(e.Pid),
-		ExitStatus:  uint32(e.Status),
-		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
-	})
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
+	} else {
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
+		var indexDelete int
+		for index, childPid := range s.initChildPid[c.ID] {
+			cpid := childPid
+			if cpid.pid == p.Pid() {
+				indexDelete = index
+			}
+		}
+		s.initChildPid[c.ID] = append(s.initChildPid[c.ID][:indexDelete], s.initChildPid[c.ID][indexDelete+1:]...)
+	}
+}
+
+func childProcessExitedNotSented(initChildPid map[string][]childPid, ID string) int {
+	notSentCount := 0
+	for _, childPid := range initChildPid[ID] {
+		if !childPid.eventSented {
+			notSentCount = notSentCount + 1
+		}
+	}
+	return notSentCount
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
