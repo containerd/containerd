@@ -17,19 +17,13 @@
 package main
 
 import (
-	"crypto"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/command"
-	"github.com/containerd/containerd/v2/internal/hasher"
 
 	_ "github.com/containerd/containerd/v2/cmd/containerd/builtins"
 )
-
-func init() {
-	crypto.RegisterHash(crypto.SHA256, hasher.NewSHA256)
-}
 
 func main() {
 	app := command.App()
