@@ -41,7 +41,6 @@ require (
 	github.com/intel/goresctrl v0.7.0
 	github.com/klauspost/compress v1.17.9
 	github.com/mdlayher/vsock v1.2.1
-	github.com/minio/sha256-simd v1.0.1
 	github.com/moby/locker v1.0.1
 	github.com/moby/sys/mountinfo v0.7.2
 	github.com/moby/sys/sequential v0.6.0
@@ -109,7 +108,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/moby/spdystream v0.4.0 // indirect

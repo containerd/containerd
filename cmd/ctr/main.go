@@ -17,20 +17,14 @@
 package main
 
 import (
-	"crypto"
 	"fmt"
 	"os"
 
 	"github.com/containerd/containerd/v2/cmd/ctr/app"
-	"github.com/containerd/containerd/v2/internal/hasher"
 	"github.com/urfave/cli/v2"
 )
 
 var pluginCmds = []*cli.Command{}
-
-func init() {
-	crypto.RegisterHash(crypto.SHA256, hasher.NewSHA256)
-}
 
 func main() {
 	app := app.New()
