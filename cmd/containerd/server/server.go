@@ -49,6 +49,11 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/dynamic"
+	"github.com/containerd/plugin/registry"
+
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	csproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -61,13 +66,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/dynamic"
-	"github.com/containerd/plugin/registry"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -482,16 +482,6 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		config.PluginDir = path //nolint:staticcheck
 		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
 	}
-	// load additional plugins that don't automatically register themselves
-	registry.Register(&plugin.Registration{
-		Type: plugins.ContentPlugin,
-		ID:   "content",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			root := ic.Properties[plugins.PropertyRootDir]
-			ic.Meta.Exports["root"] = root
-			return local.NewStore(root)
-		},
-	})
 
 	clients := &proxyClients{}
 	for name, pp := range config.ProxyPlugins {
