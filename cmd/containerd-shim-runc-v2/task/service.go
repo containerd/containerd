@@ -830,7 +830,6 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 	}()
 }
 
-// s.mu must be locked when calling handleProcessExit
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
 	s.send(&eventstypes.TaskExit{
