@@ -705,7 +705,6 @@ func (s *service) send(evt interface{}) {
 	s.events <- evt
 }
 
-// s.mu must be locked when calling handleProcessExit
 func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	if ip, ok := p.(*process.Init); ok {
 		// Ensure all children are killed
