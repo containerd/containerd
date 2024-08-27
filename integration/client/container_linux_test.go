@@ -34,14 +34,18 @@ import (
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/errdefs"
+	"github.com/stretchr/testify/assert"
+
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/integration/failpoint"
 	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/require"
@@ -1550,4 +1554,208 @@ func TestIssue9103(t *testing.T) {
 			require.Equal(t, tc.expectedStatus, status.Status)
 		})
 	}
+}
+
+// TestIssue10589 is used as regression case for issue 10589.
+//
+// This issue was caused by a race between init exits and new exec process tracking inside the shim.  The test operates
+// by controlling the time between when the shim invokes "runc exec" and when the actual "runc exec" is triggered.  This
+// allows validating that races for shim state tracking between pre- and post-start of the exec process do not exist.
+//
+// The workflow is as follows:
+// 1. Create a container as normal
+// 2. Make an exec1 using runc-fp with delayexec
+// 3. Wait until the exec is waiting to start (triggered by delayexec)
+// 4. Kill the container init process (signalling it is easiest)
+// 5. Make an exec2 using runc-fp with delayexec
+// 6. Wait until the exec is waiting to start
+// 7. Allow exec1 to proceed
+// 8. Allow exec2 to proceed
+// 9. See that the container has exited and all execs have exited too
+//
+// https://github.com/containerd/containerd/issues/10589
+func TestIssue10589(t *testing.T) {
+	if f := os.Getenv("RUNC_FLAVOR"); f != "" && f != "runc" {
+		t.Skip("test requires runc")
+	}
+
+	client, err := newClient(t, address)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		client.Close()
+	})
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	t.Cleanup(cancel)
+
+	image, err = client.GetImage(ctx, testImage)
+	require.NoError(t, err)
+
+	// 1. Create a sleeping container
+	t.Log("1. Create a sleeping container")
+	container, err := client.NewContainer(ctx, id,
+		WithNewSnapshot(id, image),
+		WithNewSpec(oci.WithImageConfig(image),
+			withProcessArgs("sleep", "inf"),
+			oci.WithAnnotations(map[string]string{
+				"oci.runc.failpoint.profile": "delayExec",
+			}),
+		),
+		WithRuntime(client.Runtime(), &options.Options{
+			BinaryName: "runc-fp",
+		}),
+	)
+	require.NoError(t, err, "create container")
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		err := container.Delete(ctx, WithSnapshotCleanup)
+		if err != nil {
+			t.Log("delete err", err)
+		}
+		cancel()
+	})
+
+	task, err := container.NewTask(ctx, empty())
+	require.NoError(t, err, "create task")
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		st, err := task.Delete(ctx, WithProcessKill)
+		t.Log("exit status", st)
+		if err != nil {
+			t.Log("kill err", err)
+		}
+		cancel()
+	})
+
+	err = task.Start(ctx)
+	require.NoError(t, err, "start container")
+
+	status, err := task.Status(ctx)
+	require.NoError(t, err, "container status")
+	require.Equal(t, Running, status.Status)
+
+	// 2. Create an exec
+	t.Log("2. Create exec1")
+	exec1ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec1-ready.fifo"), 0600)
+	require.NoError(t, err, "create exec1 ready fifo")
+	exec1DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec1-delay.fifo"), 0600)
+	require.NoError(t, err, "create exec1 delay fifo")
+	exec1, err := task.Exec(ctx, "exec1", &specs.Process{
+		Args: []string{"/bin/sleep", "301"},
+		Cwd:  "/",
+		Env: []string{
+			failpoint.DelayExecReadyEnv + "=" + exec1ReadyFifo.Name(),
+			failpoint.DelayExecDelayEnv + "=" + exec1DelayFifo.Name(),
+		},
+	}, cio.NullIO)
+	require.NoError(t, err, "create exec1")
+
+	exec1done := make(chan struct{})
+	go func() {
+		defer close(exec1done)
+		t.Log("Starting exec1")
+		err := exec1.Start(ctx)
+		assert.Error(t, err, "start exec1")
+		t.Logf("error starting exec1: %s", err)
+	}()
+
+	// 3. Wait until the exec is waiting to start
+	t.Log("3. Wait until exec1 is waiting to start")
+	err = exec1ReadyFifo.Wait()
+	require.NoError(t, err, "open exec1 fifo")
+
+	// 4. Kill the container init process
+	t.Log("4. Kill the container init process")
+	target := task.Pid()
+	t.Logf("Killing main pid (%v) of container %s", target, container.ID())
+	syscall.Kill(int(target), syscall.SIGKILL)
+	status, err = task.Status(ctx)
+	require.NoError(t, err, "container status")
+	t.Log("container status", status.Status)
+
+	// 5. Make an exec (2) using this failpoint
+	t.Log("5. Create exec2")
+	exec2ReadyFifo, err := fifosync.NewWaiter(filepath.Join(t.TempDir(), "exec2-ready.fifo"), 0600)
+	require.NoError(t, err, "create exec2 ready fifo: %q", exec2ReadyFifo)
+	exec2DelayFifo, err := fifosync.NewTrigger(filepath.Join(t.TempDir(), "exec2-delay.fifo"), 0600)
+	require.NoError(t, err, "create exec2 delay fifo: %q", exec2DelayFifo)
+	exec2, err := task.Exec(ctx, "exec2", &specs.Process{
+		Args: []string{"/bin/sleep", "302"},
+		Cwd:  "/",
+		Env: []string{
+			failpoint.DelayExecReadyEnv + "=" + exec2ReadyFifo.Name(),
+			failpoint.DelayExecDelayEnv + "=" + exec2DelayFifo.Name(),
+		},
+	}, cio.NullIO)
+	require.NoError(t, err, "create exec2")
+
+	exec2done := make(chan struct{})
+	didExec2Run := true
+	go func() {
+		defer close(exec2done)
+		t.Log("Starting exec2")
+		err := exec2.Start(ctx)
+		assert.Error(t, err, "start exec2")
+		t.Logf("error starting exec2: %s", err)
+	}()
+
+	// 6. Wait until the exec is waiting to start
+	t.Log("6. Wait until exec2 is waiting to start")
+	exec2ready := make(chan struct{})
+	go func() {
+		exec2ReadyFifo.Wait()
+		close(exec2ready)
+	}()
+	select {
+	case <-exec2ready:
+	case <-exec2done:
+		didExec2Run = false
+	}
+
+	// 7. Allow exec=1 to proceed
+	t.Log("7. Allow exec=1 to proceed")
+	err = exec1DelayFifo.Trigger()
+	assert.NoError(t, err, "trigger exec1 fifo")
+	status, err = task.Status(ctx)
+	require.NoError(t, err, "container status")
+	t.Log("container status", status.Status)
+	<-exec1done
+	status, err = task.Status(ctx)
+	require.NoError(t, err, "container status")
+	t.Log("container status", status.Status)
+
+	// 8. Allow exec=2 to proceed
+	if didExec2Run {
+		t.Log("8. Allow exec2 to proceed")
+		err = exec2DelayFifo.Trigger()
+		assert.NoError(t, err, "trigger exec2 fifo")
+		status, err = task.Status(ctx)
+		require.NoError(t, err, "container status")
+		t.Log("container status", status.Status)
+		<-exec2done
+		status, err = task.Status(ctx)
+		require.NoError(t, err, "container status")
+		t.Log("container status", status.Status)
+	} else {
+		t.Log("8. Skip exec2")
+	}
+
+	// 9. Validate
+	t.Log("9. Validate")
+	status, err = exec1.Status(ctx)
+	require.NoError(t, err, "exec1 status")
+	t.Logf("exec1 status: %s", status.Status)
+	assert.Equal(t, Created, status.Status)
+	status, err = exec2.Status(ctx)
+	require.NoError(t, err, "exec2 status")
+	t.Logf("exec2 status: %s", status.Status)
+	assert.Equal(t, Created, status.Status)
+	status, err = task.Status(ctx)
+	t.Logf("task status: %s", status.Status)
+	require.NoError(t, err, "container status")
+	assert.Equal(t, Stopped, status.Status)
 }
