@@ -25,8 +25,9 @@ import (
 	"os/exec"
 	"syscall"
 
-	"github.com/containerd/containerd/oci"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/oci"
 )
 
 const (
@@ -40,6 +41,7 @@ type invokerInterceptor func(context.Context, invoker) error
 var (
 	failpointProfiles = map[string]invokerInterceptor{
 		"issue9103": issue9103KillInitAfterCreate,
+		"delayExec": delayExec,
 	}
 )
 
