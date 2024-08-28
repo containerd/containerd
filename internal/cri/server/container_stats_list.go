@@ -224,6 +224,11 @@ func (c *criService) getUsageNanoCores(containerID string, isSandbox bool, curre
 		return 0, nil
 	}
 
+	// can't go backwards, this value might come in as 0 if the container was just removed
+	if currentUsageCoreNanoSeconds < oldStats.UsageCoreNanoSeconds {
+		return 0, nil
+	}
+
 	newUsageNanoCores := uint64(float64(currentUsageCoreNanoSeconds-oldStats.UsageCoreNanoSeconds) /
 		float64(nanoSeconds) * float64(time.Second/time.Nanosecond))
 
