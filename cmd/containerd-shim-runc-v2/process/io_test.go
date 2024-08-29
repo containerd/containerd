@@ -20,9 +20,9 @@ package process
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -69,30 +69,29 @@ func TestNewBinaryIOCleanup(t *testing.T) {
 
 func descriptorCount(t *testing.T) int {
 	t.Helper()
-	files, _ := os.ReadDir("/proc/self/fd")
+	const dir = "/proc/self/fd"
+	files, _ := os.ReadDir(dir)
 
-	// Go 1.23 introduced a new internal file descriptor type "pidfd"
-	// that we don't want to count towards the total file descriptors in
-	// use by the process. This retains the behavior of previous Go
-	// versions.
-	// See https://go.dev/issues/62654.
+	// Go 1.23+ uses pidfd instead of PID for processes started by a user,
+	// if possible (see https://go.dev/cl/570036). As a side effect, every
+	// os.StartProcess or os.FindProcess call results in an extra opened
+	// file descriptor, which is only closed in p.Wait or p.Release.
 	//
-	// Once the proposal to check for internal file descriptors is
-	// accepted, we can use that instead to detect internal fds in use
-	// by the Go runtime.
-	// See https://go.dev/issues/67639.
-	for i, file := range files {
-		sym, err := os.Readlink(fmt.Sprintf("/proc/self/fd/%s", file.Name()))
-		if err != nil {
-			// ignore fds that cannot be followed.
+	// To retain compatibility with previous Go versions (or Go 1.23+
+	// behavior on older kernels), let's not count pidfds.
+	//
+	// TODO: if the proposal to check for internal file descriptors
+	// (https://go.dev/issues/67639) is accepted, we can use that
+	// instead to detect internal fds in use by the Go runtime.
+	count := 0
+	for _, file := range files {
+		sym, err := os.Readlink(filepath.Join(dir, file.Name()))
+		// Either pidfd:[70517] or anon_inode:[pidfd] (on Linux 5.4).
+		if err == nil && strings.Contains(sym, "pidfd") {
 			continue
 		}
-
-		if strings.Contains(sym, "pidfd") {
-			// Either pidfd:[70517] or anon_inode:[pidfd] (on Linux 5.4)
-			files = append(files[:i], files[i+1:]...)
-		}
+		count++
 	}
 
-	return len(files)
+	return count
 }
