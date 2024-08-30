@@ -36,6 +36,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
@@ -84,7 +86,7 @@ func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.E
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
@@ -92,7 +94,7 @@ func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.E
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {

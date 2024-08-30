@@ -38,6 +38,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ServicePlugin,
@@ -188,16 +190,16 @@ func (l *local) Delete(ctx context.Context, req *api.DeleteContainerRequest, _ .
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context) error {
 		return l.Store.Delete(ctx, req.ID)
 	}); err != nil {
-		return &ptypes.Empty{}, errdefs.ToGRPC(err)
+		return empty, errdefs.ToGRPC(err)
 	}
 
 	if err := l.publisher.Publish(ctx, "/containers/delete", &eventstypes.ContainerDelete{
 		ID: req.ID,
 	}); err != nil {
-		return &ptypes.Empty{}, err
+		return empty, err
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (l *local) withStore(ctx context.Context, fn func(ctx context.Context) error) func(tx *bolt.Tx) error {

@@ -37,7 +37,7 @@ func (s *ttrpcService) Forward(ctx context.Context, r *api.ForwardRequest) (*pty
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func fromTProto(env *types.Envelope) *events.Envelope {

@@ -37,6 +37,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ServicePlugin,
@@ -206,17 +208,17 @@ func (l *local) Delete(ctx context.Context, req *api.DeleteNamespaceRequest, _ .
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
-		return &ptypes.Empty{}, err
+		return empty, err
 	}
 	// set the namespace in the context before publishing the event
 	ctx = namespaces.WithNamespace(ctx, req.Name)
 	if err := l.publisher.Publish(ctx, "/namespaces/delete", &eventstypes.NamespaceDelete{
 		Name: req.Name,
 	}); err != nil {
-		return &ptypes.Empty{}, err
+		return empty, err
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (l *local) withStore(ctx context.Context, fn func(ctx context.Context, store namespaces.Store) error) func(tx *bolt.Tx) error {
