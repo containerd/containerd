@@ -19,15 +19,11 @@ package mount
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	"golang.org/x/sys/unix"
-
-	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 // TODO: Support multiple mappings in future
@@ -106,99 +102,3 @@ func GetUsernsFD(uidmap, gidmap string) (_usernsFD *os.File, _ error) {
 	}
 	return getUsernsFD(uidMaps, gidMaps)
 }
-
-func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_usernsFD *os.File, retErr error) {
-	runtime.LockOSThread()
-	defer runtime.UnlockOSThread()
-
-	pid, pidfd, errno := sys.ForkUserns()
-	if errno != 0 {
-		return nil, errno
-	}
-
-	pidFD := os.NewFile(pidfd, "pidfd")
-	defer func() {
-		unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
-
-		pidfdWaitid(pidFD)
-
-		pidFD.Close()
-	}()
-
-	// NOTE:
-	//
-	// The usernsFD will hold the userns reference in kernel. Even if the
-	// child process is reaped, the usernsFD is still valid.
-	usernsFD, err := os.Open(fmt.Sprintf("/proc/%d/ns/user", pid))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get userns file descriptor for /proc/%d/user/ns: %w", pid, err)
-	}
-	defer func() {
-		if retErr != nil {
-			usernsFD.Close()
-		}
-	}()
-
-	uidmapFile, err := os.OpenFile(fmt.Sprintf("/proc/%d/%s", pid, "uid_map"), os.O_WRONLY, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open /proc/%d/uid_map: %w", pid, err)
-	}
-	defer uidmapFile.Close()
-
-	gidmapFile, err := os.OpenFile(fmt.Sprintf("/proc/%d/%s", pid, "gid_map"), os.O_WRONLY, 0600)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open /proc/%d/gid_map: %w", pid, err)
-	}
-	defer gidmapFile.Close()
-
-	testHookKillChildBeforePidfdSendSignal(pid, pidFD)
-
-	// Ensure the child process is still alive. If the err is ESRCH, we
-	// should return error because we can't guarantee the usernsFD and
-	// u[g]idmapFile are valid. It's safe to return error and retry.
-	if err := unix.PidfdSendSignal(int(pidFD.Fd()), 0, nil, 0); err != nil {
-		return nil, fmt.Errorf("failed to ensure child process is alive: %w", err)
-	}
-
-	testHookKillChildAfterPidfdSendSignal(pid, pidFD)
-
-	// NOTE:
-	//
-	// The u[g]id_map file descriptor is still valid if the child process
-	// is reaped.
-	writeMappings := func(f *os.File, idmap []syscall.SysProcIDMap) error {
-		mappings := ""
-		for _, m := range idmap {
-			mappings = fmt.Sprintf("%s%d %d %d\n", mappings, m.ContainerID, m.HostID, m.Size)
-		}
-
-		_, err := f.Write([]byte(mappings))
-		if err1 := f.Close(); err1 != nil && err == nil {
-			err = err1
-		}
-		return err
-	}
-
-	if err := writeMappings(uidmapFile, uidMaps); err != nil {
-		return nil, fmt.Errorf("failed to write uid_map: %w", err)
-	}
-
-	if err := writeMappings(gidmapFile, gidMaps); err != nil {
-		return nil, fmt.Errorf("failed to write gid_map: %w", err)
-	}
-	return usernsFD, nil
-}
-
-func pidfdWaitid(pidFD *os.File) error {
-	return sys.IgnoringEINTR(func() error {
-		return unix.Waitid(unix.P_PIDFD, int(pidFD.Fd()), nil, unix.WEXITED, nil)
-	})
-}
-
-var (
-	testHookLock sync.Mutex
-
-	testHookKillChildBeforePidfdSendSignal = func(_pid uintptr, _pidFD *os.File) {}
-
-	testHookKillChildAfterPidfdSendSignal = func(_pid uintptr, _pidFD *os.File) {}
-)
