@@ -26,7 +26,6 @@ import (
 
 	eventtypes "github.com/containerd/containerd/api/events"
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
-	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -35,7 +34,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 func init() {
@@ -102,7 +100,7 @@ func (s *controllerService) Create(ctx context.Context, req *api.ControllerCreat
 	}
 	var sb sandbox.Sandbox
 	if req.Sandbox != nil {
-		sb = fromAPISandbox(req.Sandbox)
+		sb = sandbox.FromProto(req.Sandbox)
 	} else {
 		sb = sandbox.Sandbox{ID: req.GetSandboxID()}
 	}
@@ -244,33 +242,9 @@ func (s *controllerService) Update(
 	if req.Sandbox == nil {
 		return nil, fmt.Errorf("sandbox can not be nil")
 	}
-	err = ctrl.Update(ctx, req.SandboxID, fromAPISandbox(req.Sandbox), req.Fields...)
+	err = ctrl.Update(ctx, req.SandboxID, sandbox.FromProto(req.Sandbox), req.Fields...)
 	if err != nil {
 		return &api.ControllerUpdateResponse{}, errdefs.ToGRPC(err)
 	}
 	return &api.ControllerUpdateResponse{}, nil
-}
-
-func fromAPISandbox(sb *types.Sandbox) sandbox.Sandbox {
-	var runtime sandbox.RuntimeOpts
-	if sb.Runtime != nil {
-		runtime = sandbox.RuntimeOpts{
-			Name:    sb.Runtime.Name,
-			Options: sb.Runtime.Options,
-		}
-	}
-	extensions := make(map[string]typeurl.Any)
-	for k, v := range sb.Extensions {
-		extensions[k] = v
-	}
-	return sandbox.Sandbox{
-		ID:         sb.SandboxID,
-		Runtime:    runtime,
-		Spec:       sb.Spec,
-		Labels:     sb.Labels,
-		CreatedAt:  protobuf.FromTimestamp(sb.CreatedAt),
-		UpdatedAt:  protobuf.FromTimestamp(sb.UpdatedAt),
-		Extensions: extensions,
-		Sandboxer:  sb.Sandboxer,
-	}
 }
