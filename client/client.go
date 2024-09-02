@@ -395,6 +395,15 @@ type RemoteContext struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
 	MaxConcurrentDownloads int
 
+	// MaxConcurrentDownloadOperations is the max concurrent download operations for each pull.
+	MaxConcurrentDownloadOperations int
+
+	// MaxConcurrentDownloadsPerLayer is the max concurrent downloads per layer for each pull.
+	MaxConcurrentDownloadsPerLayer int
+
+	// ConcurrentFetchChunksSizeMB is the max concurrent fetch chunks size in MB for each pull.
+	ConcurrentFetchChunksSizeMB int
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
 
