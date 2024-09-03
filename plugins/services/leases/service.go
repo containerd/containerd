@@ -30,6 +30,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
@@ -87,7 +89,7 @@ func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Emp
 	}, opts...); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
@@ -117,7 +119,7 @@ func (s *service) AddResource(ctx context.Context, r *api.AddResourceRequest) (*
 	}); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) DeleteResource(ctx context.Context, r *api.DeleteResourceRequest) (*ptypes.Empty, error) {
@@ -131,7 +133,7 @@ func (s *service) DeleteResource(ctx context.Context, r *api.DeleteResourceReque
 	}); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) ListResources(ctx context.Context, r *api.ListResourcesRequest) (*api.ListResourcesResponse, error) {

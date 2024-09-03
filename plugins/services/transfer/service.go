@@ -39,6 +39,8 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.GRPCPlugin,
@@ -130,7 +132,7 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 
 	for _, t := range s.transferrers {
 		if err := t.Transfer(ctx, src, dst, transferOpts...); err == nil {
-			return &ptypes.Empty{}, nil
+			return empty, nil
 		} else if !errdefs.IsNotImplemented(err) {
 			return nil, errdefs.ToGRPC(err)
 		}

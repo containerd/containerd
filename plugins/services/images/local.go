@@ -39,6 +39,8 @@ import (
 	"github.com/containerd/plugin/registry"
 )
 
+var empty = &ptypes.Empty{}
+
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.ServicePlugin,
@@ -183,7 +185,7 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 		}
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (l *local) emitSchema1DeprecationWarning(ctx context.Context, image *images.Image) {
