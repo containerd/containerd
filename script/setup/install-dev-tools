@@ -26,7 +26,11 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
 
 # the following packages need to exist in $GOPATH so we can't use
 # go modules-aware mode of `go get` for these includes used during
-# proto building
-cd "$GOPATH"
-GO111MODULE=off go get -d github.com/gogo/googleapis || true
-GO111MODULE=off go get -d github.com/gogo/protobuf || true
+# proto building. From go1.22 `go get` is no longer supported
+# outside of a module in the legacy GOPATH mode, hence we manually
+# clone the packages in the $GOPATH
+GOGO_DIR="$GOPATH/src/github.com/gogo"
+mkdir -p "$GOGO_DIR"
+cd "$GOGO_DIR"
+git clone https://github.com/gogo/googleapis
+git clone https://github.com/gogo/protobuf
