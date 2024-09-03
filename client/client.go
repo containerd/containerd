@@ -753,7 +753,7 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
+	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
 }
 
 // VersionService returns the underlying VersionClient
