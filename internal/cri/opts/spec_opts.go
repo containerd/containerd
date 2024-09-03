@@ -222,15 +222,6 @@ func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container
 	return nil
 }
 
-// WithDisabledCgroups clears the Cgroups Path from the spec
-func WithDisabledCgroups(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Linux == nil {
-		s.Linux = &runtimespec.Linux{}
-	}
-	s.Linux.CgroupsPath = ""
-	return nil
-}
-
 // WithSelinuxLabels sets the mount and process labels
 func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
