@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/msdb"
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
@@ -82,7 +83,9 @@ func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots
 			Name: key,
 		}
 	)
-	err := withSnapshotBucket(ctx, key, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err := withSnapshotBucket(ctx, key, func(ctx context.Context, bktMs, _ *msdb.MsBucket) error {
+		bkt := bktMs.Master()
+
 		getUsage(bkt, &su)
 		return readSnapshot(bkt, &id, &si)
 	})
@@ -95,52 +98,65 @@ func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots
 
 // UpdateInfo updates an existing snapshot info's data
 func UpdateInfo(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
-	updated := snapshots.Info{
-		Name: info.Name,
+	updated := [2]snapshots.Info{
+		{
+			Name: info.Name,
+		},
+		{
+			Name: info.Name,
+		},
 	}
-	err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		sbkt := bkt.Bucket([]byte(info.Name))
-		if sbkt == nil {
-			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
-		}
-		if err := readSnapshot(sbkt, nil, &updated); err != nil {
-			return err
-		}
+	err := withBucket(ctx, func(ctx context.Context, bktMs, _ *msdb.MsBucket) error {
+		bkts := bktMs.MasterSlave()
 
-		if len(fieldpaths) > 0 {
-			for _, path := range fieldpaths {
-				if strings.HasPrefix(path, "labels.") {
-					if updated.Labels == nil {
-						updated.Labels = map[string]string{}
+		for i := range bkts {
+			sbkt := bkts[i].Bucket([]byte(info.Name))
+			if sbkt == nil {
+				return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
+			}
+			if err := readSnapshot(sbkt, nil, &updated[i]); err != nil {
+				return err
+			}
+
+			if len(fieldpaths) > 0 {
+				for _, path := range fieldpaths {
+					if strings.HasPrefix(path, "labels.") {
+						if updated[i].Labels == nil {
+							updated[i].Labels = map[string]string{}
+						}
+
+						key := strings.TrimPrefix(path, "labels.")
+						updated[i].Labels[key] = info.Labels[key]
+						continue
 					}
 
-					key := strings.TrimPrefix(path, "labels.")
-					updated.Labels[key] = info.Labels[key]
-					continue
+					switch path {
+					case "labels":
+						updated[i].Labels = info.Labels
+					default:
+						return fmt.Errorf("cannot update %q field on snapshot %q: %w", path, info.Name, errdefs.ErrInvalidArgument)
+					}
 				}
-
-				switch path {
-				case "labels":
-					updated.Labels = info.Labels
-				default:
-					return fmt.Errorf("cannot update %q field on snapshot %q: %w", path, info.Name, errdefs.ErrInvalidArgument)
-				}
+			} else {
+				// Set mutable fields
+				updated[i].Labels = info.Labels
 			}
-		} else {
-			// Set mutable fields
-			updated.Labels = info.Labels
-		}
-		updated.Updated = time.Now().UTC()
-		if err := boltutil.WriteTimestamps(sbkt, updated.Created, updated.Updated); err != nil {
-			return err
+			updated[i].Updated = time.Now().UTC()
+			if err := boltutil.WriteTimestamps(sbkt, updated[i].Created, updated[i].Updated); err != nil {
+				return err
+			}
+
+			if err := boltutil.WriteLabels(sbkt, updated[i].Labels); err != nil {
+				return err
+			}
 		}
 
-		return boltutil.WriteLabels(sbkt, updated.Labels)
+		return nil
 	})
 	if err != nil {
 		return snapshots.Info{}, err
 	}
-	return updated, nil
+	return updated[0], nil
 }
 
 // WalkInfo iterates through all metadata Info for the stored snapshots and
@@ -152,7 +168,9 @@ func WalkInfo(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 		return err
 	}
 	// TODO: allow indexes (name, parent, specific labels)
-	return withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	return withBucket(ctx, func(ctx context.Context, bktMs, _ *msdb.MsBucket) error {
+		bkt := bktMs.Master()
+
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip non buckets
 			if v != nil {
@@ -179,7 +197,9 @@ func WalkInfo(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 // GetSnapshot returns the metadata for the active or view snapshot transaction
 // referenced by the given key. Requires a context with a storage transaction.
 func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
-	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
+	err = withBucket(ctx, func(ctx context.Context, bktMs, _ *msdb.MsBucket) error {
+		bkt := bktMs.Master()
+
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
 			return fmt.Errorf("snapshot does not exist: %w", errdefs.ErrNotFound)
@@ -226,62 +246,68 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 		}
 	}
 
-	err = createBucketIfNotExists(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		var (
-			spbkt *bolt.Bucket
-		)
-		if parent != "" {
-			spbkt = bkt.Bucket([]byte(parent))
-			if spbkt == nil {
-				return fmt.Errorf("missing parent %q bucket: %w", parent, errdefs.ErrNotFound)
+	err = createBucketIfNotExists(ctx, func(ctx context.Context, bktMs, pbktMs *msdb.MsBucket) error {
+		bkts := bktMs.MasterSlave()
+		pbkts := pbktMs.MasterSlave()
+
+		for i := range bkts {
+			var (
+				spbkt *bolt.Bucket
+			)
+			if parent != "" {
+				spbkt = bkts[i].Bucket([]byte(parent))
+				if spbkt == nil {
+					return fmt.Errorf("missing parent %q bucket: %w", parent, errdefs.ErrNotFound)
+				}
+
+				if readKind(spbkt) != snapshots.KindCommitted {
+					return fmt.Errorf("parent %q is not committed snapshot: %w", parent, errdefs.ErrInvalidArgument)
+				}
 			}
-
-			if readKind(spbkt) != snapshots.KindCommitted {
-				return fmt.Errorf("parent %q is not committed snapshot: %w", parent, errdefs.ErrInvalidArgument)
-			}
-		}
-		sbkt, err := bkt.CreateBucket([]byte(key))
-		if err != nil {
-			if err == bolt.ErrBucketExists {
-				err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
-			}
-			return err
-		}
-
-		id, err := bkt.NextSequence()
-		if err != nil {
-			return fmt.Errorf("unable to get identifier for snapshot %q: %w", key, err)
-		}
-
-		t := time.Now().UTC()
-		si := snapshots.Info{
-			Parent:  parent,
-			Kind:    kind,
-			Labels:  base.Labels,
-			Created: t,
-			Updated: t,
-		}
-		if err := putSnapshot(sbkt, id, si); err != nil {
-			return err
-		}
-
-		if spbkt != nil {
-			pid := readID(spbkt)
-
-			// Store a backlink from the key to the parent. Store the snapshot name
-			// as the value to allow following the backlink to the snapshot value.
-			if err := pbkt.Put(parentKey(pid, id), []byte(key)); err != nil {
-				return fmt.Errorf("failed to write parent link for snapshot %q: %w", key, err)
-			}
-
-			s.ParentIDs, err = parents(bkt, spbkt, pid)
+			sbkt, err := bkts[i].CreateBucket([]byte(key))
 			if err != nil {
-				return fmt.Errorf("failed to get parent chain for snapshot %q: %w", key, err)
+				if err == bolt.ErrBucketExists {
+					err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
+				}
+				return err
 			}
+
+			id, err := bkts[i].NextSequence()
+			if err != nil {
+				return fmt.Errorf("unable to get identifier for snapshot %q: %w", key, err)
+			}
+
+			t := time.Now().UTC()
+			si := snapshots.Info{
+				Parent:  parent,
+				Kind:    kind,
+				Labels:  base.Labels,
+				Created: t,
+				Updated: t,
+			}
+			if err := putSnapshot(sbkt, id, si); err != nil {
+				return err
+			}
+
+			if spbkt != nil {
+				pid := readID(spbkt)
+
+				// Store a backlink from the key to the parent. Store the snapshot name
+				// as the value to allow following the backlink to the snapshot value.
+				if err := pbkts[i].Put(parentKey(pid, id), []byte(key)); err != nil {
+					return fmt.Errorf("failed to write parent link for snapshot %q: %w", key, err)
+				}
+
+				s.ParentIDs, err = parents(bkts[i], spbkt, pid)
+				if err != nil {
+					return fmt.Errorf("failed to get parent chain for snapshot %q: %w", key, err)
+				}
+			}
+
+			s.ID = strconv.FormatUint(id, 10)
+			s.Kind = kind
 		}
 
-		s.ID = strconv.FormatUint(id, 10)
-		s.Kind = kind
 		return nil
 	})
 	if err != nil {
@@ -296,40 +322,45 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 // writable transaction.
 func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 	var (
-		id uint64
-		si snapshots.Info
+		ids [2]uint64
+		sis [2]snapshots.Info
 	)
 
-	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		sbkt := bkt.Bucket([]byte(key))
-		if sbkt == nil {
-			return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
-		}
+	if err := withBucket(ctx, func(ctx context.Context, bktMs, pbktMs *msdb.MsBucket) error {
+		bkts := bktMs.MasterSlave()
+		pbkts := pbktMs.MasterSlave()
 
-		if err := readSnapshot(sbkt, &id, &si); err != nil {
-			return fmt.Errorf("failed to read snapshot %s: %w", key, err)
-		}
-
-		if pbkt != nil {
-			k, _ := pbkt.Cursor().Seek(parentPrefixKey(id))
-			if getParentPrefix(k) == id {
-				return fmt.Errorf("cannot remove snapshot with child: %w", errdefs.ErrFailedPrecondition)
+		for i := range bkts {
+			sbkt := bkts[i].Bucket([]byte(key))
+			if sbkt == nil {
+				return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
 			}
 
-			if si.Parent != "" {
-				spbkt := bkt.Bucket([]byte(si.Parent))
-				if spbkt == nil {
-					return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
+			if err := readSnapshot(sbkt, &ids[i], &sis[i]); err != nil {
+				return fmt.Errorf("failed to read snapshot %s: %w", key, err)
+			}
+
+			if pbkts[i] != nil {
+				k, _ := pbkts[i].Cursor().Seek(parentPrefixKey(ids[i]))
+				if getParentPrefix(k) == ids[i] {
+					return fmt.Errorf("cannot remove snapshot with child: %w", errdefs.ErrFailedPrecondition)
 				}
 
-				if err := pbkt.Delete(parentKey(readID(spbkt), id)); err != nil {
-					return fmt.Errorf("failed to delete parent link: %w", err)
+				if sis[i].Parent != "" {
+					spbkt := bkts[i].Bucket([]byte(sis[i].Parent))
+					if spbkt == nil {
+						return fmt.Errorf("snapshot %v: %w", key, errdefs.ErrNotFound)
+					}
+
+					if err := pbkts[i].Delete(parentKey(readID(spbkt), ids[i])); err != nil {
+						return fmt.Errorf("failed to delete parent link: %w", err)
+					}
 				}
 			}
-		}
 
-		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return fmt.Errorf("failed to delete snapshot: %w", err)
+			if err := bkts[i].DeleteBucket([]byte(key)); err != nil {
+				return fmt.Errorf("failed to delete snapshot: %w", err)
+			}
 		}
 
 		return nil
@@ -337,7 +368,7 @@ func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 		return "", 0, err
 	}
 
-	return strconv.FormatUint(id, 10), si.Kind, nil
+	return strconv.FormatUint(ids[0], 10), sis[0].Kind, nil
 }
 
 // CommitActive renames the active snapshot transaction referenced by `key`
@@ -348,7 +379,7 @@ func Remove(ctx context.Context, key string) (string, snapshots.Kind, error) {
 // must contain a writable transaction.
 func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, opts ...snapshots.Opt) (string, error) {
 	var (
-		id   uint64
+		ids  [2]uint64
 		base snapshots.Info
 	)
 	for _, opt := range opts {
@@ -357,53 +388,58 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		}
 	}
 
-	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
-		dbkt, err := bkt.CreateBucket([]byte(name))
-		if err != nil {
-			if err == bolt.ErrBucketExists {
-				err = errdefs.ErrAlreadyExists
+	if err := withBucket(ctx, func(ctx context.Context, bktMs, pbktMs *msdb.MsBucket) error {
+		bkts := bktMs.MasterSlave()
+		pbkts := pbktMs.MasterSlave()
+
+		for i := range bkts {
+			dbkt, err := bkts[i].CreateBucket([]byte(name))
+			if err != nil {
+				if err == bolt.ErrBucketExists {
+					err = errdefs.ErrAlreadyExists
+				}
+				return fmt.Errorf("committed snapshot %v: %w", name, err)
 			}
-			return fmt.Errorf("committed snapshot %v: %w", name, err)
-		}
-		sbkt := bkt.Bucket([]byte(key))
-		if sbkt == nil {
-			return fmt.Errorf("failed to get active snapshot %q: %w", key, errdefs.ErrNotFound)
-		}
-
-		var si snapshots.Info
-		if err := readSnapshot(sbkt, &id, &si); err != nil {
-			return fmt.Errorf("failed to read active snapshot %q: %w", key, err)
-		}
-
-		if si.Kind != snapshots.KindActive {
-			return fmt.Errorf("snapshot %q is not active: %w", key, errdefs.ErrFailedPrecondition)
-		}
-		si.Kind = snapshots.KindCommitted
-		si.Created = time.Now().UTC()
-		si.Updated = si.Created
-
-		// Replace labels, do not inherit
-		si.Labels = base.Labels
-
-		if err := putSnapshot(dbkt, id, si); err != nil {
-			return err
-		}
-		if err := putUsage(dbkt, usage); err != nil {
-			return err
-		}
-		if err := bkt.DeleteBucket([]byte(key)); err != nil {
-			return fmt.Errorf("failed to delete active snapshot %q: %w", key, err)
-		}
-		if si.Parent != "" {
-			spbkt := bkt.Bucket([]byte(si.Parent))
-			if spbkt == nil {
-				return fmt.Errorf("missing parent %q of snapshot %q: %w", si.Parent, key, errdefs.ErrNotFound)
+			sbkt := bkts[i].Bucket([]byte(key))
+			if sbkt == nil {
+				return fmt.Errorf("failed to get active snapshot %q: %w", key, errdefs.ErrNotFound)
 			}
-			pid := readID(spbkt)
 
-			// Updates parent back link to use new key
-			if err := pbkt.Put(parentKey(pid, id), []byte(name)); err != nil {
-				return fmt.Errorf("failed to update parent link %q from %q to %q: %w", pid, key, name, err)
+			var si snapshots.Info
+			if err := readSnapshot(sbkt, &ids[i], &si); err != nil {
+				return fmt.Errorf("failed to read active snapshot %q: %w", key, err)
+			}
+
+			if si.Kind != snapshots.KindActive {
+				return fmt.Errorf("snapshot %q is not active: %w", key, errdefs.ErrFailedPrecondition)
+			}
+			si.Kind = snapshots.KindCommitted
+			si.Created = time.Now().UTC()
+			si.Updated = si.Created
+
+			// Replace labels, do not inherit
+			si.Labels = base.Labels
+
+			if err := putSnapshot(dbkt, ids[i], si); err != nil {
+				return err
+			}
+			if err := putUsage(dbkt, usage); err != nil {
+				return err
+			}
+			if err := bkts[i].DeleteBucket([]byte(key)); err != nil {
+				return fmt.Errorf("failed to delete active snapshot %q: %w", key, err)
+			}
+			if si.Parent != "" {
+				spbkt := bkts[i].Bucket([]byte(si.Parent))
+				if spbkt == nil {
+					return fmt.Errorf("missing parent %q of snapshot %q: %w", si.Parent, key, errdefs.ErrNotFound)
+				}
+				pid := readID(spbkt)
+
+				// Updates parent back link to use new key
+				if err := pbkts[i].Put(parentKey(pid, ids[i]), []byte(name)); err != nil {
+					return fmt.Errorf("failed to update parent link %q from %q to %q: %w", pid, key, name, err)
+				}
 			}
 		}
 
@@ -412,13 +448,15 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 		return "", err
 	}
 
-	return strconv.FormatUint(id, 10), nil
+	return strconv.FormatUint(ids[0], 10), nil
 }
 
 // IDMap returns all the IDs mapped to their key
 func IDMap(ctx context.Context) (map[string]string, error) {
 	m := map[string]string{}
-	if err := withBucket(ctx, func(ctx context.Context, bkt, _ *bolt.Bucket) error {
+	if err := withBucket(ctx, func(ctx context.Context, bktMs, _ *msdb.MsBucket) error {
+		bkt := bktMs.Master()
+
 		return bkt.ForEach(func(k, v []byte) error {
 			// skip non buckets
 			if v != nil {
@@ -435,8 +473,8 @@ func IDMap(ctx context.Context) (map[string]string, error) {
 	return m, nil
 }
 
-func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
+func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context, *msdb.MsBucket, *msdb.MsBucket) error) error {
+	tx, ok := ctx.Value(transactionKey{}).(*msdb.MsTx)
 	if !ok {
 		return ErrNoTransaction
 	}
@@ -456,8 +494,8 @@ func withSnapshotBucket(ctx context.Context, key string, fn func(context.Context
 	return fn(ctx, bkt, vbkt.Bucket(bucketKeyParents))
 }
 
-func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
+func withBucket(ctx context.Context, fn func(context.Context, *msdb.MsBucket, *msdb.MsBucket) error) error {
+	tx, ok := ctx.Value(transactionKey{}).(*msdb.MsTx)
 	if !ok {
 		return ErrNoTransaction
 	}
@@ -468,8 +506,8 @@ func withBucket(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bol
 	return fn(ctx, bkt.Bucket(bucketKeySnapshot), bkt.Bucket(bucketKeyParents))
 }
 
-func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *bolt.Bucket, *bolt.Bucket) error) error {
-	tx, ok := ctx.Value(transactionKey{}).(*bolt.Tx)
+func createBucketIfNotExists(ctx context.Context, fn func(context.Context, *msdb.MsBucket, *msdb.MsBucket) error) error {
+	tx, ok := ctx.Value(transactionKey{}).(*msdb.MsTx)
 	if !ok {
 		return ErrNoTransaction
 	}

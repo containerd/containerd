@@ -28,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/msdb"
 	"github.com/containerd/log"
 	bolt "go.etcd.io/bbolt"
 )
@@ -67,7 +68,7 @@ type MetaStore struct {
 	dbfile string
 
 	dbL sync.Mutex
-	db  *bolt.DB
+	db  *msdb.MsDb
 }
 
 // NewMetaStore returns a snapshot MetaStore for storage of metadata related to
@@ -87,7 +88,9 @@ type transactionKey struct{}
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
 	ms.dbL.Lock()
 	if ms.db == nil {
-		db, err := bolt.Open(ms.dbfile, 0600, nil)
+		options := *bolt.DefaultOptions
+		options.NoFreelistSync = true
+		db, err := msdb.Open(ms.dbfile, 0600, &options)
 		if err != nil {
 			ms.dbL.Unlock()
 			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)

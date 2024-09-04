@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/pkg/msdb"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
@@ -158,7 +159,7 @@ func init() {
 					return
 				}
 			}()
-			db, err := bolt.Open(path, 0644, &options)
+			db, err := msdb.Open(path, 0644, &options)
 			close(doneCh)
 			if err != nil {
 				return nil, err
