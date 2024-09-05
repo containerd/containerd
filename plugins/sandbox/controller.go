@@ -26,8 +26,8 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/protobuf/types/known/anypb"
 
 	runtimeAPI "github.com/containerd/containerd/api/runtime/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
@@ -150,19 +150,11 @@ func (c *controllerLocal) Create(ctx context.Context, info sandbox.Sandbox, opts
 		return err
 	}
 
-	var options *anypb.Any
-	if coptions.Options != nil {
-		options = &anypb.Any{
-			TypeUrl: coptions.Options.GetTypeUrl(),
-			Value:   coptions.Options.GetValue(),
-		}
-	}
-
 	if _, err := svc.CreateSandbox(ctx, &runtimeAPI.CreateSandboxRequest{
 		SandboxID:  sandboxID,
 		BundlePath: shim.Bundle(),
 		Rootfs:     mount.ToProto(coptions.Rootfs),
-		Options:    options,
+		Options:    typeurl.MarshalProto(coptions.Options),
 		NetnsPath:  coptions.NetNSPath,
 	}); err != nil {
 		c.cleanupShim(ctx, sandboxID, svc)

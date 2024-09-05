@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/gc"
+	"github.com/containerd/containerd/v2/pkg/oci"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
@@ -170,7 +171,7 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 
 	var opts []images.DeleteOpt
 	if req.Target != nil {
-		desc := descFromProto(req.Target)
+		desc := oci.DescriptorFromProto(req.Target)
 		opts = append(opts, images.DeleteTarget(&desc))
 	}
 
