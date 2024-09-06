@@ -195,7 +195,11 @@ func (s *service) preStart(c *runc.Container) (handleStarted func(*runc.Containe
 		if pid == 0 || exited {
 			s.lifecycleMu.Unlock()
 			for _, ee := range ees {
-				s.handleProcessExit(ee, c, p)
+				if process, init := p.(*process.Init); init {
+					s.handleInitExit(ee, c, process)
+				} else {
+					s.handleExecProcessExit(ee, c, p)
+				}
 			}
 		} else {
 			// Process start was successful, add to `s.running`.
@@ -290,7 +294,7 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
 	p, err := container.Start(ctx, r)
 	if err != nil {
 		// If we failed to even start the process, s.runningExecs
-		// won't get decremented in s.handleProcessExit. We still need
+		// won't get decremented in s.handleExecProcessExit. We still need
 		// to update it.
 		if r.ExecID != "" {
 			s.lifecycleMu.Lock()
@@ -676,10 +680,10 @@ func (s *service) processExits() {
 		s.lifecycleMu.Unlock()
 
 		for _, cp := range cps {
-			if ip, ok := cp.Process.(*process.Init); ok {
+			if ip, init := cp.Process.(*process.Init); init {
 				s.handleInitExit(e, cp.Container, ip)
 			} else {
-				s.handleProcessExit(e, cp.Container, cp.Process)
+				s.handleExecProcessExit(e, cp.Container, cp.Process)
 			}
 		}
 	}
@@ -712,7 +716,14 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 	if numRunningExecs == 0 {
 		delete(s.runningExecs, c)
 		s.lifecycleMu.Unlock()
-		s.handleProcessExit(e, c, p)
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
 		return
 	}
 
@@ -738,11 +749,18 @@ func (s *service) handleInitExit(e runcC.Exit, c *runc.Container, p *process.Ini
 
 		// all running processes have exited now, and no new
 		// ones can start, so we can publish the init exit
-		s.handleProcessExit(e, c, p)
+		p.SetExited(e.Status)
+		s.send(&eventstypes.TaskExit{
+			ContainerID: c.ID,
+			ID:          p.ID(),
+			Pid:         uint32(e.Pid),
+			ExitStatus:  uint32(e.Status),
+			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
+		})
 	}()
 }
 
-func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
+func (s *service) handleExecProcessExit(e runcC.Exit, c *runc.Container, p process.Process) {
 	p.SetExited(e.Status)
 	s.send(&eventstypes.TaskExit{
 		ContainerID: c.ID,
@@ -751,14 +769,14 @@ func (s *service) handleProcessExit(e runcC.Exit, c *runc.Container, p process.P
 		ExitStatus:  uint32(e.Status),
 		ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 	})
-	if _, init := p.(*process.Init); !init {
-		s.lifecycleMu.Lock()
-		s.runningExecs[c]--
-		if ch, ok := s.execCountSubscribers[c]; ok {
-			ch <- s.runningExecs[c]
-		}
-		s.lifecycleMu.Unlock()
+
+	s.lifecycleMu.Lock()
+	s.runningExecs[c]--
+	if ch, ok := s.execCountSubscribers[c]; ok {
+		ch <- s.runningExecs[c]
 	}
+	s.lifecycleMu.Unlock()
+
 }
 
 func (s *service) getContainerPids(ctx context.Context, container *runc.Container) ([]uint32, error) {
