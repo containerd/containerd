@@ -17,13 +17,13 @@
 package watchdog
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -38,20 +38,17 @@ func init() {
 			if runtime.GOOS != "linux" {
 				return nil, fmt.Errorf("host does not support watchdog: %w", plugin.ErrSkipPlugin)
 			}
-			// system manager sets the WATCHDOG_USEC variable
 			// https://0pointer.de/blog/projects/watchdog.html
-			watchdogUsec := os.Getenv("WATCHDOG_USEC")
-			fmt.Println("WATCHDOG_USEC:", watchdogUsec)
-			if watchdogUsec == "" {
+			watchdogInterval, err := daemon.SdWatchdogEnabled(false)
+			if watchdogInterval == 0 {
 				return nil, fmt.Errorf("no watchdog interval is configured: %w", plugin.ErrSkipPlugin)
 			}
-			watchdogInt, err := strconv.Atoi(watchdogUsec)
 			if err != nil {
-				return nil, fmt.Errorf("error converting WATCHDOG_USEC: %w", plugin.ErrSkipPlugin)
+				return nil, fmt.Errorf("%s: %w", err, plugin.ErrSkipPlugin)
 			}
-			watchdogInterval := time.Duration(watchdogInt/2) * time.Microsecond
+
 			// Start a Go routine to periodically notify systemd
-			go notifyWatchdog(watchdogInterval)
+			go notifyWatchdog(ic.Context, watchdogInterval)
 			return &service{}, nil
 		},
 	})
@@ -60,23 +57,27 @@ func init() {
 type service struct {
 }
 
-func notifyWatchdog(interval time.Duration) {
+func notifyWatchdog(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for range ticker.C {
 		ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 		if err != nil {
-			fmt.Println("Failed to notify systemd watchdog - ", err)
+			log.G(ctx).WithError(err).Warn("notify watchdog failed")
 		}
-		fmt.Println("Sent watchdog notification -", ack)
+		log.G(ctx).WithField("notified", ack).
+			WithField("state", daemon.SdNotifyWatchdog).
+			Debug("watchdog plugin notification")
 	}
 }
 
-func NotifyReady(){
+func NotifyReady(ctx context.Context) {
 	ack, err := daemon.SdNotify(false, daemon.SdNotifyReady)
 	if err != nil {
-		fmt.Println("Failed to notify systemd ready - ", err)
+		log.G(ctx).WithError(err).Warn("notify ready failed")
 	}
-	fmt.Println("Notified systemd ready - ", ack)
+	log.G(ctx).WithField("notified", ack).
+		WithField("state", daemon.SdNotifyReady).
+		Debug("watchdog plugin notification")
 }
