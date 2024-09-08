@@ -39,16 +39,16 @@ func init() {
 				return nil, fmt.Errorf("host does not support watchdog: %w", plugin.ErrSkipPlugin)
 			}
 			// https://0pointer.de/blog/projects/watchdog.html
-			watchdogInterval, err := daemon.SdWatchdogEnabled(false)
-			if watchdogInterval == 0 {
+			watchdogVal, err := daemon.SdWatchdogEnabled(false)
+			if watchdogVal == 0 {
 				return nil, fmt.Errorf("no watchdog interval is configured: %w", plugin.ErrSkipPlugin)
 			}
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", err, plugin.ErrSkipPlugin)
 			}
-
+			interval := watchdogVal / 2
 			// Start a Go routine to periodically notify systemd
-			go notifyWatchdog(ic.Context, watchdogInterval)
+			go notifyWatchdog(ic.Context, interval)
 			return &service{}, nil
 		},
 	})
@@ -65,6 +65,7 @@ func notifyWatchdog(ctx context.Context, interval time.Duration) {
 		ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 		if err != nil {
 			log.G(ctx).WithError(err).Warn("notify watchdog failed")
+			return;
 		}
 		log.G(ctx).WithField("notified", ack).
 			WithField("state", daemon.SdNotifyWatchdog).
@@ -76,6 +77,7 @@ func NotifyReady(ctx context.Context) {
 	ack, err := daemon.SdNotify(false, daemon.SdNotifyReady)
 	if err != nil {
 		log.G(ctx).WithError(err).Warn("notify ready failed")
+		return;
 	}
 	log.G(ctx).WithField("notified", ack).
 		WithField("state", daemon.SdNotifyReady).
