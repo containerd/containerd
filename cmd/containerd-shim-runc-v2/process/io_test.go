@@ -34,7 +34,7 @@ func TestNewBinaryIO(t *testing.T) {
 
 	before := descriptorCount(t)
 
-	io, err := NewBinaryIO(ctx, "1", uri)
+	io, err := NewBinaryIO(ctx, false, "1", uri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,11 +54,11 @@ func TestNewAttachableBinaryIO(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	ctx := namespaces.WithNamespace(context.Background(), "test")
-	uri, _ := url.Parse("attachablebinary:///bin/echo?test")
+	uri, _ := url.Parse("binary:///bin/echo?test")
 
 	before := descriptorCount(t)
 
-	_, err := NewAttachableBinary(ctx, "1", uri)
+	_, err := NewBinaryIO(ctx, true, "1", uri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestNewBinaryIOCleanup(t *testing.T) {
 	uri, _ := url.Parse("binary:///not/existing")
 
 	before := descriptorCount(t)
-	_, err := NewBinaryIO(ctx, "2", uri)
+	_, err := NewBinaryIO(ctx, false, "2", uri)
 	if err == nil {
 		t.Fatal("error expected for invalid binary")
 	}

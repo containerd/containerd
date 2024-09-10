@@ -122,7 +122,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 		}
 		defer socket.Close()
 	} else {
-		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio); err != nil {
+		if pio, err = createIO(ctx, p.id, p.IoUID, p.IoGID, p.stdio, true); err != nil {
 			return fmt.Errorf("failed to create init process I/O: %w", err)
 		}
 		p.io = pio
