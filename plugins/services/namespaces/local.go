@@ -28,7 +28,7 @@ import (
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	bolt "go.etcd.io/bbolt"
@@ -80,7 +80,7 @@ func (l *local) Get(ctx context.Context, req *api.GetNamespaceRequest, _ ...grpc
 	return &resp, l.withStoreView(ctx, func(ctx context.Context, store namespaces.Store) error {
 		labels, err := store.Labels(ctx, req.Name)
 		if err != nil {
-			return errdefs.ToGRPC(err)
+			return errgrpc.ToGRPC(err)
 		}
 
 		resp.Namespace = &api.Namespace{
@@ -106,7 +106,7 @@ func (l *local) List(ctx context.Context, req *api.ListNamespacesRequest, _ ...g
 			if err != nil {
 				// In general, this should be unlikely, since we are holding a
 				// transaction to service this request.
-				return errdefs.ToGRPC(err)
+				return errgrpc.ToGRPC(err)
 			}
 
 			resp.Namespaces = append(resp.Namespaces, &api.Namespace{
@@ -124,7 +124,7 @@ func (l *local) Create(ctx context.Context, req *api.CreateNamespaceRequest, _ .
 
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
 		if err := store.Create(ctx, req.Namespace.Name, req.Namespace.Labels); err != nil {
-			return errdefs.ToGRPC(err)
+			return errgrpc.ToGRPC(err)
 		}
 
 		for k, v := range req.Namespace.Labels {
@@ -171,7 +171,7 @@ func (l *local) Update(ctx context.Context, req *api.UpdateNamespaceRequest, _ .
 			// get current set of labels
 			labels, err := store.Labels(ctx, req.Namespace.Name)
 			if err != nil {
-				return errdefs.ToGRPC(err)
+				return errgrpc.ToGRPC(err)
 			}
 
 			for k := range labels {
@@ -206,7 +206,7 @@ func (l *local) Update(ctx context.Context, req *api.UpdateNamespaceRequest, _ .
 
 func (l *local) Delete(ctx context.Context, req *api.DeleteNamespaceRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
 	if err := l.withStoreUpdate(ctx, func(ctx context.Context, store namespaces.Store) error {
-		return errdefs.ToGRPC(store.Delete(ctx, req.Name))
+		return errgrpc.ToGRPC(store.Delete(ctx, req.Name))
 	}); err != nil {
 		return empty, err
 	}

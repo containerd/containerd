@@ -24,7 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	protobuftypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 )
 
 // NewSnapshotter returns a new Snapshotter which communicates over a GRPC
@@ -48,7 +48,7 @@ func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info
 			Key:         key,
 		})
 	if err != nil {
-		return snapshots.Info{}, errdefs.FromGRPC(err)
+		return snapshots.Info{}, errgrpc.ToNative(err)
 	}
 	return InfoFromProto(resp.Info), nil
 }
@@ -63,7 +63,7 @@ func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fiel
 			},
 		})
 	if err != nil {
-		return snapshots.Info{}, errdefs.FromGRPC(err)
+		return snapshots.Info{}, errgrpc.ToNative(err)
 	}
 	return InfoFromProto(resp.Info), nil
 }
@@ -74,7 +74,7 @@ func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 		Key:         key,
 	})
 	if err != nil {
-		return snapshots.Usage{}, errdefs.FromGRPC(err)
+		return snapshots.Usage{}, errgrpc.ToNative(err)
 	}
 	return UsageFromProto(resp), nil
 }
@@ -85,7 +85,7 @@ func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Moun
 		Key:         key,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return mount.FromProto(resp.Mounts), nil
 }
@@ -104,7 +104,7 @@ func (p *proxySnapshotter) Prepare(ctx context.Context, key, parent string, opts
 		Labels:      local.Labels,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return mount.FromProto(resp.Mounts), nil
 }
@@ -123,7 +123,7 @@ func (p *proxySnapshotter) View(ctx context.Context, key, parent string, opts ..
 		Labels:      local.Labels,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return mount.FromProto(resp.Mounts), nil
 }
@@ -141,7 +141,7 @@ func (p *proxySnapshotter) Commit(ctx context.Context, name, key string, opts ..
 		Key:         key,
 		Labels:      local.Labels,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
@@ -149,7 +149,7 @@ func (p *proxySnapshotter) Remove(ctx context.Context, key string) error {
 		Snapshotter: p.snapshotterName,
 		Key:         key,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
@@ -158,7 +158,7 @@ func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs .
 		Filters:     fs,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	for {
 		resp, err := sc.Recv()
@@ -166,7 +166,7 @@ func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs .
 			if err == io.EOF {
 				return nil
 			}
-			return errdefs.FromGRPC(err)
+			return errgrpc.ToNative(err)
 		}
 		if resp == nil {
 			return nil
@@ -187,5 +187,5 @@ func (p *proxySnapshotter) Cleanup(ctx context.Context) error {
 	_, err := p.client.Cleanup(ctx, &snapshotsapi.CleanupRequest{
 		Snapshotter: p.snapshotterName,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }

@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 )
@@ -130,10 +131,10 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		rootfs,
 	)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	if err := p.Create(ctx, config); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	container := &Container{
 		ID:              r.ID,

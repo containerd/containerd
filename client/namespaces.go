@@ -23,7 +23,7 @@ import (
 	api "github.com/containerd/containerd/api/services/namespaces/v1"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 )
 
 // NewNamespaceStoreFromClient returns a new namespace store
@@ -45,7 +45,7 @@ func (r *remoteNamespaces) Create(ctx context.Context, namespace string, labels 
 
 	_, err := r.client.Create(ctx, &req)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -57,7 +57,7 @@ func (r *remoteNamespaces) Labels(ctx context.Context, namespace string) (map[st
 
 	resp, err := r.client.Get(ctx, &req)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	return resp.Namespace.Labels, nil
@@ -77,7 +77,7 @@ func (r *remoteNamespaces) SetLabel(ctx context.Context, namespace, key, value s
 
 	_, err := r.client.Update(ctx, &req)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -88,7 +88,7 @@ func (r *remoteNamespaces) List(ctx context.Context) ([]string, error) {
 
 	resp, err := r.client.List(ctx, &req)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	var namespaces []string
@@ -114,7 +114,7 @@ func (r *remoteNamespaces) Delete(ctx context.Context, namespace string, opts ..
 	}
 	_, err := r.client.Delete(ctx, &req)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
