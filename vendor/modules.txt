@@ -77,8 +77,8 @@ github.com/cespare/xxhash/v2
 # github.com/checkpoint-restore/checkpointctl v1.2.1
 ## explicit; go 1.21
 github.com/checkpoint-restore/checkpointctl/lib
-# github.com/checkpoint-restore/go-criu/v7 v7.1.0
-## explicit; go 1.18
+# github.com/checkpoint-restore/go-criu/v7 v7.2.0
+## explicit; go 1.20
 github.com/checkpoint-restore/go-criu/v7
 github.com/checkpoint-restore/go-criu/v7/rpc
 # github.com/cilium/ebpf v0.11.0
@@ -590,7 +590,7 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.24.0
+# golang.org/x/sys v0.25.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
