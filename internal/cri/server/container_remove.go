@@ -124,6 +124,11 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 			volatileContainerRootDir, err)
 	}
 
+	err = c.mutateUnmounts(ctx, container.Config.Mounts, container.SandboxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mutate unmount config for container %q: %w", id, err)
+	}
+
 	c.containerStore.Delete(id)
 
 	c.containerNameIndex.ReleaseByKey(id)
