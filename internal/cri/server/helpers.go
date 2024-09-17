@@ -61,6 +61,8 @@ const (
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
+	// imageVolumeDir contains all image volume root.
+	imageVolumeDir = "image-volumes"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
 
@@ -137,6 +139,11 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 // e.g. state checkpoint.
 func (c *criService) getContainerRootDir(id string) string {
 	return filepath.Join(c.config.RootDir, containersDir, id)
+}
+
+// getImageVolumeHostPath returns the image volume directory for share.
+func (c *criService) getImageVolumeHostPath(podID, imageID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID, imageID)
 }
 
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
