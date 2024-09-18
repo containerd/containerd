@@ -219,6 +219,17 @@ func (s *snapshotter) MountFsMeta(snap storage.Snapshot, mnt string, id int) boo
 		m.Options = append(m.Options, fmt.Sprintf("device=%s", s.layerBlobPath(snap.ParentIDs[j])))
 	}
 	err := m.Mount(mnt)
+	if err == unix.ENOTBLK {
+		m.Options = []string{"ro", "loop"}
+		for j := len(snap.ParentIDs) - 1; j >= id; j-- {
+			devname, err := bindLoopDevice(s.layerBlobPath(snap.ParentIDs[j]))
+			if err != nil {
+				return false
+			}
+			m.Options = append(m.Options, fmt.Sprintf("device=%s", devname))
+		}
+		err = m.Mount(mnt)
+	}
 	return err == nil
 }
 
@@ -483,7 +494,9 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 			if err := mount.UnmountAll(s.upperPath(id), 0); err != nil {
 				log.G(ctx).Warnf("failed to unmount EROFS mount for %v", id)
 			}
-
+			if err := unbindLoopDevice(filepath.Join(s.root, "snapshots", id)); err != nil {
+				log.G(ctx).Warnf("failed to detach EROFS loop device %v", id)
+			}
 			for _, dir := range removals {
 				if err := os.RemoveAll(dir); err != nil {
 					log.G(ctx).WithError(err).WithField("path", dir).Warn("failed to remove directory")
