@@ -17,9 +17,11 @@
 package podsandbox
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/moby/sys/userns"
@@ -32,11 +34,15 @@ import (
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
+	"github.com/containerd/containerd/v2/pkg/netns"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
+	"github.com/containerd/containerd/v2/pkg/sys"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData(criCfg criconfig.Config) (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
@@ -94,7 +100,7 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 		}
 
 		assert.Contains(t, spec.Mounts, runtimespec.Mount{
-			Source:      "/test/root/sandboxes/test-id/resolv.conf",
+			Source:      filepath.Join(criCfg.RootDir, "sandboxes/test-id/resolv.conf"),
 			Destination: resolvConfPath,
 			Type:        "bind",
 			Options:     []string{"rbind", "ro", "nosuid", "nodev", "noexec"},
@@ -105,8 +111,10 @@ func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConf
 }
 
 func TestLinuxSandboxContainerSpec(t *testing.T) {
+	testutil.RequiresRoot(t)
+
 	testID := "test-id"
-	nsPath := "test-cni"
+
 	idMap := runtime.IDMapping{
 		HostId:      1000,
 		ContainerId: 1000,
@@ -118,15 +126,30 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		Size:        10,
 	}
 
+	netnsBasedir := t.TempDir()
+	t.Cleanup(func() {
+		assert.NoError(t, unmountRecursive(context.Background(), netnsBasedir))
+	})
+
+	var netNs *netns.NetNS
+	uerr := sys.UnshareAfterEnterUserns("1000:1000:10", "1000:1000:10", syscall.CLONE_NEWNET, func(pid int) error {
+		var err error
+		netNs, err = netns.NewNetNSFromPID(netnsBasedir, uint32(pid))
+		return err
+	})
+	require.NoError(t, uerr)
+
+	nsPath := netNs.GetPath()
+
 	for _, test := range []struct {
 		desc         string
 		configChange func(*runtime.PodSandboxConfig)
-		specCheck    func(*testing.T, *runtimespec.Spec)
+		specCheck    func(*testing.T, *Controller, *runtimespec.Spec)
 		expectErr    bool
 	}{
 		{
 			desc: "spec should reflect original config",
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				// runtime spec should have expected namespaces enabled by default.
 				require.NotNil(t, spec.Linux)
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
@@ -162,10 +185,11 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					},
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, c *Controller, spec *runtimespec.Spec) {
 				require.NotNil(t, spec.Linux)
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.UserNamespace,
+					Path: filepath.Join(c.config.StateDir, "sandboxes", testID, "pinned-namespaces", "user"),
 				})
 				assert.NotContains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "0 2147483647")
 			},
@@ -181,7 +205,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					},
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				// runtime spec should disable expected namespaces in host mode.
 				require.NotNil(t, spec.Linux)
 				assert.NotContains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
@@ -213,10 +237,11 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					},
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, c *Controller, spec *runtimespec.Spec) {
 				require.NotNil(t, spec.Linux)
 				assert.Contains(t, spec.Linux.Namespaces, runtimespec.LinuxNamespace{
 					Type: runtimespec.UserNamespace,
+					Path: filepath.Join(c.config.StateDir, "sandboxes", testID, "pinned-namespaces", "user"),
 				})
 				require.Equal(t, spec.Linux.UIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
 				require.Equal(t, spec.Linux.GIDMappings, []runtimespec.LinuxIDMapping{expIDMap})
@@ -314,7 +339,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					SupplementalGroups: []int64{1111, 2222},
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				require.NotNil(t, spec.Process)
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(1111))
 				assert.Contains(t, spec.Process.User.AdditionalGids, uint32(2222))
@@ -328,7 +353,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					"net.ipv4.ping_group_range":           "1 1000",
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				require.NotNil(t, spec.Process)
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ip_unprivileged_port_start"], "500")
 				assert.Contains(t, spec.Linux.Sysctl["net.ipv4.ping_group_range"], "1 1000")
@@ -344,7 +369,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 					MemoryLimitInBytes: 1024,
 				}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]
 				assert.True(t, ok)
 				assert.EqualValues(t, strconv.FormatInt(100, 10), value)
@@ -365,7 +390,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		},
 		{
 			desc: "sandbox sizing annotations should not be set if LinuxContainerResources were not provided",
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				_, ok := spec.Annotations[annotations.SandboxCPUPeriod]
 				assert.False(t, ok)
 				_, ok = spec.Annotations[annotations.SandboxCPUQuota]
@@ -381,7 +406,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			configChange: func(c *runtime.PodSandboxConfig) {
 				c.Linux.Resources = &v1.LinuxContainerResources{}
 			},
-			specCheck: func(t *testing.T, spec *runtimespec.Spec) {
+			specCheck: func(t *testing.T, _ *Controller, spec *runtimespec.Spec) {
 				value, ok := spec.Annotations[annotations.SandboxCPUPeriod]
 				assert.True(t, ok)
 				assert.EqualValues(t, "0", value)
@@ -400,9 +425,17 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
+			c.config.RootDir = t.TempDir()
+			c.config.StateDir = t.TempDir()
+
+			defer func() {
+				assert.NoError(t, unmountRecursive(context.Background(), c.config.StateDir))
+			}()
+
 			c.config.EnableUnprivilegedICMP = true
 			c.config.EnableUnprivilegedPorts = true
-			config, imageConfig, specCheck := getRunPodSandboxTestData()
+
+			config, imageConfig, specCheck := getRunPodSandboxTestData(c.config)
 			if test.configChange != nil {
 				test.configChange(config)
 			}
@@ -416,7 +449,7 @@ func TestLinuxSandboxContainerSpec(t *testing.T) {
 			assert.NotNil(t, spec)
 			specCheck(t, testID, spec)
 			if test.specCheck != nil {
-				test.specCheck(t, spec)
+				test.specCheck(t, c, spec)
 			}
 		})
 	}
@@ -757,6 +790,3 @@ options timeout:1
 		})
 	}
 }
-
-// TODO(random-liu): [P1] Add unit test for different error cases to make sure
-// the function cleans up on error properly.

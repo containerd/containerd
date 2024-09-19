@@ -14,19 +14,25 @@
    limitations under the License.
 */
 
-package server
+package sys
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 
-	"github.com/containerd/containerd/v2/pkg/netns"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	"golang.org/x/sys/unix"
 )
 
-func (c *criService) bringUpLoopback(string) error {
-	return nil
-}
+// GetUsernsForNamespace returns a file descriptor that refers to the owning
+// user namespace for the namespace referred to by fd.
+//
+// REF: https://man7.org/linux/man-pages/man2/ioctl_ns.2.html
+func GetUsernsForNamespace(fd uintptr) (*os.File, error) {
+	fd, _, errno := unix.Syscall(syscall.SYS_IOCTL, fd, uintptr(unix.NS_GET_USERNS), 0)
+	if errno != 0 {
+		return nil, fmt.Errorf("failed to get user namespace fd: %w", errno)
+	}
 
-func (c *criService) setupNetnsWithinUserns(basedir string, cfg *runtime.UserNamespace) (*netns.NetNS, error) {
-	return nil, fmt.Errorf("unsupported to setup netns within userns on windows platform")
+	return os.NewFile(fd, fmt.Sprintf("/proc/%d/fd/%d", os.Getpid(), fd)), nil
 }

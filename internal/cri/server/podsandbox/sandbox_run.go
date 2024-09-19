@@ -95,6 +95,39 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	labels["oci_runtime_type"] = ociRuntime.Type
 
+	// Create sandbox container root directories.
+	sandboxRootDir := c.getSandboxRootDir(id)
+	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
+		return cin, fmt.Errorf("failed to create sandbox root directory %q: %w",
+			sandboxRootDir, err)
+	}
+	defer func() {
+		if retErr != nil && cleanupErr == nil {
+			// Cleanup the sandbox root directory.
+			if cleanupErr = c.os.RemoveAll(sandboxRootDir); cleanupErr != nil {
+				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove sandbox root directory %q",
+					sandboxRootDir)
+			}
+		}
+	}()
+
+	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
+	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
+		return cin, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
+			volatileSandboxRootDir, err)
+	}
+	defer func() {
+		if retErr != nil && cleanupErr == nil {
+			deferCtx, deferCancel := ctrdutil.DeferContext()
+			defer deferCancel()
+			// Cleanup the volatile sandbox root directory.
+			if cleanupErr = ensureRemoveAll(deferCtx, volatileSandboxRootDir); cleanupErr != nil {
+				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove volatile sandbox root directory %q",
+					volatileSandboxRootDir)
+			}
+		}
+	}()
+
 	// Create sandbox container.
 	// NOTE: sandboxContainerSpec SHOULD NOT have side
 	// effect, e.g. accessing/creating files, so that we can test
@@ -161,37 +194,6 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 				log.G(ctx).WithError(cleanupErr).Errorf("Failed to delete containerd container %q", id)
 			}
 			podSandbox.Container = nil
-		}
-	}()
-
-	// Create sandbox container root directories.
-	sandboxRootDir := c.getSandboxRootDir(id)
-	if err := c.os.MkdirAll(sandboxRootDir, 0755); err != nil {
-		return cin, fmt.Errorf("failed to create sandbox root directory %q: %w",
-			sandboxRootDir, err)
-	}
-	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			// Cleanup the sandbox root directory.
-			if cleanupErr = c.os.RemoveAll(sandboxRootDir); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove sandbox root directory %q",
-					sandboxRootDir)
-			}
-		}
-	}()
-
-	volatileSandboxRootDir := c.getVolatileSandboxRootDir(id)
-	if err := c.os.MkdirAll(volatileSandboxRootDir, 0755); err != nil {
-		return cin, fmt.Errorf("failed to create volatile sandbox root directory %q: %w",
-			volatileSandboxRootDir, err)
-	}
-	defer func() {
-		if retErr != nil && cleanupErr == nil {
-			// Cleanup the volatile sandbox root directory.
-			if cleanupErr = c.os.RemoveAll(volatileSandboxRootDir); cleanupErr != nil {
-				log.G(ctx).WithError(cleanupErr).Errorf("Failed to remove volatile sandbox root directory %q",
-					volatileSandboxRootDir)
-			}
 		}
 	}()
 

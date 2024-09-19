@@ -103,6 +103,11 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 		case runtime.NamespaceMode_POD:
 			specOpts = append(specOpts, oci.WithUserNamespace(uids, gids))
 			usernsEnabled = true
+
+			if err := c.pinUserNamespace(id, nsPath); err != nil {
+				return nil, fmt.Errorf("failed to pin user namespace: %w", err)
+			}
+			specOpts = append(specOpts, customopts.WithNamespacePath(runtimespec.UserNamespace, c.getSandboxPinnedUserNamespace(id)))
 		default:
 			return nil, fmt.Errorf("unsupported user namespace mode: %q", mode)
 		}
