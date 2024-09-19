@@ -17,6 +17,7 @@ Block-based:
 Filesystem-specific:
 - `btrfs`: btrfs. Needs the plugin root (`/var/lib/containerd/io.containerd.snapshotter.v1.btrfs`) to be mounted as btrfs.
 - `zfs`: ZFS. Needs the plugin root (`/var/lib/containerd/io.containerd.snapshotter.v1.zfs`) to be mounted as ZFS. See also https://github.com/containerd/zfs .
+- `erofs`: EROFS. `OverlayFS` kernel module needs to be enabled for active snapshots. See also [`erofs.md`](./erofs.md).
 
 [Deprecated](https://github.com/containerd/containerd/blob/main/RELEASES.md#deprecated-features):
 - `aufs`: AUFS. Deprecated since containerd 1.5. Removed in containerd 2.0. See also https://github.com/containerd/aufs .
