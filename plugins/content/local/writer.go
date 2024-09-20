@@ -94,11 +94,6 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return fmt.Errorf("cannot commit on closed writer: %w", errdefs.ErrFailedPrecondition)
 	}
 
-	if err := fp.Sync(); err != nil {
-		fp.Close()
-		return fmt.Errorf("sync failed: %w", err)
-	}
-
 	fi, err := fp.Stat()
 	closeErr := fp.Close()
 	if err != nil {
