@@ -560,21 +560,6 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	if err := t.Checkpoint(ctx, image, r.Options); err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
-	// do not commit checkpoint image if checkpoint ImagePath is passed,
-	// return if checkpointImageExists is false
-	if !checkpointImageExists {
-		return &api.CheckpointTaskResponse{}, nil
-	}
-	// write checkpoint to the content store
-	tar := archive.Diff(ctx, "", image)
-	cp, err := l.writeContent(ctx, images.MediaTypeContainerd1Checkpoint, image, tar)
-	// close tar first after write
-	if err := tar.Close(); err != nil {
-		return nil, err
-	}
-	if err != nil {
-		return nil, err
-	}
 	// write the config to the content store
 	pbany := typeurl.MarshalProto(container.Spec)
 	data, err := proto.Marshal(pbany)
@@ -585,6 +570,25 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	specD, err := l.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
+	}
+	// do not commit checkpoint image if checkpoint ImagePath is passed,
+	// return if checkpointImageExists is false
+	if !checkpointImageExists {
+		return &api.CheckpointTaskResponse{
+			Descriptors: []*types.Descriptor{
+				specD,
+			},
+		}, nil
+	}
+	// write checkpoint to the content store
+	tar := archive.Diff(ctx, "", image)
+	cp, err := l.writeContent(ctx, images.MediaTypeContainerd1Checkpoint, image, tar)
+	// close tar first after write
+	if err := tar.Close(); err != nil {
+		return nil, err
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &api.CheckpointTaskResponse{
 		Descriptors: []*types.Descriptor{
