@@ -25,8 +25,11 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/oci"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
@@ -35,8 +38,6 @@ import (
 	osinterface "github.com/containerd/containerd/pkg/os"
 	"github.com/containerd/containerd/protobuf"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 )
 
 // CRIService interface contains things required by controller, but not yet refactored from criService.

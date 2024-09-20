@@ -24,10 +24,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
 

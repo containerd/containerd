@@ -28,6 +28,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	clabels "github.com/containerd/containerd/labels"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
@@ -37,7 +38,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	docker "github.com/distribution/reference"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"

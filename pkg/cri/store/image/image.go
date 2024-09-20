@@ -21,17 +21,17 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/pkg/cri/labels"
-	"github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/errdefs"
 	docker "github.com/distribution/reference"
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	imagedigest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/go-digest/digestset"
 	imageidentity "github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/labels"
+	"github.com/containerd/containerd/pkg/cri/util"
 )
 
 // Image contains all resources associated with the image. All fields

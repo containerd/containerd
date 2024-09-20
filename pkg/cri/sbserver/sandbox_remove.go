@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/errdefs"
 
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"

@@ -19,20 +19,21 @@ package transfer
 import (
 	"context"
 
-	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
-	transferTypes "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/pkg/streaming"
-	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/transfer/plugins"
-	"github.com/containerd/containerd/plugin"
-	ptypes "github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
+	transferTypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/streaming"
+	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/pkg/transfer/plugins"
+	"github.com/containerd/containerd/plugin"
+	ptypes "github.com/containerd/containerd/protobuf/types"
 )
 
 func init() {

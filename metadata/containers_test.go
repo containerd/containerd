@@ -25,12 +25,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/filters"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/containerd/protobuf/types"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log/logtest"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
@@ -38,6 +32,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/namespaces"
+	"github.com/containerd/containerd/protobuf"
+	"github.com/containerd/containerd/protobuf/types"
 )
 
 func init() {

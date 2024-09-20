@@ -24,10 +24,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/errdefs"
 )
 
 // Command is the cli command for managing namespaces

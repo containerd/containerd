@@ -23,15 +23,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/log"
+	"github.com/moby/sys/signal"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
 	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-
-	"github.com/moby/sys/signal"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // StopContainer stops a running container with a grace period (i.e., timeout).

@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/filters"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
@@ -35,7 +36,6 @@ import (
 	"github.com/containerd/containerd/snapshots"
 	"github.com/containerd/containerd/snapshots/native"
 	"github.com/containerd/containerd/snapshots/testsuite"
-	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
 )
 

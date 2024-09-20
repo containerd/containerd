@@ -23,12 +23,13 @@ import (
 	"io"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"

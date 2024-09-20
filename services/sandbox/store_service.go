@@ -21,12 +21,13 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/containerd/log"
+
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func init() {
