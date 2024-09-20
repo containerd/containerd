@@ -42,6 +42,10 @@ var restoreCommand = &cli.Command{
 			Name:  "live",
 			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
+		&cli.StringFlag{
+			Name:  "image-path",
+			Usage: "Path to criu image files",
+		},
 	},
 	Action: func(cliContext *cli.Context) error {
 		id := cliContext.Args().First()
@@ -85,8 +89,18 @@ var restoreCommand = &cli.Command{
 			return err
 		}
 		topts := []containerd.NewTaskOpts{}
-		if cliContext.Bool("live") {
-			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
+		imagePath := cliContext.String("image-path")
+		switch cliContext.Bool("live") {
+		case true:
+			if imagePath == "" {
+				topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
+			} else {
+				return errors.New("live and image-path must not be both provided")
+			}
+		case false:
+			if imagePath != "" {
+				topts = append(topts, containerd.WithRestoreImagePath(imagePath))
+			}
 		}
 		spec, err := ctr.Spec(ctx)
 		if err != nil {
