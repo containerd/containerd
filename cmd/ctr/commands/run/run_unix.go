@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+
 	"github.com/intel/goresctrl/pkg/blockio"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
@@ -45,13 +46,13 @@ import (
 )
 
 var platformRunFlags = []cli.Flag{
-	&cli.StringFlag{
+	&cli.StringSliceFlag{
 		Name:  "uidmap",
-		Usage: "Run inside a user namespace with the specified UID mapping range; specified with the format `container-uid:host-uid:length`",
+		Usage: "Run inside a user namespace with the specified UID mapping ranges; specified with the format `container-uid:host-uid:length`",
 	},
-	&cli.StringFlag{
+	&cli.StringSliceFlag{
 		Name:  "gidmap",
-		Usage: "Run inside a user namespace with the specified GID mapping range; specified with the format `container-gid:host-gid:length`",
+		Usage: "Run inside a user namespace with the specified GID mapping ranges; specified with the format `container-gid:host-gid:length`",
 	},
 	&cli.BoolFlag{
 		Name:  "remap-labels",
@@ -159,26 +160,28 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 				containerd.WithImageConfigLabels(image),
 				containerd.WithAdditionalContainerLabels(labels),
 				containerd.WithSnapshotter(snapshotter))
-			if uidmap, gidmap := cliContext.String("uidmap"), cliContext.String("gidmap"); uidmap != "" && gidmap != "" {
-				uidMap, err := parseIDMapping(uidmap)
-				if err != nil {
+
+			if uidmaps, gidmaps := cliContext.StringSlice("uidmap"), cliContext.StringSlice("gidmap"); len(uidmaps) > 0 && len(gidmaps) > 0 {
+				var uidSpec, gidSpec []specs.LinuxIDMapping
+				if uidSpec, err = parseIDMappingOption(uidmaps); err != nil {
 					return nil, err
 				}
-				gidMap, err := parseIDMapping(gidmap)
-				if err != nil {
+				if gidSpec, err = parseIDMappingOption(gidmaps); err != nil {
 					return nil, err
 				}
-				opts = append(opts,
-					oci.WithUserNamespace([]specs.LinuxIDMapping{uidMap}, []specs.LinuxIDMapping{gidMap}))
+				opts = append(opts, oci.WithUserNamespace(uidSpec, gidSpec))
 				// use snapshotter opts or the remapped snapshot support to shift the filesystem
 				// currently the snapshotters known to support the labels are:
 				// fuse-overlayfs - https://github.com/containerd/fuse-overlayfs-snapshotter
 				// overlay - in case of idmapped mount points are supported by host kernel (Linux kernel 5.19)
 				if cliContext.Bool("remap-labels") {
-					cOpts = append(cOpts, containerd.WithNewSnapshot(id, image,
-						containerd.WithRemapperLabels(0, uidMap.HostID, 0, gidMap.HostID, uidMap.Size)))
+					// TODO: the optimization code path on id mapped mounts only supports single mapping entry today.
+					if len(uidSpec) > 1 || len(gidSpec) > 1 {
+						return nil, errors.New("'remap-labels' option does not support multiple mappings")
+					}
+					cOpts = append(cOpts, containerd.WithNewSnapshot(id, image, containerd.WithRemapperLabels(0, uidSpec[0].HostID, 0, gidSpec[0].HostID, uidSpec[0].Size)))
 				} else {
-					cOpts = append(cOpts, containerd.WithRemappedSnapshot(id, image, uidMap.HostID, gidMap.HostID))
+					cOpts = append(cOpts, containerd.WithUserNSRemappedSnapshot(id, image, uidSpec, gidSpec))
 				}
 			} else {
 				// Even when "read-only" is set, we don't use KindView snapshot here. (#1495)
@@ -413,6 +416,18 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 	// oci.WithImageConfig (WithUsername, WithUserID) depends on access to rootfs for resolving via
 	// the /etc/{passwd,group} files. So cOpts needs to have precedence over opts.
 	return client.NewContainer(ctx, id, cOpts...)
+}
+
+func parseIDMappingOption(stringSlices []string) ([]specs.LinuxIDMapping, error) {
+	var res []specs.LinuxIDMapping
+	for _, str := range stringSlices {
+		m, err := parseIDMapping(str)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, m)
+	}
+	return res, nil
 }
 
 func parseIDMapping(mapping string) (specs.LinuxIDMapping, error) {

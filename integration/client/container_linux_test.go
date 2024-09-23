@@ -40,6 +40,7 @@ import (
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/integration/failpoint"
+	"github.com/containerd/containerd/v2/integration/images"
 	"github.com/containerd/containerd/v2/pkg/cio"
 	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -52,7 +53,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const testUserNSImage = "ghcr.io/containerd/alpine:3.14.0"
+// We use this image for user ns tests because it has files with setuid bits
+var testUserNSImage = images.Get(images.VolumeOwnership)
 
 func TestTaskUpdate(t *testing.T) {
 	t.Parallel()
@@ -1095,9 +1097,61 @@ func TestContainerKillInitPidHost(t *testing.T) {
 }
 
 func TestUserNamespaces(t *testing.T) {
-	t.Run("WritableRootFS", func(t *testing.T) { testUserNamespaces(t, false) })
-	// see #1373 and runc#1572
-	t.Run("ReadonlyRootFS", func(t *testing.T) { testUserNamespaces(t, true) })
+	for name, test := range map[string]struct {
+		testCmd  oci.SpecOpts
+		roRootFS bool
+		exitCode uint32 // testUserNamespaces validates the exit code of the test container against this value
+		uidmaps  []specs.LinuxIDMapping
+		gidmaps  []specs.LinuxIDMapping
+	}{
+		"WritableRootFS": {
+			testCmd:  withExitStatus(7),
+			roRootFS: false,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 1000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 2000, Size: 65535}},
+		},
+		// see #1373 and runc#1572
+		"ReadonlyRootFS": {
+			testCmd:  withExitStatus(7),
+			roRootFS: true,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 1000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 2000, Size: 65535}},
+		},
+		"CheckSetUidBit": {
+			testCmd:  withProcessArgs("bash", "-c", "[ -u /usr/bin/passwd ] && exit 7"),
+			roRootFS: false,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 1000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 2000, Size: 65535}},
+		},
+		"WritableRootFSMultipleMap": {
+			testCmd:  withExitStatus(7),
+			roRootFS: false,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 10}, {ContainerID: 10, HostID: 1000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 20}, {ContainerID: 20, HostID: 2000, Size: 65535}},
+		},
+		"ReadonlyRootFSMultipleMap": {
+			testCmd:  withExitStatus(7),
+			roRootFS: true,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 20}, {ContainerID: 20, HostID: 2000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 20}, {ContainerID: 20, HostID: 2000, Size: 65535}},
+		},
+		"CheckSetUidBitMultipleMap": {
+			testCmd:  withProcessArgs("bash", "-c", "[ -u /usr/bin/passwd ] && exit 7"),
+			roRootFS: false,
+			exitCode: 7,
+			uidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 20}, {ContainerID: 20, HostID: 2000, Size: 65535}},
+			gidmaps:  []specs.LinuxIDMapping{{ContainerID: 0, HostID: 0, Size: 20}, {ContainerID: 20, HostID: 2000, Size: 65535}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			testUserNamespaces(t, test.uidmaps, test.gidmaps, test.testCmd, test.roRootFS, test.exitCode)
+		})
+	}
 }
 
 func checkUserNS(t *testing.T) {
@@ -1111,7 +1165,7 @@ func checkUserNS(t *testing.T) {
 	}
 }
 
-func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
+func testUserNamespaces(t *testing.T, uidmaps, gidmaps []specs.LinuxIDMapping, cmdOpt oci.SpecOpts, readonlyRootFS bool, expected uint32) {
 	checkUserNS(t)
 
 	client, err := newClient(t, address)
@@ -1133,25 +1187,23 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	}
 
 	opts := []NewContainerOpts{WithNewSpec(oci.WithImageConfig(image),
-		withExitStatus(7),
-		oci.WithUserNamespace([]specs.LinuxIDMapping{
-			{
-				ContainerID: 0,
-				HostID:      1000,
-				Size:        10000,
-			},
-		}, []specs.LinuxIDMapping{
-			{
-				ContainerID: 0,
-				HostID:      2000,
-				Size:        10000,
-			},
-		}),
+		cmdOpt,
+		oci.WithUserID(34), // run task as the "backup" user
+		oci.WithUserNamespace(uidmaps, gidmaps),
 	)}
+
 	if readonlyRootFS {
-		opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 2000)}, opts...)
+		if len(uidmaps) > 1 {
+			opts = append([]NewContainerOpts{WithUserNSRemappedSnapshotView(id, image, uidmaps, gidmaps)}, opts...)
+		} else {
+			opts = append([]NewContainerOpts{WithRemappedSnapshotView(id, image, 1000, 2000)}, opts...)
+		}
 	} else {
-		opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 2000)}, opts...)
+		if len(uidmaps) > 1 {
+			opts = append([]NewContainerOpts{WithUserNSRemappedSnapshot(id, image, uidmaps, gidmaps)}, opts...)
+		} else {
+			opts = append([]NewContainerOpts{WithRemappedSnapshot(id, image, 1000, 2000)}, opts...)
+		}
 	}
 
 	container, err := client.NewContainer(ctx, id, opts...)
@@ -1192,15 +1244,15 @@ func testUserNamespaces(t *testing.T, readonlyRootFS bool) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code != 7 {
-		t.Errorf("expected status 7 from wait but received %d", code)
+	if code != expected {
+		t.Errorf("expected status %d from wait but received %d", expected, code)
 	}
 	deleteStatus, err := task.Delete(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ec := deleteStatus.ExitCode(); ec != 7 {
-		t.Errorf("expected status 7 from delete but received %d", ec)
+	if ec := deleteStatus.ExitCode(); ec != expected {
+		t.Errorf("expected status %d from delete but received %d", expected, ec)
 	}
 }
 

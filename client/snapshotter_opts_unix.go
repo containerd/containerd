@@ -20,9 +20,14 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"slices"
 
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/internal/userns"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/runtime-spec/specs-go"
 )
 
 const (
@@ -58,15 +63,15 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	needsRemap := false
-	var uidMap, gidMap string
+	var uidMapLabel, gidMapLabel string
 
 	if value, ok := local.Labels[snapshots.LabelSnapshotUIDMapping]; ok {
 		needsRemap = true
-		uidMap = value
+		uidMapLabel = value
 	}
 	if value, ok := local.Labels[snapshots.LabelSnapshotGIDMapping]; ok {
 		needsRemap = true
-		gidMap = value
+		gidMapLabel = value
 	}
 
 	if !needsRemap {
@@ -84,24 +89,32 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 		return "", fmt.Errorf("snapshotter %q doesn't support idmap mounts on this host, configure `slow_chown` to allow a slower and expensive fallback", snapshotterName)
 	}
 
-	var ctrUID, hostUID, length uint32
-	_, err = fmt.Sscanf(uidMap, "%d:%d:%d", &ctrUID, &hostUID, &length)
+	var uidMap, gidMap specs.LinuxIDMapping
+	_, err = fmt.Sscanf(uidMapLabel, "%d:%d:%d", &uidMap.ContainerID, &uidMap.HostID, &uidMap.Size)
 	if err != nil {
-		return "", fmt.Errorf("uidMap unparsable: %w", err)
+		return "", fmt.Errorf("uidMapLabel unparsable: %w", err)
 	}
-
-	var ctrGID, hostGID, lengthGID uint32
-	_, err = fmt.Sscanf(gidMap, "%d:%d:%d", &ctrGID, &hostGID, &lengthGID)
+	_, err = fmt.Sscanf(gidMapLabel, "%d:%d:%d", &gidMap.ContainerID, &gidMap.HostID, &gidMap.Size)
 	if err != nil {
-		return "", fmt.Errorf("gidMap unparsable: %w", err)
+		return "", fmt.Errorf("gidMapLabel unparsable: %w", err)
 	}
 
-	if ctrUID != 0 || ctrGID != 0 {
-		return "", fmt.Errorf("Container UID/GID of 0 only supported currently (%d/%d)", ctrUID, ctrGID)
+	if uidMap.ContainerID != 0 || gidMap.ContainerID != 0 {
+		return "", fmt.Errorf("Container UID/GID of 0 only supported currently (%d/%d)", uidMap.ContainerID, gidMap.ContainerID)
 	}
 
-	// TODO(dgl): length isn't taken into account for the intermediate snapshot id.
-	usernsID := fmt.Sprintf("%s-%d-%d", parent, hostUID, hostGID)
+	rsn := remappedSnapshot{
+		Parent: parent,
+		IDMap: userns.IDMap{
+			UidMap: []specs.LinuxIDMapping{uidMap},
+			GidMap: []specs.LinuxIDMapping{gidMap},
+		},
+	}
+	usernsID, err := rsn.ID()
+	if err != nil {
+		return "", fmt.Errorf("failed to remap snapshot: %w", err)
+	}
+
 	if _, err := snapshotter.Stat(ctx, usernsID); err == nil {
 		return usernsID, nil
 	}
@@ -109,8 +122,8 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	if err != nil {
 		return "", err
 	}
-	// TODO(dgl): length isn't taken into account here yet either.
-	if err := remapRootFS(ctx, mounts, hostUID, hostGID); err != nil {
+
+	if err := remapRootFS(ctx, mounts, rsn.IDMap); err != nil {
 		snapshotter.Remove(ctx, usernsID+"-remap")
 		return "", err
 	}
@@ -119,4 +132,28 @@ func resolveSnapshotOptions(ctx context.Context, client *Client, snapshotterName
 	}
 
 	return usernsID, nil
+}
+
+type remappedSnapshot struct {
+	Parent string       `json:"Parent"`
+	IDMap  userns.IDMap `json:"IDMap"`
+}
+
+func (s *remappedSnapshot) ID() (string, error) {
+	compare := func(a, b specs.LinuxIDMapping) int {
+		if a.ContainerID < b.ContainerID {
+			return -1
+		} else if a.ContainerID == b.ContainerID {
+			return 0
+		}
+		return 1
+	}
+	slices.SortStableFunc(s.IDMap.UidMap, compare)
+	slices.SortStableFunc(s.IDMap.GidMap, compare)
+
+	buf, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return digest.FromBytes(buf).String(), nil
 }
