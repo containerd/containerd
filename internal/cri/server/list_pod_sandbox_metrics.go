@@ -25,10 +25,5 @@ import (
 )
 
 func (c *criService) ListPodSandboxMetrics(context.Context, *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
-	sandboxList := c.sandboxStore.List()
-	metricsList := c.sandboxStore.
-
-	return &runtime.ListPodSandboxMetricsResponse{
-		PodMetrics:
-	}, nil
+	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxMetrics not implemented")
 }
