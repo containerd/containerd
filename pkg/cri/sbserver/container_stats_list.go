@@ -26,14 +26,15 @@ import (
 	wstats "github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats"
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
-	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/pkg/cri/store/stats"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/api/services/tasks/v1"
+	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/cri/store/stats"
+	"github.com/containerd/containerd/protobuf"
 
 	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )

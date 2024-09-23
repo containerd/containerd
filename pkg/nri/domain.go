@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	nri "github.com/containerd/nri/pkg/adaptation"
 	"github.com/sirupsen/logrus"
+
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/namespaces"
 )
 
 // Domain implements the functions the generic NRI interface needs to

@@ -34,8 +34,11 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd"
 	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/pkg/cri/annotations"
 	criconfig "github.com/containerd/containerd/pkg/cri/config"
 	customopts "github.com/containerd/containerd/pkg/cri/opts"
@@ -44,8 +47,6 @@ import (
 	"github.com/containerd/containerd/pkg/cri/util"
 	"github.com/containerd/containerd/pkg/netns"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func init() {

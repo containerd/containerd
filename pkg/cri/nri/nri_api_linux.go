@@ -21,15 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/pkg/blockio"
-	"github.com/containerd/containerd/pkg/cri/annotations"
-	"github.com/containerd/containerd/pkg/cri/constants"
-	cstore "github.com/containerd/containerd/pkg/cri/store/container"
-	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -37,9 +28,20 @@ import (
 	"github.com/opencontainers/runtime-tools/generate"
 	cri "k8s.io/cri-api/pkg/apis/runtime/v1"
 
-	"github.com/containerd/containerd/pkg/nri"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/pkg/blockio"
+	"github.com/containerd/containerd/pkg/cri/annotations"
+	"github.com/containerd/containerd/pkg/cri/constants"
+	cstore "github.com/containerd/containerd/pkg/cri/store/container"
+	sstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
+	ctrdutil "github.com/containerd/containerd/pkg/cri/util"
+
 	"github.com/containerd/nri/pkg/api"
 	nrigen "github.com/containerd/nri/pkg/runtime-tools/generate"
+
+	"github.com/containerd/containerd/pkg/nri"
 )
 
 type API struct {

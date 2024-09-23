@@ -22,12 +22,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/errdefs"
+	containerstore "github.com/containerd/containerd/pkg/cri/store/container"
 )
 
 // RemoveContainer removes the container.

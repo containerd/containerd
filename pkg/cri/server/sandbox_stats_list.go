@@ -21,11 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/errdefs"
+	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 
 	"github.com/hashicorp/go-multierror"
 )

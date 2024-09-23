@@ -22,15 +22,16 @@ import (
 	"context"
 
 	cgroups "github.com/containerd/cgroups/v3/cgroup1"
+	"github.com/containerd/log"
+	"github.com/docker/go-metrics"
+	"github.com/sirupsen/logrus"
+
 	eventstypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/v1/linux"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/docker/go-metrics"
-	"github.com/sirupsen/logrus"
 )
 
 // NewTaskMonitor returns a new cgroups monitor

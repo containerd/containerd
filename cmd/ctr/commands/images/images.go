@@ -24,13 +24,14 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/pkg/progress"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/progress"
 )
 
 // Command is the cli command for managing images

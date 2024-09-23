@@ -28,15 +28,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/continuity/fs/fstest"
+	"github.com/containerd/log/logtest"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/pkg/randutil"
 	"github.com/containerd/containerd/pkg/testutil"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/continuity/fs/fstest"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log/logtest"
-	"github.com/stretchr/testify/assert"
 )
 
 // SnapshotterFunc is used in SnapshotterSuite
@@ -553,7 +554,7 @@ func checkRemoveIntermediateSnapshot(ctx context.Context, t *testing.T, snapshot
 		t.Fatal("intermediate layer removal should fail.")
 	}
 
-	// Removal from toplayer to base should not fail.
+	//Removal from toplayer to base should not fail.
 	err = snapshotter.Remove(ctx, topLayer)
 	if err != nil {
 		t.Fatal(err)

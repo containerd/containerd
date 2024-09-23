@@ -23,11 +23,12 @@ import (
 	"syscall"
 	"time"
 
-	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/protobuf"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/protobuf"
 
 	sandboxstore "github.com/containerd/containerd/pkg/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/pkg/cri/util"

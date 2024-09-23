@@ -25,7 +25,12 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events/exchange"
 	"github.com/containerd/containerd/metadata"
 	"github.com/containerd/containerd/namespaces"
@@ -36,10 +41,6 @@ import (
 	"github.com/containerd/containerd/runtime"
 	shimbinary "github.com/containerd/containerd/runtime/v2/shim"
 	"github.com/containerd/containerd/sandbox"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // Config for the v2 runtime

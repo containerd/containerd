@@ -21,13 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
-	"github.com/containerd/containerd/tracing"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd/errdefs"
+	imagestore "github.com/containerd/containerd/pkg/cri/store/image"
+	"github.com/containerd/containerd/tracing"
 )
 
 // ImageStatus returns the status of the image, returns nil if the image isn't present.

@@ -24,13 +24,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containerd/containerd"
-	containerdio "github.com/containerd/containerd/cio"
-	"github.com/containerd/containerd/oci"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"k8s.io/client-go/tools/remotecommand"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/containerd"
+	containerdio "github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/oci"
 
 	cio "github.com/containerd/containerd/pkg/cri/io"
 	"github.com/containerd/containerd/pkg/cri/util"

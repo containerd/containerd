@@ -23,8 +23,11 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/containerd/log"
+
 	eventstypes "github.com/containerd/containerd/api/events"
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/events"
 	"github.com/containerd/containerd/gc"
 	"github.com/containerd/containerd/images"
@@ -35,8 +38,6 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func init() {

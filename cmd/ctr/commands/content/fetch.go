@@ -26,18 +26,19 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/pkg/progress"
-	"github.com/containerd/containerd/remotes"
-	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/remotes"
 )
 
 var fetchCommand = cli.Command{
