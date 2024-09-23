@@ -251,7 +251,9 @@ func doPrepareIDMappedOverlay(lowerDirs []string, usernsFd int) (tmpLowerDirs []
 	}
 	cleanUp := func() {
 		for _, lowerDir := range tmpLowerDirs {
-			if err := unix.Unmount(lowerDir, 0); err != nil {
+			// Do a detached unmount so even if the resource is busy, the mount will be
+			// gone (eventually) and we can safely delete the directory too.
+			if err := unix.Unmount(lowerDir, unix.MNT_DETACH); err != nil {
 				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
 			}
 		}
