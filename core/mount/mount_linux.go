@@ -255,6 +255,7 @@ func doPrepareIDMappedOverlay(lowerDirs []string, usernsFd int) (tmpLowerDirs []
 			// gone (eventually) and we can safely delete the directory too.
 			if err := unix.Unmount(lowerDir, unix.MNT_DETACH); err != nil {
 				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
+				continue
 			}
 			// Using os.Remove() so if it's not empty, we don't delete files in the
 			// rootfs.
