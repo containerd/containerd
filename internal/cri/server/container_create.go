@@ -167,7 +167,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 
 	// mutate the extra CRI volume mounts from the runtime spec to properly specify the OCI image volume mount requests as bind mounts for this container
-	err = c.mutateMounts(ctx, config.GetMounts(), sandboxID, c.RuntimeSnapshotter(ctx, ociRuntime), platform)
+	err = c.mutateMounts(ctx, config.GetMounts(), c.RuntimeSnapshotter(ctx, ociRuntime), sandboxID, platform)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount image volume: %w", err)
 	}

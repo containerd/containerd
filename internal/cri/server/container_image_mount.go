@@ -39,13 +39,13 @@ const (
 func (c *criService) mutateMounts(
 	ctx context.Context,
 	extraMounts []*runtime.Mount,
-	sandboxID string,
 	snapshotter string,
+	sandboxID string,
 	platform imagespec.Platform,
 
 ) error {
 	for _, m := range extraMounts {
-		err := c.mutateImageMount(ctx, m, sandboxID, snapshotter, platform)
+		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, platform)
 		if err != nil {
 			return err
 		}
@@ -56,8 +56,8 @@ func (c *criService) mutateMounts(
 func (c *criService) mutateImageMount(
 	ctx context.Context,
 	extraMount *runtime.Mount,
-	sandboxID string,
 	snapshotter string,
+	sandboxID string,
 	platform imagespec.Platform,
 ) (retErr error) {
 	imageSpec := extraMount.GetImage()
@@ -96,12 +96,12 @@ func (c *criService) mutateImageMount(
 	}
 
 	ctx, done, err := c.client.WithLease(ctx,
-		leases.WithID(sandboxID),
+		leases.WithID(target),
 		leases.WithLabel(defaults.DefaultSnapshotterNSLabel, snapshotter),
 		leases.WithLabel(labelGCSnapRef+snapshotter, target),
 	)
-	if err != nil {
-		return fmt.Errorf("failed to create lease %q: %w", sandboxID, err)
+	if err != nil && !errdefs.IsAlreadyExists(err) {
+		return fmt.Errorf("failed to create lease: %w", err)
 	}
 	defer func() {
 		if retErr != nil {
@@ -152,10 +152,10 @@ func (c *criService) mutateImageMount(
 func (c *criService) mutateUnmounts(
 	ctx context.Context,
 	extraMounts []*runtime.Mount,
-	sandboxID string,
+	snapshotter string,
 ) error {
 	for _, m := range extraMounts {
-		err := c.mutateImageUnmount(ctx, m, sandboxID)
+		err := c.mutateImageUnmount(ctx, m, snapshotter)
 		if err != nil {
 			return err
 		}
@@ -166,7 +166,7 @@ func (c *criService) mutateUnmounts(
 func (c *criService) mutateImageUnmount(
 	ctx context.Context,
 	extraMount *runtime.Mount,
-	sandboxID string,
+	snapshotter string,
 ) (retErr error) {
 	if extraMount.Image == nil {
 		return nil
@@ -182,23 +182,11 @@ func (c *criService) mutateImageUnmount(
 		return nil
 	}
 
-	// Try to get the snapshotter for the image volume
-	l := c.client.LeasesService()
-	ls, err := l.List(ctx, fmt.Sprintf("id==%q", sandboxID))
-	if err != nil {
-		return fmt.Errorf("failed to list leases for image volume component %q: %w", target, err)
-	}
-	if len(ls) != 1 {
-		return fmt.Errorf("expected 1 leases for image volume component %q, got %d", target, len(ls))
-	}
-	lease := ls[0]
-	snapshotter := lease.Labels[defaults.DefaultSnapshotterNSLabel]
-
-	err = mount.UnmountAll(target, 0)
+	err := mount.UnmountAll(target, 0)
 	if err != nil {
 		return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
 	}
-	err = l.Delete(ctx, leases.Lease{ID: sandboxID})
+	err = c.client.LeasesService().Delete(ctx, leases.Lease{ID: target})
 	if err != nil {
 		return fmt.Errorf("failed to deleting lease: %w", err)
 	}
