@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/api/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/typeurl/v2"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -347,6 +348,9 @@ func TestContainerMetricsMemory(t *testing.T) {
 
 func TestListContainerStats(t *testing.T) {
 	c := newTestCRIService()
+	metricsWithCpuUsage, err := typeurl.MarshalAnyToProto(&v1.Metrics{CPU: &v1.CPUStat{Usage: &v1.CPUUsage{Total: 100}}})
+	assert.NoError(t, err)
+
 	type args struct {
 		ctx        context.Context
 		stats      []*types.Metric
@@ -421,6 +425,35 @@ func TestListContainerStats(t *testing.T) {
 			},
 			wantErr: true,
 			want:    nil,
+		},
+		{
+			name: "args containers has c1 of sandbox s1, s1 exists in sandboxStore, but c1 not exists in containerStore, so filter c1",
+			args: args{
+				ctx: context.Background(),
+				stats: []*types.Metric{
+					{
+						ID: "c1",
+						Data: metricsWithCpuUsage,
+					},
+				},
+				containers: []containerstore.Container{
+					{
+						Metadata: containerstore.Metadata{
+							ID:        "c1",
+							SandboxID: "s1",
+						},
+					},
+				},
+			},
+			before: func() {
+				c.sandboxStore.Add(sandboxstore.Sandbox{
+					Metadata: sandboxstore.Metadata{
+						ID: "s1",
+					},
+				})
+			},
+			wantErr: false,
+			want:	 &runtime.ListContainerStatsResponse{},
 		},
 	}
 
