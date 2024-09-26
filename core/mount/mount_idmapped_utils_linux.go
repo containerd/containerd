@@ -43,9 +43,10 @@ func getUsernsFD(uidMaps, gidMaps []syscall.SysProcIDMap) (_ *os.File, retErr er
 
 	proc, err := os.StartProcess("/proc/self/exe", []string{"containerd[getUsernsFD]"}, &os.ProcAttr{
 		Sys: &syscall.SysProcAttr{
-			Cloneflags:  unix.CLONE_NEWUSER,
-			UidMappings: uidMaps,
-			GidMappings: gidMaps,
+			Cloneflags:                 unix.CLONE_NEWUSER,
+			UidMappings:                uidMaps,
+			GidMappings:                gidMaps,
+			GidMappingsEnableSetgroups: true,
 			// NOTE: It's reexec but it's not heavy because subprocess
 			// be in PTRACE_TRACEME mode before performing execve.
 			Ptrace:    true,
