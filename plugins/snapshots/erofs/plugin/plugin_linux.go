@@ -33,6 +33,9 @@ type Config struct {
 
 	// MountOptions are options used for the EROFS overlayfs mount
 	OvlOptions []string `toml:"ovl_mount_options"`
+
+	// Indicate if fsmerge feature is enabled: tiny fsmeta will be used to avoid mounting individual layers
+	MergeFsMeta bool `toml:"merge_fsmeta"`
 }
 
 func init() {
@@ -57,6 +60,7 @@ func init() {
 			if len(config.OvlOptions) > 0 {
 				opts = append(opts, erofs.WithOvlOptions(config.OvlOptions))
 			}
+			opts = append(opts, erofs.WithMergeFSMeta(config.MergeFsMeta))
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
 			return erofs.NewSnapshotter(root, opts...)
