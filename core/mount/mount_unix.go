@@ -73,27 +73,44 @@ func UnmountRecursive(target string, flags int) error {
 	return nil
 }
 
+// unmount tries to unmount a filesystem at the target path.
+// If the target is a FUSE filesystem, it uses unmountFUSE.
+// If unmountFUSE fails, the function returns an error without calling unix.Unmount.
+//
+// The reason for not attempting unix.Unmount after unmountFUSE failure is that
+// FUSE filesystems are managed by userspace and require specific handling
+// via FUSE tools (e.g., fusermount). Standard system calls like unix.Unmount
+// do not work for FUSE filesystems, making such a call redundant and ineffective.
 func unmount(target string, flags int) error {
+	// Check if the target is a FUSE filesystem.
 	if isFUSE(target) {
-		// TODO: Why error is ignored?
-		// Shouldn't this just be unconditional "return unmountFUSE(target)"?
-		if err := unmountFUSE(target); err == nil {
-			return nil
-		}
-	}
-	for i := 0; i < 50; i++ {
-		if err := unix.Unmount(target, flags); err != nil {
-			switch err {
-			case unix.EBUSY:
-				time.Sleep(50 * time.Millisecond)
-				continue
-			default:
-				return err
-			}
+		// Try to unmount using FUSE-specific logic.
+		if err := unmountFUSE(target); err != nil {
+			return err
 		}
 		return nil
 	}
-	return fmt.Errorf("failed to unmount target %s: %w", target, unix.EBUSY)
+
+	// Retry unmounting up to 50 times in case of EBUSY.
+	const maxRetries = 50
+	const retryDelay = 50 * time.Millisecond
+
+	for i := 0; i < maxRetries; i++ {
+		if err := unix.Unmount(target, flags); err != nil {
+			if err == unix.EBUSY {
+				// If target is busy, wait and retry.
+				time.Sleep(retryDelay)
+				continue
+			}
+			// Return the error for any other failure.
+			return fmt.Errorf("failed to unmount target %s: %w", target, err)
+		}
+		// Unmount successful.
+		return nil
+	}
+
+	// If all retries failed due to EBUSY, return an error.
+	return fmt.Errorf("failed to unmount target %s after %d retries: %w", target, maxRetries, unix.EBUSY)
 }
 
 // Unmount the provided mount path with the flags
