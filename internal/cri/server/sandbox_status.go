@@ -46,6 +46,7 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 		state     string
 		info      map[string]string
 	)
+	timestamp := time.Now().UnixNano()
 	cstatus, err := c.sandboxService.SandboxStatus(ctx, sandbox.Sandboxer, sandbox.ID, r.GetVerbose())
 	if err != nil {
 		// If the shim died unexpectedly (segfault etc.) let's set the state as
@@ -83,8 +84,9 @@ func (c *criService) PodSandboxStatus(ctx context.Context, r *runtime.PodSandbox
 	}
 
 	return &runtime.PodSandboxStatusResponse{
-		Status: status,
-		Info:   info,
+		Status:    status,
+		Info:      info,
+		Timestamp: timestamp,
 	}, nil
 }
 
