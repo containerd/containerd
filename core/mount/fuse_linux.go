@@ -17,6 +17,7 @@
 package mount
 
 import (
+	"fmt"
 	"os/exec"
 
 	"golang.org/x/sys/unix"
@@ -38,13 +39,25 @@ func isFUSE(dir string) bool {
 // For FUSE mounts, using these helper binaries is preferred, see:
 // https://github.com/containerd/containerd/pull/3765#discussion_r342083514
 func unmountFUSE(target string) error {
-	var err error
-	for _, helperBinary := range []string{"fusermount3", "fusermount"} {
-		cmd := exec.Command(helperBinary, "-u", target)
-		err = cmd.Run()
-		if err == nil {
-			return nil
+	// Check if either "fusermount3" or "fusermount" exists in the PATH
+	var helperBinary string
+	for _, binary := range []string{"fusermount3", "fusermount"} {
+		if path, err := exec.LookPath(binary); err == nil {
+			helperBinary = path
+			break
 		}
 	}
-	return err
+
+	// If neither binary is found, return an error
+	if helperBinary == "" {
+		return fmt.Errorf("neither fusermount3 nor fusermount found in PATH")
+	}
+
+	// Run the found helper binary to unmount the target
+	cmd := exec.Command(helperBinary, "-u", target)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	return nil
 }
