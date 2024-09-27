@@ -46,9 +46,9 @@ func init() {
 
 // BoltOptions replicates bolt.Options struct, but excludes function fields and adds tags to allow TOML marshalling.
 type BoltOptions struct {
-	// Sets the DB.NoGrowSync flag before memory mapping the file.
+	//  NoGrowSync sets the DB.NoGrowSync flag before memory mapping the file.
 	NoGrowSync bool `toml:"no_grow_sync"`
-	// Do not sync freelist to disk. This improves the database write performance
+	// NoFreelistSync disables sync freelist to disk. This improves the database write performance
 	// under normal operation, but requires a full database re-sync during recovery.
 	NoFreelistSync bool `toml:"no_freelist_sync"`
 	// PreLoadFreelist sets whether to load the free pages when opening
@@ -63,7 +63,7 @@ type BoltOptions struct {
 	// It prevents potential page faults, however
 	// used memory can't be reclaimed. (UNIX only)
 	Mlock bool `toml:"mlock"`
-	// Sets the DB.MmapFlags flag before memory mapping the file.
+	// MmapFlags sets the DB.MmapFlags flag before memory mapping the file.
 	MmapFlags int `toml:"mmap_flags"`
 	// InitialMmapSize is the initial mmap size of the database
 	// in bytes. Read transactions won't block write transaction
