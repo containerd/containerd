@@ -19,7 +19,7 @@ set -eu -o pipefail
 DESTDIR="${DESTDIR:-"C:\\Program Files\\containerd"}"
 WINCNI_BIN_DIR="${DESTDIR}/cni/bin"
 WINCNI_PKG=github.com/Microsoft/windows-container-networking
-WINCNI_VERSION=aa10a0b31e9f72937063436454def1760b858ee2
+WINCNI_VERSION=0.3.1
 
 git clone "https://${WINCNI_PKG}.git" "${GOPATH}/src/${WINCNI_PKG}"
 cd "${GOPATH}/src/${WINCNI_PKG}"
