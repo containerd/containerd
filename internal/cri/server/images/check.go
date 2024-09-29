@@ -45,12 +45,17 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 			// Check if image name is a tuple of (ref, runtimeHandler). If it is not,
 			// use the default runtime handler
 			ref, runtimeHandler := RuntimeHandlerFromImageName(i.Name)
-			if runtimeHandler != "" {
-			} else {
-				runtimeHandler = c.defaultRuntimeName
+			if runtimeHandler == "" {
+				// do nothing for root images
+				return
+			}
+			platformForRuntimeHandler := platforms.DefaultSpec()
+			if runtimeHandler != "" && c.config.RuntimePlatforms != nil {
+				if runtimePlatform, ok := c.config.RuntimePlatforms[runtimeHandler]; ok {
+					platformForRuntimeHandler = platforms.MustParse(runtimePlatform.Platform)
+				}
 			}
 
-			platformForRuntimeHandler := platforms.MustParse(c.config.RuntimePlatforms[runtimeHandler].Platform)
 			ok, _, _, _, err := images.Check(ctx, c.content, i.Target, platforms.Only(platformForRuntimeHandler))
 			if err != nil {
 				// TODO: Should we delete this image from containerd store?

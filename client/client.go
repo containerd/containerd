@@ -450,6 +450,14 @@ func (c *Client) Fetch(ctx context.Context, ref string, opts ...RemoteOpt) (imag
 	if err != nil {
 		return images.Image{}, err
 	}
+
+	return img, nil
+	// update containerd store only after unpack. This API
+	// should merely only fetch the contents into content store.
+	// return c.createNewImage(ctx, img)
+}
+
+func (c *Client) CreateImageInContainerd(ctx context.Context, img images.Image) (images.Image, error) {
 	return c.createNewImage(ctx, img)
 }
 
@@ -520,6 +528,9 @@ func (c *Client) GetImageWithPlatform(ctx context.Context, ref string, platform 
 	i, err := c.ImageService().Get(ctx, ref)
 	if err != nil {
 		return nil, err
+	}
+	if platform.OS == "" && platform.Architecture == "" {
+		platform = platforms.DefaultSpec()
 	}
 	return NewImageWithPlatform(c, i, platforms.Only(platform)), nil
 }
