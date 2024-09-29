@@ -212,10 +212,16 @@ func (s *Store) update(refKey RefKey, img *Image) error {
 
 // getImage gets image information from containerd for current runtimeHandler.
 func (s *Store) getImage(ctx context.Context, i images.Image, runtimeHandler string) (*Image, error) {
+	// get platformMatcher to be used
+	platformMatcher := platforms.Only(platforms.DefaultSpec())
 	if runtimeHandler == "" {
 		runtimeHandler = s.defaultRuntimeName
+	} else if s.platforms != nil {
+		if platform, ok := s.platforms[runtimeHandler]; ok {
+			platformMatcher = platforms.Only(platform)
+		}
 	}
-	platformMatcher := platforms.Only(s.platforms[runtimeHandler])
+
 	diffIDs, err := i.RootFS(ctx, s.provider, platformMatcher)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
@@ -402,15 +408,11 @@ func (s *store) unpin(imageID string, refKey RefKey) error {
 	if refs == nil {
 		return nil
 	}
-	refs.Delete(refKey)
-
-	// delete unpinned image, we only need to keep the pinned
-	// entries in the map. Since an image digest can now be
-	// referenced by multiple platforms, we need to check that
-	// there are no more entries left before deleting.
-	if len(refs) == 0 {
-		delete(s.pinnedRefs, digest.String())
+	if refs.Delete(refKey); len(refs) > 0 {
+		return nil
 	}
+
+	delete(s.pinnedRefs, digest.String())
 	i.Pinned = false
 	s.images[imageIDKey] = i
 	return nil
@@ -468,7 +470,7 @@ func (s *store) delete(imageID string, refKey RefKey) {
 	delete(s.digestReferences[digest.String()], imageIDKey)
 	delete(s.images, imageIDKey)
 
-	// Remove the image if it is not referenced any more.
+	// Remove the image from digestReferences if it is not referenced any more.
 	if len(s.digestReferences[digest.String()]) == 0 {
 		s.digestSet.Remove(digest)
 	}

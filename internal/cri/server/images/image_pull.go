@@ -940,14 +940,21 @@ func (rt *pullRequestReporterRoundTripper) RoundTrip(req *http.Request) (*http.R
 	return resp, err
 }
 
-func (c *CRIImageService) getInfoFromRuntimePlatforms(runtimeHandler string) (string, imagespec.Platform, error) {
+// getInfoFromRuntimePlatforms validates the CRI runtime handler and passed the default
+// snapshotter and platform values if no such runtime handler was defined.
+func (c *CRIImageService) getInfoFromRuntimePlatforms(ctx context.Context, criRuntimeHandler string) (string, imagespec.Platform, error) {
+	defaultSnapshotter := c.config.Snapshotter
+	defaultPlatform := platforms.DefaultSpec()
+
 	if c.runtimePlatforms == nil {
-		return "", imagespec.Platform{}, fmt.Errorf("no CRIImageService.runtimePlatforms defined")
+		log.G(ctx).Debugf("no CRIImageService.runtimePlatforms defined")
+		return defaultSnapshotter, defaultPlatform, nil
 	}
-	if _, ok := c.runtimePlatforms[runtimeHandler]; !ok {
-		return "", imagespec.Platform{}, fmt.Errorf("invalid runtimehandler")
+	if _, ok := c.runtimePlatforms[criRuntimeHandler]; !ok {
+		log.G(ctx).Debugf("invalid CRI runtimehandler %v", criRuntimeHandler)
+		return defaultSnapshotter, defaultPlatform, nil
 	}
-	imagePlatform := c.runtimePlatforms[runtimeHandler]
+	imagePlatform := c.runtimePlatforms[criRuntimeHandler]
 	return imagePlatform.Snapshotter, imagePlatform.Platform, nil
 }
 
@@ -966,7 +973,7 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	// in c.RuntimPlatforms[runtimehandler] are empty, fallback to using the
 	// default snapshotter and platform.
 	if runtimeHandlerFromCRI != "" {
-		return c.getInfoFromRuntimePlatforms(runtimeHandlerFromCRI)
+		return c.getInfoFromRuntimePlatforms(ctx, runtimeHandlerFromCRI)
 	}
 
 	if s == nil || s.Annotations == nil {
@@ -976,7 +983,7 @@ func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, i
 	// runtimeHandler from CRI was "", attempt to read runtimeHandler from annotations
 	runtimeHandler, ok := s.Annotations[annotations.RuntimeHandler]
 	if ok {
-		return c.getInfoFromRuntimePlatforms(runtimeHandler)
+		return c.getInfoFromRuntimePlatforms(ctx, runtimeHandler)
 	}
 
 	return snapshotter, platform, nil

@@ -521,6 +521,9 @@ func (c *Client) GetImageWithPlatform(ctx context.Context, ref string, platform 
 	if err != nil {
 		return nil, err
 	}
+	if platform.OS == "" && platform.Architecture == "" {
+		platform = platforms.DefaultSpec()
+	}
 	return NewImageWithPlatform(c, i, platforms.Only(platform)), nil
 }
 
