@@ -63,7 +63,7 @@ func RegisterDomain(d Domain) {
 }
 
 type domainTable struct {
-	sync.Mutex
+	sync.RWMutex
 	domains map[string]Domain
 }
 
@@ -84,8 +84,8 @@ func (t *domainTable) add(d Domain) error {
 func (t *domainTable) listPodSandboxes() []PodSandbox {
 	var pods []PodSandbox
 
-	t.Lock()
-	defer t.Unlock()
+	t.RLock()
+	defer t.RUnlock()
 
 	for _, d := range t.domains {
 		pods = append(pods, d.ListPodSandboxes()...)
@@ -96,8 +96,8 @@ func (t *domainTable) listPodSandboxes() []PodSandbox {
 func (t *domainTable) listContainers() []Container {
 	var ctrs []Container
 
-	t.Lock()
-	defer t.Unlock()
+	t.RLock()
+	defer t.RUnlock()
 
 	for _, d := range t.domains {
 		ctrs = append(ctrs, d.ListContainers()...)
@@ -106,8 +106,8 @@ func (t *domainTable) listContainers() []Container {
 }
 
 func (t *domainTable) getContainer(id string) (Container, Domain) {
-	t.Lock()
-	defer t.Unlock()
+	t.RLock()
+	defer t.RUnlock()
 
 	// TODO(klihub): Are ID conflicts across namespaces possible ? Probably...
 
