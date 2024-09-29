@@ -91,7 +91,7 @@ func TestPodHostname(t *testing.T) {
 				containerName = "test-container"
 			)
 
-			EnsureImageExists(t, testImage)
+			EnsureImageExists(t, testImage, "")
 
 			t.Log("Create a container to print env")
 			cnConfig := ContainerConfig(

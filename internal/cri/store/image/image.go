@@ -73,6 +73,7 @@ type Image struct {
 // Getter is used to get images but does not make changes
 type Getter interface {
 	Get(ctx context.Context, name string) (images.Image, error)
+	Delete(ctx context.Context, name string, opts ...images.DeleteOpt) error
 }
 
 // Store stores all images.
@@ -166,17 +167,27 @@ func (s *Store) Update(ctx context.Context, ref string, runtimeHandler string) e
 	return s.update(refKey, img)
 }
 
-// Remove all references from CRI image store cache, if the image was not
-// found in containerd image store.
-func (s *Store) RemoveAllReferences(ctx context.Context, ref string) error {
+// Remove all entries of 'ref' from CRI image store cache. All ensures
+// it is removed from containerd store.
+func (s *Store) RemoveReference(ctx context.Context, ref string) error {
+	// TODO: check for error if ref is of form (id,runtimehandler) and return error
 	for refKey, imageIDKey := range s.refCache {
 		if refKey.Ref == ref {
 			// Remove the reference from the store.
 			s.store.delete(imageIDKey.ID, refKey)
-			delete(s.refCache, refKey)
+			s.deleteFromRefCache(refKey)
+
+			// Remove from containerd store
+			s.images.Delete(ctx, fmt.Sprintf(newImageNameFormat, ref, refKey.RuntimeHandler))
 		}
 	}
 	return nil
+}
+
+func (s *Store) deleteFromRefCache(refKey RefKey) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+	delete(s.refCache, refKey)
 }
 
 // update updates the internal cache. img == nil means that
@@ -212,10 +223,16 @@ func (s *Store) update(refKey RefKey, img *Image) error {
 
 // getImage gets image information from containerd for current runtimeHandler.
 func (s *Store) getImage(ctx context.Context, i images.Image, runtimeHandler string) (*Image, error) {
+	// get platformMatcher to be used
+	platformMatcher := platforms.Only(platforms.DefaultSpec())
 	if runtimeHandler == "" {
 		runtimeHandler = s.defaultRuntimeName
+	} else if s.platforms != nil {
+		if platform, ok := s.platforms[runtimeHandler]; ok {
+			platformMatcher = platforms.Only(platform)
+		}
 	}
-	platformMatcher := platforms.Only(s.platforms[runtimeHandler])
+
 	diffIDs, err := i.RootFS(ctx, s.provider, platformMatcher)
 	if err != nil {
 		return nil, fmt.Errorf("get image diffIDs: %w", err)
@@ -402,15 +419,11 @@ func (s *store) unpin(imageID string, refKey RefKey) error {
 	if refs == nil {
 		return nil
 	}
-	refs.Delete(refKey)
-
-	// delete unpinned image, we only need to keep the pinned
-	// entries in the map. Since an image digest can now be
-	// referenced by multiple platforms, we need to check that
-	// there are no more entries left before deleting.
-	if len(refs) == 0 {
-		delete(s.pinnedRefs, digest.String())
+	if refs.Delete(refKey); len(refs) > 0 {
+		return nil
 	}
+
+	delete(s.pinnedRefs, digest.String())
 	i.Pinned = false
 	s.images[imageIDKey] = i
 	return nil
@@ -468,7 +481,7 @@ func (s *store) delete(imageID string, refKey RefKey) {
 	delete(s.digestReferences[digest.String()], imageIDKey)
 	delete(s.images, imageIDKey)
 
-	// Remove the image if it is not referenced any more.
+	// Remove the image from digestReferences if it is not referenced any more.
 	if len(s.digestReferences[digest.String()]) == 0 {
 		s.digestSet.Remove(digest)
 	}

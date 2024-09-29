@@ -109,7 +109,7 @@ func TestContainerdRestart(t *testing.T) {
 		}()
 
 		pauseImage := images.Get(images.Pause)
-		EnsureImageExists(t, pauseImage)
+		EnsureImageExists(t, pauseImage, "")
 
 		s.id = sid
 		for j := range s.containers {
@@ -159,7 +159,7 @@ func TestContainerdRestart(t *testing.T) {
 
 	t.Logf("Pull test images")
 	for _, image := range []string{images.Get(images.BusyBox), images.Get(images.Pause)} {
-		EnsureImageExists(t, image)
+		EnsureImageExists(t, image, "")
 	}
 	imagesBeforeRestart, err := imageService.ListImages(nil)
 	assert.NoError(t, err)

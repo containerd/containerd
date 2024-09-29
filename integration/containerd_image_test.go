@@ -199,7 +199,7 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 
 	PodSandboxConfigWithCleanup(t, "sandbox", "test")
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, "")
 
 	t.Logf("cri plugin should see the image now")
 	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})

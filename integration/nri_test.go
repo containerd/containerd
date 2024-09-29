@@ -667,7 +667,7 @@ func (tc *nriTest) startContainer(podID, name string, opts ...ContainerOpts) str
 	ctrCfg := ContainerConfig(name, "", opts...)
 	if ctrCfg.Image.Image == "" {
 		image := images.Get(images.BusyBox)
-		EnsureImageExists(tc.t, image)
+		EnsureImageExists(tc.t, image, "")
 		ctrCfg.Image.Image = image
 	}
 
