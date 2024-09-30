@@ -34,6 +34,10 @@ func setCPUFreqValue(cpu ID, setting string, value int) error {
 	return writeFileInt(cpuFreqPath(cpu, setting), value)
 }
 
+func SetCPUScalingGovernor(cpu ID, governor string) error {
+	return writeFileStr(cpuFreqPath(cpu, "scaling_governor"), governor)
+}
+
 // GetCPUFreqValue returns information of the currently used CPU frequency
 func GetCPUFreqValue(cpu ID, setting string) (int, error) {
 	raw, err := os.ReadFile(cpuFreqPath(cpu, setting))
@@ -61,6 +65,17 @@ func SetCPUScalingMinFreq(cpu ID, freq int) error {
 // SetCPUScalingMaxFreq sets the scaling_max_freq value of a given CPU
 func SetCPUScalingMaxFreq(cpu ID, freq int) error {
 	return setCPUFreqValue(cpu, "scaling_max_freq", freq)
+}
+
+// SetScalingGovernorForCPUs sets the scaling_governor of a given set of CPUs
+func SetScalingGovernorForCPUs(cpus []ID, governor string) error {
+	for _, cpu := range cpus {
+		if err := SetCPUScalingGovernor(cpu, governor); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // SetCPUsScalingMinFreq sets the scaling_min_freq value of a given set of CPUs
@@ -127,6 +142,10 @@ func setUncoreFreqValue(pkg, die ID, attribute string, value int) error {
 
 func writeFileInt(path string, value int) error {
 	return os.WriteFile(path, []byte(strconv.Itoa(value)), 0644)
+}
+
+func writeFileStr(path string, value string) error {
+	return os.WriteFile(path, []byte(value), 0644)
 }
 
 func readFileInt(path string) (int, error) {
