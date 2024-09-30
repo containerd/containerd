@@ -203,6 +203,9 @@ func newTracer(ctx context.Context, procs []trace.SpanProcessor) (io.Closer, err
 }
 
 func warnTraceConfig(ic *plugin.InitContext) error {
+	if ic.Config == nil {
+		return nil
+	}
 	ctx := ic.Context
 	cfg := ic.Config.(*TraceConfig)
 	var warn bool
@@ -227,6 +230,9 @@ func warnTraceConfig(ic *plugin.InitContext) error {
 }
 
 func warnOTLPConfig(ic *plugin.InitContext) error {
+	if ic.Config == nil {
+		return nil
+	}
 	ctx := ic.Context
 	cfg := ic.Config.(*OTLPConfig)
 	var warn bool

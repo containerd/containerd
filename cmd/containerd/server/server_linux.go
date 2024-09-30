@@ -26,6 +26,7 @@ import (
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -66,5 +67,8 @@ func apply(ctx context.Context, config *srvconfig.Config) error {
 }
 
 func newTTRPCServer() (*ttrpc.Server, error) {
-	return ttrpc.NewServer(ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()))
+	return ttrpc.NewServer(
+		ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()),
+		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
+	)
 }

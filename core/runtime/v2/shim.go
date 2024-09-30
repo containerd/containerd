@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -46,6 +47,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 )
@@ -273,10 +275,16 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 			}
 		}()
 
-		return ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose)), nil
+		return ttrpc.NewClient(
+			conn,
+			ttrpc.WithOnClose(onClose),
+			ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
+		), nil
 	case "grpc":
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),   //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()), //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
 		}
 		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
