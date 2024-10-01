@@ -22,6 +22,7 @@ import (
 	v2 "github.com/containerd/containerd/v2/core/metrics/types/v2"
 	metrics "github.com/docker/go-metrics"
 	"github.com/prometheus/client_golang/prometheus"
+	types "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 // IDName is the name that is used to identify the id being collected in the metric
@@ -61,4 +62,34 @@ func (m *metric) collect(id, namespace string, stats *v2.Metrics, ns *metrics.Na
 		default:
 		}
 	}
+}
+
+func (m *metric) toMetricDescriptor() *types.MetricDescriptor {
+	return &types.MetricDescriptor{
+		Name:      m.name,
+		Help:      m.help,
+		LabelKeys: m.labels,
+	}
+}
+
+func ToMetricDescriptors() []*types.MetricDescriptor {
+	var md []*types.MetricDescriptor
+
+	for _, m := range pidMetrics {
+		md = append(md, m.toMetricDescriptor())
+	}
+
+	for _, m := range cpuMetrics {
+		md = append(md, m.toMetricDescriptor())
+	}
+
+	for _, m := range memoryMetrics {
+		md = append(md, m.toMetricDescriptor())
+	}
+
+	for _, m := range ioMetrics {
+		md = append(md, m.toMetricDescriptor())
+	}
+
+	return md
 }

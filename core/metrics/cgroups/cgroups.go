@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
+
 	metrics "github.com/docker/go-metrics"
 )
 

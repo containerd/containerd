@@ -19,11 +19,22 @@ package server
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"github.com/containerd/cgroups/v3"
+	v1 "github.com/containerd/containerd/v2/core/metrics/cgroups/v1"
+	v2 "github.com/containerd/containerd/v2/core/metrics/cgroups/v2"
+
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func (c *criService) ListMetricDescriptors(context.Context, *runtime.ListMetricDescriptorsRequest) (*runtime.ListMetricDescriptorsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListMetricDescriptors not implemented")
+	var mds []*runtime.MetricDescriptor
+	if cgroups.Mode() == cgroups.Unified {
+		mds = v2.ToMetricDescriptors()
+	} else {
+		mds = v1.ToMetricDescriptors()
+	}
+	response := &runtime.ListMetricDescriptorsResponse{
+		Descriptors: mds,
+	}
+	return response, nil
 }
