@@ -348,7 +348,7 @@ func TestContainerMetricsMemory(t *testing.T) {
 
 func TestListContainerStats(t *testing.T) {
 	c := newTestCRIService()
-	metricsWithCpuUsage, err := typeurl.MarshalAnyToProto(&v1.Metrics{CPU: &v1.CPUStat{Usage: &v1.CPUUsage{Total: 100}}})
+	metricsWithCPUUsage, err := typeurl.MarshalAnyToProto(&v1.Metrics{CPU: &v1.CPUStat{Usage: &v1.CPUUsage{Total: 100}}})
 	assert.NoError(t, err)
 
 	type args struct {
@@ -432,8 +432,8 @@ func TestListContainerStats(t *testing.T) {
 				ctx: context.Background(),
 				stats: []*types.Metric{
 					{
-						ID: "c1",
-						Data: metricsWithCpuUsage,
+						ID:   "c1",
+						Data: metricsWithCPUUsage,
 					},
 				},
 				containers: []containerstore.Container{
@@ -453,7 +453,7 @@ func TestListContainerStats(t *testing.T) {
 				})
 			},
 			wantErr: false,
-			want:	 &runtime.ListContainerStatsResponse{},
+			want:    &runtime.ListContainerStatsResponse{},
 		},
 	}
 
