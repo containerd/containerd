@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/runc"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/schedcore"
 	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/version"
@@ -112,7 +111,8 @@ func newCommand(ctx context.Context, id, containerdAddress, containerdTTRPCAddre
 }
 
 func readSpec() (*spec, error) {
-	f, err := os.Open(oci.ConfigFilename)
+	const configFileName = "config.json"
+	f, err := os.Open(configFileName)
 	if err != nil {
 		return nil, err
 	}
