@@ -22,6 +22,7 @@ import (
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/proxy"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
 )
@@ -103,16 +104,16 @@ func (s service) Stat(ctx context.Context, sr *snapshotsapi.StatSnapshotRequest)
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &snapshotsapi.StatSnapshotResponse{Info: snapshots.InfoToProto(info)}, nil
+	return &snapshotsapi.StatSnapshotResponse{Info: proxy.InfoToProto(info)}, nil
 }
 
 func (s service) Update(ctx context.Context, sr *snapshotsapi.UpdateSnapshotRequest) (*snapshotsapi.UpdateSnapshotResponse, error) {
-	info, err := s.sn.Update(ctx, snapshots.InfoFromProto(sr.Info), sr.UpdateMask.GetPaths()...)
+	info, err := s.sn.Update(ctx, proxy.InfoFromProto(sr.Info), sr.UpdateMask.GetPaths()...)
 	if err != nil {
 		return nil, errdefs.ToGRPC(err)
 	}
 
-	return &snapshotsapi.UpdateSnapshotResponse{Info: snapshots.InfoToProto(info)}, nil
+	return &snapshotsapi.UpdateSnapshotResponse{Info: proxy.InfoToProto(info)}, nil
 }
 
 func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Snapshots_ListServer) error {
@@ -125,7 +126,7 @@ func (s service) List(sr *snapshotsapi.ListSnapshotsRequest, ss snapshotsapi.Sna
 		}
 	)
 	err := s.sn.Walk(ss.Context(), func(ctx context.Context, info snapshots.Info) error {
-		buffer = append(buffer, snapshots.InfoToProto(info))
+		buffer = append(buffer, proxy.InfoToProto(info))
 
 		if len(buffer) >= 100 {
 			if err := sendBlock(buffer); err != nil {

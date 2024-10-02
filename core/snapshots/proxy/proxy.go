@@ -50,14 +50,14 @@ func (p *proxySnapshotter) Stat(ctx context.Context, key string) (snapshots.Info
 	if err != nil {
 		return snapshots.Info{}, errdefs.FromGRPC(err)
 	}
-	return snapshots.InfoFromProto(resp.Info), nil
+	return InfoFromProto(resp.Info), nil
 }
 
 func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fieldpaths ...string) (snapshots.Info, error) {
 	resp, err := p.client.Update(ctx,
 		&snapshotsapi.UpdateSnapshotRequest{
 			Snapshotter: p.snapshotterName,
-			Info:        snapshots.InfoToProto(info),
+			Info:        InfoToProto(info),
 			UpdateMask: &protobuftypes.FieldMask{
 				Paths: fieldpaths,
 			},
@@ -65,7 +65,7 @@ func (p *proxySnapshotter) Update(ctx context.Context, info snapshots.Info, fiel
 	if err != nil {
 		return snapshots.Info{}, errdefs.FromGRPC(err)
 	}
-	return snapshots.InfoFromProto(resp.Info), nil
+	return InfoFromProto(resp.Info), nil
 }
 
 func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usage, error) {
@@ -76,7 +76,7 @@ func (p *proxySnapshotter) Usage(ctx context.Context, key string) (snapshots.Usa
 	if err != nil {
 		return snapshots.Usage{}, errdefs.FromGRPC(err)
 	}
-	return snapshots.UsageFromProto(resp), nil
+	return UsageFromProto(resp), nil
 }
 
 func (p *proxySnapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, error) {
@@ -172,7 +172,7 @@ func (p *proxySnapshotter) Walk(ctx context.Context, fn snapshots.WalkFunc, fs .
 			return nil
 		}
 		for _, info := range resp.Info {
-			if err := fn(ctx, snapshots.InfoFromProto(info)); err != nil {
+			if err := fn(ctx, InfoFromProto(info)); err != nil {
 				return err
 			}
 		}

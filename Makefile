@@ -150,6 +150,8 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
+SHIM_GO_TAGS := --tags no_grpc
+
 .PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test remove-replace clean-vendor
 .DEFAULT: default
 
@@ -171,7 +173,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-go-fieldpath
+protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
 	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
 	$(eval TMPDIR := $(shell mktemp -d))
@@ -181,6 +183,7 @@ protos: bin/protoc-gen-go-fieldpath
 	@rm -rf ${TMPDIR} v2
 	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
+	bin/go-buildtag -w --tags '!no_grpc' $(shell find api/ -name '*_grpc.pb.go')
 	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
@@ -230,7 +233,7 @@ cri-integration: binaries bin/cri-integration.test ## run cri integration tests 
 # build runc shimv2 with failpoint control, only used by integration test
 bin/containerd-shim-runc-fp-v1: integration/failpoint/cmd/containerd-shim-runc-fp-v1 FORCE
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ${SHIM_GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
 
 # build CNI bridge plugin wrapper with failpoint support, only used by integration test
 bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
@@ -264,7 +267,7 @@ bin/gen-manpages: cmd/gen-manpages FORCE
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"

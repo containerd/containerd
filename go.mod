@@ -149,3 +149,5 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 	tags.cncf.io/container-device-interface/specs-go v0.8.0 // indirect
 )
+
+replace github.com/containerd/containerd/api => ./api
