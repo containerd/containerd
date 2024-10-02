@@ -96,7 +96,11 @@ GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
 endif
+
+SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
+
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
+SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
@@ -150,7 +154,6 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
-SHIM_GO_TAGS := --tags no_grpc
 
 .PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test remove-replace clean-vendor
 .DEFAULT: default
@@ -267,7 +270,7 @@ bin/gen-manpages: cmd/gen-manpages FORCE
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
