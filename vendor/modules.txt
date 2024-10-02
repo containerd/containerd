@@ -317,7 +317,7 @@ github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/hashicorp/errwrap v1.1.0
 ## explicit
-# github.com/intel/goresctrl v0.7.0
+# github.com/intel/goresctrl v0.8.0
 ## explicit; go 1.20
 github.com/intel/goresctrl/pkg/blockio
 github.com/intel/goresctrl/pkg/kubernetes

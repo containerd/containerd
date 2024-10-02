@@ -921,8 +921,8 @@ github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ
 github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47ZCWhYzw7ho=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/intel/goresctrl v0.7.0 h1:x6RclP6LiJc24t9mf47BRbjf06B8oVisZMBv31x3rKc=
-github.com/intel/goresctrl v0.7.0/go.mod h1:T3ZZnuHSNouwELB5wvOoUJaB7l/4Rm23rJy/wuWJlr0=
+github.com/intel/goresctrl v0.8.0 h1:N3shVbS3kA1Hk2AmcbHv8805Hjbv+zqsCIZCGktxx50=
+github.com/intel/goresctrl v0.8.0/go.mod h1:T3ZZnuHSNouwELB5wvOoUJaB7l/4Rm23rJy/wuWJlr0=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
