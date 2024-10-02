@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -168,7 +169,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	ongoing := NewJobs(ref)
 
 	if config.TraceHTTP {
-		ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+		ctx = httptrace.WithClientTrace(ctx, httpdbg.NewDebugClientTrace(ctx))
 	}
 
 	pctx, stopProgress := context.WithCancel(ctx)
