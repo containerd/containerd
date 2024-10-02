@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
-	"github.com/containerd/otelttrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
@@ -112,10 +111,12 @@ type TTRPCService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
-type TTRPCServerOptioner interface {
-	TTRPCService
+type TTRPCServerUnaryOptioner interface {
+	UnaryServerInterceptor() ttrpc.UnaryServerInterceptor
+}
 
-	UnaryInterceptor() ttrpc.UnaryServerInterceptor
+type TTRPCClientUnaryOptioner interface {
+	UnaryClientInterceptor() ttrpc.UnaryClientInterceptor
 }
 
 var (
@@ -249,13 +250,6 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-	publisher, err := NewPublisher(ttrpcAddress, WithPublishTTRPCOpts(
-		ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
-	))
-	if err != nil {
-		return err
-	}
-	defer publisher.Close()
 
 	ctx = namespaces.WithNamespace(ctx, namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
@@ -333,7 +327,15 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		Type: plugins.EventPlugin,
 		ID:   "publisher",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return publisher, nil
+			return NewPublisher(ttrpcAddress, func(cfg *publisherConfig) {
+				p, _ := ic.GetByID(plugins.TTRPCPlugin, "otelttrpc")
+				if p == nil {
+					return
+				}
+
+				opts := ttrpc.WithUnaryClientInterceptor(p.(TTRPCClientUnaryOptioner).UnaryClientInterceptor())
+				WithPublishTTRPCOpts(opts)(cfg)
+			})
 		},
 	})
 
@@ -389,19 +391,18 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		if src, ok := instance.(TTRPCService); ok {
 			log.G(ctx).WithField("id", pID).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
-
 		}
 
-		if src, ok := instance.(TTRPCServerOptioner); ok {
-			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
+		if src, ok := instance.(TTRPCServerUnaryOptioner); ok {
+			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryServerInterceptor())
+		}
+
 		}
 	}
 
 	if len(ttrpcServices) == 0 {
 		return fmt.Errorf("required that ttrpc service")
 	}
-
-	ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, otelttrpc.UnaryServerInterceptor())
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
 	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
