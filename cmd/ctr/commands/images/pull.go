@@ -106,7 +106,7 @@ command. As part of this process, we do the following:
 
 		if !cliContext.Bool("local") {
 			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
-				"skip-verify", "tlscacert", "tlscert", "tlskey", "http-dump", "http-trace", // RegistryFlags
+				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
 				if cliContext.IsSet(s) {
@@ -152,9 +152,18 @@ command. As part of this process, we do the following:
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
 			}
 
-			opts := []registry.Opt{registry.WithCredentials(ch), registry.WithHostDir(cliContext.String("hosts-dir"))}
+			opts := []registry.Opt{
+				registry.WithCredentials(ch),
+				registry.WithHostDir(cliContext.String("hosts-dir")),
+			}
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
+			}
+			if cliContext.Bool("http-dump") {
+				opts = append(opts, registry.WithHTTPDebug())
+			}
+			if cliContext.Bool("http-trace") {
+				opts = append(opts, registry.WithHTTPTrace())
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 			if err != nil {

@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/pkg/httpdbg"
-	"github.com/containerd/log"
 	"github.com/urfave/cli/v2"
 )
 
@@ -102,10 +101,7 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 
 	if cliContext.Bool("http-dump") {
 		hostOptions.UpdateClient = func(client *http.Client) error {
-			client.Transport = &httpdbg.DebugTransport{
-				Transport: client.Transport,
-				Writer:    log.G(ctx).Writer(),
-			}
+			httpdbg.DumpRequests(ctx, client)
 			return nil
 		}
 	}

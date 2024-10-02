@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http/httptrace"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -177,7 +176,7 @@ var pushCommand = &cli.Command{
 		}
 
 		if cliContext.Bool("http-trace") {
-			ctx = httptrace.WithClientTrace(ctx, httpdbg.NewDebugClientTrace(ctx))
+			ctx = httpdbg.WithClientTrace(ctx)
 		}
 		resolver, err := commands.GetResolver(ctx, cliContext)
 		if err != nil {

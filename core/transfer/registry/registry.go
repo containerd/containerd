@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -48,6 +49,8 @@ type registryOpts struct {
 	creds         CredentialHelper
 	hostDir       string
 	defaultScheme string
+	httpDebug     bool
+	httpTrace     bool
 }
 
 // Opt sets registry-related configurations.
@@ -85,6 +88,22 @@ func WithDefaultScheme(s string) Opt {
 	}
 }
 
+// WithHTTPDebug dumps requests made to an OCI registry. Useful to debug interactions between containerd and registry.
+func WithHTTPDebug() Opt {
+	return func(o *registryOpts) error {
+		o.httpDebug = true
+		return nil
+	}
+}
+
+// WithHTTPTrace traces HTTP events made to an OCI registry.
+func WithHTTPTrace() Opt {
+	return func(o *registryOpts) error {
+		o.httpTrace = true
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -113,6 +132,16 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		hostOptions.DefaultScheme = ropts.defaultScheme
 	}
 
+	hostOptions.UpdateClient = func(client *http.Client) error {
+		if ropts.httpDebug {
+			httpdbg.DumpRequests(ctx, client)
+		}
+		if ropts.httpTrace {
+			httpdbg.DumpTraces(ctx, client)
+		}
+		return nil
+	}
+
 	resolver := docker.NewResolver(docker.ResolverOptions{
 		Hosts:   config.ConfigureHosts(ctx, hostOptions),
 		Headers: ropts.headers,
@@ -125,6 +154,8 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		resolver:      resolver,
 		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
+		httpDebug:     ropts.httpDebug,
+		httpTrace:     ropts.httpTrace,
 	}, nil
 }
 
@@ -152,6 +183,9 @@ type OCIRegistry struct {
 	hostDir string
 
 	defaultScheme string
+
+	httpDebug bool
+	httpTrace bool
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
@@ -253,6 +287,8 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 	}
 	res.HostDir = r.hostDir
 	res.DefaultScheme = r.defaultScheme
+	res.HttpDebug = r.httpDebug
+	res.HttpTrace = r.httpTrace
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
 		Resolver:  res,
@@ -297,6 +333,19 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 		for k, v := range s.Resolver.Headers {
 			r.headers.Add(k, v)
 		}
+
+		r.httpDebug = s.Resolver.GetHttpDebug()
+		r.httpTrace = s.Resolver.GetHttpTrace()
+	}
+
+	hostOptions.UpdateClient = func(client *http.Client) error {
+		if r.httpDebug {
+			httpdbg.DumpRequests(ctx, client)
+		}
+		if r.httpTrace {
+			httpdbg.DumpTraces(ctx, client)
+		}
+		return nil
 	}
 
 	r.reference = s.Reference
