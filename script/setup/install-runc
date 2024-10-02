@@ -34,13 +34,13 @@ function install_runc() {
 	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
 
 	TMPROOT=$(mktemp -d)
+	trap "rm -fR ${TMPROOT}" EXIT
 	git clone "${RUNC_REPO}" "${TMPROOT}"/runc
 	pushd "${TMPROOT}"/runc
 	git checkout "${RUNC_VERSION}"
 	env -u VERSION make BUILDTAGS='seccomp' runc
 	$SUDO make install
 	popd
-	rm -fR "${TMPROOT}"
 }
 
 function install_crun() {
