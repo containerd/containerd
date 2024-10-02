@@ -27,24 +27,24 @@ import (
 	"github.com/containerd/log"
 )
 
-// DebugTransport wraps the underlying http.RoundTripper interface and dumps all requests/responses to the writer.
-type DebugTransport struct {
-	Transport http.RoundTripper
-	Writer    io.Writer
+// debugTransport wraps the underlying http.RoundTripper interface and dumps all requests/responses to the writer.
+type debugTransport struct {
+	transport http.RoundTripper
+	writer    io.Writer
 }
 
 // RoundTrip dumps request/responses and executes the request using the underlying transport.
-func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	in, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dump request: %w", err)
 	}
 
-	if _, err := t.Writer.Write(in); err != nil {
+	if _, err := t.writer.Write(in); err != nil {
 		return nil, err
 	}
 
-	resp, err := t.Transport.RoundTrip(req)
+	resp, err := t.transport.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
@@ -54,11 +54,19 @@ func (t DebugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("failed to dump response: %w", err)
 	}
 
-	if _, err := t.Writer.Write(out); err != nil {
+	if _, err := t.writer.Write(out); err != nil {
 		return nil, err
 	}
 
 	return resp, err
+}
+
+// DumpRequests wraps the underlying http.Client transport to logs all requests/responses to the log.
+func DumpRequests(ctx context.Context, client *http.Client) {
+	client.Transport = debugTransport{
+		transport: client.Transport,
+		writer:    log.G(ctx).Writer(),
+	}
 }
 
 // NewDebugClientTrace returns a Go http trace client predefined to write DNS and connection
@@ -84,4 +92,27 @@ func NewDebugClientTrace(ctx context.Context) *httptrace.ClientTrace {
 			log.G(ctx).WithField("reused", connInfo.Reused).WithField("remote_addr", remoteAddr).Debugf("Connection successful")
 		},
 	}
+}
+
+type traceTransport struct {
+	tracer    *httptrace.ClientTrace
+	transport http.RoundTripper
+}
+
+func (t traceTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), t.tracer))
+	return t.transport.RoundTrip(req)
+}
+
+// DumpTraces attaches HTTP events tracer to the client's transport.
+func DumpTraces(ctx context.Context, client *http.Client) {
+	client.Transport = traceTransport{
+		tracer:    NewDebugClientTrace(ctx),
+		transport: client.Transport,
+	}
+}
+
+// WithClientTrace wraps context with a httptrace.ClientTrace for debugging.
+func WithClientTrace(ctx context.Context) context.Context {
+	return httptrace.WithClientTrace(ctx, NewDebugClientTrace(ctx))
 }

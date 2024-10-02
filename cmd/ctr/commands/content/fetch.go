@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http/httptrace"
 	"os"
 	"sync"
 	"text/tabwriter"
@@ -169,7 +168,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	ongoing := NewJobs(ref)
 
 	if config.TraceHTTP {
-		ctx = httptrace.WithClientTrace(ctx, httpdbg.NewDebugClientTrace(ctx))
+		ctx = httpdbg.WithClientTrace(ctx)
 	}
 
 	pctx, stopProgress := context.WithCancel(ctx)
