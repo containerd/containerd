@@ -40,6 +40,12 @@ message RegistryResolver {
 	string default_scheme = 4;
 	// Force skip verify
 	// CA callback? Client TLS callback?
+
+    // Enable HTTP debugging
+    bool http_debug = 5;
+
+    // Enable HTTP requests tracing
+    bool http_trace = 6;
 }
 
 // AuthRequest is sent as a callback on a stream
