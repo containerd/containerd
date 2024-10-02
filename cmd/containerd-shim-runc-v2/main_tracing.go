@@ -18,4 +18,7 @@
 
 package main
 
-import _ "github.com/containerd/containerd/v2/pkg/tracing/plugin"
+import (
+	_ "github.com/containerd/containerd/v2/internal/pprof"
+	_ "github.com/containerd/containerd/v2/pkg/tracing/plugin"
+)
