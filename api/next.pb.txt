@@ -7775,6 +7775,20 @@ file {
       type: TYPE_STRING
       json_name: "defaultScheme"
     }
+    field {
+      name: "http_debug"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "httpDebug"
+    }
+    field {
+      name: "http_trace"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "httpTrace"
+    }
     nested_type {
       name: "HeadersEntry"
       field {
