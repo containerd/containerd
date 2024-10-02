@@ -35,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/image"
 	"github.com/containerd/containerd/v2/core/transfer/registry"
+	"github.com/containerd/containerd/v2/pkg/httpdbg"
 	"github.com/containerd/containerd/v2/pkg/progress"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
@@ -176,7 +177,7 @@ var pushCommand = &cli.Command{
 		}
 
 		if cliContext.Bool("http-trace") {
-			ctx = httptrace.WithClientTrace(ctx, commands.NewDebugClientTrace(ctx))
+			ctx = httptrace.WithClientTrace(ctx, httpdbg.NewDebugClientTrace(ctx))
 		}
 		resolver, err := commands.GetResolver(ctx, cliContext)
 		if err != nil {
