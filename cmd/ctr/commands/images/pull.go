@@ -159,11 +159,12 @@ command. As part of this process, we do the following:
 			if cliContext.Bool("plain-http") {
 				opts = append(opts, registry.WithDefaultScheme("http"))
 			}
+			logStream := log.G(ctx).Writer()
 			if cliContext.Bool("http-dump") {
-				opts = append(opts, registry.WithHTTPDebug())
+				opts = append(opts, registry.WithHTTPDebug(), registry.WithClientStream(logStream))
 			}
 			if cliContext.Bool("http-trace") {
-				opts = append(opts, registry.WithHTTPTrace())
+				opts = append(opts, registry.WithHTTPTrace(), registry.WithClientStream(logStream))
 			}
 			reg, err := registry.NewOCIRegistry(ctx, ref, opts...)
 			if err != nil {

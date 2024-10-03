@@ -101,7 +101,7 @@ func GetResolver(ctx context.Context, cliContext *cli.Context) (remotes.Resolver
 
 	if cliContext.Bool("http-dump") {
 		hostOptions.UpdateClient = func(client *http.Client) error {
-			httpdbg.DumpRequests(ctx, client)
+			httpdbg.DumpRequests(ctx, client, nil)
 			return nil
 		}
 	}

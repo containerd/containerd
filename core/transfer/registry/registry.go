@@ -51,6 +51,7 @@ type registryOpts struct {
 	defaultScheme string
 	httpDebug     bool
 	httpTrace     bool
+	localStream   io.WriteCloser
 }
 
 // Opt sets registry-related configurations.
@@ -104,6 +105,15 @@ func WithHTTPTrace() Opt {
 	}
 }
 
+// WithClientStream tells the registry to stream HTTP debug data back to the client.
+// Applicable only when HTTP debug or tracing enabled.
+func WithClientStream(writer io.WriteCloser) Opt {
+	return func(o *registryOpts) error {
+		o.localStream = writer
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -134,7 +144,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 
 	hostOptions.UpdateClient = func(client *http.Client) error {
 		if ropts.httpDebug {
-			httpdbg.DumpRequests(ctx, client)
+			httpdbg.DumpRequests(ctx, client, ropts.localStream)
 		}
 		if ropts.httpTrace {
 			httpdbg.DumpTraces(ctx, client)
@@ -156,6 +166,7 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 		defaultScheme: ropts.defaultScheme,
 		httpDebug:     ropts.httpDebug,
 		httpTrace:     ropts.httpTrace,
+		localStream:   ropts.localStream,
 	}, nil
 }
 
@@ -184,8 +195,9 @@ type OCIRegistry struct {
 
 	defaultScheme string
 
-	httpDebug bool
-	httpTrace bool
+	httpDebug   bool
+	httpTrace   bool
+	localStream io.WriteCloser
 
 	// This could be an interface which returns resolver?
 	// Resolver could also be a plug-able interface, to call out to a program to fetch?
@@ -285,10 +297,43 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		}()
 		res.AuthStream = sid
 	}
+
+	if r.httpDebug || r.httpTrace {
+		switch {
+		case r.httpDebug && r.httpTrace:
+			res.HttpDebug = transfertypes.HTTPDebug_BOTH
+		case r.httpDebug:
+			res.HttpDebug = transfertypes.HTTPDebug_DEBUG
+		case r.httpTrace:
+			res.HttpDebug = transfertypes.HTTPDebug_TRACE
+		default:
+			res.HttpDebug = transfertypes.HTTPDebug_DISABLED
+		}
+
+		if r.localStream != nil {
+			res.LogsStream = tstreaming.GenerateID("http-debug-logs")
+
+			stream, err := sm.Create(ctx, res.LogsStream)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create stream for HTTP debug logs: %w", err)
+			}
+
+			go func() {
+				// Start pumping logs to the client
+				_, err := io.Copy(r.localStream, tstreaming.ReceiveStream(ctx, stream))
+				if err != nil && !errors.Is(err, io.EOF) {
+					log.G(ctx).WithError(err).Error("failed to copy HTTP debug logs stream")
+				}
+
+				if err := r.localStream.Close(); err != nil {
+					log.G(ctx).WithError(err).Error("failed to close HTTP debug logs local stream")
+				}
+			}()
+		}
+	}
+
 	res.HostDir = r.hostDir
 	res.DefaultScheme = r.defaultScheme
-	res.HttpDebug = r.httpDebug
-	res.HttpTrace = r.httpTrace
 	s := &transfertypes.OCIRegistry{
 		Reference: r.reference,
 		Resolver:  res,
@@ -334,18 +379,41 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 			r.headers.Add(k, v)
 		}
 
-		r.httpDebug = s.Resolver.GetHttpDebug()
-		r.httpTrace = s.Resolver.GetHttpTrace()
-	}
+		if s.Resolver.HttpDebug != transfertypes.HTTPDebug_DISABLED {
+			var writer io.WriteCloser
 
-	hostOptions.UpdateClient = func(client *http.Client) error {
-		if r.httpDebug {
-			httpdbg.DumpRequests(ctx, client)
+			// Stream to local client.
+			if sid := s.Resolver.LogsStream; sid != "" {
+				stream, err := sm.Get(ctx, sid)
+				if err != nil {
+					return fmt.Errorf("failed to get stream for HTTP debug logs: %w", err)
+				}
+
+				writer = tstreaming.WriteByteStream(ctx, stream)
+			} else {
+				writer = log.G(ctx).Writer()
+			}
+
+			go func() {
+				<-ctx.Done()
+				if err := writer.Close(); err != nil {
+					log.G(ctx).Errorf("failed to close HTTP debug logs stream: %v", err)
+				}
+			}()
+
+			hostOptions.UpdateClient = func(client *http.Client) error {
+				switch s.Resolver.HttpDebug {
+				case transfertypes.HTTPDebug_DEBUG:
+					httpdbg.DumpRequests(ctx, client, writer)
+				case transfertypes.HTTPDebug_TRACE:
+					httpdbg.DumpTraces(ctx, client)
+				case transfertypes.HTTPDebug_BOTH:
+					httpdbg.DumpRequests(ctx, client, writer)
+					httpdbg.DumpTraces(ctx, client)
+				}
+				return nil
+			}
 		}
-		if r.httpTrace {
-			httpdbg.DumpTraces(ctx, client)
-		}
-		return nil
 	}
 
 	r.reference = s.Reference
