@@ -272,6 +272,7 @@ EOF
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
         'GOTESTSUM_JSONFILE': ENV['GOTESTSUM_JSONFILE'],
         'GITHUB_WORKSPACE': '',
+        'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash
@@ -299,6 +300,7 @@ EOF
     sh.env = {
         'GOTEST': ENV['GOTEST'] || "go test",
         'REPORT_DIR': ENV['REPORT_DIR'],
+        'CGROUP_DRIVER': ENV['CGROUP_DRIVER'],
     }
     sh.inline = <<~SHELL
         #!/usr/bin/env bash

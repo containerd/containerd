@@ -27,6 +27,11 @@
 # "cri-in-userns": for running critest with "CRI-in-UserNS" mode; needs Rootless Docker/Podman/nerdctl:
 #   docker build -t containerd-test -f Dockerfile.test --target cri-in-userns ../
 #   docker run --privileged containerd-test
+#
+# "cri-in-userns-systemd": for running critest with "CRI-in-UserNS-Systemd" mode; needs Rootless Docker/Podman/nerdctl:
+#   docker build -t containerd-test -f Dockerfile.test --target cri-in-userns-systemd ../
+#   touch ./critest_exit_code.txt
+#   docker run --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt containerd-test
 # ------------------------------------------------------------------------------
 
 ARG GOLANG_VERSION=1.23.1
@@ -111,6 +116,7 @@ CMD ["script/critest.sh", "/tmp"]
 # Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
 # (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
 FROM critest AS cri-in-userns
+ENV IS_SYSTEMD_CGROUP=false
 COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
 COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
 ENTRYPOINT ["/docker-entrypoint.sh"]
@@ -118,6 +124,24 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 # Skip "runtime should support safe sysctls": `container init caused: write sysctl key kernel.shm_rmid_forced: open /proc/sys/kernel/shm_rmid_forced: permission denied`
 # Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
 CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"]
+
+# cri-in-userns-systemd stage is for testing "CRI-in-UserNS-Systemd", which should be used in conjunction with
+# "Kubelet-in-UserNS": https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2033-kubelet-in-userns-aka-rootless
+# This feature is mostly expected to be used for `kind` and `minikube`.
+#
+# Requires Rootless Docker/Podman/nerdctl with cgroup v2 delegation: https://rootlesscontaine.rs/getting-started/common/cgroup2/
+# (Rootless Docker/Podman/nerdctl prepares the UserNS, so we do not need to create UserNS by ourselves)
+FROM critest AS cri-in-userns-systemd
+ENV IS_SYSTEMD_CGROUP=true
+RUN apt-get update && apt-get install -y systemd sysvinit-core
+COPY contrib/Dockerfile.test.d/cri-in-userns/etc_containerd_config.toml /etc/containerd/config.toml
+COPY contrib/Dockerfile.test.d/cri-in-userns/docker-entrypoint.sh       /docker-entrypoint.sh
+COPY contrib/Dockerfile.test.d/critest.sh /critest.sh
+# Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
+# Skip "runtime should support safe sysctls": `container init caused: write sysctl key kernel.shm_rmid_forced: open /proc/sys/kernel/shm_rmid_forced: permission denied`
+# Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
+ENTRYPOINT ["/critest.sh","start"]
+
 
 # Install proto3
 FROM golang AS proto3

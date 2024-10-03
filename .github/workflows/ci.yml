@@ -219,6 +219,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [windows-2022, windows-2019]
+        cgroup_driver: [cgroupfs]
 
     defaults:
       run:
@@ -345,12 +346,14 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_IMAGE_LIST: ${{github.workspace}}/repolist.toml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           make cri-integration
 
       - name: cri-tools critest
         env:
           CRI_TEST_IMAGES: ${{github.workspace}}/cri-test-images.yaml
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         shell: powershell
         run: |
           Start-Process -FilePath containerd.exe -NoNewWindow -RedirectStandardError true -PassThru
@@ -367,7 +370,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.os }}
+          name: TestResults ${{ matrix.os }} ${{ matrix.cgroup_driver }}
           path: |
             ${{github.workspace}}/*-junit.xml
             ${{github.workspace}}/*-gotest.json
@@ -388,6 +391,7 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04, actuated-arm64-4cpu-16gb]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+        cgroup_driver: [cgroupfs, systemd]
 
     env:
       GOTEST: gotestsum --
@@ -476,7 +480,15 @@ jobs:
       - name: CRI Integration Test
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+          RUNC_FLAVOR: ${{ matrix.runc }}
         run: |
+          cat /sys/fs/cgroup/cgroup.controllers
+          systemctl status
+          [ "${RUNC_FLAVOR}" == "crun" ] && {
+             export XDG_RUNTIME_DIR=/run/user/$(id -u)
+          }
+          runc --version
           CONTAINERD_RUNTIME=$TEST_RUNTIME make cri-integration
 
       - name: Fix up for actuated
@@ -488,6 +500,7 @@ jobs:
       - name: cri-tools critest
         env:
           TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
@@ -510,7 +523,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }}
+          name: TestResults ${{ matrix.runtime }} ${{matrix.runc}} ${{ matrix.os }} ${{ matrix.cgroup_driver }}
           path: |
             *-junit.xml
             *-gotest.json
@@ -534,9 +547,10 @@ jobs:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
           - rockylinux/9@4.0.0
+        cgroup_driver: [cgroupfs, systemd]
     env:
       BOX: ${{ matrix.box }}
-
+      CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
     steps:
       - name: Show the host info
         run: |
@@ -586,9 +600,9 @@ jobs:
       - name: test-integration
         run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
@@ -596,6 +610,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        cgroup_driver: [cgroupfs, systemd]
 
     steps:
       - uses: actions/checkout@v4
@@ -608,11 +627,35 @@ jobs:
           EOF
           sudo systemctl daemon-reload
       - name: Build cri-in-userns image
-        run: podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+        env:
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          if [ "$CGROUP_DRIVER" = "systemd" ];then
+            podman build --target cri-in-userns-systemd -t cri-in-userns-systemd -f ./contrib/Dockerfile.test .
+          else
+            podman build --target cri-in-userns -t cri-in-userns -f ./contrib/Dockerfile.test .
+          fi
+
       - name: Run cri-in-userns image
+        env:
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         # Rootless Podman is used for testing CRI-in-UserNS
         # (We could use rootless Docker or rootless nerdctl, but we are using Podman here because it is preinstalled)
-        run: podman run --rm --privileged cri-in-userns
+        run: |
+          if [ "$CGROUP_DRIVER" = "systemd" ];then
+              set +e
+              touch ./critest_exit_code.txt
+              podman run --rm --privileged --group-add keep-groups -v ./critest_exit_code.txt:/tmp/critest_exit_code.txt cri-in-userns-systemd
+              exit_code=`cat ./critest_exit_code.txt`
+              echo "exit_code:"$exit_code
+              if [ "$exit_code" -gt 0 ]; then
+                exit 1
+              else
+                exit 0
+              fi
+          else
+            podman run --rm --privileged cri-in-userns
+          fi
 
   tests-mac-os:
     name: MacOS unit tests
