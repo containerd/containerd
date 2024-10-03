@@ -62,10 +62,14 @@ func (t debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 // DumpRequests wraps the underlying http.Client transport to logs all requests/responses to the log.
-func DumpRequests(ctx context.Context, client *http.Client) {
+func DumpRequests(ctx context.Context, client *http.Client, writer io.Writer) {
+	if writer == nil {
+		writer = log.G(ctx).Writer()
+	}
+
 	client.Transport = debugTransport{
 		transport: client.Transport,
-		writer:    log.G(ctx).Writer(),
+		writer:    writer,
 	}
 }
 
