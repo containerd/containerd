@@ -20,13 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"expvar"
 	"flag"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -43,7 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
 	"github.com/containerd/log"
-	"github.com/containerd/otelttrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
@@ -112,10 +108,12 @@ type TTRPCService interface {
 	RegisterTTRPC(*ttrpc.Server) error
 }
 
-type TTRPCServerOptioner interface {
-	TTRPCService
+type TTRPCServerUnaryOptioner interface {
+	UnaryServerInterceptor() ttrpc.UnaryServerInterceptor
+}
 
-	UnaryInterceptor() ttrpc.UnaryServerInterceptor
+type TTRPCClientUnaryOptioner interface {
+	UnaryClientInterceptor() ttrpc.UnaryClientInterceptor
 }
 
 var (
@@ -249,13 +247,6 @@ func run(ctx context.Context, manager Manager, config Config) error {
 	}
 
 	ttrpcAddress := os.Getenv(ttrpcAddressEnv)
-	publisher, err := NewPublisher(ttrpcAddress, WithPublishTTRPCOpts(
-		ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
-	))
-	if err != nil {
-		return err
-	}
-	defer publisher.Close()
 
 	ctx = namespaces.WithNamespace(ctx, namespaceFlag)
 	ctx = context.WithValue(ctx, OptsKey{}, Opts{BundlePath: bundlePath, Debug: debugFlag})
@@ -333,7 +324,15 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		Type: plugins.EventPlugin,
 		ID:   "publisher",
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			return publisher, nil
+			return NewPublisher(ttrpcAddress, func(cfg *publisherConfig) {
+				p, _ := ic.GetByID(plugins.TTRPCPlugin, "otelttrpc")
+				if p == nil {
+					return
+				}
+
+				opts := ttrpc.WithUnaryClientInterceptor(p.(TTRPCClientUnaryOptioner).UnaryClientInterceptor())
+				WithPublishTTRPCOpts(opts)(cfg)
+			})
 		},
 	})
 
@@ -342,6 +341,8 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		ttrpcServices = []TTRPCService{}
 
 		ttrpcUnaryInterceptors = []ttrpc.UnaryServerInterceptor{}
+
+		pprofHandler server
 	)
 
 	for _, p := range registry.Graph(func(*plugin.Registration) bool { return false }) {
@@ -389,19 +390,22 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		if src, ok := instance.(TTRPCService); ok {
 			log.G(ctx).WithField("id", pID).Debug("registering ttrpc service")
 			ttrpcServices = append(ttrpcServices, src)
-
 		}
 
-		if src, ok := instance.(TTRPCServerOptioner); ok {
-			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryInterceptor())
+		if src, ok := instance.(TTRPCServerUnaryOptioner); ok {
+			ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, src.UnaryServerInterceptor())
+		}
+
+		if result.Registration.ID == "pprof" {
+			if src, ok := instance.(server); ok {
+				pprofHandler = src
+			}
 		}
 	}
 
 	if len(ttrpcServices) == 0 {
 		return fmt.Errorf("required that ttrpc service")
 	}
-
-	ttrpcUnaryInterceptors = append(ttrpcUnaryInterceptors, otelttrpc.UnaryServerInterceptor())
 
 	unaryInterceptor := chainUnaryServerInterceptors(ttrpcUnaryInterceptors...)
 	server, err := newServer(ttrpc.WithUnaryServerInterceptor(unaryInterceptor))
@@ -415,7 +419,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 		}
 	}
 
-	if err := serve(ctx, server, signals, sd.Shutdown); err != nil {
+	if err := serve(ctx, server, signals, sd.Shutdown, pprofHandler); err != nil {
 		if !errors.Is(err, shutdown.ErrShutdown) {
 			cleanupSockets(ctx)
 			return err
@@ -436,7 +440,7 @@ func run(ctx context.Context, manager Manager, config Config) error {
 
 // serve serves the ttrpc API over a unix socket in the current working directory
 // and blocks until the context is canceled
-func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, shutdown func()) error {
+func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, shutdown func(), pprof server) error {
 	dump := make(chan os.Signal, 32)
 	setupDumpStacks(dump)
 
@@ -456,9 +460,9 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 		}
 	}()
 
-	if debugFlag {
-		if err := serveDebug(ctx); err != nil {
-			return err
+	if debugFlag && pprof != nil {
+		if err := setupPprof(ctx, pprof); err != nil {
+			log.G(ctx).WithError(err).Warn("Could not setup pprof")
 		}
 	}
 
@@ -477,31 +481,6 @@ func serve(ctx context.Context, server *ttrpc.Server, signals chan os.Signal, sh
 	return reap(ctx, logger, signals)
 }
 
-func serveDebug(ctx context.Context) error {
-	l, err := serveListener(debugSocketFlag, 4)
-	if err != nil {
-		return err
-	}
-	go func() {
-		defer l.Close()
-		m := http.NewServeMux()
-		m.Handle("/debug/vars", expvar.Handler())
-		m.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
-		m.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
-		m.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
-		m.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
-		m.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
-		srv := &http.Server{
-			Handler:           m,
-			ReadHeaderTimeout: 5 * time.Minute,
-		}
-		if err := srv.Serve(l); err != nil && !errors.Is(err, net.ErrClosed) {
-			log.G(ctx).WithError(err).Fatal("containerd-shim: pprof endpoint failure")
-		}
-	}()
-	return nil
-}
-
 func dumpStacks(logger *log.Entry) {
 	var (
 		buf       []byte
@@ -515,4 +494,23 @@ func dumpStacks(logger *log.Entry) {
 	}
 	buf = buf[:stackSize]
 	logger.Infof("=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
+}
+
+type server interface {
+	Serve(net.Listener) error
+}
+
+func setupPprof(ctx context.Context, srv server) error {
+	l, err := serveListener(debugSocketFlag, 4)
+	if err != nil {
+		return fmt.Errorf("could not setup pprof listener: %w", err)
+	}
+
+	go func() {
+		if err := srv.Serve(l); err != nil && !errors.Is(err, net.ErrClosed) {
+			log.G(ctx).WithError(err).Fatal("containerd-shim: pprof endpoint failure")
+		}
+	}()
+
+	return nil
 }

@@ -73,6 +73,8 @@ const (
 	CRIServicePlugin plugin.Type = "io.containerd.cri.v1"
 	// ShimPlugin implements a shim service
 	ShimPlugin plugin.Type = "io.containerd.shim.v1"
+	// HTTPHandler implements an http handler
+	HTTPHandler plugin.Type = "io.containerd.http.v1"
 )
 
 const (
