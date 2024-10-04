@@ -129,6 +129,11 @@ func (a *ContainerAdjustment) RemoveDevice(path string) {
 	})
 }
 
+// AddCDIDevice records the addition of the given CDI device to a container.
+func (a *ContainerAdjustment) AddCDIDevice(d *CDIDevice) {
+	a.CDIDevices = append(a.CDIDevices, d) // TODO: should we dup d here ?
+}
+
 // SetLinuxMemoryLimit records setting the memory limit for a container.
 func (a *ContainerAdjustment) SetLinuxMemoryLimit(value int64) {
 	a.initLinuxResourcesMemory()
@@ -219,6 +224,12 @@ func (a *ContainerAdjustment) SetLinuxCPUSetMems(value string) {
 	a.Linux.Resources.Cpu.Mems = value
 }
 
+// SetLinuxPidLimits records setting the pid max number for a container.
+func (a *ContainerAdjustment) SetLinuxPidLimits(value int64) {
+	a.initLinuxResourcesPids()
+	a.Linux.Resources.Pids.Limit = value
+}
+
 // AddLinuxHugepageLimit records adding a hugepage limit for a container.
 func (a *ContainerAdjustment) AddLinuxHugepageLimit(pageSize string, value uint64) {
 	a.initLinuxResources()
@@ -251,6 +262,12 @@ func (a *ContainerAdjustment) AddLinuxUnified(key, value string) {
 func (a *ContainerAdjustment) SetLinuxCgroupsPath(value string) {
 	a.initLinux()
 	a.Linux.CgroupsPath = value
+}
+
+// SetLinuxOomScoreAdj records setting the kernel's Out-Of-Memory (OOM) killer score for a container.
+func (a *ContainerAdjustment) SetLinuxOomScoreAdj(value *int) {
+	a.initLinux()
+	a.Linux.OomScoreAdj = Int(value) // using Int(value) from ./options.go to optionally allocate a pointer to normalized copy of value
 }
 
 //
@@ -299,6 +316,13 @@ func (a *ContainerAdjustment) initLinuxResourcesCPU() {
 	a.initLinuxResources()
 	if a.Linux.Resources.Cpu == nil {
 		a.Linux.Resources.Cpu = &LinuxCPU{}
+	}
+}
+
+func (a *ContainerAdjustment) initLinuxResourcesPids() {
+	a.initLinuxResources()
+	if a.Linux.Resources.Pids == nil {
+		a.Linux.Resources.Pids = &LinuxPids{}
 	}
 }
 

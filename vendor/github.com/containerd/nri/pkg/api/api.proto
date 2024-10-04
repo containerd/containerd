@@ -46,7 +46,7 @@ message UpdateContainersRequest {
 }
 
 message UpdateContainersResponse {
-  // Containers that the runtime failed to udpate.
+  // Containers that the runtime failed to update.
   repeated ContainerUpdate failed = 1;
 }
 
@@ -114,6 +114,10 @@ message ConfigureRequest {
   string runtime_name = 2;
   // Version of the runtime NRI is running in.
   string runtime_version = 3;
+  // Configured registration timeout in milliseconds.
+  int64 registration_timeout = 4;
+  // Configured request processing timeout in milliseconds.
+  int64 request_timeout = 5;
 }
 
 message ConfigureResponse {
@@ -127,11 +131,15 @@ message SynchronizeRequest {
   repeated PodSandbox pods = 1;
   // Containers known to the runtime.
   repeated Container containers = 2;
+  // Whether there are more pods and containers to follow.
+  bool more = 3;
 }
 
 message SynchronizeResponse {
   // Updates to containers requested by the plugin.
   repeated ContainerUpdate update = 1;
+  // Whether the client is able to handle more advertised pods and containers.
+  bool more = 2;
 }
 
 message CreateContainerRequest {
@@ -319,6 +327,11 @@ message LinuxDeviceCgroup {
   string access = 5;
 }
 
+// A CDI device reference.
+message CDIDevice {
+  string name = 1;
+}
+
 // Container (linux) resources.
 message LinuxResources {
   LinuxMemory memory = 1;
@@ -328,6 +341,7 @@ message LinuxResources {
   OptionalString rdt_class = 5;
   map<string, string> unified = 6;
   repeated LinuxDeviceCgroup devices = 7; // for NRI v1 emulation
+  LinuxPids pids = 8;
 }
 
 // Memory-related parts of (linux) resources.
@@ -366,6 +380,11 @@ message POSIXRlimit {
   uint64 soft = 3;
 }
 
+// Pids-related parts of (linux) resources.
+message LinuxPids {
+  int64 limit = 1;
+}
+
 // Requested adjustments to a container being created.
 message ContainerAdjustment {
   map<string, string> annotations = 2;
@@ -374,6 +393,7 @@ message ContainerAdjustment {
   Hooks hooks = 5;
   LinuxContainerAdjustment linux = 6;
   repeated POSIXRlimit rlimits = 7;
+  repeated CDIDevice CDI_devices = 8;
 }
 
 // Adjustments to (linux) resources.
@@ -381,6 +401,7 @@ message LinuxContainerAdjustment {
   repeated LinuxDevice devices = 1;
   LinuxResources resources = 2;
   string cgroups_path = 3;
+  OptionalInt oom_score_adj = 4;
 }
 
 // Requested update to an already created container.

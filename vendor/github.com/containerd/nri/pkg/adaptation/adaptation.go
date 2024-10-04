@@ -65,6 +65,7 @@ type Adaptation struct {
 	serverOpts []ttrpc.ServerOpt
 	listener   net.Listener
 	plugins    []*plugin
+	syncLock   sync.RWMutex
 }
 
 var (
@@ -135,6 +136,7 @@ func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option)
 		pluginPath: DefaultPluginPath,
 		dropinPath: DefaultPluginConfigPath,
 		socketPath: DefaultSocketPath,
+		syncLock:   sync.RWMutex{},
 	}
 
 	for _, o := range opts {
@@ -336,25 +338,48 @@ func (r *Adaptation) startPlugins() (retErr error) {
 	}()
 
 	for i, name := range names {
-		log.Infof(noCtx, "starting plugin %q...", name)
+		log.Infof(noCtx, "starting pre-installed NRI plugin %q...", name)
 
 		id := ids[i]
-
 		p, err := r.newLaunchedPlugin(r.pluginPath, id, name, configs[i])
 		if err != nil {
-			return fmt.Errorf("failed to start NRI plugin %q: %w", name, err)
+			log.Warnf(noCtx, "failed to initialize pre-installed NRI plugin %q: %v", name, err)
+			continue
 		}
 
 		if err := p.start(r.name, r.version); err != nil {
-			return err
+			log.Warnf(noCtx, "failed to start pre-installed NRI plugin %q: %v", name, err)
+			continue
 		}
 
 		plugins = append(plugins, p)
 	}
 
+	// Although the error returned by syncPlugins may not be nil, r.syncFn could still ignores this error and returns a nil error.
+	// We need to make sure that the plugins are successfully synchronized in the `plugins`
+	syncPlugins := func(ctx context.Context, pods []*PodSandbox, containers []*Container) (updates []*ContainerUpdate, err error) {
+		startedPlugins := plugins
+		plugins = make([]*plugin, 0, len(plugins))
+		for _, plugin := range startedPlugins {
+			us, err := plugin.synchronize(ctx, pods, containers)
+			if err != nil {
+				plugin.stop()
+				log.Warnf(noCtx, "failed to synchronize pre-installed NRI plugin %q: %v", plugin.name(), err)
+				continue
+			}
+
+			plugins = append(plugins, plugin)
+			updates = append(updates, us...)
+			log.Infof(noCtx, "pre-installed NRI plugin %q synchronization success", plugin.name())
+		}
+		return updates, nil
+	}
+	if err := r.syncFn(noCtx, syncPlugins); err != nil {
+		return fmt.Errorf("failed to synchronize pre-installed NRI Plugins: %w", err)
+	}
+
 	r.plugins = plugins
 	r.sortPlugins()
-
 	return nil
 }
 
@@ -369,11 +394,21 @@ func (r *Adaptation) stopPlugins() {
 }
 
 func (r *Adaptation) removeClosedPlugins() {
-	active := []*plugin{}
+	var active, closed []*plugin
 	for _, p := range r.plugins {
-		if !p.isClosed() {
+		if p.isClosed() {
+			closed = append(closed, p)
+		} else {
 			active = append(active, p)
 		}
+	}
+
+	if len(closed) != 0 {
+		go func() {
+			for _, plugin := range closed {
+				plugin.stop()
+			}
+		}()
 	}
 	r.plugins = active
 }
@@ -431,6 +466,8 @@ func (r *Adaptation) acceptPluginConnections(l net.Listener) error {
 				continue
 			}
 
+			r.requestPluginSync()
+
 			err = r.syncFn(ctx, p.synchronize)
 			if err != nil {
 				log.Infof(ctx, "failed to synchronize plugin: %v", err)
@@ -439,9 +476,10 @@ func (r *Adaptation) acceptPluginConnections(l net.Listener) error {
 				r.plugins = append(r.plugins, p)
 				r.sortPlugins()
 				r.Unlock()
+				log.Infof(ctx, "plugin %q connected and synchronized", p.name())
 			}
 
-			log.Infof(ctx, "plugin %q connected", p.name())
+			r.finishedPluginSync()
 		}
 	}()
 
@@ -510,5 +548,32 @@ func (r *Adaptation) sortPlugins() {
 		for i, p := range r.plugins {
 			log.Infof(noCtx, "  #%d: %q (%s)", i+1, p.name(), p.qualifiedName())
 		}
+	}
+}
+
+func (r *Adaptation) requestPluginSync() {
+	r.syncLock.Lock()
+}
+
+func (r *Adaptation) finishedPluginSync() {
+	r.syncLock.Unlock()
+}
+
+type PluginSyncBlock struct {
+	r *Adaptation
+}
+
+// BlockPluginSync blocks plugins from being synchronized/fully registered.
+func (r *Adaptation) BlockPluginSync() *PluginSyncBlock {
+	r.syncLock.RLock()
+	return &PluginSyncBlock{r: r}
+}
+
+// Unblock a plugin sync. block put in place by BlockPluginSync. Safe to call
+// multiple times but only from a single goroutine.
+func (b *PluginSyncBlock) Unblock() {
+	if b != nil && b.r != nil {
+		b.r.syncLock.RUnlock()
+		b.r = nil
 	}
 }

@@ -124,7 +124,7 @@ $(BIN_PATH)/template: $(wildcard plugins/template/*.go)
 
 test-gopkgs: ginkgo-tests test-ulimits
 
-SKIPPED_PKGS="ulimit-adjuster"
+SKIPPED_PKGS="ulimit-adjuster,device-injector"
 
 ginkgo-tests:
 	$(Q)$(GINKGO) run \
@@ -137,11 +137,14 @@ ginkgo-tests:
 	    --coverprofile coverprofile \
 	    --succinct \
 	    --skip-package $(SKIPPED_PKGS) \
-	    -r .; \
+	    -r && \
 	$(GO_CMD) tool cover -html=$(COVERAGE_PATH)/coverprofile -o $(COVERAGE_PATH)/coverage.html
 
 test-ulimits:
 	$(Q)cd ./plugins/ulimit-adjuster && $(GO_TEST) -v
+
+test-device-injector:
+	$(Q)cd ./plugins/device-injector && $(GO_TEST) -v
 
 codecov: SHELL := $(shell which bash)
 codecov:
@@ -162,6 +165,13 @@ vet:
 
 golangci-lint:
 	$(Q)$(GOLANG_CILINT) run
+
+validate-repo-no-changes:
+	$(Q)test -z "$$(git status --short | tee /dev/stderr)" || { \
+		echo "Repository has changes."; \
+		echo "Please make sure to commit all changes, including generated files."; \
+		exit 1; \
+	}
 
 #
 # proto generation targets
