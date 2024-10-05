@@ -352,6 +352,10 @@ func TestContainerMetricsMemory(t *testing.T) {
 }
 
 func TestListContainerStats(t *testing.T) {
+	if goruntime.GOOS == "darwin" {
+		t.Skip("not implemented on Darwin")
+	}
+
 	c := newTestCRIService()
 
 	type args struct {
@@ -461,10 +465,6 @@ func TestListContainerStats(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if goruntime.GOOS == "darwin" {
-			t.Skip("not implemented on Darwin")
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.before != nil {
 				tt.before()
