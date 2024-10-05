@@ -102,7 +102,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 
 	params, err := restoreBootstrapParams(bundle.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
+		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
 	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
