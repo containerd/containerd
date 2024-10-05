@@ -20,6 +20,7 @@ import (
 	"context"
 	"math"
 	"reflect"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -460,6 +461,10 @@ func TestListContainerStats(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		if goruntime.GOOS == "darwin" {
+			t.Skip("not implemented on Darwin")
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.before != nil {
 				tt.before()
