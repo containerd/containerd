@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019]
+        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-13, windows-2019]
 
     steps:
       - uses: actions/checkout@v4
@@ -191,7 +191,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-12, windows-2019, windows-2022]
+        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-13, windows-2019, windows-2022]
         go-version: ["1.22.7", "1.23.1"]
     steps:
       - uses: actions/checkout@v4
@@ -610,7 +610,7 @@ jobs:
 
   tests-mac-os:
     name: MacOS unit tests
-    runs-on: macos-12
+    runs-on: macos-13
     timeout-minutes: 10
     needs: [project, linters, protos, man]
     env:
