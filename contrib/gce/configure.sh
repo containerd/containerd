@@ -235,6 +235,15 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
 EOF
 chmod 644 "${config_path}"
 
+cri_sandboxes="${CONTAINERD_ENABLE_CRI_SANDBOXES:-}"
+containerd_env_path="${CONTAINERD_ENV_PATH:-"/etc/containerd/env"}"
+touch "${containerd_env_path}"
+if [[ -n "${cri_sandboxes}" ]]; then
+  cat > ${containerd_env_path} <<EOF
+ENABLE_CRI_SANDBOXES="${cri_sandboxes}"
+EOF
+fi
+
 # containerd_extra_runtime_handler is the extra runtime handler to install.
 containerd_extra_runtime_handler=${CONTAINERD_EXTRA_RUNTIME_HANDLER:-""}
 if [[ -n "${containerd_extra_runtime_handler}" ]]; then
