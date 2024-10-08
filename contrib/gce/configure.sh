@@ -177,7 +177,9 @@ if [ "${KUBERNETES_MASTER:-}" != "true" ]; then
   fi
 fi
 # Use systemd cgroup if specified in env
+echo "!!! CONTAINERD_SYSTEMD_CGROUP=${CONTAINERD_SYSTEMD_CGROUP:-"unset"}"
 systemdCgroup="${CONTAINERD_SYSTEMD_CGROUP:-"false"}"
+echo "!!! systemdCgroup=${systemdCgroup}"
 log_level="${CONTAINERD_LOG_LEVEL:-"info"}"
 max_container_log_line="${CONTAINERD_MAX_CONTAINER_LOG_LINE:-16384}"
 cat > ${config_path} <<EOF

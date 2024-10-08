@@ -21,6 +21,8 @@ CONTAINERD_HOME="/home/containerd"
 CONTAINERD_ENV_METADATA="containerd-env"
 
 if [ -f "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}" ]; then
+  echo "!!! containerd-env !!!"
+  cat "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
   source "${CONTAINERD_HOME}/${CONTAINERD_ENV_METADATA}"
 fi
 
@@ -64,3 +66,6 @@ mount --make-rshared /home/kubernetes/containerized_mounter/rootfs/var/lib/kubel
 mount --bind /proc /home/kubernetes/containerized_mounter/rootfs/proc
 mount --bind /dev /home/kubernetes/containerized_mounter/rootfs/dev
 rm /tmp/mounter.tar
+
+echo "!!! cgroup !!!"
+mount | grep cgroup
