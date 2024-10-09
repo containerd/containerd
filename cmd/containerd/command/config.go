@@ -18,6 +18,7 @@ package command
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -34,6 +35,10 @@ import (
 )
 
 func outputConfig(ctx context.Context, config *srvconfig.Config) error {
+	return generateConfig(ctx, config, os.Stdout)
+}
+
+func generateConfig(ctx context.Context, config *srvconfig.Config, output io.Writer) error {
 	plugins, err := server.LoadPlugins(ctx, config)
 	if err != nil {
 		return err
@@ -66,13 +71,13 @@ func outputConfig(ctx context.Context, config *srvconfig.Config) error {
 		}
 	}
 
-	// for the time being, keep the defaultConfig's version set at 1 so that
+	// for the time being, keep the defaultConfig's version set at 3 so that
 	// when a config without a version is loaded from disk and has no version
-	// set, we assume it's a v1 config.  But when generating new configs via
+	// set, we assume it's a v3 config.  But when generating new configs via
 	// this command, generate the max configuration version
 	config.Version = version.ConfigVersion
 
-	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+	return toml.NewEncoder(output).SetIndentTables(true).Encode(config)
 }
 
 func defaultConfig() *srvconfig.Config {

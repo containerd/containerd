@@ -412,10 +412,6 @@ func mergeConfig(to, from *Config) error {
 	}
 
 	// Replace entire sections instead of merging map's values.
-	for k, v := range from.Plugins {
-		to.Plugins[k] = v
-	}
-
 	for k, v := range from.StreamProcessors {
 		to.StreamProcessors[k] = v
 	}
