@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,6 +37,7 @@ import (
 	"github.com/containerd/imgcrypt"
 	"github.com/containerd/imgcrypt/images/encryption"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	distribution "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -46,6 +48,8 @@ import (
 	containerdimages "github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/containerd/v2/core/remotes/docker/config"
+	transferimage "github.com/containerd/containerd/v2/core/transfer/image"
+	"github.com/containerd/containerd/v2/core/transfer/registry"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
@@ -137,6 +141,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image reference %q: %w", name, err)
 	}
+
 	ref := namedRef.String()
 	if ref != name {
 		log.G(ctx).Debugf("PullImage using normalized image ref: %q", ref)
@@ -156,6 +161,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			Headers: c.config.Registry.Headers,
 			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 		})
+		image        containerd.Image
 		isSchema1    bool
 		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
 			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
@@ -171,48 +177,83 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	if err != nil {
 		return "", err
 	}
-	log.G(ctx).Debugf("PullImage %q with snapshotter %s", ref, snapshotter)
+
 	span.SetAttributes(
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("snapshotter.name", snapshotter),
 	)
-
 	labels := c.getLabels(ctx, ref)
 
-	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
-		containerd.WithResolver(resolver),
-		containerd.WithPullSnapshotter(snapshotter),
-		containerd.WithPullUnpack,
-		containerd.WithPullLabels(labels),
-		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
-		containerd.WithUnpackOpts([]containerd.UnpackOpt{
-			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
-			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
-		}),
-	}
+	// Use client.Pull to pull the image if UseLocalImagePull is set
+	if c.config.UseLocalImagePull {
+		log.G(ctx).Debugf("PullImage %q with snapshotter %s using client.Pull()", ref, snapshotter)
+		pullOpts := []containerd.RemoteOpt{
+			containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
+			containerd.WithResolver(resolver),
+			containerd.WithPullSnapshotter(snapshotter),
+			containerd.WithPullUnpack,
+			containerd.WithPullLabels(labels),
+			containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+			containerd.WithImageHandler(imageHandler),
+			containerd.WithUnpackOpts([]containerd.UnpackOpt{
+				containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
+				containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
+			}),
+		}
 
-	// Temporarily removed for v2 upgrade
-	//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
-	if !c.config.DisableSnapshotAnnotations {
-		pullOpts = append(pullOpts,
-			containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
-	}
+		// Temporarily removed for v2 upgrade
+		//pullOpts = append(pullOpts, c.encryptedImagesPullOpts()...)
+		if !c.config.DisableSnapshotAnnotations {
+			pullOpts = append(pullOpts,
+				containerd.WithImageHandlerWrapper(snpkg.AppendInfoHandlerWrapper(ref)))
+		}
 
-	if c.config.DiscardUnpackedLayers {
-		// Allows GC to clean layers up from the content store after unpacking
-		pullOpts = append(pullOpts,
-			containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
-	}
+		if c.config.DiscardUnpackedLayers {
+			// Allows GC to clean layers up from the content store after unpacking
+			pullOpts = append(pullOpts,
+				containerd.WithChildLabelMap(containerdimages.ChildGCLabelsFilterLayers))
+		}
 
-	pullReporter.start(pctx)
-	image, err := c.client.Pull(pctx, ref, pullOpts...)
-	pcancel()
-	if err != nil {
-		return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		pullReporter.start(pctx)
+		image, err = c.client.Pull(pctx, ref, pullOpts...)
+		pcancel()
+		if err != nil {
+			return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		}
+		span.AddEvent("Pull and unpack image complete")
+	} else { // Use transfer service by default
+		log.G(ctx).Debugf("PullImage %q with snapshotter %s using transfer service", ref, snapshotter)
+		// Set image store opts
+		var sopts []transferimage.StoreOpt
+		sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
+		sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
+		sopts = append(sopts, transferimage.WithImageLabels(labels))
+		// Set registry opts
+		var registryOpts []registry.Opt
+		registryOpts = append(registryOpts, registry.WithResolver(resolver))
+		reg, err := registry.NewOCIRegistry(ctx, ref, registryOpts...)
+		if err != nil {
+			return "", fmt.Errorf("failed to initialize OCI registry: %w", err)
+		}
+		is := transferimage.NewStore(ref, sopts...)
+
+		if c.transferrer == nil {
+			return "", errors.New("no transferrer configured in CRI image service")
+		}
+		pullReporter.start(pctx)
+		err = c.transferrer.Transfer(pctx, reg, is)
+		pcancel()
+		if err != nil {
+			return "", fmt.Errorf("failed to pull and unpack image %q: %w", ref, err)
+		}
+
+		// Image should be pulled, unpacked and present in containerd image store at this moment
+		image, err = c.client.GetImage(ctx, ref)
+		if err != nil {
+			return "", fmt.Errorf("failed to get image %q from containerd image store: %w", ref, err)
+		}
+		span.AddEvent("Pull and unpack image complete")
 	}
-	span.AddEvent("Pull and unpack image complete")
 
 	configDesc, err := image.Config(ctx)
 	if err != nil {
@@ -348,6 +389,8 @@ func (c *CRIImageService) createOrUpdateImageReference(ctx context.Context, name
 }
 
 // getLabels get image labels to be added on CRI image
+// If by any chance SandboxImage was not set(e.g. CRI config was only partially set),
+// default will be used
 func (c *CRIImageService) getLabels(ctx context.Context, name string) map[string]string {
 	labels := map[string]string{crilabels.ImageLabelKey: crilabels.ImageLabelValue}
 	for _, pinned := range c.config.PinnedImages {

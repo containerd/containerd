@@ -48,6 +48,7 @@ type registryOpts struct {
 	creds         CredentialHelper
 	hostDir       string
 	defaultScheme string
+	resolver      remotes.Resolver
 }
 
 // Opt sets registry-related configurations.
@@ -85,6 +86,14 @@ func WithDefaultScheme(s string) Opt {
 	}
 }
 
+// WithResolver specifies the resolver to use.
+func WithResolver(resolver remotes.Resolver) Opt {
+	return func(o *registryOpts) error {
+		o.resolver = resolver
+		return nil
+	}
+}
+
 // NewOCIRegistry initializes with hosts, authorizer callback, and headers
 func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry, error) {
 	var ropts registryOpts
@@ -93,33 +102,39 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 			return nil, err
 		}
 	}
-	hostOptions := config.HostOptions{}
-	if ropts.hostDir != "" {
-		hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
-	}
-	if ropts.creds != nil {
-		// TODO: Support bearer
-		hostOptions.Credentials = func(host string) (string, string, error) {
-			c, err := ropts.creds.GetCredentials(context.Background(), ref, host)
-			if err != nil {
-				return "", "", err
-			}
 
-			return c.Username, c.Secret, nil
+	// configure resolver and provided host options
+	if ropts.resolver == nil {
+		hostOptions := config.HostOptions{}
+		if ropts.hostDir != "" {
+			hostOptions.HostDir = config.HostDirFromRoot(ropts.hostDir)
 		}
+		if ropts.creds != nil {
+			// TODO: Support bearer
+			hostOptions.Credentials = func(host string) (string, string, error) {
+				c, err := ropts.creds.GetCredentials(context.Background(), ref, host)
+				if err != nil {
+					return "", "", err
+				}
+
+				return c.Username, c.Secret, nil
+			}
+		}
+		if ropts.defaultScheme != "" {
+			hostOptions.DefaultScheme = ropts.defaultScheme
+		}
+
+		ropts.resolver = docker.NewResolver(docker.ResolverOptions{
+			Hosts:   config.ConfigureHosts(ctx, hostOptions),
+			Headers: ropts.headers,
+		})
 	}
-	if ropts.defaultScheme != "" {
-		hostOptions.DefaultScheme = ropts.defaultScheme
-	}
-	resolver := docker.NewResolver(docker.ResolverOptions{
-		Hosts:   config.ConfigureHosts(ctx, hostOptions),
-		Headers: ropts.headers,
-	})
+
 	return &OCIRegistry{
 		reference:     ref,
 		headers:       ropts.headers,
 		creds:         ropts.creds,
-		resolver:      resolver,
+		resolver:      ropts.resolver,
 		hostDir:       ropts.hostDir,
 		defaultScheme: ropts.defaultScheme,
 	}, nil
