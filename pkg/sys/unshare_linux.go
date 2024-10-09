@@ -49,10 +49,11 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 	proc, err := os.StartProcess("/proc/self/exe", []string{"UnshareAfterEnterUserns"}, &os.ProcAttr{
 		Sys: &syscall.SysProcAttr{
 			// clone new user namespace first and then unshare
-			Cloneflags:   unix.CLONE_NEWUSER,
-			Unshareflags: unshareFlags,
-			UidMappings:  uidMaps,
-			GidMappings:  gidMaps,
+			Cloneflags:                 unix.CLONE_NEWUSER,
+			Unshareflags:               unshareFlags,
+			UidMappings:                uidMaps,
+			GidMappings:                gidMaps,
+			GidMappingsEnableSetgroups: true,
 			// NOTE: It's reexec but it's not heavy because subprocess
 			// be in PTRACE_TRACEME mode before performing execve.
 			Ptrace:    true,
