@@ -195,6 +195,25 @@ func (c *criService) recover(ctx context.Context) error {
 		return err
 	}
 
+	for _, container := range c.containerStore.List() {
+		container := container
+		status := container.Status.Get()
+		if status.State() == runtime.ContainerState_CONTAINER_RUNNING {
+			task, err := container.Container.Task(ctx, nil)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to get container %s task", container.ID)
+				continue
+			}
+			exitCh, err := task.Wait(ctrdutil.NamespacedContext())
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to wait container %s", container.ID)
+				continue
+			}
+			// Start exit monitor should be called after container is added into containerStore
+			c.startContainerExitMonitor(context.Background(), container.ID, status.Pid, exitCh)
+		}
+	}
+
 	// Recover all images.
 	if err := c.ImageService.CheckImages(ctx); err != nil {
 		return fmt.Errorf("failed to check images: %w", err)
@@ -376,7 +395,7 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 				}
 				// Wait for the task for exit monitor.
 				// wait is a long running background request, no timeout needed.
-				exitCh, err := t.Wait(ctrdutil.NamespacedContext())
+				_, err := t.Wait(ctrdutil.NamespacedContext())
 				if err != nil {
 					if !errdefs.IsNotFound(err) {
 						return fmt.Errorf("failed to wait for task: %w", err)
@@ -386,9 +405,6 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.FinishedAt = time.Now().UnixNano()
 					status.ExitCode = unknownExitCode
 					status.Reason = unknownExitReason
-				} else {
-					// Start exit monitor.
-					c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
 				}
 			case containerd.Stopped:
 				// Task is stopped. Update status and delete the task.
