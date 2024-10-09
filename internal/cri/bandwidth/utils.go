@@ -52,31 +52,54 @@ func validateBandwidthIsReasonable(rsrc *resource.Quantity) error {
 }
 
 // ExtractPodBandwidthResources extracts the ingress and egress from the given pod annotations
-func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress *resource.Quantity, err error) {
+func ExtractPodBandwidthResources(podAnnotations map[string]string) (ingress, egress, ingressBurst, egressBurst *resource.Quantity, err error) {
 	if podAnnotations == nil {
-		return nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 	str, found := podAnnotations["kubernetes.io/ingress-bandwidth"]
 	if found {
 		ingressValue, err := resource.ParseQuantity(str)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		ingress = &ingressValue
 		if err := validateBandwidthIsReasonable(ingress); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
 	str, found = podAnnotations["kubernetes.io/egress-bandwidth"]
 	if found {
 		egressValue, err := resource.ParseQuantity(str)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		egress = &egressValue
 		if err := validateBandwidthIsReasonable(egress); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 	}
-	return ingress, egress, nil
+
+	str, found = podAnnotations["kubernetes.io/ingress-bandwidth-burst"]
+	if found {
+		ingressBurstValue, err := resource.ParseQuantity(str)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		ingressBurst = &ingressBurstValue
+		if err := validateBandwidthIsReasonable(ingress); err != nil {
+			return nil, nil, nil, nil, err
+		}
+	}
+	str, found = podAnnotations["kubernetes.io/egress-bandwidth-burst"]
+	if found {
+		egressBurstValue, err := resource.ParseQuantity(str)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		egressBurst = &egressBurstValue
+		if err := validateBandwidthIsReasonable(egress); err != nil {
+			return nil, nil, nil, nil, err
+		}
+	}
+	return ingress, egress, ingressBurst, egressBurst, nil
 }
