@@ -333,7 +333,7 @@ func (c *fakeSpecOnlyContainer) Spec(context.Context) (*specs.Spec, error) {
 }
 
 // Checkpoint implements client.Container.
-func (c *fakeSpecOnlyContainer) Checkpoint(context.Context, string, ...containerd.CheckpointOpts) (containerd.Image, error) {
+func (c *fakeSpecOnlyContainer) Checkpoint(context.Context, string, string, ...containerd.CheckpointOpts) (containerd.Image, error) {
 	c.t.Error("fakeSpecOnlyContainer.Checkpoint: not implemented")
 	return nil, errors.New("not implemented")
 }

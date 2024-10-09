@@ -194,7 +194,7 @@ func (f *fakeContainer) Update(ctx context.Context, opts ...containerd.UpdateCon
 	return errdefs.ErrNotImplemented
 }
 
-func (f *fakeContainer) Checkpoint(ctx context.Context, s string, opts ...containerd.CheckpointOpts) (containerd.Image, error) {
+func (f *fakeContainer) Checkpoint(ctx context.Context, s1, s2 string, opts ...containerd.CheckpointOpts) (containerd.Image, error) {
 	return nil, errdefs.ErrNotImplemented
 }
 

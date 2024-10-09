@@ -90,7 +90,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"withpty", []CheckpointOpts{
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"withpty", "", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
 		WithCheckpointTaskExit,
@@ -202,7 +202,7 @@ func TestCheckpointRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"restore", []CheckpointOpts{
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"restore", "", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
 		WithCheckpointTask,
@@ -287,7 +287,7 @@ func TestCheckpointRestoreNewContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"newcontainer", []CheckpointOpts{
+	checkpoint, err := container.Checkpoint(ctx, testCheckpointName+"newcontainer", "", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
 		WithCheckpointTask,
@@ -377,7 +377,7 @@ func TestCheckpointLeaveRunning(t *testing.T) {
 	}
 
 	// checkpoint
-	if _, err := container.Checkpoint(ctx, testCheckpointName+"leaverunning", []CheckpointOpts{
+	if _, err := container.Checkpoint(ctx, testCheckpointName+"leaverunning", "", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
 		WithCheckpointTask,
@@ -564,7 +564,7 @@ func TestCheckpointOnPauseStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = container.Checkpoint(ctx, testCheckpointName+"on-pause", []CheckpointOpts{
+	_, err = container.Checkpoint(ctx, testCheckpointName+"on-pause", "", []CheckpointOpts{
 		WithCheckpointRuntime,
 		WithCheckpointRW,
 		WithCheckpointTask,

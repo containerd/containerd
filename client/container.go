@@ -82,7 +82,7 @@ type Container interface {
 	// Update a container
 	Update(context.Context, ...UpdateContainerOpts) error
 	// Checkpoint creates a checkpoint image of the current container
-	Checkpoint(context.Context, string, ...CheckpointOpts) (Image, error)
+	Checkpoint(context.Context, string, string, ...CheckpointOpts) (Image, error)
 }
 
 func containerFromRecord(client *Client, c containers.Container) *container {
@@ -346,7 +346,7 @@ func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) err
 	return nil
 }
 
-func (c *container) Checkpoint(ctx context.Context, ref string, opts ...CheckpointOpts) (Image, error) {
+func (c *container) Checkpoint(ctx context.Context, ref, imagePath string, opts ...CheckpointOpts) (Image, error) {
 	index := &ocispec.Index{
 		Versioned: ver.Versioned{
 			SchemaVersion: 2,
@@ -361,6 +361,7 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 		FileLocks:           true,
 		EmptyNamespaces:     nil,
 	}
+	copts.ImagePath = imagePath
 	info, err := c.Info(ctx)
 	if err != nil {
 		return nil, err
