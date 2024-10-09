@@ -26,7 +26,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TODO: Support multiple mappings in future
 func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 	parts := strings.Split(mapping, ":")
 	if len(parts) != 3 {
@@ -61,6 +60,21 @@ func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 	}, nil
 }
 
+func parseIDMappingList(mappings string) ([]syscall.SysProcIDMap, error) {
+	var (
+		res     []syscall.SysProcIDMap
+		maplist = strings.Split(mappings, ",")
+	)
+	for _, m := range maplist {
+		r, err := parseIDMapping(m)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, r...)
+	}
+	return res, nil
+}
+
 // IDMapMount applies GID/UID shift according to gidmap/uidmap for target path
 func IDMapMount(source, target string, usernsFd int) (err error) {
 	var (
@@ -88,15 +102,15 @@ func IDMapMount(source, target string, usernsFd int) (err error) {
 	return nil
 }
 
-// GetUsernsFD forks the current process and creates a user namespace using
-// the specified mappings.
+// GetUsernsFD forks the current process and creates a user namespace using the specified mappings.
+// Expected syntax of ID mapping parameter is "%d:%d:%d[,%d:%d:%d,...]"
 func GetUsernsFD(uidmap, gidmap string) (_usernsFD *os.File, _ error) {
-	uidMaps, err := parseIDMapping(uidmap)
+	uidMaps, err := parseIDMappingList(uidmap)
 	if err != nil {
 		return nil, err
 	}
 
-	gidMaps, err := parseIDMapping(gidmap)
+	gidMaps, err := parseIDMappingList(gidmap)
 	if err != nil {
 		return nil, err
 	}
