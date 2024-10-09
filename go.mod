@@ -25,7 +25,7 @@ require (
 	github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723
 	github.com/containerd/platforms v0.2.1
 	github.com/containerd/plugin v0.1.0
-	github.com/containerd/ttrpc v1.2.5
+	github.com/containerd/ttrpc v1.2.6-0.20240827082320-b5cd6e4b3287
 	github.com/containerd/typeurl/v2 v2.2.0
 	github.com/containernetworking/cni v1.2.3
 	github.com/containernetworking/plugins v1.5.1
@@ -151,3 +151,5 @@ require (
 )
 
 replace github.com/containerd/containerd/api => ./api
+
+replace github.com/containerd/nri => github.com/klihub/nri v0.6.2-0.20241004070708-65b762f432ef

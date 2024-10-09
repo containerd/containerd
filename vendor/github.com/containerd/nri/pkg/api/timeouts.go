@@ -14,16 +14,15 @@
    limitations under the License.
 */
 
-package multiplex
+package api
 
-const (
-	// PluginServiceConn is the mux connection ID for NRI plugin services.
-	PluginServiceConn ConnID = iota + 1
-	// RuntimeServiceConn is the mux connection ID for NRI runtime services.
-	RuntimeServiceConn
+import (
+	"time"
 )
 
 const (
-	ttrpcMessageHeaderLength = 10
-	ttrpcMessageLengthMax    = 4 << 20
+	// DefaultPluginRegistrationTimeout is the default timeout for plugin registration.
+	DefaultPluginRegistrationTimeout = 5 * time.Second
+	// DefaultPluginRequestTimeout is the default timeout for plugins to handle a request.
+	DefaultPluginRequestTimeout = 2 * time.Second
 )

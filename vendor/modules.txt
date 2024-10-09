@@ -163,8 +163,8 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit; go 1.20
 github.com/containerd/log
 github.com/containerd/log/logtest
-# github.com/containerd/nri v0.6.1
-## explicit; go 1.19
+# github.com/containerd/nri v0.6.1 => github.com/klihub/nri v0.6.2-0.20241004070708-65b762f432ef
+## explicit; go 1.21
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation
 github.com/containerd/nri/pkg/api
@@ -186,7 +186,7 @@ github.com/containerd/platforms
 github.com/containerd/plugin
 github.com/containerd/plugin/dynamic
 github.com/containerd/plugin/registry
-# github.com/containerd/ttrpc v1.2.5
+# github.com/containerd/ttrpc v1.2.6-0.20240827082320-b5cd6e4b3287
 ## explicit; go 1.19
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.2.0
@@ -869,3 +869,4 @@ tags.cncf.io/container-device-interface/pkg/parser
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
 # github.com/containerd/containerd/api => ./api
+# github.com/containerd/nri => github.com/klihub/nri v0.6.2-0.20241004070708-65b762f432ef
