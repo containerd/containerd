@@ -318,6 +318,74 @@ func sbserverSandboxInfo(id string) (*criapiv1.PodSandboxStatus, *types.SandboxI
 	}
 	return status, &info, nil
 }
+// TestRunPodSandboxNoCNIPlugins checks if the sandbox creation fails with the expected error message when no CNI plugins are initialized.
+func TestRunPodSandboxNoCNIPlugins(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip()
+	}
+
+	testCase := func(restart bool) func(*testing.T) {
+		return func(t *testing.T) {
+			t.Log("Init PodSandboxConfig with specific label")
+			labels := map[string]string{
+				t.Name(): "true",
+			}
+			sbConfig := PodSandboxConfig(t.Name(), "nocni", WithPodLabels(labels))
+
+			t.Log("Inject CNI plugin initialization failpoint")
+			injectCNIFailpoint(t, sbConfig, map[string]string{
+				"Init": "1*error(no CNI plugins initialized)",
+			})
+
+			t.Log("Create a sandbox")
+			_, err := runtimeService.RunPodSandbox(sbConfig, failpointRuntimeHandler)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "no CNI plugins initialized")
+
+			t.Log("ListPodSandbox with the specific label")
+			l, err := runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{LabelSelector: labels})
+			require.NoError(t, err)
+			require.Len(t, l, 1)
+
+			sb := l[0]
+			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sb.State)
+			require.Equal(t, sbConfig.Metadata.Name, sb.Metadata.Name)
+			require.Equal(t, sbConfig.Metadata.Namespace, sb.Metadata.Namespace)
+			require.Equal(t, sbConfig.Metadata.Uid, sb.Metadata.Uid)
+			require.Equal(t, sbConfig.Metadata.Attempt, sb.Metadata.Attempt)
+
+			t.Log("Check PodSandboxStatus")
+			sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
+			require.NoError(t, err)
+			require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
+			require.Greater(t, len(sbStatus.Network.Ip), 0)
+
+			if restart {
+				t.Log("Restart containerd")
+				RestartContainerd(t, syscall.SIGTERM)
+
+				t.Log("ListPodSandbox with the specific label")
+				l, err = runtimeService.ListPodSandbox(&criapiv1.PodSandboxFilter{Id: sb.Id})
+				require.NoError(t, err)
+				require.Len(t, l, 1)
+				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, l[0].State)
+
+				t.Log("Check PodSandboxStatus")
+				sbStatus, err := runtimeService.PodSandboxStatus(sb.Id)
+				require.NoError(t, err)
+				t.Log(sbStatus.Network)
+				require.Equal(t, criapiv1.PodSandboxState_SANDBOX_NOTREADY, sbStatus.State)
+			}
+
+			t.Log("Cleanup leaky sandbox")
+			err = runtimeService.RemovePodSandbox(sb.Id)
+			require.NoError(t, err)
+		}
+	}
+
+	t.Run("CleanupAfterRestart", testCase(true))
+	t.Run("JustCleanup", testCase(false))
+}
 
 func ensureCNIAddRunning(t *testing.T, sbName string) error {
 	return Eventually(func() (bool, error) {
