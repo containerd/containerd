@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
@@ -67,7 +68,7 @@ var publishCommand = &cli.Command{
 			Topic: topic,
 			Event: payload,
 		}); err != nil {
-			return errdefs.FromGRPC(err)
+			return errgrpc.ToNative(err)
 		}
 		return nil
 	},

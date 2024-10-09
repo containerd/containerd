@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
@@ -73,7 +74,7 @@ func (p *grpcEventsProxy) Publish(ctx context.Context, topic string, event event
 		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := p.client.Publish(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -88,7 +89,7 @@ func (p *grpcEventsProxy) Forward(ctx context.Context, envelope *events.Envelope
 		},
 	}
 	if _, err := p.client.Forward(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -154,7 +155,7 @@ func (p *ttrpcEventsProxy) Publish(ctx context.Context, topic string, event even
 		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := p.client.Publish(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -169,7 +170,7 @@ func (p *ttrpcEventsProxy) Forward(ctx context.Context, envelope *events.Envelop
 		},
 	}
 	if _, err := p.client.Forward(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
