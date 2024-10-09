@@ -79,13 +79,13 @@ type Init struct {
 }
 
 // NewRunc returns a new runc instance for a process
-func NewRunc(root, path, namespace, runtime string, systemd bool) *runc.Runc {
+func NewRunc(root, file, namespace, runtime string, systemd bool) *runc.Runc {
 	if root == "" {
 		root = RuncRoot
 	}
 	return &runc.Runc{
 		Command:       runtime,
-		Log:           filepath.Join(path, "log.json"),
+		Log:           file,
 		LogFormat:     runc.JSON,
 		PdeathSignal:  unix.SIGKILL,
 		Root:          filepath.Join(root, namespace),
@@ -476,8 +476,7 @@ func (p *Init) runtimeError(rErr error, msg string) error {
 	if rErr == nil {
 		return nil
 	}
-
-	rMsg, err := getLastRuntimeError(p.runtime)
+	rMsg, err := getLastRuntimeError(filepath.Join(p.Bundle, "log.json"))
 	switch {
 	case err != nil:
 		return fmt.Errorf("%s: %s (%s): %w", msg, "unable to retrieve OCI runtime error", err.Error(), rErr)
