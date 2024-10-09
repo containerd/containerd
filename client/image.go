@@ -333,7 +333,11 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	}
 
 	for _, layer := range layers {
-		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, config.SnapshotOpts, config.ApplyOpts)
+		c := append(chain, layer.Diff.Digest)
+		l := map[string]string{"containerd.io/snapshot.ref": identity.ChainID(c).String()}
+		snOpts := append(config.SnapshotOpts, snapshots.WithLabels(l))
+
+		unpacked, err = rootfs.ApplyLayerWithOpts(ctx, layer, chain, sn, a, snOpts, config.ApplyOpts)
 		if err != nil {
 			return fmt.Errorf("apply layer error for %q: %w", i.Name(), err)
 		}
@@ -351,8 +355,7 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 				return err
 			}
 		}
-
-		chain = append(chain, layer.Diff.Digest)
+		chain = c
 	}
 
 	desc, err := i.i.Config(ctx, cs, i.platform)
