@@ -44,54 +44,6 @@ func init() {
 	timeout.Set(boltOpenTimeout, 0) // set to 0 means to wait indefinitely for bolt.Open
 }
 
-// BoltOptions replicates bolt.Options struct, but excludes function fields and adds tags to allow TOML marshalling.
-type BoltOptions struct {
-	//  NoGrowSync sets the DB.NoGrowSync flag before memory mapping the file.
-	NoGrowSync bool `toml:"no_grow_sync"`
-	// NoFreelistSync disables sync freelist to disk. This improves the database write performance
-	// under normal operation, but requires a full database re-sync during recovery.
-	NoFreelistSync bool `toml:"no_freelist_sync"`
-	// PreLoadFreelist sets whether to load the free pages when opening
-	// the db file. Note when opening db in write mode, bbolt will always
-	// load the free pages.
-	PreLoadFreelist bool `toml:"preload_freelist"`
-	// NoSync sets the initial value of DB.NoSync. Normally this can just be
-	// set directly on the DB itself when returned from Open(), but this option
-	// is useful in APIs which expose Options but not the underlying DB.
-	NoSync bool `toml:"no_sync"`
-	// Mlock locks database file in memory when set to true.
-	// It prevents potential page faults, however
-	// used memory can't be reclaimed. (UNIX only)
-	Mlock bool `toml:"mlock"`
-	// MmapFlags sets the DB.MmapFlags flag before memory mapping the file.
-	MmapFlags int `toml:"mmap_flags"`
-	// InitialMmapSize is the initial mmap size of the database
-	// in bytes. Read transactions won't block write transaction
-	// if the InitialMmapSize is large enough to hold database mmap
-	// size. (See DB.Begin for more information)
-	InitialMmapSize int `toml:"init_mmap_size"`
-	// PageSize overrides the default OS page size.
-	PageSize int `toml:"page_size"`
-}
-
-func defaultBoltOptions() BoltOptions {
-	opts := bolt.DefaultOptions
-	return BoltOptions{
-		// Reading bbolt's freelist sometimes fails when the file has a data corruption.
-		// Disabling freelist sync reduces the chance of the breakage.
-		// https://github.com/etcd-io/bbolt/pull/1
-		// https://github.com/etcd-io/bbolt/pull/6
-		NoFreelistSync:  true,
-		NoGrowSync:      opts.NoGrowSync,
-		PreLoadFreelist: opts.PreLoadFreelist,
-		NoSync:          opts.NoSync,
-		Mlock:           opts.Mlock,
-		MmapFlags:       opts.MmapFlags,
-		InitialMmapSize: opts.InitialMmapSize,
-		PageSize:        opts.PageSize,
-	}
-}
-
 // BoltConfig defines the configuration values for the bolt plugin, which is
 // loaded here, rather than back registered in the metadata package.
 type BoltConfig struct {
@@ -112,8 +64,14 @@ type BoltConfig struct {
 	// just by knowing its digest.
 	ContentSharingPolicy string `toml:"content_sharing_policy"`
 
-	// DB allows low-level tuning of how DB writes database to disk.
-	DB BoltOptions `toml:"db"`
+	// NoSync enables optimizations that improve database write performance by:
+	// 1. Disabling fsync calls after every write, which prevents ensuring that data is immediately flushed
+	//    to disk but significantly improves write throughput (NoSync).
+	// 2. Preventing automatic growth of the memory-mapped file during writes, further improving performance
+	//    in environments where the database size is stable (NoGrowSync).
+	//
+	// These settings can improve performance, but introduce a risk of data loss during crashes. Use with care!
+	NoSync bool `toml:"no_sync"`
 }
 
 const (
@@ -144,7 +102,7 @@ func init() {
 		},
 		Config: &BoltConfig{
 			ContentSharingPolicy: SharingPolicyShared,
-			DB:                   defaultBoltOptions(),
+			NoSync:               false,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
@@ -171,9 +129,14 @@ func init() {
 				return nil, err
 			}
 
-			config := *bolt.DefaultOptions
+			options := *bolt.DefaultOptions
+			// Reading bbolt's freelist sometimes fails when the file has a data corruption.
+			// Disabling freelist sync reduces the chance of the breakage.
+			// https://github.com/etcd-io/bbolt/pull/1
+			// https://github.com/etcd-io/bbolt/pull/6
+			options.NoFreelistSync = true
 			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
-			config.Timeout = timeout.Get(boltOpenTimeout)
+			options.Timeout = timeout.Get(boltOpenTimeout)
 
 			shared := true
 			ic.Meta.Exports["policy"] = SharingPolicyShared
@@ -189,18 +152,13 @@ func init() {
 
 					log.G(ic.Context).WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
 
-					// Apply options from config
-					config.NoFreelistSync = cfg.DB.NoFreelistSync
-					config.PreLoadFreelist = cfg.DB.PreLoadFreelist
-					config.NoSync = cfg.DB.NoSync
-					config.Mlock = cfg.DB.Mlock
-					config.NoGrowSync = cfg.DB.NoGrowSync
-					config.MmapFlags = cfg.DB.MmapFlags
-					config.InitialMmapSize = cfg.DB.InitialMmapSize
-					config.PageSize = cfg.DB.PageSize
+					if cfg.NoSync {
+						options.NoSync = true
+						options.NoGrowSync = true
+					}
 				}
 			}
-			log.G(ic.Context).WithField("plugin", "bolt").Infof("bolt config: %+v", config)
+			log.G(ic.Context).WithField("plugin", "bolt").Infof("bolt config: %+v", options)
 
 			path := filepath.Join(root, "meta.db")
 			ic.Meta.Exports["path"] = path
@@ -217,7 +175,7 @@ func init() {
 				}
 			}()
 
-			db, err := bolt.Open(path, 0644, &config)
+			db, err := bolt.Open(path, 0644, &options)
 			close(doneCh)
 			if err != nil {
 				return nil, err
