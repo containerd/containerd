@@ -45,6 +45,7 @@ write_files:
       LimitNPROC=infinity
       LimitCORE=infinity
       TasksMax=infinity
+      EnvironmentFile=/etc/containerd/env
       ExecStartPre=/sbin/modprobe overlay
       ExecStart=/home/containerd/usr/local/bin/containerd
 
