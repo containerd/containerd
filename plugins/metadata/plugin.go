@@ -155,10 +155,11 @@ func init() {
 					if cfg.NoSync {
 						options.NoSync = true
 						options.NoGrowSync = true
+
+						log.G(ic.Context).Warn("using async mode for boltdb")
 					}
 				}
 			}
-			log.G(ic.Context).WithField("plugin", "bolt").Infof("bolt config: %+v", options)
 
 			path := filepath.Join(root, "meta.db")
 			ic.Meta.Exports["path"] = path
