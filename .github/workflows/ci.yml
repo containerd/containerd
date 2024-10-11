@@ -26,13 +26,13 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-13, windows-2019]
+        os: [ubuntu-20.04, arm64-8core-32gb, macos-13, windows-2019]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
 
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'actuated-arm64-4cpu-16gb'
+        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'arm64-8core-32gb'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -219,13 +219,13 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-20.04, arm64-8core-32gb, macos-13, windows-2019, windows-2022]
         go-version: ["1.22.8", "1.23.2"]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'actuated-arm64-4cpu-16gb'
+        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'arm64-8core-32gb'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -354,19 +354,19 @@ jobs:
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
-        os: [ubuntu-20.04, actuated-arm64-4cpu-16gb]
+        os: [ubuntu-20.04, arm64-8core-32gb]
         exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'actuated-arm64-4cpu-16gb' }}
+          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
           - runtime: io.containerd.runc.v1
             runc: crun
           - runtime: io.containerd.runtime.v1.linux
             runc: crun
           # runc.v1 doesn't support cgroupv2
           - runtime: io.containerd.runc.v1
-            os: actuated-arm64-4cpu-16gb
+            os: arm64-8core-32gb
           # shim.v1 doesn't support cgroupv2
           - runtime: io.containerd.runtime.v1.linux
-            os: actuated-arm64-4cpu-16gb
+            os: arm64-8core-32gb
 
     env:
       GOTEST: gotestsum --
@@ -386,10 +386,10 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
-        # NOTE: Required actuated enable CONFIG_CHECKPOINT_RESTORE
+        # NOTE: Required arm64 enable CONFIG_CHECKPOINT_RESTORE (need to confirm GitHub action runners config)
         #
         # REF: https://criu.org/Linux_kernel
-        if: matrix.os != 'actuated-arm64-4cpu-16gb'
+        if: matrix.os != 'arm64-8core-32gb'
         run: |
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
