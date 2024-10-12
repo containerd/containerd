@@ -563,30 +563,14 @@ jobs:
           # Canonical's Vagrant 2.2.19 dpkg cannot download Fedora 38 image: https://bugs.launchpad.net/vagrant/+bug/2017828
           # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com jammy main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
-          # we use vagrant from jammy since the sources are not yet available in noble for vagrant
-          # TODO: once vagrant package sources are available in ubuntu-24 this can be removed
-          sudo tee -a /etc/apt/sources.list.d/ubuntu.sources <<EOF
-          Types: deb deb-src
-          URIs: http://archive.ubuntu.com/ubuntu
-          Suites: jammy
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
-          echo "" | sudo tee -a /etc/apt/sources.list.d/ubuntu.sources > /dev/null
-          # jammy security needs to be added so that the compatible ovmf package can be fetched
-          sudo tee -a /etc/apt/sources.list.d/ubuntu.sources <<EOF
-          Types: deb deb-src
-          URIs: http://security.archive.ubuntu.com/ubuntu
-          Suites: jammy-security
-          Components: main restricted universe multiverse
-          Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-          EOF
           sudo apt-get update
-          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf=2022.02-3ubuntu0.22.04.2
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
+          # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
+          sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
           sudo systemctl enable --now libvirtd
-          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get build-dep -y ruby-libvirt
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo vagrant plugin install vagrant-libvirt
       - name: Boot VM
