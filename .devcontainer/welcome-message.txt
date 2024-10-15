@@ -1,7 +1,0 @@
-👋 Welcome to "containerd" in GitHub Codespaces!
-
-🛠️  Your environment is fully setup with all the required software.
-
-🔍 To explore VS Code to its fullest, search using the Command Palette (Cmd/Ctrl + Shift + P or F1).
-
-ℹ️  Look at https://github.com/containerd/project/blob/main/CONTRIBUTING.md for contribution guidelines.
