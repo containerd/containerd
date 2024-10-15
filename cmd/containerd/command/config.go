@@ -94,6 +94,12 @@ var configCommand = &cli.Command{
 		{
 			Name:  "dump",
 			Usage: "See the output of the final main config with imported in subconfig files",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "config",
+					Usage: "Path to configuration file on disk",
+				},
+			},
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
 				ctx := cliContext.Context
@@ -107,6 +113,12 @@ var configCommand = &cli.Command{
 		{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  "config",
+					Usage: "Path to configuration file on disk",
+				},
+			},
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
 				ctx := cliContext.Context
