@@ -111,62 +111,69 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 			bundle.Delete()
 			continue
 		}
-
 	}
 	return nil
 }
 
 func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	var (
-		runtime string
-		id      = bundle.ID
+		shim *shimTask
+		id   = bundle.ID
 	)
 
-	// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
-	if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
-		runtime = string(data)
-	} else if err != nil && !os.IsNotExist(err) {
-		log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
-	}
-
-	// Query runtime name from metadata store
-	if runtime == "" {
-		container, err := m.containers.Get(ctx, id)
+	// If the 'sandbox' file exists in the bundle path, then connect to the sandbox shim.
+	if _, err := os.ReadFile(filepath.Join(bundle.Path, "sandbox")); err == nil {
+		shim, err = loadShimTask(ctx, bundle, func() {})
 		if err != nil {
-			log.G(ctx).WithError(err).Errorf("loading container %s", id)
-			if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
-				log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
-			}
-			return err
+			return fmt.Errorf("unable to load shim %q: %w", id, err)
 		}
-		runtime = container.Runtime.Name
-	}
+	} else {
+		var runtime string
+		// If we're on 1.6+ and specified custom path to the runtime binary, path will be saved in 'shim-binary-path' file.
+		if data, err := os.ReadFile(filepath.Join(bundle.Path, "shim-binary-path")); err == nil {
+			runtime = string(data)
+		} else if !os.IsNotExist(err) {
+			log.G(ctx).WithError(err).Error("failed to read `runtime` path from bundle")
+		}
 
-	runtime, err := m.resolveRuntimePath(runtime)
-	if err != nil {
-		bundle.Delete()
+		// Query runtime name from metadata store
+		if runtime == "" {
+			container, err := m.containers.Get(ctx, id)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("loading container %s", id)
+				if err := mount.UnmountRecursive(filepath.Join(bundle.Path, "rootfs"), 0); err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to unmount of rootfs %s", id)
+				}
+				return err
+			}
+			runtime = container.Runtime.Name
+		}
 
-		return fmt.Errorf("failed to resolve runtime path: %w", err)
-	}
+		runtime, err := m.resolveRuntimePath(runtime)
+		if err != nil {
+			bundle.Delete()
 
-	binaryCall := shimBinary(bundle,
-		shimBinaryConfig{
-			runtime:      runtime,
-			address:      m.containerdAddress,
-			ttrpcAddress: m.containerdTTRPCAddress,
-			env:          m.env,
+			return fmt.Errorf("failed to resolve runtime path: %w", err)
+		}
+
+		binaryCall := shimBinary(bundle,
+			shimBinaryConfig{
+				runtime:      runtime,
+				address:      m.containerdAddress,
+				ttrpcAddress: m.containerdTTRPCAddress,
+				env:          m.env,
+			})
+		shim, err = loadShimTask(ctx, bundle, func() {
+			log.G(ctx).WithField("id", id).Info("shim disconnected")
+
+			cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
+			// Remove self from the runtime task list.
+			m.shims.Delete(ctx, id)
 		})
-	// TODO: It seems we can only call loadShim here if it is a sandbox shim?
-	shim, err := loadShimTask(ctx, bundle, func() {
-		log.G(ctx).WithField("id", id).Info("shim disconnected")
-
-		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
-		// Remove self from the runtime task list.
-		m.shims.Delete(ctx, id)
-	})
-	if err != nil {
-		cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
-		return fmt.Errorf("unable to load shim %q: %w", id, err)
+		if err != nil {
+			cleanupAfterDeadShim(ctx, id, m.shims, m.events, binaryCall)
+			return fmt.Errorf("unable to load shim %q: %w", id, err)
+		}
 	}
 
 	// There are 3 possibilities for the loaded shim here:
