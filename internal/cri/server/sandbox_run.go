@@ -220,6 +220,11 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 				// Teardown network if an error is returned.
 				if cleanupErr = c.teardownPodNetwork(deferCtx, sandbox); cleanupErr != nil {
 					log.G(ctx).WithError(cleanupErr).Errorf("Failed to destroy network for sandbox %q", id)
+
+					// ignoring failed to destroy networks when we failed to setup networks
+					if sandbox.CNIResult == nil {
+						cleanupErr = nil
+					}
 				}
 
 			}
