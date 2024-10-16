@@ -148,16 +148,12 @@ func (c *Collector) collect(entry entry, ch chan<- prometheus.Metric, block bool
 		return
 	}
 
-	data, err := typeurl.UnmarshalAny(stats)
-	if err != nil {
+	s := &v1.Metrics{}
+	if err := typeurl.UnmarshalTo(stats, s); err != nil {
 		log.L.WithError(err).Errorf("unmarshal stats for %s", t.ID())
 		return
 	}
-	s, ok := data.(*v1.Metrics)
-	if !ok {
-		log.L.WithError(err).Errorf("invalid metric type for %s", t.ID())
-		return
-	}
+
 	ns := entry.ns
 	if ns == nil {
 		ns = c.ns
