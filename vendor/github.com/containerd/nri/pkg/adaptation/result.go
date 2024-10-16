@@ -19,6 +19,8 @@ package adaptation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/containerd/nri/pkg/api"
 )
 
 type result struct {
@@ -89,6 +91,7 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 				Env:         []*KeyValue{},
 				Hooks:       &Hooks{},
 				Rlimits:     []*POSIXRlimit{},
+				CDIDevices:  []*CDIDevice{},
 				Linux: &LinuxContainerAdjustment{
 					Devices: []*LinuxDevice{},
 					Resources: &LinuxResources{
@@ -200,7 +203,7 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 	if err := r.adjustEnv(rpl.Env, plugin); err != nil {
 		return err
 	}
-	if err := r.adjustHooks(rpl.Hooks, plugin); err != nil {
+	if err := r.adjustHooks(rpl.Hooks); err != nil {
 		return err
 	}
 	if rpl.Linux != nil {
@@ -213,8 +216,14 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 		if err := r.adjustCgroupsPath(rpl.Linux.CgroupsPath, plugin); err != nil {
 			return err
 		}
+		if err := r.adjustOomScoreAdj(rpl.Linux.OomScoreAdj, plugin); err != nil {
+			return err
+		}
 	}
 	if err := r.adjustRlimits(rpl.Rlimits, plugin); err != nil {
+		return err
+	}
+	if err := r.adjustCDIDevices(rpl.CDIDevices, plugin); err != nil {
 		return err
 	}
 
@@ -322,6 +331,13 @@ func (r *result) adjustMounts(mounts []*Mount, plugin string) error {
 		r.reply.adjust.Mounts = append(r.reply.adjust.Mounts, m)
 	}
 
+	// next, apply deletions with no corresponding additions
+	for _, m := range del {
+		if _, ok := mod[api.ClearRemovalMarker(m.Destination)]; !ok {
+			r.reply.adjust.Mounts = append(r.reply.adjust.Mounts, m)
+		}
+	}
+
 	// finally, apply additions/modifications to plugin container creation request
 	create.Container.Mounts = append(create.Container.Mounts, add...)
 
@@ -382,6 +398,36 @@ func (r *result) adjustDevices(devices []*LinuxDevice, plugin string) error {
 
 	// finally, apply additions/modifications to plugin container creation request
 	create.Container.Linux.Devices = append(create.Container.Linux.Devices, add...)
+
+	return nil
+}
+
+func (r *result) adjustCDIDevices(devices []*CDIDevice, plugin string) error {
+	if len(devices) == 0 {
+		return nil
+	}
+
+	// Notes:
+	//   CDI devices are opaque references, typically to vendor specific
+	//   devices. They get resolved to actual devices and potential related
+	//   mounts, environment variables, etc. in the runtime. Unlike with
+	//   devices, we only allow CDI device references to be added to a
+	//   container, not removed. We pass them unresolved to the runtime and
+	//   have them resolved there. Also unlike with devices, we don't include
+	//   CDI device references in creation requests. However, since there
+	//   is typically a strong ownership and a single related management entity
+	//   per vendor/class for these devices we do treat multiple injection of
+	//   the same CDI device reference as an error here.
+
+	id := r.request.create.Container.Id
+
+	// apply additions to collected adjustments
+	for _, d := range devices {
+		if err := r.owners.claimCDIDevice(id, d.Name, plugin); err != nil {
+			return err
+		}
+		r.reply.adjust.CDIDevices = append(r.reply.adjust.CDIDevices, d)
+	}
 
 	return nil
 }
@@ -458,7 +504,7 @@ func splitEnvVar(s string) (string, string) {
 	return split[0], split[1]
 }
 
-func (r *result) adjustHooks(hooks *Hooks, plugin string) error {
+func (r *result) adjustHooks(hooks *Hooks) error {
 	if hooks == nil {
 		return nil
 	}
@@ -645,7 +691,16 @@ func (r *result) adjustResources(resources *LinuxResources, plugin string) error
 		container.RdtClass = String(v.GetValue())
 		reply.RdtClass = String(v.GetValue())
 	}
-
+	if v := resources.GetPids(); v != nil {
+		if err := r.owners.claimPidsLimit(id, plugin); err != nil {
+			return err
+		}
+		pidv := &api.LinuxPids{
+			Limit: v.GetLimit(),
+		}
+		container.Pids = pidv
+		reply.Pids = pidv
+	}
 	return nil
 }
 
@@ -662,6 +717,23 @@ func (r *result) adjustCgroupsPath(path, plugin string) error {
 
 	create.Container.Linux.CgroupsPath = path
 	r.reply.adjust.Linux.CgroupsPath = path
+
+	return nil
+}
+
+func (r *result) adjustOomScoreAdj(OomScoreAdj *OptionalInt, plugin string) error {
+	if OomScoreAdj == nil {
+		return nil
+	}
+
+	create, id := r.request.create, r.request.create.Container.Id
+
+	if err := r.owners.claimOomScoreAdj(id, plugin); err != nil {
+		return err
+	}
+
+	create.Container.Linux.OomScoreAdj = OomScoreAdj
+	r.reply.adjust.Linux.OomScoreAdj = OomScoreAdj
 
 	return nil
 }
@@ -820,6 +892,14 @@ func (r *result) updateResources(reply, u *ContainerUpdate, plugin string) error
 		}
 		resources.RdtClass = String(v.GetValue())
 	}
+	if v := resources.GetPids(); v != nil {
+		if err := r.owners.claimPidsLimit(id, plugin); err != nil {
+			return err
+		}
+		resources.Pids = &api.LinuxPids{
+			Limit: v.GetLimit(),
+		}
+	}
 
 	// update request/reply from copy on success
 	reply.Linux.Resources = resources.Copy()
@@ -872,6 +952,7 @@ type owners struct {
 	annotations         map[string]string
 	mounts              map[string]string
 	devices             map[string]string
+	cdiDevices          map[string]string
 	env                 map[string]string
 	memLimit            string
 	memReservation      string
@@ -888,11 +969,13 @@ type owners struct {
 	cpuRealtimePeriod   string
 	cpusetCpus          string
 	cpusetMems          string
+	pidsLimit           string
 	hugepageLimits      map[string]string
 	blockioClass        string
 	rdtClass            string
 	unified             map[string]string
 	cgroupsPath         string
+	oomScoreAdj         string
 	rlimits             map[string]string
 }
 
@@ -915,6 +998,10 @@ func (ro resultOwners) claimMount(id, destination, plugin string) error {
 
 func (ro resultOwners) claimDevice(id, path, plugin string) error {
 	return ro.ownersFor(id).claimDevice(path, plugin)
+}
+
+func (ro resultOwners) claimCDIDevice(id, path, plugin string) error {
+	return ro.ownersFor(id).claimCDIDevice(path, plugin)
 }
 
 func (ro resultOwners) claimEnv(id, name, plugin string) error {
@@ -981,6 +1068,10 @@ func (ro resultOwners) claimCpusetMems(id, plugin string) error {
 	return ro.ownersFor(id).claimCpusetMems(plugin)
 }
 
+func (ro resultOwners) claimPidsLimit(id, plugin string) error {
+	return ro.ownersFor(id).claimPidsLimit(plugin)
+}
+
 func (ro resultOwners) claimHugepageLimit(id, size, plugin string) error {
 	return ro.ownersFor(id).claimHugepageLimit(size, plugin)
 }
@@ -999,6 +1090,10 @@ func (ro resultOwners) claimUnified(id, key, plugin string) error {
 
 func (ro resultOwners) claimCgroupsPath(id, plugin string) error {
 	return ro.ownersFor(id).claimCgroupsPath(plugin)
+}
+
+func (ro resultOwners) claimOomScoreAdj(id, plugin string) error {
+	return ro.ownersFor(id).claimOomScoreAdj(plugin)
 }
 
 func (ro resultOwners) claimRlimits(id, typ, plugin string) error {
@@ -1035,6 +1130,17 @@ func (o *owners) claimDevice(path, plugin string) error {
 		return conflict(plugin, other, "device", path)
 	}
 	o.devices[path] = plugin
+	return nil
+}
+
+func (o *owners) claimCDIDevice(name, plugin string) error {
+	if o.cdiDevices == nil {
+		o.cdiDevices = make(map[string]string)
+	}
+	if other, taken := o.cdiDevices[name]; taken {
+		return conflict(plugin, other, "CDI device", name)
+	}
+	o.cdiDevices[name] = plugin
 	return nil
 }
 
@@ -1169,6 +1275,14 @@ func (o *owners) claimCpusetMems(plugin string) error {
 	return nil
 }
 
+func (o *owners) claimPidsLimit(plugin string) error {
+	if other := o.pidsLimit; other != "" {
+		return conflict(plugin, other, "pids pinning")
+	}
+	o.pidsLimit = plugin
+	return nil
+}
+
 func (o *owners) claimHugepageLimit(size, plugin string) error {
 	if o.hugepageLimits == nil {
 		o.hugepageLimits = make(map[string]string)
@@ -1224,6 +1338,14 @@ func (o *owners) claimCgroupsPath(plugin string) error {
 		return conflict(plugin, other, "cgroups path")
 	}
 	o.cgroupsPath = plugin
+	return nil
+}
+
+func (o *owners) claimOomScoreAdj(plugin string) error {
+	if other := o.oomScoreAdj; other != "" {
+		return conflict(plugin, other, "oom score adj")
+	}
+	o.oomScoreAdj = plugin
 	return nil
 }
 

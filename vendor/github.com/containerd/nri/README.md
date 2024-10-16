@@ -297,7 +297,7 @@ apply NRI responses to containers.
 
 The plugin stub hides many of the low-level details of implementing an NRI
 plugin. It takes care of connection establishment, plugin registration,
-configuration, and event subscription. All [sample plugins](pkg/plugins)
+configuration, and event subscription. All [sample plugins](plugins)
 are implemented using the stub. Any of these can be used as a tutorial on
 how the stub library should be used.
 
@@ -308,6 +308,7 @@ The following sample plugins exist for NRI:
   - [logger](plugins/logger)
   - [differ](plugins/differ)
   - [device injector](plugins/device-injector)
+  - [network device injector](plugins/network-device-injector)
   - [OCI hook injector](plugins/hook-injector)
   - [ulimit adjuster](plugins/ulimit-adjuster)
   - [NRI v0.1.0 plugin adapter](plugins/v010-adapter)

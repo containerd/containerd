@@ -21,11 +21,11 @@ require (
 	github.com/containerd/go-runc v1.1.0
 	github.com/containerd/imgcrypt v1.2.0-rc1
 	github.com/containerd/log v0.1.0
-	github.com/containerd/nri v0.6.1
+	github.com/containerd/nri v0.6.2-0.20241010080438-159f5754db39
 	github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723
 	github.com/containerd/platforms v0.2.1
 	github.com/containerd/plugin v0.1.0
-	github.com/containerd/ttrpc v1.2.5
+	github.com/containerd/ttrpc v1.2.6-0.20240827082320-b5cd6e4b3287
 	github.com/containerd/typeurl/v2 v2.2.0
 	github.com/containernetworking/cni v1.2.3
 	github.com/containernetworking/plugins v1.5.1
