@@ -149,6 +149,11 @@ func (f *FakeOS) Stat(name string) (os.FileInfo, error) {
 	return nil, nil
 }
 
+func (f *FakeOS) StatWithoutFileInfo(name string) error {
+	_, err := f.Stat(name)
+	return err
+}
+
 // ResolveSymbolicLink is a fake call that invokes ResolveSymbolicLinkFn or returns its input
 func (f *FakeOS) ResolveSymbolicLink(path string) (string, error) {
 	f.appendCalls("ResolveSymbolicLink", path)
