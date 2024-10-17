@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/ttrpc"
@@ -83,7 +83,7 @@ func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
 
 func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.Empty, error) {
 	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	return empty, nil
@@ -91,7 +91,7 @@ func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.E
 
 func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
 	if err := s.events.Forward(ctx, fromProto(r.Envelope)); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	return empty, nil

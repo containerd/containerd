@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -229,7 +230,7 @@ func (c *criService) handleContainerExit(ctx context.Context, e *eventtypes.Task
 	if errdefs.IsNotFound(err) {
 		_, err = c.client.TaskService().Delete(ctx, &apitasks.DeleteTaskRequest{ContainerID: cntr.Container.ID()})
 		if err != nil {
-			err = errdefs.FromGRPC(err)
+			err = errgrpc.ToNative(err)
 			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("failed to cleanup container %s in task-service: %w", cntr.Container.ID(), err)
 			}
