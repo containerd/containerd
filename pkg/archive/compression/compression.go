@@ -19,6 +19,7 @@ package compression
 import (
 	"bufio"
 	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"context"
 	"encoding/binary"
@@ -45,6 +46,10 @@ const (
 	Gzip
 	// Zstd is zstd compression algorithm.
 	Zstd
+	// Bzip2 is bzip2 compression algorithm
+	Bzip2
+	// Xz is Xz compression algorithm
+	Xz
 )
 
 const (
@@ -135,8 +140,10 @@ const (
 )
 
 var (
-	gzipMagic = []byte{0x1F, 0x8B, 0x08}
-	zstdMagic = []byte{0x28, 0xb5, 0x2f, 0xfd}
+	gzipMagic  = []byte{0x1F, 0x8B, 0x08}
+	zstdMagic  = []byte{0x28, 0xb5, 0x2f, 0xfd}
+	bzip2Magic = []byte{0x42, 0x5A, 0x68}
+	xzMagic    = []byte{0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00}
 )
 
 type matcher = func([]byte) bool
@@ -171,8 +178,10 @@ func zstdMatcher() matcher {
 // DetectCompression detects the compression algorithm of the source.
 func DetectCompression(source []byte) Compression {
 	for compression, fn := range map[Compression]matcher{
-		Gzip: magicNumberMatcher(gzipMagic),
-		Zstd: zstdMatcher(),
+		Gzip:  magicNumberMatcher(gzipMagic),
+		Zstd:  zstdMatcher(),
+		Bzip2: magicNumberMatcher(bzip2Magic),
+		Xz:    magicNumberMatcher(xzMagic),
 	} {
 		if fn(source) {
 			return compression
@@ -230,6 +239,33 @@ func DecompressStream(archive io.Reader) (DecompressReadCloser, error) {
 				return nil
 			},
 		}, nil
+	case Xz:
+		ctx, cancel := context.WithCancel(context.Background())
+		xzReader, err := xzDecompress(ctx, buf)
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+		return &readCloserWrapper{
+			Reader:      xzReader,
+			compression: compression,
+			closer: func() error {
+				cancel()
+				return xzReader.Close()
+			},
+		}, nil
+	case Bzip2:
+		bzip2Reader := bzip2.NewReader(buf)
+		if err != nil {
+			return nil, err
+		}
+		return &readCloserWrapper{
+			Reader:      bzip2Reader,
+			compression: compression,
+			closer: func() error {
+				return nil
+			},
+		}, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported compression format %s", (&compression).Extension())
@@ -259,6 +295,12 @@ func (compression *Compression) Extension() string {
 		return "zst"
 	}
 	return ""
+}
+
+func xzDecompress(ctx context.Context, archive io.Reader) (io.ReadCloser, error) {
+	args := []string{"xz", "-d", "-c", "-q"}
+
+	return cmdStream(exec.CommandContext(ctx, args[0], args[1:]...), archive)
 }
 
 func gzipDecompress(ctx context.Context, buf io.Reader) (io.ReadCloser, error) {
