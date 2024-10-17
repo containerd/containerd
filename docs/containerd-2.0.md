@@ -8,7 +8,7 @@ Please try out the release binaries available at <https://github.com/containerd/
 
 Proposed in [#7592](https://github.com/containerd/containerd/issues/7592), the transfer service is now stable. The transfer service provides a simple interface to transfer artifact objects between any source and destination. Inspired by the core ideas put forth by the libchan project, the transfer service provides an API with binary streams and data channels as first class citizens to offer a more robust API without the need for constant protocol and API updates.
 
-The transfer service has been integrated with the containerd [client](https://pkg.go.dev/github.com/containerd/containerd/v2@v2.0.0-rc.5/client#Client.Transfer) and the debugging tool `ctr` to pull, push, import and export images to containerd. See [transfer.md](./transfer.md) for more details.
+The transfer service has been integrated with the containerd [`client.Transfer`](https://pkg.go.dev/github.com/containerd/containerd/v2@v2.0.0-rc.5/client#Client.Transfer) and the debugging tool `ctr` to pull, push, import and export images to containerd. See the ["Transfer Service"](./transfer.md) document for more details.
 
 ### Sandbox service is now stable
 
@@ -24,11 +24,11 @@ The sandbox controller has added the `Update` API (`/containerd.services.sandbox
 
 ### NRI is now enabled by default
 
-NRI is a framework for plugging domain or vendor-specific logic into OCI-compatible container runtimes. It allows users to make changes to containers, perform extra actions, and improve the management of resources. NRI plugins are considered to be part of the container runtime, and access to NRI is controlled by restricting access to the systemwide NRI socket. See [NRI.md](./NRI.md) for more details.
+NRI is a framework for plugging domain or vendor-specific logic into OCI-compatible container runtimes. It allows users to make changes to containers, perform extra actions, and improve the management of resources. NRI plugins are considered to be part of the container runtime, and access to NRI is controlled by restricting access to the systemwide NRI socket. See the ["NRI"](NRI.md) document for more details.
 
 ### Daemon configuration version 3
 
-This release adds support for containerd daemon configuration `version = 3`. Daemon configurations are automatically migrated to the latest version on startup. This ensures previous configurations continue to work on future daemons; however, it is recommended to migrate to the latest version to avoid migrations and optimize daemon startup time. See [daemon configuration](../RELEASES.md#daemon-configuration) for more details.
+This release adds support for containerd daemon configuration `version = 3`. Daemon configurations are automatically migrated to the latest version on startup. This ensures previous configurations continue to work on future daemons; however, it is recommended to migrate to the latest version to avoid migrations and optimize daemon startup time. See ["Daemon configuration"](../RELEASES.md#daemon-configuration) in the releases document for more details.
 
 ### Plugin info has been added to the Introspection API
 
@@ -107,11 +107,11 @@ Deprecated in containerd v1.5, support for the `containerd.io/restart.logpath` c
 
 ### CRI v1alpha2 API has been removed
 
-Deprecated in containerd v1.7, support for the CRI v1alpha2 API has been removed. Users should migrate to use CRI v1 instead. k8s users can reference containerd's [kubernetes support](../RELEASES.md#kubernetes-support) matrix to verify support for their Kubernetes version.
+Deprecated in containerd v1.7, support for the CRI v1alpha2 API has been removed. Users should migrate to use CRI v1 instead. k8s users can reference containerd's ["Kubernetes support"](../RELEASES.md#kubernetes-support) matrix to verify support for their Kubernetes version.
 
 ### AUFS snapshotter has been removed
 
-Deprecated in containerd v1.7, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See [`snapshotters/README.md`](snapshotters/README.md) for more details.
+Deprecated in containerd v1.7, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See the ["Snapshotters"](snapshotters/README.md) document for more details.
 
 ### `cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz` release bundles have been removed
 
@@ -133,7 +133,7 @@ See also the ["Getting started"](./getting-started.md) document.
 
 The containerd client Go library has moved to its own package ([`github.com/containerd/containerd/v2/client`](https://pkg.go.dev/github.com/containerd/containerd/v2/client)).
 
-See [getting-started.md](./getting-started.md#implementing-your-own-containerd-client) for a working example for building on top of the containerd client.
+See ["Implementing your own containerd client"](./getting-started.md#implementing-your-own-containerd-client) from the getting started guide for a working example for building on top of the containerd client.
 
 ### CRI registry properties are deprecated
 
@@ -149,11 +149,11 @@ Go-plugin libraries (`*.so`) support as containerd runtime plugins (sometimes re
 
 Affected configurations have `plugin_dir` at the root of their containerd configuration.
 
-It is recommended to migrate to use proxy or binary external plugins. See [PLUGINS.md](./PLUGINS.md) for more details.
+It is recommended to migrate to use proxy or binary external plugins. See the ["containerd Plugins"](./PLUGINS.md) document for more details.
 
 ### Support for events envelope to package containerd events is deprecated
 
-[service.events.Envelope](https://pkg.go.dev/github.com/containerd/containerd/api@v1.7.19/services/events/v1#Envelope) and [ttrpc.events.Envelope](https://pkg.go.dev/github.com/containerd/containerd/api@v1.7.19/services/ttrpc/events/v1#Envelope) support is deprecated and will be removed in a future release. It is recommended for users to migrate to [types.Envelope](https://pkg.go.dev/github.com/containerd/containerd/api/types#Envelope).
+[`service.events.Envelope`](https://pkg.go.dev/github.com/containerd/containerd/api@v1.7.19/services/events/v1#Envelope) and [`ttrpc.events.Envelope`](https://pkg.go.dev/github.com/containerd/containerd/api@v1.7.19/services/ttrpc/events/v1#Envelope) support is deprecated and will be removed in a future release. It is recommended for users to migrate to [`types.Envelope`](https://pkg.go.dev/github.com/containerd/containerd/api/types#Envelope).
 
 ### Support for CRI configuration of CNI configuration templates is extended
 
