@@ -30,13 +30,11 @@ their ever increasing deployment footprints and variety of use cases.
 * Use Intel ISA-L's igzip if available ([#9200](https://github.com/containerd/containerd/pull/9200))
 * Introduce top level config migration ([#9223](https://github.com/containerd/containerd/pull/9223))
 * Add image delete target ([#8989](https://github.com/containerd/containerd/pull/8989))
-* Remove `LimitNOFILE` from `containerd.service` ([#8924](https://github.com/containerd/containerd/pull/8924))
 * Add support for image expiration during garbage collection ([#9022](https://github.com/containerd/containerd/pull/9022))
 * Reduce the contention between ref lock and boltdb lock in content store ([#8792](https://github.com/containerd/containerd/pull/8792))
 * Remove "containerd.io/restart.logpath" label ([#8264](https://github.com/containerd/containerd/pull/8264))
 * Remove `aufs` snapshotter ([#8263](https://github.com/containerd/containerd/pull/8263))
-* Fix deadlock during NRI plugin registration ([containerd/nri#79](https://github.com/containerd/nri/pull/79))
-* Fix deadlock when writing to pipe blocks ([containerd/ttrpc#168](https://github.com/containerd/ttrpc/pull/168))
+* Remove `cri-containerd-*.tar.gz` release bundles ([#9096](https://github.com/containerd/containerd/pull/9096))
 
 #### Build and Release Toolchain
 
@@ -92,6 +90,13 @@ their ever increasing deployment footprints and variety of use cases.
 * Remove the CriuPath field from runc's options ([#8279](https://github.com/containerd/containerd/pull/8279))
 * Remove `io.containerd.runtime.v1.linux` and `io.containerd.runc.v1` ([#8262](https://github.com/containerd/containerd/pull/8262))
 
+#### Systemd unit
+* Remove `LimitNOFILE` from `containerd.service` ([#8924](https://github.com/containerd/containerd/pull/8924))
+
+### Bug fixes
+* Fix deadlock during NRI plugin registration ([containerd/nri#79](https://github.com/containerd/nri/pull/79))
+* Fix deadlock when writing to pipe blocks ([containerd/ttrpc#168](https://github.com/containerd/ttrpc/pull/168))
+
 #### Security Advisories
 
 * [medium] RAPL accessible to a container [GHSA-7ww5-4wqc-m92c](https://github.com/containerd/containerd/security/advisories/GHSA-7ww5-4wqc-m92c)
@@ -107,6 +112,7 @@ their ever increasing deployment footprints and variety of use cases.
 * Remove `io.containerd.runtime.v1.linux` and `io.containerd.runc.v1` ([#8262](https://github.com/containerd/containerd/pull/8262))
 * Remove "containerd.io/restart.logpath" label ([#8264](https://github.com/containerd/containerd/pull/8264))
 * Remove `aufs` snapshotter ([#8263](https://github.com/containerd/containerd/pull/8263))
+* Remove `cri-containerd-*.tar.gz` release bundles ([#9096](https://github.com/containerd/containerd/pull/9096))
 
 #### Deprecations
 
