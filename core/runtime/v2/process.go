@@ -72,6 +72,9 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 		ExecID: p.id,
 	})
 	if err != nil {
+		if err == context.DeadlineExceeded {
+			return runtime.State{}, err
+		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
 			return runtime.State{}, errdefs.FromGRPC(err)
 		}
