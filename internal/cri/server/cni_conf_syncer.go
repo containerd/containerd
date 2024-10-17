@@ -97,6 +97,11 @@ func (syncer *cniNetConfSyncer) syncLoop() error {
 			}
 			log.L.Debugf("receiving change event from cni conf dir: %s", event)
 
+			// If the confDir is removed, stop watching.
+			if event.Name == syncer.confDir && (event.Has(fsnotify.Rename) || event.Has(fsnotify.Remove)) {
+				return fmt.Errorf("cni conf dir is removed, stop watching")
+			}
+
 			lerr := syncer.netPlugin.Load(syncer.loadOpts...)
 			if lerr != nil {
 				log.L.WithError(lerr).
