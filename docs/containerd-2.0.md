@@ -113,6 +113,20 @@ Deprecated in containerd v1.7, support for the CRI v1alpha2 API has been removed
 
 Deprecated in containerd v1.7, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See [`snapshotters/README.md`](snapshotters/README.md) for more details.
 
+### `cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz` release bundles have been removed
+
+Deprecated in containerd v1.7, the `cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz` release bundles have been removed from
+<https://github.com/containerd/containerd/releases>.
+
+Instead of this, install the following components separately, either from the binary or from the source:
+* [containerd (`containerd-VERSION-OS-ARCH.tar.gz`)](https://github.com/containerd/containerd/releases)
+* [runc](https://github.com/opencontainers/runc/releases)
+* [CNI plugins](https://github.com/containernetworking/plugins/releases)
+
+The CRI plugin has been included in containerd since containerd 1.1.
+
+See also the ["Getting started"](./getting-started.md) document.
+
 ## What's changing
 
 ### containerd client has moved to its own package
