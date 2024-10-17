@@ -41,17 +41,26 @@ func init() {
 		Type: plugins.GRPCPlugin,
 		ID:   "sandbox-controllers",
 		Requires: []plugin.Type{
+			plugins.PodSandboxPlugin,
 			plugins.SandboxControllerPlugin,
 			plugins.EventPlugin,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			sandboxers, err := ic.GetByType(plugins.SandboxControllerPlugin)
+			sc := make(map[string]sandbox.Controller)
+
+			sandboxers, err := ic.GetByType(plugins.PodSandboxPlugin)
 			if err != nil {
 				return nil, err
 			}
-
-			sc := make(map[string]sandbox.Controller)
 			for name, p := range sandboxers {
+				sc[name] = p.(sandbox.Controller)
+			}
+
+			sandboxersV2, err := ic.GetByType(plugins.SandboxControllerPlugin)
+			if err != nil {
+				return nil, err
+			}
+			for name, p := range sandboxersV2 {
 				sc[name] = p.(sandbox.Controller)
 			}
 
