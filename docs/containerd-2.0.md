@@ -66,6 +66,10 @@ Implementation note: Both `OTEL_SDK_DISABLED` and one of either `OTEL_EXPORTER_O
 
 Intel ISA-L's igzip support has been added to the containerd client. If found, the containerd client uses igzip for gzip decompression, such as when pulling container images. Benchmarks have shown igzip to outperform both Go's built-in gzip and external pigz implementations.
 
+### Image verifier plugins
+
+The transfer service now supports plugins that can verify that images are allowed to be pulled. Plugins like this can implement policy, such as enforcing that container images are signed, or that images must have particular names. Plugins are independent programs that communicate via command-line arguments and standard I/O. See more details in [the image verifier plugin documentation](image-verification.md).
+
 ### Deprecation warnings can now be discovered via the Introspection API
 
 Deprecations warnings have been added to the `ServerResponse` for the introspection service (`/containerd.services.introspection.v1.Introspection/Server`) and to the `ctr` tool via `ctr deprecation list`.
