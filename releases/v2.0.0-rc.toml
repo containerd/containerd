@@ -18,6 +18,103 @@ release includes the stabilization of new features added in the last 1.x release
 as well as the removal of features which were deprecated in 1.x. The goal is to
 support the vast community of containerd users well into the future along with
 their ever increasing deployment footprints and variety of use cases.
+
+### Highlights
+
+* Add Update API for sandbox controller ([#9903](https://github.com/containerd/containerd/pull/9903))
+* Configure otel from env instead of config.toml ([#8970](https://github.com/containerd/containerd/pull/8970))
+* Enable NRI by default ([#9744](https://github.com/containerd/containerd/pull/9744))
+* Add PluginInfo to introspection API ([#9442](https://github.com/containerd/containerd/pull/9442))
+* Remove overlayfs volatile option on temp mounts ([#9555](https://github.com/containerd/containerd/pull/9555))
+* Expose usage of deprecated features ([#9258](https://github.com/containerd/containerd/pull/9258))
+* Use Intel ISA-L's igzip if available ([#9200](https://github.com/containerd/containerd/pull/9200))
+* Introduce top level config migration ([#9223](https://github.com/containerd/containerd/pull/9223))
+* Add image delete target ([#8989](https://github.com/containerd/containerd/pull/8989))
+* Remove `LimitNOFILE` from `containerd.service` ([#8924](https://github.com/containerd/containerd/pull/8924))
+* Add support for image expiration during garbage collection ([#9022](https://github.com/containerd/containerd/pull/9022))
+* Reduce the contention between ref lock and boltdb lock in content store ([#8792](https://github.com/containerd/containerd/pull/8792))
+* Remove "containerd.io/restart.logpath" label ([#8264](https://github.com/containerd/containerd/pull/8264))
+* Remove `aufs` snapshotter ([#8263](https://github.com/containerd/containerd/pull/8263))
+* Fix deadlock during NRI plugin registration ([containerd/nri#79](https://github.com/containerd/nri/pull/79))
+* Fix deadlock when writing to pipe blocks ([containerd/ttrpc#168](https://github.com/containerd/ttrpc/pull/168))
+
+#### Build and Release Toolchain
+
+* Generate attestation for artifacts during release ([#10543](https://github.com/containerd/containerd/pull/10543))
+
+#### Container Runtime Interface (CRI)
+
+* Use 'UserSpecifiedImage' from CRI to set the image-name annotation ([#10747](https://github.com/containerd/containerd/pull/10747))
+* Add support to set loopback to up ([#10238](https://github.com/containerd/containerd/pull/10238))
+* Add support for multiple subscribers to CRI container events ([#9661](https://github.com/containerd/containerd/pull/9661))
+* Enable CDI by default ([#9621](https://github.com/containerd/containerd/pull/9621))
+* Remove non-sandboxed CRI implementation ([#9228](https://github.com/containerd/containerd/pull/9228))
+* Add support for userns in stateless and stateful pods with idmap mounts (KEP-127, k8s >= 1.27) ([#8287](https://github.com/containerd/containerd/pull/8287))
+* Use sandboxed CRI by default ([#8994](https://github.com/containerd/containerd/pull/8994))
+* Implement RuntimeConfig CRI call ([#8722](https://github.com/containerd/containerd/pull/8722))
+* Add support for user namespaces (KEP-127) ([#8803](https://github.com/containerd/containerd/pull/8803))
+* Remove CRI v1alpha2 ([#8276](https://github.com/containerd/containerd/pull/8276))
+
+#### Go client
+
+* Add api Go module and move all protos under api ([#10151](https://github.com/containerd/containerd/pull/10151))
+* Move packages based on contributing guide ([#9365](https://github.com/containerd/containerd/pull/9365))
+* Generalize plugin library ([#9214](https://github.com/containerd/containerd/pull/9214))
+* Use github.com/containerd/log ([#9086](https://github.com/containerd/containerd/pull/9086))
+
+#### Image Distribution
+
+* Support to syncfs after pull by using diff plugin ([#10284](https://github.com/containerd/containerd/pull/10284))
+* Skip "unknown" in image platform listing ([#10257](https://github.com/containerd/containerd/pull/10257))
+* Update unpacker to fetch all provided content ([#10202](https://github.com/containerd/containerd/pull/10202))
+* Enable Transfer service API to support plain HTTP ([#10024](https://github.com/containerd/containerd/pull/10024))
+* Enable Transfer service to use registry configuration directory ([#9908](https://github.com/containerd/containerd/pull/9908))
+* Disable the support for Schema 1 images ([#9765](https://github.com/containerd/containerd/pull/9765))
+* Update Transfer service to add OCI descriptors to Progress structure ([#9630](https://github.com/containerd/containerd/pull/9630))
+* Update import and export to allow references to missing content  ([#9554](https://github.com/containerd/containerd/pull/9554))
+* Add option to perform syncfs after pull ([#9401](https://github.com/containerd/containerd/pull/9401))
+* Add image verifier transfer service plugin system based on a binary directory ([#8493](https://github.com/containerd/containerd/pull/8493))
+
+#### Runtime
+
+* Implement  RuntimeStatus.features.supplemental_groups_policy from KEP-3619 ([#10410](https://github.com/containerd/containerd/pull/10410))
+* Add pprof to runc-shim ([#10242](https://github.com/containerd/containerd/pull/10242))
+* Provide runtime options in plugin info ([#10251](https://github.com/containerd/containerd/pull/10251))
+* Store bootstrap parameters in sandbox metadata ([#9736](https://github.com/containerd/containerd/pull/9736))
+* Update apparmor to allow confined runc to kill containers ([#10123](https://github.com/containerd/containerd/pull/10123))
+* Support vsock connection to task api ([#9738](https://github.com/containerd/containerd/pull/9738))
+* Update RuntimeDefault seccomp profile to disallow io_uring related syscalls ([#9320](https://github.com/containerd/containerd/pull/9320))
+* Switch runc shim to task service v3 and fix restore ([#9233](https://github.com/containerd/containerd/pull/9233))
+* Add sandboxer configuration and move sandbox controllers to plugins ([#8268](https://github.com/containerd/containerd/pull/8268))
+* Add annotations to CreateSandbox request ([#8960](https://github.com/containerd/containerd/pull/8960))
+* Add SandboxMetrics ([#8680](https://github.com/containerd/containerd/pull/8680))
+* Publish sandbox events ([#8602](https://github.com/containerd/containerd/pull/8602))
+* Remove the CriuPath field from runc's options ([#8279](https://github.com/containerd/containerd/pull/8279))
+* Remove `io.containerd.runtime.v1.linux` and `io.containerd.runc.v1` ([#8262](https://github.com/containerd/containerd/pull/8262))
+
+#### Security Advisories
+
+* [medium] RAPL accessible to a container [GHSA-7ww5-4wqc-m92c](https://github.com/containerd/containerd/security/advisories/GHSA-7ww5-4wqc-m92c)
+
+#### Breaking
+
+* Remove `disable_cgroup` from CRI config ([#10594](https://github.com/containerd/containerd/pull/10594))
+* Disable the support for Schema 1 images ([#9765](https://github.com/containerd/containerd/pull/9765))
+* Update RuntimeDefault seccomp profile to disallow io_uring related syscalls ([#9320](https://github.com/containerd/containerd/pull/9320))
+* Move client to subpackage ([#9316](https://github.com/containerd/containerd/pull/9316))
+* Remove `LimitNOFILE` from `containerd.service` ([#8924](https://github.com/containerd/containerd/pull/8924))
+* Remove CRI v1alpha2 ([#8276](https://github.com/containerd/containerd/pull/8276))
+* Remove `io.containerd.runtime.v1.linux` and `io.containerd.runc.v1` ([#8262](https://github.com/containerd/containerd/pull/8262))
+* Remove "containerd.io/restart.logpath" label ([#8264](https://github.com/containerd/containerd/pull/8264))
+* Remove `aufs` snapshotter ([#8263](https://github.com/containerd/containerd/pull/8263))
+
+#### Deprecations
+
+* Update warnings for deprecated CRI config fields ([#10509](https://github.com/containerd/containerd/pull/10509))
+* Add type alias for event Envelope ([#10279](https://github.com/containerd/containerd/pull/10279))
+* Postpone removal of deprecated CRI config properties ([#9966](https://github.com/containerd/containerd/pull/9966))
+* Deprecate go-plugin configuration option ([#9238](https://github.com/containerd/containerd/pull/9238))
+* CNI conf_template in CRI is no longer deprecated ([#8637](https://github.com/containerd/containerd/pull/8637))
 """
 
 postface = """\
