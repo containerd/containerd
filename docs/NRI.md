@@ -23,8 +23,8 @@ look at the [NRI repository](https://github.com/containerd/nri).
 </details>
 
 NRI support in containerd is split into two parts both logically and
-physically. These parts are a common plugin (/nri/*) to integrate to
-NRI and CRI-specific bits (/pkg/cri/server/nri-api) which convert
+physically. These parts are a common plugin (`/internal/nri/*`) to integrate to
+NRI and CRI-specific bits (`/internal/cri/nri`) which convert
 data between the runtime-agnostic NRI representation and the internal
 representation of the CRI plugin.
 
@@ -42,10 +42,7 @@ an external NRI plugin needs to be applied to a container within containerd. `Do
 
 The containerd CRI plugin registers itself as an above mentioned NRI
 Domain for the "k8s.io" namespace, to allow container configuration to be customized by external
-NRI plugins. Currently this Domain interface is only implemented for
-the original CRI `pkg/cri/server` implementation. Implementing it for
-the more recent experimental `pkg/cri/sbserver` implementation is on
-the TODO list.
+NRI plugins.
 
 ### NRI Support for Other Container 'Domains'
 
@@ -75,7 +72,7 @@ look something like this:
     plugin_path = "/opt/nri/plugins"
     # plugin_registration_timeout is the timeout for a plugin to register after connection.
     plugin_registration_timeout = "5s"
-    # plugin_requst_timeout is the timeout for a plugin to handle an event/request.
+    # plugin_request_timeout is the timeout for a plugin to handle an event/request.
     plugin_request_timeout = "2s"
     # socket_path is the path of the NRI socket to create for plugins to connect to.
     socket_path = "/var/run/nri/nri.sock"
