@@ -17,6 +17,7 @@
 package tasks
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -678,9 +679,15 @@ func (l *local) writeContent(ctx context.Context, mediaType, ref string, r io.Re
 		return nil, err
 	}
 	defer writer.Close()
-	size, err := io.Copy(writer, r)
+	bw := bufio.NewWriter(writer)
+	size, err := io.Copy(bw, r)
 	if err != nil {
 		return nil, err
+	}
+	// Sync() may take serval minutes to write in-memory big data to local storage.
+	// Use Flush() method instead to accelerate it.
+	if err := bw.Flush(); err != nil {
+		return nil, fmt.Errorf("flush failed: %w", err)
 	}
 	if err := writer.Commit(ctx, 0, ""); err != nil && !errdefs.IsAlreadyExists(err) {
 		return nil, err
