@@ -108,8 +108,7 @@ To use it via the go client API, it is identical to using any other snapshotter:
 ```go
 import (
     "context"
-    "github.com/containerd/containerd"
-    "github.com/containerd/containerd/snapshots"
+    containerd "github.com/containerd/containerd/v2/client"
 )
 
 // create a new client
