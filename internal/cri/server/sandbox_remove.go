@@ -113,6 +113,14 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 
 	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
 
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+	if err := c.cleanupImageMounts(ctx, id, c.RuntimeSnapshotter(ctx, ociRuntime)); err != nil {
+		return nil, fmt.Errorf("failed to cleanup image mounts for sandbox %q: %w", id, err)
+	}
+
 	span.AddEvent("pod sandbox removed",
 		tracing.Attribute("sandbox.remove.duration", time.Since(start).String()),
 	)
