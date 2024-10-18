@@ -107,7 +107,8 @@ func (c *criService) recover(ctx context.Context) error {
 		metadata := sandboxstore.Metadata{}
 		err := sbx.GetExtension(podsandbox.MetadataKey, &metadata)
 		if err != nil {
-			return fmt.Errorf("failed to get metadata for stored sandbox %q: %w", sbx.ID, err)
+			log.G(ctx).WithError(err).Warnf("failed to get metadata for stored sandbox %q: %w", sbx.ID)
+			continue
 		}
 
 		var (
