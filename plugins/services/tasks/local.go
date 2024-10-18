@@ -30,6 +30,18 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
@@ -47,16 +59,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var (
@@ -153,7 +155,7 @@ type local struct {
 func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	var (
@@ -228,14 +230,14 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 
 	_, err = rtime.Get(ctx, r.ContainerID)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	if err == nil {
-		return nil, errdefs.ToGRPC(fmt.Errorf("task %s: %w", r.ContainerID, errdefs.ErrAlreadyExists))
+		return nil, errgrpc.ToGRPC(fmt.Errorf("task %s: %w", r.ContainerID, errdefs.ErrAlreadyExists))
 	}
 	c, err := rtime.Create(ctx, r.ContainerID, opts)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	labels := map[string]string{"runtime": container.Runtime.Name}
 	if err := l.monitor.Monitor(c, labels); err != nil {
@@ -259,15 +261,15 @@ func (l *local) Start(ctx context.Context, r *api.StartRequest, _ ...grpc.CallOp
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	if err := p.Start(ctx); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	state, err := p.State(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &api.StartResponse{
 		Pid: state.Pid,
@@ -292,7 +294,7 @@ func (l *local) Delete(ctx context.Context, r *api.DeleteTaskRequest, _ ...grpc.
 
 	exit, err := l.v2Runtime.Delete(ctx, r.ContainerID)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	return &api.DeleteResponse{
@@ -309,11 +311,11 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 	}
 	process, err := t.Process(ctx, r.ExecID)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	exit, err := process.Delete(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &api.DeleteResponse{
 		ID:         r.ExecID,
@@ -370,12 +372,12 @@ func (l *local) Get(ctx context.Context, r *api.GetRequest, _ ...grpc.CallOption
 	p := runtime.Process(task)
 	if r.ExecID != "" {
 		if p, err = task.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	t, err := getProcessState(ctx, p)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &api.GetResponse{
 		Process: t,
@@ -386,7 +388,7 @@ func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.Cal
 	resp := &api.ListTasksResponse{}
 	tasks, err := l.v2Runtime.Tasks(ctx, false)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	addTasks(ctx, resp, tasks)
 	return resp, nil
@@ -412,7 +414,7 @@ func (l *local) Pause(ctx context.Context, r *api.PauseTaskRequest, _ ...grpc.Ca
 	}
 	err = t.Pause(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -424,7 +426,7 @@ func (l *local) Resume(ctx context.Context, r *api.ResumeTaskRequest, _ ...grpc.
 	}
 	err = t.Resume(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -437,11 +439,11 @@ func (l *local) Kill(ctx context.Context, r *api.KillRequest, _ ...grpc.CallOpti
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	if err := p.Kill(ctx, r.Signal, r.All); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -453,7 +455,7 @@ func (l *local) ListPids(ctx context.Context, r *api.ListPidsRequest, _ ...grpc.
 	}
 	processList, err := t.Pids(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	var processes []*task.ProcessInfo
 	for _, p := range processList {
@@ -491,7 +493,7 @@ func (l *local) Exec(ctx context.Context, r *api.ExecProcessRequest, _ ...grpc.C
 			Terminal: r.Terminal,
 		},
 	}); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -504,14 +506,14 @@ func (l *local) ResizePty(ctx context.Context, r *api.ResizePtyRequest, _ ...grp
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	if err := p.ResizePty(ctx, runtime.ConsoleSize{
 		Width:  r.Width,
 		Height: r.Height,
 	}); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -524,12 +526,12 @@ func (l *local) CloseIO(ctx context.Context, r *api.CloseIORequest, _ ...grpc.Ca
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	if r.Stdin {
 		if err := p.CloseIO(ctx); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	return empty, nil
@@ -553,12 +555,12 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 		checkpointImageExists = true
 		image, err = os.MkdirTemp(os.Getenv("XDG_RUNTIME_DIR"), "ctrd-checkpoint")
 		if err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 		defer os.RemoveAll(image)
 	}
 	if err := t.Checkpoint(ctx, image, r.Options); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	// do not commit checkpoint image if checkpoint ImagePath is passed,
 	// return if checkpointImageExists is false
@@ -584,7 +586,7 @@ func (l *local) Checkpoint(ctx context.Context, r *api.CheckpointTaskRequest, _ 
 	spec := bytes.NewReader(data)
 	specD, err := l.writeContent(ctx, images.MediaTypeContainerd1CheckpointConfig, filepath.Join(image, "spec"), spec)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &api.CheckpointTaskResponse{
 		Descriptors: []*types.Descriptor{
@@ -600,7 +602,7 @@ func (l *local) Update(ctx context.Context, r *api.UpdateTaskRequest, _ ...grpc.
 		return nil, err
 	}
 	if err := t.Update(ctx, r.Resources, r.Annotations); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -627,12 +629,12 @@ func (l *local) Wait(ctx context.Context, r *api.WaitRequest, _ ...grpc.CallOpti
 	p := runtime.Process(t)
 	if r.ExecID != "" {
 		if p, err = t.Process(ctx, r.ExecID); err != nil {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	exit, err := p.Wait(ctx)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &api.WaitResponse{
 		ExitStatus: exit.Status,
@@ -697,7 +699,7 @@ func (l *local) getContainer(ctx context.Context, id string) (*containers.Contai
 	var container containers.Container
 	container, err := l.containers.Get(ctx, id)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return &container, nil
 }

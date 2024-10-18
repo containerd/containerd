@@ -20,14 +20,15 @@ import (
 	"context"
 
 	api "github.com/containerd/containerd/api/services/leases/v1"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"google.golang.org/grpc"
+
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"google.golang.org/grpc"
 )
 
 var empty = &ptypes.Empty{}
@@ -71,7 +72,7 @@ func (s *service) Create(ctx context.Context, r *api.CreateRequest) (*api.Create
 
 	l, err := s.lm.Create(ctx, opts...)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	return &api.CreateResponse{
@@ -87,7 +88,7 @@ func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Emp
 	if err := s.lm.Delete(ctx, leases.Lease{
 		ID: r.ID,
 	}, opts...); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -95,7 +96,7 @@ func (s *service) Delete(ctx context.Context, r *api.DeleteRequest) (*ptypes.Emp
 func (s *service) List(ctx context.Context, r *api.ListRequest) (*api.ListResponse, error) {
 	l, err := s.lm.List(ctx, r.Filters...)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	apileases := make([]*api.Lease, len(l))
@@ -117,7 +118,7 @@ func (s *service) AddResource(ctx context.Context, r *api.AddResourceRequest) (*
 		ID:   r.Resource.ID,
 		Type: r.Resource.Type,
 	}); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -131,7 +132,7 @@ func (s *service) DeleteResource(ctx context.Context, r *api.DeleteResourceReque
 		ID:   r.Resource.ID,
 		Type: r.Resource.Type,
 	}); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	return empty, nil
 }
@@ -143,7 +144,7 @@ func (s *service) ListResources(ctx context.Context, r *api.ListResourcesRequest
 
 	rs, err := s.lm.ListResources(ctx, lease)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	apiResources := make([]*api.Resource, 0, len(rs))

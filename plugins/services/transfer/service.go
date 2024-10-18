@@ -22,13 +22,8 @@ import (
 	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	"github.com/containerd/containerd/api/types"
 	transferTypes "github.com/containerd/containerd/api/types/transfer"
-	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/core/transfer"
-	tplugins "github.com/containerd/containerd/v2/core/transfer/plugins"
-	"github.com/containerd/containerd/v2/pkg/oci"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -37,6 +32,13 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/containerd/containerd/v2/core/streaming"
+	"github.com/containerd/containerd/v2/core/transfer"
+	tplugins "github.com/containerd/containerd/v2/core/transfer/plugins"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/plugins"
 )
 
 var empty = &ptypes.Empty{}
@@ -91,7 +93,7 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 		if req.Options.ProgressStream != "" {
 			stream, err := s.streamManager.Get(ctx, req.Options.ProgressStream)
 			if err != nil {
-				return nil, errdefs.ToGRPC(err)
+				return nil, errgrpc.ToGRPC(err)
 			}
 			defer stream.Close()
 
@@ -123,18 +125,18 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 	}
 	src, err := s.convertAny(ctx, req.Source)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	dst, err := s.convertAny(ctx, req.Destination)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
 	for _, t := range s.transferrers {
 		if err := t.Transfer(ctx, src, dst, transferOpts...); err == nil {
 			return empty, nil
 		} else if !errdefs.IsNotImplemented(err) {
-			return nil, errdefs.ToGRPC(err)
+			return nil, errgrpc.ToGRPC(err)
 		}
 	}
 	return nil, status.Errorf(codes.Unimplemented, "method Transfer not implemented for %s to %s", req.Source.GetTypeUrl(), req.Destination.GetTypeUrl())
