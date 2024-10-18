@@ -29,55 +29,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func TestGetUsageNanoCores(t *testing.T) {
-	timestamp := time.Now()
-	secondAfterTimeStamp := timestamp.Add(time.Second)
-	ID := "ID"
-
-	for _, test := range []struct {
-		desc                        string
-		firstCPUValue               uint64
-		secondCPUValue              uint64
-		expectedNanoCoreUsageFirst  uint64
-		expectedNanoCoreUsageSecond uint64
-	}{
-		{
-			desc:                        "metrics",
-			firstCPUValue:               50,
-			secondCPUValue:              500,
-			expectedNanoCoreUsageFirst:  0,
-			expectedNanoCoreUsageSecond: 450,
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			container, err := containerstore.NewContainer(
-				containerstore.Metadata{ID: ID},
-			)
-			assert.NoError(t, err)
-
-			// calculate for first iteration
-			// first run so container stats will be nil
-			assert.Nil(t, container.Stats)
-			cpuUsage := getUsageNanoCores(test.firstCPUValue, container.Stats, timestamp.UnixNano())
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedNanoCoreUsageFirst, cpuUsage)
-
-			// fill in the stats as if they now exist
-			container.Stats = &stats.ContainerStats{}
-			container.Stats.UsageCoreNanoSeconds = test.firstCPUValue
-			container.Stats.Timestamp = timestamp
-			assert.NotNil(t, container.Stats)
-
-			// calculate for second iteration
-			cpuUsage = getUsageNanoCores(test.secondCPUValue, container.Stats, secondAfterTimeStamp.UnixNano())
-			assert.NoError(t, err)
-			assert.Equal(t, test.expectedNanoCoreUsageSecond, cpuUsage)
-		})
-	}
-
-}
-
 func Test_criService_podSandboxStats(t *testing.T) {
 	initialStatsTimestamp := time.Now()
 	currentStatsTimestamp := initialStatsTimestamp.Add(time.Second)
@@ -93,6 +44,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	for _, test := range []struct {
 		desc                   string
 		metrics                map[string]*wstats.Statistics
+		metricsPeriod          int
 		sandbox                sandboxstore.Sandbox
 		containers             []containerstore.Container
 		expectedPodStats       *expectedStats
@@ -250,11 +202,12 @@ func Test_criService_podSandboxStats(t *testing.T) {
 					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
 				},
 			},
-			sandbox: sandboxPod("s1", initialStatsTimestamp, 400),
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 400, 200),
 			containers: []containerstore.Container{
 				newContainer("c1", running, &stats.ContainerStats{
 					Timestamp:            initialStatsTimestamp,
 					UsageCoreNanoSeconds: 200,
+					UsageNanoCores:       200,
 				}),
 			},
 			expectedPodStats: &expectedStats{
@@ -281,11 +234,44 @@ func Test_criService_podSandboxStats(t *testing.T) {
 				},
 				"s1": nil,
 			},
-			sandbox: sandboxPod("s1", initialStatsTimestamp, 200),
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200, 0),
 			containers: []containerstore.Container{
 				newContainer("c1", running, &stats.ContainerStats{
 					Timestamp:            initialStatsTimestamp,
 					UsageCoreNanoSeconds: 200,
+					UsageNanoCores:       200,
+				}),
+			},
+			expectedPodStats: &expectedStats{
+				UsageCoreNanoSeconds: 400,
+				UsageNanoCores:       200,
+				WorkingSetBytes:      20,
+				CommitMemoryBytes:    20,
+			},
+			expectedContainerStats: []expectedStats{
+				{
+					UsageCoreNanoSeconds: 400,
+					UsageNanoCores:       200,
+					WorkingSetBytes:      20,
+					CommitMemoryBytes:    20,
+				},
+			},
+			expectError: false,
+		},
+		{
+			desc: "pod sandbox with nil stats still works (hostprocess container scenario)",
+			metrics: map[string]*wstats.Statistics{
+				"c1": {
+					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+				},
+				"s1": nil,
+			},
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200, 0),
+			containers: []containerstore.Container{
+				newContainer("c1", running, &stats.ContainerStats{
+					Timestamp:            initialStatsTimestamp,
+					UsageCoreNanoSeconds: 200,
+					UsageNanoCores:       200,
 				}),
 			},
 			expectedPodStats: &expectedStats{
@@ -312,11 +298,12 @@ func Test_criService_podSandboxStats(t *testing.T) {
 				},
 				"s1": {},
 			},
-			sandbox: sandboxPod("s1", initialStatsTimestamp, 200),
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200, 0),
 			containers: []containerstore.Container{
 				newContainer("c1", running, &stats.ContainerStats{
 					Timestamp:            initialStatsTimestamp,
 					UsageCoreNanoSeconds: 200,
+					UsageNanoCores:       200,
 				}),
 			},
 			expectedPodStats: &expectedStats{
@@ -341,7 +328,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 				"c1": {},
 				"s1": {},
 			},
-			sandbox: sandboxPod("s1", initialStatsTimestamp, 200),
+			sandbox: sandboxPod("s1", initialStatsTimestamp, 200, 0),
 			containers: []containerstore.Container{
 				newContainer("c1", running, &stats.ContainerStats{
 					Timestamp:            initialStatsTimestamp,
@@ -355,7 +342,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 		{
 			desc:                   "pod sandbox with no stats in metric mapp will fail",
 			metrics:                map[string]*wstats.Statistics{},
-			sandbox:                sandboxPod("s1", initialStatsTimestamp, 200),
+			sandbox:                sandboxPod("s1", initialStatsTimestamp, 200, 0),
 			containers:             []containerstore.Container{},
 			expectedPodStats:       nil,
 			expectedContainerStats: []expectedStats{},
@@ -364,6 +351,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	} {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
+			c.config.StatsMetricsPeriod = test.metricsPeriod
 			actualPodStats, actualContainerStats, err := c.toPodSandboxStats(test.sandbox, test.metrics, test.containers, currentStatsTimestamp)
 			if test.expectError {
 				assert.NotNil(t, err)
@@ -378,7 +366,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			}
 
 			assert.Equal(t, test.expectedPodStats.UsageCoreNanoSeconds, actualPodStats.Cpu.UsageCoreNanoSeconds.Value)
-			assert.Equal(t, test.expectedPodStats.UsageNanoCores, actualPodStats.Cpu.UsageNanoCores.Value)
+			assert.Equal(t, int(test.expectedPodStats.UsageNanoCores), int(actualPodStats.Cpu.UsageNanoCores.Value))
 
 			for i, expectedStat := range test.expectedContainerStats {
 				actutalStat := actualContainerStats[i]
@@ -390,12 +378,13 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	}
 }
 
-func sandboxPod(id string, timestamp time.Time, cachedCPU uint64) sandboxstore.Sandbox {
+func sandboxPod(id string, timestamp time.Time, cachedCPU uint64, cachedNanoCores uint64) sandboxstore.Sandbox {
 	return sandboxstore.Sandbox{
 		Metadata: sandboxstore.Metadata{ID: id, RuntimeHandler: "runc"},
 		Stats: &stats.ContainerStats{
 			Timestamp:            timestamp,
 			UsageCoreNanoSeconds: cachedCPU,
+			UsageNanoCores:       cachedNanoCores,
 		}}
 }
 
