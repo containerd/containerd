@@ -21,10 +21,11 @@ import (
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
 )
 
 // EventService handles the publish, forward and subscribe of events.
@@ -56,7 +57,7 @@ func (e *eventRemote) Publish(ctx context.Context, topic string, event events.Ev
 		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := e.client.Publish(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -71,7 +72,7 @@ func (e *eventRemote) Forward(ctx context.Context, envelope *events.Envelope) er
 		},
 	}
 	if _, err := e.client.Forward(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }

@@ -21,14 +21,16 @@ import (
 	"fmt"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/containerd/containerd/v2/core/introspection"
 )
 
 var _ = (introspection.Service)(&introspectionRemote{})
@@ -60,7 +62,7 @@ func (i *introspectionRemote) Plugins(ctx context.Context, filters ...string) (*
 	})
 
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	return resp, nil
@@ -70,7 +72,7 @@ func (i *introspectionRemote) Server(ctx context.Context) (*api.ServerResponse, 
 	resp, err := i.client.Server(ctx, &emptypb.Empty{})
 
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	return resp, nil
@@ -90,7 +92,7 @@ func (i *introspectionRemote) PluginInfo(ctx context.Context, pluginType, id str
 		Options: optionsPB,
 	})
 
-	return resp, errdefs.FromGRPC(err)
+	return resp, errgrpc.ToNative(err)
 }
 
 type convertIntrospection struct {

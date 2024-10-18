@@ -32,6 +32,12 @@ import (
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -39,10 +45,6 @@ import (
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/services"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 func init() {
@@ -222,7 +224,7 @@ func pluginToPB(p *plugin.Plugin) *api.Plugin {
 
 	var initErr *rpc.Status
 	if err := p.Err(); err != nil {
-		st, ok := status.FromError(errdefs.ToGRPC(err))
+		st, ok := status.FromError(errgrpc.ToGRPC(err))
 		if ok {
 			var details []*ptypes.Any
 			for _, d := range st.Proto().Details {
@@ -307,7 +309,7 @@ func (l *Local) PluginInfo(ctx context.Context, pluginType, id string, options a
 
 		info, err := pi.PluginInfo(ctx, options)
 		if err != nil {
-			return resp, errdefs.ToGRPC(err)
+			return resp, errgrpc.ToGRPC(err)
 		}
 		ai, err := typeurl.MarshalAny(info)
 		if err != nil {

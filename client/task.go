@@ -29,6 +29,14 @@ import (
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/typeurl/v2"
+	digest "github.com/opencontainers/go-digest"
+	is "github.com/opencontainers/image-spec/specs-go"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
@@ -40,12 +48,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/rootfs"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/typeurl/v2"
-	digest "github.com/opencontainers/go-digest"
-	is "github.com/opencontainers/image-spec/specs-go"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
 // UnknownExitStatus is returned when containerd is unable to
@@ -223,7 +225,7 @@ func (t *task) Start(ctx context.Context) error {
 			t.io.Cancel()
 			t.io.Close()
 		}
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	span.SetAttributes(tracing.Attribute("task.pid", r.Pid))
 	t.pid = r.Pid
@@ -254,7 +256,7 @@ func (t *task) Kill(ctx context.Context, s syscall.Signal, opts ...KillOpts) err
 		All:         i.All,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -267,7 +269,7 @@ func (t *task) Pause(ctx context.Context) error {
 	_, err := t.client.TaskService().Pause(ctx, &tasks.PauseTaskRequest{
 		ContainerID: t.id,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (t *task) Resume(ctx context.Context) error {
@@ -278,7 +280,7 @@ func (t *task) Resume(ctx context.Context) error {
 	_, err := t.client.TaskService().Resume(ctx, &tasks.ResumeTaskRequest{
 		ContainerID: t.id,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (t *task) Status(ctx context.Context) (Status, error) {
@@ -286,7 +288,7 @@ func (t *task) Status(ctx context.Context) (Status, error) {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return Status{}, errdefs.FromGRPC(err)
+		return Status{}, errgrpc.ToNative(err)
 	}
 	status := ProcessStatus(strings.ToLower(r.Process.Status.String()))
 	exitStatus := r.Process.ExitStatus
@@ -377,7 +379,7 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	// Only cleanup the IO after a successful Delete
 	if t.io != nil {
@@ -423,7 +425,7 @@ func (t *task) Exec(ctx context.Context, id string, spec *specs.Process, ioCreat
 		i.Cancel()
 		i.Wait()
 		i.Close()
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &process{
 		id:   id,
@@ -437,7 +439,7 @@ func (t *task) Pids(ctx context.Context) ([]ProcessInfo, error) {
 		ContainerID: t.id,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	var processList []ProcessInfo
 	for _, p := range response.Processes {
@@ -464,7 +466,7 @@ func (t *task) CloseIO(ctx context.Context, opts ...IOCloserOpts) error {
 	r.Stdin = i.Stdin
 
 	_, err := t.client.TaskService().CloseIO(ctx, r)
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (t *task) IO() cio.IO {
@@ -481,7 +483,7 @@ func (t *task) Resize(ctx context.Context, w, h uint32) error {
 		Width:       w,
 		Height:      h,
 	})
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 // NOTE: Checkpoint supports to dump task information to a directory, in this way, an empty
@@ -613,7 +615,7 @@ func (t *task) Update(ctx context.Context, opts ...UpdateTaskOpts) error {
 		request.Annotations = i.Annotations
 	}
 	_, err := t.client.TaskService().Update(ctx, request)
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func (t *task) LoadProcess(ctx context.Context, id string, ioAttach cio.Attach) (Process, error) {
@@ -625,7 +627,7 @@ func (t *task) LoadProcess(ctx context.Context, id string, ioAttach cio.Attach) 
 		ExecID:      id,
 	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		err = errgrpc.ToNative(err)
 		if errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("no running process found: %w", err)
 		}
@@ -651,7 +653,7 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 		},
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	if response.Metrics == nil {
@@ -668,7 +670,7 @@ func (t *task) Metrics(ctx context.Context) (*types.Metric, error) {
 func (t *task) checkpointTask(ctx context.Context, index *v1.Index, request *tasks.CheckpointTaskRequest) error {
 	response, err := t.client.TaskService().Checkpoint(ctx, request)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	// NOTE: response.Descriptors can be an empty slice if checkpoint image is jumped
 	// add the checkpoint descriptors to the index
