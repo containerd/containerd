@@ -33,7 +33,7 @@ Processor Fields:
 * `args` - Arguments passed to the processor binary.
 
 ```toml
-version = 2
+version = 3
 
 [stream_processors]
   [stream_processors."io.containerd.processor.v1.pigz"]

@@ -43,7 +43,7 @@ $ rootlesskit --net=slirp4netns --copy-up=/etc --copy-up=/run \
 * `--state-dir` is set to a random directory under `/tmp` if unset. RootlessKit writes the PID to a file named `child_pid` under this directory.
 * You need to provide `config.toml` with your own path configuration. e.g.
 ```toml
-version = 2
+version = 3
 root = "/home/penguin/.local/share/containerd"
 state = "/run/user/1001/containerd"
 

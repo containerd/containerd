@@ -12,7 +12,7 @@ This file is typically located at `/etc/containerd/config.toml`.
 Here's a minimal sample entry that can be made in the configuration file:
 
 ```toml
-version = 2
+version = 3
 
 [plugins]
   ...

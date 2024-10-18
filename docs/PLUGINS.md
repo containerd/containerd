@@ -63,7 +63,7 @@ refer to a local socket file which the containerd process has access to. The
 currently supported types are `snapshot`, `content`, and `diff`.
 
 ```toml
-version = 2
+version = 3
 
 [proxy_plugins]
   [proxy_plugins.customsnapshot]
@@ -250,10 +250,10 @@ Every plugin can have its own section using the pattern `[plugins."<plugin type>
 
 example configuration
 ```toml
-version = 2
+version = 3
 
 [plugins]
-  [plugins."io.containerd.monitor.v1.cgroups"]
+  [plugins."io.containerd.monitor.task.v1.cgroups"]
     no_prometheus = false
 ```
 
