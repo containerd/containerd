@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
@@ -149,53 +150,46 @@ func (c *criService) mutateImageMount(
 	return nil
 }
 
-func (c *criService) mutateUnmounts(
+func (c *criService) cleanupImageMounts(
 	ctx context.Context,
-	extraMounts []*runtime.Mount,
-	snapshotter string,
-) error {
-	for _, m := range extraMounts {
-		err := c.mutateImageUnmount(ctx, m, snapshotter)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (c *criService) mutateImageUnmount(
-	ctx context.Context,
-	extraMount *runtime.Mount,
+	sandboxID string,
 	snapshotter string,
 ) (retErr error) {
-	if extraMount.Image == nil {
-		return nil
-	}
-
-	target := extraMount.HostPath
-	if target == "" {
-		return nil
-	}
-
-	// Already unmounted from another container on the same pod
-	if _, err := os.Stat(target); os.IsNotExist(err) {
-		return nil
-	}
-
-	err := mount.UnmountAll(target, 0)
+	targetRoot := c.getImageVolumeRoots(sandboxID)
+	dirs, err := os.ReadDir(targetRoot)
 	if err != nil {
-		return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
-	}
-	err = c.client.LeasesService().Delete(ctx, leases.Lease{ID: target})
-	if err != nil {
-		return fmt.Errorf("failed to deleting lease: %w", err)
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
 	}
 
 	s := c.client.SnapshotService(snapshotter)
-	err = s.Remove(ctx, target)
-	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("failed to removing snapshot: %w", err)
+	ls := c.client.LeasesService()
+
+	for _, d := range dirs {
+		target := filepath.Join(targetRoot, d.Name())
+		err = mount.UnmountAll(target, 0)
+		if err != nil {
+			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
+		}
+		err = ls.Delete(ctx, leases.Lease{ID: target})
+		if err != nil {
+			return fmt.Errorf("failed to deleting lease: %w", err)
+		}
+		err = s.Remove(ctx, target)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to removing snapshot: %w", err)
+		}
+		err = os.Remove(target)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to removing mounts directory: %w", err)
+		}
 	}
 
+	err = os.Remove(targetRoot)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return fmt.Errorf("failed to remove directory to cleanup image volume mounts: %w", err)
+	}
 	return nil
 }

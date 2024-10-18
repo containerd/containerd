@@ -148,6 +148,11 @@ func (c *criService) getImageVolumeHostPath(podID, imageID string) string {
 	return filepath.Join(c.config.StateDir, imageVolumeDir, podID, imageID)
 }
 
+// getImageVolumeRoots returns the image volume root directory for cleanup.
+func (c *criService) getImageVolumeRoots(podID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID)
+}
+
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
 // e.g. named pipes.
 func (c *criService) getVolatileContainerRootDir(id string) string {
