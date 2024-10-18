@@ -30,8 +30,8 @@ import (
 )
 
 const (
-	capaRemapIDs     = "remap-ids"
-	capaOnlyRemapIDs = "only-remap-ids"
+	capaOnlyRemapIDs  = "only-remap-ids"
+	capaMultiRemapIDs = "multi-remap-ids"
 )
 
 // Config represents configuration for the overlay plugin.
@@ -81,7 +81,7 @@ func init() {
 			}
 			if ok, err := overlayutils.SupportsIDMappedMounts(); err == nil && ok {
 				oOpts = append(oOpts, overlay.WithRemapIDs)
-				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaRemapIDs)
+				ic.Meta.Capabilities = append(ic.Meta.Capabilities, capaMultiRemapIDs)
 			}
 
 			if config.SlowChown {
