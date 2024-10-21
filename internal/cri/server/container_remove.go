@@ -124,16 +124,6 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 			volatileContainerRootDir, err)
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
-	}
-
-	err = c.mutateUnmounts(ctx, container.Config.Mounts, c.RuntimeSnapshotter(ctx, ociRuntime))
-	if err != nil {
-		return nil, fmt.Errorf("failed to mutate unmount config for container %q: %w", id, err)
-	}
-
 	c.containerStore.Delete(id)
 
 	c.containerNameIndex.ReleaseByKey(id)
