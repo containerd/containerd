@@ -273,25 +273,6 @@ func unknownContainerStatus() containerstore.Status {
 	}
 }
 
-// getPassthroughAnnotations filters requested pod annotations by comparing
-// against permitted annotations for the given runtime.
-func getPassthroughAnnotations(podAnnotations map[string]string,
-	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
-	passthroughAnnotations = make(map[string]string)
-
-	for podAnnotationKey, podAnnotationValue := range podAnnotations {
-		for _, pattern := range runtimePodAnnotations {
-			// Use path.Match instead of filepath.Match here.
-			// filepath.Match treated `\\` as path separator
-			// on windows, which is not what we want.
-			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
-				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
-			}
-		}
-	}
-	return passthroughAnnotations
-}
-
 // copyResourcesToStatus copys container resource contraints from spec to
 // container status.
 // This will need updates when new fields are added to ContainerResources.
