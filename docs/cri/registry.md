@@ -16,6 +16,10 @@ This document describes the method to configure the image registry for `containe
    config_path = "/etc/containerd/certs.d"
 ```
 
+If no registry-specific options are set, `config_path` will default to
+`/etc/containerd/certs.d:/etc/docker/certs.d`, which enables compatibility with
+[the docker method of adding registry configuration](https://docs.docker.com/registry/insecure/#use-self-signed-certificates).
+
 ## Configure Registry Credentials
 
 > **_NOTE:_**  registry.configs.*.auth is DEPRECATED and will NOT have an equivalent way to store
