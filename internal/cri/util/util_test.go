@@ -17,8 +17,10 @@
 package util
 
 import (
+	"strings"
 	"testing"
 
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -135,4 +137,27 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)
 		})
 	}
+}
+
+func TestBuildLabels(t *testing.T) {
+	imageConfigLabels := map[string]string{
+		"a":          "z",
+		"d":          "y",
+		"long-label": strings.Repeat("example", 10000),
+	}
+	configLabels := map[string]string{
+		"a": "b",
+		"c": "d",
+	}
+	newLabels := BuildLabels(configLabels, imageConfigLabels, crilabels.ContainerKindSandbox)
+	assert.Len(t, newLabels, 4)
+	assert.Equal(t, "b", newLabels["a"])
+	assert.Equal(t, "d", newLabels["c"])
+	assert.Equal(t, "y", newLabels["d"])
+	assert.Equal(t, crilabels.ContainerKindSandbox, newLabels[crilabels.ContainerKindLabel])
+	assert.NotContains(t, newLabels, "long-label")
+
+	newLabels["a"] = "e"
+	assert.Empty(t, configLabels[crilabels.ContainerKindLabel], "should not add new labels into original label")
+	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
 }

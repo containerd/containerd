@@ -21,9 +21,11 @@ import (
 	"path"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-
 	"github.com/containerd/containerd/v2/internal/cri/constants"
+	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	clabels "github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/log"
 )
 
 // deferCleanupTimeout is the default timeout for containerd cleanup operations
@@ -63,4 +65,25 @@ func GetPassthroughAnnotations(podAnnotations map[string]string,
 		}
 	}
 	return passthroughAnnotations
+}
+
+// BuildLabel builds the labels from config to be passed to containerd
+func BuildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
+	labels := make(map[string]string)
+
+	for k, v := range imageConfigLabels {
+		if err := clabels.Validate(k, v); err == nil {
+			labels[k] = v
+		} else {
+			// In case the image label is invalid, we output a warning and skip adding it to the
+			// container.
+			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
+		}
+	}
+	// labels from the CRI request (config) will override labels in the image config
+	for k, v := range configLabels {
+		labels[k] = v
+	}
+	labels[crilabels.ContainerKindLabel] = containerType
+	return labels
 }

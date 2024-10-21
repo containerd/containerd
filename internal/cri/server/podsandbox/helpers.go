@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 
@@ -31,7 +30,6 @@ import (
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
@@ -69,27 +67,6 @@ func (c *Controller) toContainerdImage(ctx context.Context, image imagestore.Ima
 		return nil, fmt.Errorf("invalid image with no reference %q", image.ID)
 	}
 	return c.client.GetImage(ctx, image.References[0])
-}
-
-// buildLabel builds the labels from config to be passed to containerd
-func buildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
-	labels := make(map[string]string)
-
-	for k, v := range imageConfigLabels {
-		if err := clabels.Validate(k, v); err == nil {
-			labels[k] = v
-		} else {
-			// In case the image label is invalid, we output a warning and skip adding it to the
-			// container.
-			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
-		}
-	}
-	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
-	labels[crilabels.ContainerKindLabel] = containerType
-	return labels
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.

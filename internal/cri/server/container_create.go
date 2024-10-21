@@ -287,7 +287,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to get container spec opts: %w", err)
 	}
 
-	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindContainer)
+	containerLabels := util.BuildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindContainer)
 
 	// TODO the sandbox in the cache should hold this info
 	runtimeName, runtimeOption, err := c.runtimeInfo(ctx, sandboxID)
