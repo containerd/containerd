@@ -99,22 +99,6 @@ func TestBuildLabels(t *testing.T) {
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
 }
 
-func TestParseImageReferences(t *testing.T) {
-	refs := []string{
-		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"gcr.io/library/busybox:1.2",
-		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"arbitrary-ref",
-	}
-	expectedTags := []string{
-		"gcr.io/library/busybox:1.2",
-	}
-	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
-	tags, digests := parseImageReferences(refs)
-	assert.Equal(t, expectedTags, tags)
-	assert.Equal(t, expectedDigests, digests)
-}
-
 func TestEnvDeduplication(t *testing.T) {
 	for _, test := range []struct {
 		desc     string

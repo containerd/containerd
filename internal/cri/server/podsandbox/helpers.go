@@ -110,24 +110,6 @@ func buildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	return labels
 }
 
-// parseImageReferences parses a list of arbitrary image references and returns
-// the repotags and repodigests
-func parseImageReferences(refs []string) ([]string, []string) {
-	var tags, digests []string
-	for _, ref := range refs {
-		parsed, err := docker.ParseAnyReference(ref)
-		if err != nil {
-			continue
-		}
-		if _, ok := parsed.(docker.Canonical); ok {
-			digests = append(digests, parsed.String())
-		} else if _, ok := parsed.(docker.Tagged); ok {
-			tags = append(tags, parsed.String())
-		}
-	}
-	return tags, digests
-}
-
 // getPassthroughAnnotations filters requested pod annotations by comparing
 // against permitted annotations for the given runtime.
 func getPassthroughAnnotations(podAnnotations map[string]string,
