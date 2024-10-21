@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -149,53 +151,62 @@ func (c *criService) mutateImageMount(
 	return nil
 }
 
-func (c *criService) mutateUnmounts(
+func (c *criService) cleanupImageMounts(
 	ctx context.Context,
-	extraMounts []*runtime.Mount,
-	snapshotter string,
-) error {
-	for _, m := range extraMounts {
-		err := c.mutateImageUnmount(ctx, m, snapshotter)
+	sandboxID string,
+) (retErr error) {
+	// Some checks to avoid affecting old pods.
+	ociRuntime, err := c.getPodSandboxRuntime(sandboxID)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to get sandbox runtime handler %q", sandboxID)
+		return nil
+	}
+	snapshotter := c.RuntimeSnapshotter(ctx, ociRuntime)
+	if snapshotter == "" {
+		return nil
+	}
+	s := c.client.SnapshotService(snapshotter)
+	if s == nil {
+		return nil
+	}
+	targetBase := c.getImageVolumeBaseDir(sandboxID)
+	dir, err := os.Open(targetBase)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	entries, err := dir.Readdir(-1)
+	if err != nil {
+		return fmt.Errorf("failed to read directory entries: %w", err)
+	}
+
+	ls := c.client.LeasesService()
+	for _, entry := range entries {
+		target := filepath.Join(targetBase, entry.Name())
+
+		err = mount.UnmountAll(target, 0)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
+		}
+		err = ls.Delete(ctx, leases.Lease{ID: target})
+		if err != nil {
+			return fmt.Errorf("failed to delete lease %q: %w", target, err)
+		}
+		err = s.Remove(ctx, target)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to removing snapshot: %w", err)
+		}
+		err = os.Remove(target)
+		if err != nil && !errdefs.IsNotFound(err) {
+			return fmt.Errorf("failed to removing mounts directory: %w", err)
 		}
 	}
-	return nil
-}
 
-func (c *criService) mutateImageUnmount(
-	ctx context.Context,
-	extraMount *runtime.Mount,
-	snapshotter string,
-) (retErr error) {
-	if extraMount.Image == nil {
-		return nil
-	}
-
-	target := extraMount.HostPath
-	if target == "" {
-		return nil
-	}
-
-	// Already unmounted from another container on the same pod
-	if _, err := os.Stat(target); os.IsNotExist(err) {
-		return nil
-	}
-
-	err := mount.UnmountAll(target, 0)
-	if err != nil {
-		return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
-	}
-	err = c.client.LeasesService().Delete(ctx, leases.Lease{ID: target})
-	if err != nil {
-		return fmt.Errorf("failed to deleting lease: %w", err)
-	}
-
-	s := c.client.SnapshotService(snapshotter)
-	err = s.Remove(ctx, target)
+	err = os.Remove(targetBase)
 	if err != nil && !errdefs.IsNotFound(err) {
-		return fmt.Errorf("failed to removing snapshot: %w", err)
+		return fmt.Errorf("failed to remove directory to cleanup image volume mounts: %w", err)
 	}
-
 	return nil
 }

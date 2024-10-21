@@ -86,6 +86,11 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 		return nil, fmt.Errorf("failed to delete sandbox %q: %w", id, err)
 	}
 
+	err = c.cleanupImageMounts(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to cleanup image mounts for sandbox %q: %w", id, err)
+	}
+
 	// Send CONTAINER_DELETED event with ContainerId equal to SandboxId.
 	c.generateAndSendContainerEvent(ctx, id, id, runtime.ContainerEventType_CONTAINER_DELETED_EVENT)
 
