@@ -20,13 +20,14 @@ import (
 	"context"
 
 	imagesapi "github.com/containerd/containerd/api/services/images/v1"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/errdefs"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type remoteImages struct {
@@ -45,7 +46,7 @@ func (s *remoteImages) Get(ctx context.Context, name string) (images.Image, erro
 		Name: name,
 	})
 	if err != nil {
-		return images.Image{}, errdefs.FromGRPC(err)
+		return images.Image{}, errgrpc.ToNative(err)
 	}
 
 	return imageFromProto(resp.Image), nil
@@ -56,7 +57,7 @@ func (s *remoteImages) List(ctx context.Context, filters ...string) ([]images.Im
 		Filters: filters,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	return imagesFromProto(resp.Images), nil
@@ -71,7 +72,7 @@ func (s *remoteImages) Create(ctx context.Context, image images.Image) (images.I
 	}
 	created, err := s.client.Create(ctx, req)
 	if err != nil {
-		return images.Image{}, errdefs.FromGRPC(err)
+		return images.Image{}, errgrpc.ToNative(err)
 	}
 
 	return imageFromProto(created.Image), nil
@@ -93,7 +94,7 @@ func (s *remoteImages) Update(ctx context.Context, image images.Image, fieldpath
 	}
 	updated, err := s.client.Update(ctx, req)
 	if err != nil {
-		return images.Image{}, errdefs.FromGRPC(err)
+		return images.Image{}, errgrpc.ToNative(err)
 	}
 
 	return imageFromProto(updated.Image), nil
@@ -114,7 +115,7 @@ func (s *remoteImages) Delete(ctx context.Context, name string, opts ...images.D
 		req.Target = oci.DescriptorToProto(*do.Target)
 	}
 	_, err := s.client.Delete(ctx, req)
-	return errdefs.FromGRPC(err)
+	return errgrpc.ToNative(err)
 }
 
 func imageToProto(image *images.Image) *imagesapi.Image {

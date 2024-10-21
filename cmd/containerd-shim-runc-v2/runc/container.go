@@ -32,13 +32,15 @@ import (
 	"github.com/containerd/console"
 	"github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/cmd/containerd-shim-runc-v2/process"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/stdio"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/typeurl/v2"
 )
 
 // NewContainer returns a new runc container
@@ -130,10 +132,10 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		rootfs,
 	)
 	if err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	if err := p.Create(ctx, config); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 	container := &Container{
 		ID:              r.ID,

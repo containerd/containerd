@@ -22,11 +22,13 @@ import (
 
 	api "github.com/containerd/containerd/api/services/sandbox/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/typeurl/v2"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/core/sandbox"
 )
 
 // remoteSandboxController is a low level GRPC client for containerd's sandbox controller service
@@ -58,7 +60,7 @@ func (s *remoteSandboxController) Create(ctx context.Context, sandboxInfo sandbo
 		Sandboxer:   s.sandboxerName,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -70,7 +72,7 @@ func (s *remoteSandboxController) Start(ctx context.Context, sandboxID string) (
 		Sandboxer: s.sandboxerName,
 	})
 	if err != nil {
-		return sandbox.ControllerInstance{}, errdefs.FromGRPC(err)
+		return sandbox.ControllerInstance{}, errgrpc.ToNative(err)
 	}
 
 	return sandbox.ControllerInstance{
@@ -89,7 +91,7 @@ func (s *remoteSandboxController) Platform(ctx context.Context, sandboxID string
 		Sandboxer: s.sandboxerName,
 	})
 	if err != nil {
-		return imagespec.Platform{}, errdefs.FromGRPC(err)
+		return imagespec.Platform{}, errgrpc.ToNative(err)
 	}
 
 	platform := resp.GetPlatform()
@@ -114,7 +116,7 @@ func (s *remoteSandboxController) Stop(ctx context.Context, sandboxID string, op
 	}
 	_, err := s.client.Stop(ctx, req)
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -126,7 +128,7 @@ func (s *remoteSandboxController) Shutdown(ctx context.Context, sandboxID string
 		Sandboxer: s.sandboxerName,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 
 	return nil
@@ -146,7 +148,7 @@ func (s *remoteSandboxController) Wait(ctx context.Context, sandboxID string) (s
 			Sandboxer: s.sandboxerName,
 		})
 		if err != nil {
-			grpcErr := errdefs.FromGRPC(err)
+			grpcErr := errgrpc.ToNative(err)
 			if !errdefs.IsUnavailable(grpcErr) {
 				return sandbox.ExitStatus{}, grpcErr
 			}
@@ -176,7 +178,7 @@ func (s *remoteSandboxController) Status(ctx context.Context, sandboxID string, 
 		Sandboxer: s.sandboxerName,
 	})
 	if err != nil {
-		return sandbox.ControllerStatus{}, errdefs.FromGRPC(err)
+		return sandbox.ControllerStatus{}, errgrpc.ToNative(err)
 	}
 	return sandbox.ControllerStatus{
 		SandboxID: sandboxID,
@@ -197,7 +199,7 @@ func (s *remoteSandboxController) Metrics(ctx context.Context, sandboxID string)
 		Sandboxer: s.sandboxerName,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return resp.Metrics, nil
 }
@@ -214,7 +216,7 @@ func (s *remoteSandboxController) Update(
 		Fields:    fields,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
