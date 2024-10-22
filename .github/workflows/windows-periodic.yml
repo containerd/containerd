@@ -86,13 +86,13 @@ jobs:
           creds: ${{ secrets.AZURE_CREDS }}
 
       - name: AZResourceGroupCreate
-        uses: azure/CLI@4db43908b9df2e7ac93c8275a8f9a448c59338dd # v1.0.9
+        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
         with:
           inlinescript: |
             az group create -n ${{ matrix.AZURE_RESOURCE_GROUP }} -l ${{ env.AZURE_DEFAULT_LOCATION }} --tags creationTimestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 
       - name: AZTestVMCreate
-        uses: azure/CLI@4db43908b9df2e7ac93c8275a8f9a448c59338dd # v1.0.9
+        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
         with:
           inlinescript: |
             DETAILS=$(az vm create -n winTestVM --admin-username ${{ env.DEFAULT_ADMIN_USERNAME }} --admin-password ${{ env.PASSWORD }} --image ${{ matrix.AZURE_IMG }} -g ${{ matrix.AZURE_RESOURCE_GROUP }} --nsg-rule SSH --size ${{ env.AZURE_DEFAULT_VM_SIZE }} --public-ip-sku Standard -o json)
@@ -116,7 +116,7 @@ jobs:
             echo "VM_PUB_IP=$PUB_IP" >> $GITHUB_ENV
 
       - name: EnableAZVMSSH
-        uses: azure/CLI@4db43908b9df2e7ac93c8275a8f9a448c59338dd # v1.0.9
+        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
         with:
           inlinescript: |
             az vm run-command invoke  --command-id RunPowerShellScript -n winTestVM -g ${{ matrix.AZURE_RESOURCE_GROUP }} --scripts @$GITHUB_WORKSPACE/script/setup/enable_ssh_windows.ps1 --parameters 'SSHPublicKey=${{ env.SSH_PUB_KEY }}'
@@ -301,7 +301,7 @@ jobs:
 
       - name: ResourceCleanup
         if: always()
-        uses: azure/CLI@4db43908b9df2e7ac93c8275a8f9a448c59338dd # v1.0.9
+        uses: azure/CLI@089eac9d8cc39f5d003e94f8b65efc51076c9cbd # v2.1.0
         with:
           inlinescript: |
             az group delete -g ${{ matrix.AZURE_RESOURCE_GROUP }} --yes
