@@ -22,7 +22,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) ListPodSandboxMetrics(context.Context, *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
+func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
 	sandboxList := c.sandboxStore.List()
 	//metricsList := c.sandboxStore.
 
