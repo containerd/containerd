@@ -29,12 +29,20 @@ func (c *criService) ListPodSandboxMetrics(context.Context, *runtime.ListPodSand
 	podMetrics := make([]*runtime.PodSandboxMetrics, 0)
 	for _, sandbox := range sandboxList {
 		c.containerStore.List()
+		containerMetrics := make([]*runtime.ContainerMetrics, 0)
+
 		podMetrics = append(podMetrics, &runtime.PodSandboxMetrics{
-			PodSandboxId: sandbox.ID,
+			PodSandboxId:     sandbox.ID,
+			ContainerMetrics: containerMetrics,
 		})
 	}
 
 	return &runtime.ListPodSandboxMetricsResponse{
 		PodMetrics: podMetrics,
 	}, nil
+}
+
+// gives the metrics for a given container in a sandbox
+func (c *criService) listContainerMetrics(sandboxID string, containerID string) *runtime.ContainerMetrics {
+
 }
