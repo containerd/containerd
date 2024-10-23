@@ -76,7 +76,7 @@ Deprecations warnings have been added to the `ServerResponse` for the introspect
 
 To ease containerd 2.0 transition, the community has moved to backport this feature to containerd 1.6 and 1.7 release branches to give users another tool to identify the sticking points for migrating containerd versions.
 
-Administrators whose workloads are running on containerd versions >= 1.6.25, >= 1.7.9 can query their containerd server to receive  warnings for features marked for deprecation and are in the critical path. With the `ctr` client, users can run `ctr deprecations list`.
+Administrators whose workloads are running on containerd versions >= 1.6.27, >= 1.7.12 can query their containerd server to receive warnings for features marked for deprecation and are in the critical path. With the `ctr` client, users can run `ctr deprecations list` (and optionally pass `--format json` for machine-readable output).
 
 ## What's breaking
 
