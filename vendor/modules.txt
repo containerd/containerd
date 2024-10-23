@@ -108,7 +108,7 @@ github.com/containerd/console
 # github.com/containerd/containerd v1.7.23
 ## explicit; go 1.21
 github.com/containerd/containerd/errdefs
-# github.com/containerd/containerd/api v1.8.0-rc.3 => ./api
+# github.com/containerd/containerd/api v1.8.0-rc.4
 ## explicit; go 1.21
 github.com/containerd/containerd/api/events
 github.com/containerd/containerd/api/runtime/sandbox/v1
@@ -874,4 +874,3 @@ tags.cncf.io/container-device-interface/pkg/parser
 # tags.cncf.io/container-device-interface/specs-go v0.8.0
 ## explicit; go 1.19
 tags.cncf.io/container-device-interface/specs-go
-# github.com/containerd/containerd/api => ./api
