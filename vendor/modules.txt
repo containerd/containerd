@@ -171,7 +171,7 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit; go 1.20
 github.com/containerd/log
 github.com/containerd/log/logtest
-# github.com/containerd/nri v0.6.2-0.20241010080438-159f5754db39
+# github.com/containerd/nri v0.7.0
 ## explicit; go 1.21
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation

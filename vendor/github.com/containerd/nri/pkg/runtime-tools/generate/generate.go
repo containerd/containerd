@@ -329,9 +329,6 @@ func (g *Generator) AdjustCgroupsPath(path string) {
 func (g *Generator) AdjustOomScoreAdj(score *nri.OptionalInt) {
 	if score != nil {
 		g.SetProcessOOMScoreAdj(int(score.Value))
-	} else {
-		g.SetProcessOOMScoreAdj(0)
-		g.Config.Process.OOMScoreAdj = nil
 	}
 }
 
