@@ -67,6 +67,9 @@ type store struct {
 	root               string
 	ls                 LabelStore
 	integritySupported bool
+
+	locksMu sync.Mutex
+	locks   map[string]*lock
 }
 
 // NewStore returns a local content store
@@ -90,6 +93,7 @@ func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
 		root:               root,
 		ls:                 ls,
 		integritySupported: supported,
+		locks:              map[string]*lock{},
 	}, nil
 }
 
@@ -464,13 +468,13 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 		return nil, fmt.Errorf("ref must not be empty: %w", errdefs.ErrInvalidArgument)
 	}
 
-	if err := tryLock(wOpts.Ref); err != nil {
+	if err := s.tryLock(wOpts.Ref); err != nil {
 		return nil, err
 	}
 
 	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
 	if err != nil {
-		unlock(wOpts.Ref)
+		s.unlock(wOpts.Ref)
 		return nil, err
 	}
 
