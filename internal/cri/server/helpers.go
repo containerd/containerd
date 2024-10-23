@@ -33,10 +33,8 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
-	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
-	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 )
@@ -220,27 +218,6 @@ func filterLabel(k, v string) string {
 	return fmt.Sprintf("labels.%q==%q", k, v)
 }
 
-// buildLabel builds the labels from config to be passed to containerd
-func buildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
-	labels := make(map[string]string)
-
-	for k, v := range imageConfigLabels {
-		if err := clabels.Validate(k, v); err == nil {
-			labels[k] = v
-		} else {
-			// In case the image label is invalid, we output a warning and skip adding it to the
-			// container.
-			log.L.WithError(err).Warnf("unable to add image label with key %s to the container", k)
-		}
-	}
-	// labels from the CRI request (config) will override labels in the image config
-	for k, v := range configLabels {
-		labels[k] = v
-	}
-	labels[crilabels.ContainerKindLabel] = containerType
-	return labels
-}
-
 // getRuntimeOptions get runtime options from container metadata.
 func getRuntimeOptions(c containers.Container) (interface{}, error) {
 	from := c.Runtime.Options
@@ -271,25 +248,6 @@ func unknownContainerStatus() containerstore.Status {
 		Reason:     unknownExitReason,
 		Unknown:    true,
 	}
-}
-
-// getPassthroughAnnotations filters requested pod annotations by comparing
-// against permitted annotations for the given runtime.
-func getPassthroughAnnotations(podAnnotations map[string]string,
-	runtimePodAnnotations []string) (passthroughAnnotations map[string]string) {
-	passthroughAnnotations = make(map[string]string)
-
-	for podAnnotationKey, podAnnotationValue := range podAnnotations {
-		for _, pattern := range runtimePodAnnotations {
-			// Use path.Match instead of filepath.Match here.
-			// filepath.Match treated `\\` as path separator
-			// on windows, which is not what we want.
-			if ok, _ := path.Match(pattern, podAnnotationKey); ok {
-				passthroughAnnotations[podAnnotationKey] = podAnnotationValue
-			}
-		}
-	}
-	return passthroughAnnotations
 }
 
 // copyResourcesToStatus copys container resource contraints from spec to
