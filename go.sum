@@ -687,8 +687,8 @@ github.com/containerd/imgcrypt v1.2.0-rc1 h1:XESaAcMqxrGlRjQIqLdzxqsO/ddNK4vwfe7
 github.com/containerd/imgcrypt v1.2.0-rc1/go.mod h1:F9roK2DzKlFnV+h+ZJy/r2FoS28bIvxKgdcoV7o8Sms=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
-github.com/containerd/nri v0.6.2-0.20241010080438-159f5754db39 h1:M2Cz4Bm2++xdq0A/zWqunOjnp0HNYQnNDNSSzqCmqnE=
-github.com/containerd/nri v0.6.2-0.20241010080438-159f5754db39/go.mod h1:uSkgBrCdEtAiEz4vnrq8gmAC4EnVAM5Klt0OuK5rZYQ=
+github.com/containerd/nri v0.7.0 h1:scGL9JiBqNaWnghLFFPOzp0GxxWAc1uQtQ7qx8PHdCs=
+github.com/containerd/nri v0.7.0/go.mod h1:uSkgBrCdEtAiEz4vnrq8gmAC4EnVAM5Klt0OuK5rZYQ=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723 h1:swk9KxrmARZjSMrHc1Lzb39XhcDwAhYpqkBhinCFLCQ=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723/go.mod h1:ZKzztepTSz/LKtbUSzfBNVwgqBEPABVZV9PQF/l53+Q=
 github.com/containerd/platforms v0.2.1 h1:zvwtM3rz2YHPQsF2CHYM8+KtB5dvhISiXh5ZpSBQv6A=
