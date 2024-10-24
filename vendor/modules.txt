@@ -200,6 +200,10 @@ github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.2.0
 ## explicit; go 1.21
 github.com/containerd/typeurl/v2
+# github.com/containerd/zfs/v2 v2.0.0-rc.0
+## explicit; go 1.22.0
+github.com/containerd/zfs/v2
+github.com/containerd/zfs/v2/plugin
 # github.com/containernetworking/cni v1.2.3
 ## explicit; go 1.21
 github.com/containernetworking/cni/libcni
@@ -352,6 +356,9 @@ github.com/mdlayher/vsock
 # github.com/miekg/pkcs11 v1.1.1
 ## explicit; go 1.12
 github.com/miekg/pkcs11
+# github.com/mistifyio/go-zfs/v3 v3.0.1
+## explicit; go 1.14
+github.com/mistifyio/go-zfs/v3
 # github.com/moby/locker v1.0.1
 ## explicit; go 1.13
 github.com/moby/locker
