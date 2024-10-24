@@ -31,7 +31,7 @@ fi
 function install_runc() {
 	# When updating runc-version, consider updating the runc module in go.mod as well
 	: "${RUNC_VERSION:=$(cat "${script_dir}/runc-version")}"
-	: "${RUNC_REPO:=https://github.com/opencontainers/runc.git}"
+	: "${RUNC_REPO:=https://github.com/lifubang/runc.git}"
 
 	TMPROOT=$(mktemp -d)
 	trap "rm -fR ${TMPROOT}" EXIT
