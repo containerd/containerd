@@ -633,6 +633,14 @@ func (p *criPodSandbox) GetPid() uint32 {
 	return p.pid
 }
 
+func (p *criPodSandbox) GetIPs() []string {
+	if p.IP == "" {
+		return nil
+	}
+	ips := append([]string{p.IP}, p.AdditionalIPs...)
+	return ips
+}
+
 //
 // NRI integration wrapper for CRI Containers
 //
