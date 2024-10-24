@@ -155,6 +155,21 @@ func NewFetchConfig(ctx context.Context, cliContext *cli.Context) (*FetchConfig,
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloads(mcd))
 	}
 
+	if cliContext.IsSet("max-concurrent-downloads-per-layer") {
+		mcdpl := cliContext.Int("max-concurrent-downloads-per-layer")
+		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloadsPerLayer(mcdpl))
+	}
+
+	if cliContext.IsSet("max-concurrent-download-operations") {
+		mcdo := cliContext.Int("max-concurrent-download-operations")
+		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentDownloadOperations(mcdo))
+	}
+
+	if cliContext.IsSet("concurrent-fetch-chunks-size-mb") {
+		mcfcsm := cliContext.Int("concurrent-fetch-chunks-size-mb")
+		config.RemoteOpts = append(config.RemoteOpts, containerd.WithConcurrentFetchChunksSizeMB(mcfcsm))
+	}
+
 	if cliContext.IsSet("max-concurrent-uploaded-layers") {
 		mcu := cliContext.Int("max-concurrent-uploaded-layers")
 		config.RemoteOpts = append(config.RemoteOpts, containerd.WithMaxConcurrentUploadedLayers(mcu))

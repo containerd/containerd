@@ -120,15 +120,16 @@ command. As part of this process, we do the following:
 				return err
 			}
 
-			// Set unpack configuration
-			for _, platform := range p {
-				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
-			}
 			if !cliContext.Bool("all-platforms") {
 				if len(p) == 0 {
 					p = append(p, platforms.DefaultSpec())
 				}
 				sopts = append(sopts, image.WithPlatforms(p...))
+			}
+
+			// Set unpack configuration
+			for _, platform := range p {
+				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
 			}
 			// TODO: Support unpack for all platforms..?
 			// Pass in a *?
