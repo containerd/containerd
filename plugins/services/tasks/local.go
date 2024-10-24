@@ -326,12 +326,26 @@ func (l *local) DeleteProcess(ctx context.Context, r *api.DeleteProcessRequest, 
 }
 
 func getProcessState(ctx context.Context, p runtime.Process) (*task.Process, error) {
-	ctx, cancel := timeout.WithContext(ctx, stateTimeout)
-	defer cancel()
+	var state runtime.State
+	var err error
+	for retry := 1; retry <= 3; retry++ {
+		stateCtx, cancel := timeout.WithContext(ctx, stateTimeout)
+		defer cancel()
 
-	state, err := p.State(ctx)
+		state, err = p.State(stateCtx)
+		if err != nil {
+			if errdefs.IsDeadlineExceeded(err) {
+				continue
+			}
+			if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) {
+				return nil, err
+			}
+		}
+		break
+	}
 	if err != nil {
-		if errdefs.IsNotFound(err) || errdefs.IsUnavailable(err) {
+		if errdefs.IsDeadlineExceeded(err) {
+			log.G(ctx).WithError(err).Errorf("get state for %s timeout, %s:%s", p.ID(), stateTimeout, timeout.Get(stateTimeout))
 			return nil, err
 		}
 		log.G(ctx).WithError(err).Errorf("get state for %s", p.ID())
