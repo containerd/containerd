@@ -78,7 +78,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Ensure even on error the writer is fully closed
-	defer unlock(w.ref)
+	defer w.s.unlock(w.ref)
 
 	var base content.Info
 	for _, opt := range opts {
@@ -198,7 +198,7 @@ func (w *writer) Close() (err error) {
 		err = w.fp.Close()
 		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
-		unlock(w.ref)
+		w.s.unlock(w.ref)
 		return
 	}
 
