@@ -18,8 +18,4 @@
 
 package builtins
 
-// zfs snapshotter is temporarily removed until it is updated to use the
-// new plugin package. In the future, the external plugin package will
-// make it easier to update zfs and containerd independently without
-// the dependency loop. Add back before 2.0 release.
-//import _ "github.com/containerd/zfs/plugin"
+import _ "github.com/containerd/zfs/v2/plugin"
