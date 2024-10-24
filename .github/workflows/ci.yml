@@ -387,7 +387,7 @@ jobs:
       matrix:
         runtime:
           - io.containerd.runc.v2
-        runc: [runc, crun]
+        runc: [runc]  # crun can be added here to debug crun issues
         os: [ubuntu-22.04, ubuntu-24.04, arm64-8core-32gb]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
@@ -533,18 +533,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        box:
-          - fedora/40-cloud-base
-          # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
-          # The image was changed from rockylinux/8 to almalinux/8,
-          # as the former one no longer works:
-          # https://github.com/containerd/containerd/pull/10297
-          - almalinux/8
-          - rockylinux/9@4.0.0
-        cgroup_driver: [cgroupfs, systemd]
+        include:
+          - box: fedora/40-cloud-base
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: fedora/40-cloud-base
+            cgroup_driver: systemd
+            runc: runc
+          - box: fedora/40-cloud-base
+            cgroup_driver: cgroupfs
+            runc: crun
+          - box: fedora/40-cloud-base
+            cgroup_driver: systemd
+            runc: crun
+            # We have to keep EL8 to test old glibc, cgroup, kernel, etc.
+            # The image was changed from rockylinux/8 to almalinux/8,
+            # as the former one no longer works:
+            # https://github.com/containerd/containerd/pull/10297
+          - box: almalinux/8
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: almalinux/8
+            cgroup_driver: systemd
+            runc: runc
+          - box: rockylinux/9@4.0.0
+            cgroup_driver: cgroupfs
+            runc: runc
+          - box: rockylinux/9@4.0.0
+            cgroup_driver: systemd
+            runc: runc
     env:
       BOX: ${{ matrix.box }}
       CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+      RUNC_FLAVOR: ${{ matrix.runc }}
     steps:
       - name: Show the host info
         run: |
@@ -574,13 +595,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo vagrant plugin install vagrant-libvirt
       - name: Boot VM
-        run: sudo BOX=$BOX vagrant up --no-tty
+        run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --no-tty
       - name: test-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: sudo BOX=$BOX RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
-        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
-        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: sudo BOX=$BOX CGROUP_DRIVER=$CGROUP_DRIVER RUNC_FLAVOR=$RUNC_FLAVOR vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
