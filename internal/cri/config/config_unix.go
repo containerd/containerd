@@ -94,7 +94,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 		MaxContainerLogLineSize:          16 * 1024,
 		DisableProcMount:                 false,
 		TolerateMissingHugetlbController: true,
-		DisableHugetlbController:         true,
+		DisableHugetlbController:         false,
 		IgnoreImageDefinedVolumes:        false,
 		EnableCDI:                        true,
 		CDISpecDirs:                      []string{"/etc/cdi", "/var/run/cdi"},
