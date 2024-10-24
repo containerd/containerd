@@ -125,7 +125,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 // LocalResolve resolves image reference locally and returns corresponding image metadata. It
 // returns errdefs.ErrNotFound if the reference doesn't exist.
 func (c *CRIImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
-	getImageID := func(refOrId string) string {
+	getImageID := func(refOrID string) string {
 		if _, err := imagedigest.Parse(refOrID); err == nil {
 			return refOrID
 		}
@@ -186,6 +186,10 @@ func (c *CRIImageService) ImageFSPaths() map[string]string {
 // Most often used to get the "sandbox" image.
 func (c *CRIImageService) PinnedImage(name string) string {
 	return c.config.PinnedImages[name]
+}
+
+func (c *CRIImageService) Config() criconfig.ImageConfig {
+	return c.config
 }
 
 // GRPCService returns a new CRI Image Service grpc server.

@@ -55,6 +55,11 @@ var testImageConfig = criconfig.ImageConfig{
 	},
 }
 
+func TestConfig(t *testing.T) {
+	cri, _ := newTestCRIService()
+	assert.Equal(t, testImageConfig, cri.Config())
+}
+
 func TestLocalResolve(t *testing.T) {
 	image := imagestore.Image{
 		ID:      "sha256:c75bebcdd211f41b3a460c7bf82970ed6c75acaab9cd4c9a4e125b03ca113799",

@@ -67,7 +67,7 @@ func (c *criService) initPlatform() (err error) {
 
 	networkAttachCount := 2
 
-	if c.Config().UseInternalLoopback {
+	if c.RuntimeService.Config().UseInternalLoopback {
 		networkAttachCount = 1
 	}
 
