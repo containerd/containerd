@@ -171,7 +171,7 @@ They should not be tampered with as corruption and bugs can and will happen.
 External apps reading or watching changes in these directories have been known to cause `EBUSY` and stale file handles when containerd and/or its plugins try to cleanup resources.
 
 ```toml
-version = 2
+version = 3
 
 # persistent data location
 root = "/var/lib/containerd"
@@ -231,7 +231,7 @@ Both modes share backing data, while "shared" will reduce total bandwidth across
 The default is "shared". While this is largely the most desired policy, one can change to "isolated" mode with the following configuration:
 
 ```toml
-version = 2
+version = 3
 
 [plugins."io.containerd.metadata.v1.bolt"]
 	content_sharing_policy = "isolated"

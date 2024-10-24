@@ -11,7 +11,7 @@ Configuration:
 
 *containerd config:*
 ```toml
-version = 2
+version = 3
 
 [plugins."io.containerd.internal.v1.opt"]
 	path = "/opt/mypath"
