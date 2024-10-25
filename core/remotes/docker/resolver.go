@@ -29,6 +29,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -618,27 +619,39 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 }
 
 func (r *request) doWithRetries(ctx context.Context, responses []*http.Response) (*http.Response, error) {
-	resp, err := r.do(ctx)
+	return r.doWithRetriesTimeout(ctx, nil, responses)
+}
+
+func (r *request) doWithRetriesTimeout(ctx context.Context, timeout *time.Duration, responses []*http.Response) (*http.Response, error) {
+	reqCtx := ctx
+	if timeout != nil {
+		var cancel context.CancelFunc
+		reqCtx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+
+	resp, err := r.do(reqCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	responses = append(responses, resp)
-	retry, err := r.retryRequest(ctx, responses)
+	retry, timeout, err := r.retryRequest(ctx, responses)
 	if err != nil {
 		resp.Body.Close()
 		return nil, err
 	}
 	if retry {
 		resp.Body.Close()
-		return r.doWithRetries(ctx, responses)
+		return r.doWithRetriesTimeout(ctx, timeout, responses)
 	}
 	return resp, err
 }
 
-func (r *request) retryRequest(ctx context.Context, responses []*http.Response) (bool, error) {
-	if len(responses) > 5 {
-		return false, nil
+func (r *request) retryRequest(ctx context.Context, responses []*http.Response) (bool, *time.Duration, error) {
+	const maxRetries = 5
+	if len(responses) > maxRetries {
+		return false, nil, nil
 	}
 	last := responses[len(responses)-1]
 	switch last.StatusCode {
@@ -646,26 +659,29 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response) 
 		log.G(ctx).WithField("header", last.Header.Get("WWW-Authenticate")).Debug("Unauthorized")
 		if r.host.Authorizer != nil {
 			if err := r.host.Authorizer.AddResponses(ctx, responses); err == nil {
-				return true, nil
+				return true, nil, nil
 			} else if !errdefs.IsNotImplemented(err) {
-				return false, err
+				return false, nil, err
 			}
 		}
 
-		return false, nil
+		return false, nil, nil
 	case http.StatusMethodNotAllowed:
 		// Support registries which have not properly implemented the HEAD method for
 		// manifests endpoint
 		if r.method == http.MethodHead && strings.Contains(r.path, "/manifests/") {
 			r.method = http.MethodGet
-			return true, nil
+			return true, nil, nil
 		}
 	case http.StatusRequestTimeout, http.StatusTooManyRequests:
-		return true, nil
+		return true, nil, nil
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		// These 50X errors might be temporary - retry with a timeout decreasing with each retry
+		timeout := time.Duration(1+maxRetries-len(responses)) * time.Second
+		return true, &timeout, nil
 	}
 
-	// TODO: Handle 50x errors accounting for attempt history
-	return false, nil
+	return false, nil, nil
 }
 
 func (r *request) String() string {
