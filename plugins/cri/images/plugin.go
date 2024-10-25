@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -142,6 +143,11 @@ func init() {
 					Snapshotter: snapshotter,
 					Platform:    platform,
 				}
+			}
+
+			ic.Meta.Exports = map[string]string{
+				"registry.configPath":   config.Registry.ConfigPath,
+				"discardUnpackedLayers": strconv.FormatBool(config.DiscardUnpackedLayers),
 			}
 
 			service, err := images.NewService(*config, options)
