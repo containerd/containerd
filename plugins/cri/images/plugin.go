@@ -58,7 +58,8 @@ func init() {
 			}
 			mdb := m.(*metadata.DB)
 
-			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
+			config := ic.Config.(*criconfig.ImageConfig)
+			if warnings, err := criconfig.ValidateImageConfig(ic.Context, config); err != nil {
 				return nil, fmt.Errorf("invalid cri image config: %w", err)
 			} else if len(warnings) > 0 {
 				ws, err := ic.GetSingle(plugins.WarningPlugin)
@@ -143,7 +144,7 @@ func init() {
 				}
 			}
 
-			service, err := images.NewService(config, options)
+			service, err := images.NewService(*config, options)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create image service: %w", err)
 			}
