@@ -695,8 +695,8 @@ github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723 h1:swk9KxrmAR
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723/go.mod h1:ZKzztepTSz/LKtbUSzfBNVwgqBEPABVZV9PQF/l53+Q=
 github.com/containerd/platforms v0.2.1 h1:zvwtM3rz2YHPQsF2CHYM8+KtB5dvhISiXh5ZpSBQv6A=
 github.com/containerd/platforms v0.2.1/go.mod h1:XHCb+2/hzowdiut9rkudds9bE5yJ7npe7dG/wG+uFPw=
-github.com/containerd/plugin v0.1.0 h1:CYMyZk9beRAIe1FEKItbMLLAz/z16aXrGc+B+nv0fU4=
-github.com/containerd/plugin v0.1.0/go.mod h1:j6HlpMtkiZMgT4UsfVNxPBUkwdw9KQGU6nCLfRxnq+w=
+github.com/containerd/plugin v1.0.0 h1:c8Kf1TNl6+e2TtMHZt+39yAPDbouRH9WAToRjex483Y=
+github.com/containerd/plugin v1.0.0/go.mod h1:hQfJe5nmWfImiqT1q8Si3jLv3ynMUIBB47bQ+KexvO8=
 github.com/containerd/ttrpc v1.2.2/go.mod h1:sIT6l32Ph/H9cvnJsfXM5drIVzTr5A2flTf1G5tYZak=
 github.com/containerd/ttrpc v1.2.6 h1:zG+Kn5EZ6MUYCS1t2Hmt2J4tMVaLSFEJVOraDQwNPC4=
 github.com/containerd/ttrpc v1.2.6/go.mod h1:YCXHsb32f+Sq5/72xHubdiJRQY9inL4a4ZQrAbN1q9o=
