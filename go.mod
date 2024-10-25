@@ -26,7 +26,7 @@ require (
 	github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723
 	github.com/containerd/platforms v0.2.1
 	github.com/containerd/plugin v0.1.0
-	github.com/containerd/ttrpc v1.2.6-0.20240827082320-b5cd6e4b3287
+	github.com/containerd/ttrpc v1.2.6
 	github.com/containerd/typeurl/v2 v2.2.0
 	github.com/containerd/zfs/v2 v2.0.0-rc.0
 	github.com/containernetworking/cni v1.2.3
