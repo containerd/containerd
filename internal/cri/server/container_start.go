@@ -129,6 +129,12 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 			containerd.WithTaskAPIEndpoint(endpoint.Address, endpoint.Version))
 	}
 
+	ioOwnerTaskOpts, err := updateContainerIOOwner(ctx, container, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update container IO owner: %w", err)
+	}
+	taskOpts = append(taskOpts, ioOwnerTaskOpts...)
+
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
