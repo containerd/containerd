@@ -1,5 +1,3 @@
-//go:build !windows && !freebsd
-
 /*
    Copyright The containerd Authors.
 
@@ -20,20 +18,16 @@ package fs
 
 import (
 	"fmt"
-	"os"
+	"io/fs"
 	"syscall"
+	"time"
 )
 
-// copyIrregular covers devices, pipes, and sockets
-func copyIrregular(dst string, fi os.FileInfo) error {
-	st, ok := fi.Sys().(*syscall.Stat_t) // not *unix.Stat_t
+func Atime(st fs.FileInfo) (time.Time, error) {
+	stSys, ok := st.Sys().(*syscall.Win32FileAttributeData)
 	if !ok {
-		return fmt.Errorf("unsupported stat type: %s: %v", dst, fi.Mode())
+		return time.Time{}, fmt.Errorf("expected st.Sys() to be *syscall.Win32FileAttributeData, got %T", st.Sys())
 	}
-	var rDev int
-	if fi.Mode()&os.ModeDevice == os.ModeDevice {
-		rDev = int(st.Rdev)
-	}
-	//nolint:unconvert
-	return syscall.Mknod(dst, uint32(st.Mode), rDev)
+	// ref: https://github.com/golang/go/blob/go1.19.2/src/os/types_windows.go#L230
+	return time.Unix(0, stSys.LastAccessTime.Nanoseconds()), nil
 }

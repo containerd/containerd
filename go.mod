@@ -13,7 +13,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/console v1.0.3
 	github.com/containerd/containerd/api v1.7.19
-	github.com/containerd/continuity v0.4.3
+	github.com/containerd/continuity v0.4.4
 	github.com/containerd/errdefs v0.3.0
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.9
@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.21.0
 	golang.org/x/net v0.23.0
 	golang.org/x/sync v0.8.0
-	golang.org/x/sys v0.23.0
+	golang.org/x/sys v0.26.0
 	google.golang.org/genproto v0.0.0-20231211222908-989df2bf70f3
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0
 	google.golang.org/grpc v1.59.0
