@@ -33,8 +33,8 @@ import (
 	"time"
 
 	"github.com/containerd/errdefs"
-	"github.com/containerd/imgcrypt"
-	"github.com/containerd/imgcrypt/images/encryption"
+	"github.com/containerd/imgcrypt/v2"
+	"github.com/containerd/imgcrypt/v2/images/encryption"
 	"github.com/containerd/log"
 	distribution "github.com/distribution/reference"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
