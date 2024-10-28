@@ -24,8 +24,9 @@ import (
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/errdefs"
-	"github.com/containerd/imgcrypt"
 	"github.com/containerd/typeurl/v2"
+
+	"github.com/containerd/imgcrypt/v2"
 
 	encconfig "github.com/containers/ocicrypt/config"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
