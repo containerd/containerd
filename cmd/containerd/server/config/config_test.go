@@ -214,6 +214,25 @@ imports = ["data1.toml", "data2.toml"]
 	}, out.Imports)
 }
 
+// https://github.com/containerd/containerd/issues/10905
+func TestLoadConfigWithDefaultConfigVersion(t *testing.T) {
+	data1 := `
+disabled_plugins=["cri"]
+`
+	tempDir := t.TempDir()
+
+	err := os.WriteFile(filepath.Join(tempDir, "data1.toml"), []byte(data1), 0o600)
+	assert.NoError(t, err)
+
+	var out Config
+	out.Version = version.ConfigVersion
+	err = LoadConfig(context.Background(), filepath.Join(tempDir, "data1.toml"), &out)
+	assert.NoError(t, err)
+
+	assert.Equal(t, version.ConfigVersion, out.Version)
+	assert.Equal(t, []string{"io.containerd.grpc.v1.cri"}, out.DisabledPlugins)
+}
+
 func TestDecodePlugin(t *testing.T) {
 	ctx := logtest.WithT(context.Background(), t)
 	data := `
