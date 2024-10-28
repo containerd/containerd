@@ -68,8 +68,9 @@ type store struct {
 	ls                 LabelStore
 	integritySupported bool
 
-	locksMu sync.Mutex
-	locks   map[string]*lock
+	locksMu              sync.Mutex
+	locks                map[string]*lock
+	ensureIngestRootOnce func() error
 }
 
 // NewStore returns a local content store
@@ -83,18 +84,16 @@ func NewStore(root string) (content.Store, error) {
 // require labels and should use `NewStore`. `NewLabeledStore` is primarily
 // useful for tests or standalone implementations.
 func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
-	if err := os.MkdirAll(filepath.Join(root, "ingest"), 0777); err != nil {
-		return nil, err
-	}
-
 	supported, _ := fsverity.IsSupported(root)
 
-	return &store{
+	s := &store{
 		root:               root,
 		ls:                 ls,
 		integritySupported: supported,
 		locks:              map[string]*lock{},
-	}, nil
+	}
+	s.ensureIngestRootOnce = sync.OnceValue(s.ensureIngestRoot)
+	return s, nil
 }
 
 func (s *store) Info(ctx context.Context, dgst digest.Digest) (content.Info, error) {
@@ -301,6 +300,9 @@ func (s *store) Status(ctx context.Context, ref string) (content.Status, error) 
 func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Status, error) {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	defer fp.Close()
@@ -350,6 +352,9 @@ func (s *store) ListStatuses(ctx context.Context, fs ...string) ([]content.Statu
 func (s *store) WalkStatusRefs(ctx context.Context, fn func(string) error) error {
 	fp, err := os.Open(filepath.Join(s.root, "ingest"))
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
 		return err
 	}
 	defer fp.Close()
@@ -536,6 +541,11 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 	)
 
 	foundValidIngest := false
+
+	if err := s.ensureIngestRootOnce(); err != nil {
+		return nil, err
+	}
+
 	// ensure that the ingest path has been created.
 	if err := os.Mkdir(path, 0755); err != nil {
 		if !os.IsExist(err) {
@@ -644,6 +654,10 @@ func (s *store) ingestPaths(ref string) (string, string, string) {
 	)
 
 	return fp, rp, dp
+}
+
+func (s *store) ensureIngestRoot() error {
+	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0777)
 }
 
 func readFileString(path string) (string, error) {
