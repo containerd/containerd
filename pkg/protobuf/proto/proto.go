@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// Package proto provides convinient aliases that make google.golang.org/protobuf migration easier.
+// Package proto provides convenient aliases that make google.golang.org/protobuf migration easier.
 package proto
 
 import (
