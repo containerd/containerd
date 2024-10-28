@@ -133,7 +133,12 @@ func (c *Config) ValidateVersion() error {
 
 // MigrateConfig will convert the config to the latest version before using
 func (c *Config) MigrateConfig(ctx context.Context) error {
-	for c.Version < version.ConfigVersion {
+	return c.MigrateConfigTo(ctx, version.ConfigVersion)
+}
+
+// MigrateConfigTo will convert the config to the target version before using
+func (c *Config) MigrateConfigTo(ctx context.Context, targetVersion int) error {
+	for c.Version < targetVersion {
 		if m := migrations[c.Version]; m != nil {
 			if err := m(ctx, c); err != nil {
 				return err
@@ -295,6 +300,15 @@ func LoadConfig(ctx context.Context, path string, out *Config) error {
 		config, err := loadConfigFile(ctx, path)
 		if err != nil {
 			return err
+		}
+
+		switch config.Version {
+		case 0, 1:
+			if err := config.MigrateConfigTo(ctx, out.Version); err != nil {
+				return err
+			}
+		default:
+			// NOP
 		}
 
 		if err := mergeConfig(out, config); err != nil {
