@@ -248,6 +248,11 @@ bin/runc-fp: integration/failpoint/cmd/runc-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/runc-fp
 
+# build loopback-v2 with failpoint support, only used by integration test
+bin/loopback-v2: integration/failpoint/cmd/loopback-v2 FORCE
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/loopback-v2
+
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
 	@$(GO) test ${TESTFLAGS} -bench . -run Benchmark -test.root
