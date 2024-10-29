@@ -12,7 +12,7 @@ It is trivial for clients to switch namespaces.
 ## Who specifies the namespace?
 
 The client specifies the namespace via the `context`.
-There is a `github.com/containerd/containerd/v2/pkg/namespaces` package that allows a user to get and set the namespace on a context.  
+There is a `github.com/containerd/containerd/v2/pkg/namespaces` package that allows a user to get and set the namespace on a context.
 
 ```go
 // set a namespace
@@ -24,8 +24,7 @@ ns, ok := namespaces.Namespace(ctx)
 
 Because the client calls containerd's gRPC API to interact with the daemon, all API calls require a context with a namespace set.
 
-> Note that a namespace cannot be named `"version"` ([#6944](https://github.com/containerd/containerd/issues/6944)).  
-
+> Note that a namespace cannot be named `"version"` ([#6944](https://github.com/containerd/containerd/issues/6944)).
 
 ## How low level is the implementation?
 
@@ -76,4 +75,4 @@ will all use the default namespace, which is simply named "`default`".
 
 You can also use the `CONTAINERD_NAMESPACE` environment variable to specify the default namespace to use for
 any of the `ctr` client commands.  
->To know more about namespace package click here [`namespaces`](https://pkg.go.dev/github.com/containerd/containerd/v2/pkg/namespaces).
+>To know more about Namespaces package click here [`Namespaces`](https://pkg.go.dev/github.com/containerd/containerd/v2/pkg/namespaces).
