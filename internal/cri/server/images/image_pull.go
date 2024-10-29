@@ -133,6 +133,20 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	defer inProgressImagePulls.Dec()
 	startTime := time.Now()
 
+	if credentials == nil {
+		credentials = func(host string) (string, string, error) {
+			var hostauth *runtime.AuthConfig
+
+			config := c.config.Registry.Configs[host]
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+
+			}
+
+			return ParseAuth(hostauth, host)
+		}
+	}
+
 	namedRef, err := distribution.ParseDockerRef(name)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse image reference %q: %w", name, err)
