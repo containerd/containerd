@@ -76,6 +76,6 @@ will all use the default namespace, which is simply named "`default`".
 You can also use the `CONTAINERD_NAMESPACE` environment variable to specify the default namespace to use for
 any of the `ctr` client commands.  
 >To know more about different Namespaces packages click below links :  
->[`Containerd Namespaces Pkg`](https://pkg.go.dev/github.com/containerd/containerd/v2/pkg/namespaces).  
->[`kubernetes Namespaces Pkg`](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/).  
->[`Moby(Docker) Namespaces Pkg`](https://docs.docker.com/engine/security/userns-remap/).
+>[`Containerd Namespaces`](https://pkg.go.dev/github.com/containerd/containerd/v2/pkg/namespaces).  
+>[`kubernetes Namespaces`](https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/).  
+>[`Moby(Docker) Namespaces`](https://docs.docker.com/engine/security/userns-remap/).
