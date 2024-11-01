@@ -117,7 +117,7 @@ Deprecated in containerd v1.7, support for the CRI v1alpha2 API has been removed
 
 ### AUFS snapshotter has been removed
 
-Deprecated in containerd v1.7, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See the ["Snapshotters"](snapshotters/README.md) document for more details.
+Deprecated in containerd v1.5, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See the ["Snapshotters"](snapshotters/README.md) document for more details.
 
 ### `cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz` release bundles have been removed
 
