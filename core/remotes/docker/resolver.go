@@ -285,8 +285,16 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		firstErr         error
 		firstErrPriority int
 	)
+
+	nextHostOrFail := func(i int) string {
+		if i < len(hosts)-1 {
+			return "trying next host"
+		}
+		return "fetch failed"
+	}
+
 	for _, u := range paths {
-		for _, host := range hosts {
+		for i, host := range hosts {
 			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
 
 			req := base.request(host, http.MethodHead, u...)
@@ -308,7 +316,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					firstErr = err
 					firstErrPriority = 1
 				}
-				log.G(ctx).WithError(err).Info("trying next host")
+				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
 			resp.Body.Close() // don't care about body contents.
@@ -319,7 +327,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
 						firstErrPriority = 2
 					}
-					log.G(ctx).Info("trying next host - response was http.StatusNotFound")
+					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue
 				}
 				if resp.StatusCode > 399 {
@@ -327,7 +335,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
 						firstErrPriority = 3
 					}
-					log.G(ctx).Infof("trying next host - response was %s", resp.Status)
+					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
