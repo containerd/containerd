@@ -228,6 +228,7 @@ message PodSandbox {
   string runtime_handler = 7;
   LinuxPodSandbox linux = 8;
   uint32 pid = 9; // for NRI v1 emulation
+  repeated string ips = 10;
 }
 
 // PodSandbox linux-specific metadata
