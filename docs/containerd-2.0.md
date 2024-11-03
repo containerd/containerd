@@ -24,7 +24,13 @@ The sandbox controller has added the `Update` API (`/containerd.services.sandbox
 
 ### NRI is now enabled by default
 
-NRI is a framework for plugging domain or vendor-specific logic into OCI-compatible container runtimes. It allows users to make changes to containers, perform extra actions, and improve the management of resources. NRI plugins are considered to be part of the container runtime, and access to NRI is controlled by restricting access to the systemwide NRI socket. See the ["NRI"](NRI.md) document for more details.
+NRI (Node Resource Interface) is a framework for plugging domain or vendor-specific logic into OCI-compatible container runtimes. It allows users to make changes to containers, perform extra actions, and improve the management of resources. NRI plugins are considered to be part of the container runtime, and access to NRI is controlled by restricting access to the systemwide NRI socket. See the ["NRI"](NRI.md) document for more details.
+
+### CDI is now enabled by default
+
+CDI (Container Device Interface) provides a standard mechanism for device vendors to describe what is required to provide access to a specific resource such as a GPU beyond a simple device name.
+CDI is now part of the Kubernetes Device Plugin framework.
+See [the Kubernetes Enhancement Proposal 4009](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4009-add-cdi-devices-to-device-plugin-api).
 
 ### Daemon configuration version 3
 
@@ -69,6 +75,17 @@ Intel ISA-L's igzip support has been added to the containerd client. If found, t
 ### Image verifier plugins
 
 The transfer service now supports plugins that can verify that images are allowed to be pulled. Plugins like this can implement policy, such as enforcing that container images are signed, or that images must have particular names. Plugins are independent programs that communicate via command-line arguments and standard I/O. See more details in [the image verifier plugin documentation](image-verification.md).
+
+### CRI support for user namespaces
+
+The CRI plugin now supports running pods with [user namespaces](https://kubernetes.io/docs/concepts/workloads/pods/user-namespaces/) so as to map the user IDs in pods to different user IDs on the host.
+This enables isolation of the root user inside the container, constraining available permissions on the host further than seccomp and capabilities alone.
+
+This features needs [runc](https://github.com/opencontainers/runc) v1.2.0 or later.
+
+### CRI support for recursive read-only mounts
+
+The CRI plugin now supports [recursive read-only mounts](https://kubernetes.io/docs/concepts/storage/volumes/#read-only-mounts) so as to prohibit accidentally having writable submounts.
 
 ### Deprecation warnings can now be discovered via the Introspection API
 
@@ -117,7 +134,7 @@ Deprecated in containerd v1.7, support for the CRI v1alpha2 API has been removed
 
 ### AUFS snapshotter has been removed
 
-Deprecated in containerd v1.7, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See the ["Snapshotters"](snapshotters/README.md) document for more details.
+Deprecated in containerd v1.5, the built-in `aufs` snapshotter has been removed. As an alternative, it is recommended to use the `overlayfs` snapshotter. See the ["Snapshotters"](snapshotters/README.md) document for more details.
 
 ### `cri-containerd-(cni-)-VERSION-OS-ARCH.tar.gz` release bundles have been removed
 
