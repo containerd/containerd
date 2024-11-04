@@ -19,7 +19,7 @@ containerd is designed to be embedded into a larger system, rather than being us
 
 ## Announcements
 
-### containerd v2.0 is coming soon
+### containerd v2.0 is now released!
 See [`docs/containerd-2.0.md`](docs/containerd-2.0.md).
 
 ### Now Recruiting
