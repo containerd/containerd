@@ -1,8 +1,9 @@
-# /etc/containerd/config.toml 5 04/05/2022
+# /etc/containerd/config.toml 5 10/30/2024
 
 ## NAME
 
-containerd-config.toml - configuration file for containerd
+config.toml -  containerd configuration config (default path: ``/etc/containerd/config.toml``).
+
 
 ## SYNOPSIS
 
@@ -13,13 +14,29 @@ does not exist at the appropriate location or is not provided via the
 **--config** option containerd uses its default configuration settings, which
 can be displayed with the **containerd config(1)** command.
 
+For the general CRI configuration users can refer to [`../cri/config.md`](../cri/config.md) and [`../cri/containerd-config-cri-ex.x.md`](../cri/containerd-config-cri-ex.x.md) for specific CRI examples
+
+For default configurations users can refer to [`../man/containerd-config.8.md`](https://github.com/containerd/containerd/blob/main/docs/man/containerd-config.8.md) 
+
 ## DESCRIPTION
 
-The TOML file used to configure the containerd daemon settings has a short
+The **config.toml** file used to configure the containerd daemon settings has a short
 list of global settings followed by a series of sections for specific areas
 of daemon configuration. There is also a section for **plugins** that allows
 each containerd plugin to have an area for plugin-specific configuration and
 settings.
+
+## CONFIG VERSION
+The content of `/etc/containerd/config.toml` must start with a version header, for example:
+```toml
+version = 3
+```
+
+The config version 3 was introduced in containerd v2.0.
+The config version 2 used in containerd 1.x is still supported and automatically
+converted to the config version 3.
+
+For the further information, see [`../PLUGINS.md`](../PLUGINS.md).
 
 ## FORMAT
 
@@ -87,7 +104,7 @@ The following plugins are enabled by default and their settings are shown below.
 Plugins that are not enabled by default will provide their own configuration values
 documentation.
 
-- **[plugins."io.containerd.monitor.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
+- **[plugins."io.containerd.monitor.task.v1.cgroups"]** has one option __no_prometheus__ (Default: **false**)
 - **[plugins."io.containerd.service.v1.diff-service"]** has one option __default__, a list by default set to **["walking"]**
 - **[plugins."io.containerd.gc.v1.scheduler"]** has several options that perform advanced tuning for the scheduler:
   - **pause_threshold** is the maximum amount of time GC should be scheduled (Default: **0.02**),
@@ -209,6 +226,12 @@ imports = ["/etc/containerd/runtime_*.toml", "./debug.toml"]
   [plugins."io.containerd.service.v1.tasks-service"]
     blockio_config_file = ""
     rdt_config_file = ""
+  [plugins.'io.containerd.image-verifier.v1.bindir']
+    bin_dir = '/opt/containerd/image-verifier/bin'
+    max_verifiers = 10
+    per_verifier_timeout = '10s'
+  [plugins.'io.containerd.monitor.container.v1.restart']
+    interval = '10s'
 ```
 
 ### Multiple Runtimes
