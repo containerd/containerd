@@ -101,7 +101,7 @@ github.com/containerd/cgroups/v3/cgroup2/stats
 # github.com/containerd/console v1.0.3
 ## explicit; go 1.13
 github.com/containerd/console
-# github.com/containerd/containerd/api v1.7.19
+# github.com/containerd/containerd/api v1.8.0
 ## explicit; go 1.21
 github.com/containerd/containerd/api/events
 github.com/containerd/containerd/api/runtime/sandbox/v1
@@ -605,7 +605,7 @@ google.golang.org/genproto/protobuf/field_mask
 # google.golang.org/genproto/googleapis/api v0.0.0-20231120223509-83a465c0220f
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/code
 google.golang.org/genproto/googleapis/rpc/errdetails
