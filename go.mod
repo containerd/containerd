@@ -22,7 +22,7 @@ require (
 	github.com/containerd/go-runc v1.1.0
 	github.com/containerd/imgcrypt/v2 v2.0.0-rc.1
 	github.com/containerd/log v0.1.0
-	github.com/containerd/nri v0.7.0
+	github.com/containerd/nri v0.8.0
 	github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723
 	github.com/containerd/platforms v1.0.0-rc.0
 	github.com/containerd/plugin v1.0.0
