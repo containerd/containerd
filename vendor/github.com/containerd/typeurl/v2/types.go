@@ -284,16 +284,14 @@ func getTypeByUrl(url string) (reflect.Type, error) {
 	mu.RUnlock()
 	mt, err := protoregistry.GlobalTypes.FindMessageByURL(url)
 	if err != nil {
-		e := protoregistry.NotFound
-		if !errors.Is(err, e) {
-			return nil, fmt.Errorf("type with url %s: %w", url, ErrNotFound)
-		}
-
-		for _, h := range handlers {
-			if t := h.GetType(url); t != nil {
-				return t, nil
+		if errors.Is(err, protoregistry.NotFound) {
+			for _, h := range handlers {
+				if t := h.GetType(url); t != nil {
+					return t, nil
+				}
 			}
 		}
+		return nil, fmt.Errorf("type with url %s: %w", url, ErrNotFound)
 	}
 	empty := mt.New().Interface()
 	return reflect.TypeOf(empty).Elem(), nil
