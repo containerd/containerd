@@ -263,7 +263,7 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
 
       - name: UploadJobReport
-        uses: google-github-actions/upload-cloud-storage@e485962f2bef914ac9c3bdd571f821f0ba7946c4 # v2.2.0
+        uses: google-github-actions/upload-cloud-storage@386ab77f37fdf51c0e38b3d229fad286861cc0d0 # v2.2.1
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ github.workspace }}/latest-build.txt
@@ -271,7 +271,7 @@ jobs:
           parent: false
 
       - name: UploadLogsDir
-        uses: google-github-actions/upload-cloud-storage@e485962f2bef914ac9c3bdd571f821f0ba7946c4 # v2.2.0
+        uses: google-github-actions/upload-cloud-storage@386ab77f37fdf51c0e38b3d229fad286861cc0d0 # v2.2.1
         if: steps.AssignGcpCreds.outputs.GCP_SERVICE_ACCOUNT && steps.AssignGcpCreds.outputs.GCP_WORKLOAD_IDENTITY_PROVIDER
         with:
           path: ${{ env.LOGS_DIR }}
