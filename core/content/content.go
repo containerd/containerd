@@ -183,8 +183,9 @@ func WithLabels(labels map[string]string) Opt {
 
 // WriterOpts is internally used by WriterOpt.
 type WriterOpts struct {
-	Ref  string
-	Desc ocispec.Descriptor
+	Ref             string
+	Desc            ocispec.Descriptor
+	DigestAlgorithm digest.Algorithm
 }
 
 // WriterOpt is used for passing options to Ingester.Writer.
@@ -207,6 +208,19 @@ func WithDescriptor(desc ocispec.Descriptor) WriterOpt {
 func WithRef(ref string) WriterOpt {
 	return func(opts *WriterOpts) error {
 		opts.Ref = ref
+		return nil
+	}
+}
+
+// WithDigestAlgorithm overrides the digest algorithm for the writer. While
+// passing in an expected digest will use the correct algorithm, this ensures
+// that we use the alternate algorithm whether or not the expected value for
+// digest is provided.
+//
+// Implementations may choose to ignore this option.
+func WithDigestAlgorithm(alg digest.Algorithm) WriterOpt {
+	return func(opts *WriterOpts) error {
+		opts.DigestAlgorithm = alg
 		return nil
 	}
 }

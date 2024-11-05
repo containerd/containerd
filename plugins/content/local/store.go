@@ -477,7 +477,7 @@ func (s *store) Writer(ctx context.Context, opts ...content.WriterOpt) (content.
 		return nil, err
 	}
 
-	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest)
+	w, err := s.writer(ctx, wOpts.Ref, wOpts.Desc.Size, wOpts.Desc.Digest, wOpts.DigestAlgorithm)
 	if err != nil {
 		s.unlock(wOpts.Ref)
 		return nil, err
@@ -518,7 +518,9 @@ func (s *store) resumeStatus(ref string, total int64, digester digest.Digester) 
 
 // writer provides the main implementation of the Writer method. The caller
 // must hold the lock correctly and release on error if there is a problem.
-func (s *store) writer(ctx context.Context, ref string, total int64, expected digest.Digest) (content.Writer, error) {
+func (s *store) writer(ctx context.Context, ref string, total int64, expected digest.Digest, alg digest.Algorithm) (content.Writer, error) {
+	var digester digest.Digester
+
 	// TODO(stevvooe): Need to actually store expected here. We have
 	// code in the service that shouldn't be dealing with this.
 	if expected != "" {
@@ -529,12 +531,17 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 		if _, err := os.Stat(p); err == nil {
 			return nil, fmt.Errorf("content %v: %w", expected, errdefs.ErrAlreadyExists)
 		}
+
+		digester = expected.Algorithm().Digester()
+	} else if alg != "" {
+		digester = alg.Digester()
+	} else {
+		digester = digest.Canonical.Digester()
 	}
 
 	path, refp, data := s.ingestPaths(ref)
 
 	var (
-		digester  = digest.Canonical.Digester()
 		offset    int64
 		startedAt time.Time
 		updatedAt time.Time
