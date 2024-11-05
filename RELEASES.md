@@ -117,9 +117,10 @@ The current state is available in the following tables:
 | [1.3](https://github.com/containerd/containerd/releases/tag/v1.3.10) | End of Life   | September 26, 2019 | March 4, 2021                                           |
 | [1.4](https://github.com/containerd/containerd/releases/tag/v1.4.13) | End of Life   | August 17, 2020    | March 3, 2022                                           |
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life   | May 3, 2021        | February 28, 2023                                       |
-| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.23) | LTS           | February 15, 2022  | max(February 15, 2025 or next LTS + 6 months)           |
-| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.3)  | Active        | March 10, 2023     | active(release of 2.0 + 6 months), extended(EOL of 1.6) |
-| [2.0](https://github.com/containerd/containerd/milestone/35)         | Next          | TBD                | TBD                                                     |
+| [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.36) | LTS           | February 15, 2022  | next LTS + 6 months                                     |
+| [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.23) | Active        | March 10, 2023     | active(May 5, 2025), extended(EOL of 1.6)               |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.0)  | Active        | November 5, 2024   | max(November 5, 2025 or release of 2.1 + 6 months)      |
+| [2.1](https://github.com/containerd/containerd/milestone/48)         | Next          | TBD                | TBD                                                     |
 
 > **_NOTE_** containerd v1.7 will end of life at the same time as v1.6 LTS. Due to
 > [Minimal Version Selection](https://go.dev/ref/mod#minimal-version-selection) used
@@ -141,8 +142,8 @@ of containerd for every supported version of Kubernetes.
 | Kubernetes Version | containerd Version            | CRI Version     |
 |--------------------|-------------------------------|-----------------|
 | 1.29               | 1.7.11+, 1.6.27+              | v1              |
-| 1.30               | 2.0(wip), 1.7.13+, 1.6.28+    | v1              |
-| 1.31               | 2.0(wip), 1.7.20+, 1.6.34+    | v1              |
+| 1.30               | 2.0.0+, 1.7.13+, 1.6.28+      | v1              |
+| 1.31               | 2.0.0+, 1.7.20+, 1.6.34+      | v1              |
 
 Deprecated containerd and kubernetes versions
 

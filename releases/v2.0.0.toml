@@ -9,7 +9,7 @@ ignore_deps = [ "github.com/containerd/containerd" ]
 # previous release
 previous = "v1.7.0"
 
-pre_release = true
+pre_release = false
 
 preface = """\
 The first major release of containerd 2.x focuses on the continued stability of
@@ -18,6 +18,8 @@ release includes the stabilization of new features added in the last 1.x release
 as well as the removal of features which were deprecated in 1.x. The goal is to
 support the vast community of containerd users well into the future along with
 their ever increasing deployment footprints and variety of use cases.
+
+See [containerd 2.0](https://github.com/containerd/containerd/blob/main/docs/containerd-2.0.md) documentation for details on what is new and has changed in this release.
 """
 
 postface = """\
