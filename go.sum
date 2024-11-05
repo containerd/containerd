@@ -687,8 +687,8 @@ github.com/containerd/imgcrypt/v2 v2.0.0-rc.1 h1:7OMu5otk5Z2GeQs24JBPOmYbTc50+q6
 github.com/containerd/imgcrypt/v2 v2.0.0-rc.1/go.mod h1:3/Ab3iliBt/aBVNYOwecT1YagCqAiHidOmVsrjtHF1A=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
-github.com/containerd/nri v0.7.0 h1:scGL9JiBqNaWnghLFFPOzp0GxxWAc1uQtQ7qx8PHdCs=
-github.com/containerd/nri v0.7.0/go.mod h1:uSkgBrCdEtAiEz4vnrq8gmAC4EnVAM5Klt0OuK5rZYQ=
+github.com/containerd/nri v0.8.0 h1:n1S753B9lX8RFrHYeSgwVvS1yaUcHjxbB+f+xzEncRI=
+github.com/containerd/nri v0.8.0/go.mod h1:uSkgBrCdEtAiEz4vnrq8gmAC4EnVAM5Klt0OuK5rZYQ=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723 h1:swk9KxrmARZjSMrHc1Lzb39XhcDwAhYpqkBhinCFLCQ=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723/go.mod h1:ZKzztepTSz/LKtbUSzfBNVwgqBEPABVZV9PQF/l53+Q=
 github.com/containerd/platforms v1.0.0-rc.0 h1:GuHWSKgVVO3POn6nRBB4sH63uPOLa87yuuhsGLWaXAA=
