@@ -74,4 +74,4 @@ will all use the default namespace, which is simply named "`default`".
 ```
 
 You can also use the `CONTAINERD_NAMESPACE` environment variable to specify the default namespace to use for
-any of the `ctr` client commands.  
+any of the `ctr` client commands.
