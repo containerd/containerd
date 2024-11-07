@@ -48,7 +48,7 @@ trap cleanup EXIT
 
 set -x
 latest=$(readlink ./releases/cri-cni-containerd.tar.gz)
-tarball=$(echo "${latest}" | sed -e 's/cri-containerd-cni/containerd-cni/g' | sed -e 's/-linux-amd64/.linux-amd64/g')
+tarball=$(echo "${latest}" | sed -e 's/cri-containerd-cni/containerd-cni/g' | sed -e 's/-linux-/.linux-/g')
 cp "releases/${latest}" "${BUILDDIR}/${tarball}"
 cp "releases/${latest}.sha256sum" "${BUILDDIR}/${tarball}.sha256"
 
