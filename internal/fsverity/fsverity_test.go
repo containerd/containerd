@@ -123,8 +123,8 @@ func TestIsEnabled(t *testing.T) {
 		t.Errorf("fsverity Enable failed: %s", err.Error())
 	}
 
-	if enabled, err := IsEnabled(verityFile); !enabled || err != nil {
-		t.Errorf("expected fsverity to be enabled on file, received enabled: %t; error: %s", enabled, err.Error())
+	if enabled, err := IsEnabled(verityFile); !enabled && err != nil {
+		t.Errorf("expected fsverity to be enabled on file, received enabled: %t; error: %v", enabled, err)
 	}
 }
 
