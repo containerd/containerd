@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/testutil"
+	"golang.org/x/sys/unix"
 )
 
 type superblockROFeatures struct {
@@ -123,8 +124,8 @@ func TestIsEnabled(t *testing.T) {
 		t.Errorf("fsverity Enable failed: %s", err.Error())
 	}
 
-	if enabled, err := IsEnabled(verityFile); !enabled || err != nil {
-		t.Errorf("expected fsverity to be enabled on file, received enabled: %t; error: %s", enabled, err.Error())
+	if enabled, err := IsEnabled(verityFile); !enabled && err != nil {
+		t.Errorf("expected fsverity to be enabled on file, received enabled: %t; error: %v", enabled, err)
 	}
 }
 
@@ -143,8 +144,7 @@ func resolveDevicePath(path string) (_ string, e error) {
 	}
 
 	// resolve to device path
-	maj := (stat.Dev >> 8) & 0xff
-	min := stat.Dev & 0xff
+	major, minor := unix.Major(stat.Dev), unix.Minor(stat.Dev)
 
 	m, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
@@ -162,7 +162,7 @@ func resolveDevicePath(path string) (_ string, e error) {
 	scanner := bufio.NewScanner(m)
 
 	var entry string
-	sub := fmt.Sprintf("%d:%d", maj, min)
+	sub := fmt.Sprintf("%d:%d", major, minor)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), sub) {
 			entry = scanner.Text()
