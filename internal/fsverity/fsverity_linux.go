@@ -80,7 +80,7 @@ func IsEnabled(path string) (bool, error) {
 	}
 	defer f.Close()
 
-	var attr int
+	var attr int32
 
 	_, _, flagErr := unix.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(unix.FS_IOC_GETFLAGS), uintptr(unsafe.Pointer(&attr)))
 	if flagErr != 0 {
