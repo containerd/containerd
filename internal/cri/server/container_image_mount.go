@@ -186,6 +186,11 @@ func (c *criService) cleanupImageMounts(
 	for _, entry := range entries {
 		target := filepath.Join(targetBase, entry.Name())
 
+		target, err := toFullPath(target)
+		if err != nil {
+			return fmt.Errorf("failed to convert to full path: %w", err)
+		}
+
 		err = mount.UnmountAll(target, 0)
 		if err != nil {
 			return fmt.Errorf("failed to unmount image volume component %q: %w", target, err)
