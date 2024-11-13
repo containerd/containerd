@@ -99,7 +99,7 @@ Administrators whose workloads are running on containerd versions >= 1.6.27, >= 
 
 ### Docker Schema 1 image support is disabled by default
 
-Pulling Docker Schema 1 (`application/vnd.docker.distribution.manifest.v1+json` or `application/vnd.docker.distribution.manifest.v1+prettyjws`) images is disabled by default. Users should migrate their container images by rebuilding/pushing with the latest Docker or nerdctl+Buildkit tooling. Previous behavior can be re-enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1` for `containerd` (in the case of CRI) and `ctr`; however, users are **strongly recommended** to migrate to Docker Schema 2 or OCI images. Support for Docker Schema 1 images will be fully removed in a future release.
+Pulling Docker Schema 1 (`application/vnd.docker.distribution.manifest.v1+prettyjws`) images is disabled by default. Users should migrate their container images by rebuilding/pushing with the latest Docker or nerdctl+Buildkit tooling. Previous behavior can be re-enabled by setting an environment variable `CONTAINERD_ENABLE_DEPRECATED_PULL_SCHEMA_1_IMAGE=1` for `containerd` (in the case of CRI clients, such as Kubernetes and `crictl`) and `ctr` (`ctr` users also must specify `--local`); however, users are **strongly recommended** to migrate to Docker Schema 2 or OCI images. Support for Docker Schema 1 images will be fully removed in a future release.
 
 Since containerd 1.7.8 and 1.6.25, schema 1 images are labeled during pull with `io.containerd.image/converted-docker-schema1`. To find images that were converted from schema 1, you can use a command like `ctr namespaces list --quiet | xargs -I{} -- ctr --namespace={} image list 'labels."io.containerd.image/converted-docker-schema1"'`.
 
