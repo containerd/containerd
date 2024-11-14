@@ -176,6 +176,23 @@ file {
   package: "containerd.events"
   dependency: "github.com/containerd/containerd/api/types/fieldpath.proto"
   message_type {
+    name: "ContentCreate"
+    field {
+      name: "digest"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "digest"
+    }
+    field {
+      name: "size"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_INT64
+      json_name: "size"
+    }
+  }
+  message_type {
     name: "ContentDelete"
     field {
       name: "digest"
