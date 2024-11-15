@@ -157,8 +157,8 @@ type transferConfig struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
 
-	// MaxConcurrentDownloadsPerLayer is the max concurent download per layer
-	// for a pull. 1 means a layer will be donloaded with one connection. 0
+	// MaxConcurrentDownloadsPerLayer is the max concurrent download per layer
+	// for a pull. 1 means a layer will be downloaded with one connection. 0
 	// means parallel layer fetching will be turned off, which is the default
 	// behaviour.
 	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer"`

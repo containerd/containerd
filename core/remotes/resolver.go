@@ -127,7 +127,7 @@ type FetcherConfig struct {
 
 func (cfg FetcherConfig) Parallelism() int64 {
 	// parallel layer fetching remains off when MaxConcurrentDownloadsPerLayer
-	// is set to 0. This could be changed in the future if/when the feature is
+	// is <= 1. This could be changed in the future if/when the feature is
 	// successful and widely adopted.
 	if cfg.MaxConcurrentDownloads <= 0 || cfg.MaxConcurrentDownloadsPerLayer <= 0 {
 		return defaultLayerParallelism
