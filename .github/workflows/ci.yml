@@ -587,8 +587,7 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
           sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
-          # Pinned to 2.4.1-1 until https://github.com/hashicorp/vagrant/pull/13532 in released version
-          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant=2.4.1-1 ovmf
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
           # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
           sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
           sudo systemctl enable --now libvirtd
