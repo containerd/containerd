@@ -19,7 +19,6 @@
 # to /usr/local/bin.
 #
 set -eu -o pipefail
-
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 : "${IMGCRYPT_VERSION:=$(cat "${script_dir}/imgcrypt-version")}"
 : "${IMGCRYPT_REPO:=https://github.com/containerd/imgcrypt.git}" # Default repo
