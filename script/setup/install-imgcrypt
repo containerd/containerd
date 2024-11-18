@@ -19,6 +19,7 @@
 # to /usr/local/bin.
 #
 set -eu -o pipefail
+
 script_dir="$(cd -- "$(dirname -- "$0")" > /dev/null 2>&1; pwd -P)"
 : "${IMGCRYPT_VERSION:=$(cat "${script_dir}/imgcrypt-version")}"
 : "${IMGCRYPT_REPO:=https://github.com/containerd/imgcrypt.git}" # Default repo
@@ -27,7 +28,6 @@ TMPROOT=$(mktemp -d)
 git clone "${IMGCRYPT_REPO}" "${TMPROOT}"/imgcrypt
 pushd "${TMPROOT}"/imgcrypt
 git checkout "${IMGCRYPT_VERSION}"
-
 make
 make containerd-release -e DESTDIR="${DESTDIR}/usr/local"
 
