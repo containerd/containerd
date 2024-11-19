@@ -46,6 +46,7 @@ generate:
 lint:
 	@echo "+ $@"
 	@golangci-lint run
+	@(cd cmd/continuity && golangci-lint --config=../../.golangci.yml run)
 
 build:
 	@echo "+ $@"
