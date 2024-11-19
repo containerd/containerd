@@ -1,3 +1,5 @@
+//go:build unix && !linux
+
 /*
    Copyright The containerd Authors.
 
@@ -17,8 +19,18 @@
 package defaults
 
 const (
+	// DefaultAddress is the default unix socket address
+	DefaultAddress = "/var/run/containerd/containerd.sock"
+	// DefaultDebugAddress is the default unix socket address for pprof data
+	DefaultDebugAddress = "/var/run/containerd/debug.sock"
+	// DefaultFIFODir is the default location used by client-side cio library
+	// to store FIFOs.
+	DefaultFIFODir = "/var/run/containerd/fifo"
 	// DefaultSnapshotter will set the default snapshotter for the platform.
 	// This will be based on the client compilation target, so take that into
 	// account when choosing this value.
-	DefaultSnapshotter = "windows"
+	DefaultSnapshotter = "native"
+	// DefaultStateDir is the default location used by containerd to store
+	// transient data
+	DefaultStateDir = "/var/run/containerd"
 )
