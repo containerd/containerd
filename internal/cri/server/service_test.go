@@ -18,11 +18,14 @@ package server
 
 import (
 	"context"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/go-cni"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
@@ -32,6 +35,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	servertesting "github.com/containerd/containerd/v2/internal/cri/testing"
+	"github.com/containerd/containerd/v2/internal/eventq"
 	"github.com/containerd/containerd/v2/internal/registrar"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
@@ -151,6 +155,14 @@ func newTestCRIService(opts ...testOpt) *criService {
 			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
 		},
 		sandboxService: &fakeSandboxService{},
+		containerEventsQ: eventq.New[runtime.ContainerEventResponse](3*time.Second, func(event runtime.ContainerEventResponse) {
+			containerEventsDroppedCount.Inc()
+			log.L.WithFields(
+				log.Fields{
+					"container": event.ContainerId,
+					"type":      event.ContainerEventType,
+				}).Warn("container event discarded")
+		}),
 	}
 	for _, opt := range opts {
 		opt(service)
