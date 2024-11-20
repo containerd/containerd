@@ -106,16 +106,16 @@ func TestContentWriter(t *testing.T) {
 	defer cleanup()
 	defer testutil.DumpDirOnFailure(t, tmpdir)
 
-	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
-		t.Fatal("ingest dir should be created", err)
-	}
-
 	cw, err := cs.Writer(ctx, content.WithRef("myref"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := cw.Close(); err != nil {
 		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
+		t.Fatal("ingest dir should be created", err)
 	}
 
 	// reopen, so we can test things
