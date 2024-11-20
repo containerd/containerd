@@ -186,8 +186,17 @@ func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
 		tracing.WithAttribute("container.id", c.id),
 	)
 	defer span.End()
-	if _, err := c.loadTask(ctx, nil); err == nil {
-		return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
+	ts, err := c.loadTask(ctx, nil)
+	if err == nil {
+		// If containerd is not completed in the process of createing a container
+		// LoadTask will obtain the task, therefore ,it is nessessary to check the status of the task
+		// and inform shim to delete the container , because the container is not create success
+		s, err := ts.Status(ctx)
+		if err == nil && s.Status == Running {
+			return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
+		}
+		opts := []ProcessDeleteOpts{}
+		ts.Delete(ctx, opts...)
 	}
 	r, err := c.get(ctx)
 	if err != nil {
