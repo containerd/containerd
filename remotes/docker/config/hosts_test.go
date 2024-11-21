@@ -351,8 +351,8 @@ func TestHTTPFallback(t *testing.T) {
 					InsecureSkipVerify: true,
 				},
 			},
-			expectedScheme: "http",
-			usesFallback:   false,
+			expectedScheme: "https",
+			usesFallback:   true,
 		},
 		{
 			host: "localhost",
@@ -392,8 +392,8 @@ func TestHTTPFallback(t *testing.T) {
 					InsecureSkipVerify: true,
 				},
 			},
-			expectedScheme: "http",
-			usesFallback:   false,
+			expectedScheme: "https",
+			usesFallback:   true,
 		},
 		{
 			host: "example.com:5000",
