@@ -294,7 +294,7 @@ func (manager) Stop(ctx context.Context, id string) (shim.StopStatus, error) {
 		return shim.StopStatus{}, err
 	}
 	runtime, err := runc.ReadRuntime(path)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return shim.StopStatus{}, err
 	}
 	opts, err := runc.ReadOptions(path)
