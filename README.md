@@ -164,6 +164,8 @@ This will be the best place to discuss design and implementation.
 
 For sync communication catch us in the `#containerd` and `#containerd-dev` Slack channels on Cloud Native Computing Foundation's (CNCF) Slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF Slack.](https://slack.cncf.io)
 
+Join our next community meeting hosted on Zoom. The schedule is posted on the [CNCF Calendar](https://www.cncf.io/calendar/) (search 'containerd' to filter).
+
 ### Security audit
 
 Security audits for the containerd project are hosted on our website. Please see the [security page at containerd.io](https://containerd.io/security/) for more information.
