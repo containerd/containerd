@@ -529,6 +529,7 @@ jobs:
           # as the former one no longer works:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
+          - almalinux/9
     env:
       GOTEST: gotestsum --
       BOX: ${{ matrix.box }}
