@@ -556,10 +556,10 @@ jobs:
           - box: almalinux/8
             cgroup_driver: systemd
             runc: runc
-          - box: rockylinux/9@4.0.0
+          - box: almalinux/9
             cgroup_driver: cgroupfs
             runc: runc
-          - box: rockylinux/9@4.0.0
+          - box: almalinux/9
             cgroup_driver: systemd
             runc: runc
     env:
