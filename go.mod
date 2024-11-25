@@ -18,7 +18,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/errdefs/pkg v0.3.0
 	github.com/containerd/fifo v1.1.0
-	github.com/containerd/go-cni v1.1.10
+	github.com/containerd/go-cni v1.1.11
 	github.com/containerd/go-runc v1.1.0
 	github.com/containerd/imgcrypt/v2 v2.0.0-rc.1
 	github.com/containerd/log v0.1.0
