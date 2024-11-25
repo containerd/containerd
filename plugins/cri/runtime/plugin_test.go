@@ -24,8 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSandboxImageConfigMigration(t *testing.T) {
-	untrustedRoot := "/run/containerd/untrusted"
+func TestCRIRuntimePluginConfigMigration(t *testing.T) {
 	runcRoot := "/run/containerd/runc"
 	runcSandboxer := "podsandbox"
 
@@ -33,9 +32,6 @@ func TestSandboxImageConfigMigration(t *testing.T) {
 		"enable_selinux":              true,
 		"max_container_log_line_size": 100,
 		"containerd": map[string]interface{}{
-			"untrusted_workload_runtime": map[string]interface{}{
-				"runtime_root": untrustedRoot,
-			},
 			"runtimes": map[string]interface{}{
 				"runc": map[string]interface{}{
 					"runtime_root": runcRoot,
@@ -69,12 +65,4 @@ func TestSandboxImageConfigMigration(t *testing.T) {
 	require.True(t, ok)
 	require.NotNil(t, runcOptions)
 	require.Equal(t, runcRoot, runcOptions["Root"])
-
-	untrusted, ok := runtimes["untrusted"].(map[string]interface{})
-	require.True(t, ok)
-	require.NotNil(t, untrusted)
-	untrustedOptions := untrusted["options"].(map[string]interface{})
-	require.True(t, ok)
-	require.NotNil(t, untrustedOptions)
-	require.Equal(t, untrustedRoot, untrustedOptions["Root"])
 }

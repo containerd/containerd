@@ -258,22 +258,14 @@ func migrateConfig(dst, src map[string]interface{}) {
 	dst["containerd"] = newContainerdConf
 
 	// migrate runtimes configs
-	newRuntimesConf, ok := newContainerdConf["runtimes"].(map[string]interface{})
+	runtimesConf, ok := newContainerdConf["runtimes"]
 	if !ok {
 		return
 	}
-	// migrate untrusted_workload_runtime to `untrusted` runtime
-	if _, ok := newContainerdConf["untrusted_workload_runtime"]; ok {
-		if _, ok := newRuntimesConf["untrusted"]; !ok {
-			newRuntimesConf["untrusted"] = newContainerdConf["untrusted_workload_runtime"]
-			delete(newContainerdConf, "untrusted_workload_runtime")
-		}
-	}
-
-	for _, v := range newRuntimesConf {
+	for _, v := range runtimesConf.(map[string]interface{}) {
 		runtimeConf := v.(map[string]interface{})
 		if sandboxMode, ok := runtimeConf["sandbox_mode"]; ok {
-			if _, ok := runtimeConf["sandboxer"]; !ok {
+			if val, ok := runtimeConf["sandboxer"]; !ok || val == "" {
 				runtimeConf["sandboxer"] = sandboxMode
 				delete(runtimeConf, "sandbox_mode")
 			}
@@ -284,7 +276,7 @@ func migrateConfig(dst, src map[string]interface{}) {
 			if !ok {
 				options = make(map[string]interface{})
 			}
-			if _, ok := options["Root"]; !ok {
+			if val, ok := options["Root"]; !ok || val == "" {
 				options["Root"] = runtimeRoot
 				delete(runtimeConf, "runtime_root")
 			}
