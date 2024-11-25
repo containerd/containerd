@@ -550,7 +550,7 @@ jobs:
           # as the former one no longer works:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
-          - rockylinux/9@4.0.0
+          - almalinux/9
     env:
       BOX: ${{ matrix.box }}
 
