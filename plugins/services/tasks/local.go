@@ -62,8 +62,14 @@ import (
 )
 
 var (
-	_     = (api.TasksClient)(&local{})
-	empty = &ptypes.Empty{}
+	_                    = (api.TasksClient)(&local{})
+	empty                = &ptypes.Empty{}
+	tasksServiceRequires = []plugin.Type{
+		plugins.EventPlugin,
+		plugins.RuntimePluginV2,
+		plugins.MetadataPlugin,
+		plugins.TaskMonitorPlugin,
+	}
 )
 
 const (
