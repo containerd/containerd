@@ -18,9 +18,11 @@ package client
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -62,6 +64,17 @@ func TestMigration(t *testing.T) {
 				File:     "testdata/default-1.7.toml",
 				Migrated: defaultContent,
 			},
+			{
+				Name: "1.7-Custom",
+				File: "testdata/custom-1.7.toml",
+				Migrated: replaceAllValues(defaultContent, map[string]string{
+					"sandbox":               "'custom.io/pause:3.10'",
+					"stream_idle_timeout":   "'2h0m0s'",
+					"stream_server_address": "'127.0.1.1'",
+					"stream_server_port":    "'15000'",
+					"enable_tls_streaming":  "true",
+				}),
+			},
 		}...)
 	}
 
@@ -74,7 +87,7 @@ func TestMigration(t *testing.T) {
 			cmd.Stderr = os.Stderr
 			require.NoError(t, cmd.Run())
 			actual := buf.String()
-			assert.Equal(t, tc.Migrated, actual)
+			assert.Equal(t, tc.Migrated, actual, "Actual (full)\n%s", tc.Migrated, actual)
 		})
 	}
 
@@ -89,4 +102,16 @@ func currentDefaultConfig() (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func replaceAllValues(src string, values map[string]string) string {
+	for k, v := range values {
+		src = replaceValue(src, k, v)
+	}
+	return src
+}
+
+func replaceValue(src, key, value string) string {
+	re := regexp.MustCompile(fmt.Sprintf(`(\s*)%s = [^\n]*`, key))
+	return re.ReplaceAllString(src, fmt.Sprintf(`${1}%s = %s`, key, value))
 }
