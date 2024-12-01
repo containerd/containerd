@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
 	criutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
 
@@ -208,14 +209,14 @@ func (c *Controller) sandboxContainerSpecOpts(config *runtime.PodSandboxConfig, 
 	)
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
-		ssp, err = criutil.GenerateSeccompSecurityProfile(
+		ssp, err = sputil.GenerateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
-	seccompSpecOpts, err := criutil.GenerateSeccompSpecOpts(
+	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())

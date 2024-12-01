@@ -28,7 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	criutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/internal/cri/sputil"
 )
 
 func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageConfig *imagespec.ImageConfig) ([]oci.SpecOpts, error) {
@@ -65,12 +65,12 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 
 	asp := securityContext.GetApparmor()
 	if asp == nil {
-		asp, err = criutil.GenerateApparmorSecurityProfile(securityContext.GetApparmorProfile()) //nolint:staticcheck // Deprecated but we don't want to remove yet
+		asp, err = sputil.GenerateApparmorSecurityProfile(securityContext.GetApparmorProfile()) //nolint:staticcheck // Deprecated but we don't want to remove yet
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate apparmor spec opts: %w", err)
 		}
 	}
-	apparmorSpecOpts, err := criutil.GenerateApparmorSpecOpts(
+	apparmorSpecOpts, err := sputil.GenerateApparmorSpecOpts(
 		asp,
 		securityContext.GetPrivileged(),
 		c.apparmorEnabled())
@@ -83,14 +83,14 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 
 	ssp := securityContext.GetSeccomp()
 	if ssp == nil {
-		ssp, err = criutil.GenerateSeccompSecurityProfile(
+		ssp, err = sputil.GenerateSeccompSecurityProfile(
 			securityContext.GetSeccompProfilePath(), //nolint:staticcheck // Deprecated but we don't want to remove yet
 			c.config.UnsetSeccompProfile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate seccomp spec opts: %w", err)
 		}
 	}
-	seccompSpecOpts, err := criutil.GenerateSeccompSpecOpts(
+	seccompSpecOpts, err := sputil.GenerateSeccompSpecOpts(
 		ssp,
 		securityContext.GetPrivileged(),
 		c.seccompEnabled())
