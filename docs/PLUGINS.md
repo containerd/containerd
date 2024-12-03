@@ -90,7 +90,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	snapshotsapi "github.com/containerd/containerd/v2/api/services/snapshots/v1"
+	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/v2/contrib/snapshotservice"
 	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 )
