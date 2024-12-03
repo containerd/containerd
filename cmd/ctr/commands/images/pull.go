@@ -119,19 +119,20 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
-
-			// Set unpack configuration
+			allPlatforms := cliContext.Bool("all-platforms")
+			if len(p) > 0 && allPlatforms {
+				return errors.New("cannot specify both --platform and --all-platforms")
+			}
+			if len(p) == 0 && !allPlatforms {
+				p = append(p, platforms.DefaultSpec())
+			}
+			// we use an empty `Platform` slice to indicate that we want to pull all platforms
+			sopts = append(sopts, image.WithPlatforms(p...))
+			// TODO: Support unpack for all platforms..?
+			// Pass in a *?
 			for _, platform := range p {
 				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
 			}
-			if !cliContext.Bool("all-platforms") {
-				if len(p) == 0 {
-					p = append(p, platforms.DefaultSpec())
-				}
-				sopts = append(sopts, image.WithPlatforms(p...))
-			}
-			// TODO: Support unpack for all platforms..?
-			// Pass in a *?
 
 			if cliContext.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
