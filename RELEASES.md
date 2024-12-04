@@ -347,17 +347,14 @@ follow that format.
 
 ### Go client API
 
-The Go client API, documented in
-[godoc](https://godoc.org/github.com/containerd/containerd/v2/client), is currently
-considered unstable. It is recommended to vendor the necessary components to
-stabilize your project build. Note that because the Go API interfaces with the
-GRPC API, clients written against a 1.0 Go API should remain compatible with
-future 1.x series releases.
+As of containerd 2.0, the Go client API documented in
+[godoc](https://godoc.org/github.com/containerd/containerd/v2/client) is stable.
+Note that because the Go client interfaces with the GRPC API, clients building on top
+of the Go client should remain compatible with future server releases implementing the
+same major GRPC API series. For backwards compatability and as a general rule of thumb,
+it is the client's responsibility to handle not implemented errors returned by the containerd daemon.
 
-We intend to stabilize the API in a future release when more integrations have
-been carried out.
-
-Any changes to the API should be detectable at compile time, so upgrading will
+Any changes to the Go client API should be detectable at compile time, so upgrading will
 be a matter of fixing compilation errors and moving from there.
 
 ### CRI GRPC API
