@@ -31,11 +31,19 @@ func updateContainerIOOwner(ctx context.Context, cntr containerd.Container, conf
 		return nil, nil
 	}
 
-	// FIXME(fuweid): Ideally, the pipe owner should be aligned with process owner.
-	// No matter what user namespace container uses, it should work well. However,
-	// it breaks the sig-node conformance case - [when querying /stats/summary should report resource usage through the stats api].
+	// FIXME(fuweid):
+	//
+	// For builtin runc runtime, the pipe owner should be aligned with process
+	// owner. No matter what user namespace container uses, it should work
+	// well.
+	//
+	// However, gVisor runtime doesn't support runc.Options and no idea why
+	// adding options could breaks the sig-node conformance case [when querying /stats/summary should report resource usage through the stats api].
 	// In order to keep compatible, the change should apply to user namespace only.
-	if config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions() == nil {
+	//
+	// REF: https://github.com/containerd/containerd/issues/11091
+	usernsOpts := config.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions()
+	if usernsOpts == nil || usernsOpts.Mode == runtime.NamespaceMode_NODE {
 		return nil, nil
 	}
 
