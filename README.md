@@ -162,7 +162,7 @@ A Kubernetes incubator project, [cri-tools](https://github.com/kubernetes-sigs/c
 For async communication and long-running discussions please use issues and pull requests on the GitHub repo.
 This will be the best place to discuss design and implementation.
 
-For sync communication catch us in the `#containerd` and `#containerd-dev` Slack channels on Cloud Native Computing Foundation's (CNCF) Slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF Slack.](https://slack.cncf.io)
+For sync communication catch us in the `#containerd` and `#containerd-dev` Slack channels on Cloud Native Computing Foundation's (CNCF) Slack - `cloud-native.slack.com`. Everyone is welcome to join and chat. [Get Invite to CNCF Slack.](https://cloud-native.slack.com/messages/#containerd)
 
 ### Security audit
 
