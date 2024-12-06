@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/containerd/log/logtest"
 
@@ -115,8 +116,13 @@ ca = "/etc/path/default"
 
 [host."https://onlyheader.registry".header]
   x-custom-1 = "justaheader"
+
+[host."https://dial-timeout.registry"]
+  dial_timeout = "3s"
 `
+
 	var tb, fb = true, false
+	var dialTimeout = 3 * time.Second
 	expected := []hostConfig{
 		{
 			scheme:       "https",
@@ -187,6 +193,13 @@ ca = "/etc/path/default"
 			path:         "/v2",
 			capabilities: allCaps,
 			header:       http.Header{"x-custom-1": {"justaheader"}},
+		},
+		{
+			scheme:       "https",
+			host:         "dial-timeout.registry",
+			path:         "/v2",
+			capabilities: allCaps,
+			dialTimeout:  &dialTimeout,
 		},
 		{
 			scheme:       "https",
@@ -555,6 +568,14 @@ func compareHostConfig(j, k hostConfig) bool {
 		}
 	}
 
+	if j.dialTimeout != nil && k.dialTimeout != nil {
+		if *j.dialTimeout != *k.dialTimeout {
+			return false
+		}
+	} else if j.dialTimeout != nil || k.dialTimeout != nil {
+		return false
+	}
+
 	return true
 }
 
@@ -573,6 +594,9 @@ func printHostConfig(hc []hostConfig) string {
 			fmt.Fprintf(b, "\t\tskip-verify: %t\n", *hc[i].skipVerify)
 		}
 		fmt.Fprintf(b, "\t\theader: %#v\n", hc[i].header)
+		if hc[i].dialTimeout != nil {
+			fmt.Fprintf(b, "\t\tdial-timeout: %v\n", hc[i].dialTimeout)
+		}
 	}
 	return b.String()
 }

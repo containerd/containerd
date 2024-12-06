@@ -339,6 +339,15 @@ non-compliant OCI registries which are missing the `/v2` prefix.
 override_path = true
 ```
 
+## dial_timeout field
+
+`dial_timeout` is the maximum amount of time a dial will wait for
+a connect to complete.
+
+```
+dial_timeout = "1s"
+```
+
 ## host field(s) (in the toml table format)
 
 `[host]."https://namespace"` and `[host]."http://namespace"` entries in the
