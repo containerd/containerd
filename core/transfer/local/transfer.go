@@ -40,6 +40,8 @@ type localTransferService struct {
 	images  images.Store
 	// limiter for upload
 	limiterU *semaphore.Weighted
+	// limiter for operations during download
+	limiterOperationD *semaphore.Weighted
 	// limiter for download operation
 	limiterD *semaphore.Weighted
 	config   TransferConfig
@@ -54,8 +56,14 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	if tc.MaxConcurrentUploadedLayers > 0 {
 		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
 	}
+	if tc.MaxConcurrentDownloadOperations > 0 {
+		ts.limiterOperationD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadOperations))
+	}
 	if tc.MaxConcurrentDownloads > 0 {
 		ts.limiterD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloads))
+	} else {
+		// default to 3 dl at a time
+		ts.limiterD = semaphore.NewWeighted(int64(3))
 	}
 	return ts
 }
@@ -166,8 +174,30 @@ type TransferConfig struct {
 	// Leases manager is used to create leases during operations if none, exists
 	Leases leases.Manager
 
-	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
+	// MaxConcurrentDownloads restricts the total number of concurrent downloads
+	// across all layers during an image pull operation. This helps control the
+	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
+
+	// MaxConcurrentDownloadOperations limits how many operations can run in
+	// parallel during an image pull. Operations include: - Downloading a layer
+	// - Unpacking a layer into the snapshotter - Moving an unpacked layer to
+	// its final location This helps prevent system resource exhaustion.
+	MaxConcurrentDownloadOperations int
+
+	// MaxConcurrentDownloadsPerLayer enables parallel downloading of individual
+	// layers by splitting them into chunks: - Values <= 1: Layer downloads use
+	// a single connection (default) - Values > 1: Layer is split into chunks
+	// and downloaded in parallel. Parallel downloads can significantly reduce
+	// pull times for large layers.
+	MaxConcurrentDownloadsPerLayer int
+
+	// ConcurrentFetchChunksSizeMB sets the maximum size in MB for each chunk
+	// when downloading layers in parallel (requires
+	// MaxConcurrentDownloadsPerLayer > 1). Larger chunks reduce coordination
+	// overhead but use more memory.
+	ConcurrentFetchChunksSizeMB int
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int
 
