@@ -185,6 +185,7 @@ version = 3
     image_pull_progress_timeout = '5m0s'
     image_pull_with_sync_fs = false
     stats_collect_period = 10
+    use_local_image_pull = false
 
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10'
@@ -321,21 +322,6 @@ version = 2
   # It generates a self-sign certificate unless the following x509_key_pair_streaming are both set.
   enable_tls_streaming = false
 
-  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
-  # container requests with huge page limits if the cgroup controller for hugepages is not present.
-  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
-  tolerate_missing_hugetlb_controller = true
-
-  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
-	# isolation, security and early detection of issues in the mount configuration when using
-	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
-  ignore_image_defined_volumes = false
-
-  # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
-  # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
-  # requires that all containers are deleted.
-  netns_mounts_under_state_dir = false
-
   # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
   [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
     # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
@@ -378,6 +364,30 @@ version = 2
     # To summarize, there are two different seccomp defaults, the unset default used when the CRI request is
     # set to nil or `unconfined`, and the default used when the runtime default seccomp profile is requested.
   unset_seccomp_profile = ""
+
+  # tolerate_missing_hugetlb_controller if set to false will error out on create/update
+  # container requests with huge page limits if the cgroup controller for hugepages is not present.
+  # This helps with supporting Kubernetes <=1.18 out of the box. (default is `true`)
+  tolerate_missing_hugetlb_controller = true
+
+	# disable_hugetlb_controller indicates to silently disable the hugetlb controller, even when it is
+	# present in /sys/fs/cgroup/cgroup.controllers.
+	# This helps with running rootless mode + cgroup v2 + systemd but without hugetlb delegation.
+  disable_hugetlb_controller = true
+
+  # device_ownership_from_security_context changes the default behavior of setting container devices uid/gid
+	# from CRI's SecurityContext (RunAsUser/RunAsGroup) instead of taking host's uid/gid. Defaults to false.
+  device_ownership_from_security_context = false
+
+  # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
+	# isolation, security and early detection of issues in the mount configuration when using
+	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  ignore_image_defined_volumes = false
+
+  # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
+  # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
+  # requires that all containers are deleted.
+  netns_mounts_under_state_dir = false
 
   # enable_unprivileged_ports configures net.ipv4.ip_unprivileged_port_start=0
   # for all containers which are not using host network
