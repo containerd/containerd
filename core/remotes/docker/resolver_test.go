@@ -645,6 +645,39 @@ func TestResolveProxyFallback(t *testing.T) {
 	}
 }
 
+func TestRetryWithTimeout(t *testing.T) {
+	t.Parallel()
+	var tries int
+	s := httptest.NewServer(logHandler{t, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		tries++
+		t.Logf("Try %d, request: %v", tries, r)
+
+		var status int
+		switch tries {
+		case 1, 2:
+			time.Sleep(time.Second * 3)
+			status = http.StatusGatewayTimeout
+		case 3:
+			time.Sleep(time.Second)
+			status = http.StatusBadGateway
+		case 4:
+			status = http.StatusServiceUnavailable
+		default:
+			status = http.StatusOK
+		}
+		rw.WriteHeader(status)
+	})})
+	defer s.Close()
+
+	base := s.URL[7:] // strip "http://"
+	resolver := NewResolver(ResolverOptions{})
+
+	_, _, err := resolver.Resolve(context.Background(), fmt.Sprintf("%s/testname:latest", base))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func flipLocalhost(host string) string {
 	if strings.HasPrefix(host, "127.0.0.1") {
 		return "localhost" + host[9:]
