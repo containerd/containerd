@@ -19,11 +19,30 @@ package server
 import (
 	"context"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func (c *criService) ListPodSandboxMetrics(context.Context, *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListPodSandboxMetrics not implemented")
+func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
+	sandboxList := c.sandboxStore.List()
+	//metricsList := c.sandboxStore.
+
+	podMetrics := make([]*runtime.PodSandboxMetrics, 0)
+	for _, sandbox := range sandboxList {
+		c.containerStore.List()
+		containerMetrics := make([]*runtime.ContainerMetrics, 0)
+
+		podMetrics = append(podMetrics, &runtime.PodSandboxMetrics{
+			PodSandboxId:     sandbox.ID,
+			ContainerMetrics: containerMetrics,
+		})
+	}
+
+	return &runtime.ListPodSandboxMetricsResponse{
+		PodMetrics: podMetrics,
+	}, nil
+}
+
+// gives the metrics for a given container in a sandbox
+func (c *criService) listContainerMetrics(sandboxID string, containerID string) *runtime.ContainerMetrics {
+
 }
