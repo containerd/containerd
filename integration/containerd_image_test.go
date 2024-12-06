@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/errdefs"
+	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -118,17 +119,17 @@ func TestContainerdImage(t *testing.T) {
 	}()
 
 	t.Logf("the image should be marked as managed")
-	imgByRef, err := containerdClient.GetImage(ctx, testImage)
+	imgByRef, err := containerdClient.GetImageWithPlatform(ctx, testImage, imagespec.Platform{})
 	assert.NoError(t, err)
 	assert.Equal(t, "managed", imgByRef.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image id should be created and managed")
-	imgByID, err := containerdClient.GetImage(ctx, id)
+	imgByID, err := containerdClient.GetImageWithPlatform(ctx, id, imagespec.Platform{})
 	assert.NoError(t, err)
 	assert.Equal(t, "managed", imgByID.Labels()["io.cri-containerd.image"])
 
 	t.Logf("the image should be labeled")
-	img, err := containerdClient.GetImage(ctx, testImage)
+	img, err := containerdClient.GetImageWithPlatform(ctx, testImage, imagespec.Platform{})
 	assert.NoError(t, err)
 	assert.Equal(t, "bar", img.Labels()["foo"])
 	assert.Equal(t, labels.ImageLabelValue, img.Labels()[labels.ImageLabelKey])
@@ -225,7 +226,7 @@ func TestContainerdSandboxImage(t *testing.T) {
 	ctx := context.Background()
 
 	t.Log("make sure the pause image exist")
-	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
+	pauseImg, err := containerdClient.GetImageWithPlatform(ctx, pauseImage, imagespec.Platform{})
 	require.NoError(t, err)
 	t.Log("ensure correct labels are set on pause image")
 	assert.Equal(t, "pinned", pauseImg.Labels()["io.cri-containerd.pinned"])
@@ -260,7 +261,7 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 	assert.True(t, pimg.Pinned)
 
 	t.Log("make sure the pause image exist")
-	pauseImg, err := containerdClient.GetImage(ctx, pauseImage)
+	pauseImg, err := containerdClient.GetImageWithPlatform(ctx, pauseImage, imagespec.Platform{})
 	require.NoError(t, err)
 
 	t.Log("ensure correct labels are set on pause image")
@@ -296,7 +297,7 @@ func TestContainerdImageWithDockerSchema1(t *testing.T) {
 		assert.NoError(t, imageService.RemoveImage(&runtime.ImageSpec{Image: testImage}))
 	}()
 
-	imgByRef, err := containerdClient.GetImage(ctx, testImage)
+	imgByRef, err := containerdClient.GetImageWithPlatform(ctx, testImage, imagespec.Platform{})
 	require.NoError(t, err)
 
 	t.Logf("the image should be marked as managed")
