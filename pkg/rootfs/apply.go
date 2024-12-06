@@ -33,6 +33,8 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
+const labelSnapshotRef = "containerd.io/snapshot.ref"
+
 // Layer represents the descriptors for a layer diff. These descriptions
 // include the descriptor for the uncompressed tar diff as well as a blob
 // used to transport that tar. The blob descriptor may or may not describe
@@ -93,6 +95,16 @@ func ApplyLayerWithOpts(ctx context.Context, layer Layer, chain []digest.Digest,
 		chainID = identity.ChainID(append(chain, layer.Diff.Digest)).String()
 		applied bool
 	)
+	
+	snapshotLabels := snapshots.FilterInheritedLabels(layer.Blob.Annotations)
+	if snapshotLabels == nil {
+		snapshotLabels = make(map[string]string)
+	}
+	snapshotLabels[labelSnapshotRef] = chainID
+
+	if snapshotLabels != nil {
+		opts = append(opts, snapshots.WithLabels(snapshotLabels))
+	}
 	if _, err := sn.Stat(ctx, chainID); err != nil {
 		if !errdefs.IsNotFound(err) {
 			return false, fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
