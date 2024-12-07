@@ -35,9 +35,9 @@ Database schema
 	   │     │     ├──source : <string>           - Mount source
 	   │     │     ├──target : <string>           - Mount target (relative to previous mount point)
 	   │     │     ├──mp : <string>               - Mount point for filesystem mount
-	   │     │     ├──mpg : <bool>                - Whether the mount point is auto generated
-	   │     │     ├──dev : <string>              - Device active for this mount
-	   │     │     ├──pid : <int>                 - Process created for this mount
+	   │     │     ├──mpg : <bool>                - Whether the mount point is auto generated (NOT USED)
+	   │     │     ├──dev : <string>              - Device active for this mount (NOT USED)
+	   │     │     ├──pid : <int>                 - Process created for this mount (NOT USED)
 	   │     │     └──options : <string>          - Comma separate options
 	   │     ├──system
 	   │     │  ╘══*order*
@@ -50,7 +50,7 @@ Database schema
 	   ├──leases
 	   │  ╘══*lease id*
 	   │     ╘══*mount name*: nil
-	   └──unmountq
+	   └──unmountq                                (CURRENTLY NOT USED, may remove)
 	      └──*mount name + auto-increment*
 	         ├──type : <string>                   - Mount type
 	         ├──target : <string>                 - Path to check && unmount
@@ -64,8 +64,12 @@ Database schema
 package manager
 
 var (
-	bucketKeyID     = []byte("id")
-	bucketKeyMounts = []byte("mounts")
-	bucketKeyLeases = []byte("leases")
-	bucketKeyLease  = []byte("lease")
+	bucketKeyID         = []byte("id")
+	bucketKeyMounts     = []byte("mounts")
+	bucketKeyLeases     = []byte("leases")
+	bucketKeyLease      = []byte("lease")
+	bucketKeyActive     = []byte("active")
+	bucketKeyType       = []byte("type")
+	bucketKeyMountedAt  = []byte("mat")
+	bucketKeyMountPoint = []byte("mp")
 )

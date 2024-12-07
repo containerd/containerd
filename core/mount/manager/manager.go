@@ -17,7 +17,6 @@
 package manager
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -27,7 +26,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -64,8 +62,6 @@ type mountManager struct {
 	rwlock sync.RWMutex
 }
 
-type formatOptions struct{}
-
 func (mm *mountManager) Activate(ctx context.Context, name string, mounts []mount.Mount, opts ...mount.ActivateOpt) (info mount.ActivationInfo, retErr error) {
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
@@ -85,7 +81,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	// highest index of a mount
 	// first system mount is the first index which should be mounted by the system
 	var firstSystemMount = -1
-	var mountSrc []func(formatOptions) (string, error)
+	var mountConv []mountConverter
 	var handlers []mount.MountHandler
 	for i := range mounts {
 		// Check is the source needs formatting, any formatting requires
@@ -105,22 +101,16 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			// Strip "format/" from beginning before looking for handler
 			mounts[i].Type = mounts[i].Type[7:]
 
-			src := mounts[i].Source
-			if mountSrc == nil {
-				mountSrc = make([]func(formatOptions) (string, error), len(mounts))
+			if mountConv == nil {
+				mountConv = make([]mountConverter, len(mounts))
 			}
 
-			mountSrc[i] = func(fo formatOptions) (string, error) {
-				t, err := template.New("").Parse(src)
-				if err != nil {
-					return "", err
-				}
-				buf := bytes.NewBuffer(nil)
-				if err := t.Execute(buf, fo); err != nil {
-					return "", err
-				}
-				return buf.String(), nil
+			mv, err := formatMount(mounts[i])
+			if err != nil {
+				return mount.ActivationInfo{}, err
 			}
+
+			mountConv[i] = mv
 		} else if mm.handlers != nil {
 			handler, ok := mm.handlers[mounts[i].Type]
 			if ok {
@@ -282,17 +272,12 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	}
 
 	for i, m := range mounts[:firstSystemMount] {
-		if mountSrc != nil {
-			if t := mountSrc[i]; t != nil {
-				fo := formatOptions{}
-				// TODO: Add ID
-				// TODO: Add active mounts
-				newSrc, err := t(fo)
-				if err != nil {
-					return mount.ActivationInfo{}, err
-				}
-				m.Source = newSrc
+		if mountConv != nil && mountConv[i] != nil {
+			newM, err := mountConv[i](m, mounted)
+			if err != nil {
+				return mount.ActivationInfo{}, err
 			}
+			m = newM
 		}
 
 		// Use cleanup order for directory names
@@ -302,9 +287,6 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			return mount.ActivationInfo{}, err
 		}
 		mp := filepath.Join(targetBase, fmt.Sprintf(formatMP, ci))
-		if err := os.Mkdir(mp, 0700); err != nil {
-			return mount.ActivationInfo{}, err
-		}
 
 		var active mount.ActiveMount
 		if h := handlers[i]; h != nil {
@@ -313,6 +295,9 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 				return mount.ActivationInfo{}, err
 			}
 		} else {
+			if err := os.Mkdir(mp, 0700); err != nil {
+				return mount.ActivationInfo{}, err
+			}
 			if err := m.Mount(mp); err != nil {
 				return mount.ActivationInfo{}, fmt.Errorf("mount failed %v: %w", m, err)
 			}
@@ -326,17 +311,14 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		mounted = append(mounted, active)
 	}
 
-	// If first system mount is formatted, fill in the format
-	if mountSrc != nil {
-		if t := mountSrc[firstSystemMount]; t != nil {
-			fo := formatOptions{}
-			// TODO: Add ID
-			// TODO: Add active mounts
-			newSrc, err := t(fo)
+	// If first system mount is converted, fill in the format
+	if mountConv != nil {
+		if t := mountConv[firstSystemMount]; t != nil {
+			newM, err := t(mounts[firstSystemMount], mounted)
 			if err != nil {
 				return mount.ActivationInfo{}, err
 			}
-			mounts[firstSystemMount].Source = newSrc
+			mounts[firstSystemMount] = newM
 		}
 	}
 
@@ -366,7 +348,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrUnknown)
 		}
 
-		abkt, err := bkt.CreateBucket([]byte("active"))
+		abkt, err := bkt.CreateBucket(bucketKeyActive)
 		if err != nil {
 			return err
 		}
@@ -377,15 +359,9 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			if err != nil {
 				return err
 			}
-			if err := cur.Put([]byte("type"), []byte(active.Type)); err != nil {
+			if err = putActiveMount(cur, active); err != nil {
 				return err
 			}
-			// TODO: Add Source
-			// TODO: Add Target
-			// TODO: Add Options
-
-			// TODO: Add mounted at
-			// TODO: Add device or mount point
 
 		}
 
@@ -415,6 +391,47 @@ func encodeID(id uint64) ([]byte, error) {
 func readID(bkt *bolt.Bucket) uint64 {
 	id, _ := binary.Uvarint(bkt.Get(bucketKeyID))
 	return id
+}
+
+func putActiveMount(bkt *bolt.Bucket, active mount.ActiveMount) error {
+	if err := bkt.Put(bucketKeyType, []byte(active.Type)); err != nil {
+		return err
+	}
+
+	// TODO: Same if device?
+	if err := bkt.Put(bucketKeyMountPoint, []byte(active.MountPoint)); err != nil {
+		return err
+	}
+
+	mountedAt, err := active.MountedAt.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	if err := bkt.Put(bucketKeyMountedAt, mountedAt); err != nil {
+		return err
+	}
+
+	// TODO: Add Source
+	// TODO: Add Target
+	// TODO: Add Options
+
+	return nil
+}
+
+func readActiveMount(bkt *bolt.Bucket) (mount.ActiveMount, error) {
+	var active mount.ActiveMount
+	active.Type = string(bkt.Get(bucketKeyType))
+	active.MountPoint = string(bkt.Get(bucketKeyMountPoint))
+	if v := bkt.Get(bucketKeyMountedAt); v != nil {
+		var mountedAt time.Time
+		if err := mountedAt.UnmarshalBinary(v); err != nil {
+			// TODO: Should this be skipped or otherwise logged and ignored?
+			return mount.ActiveMount{}, err
+		}
+		active.MountedAt = &mountedAt
+	}
+
+	return active, nil
 }
 
 func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) {
@@ -449,22 +466,113 @@ func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
 	return bkt
 }
 
-func (mm *mountManager) Deactivate(context.Context, string) error {
+func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
+	namespace, err := namespaces.NamespaceRequired(ctx)
+	if err != nil {
+		return err
+	}
+
+	var (
+		mid       uint64
+		allActive []mount.ActiveMount
+	)
+
 	// First in a single transaction, mark the mounts as deactivated
-	// Then run cleanup in background
+	if err := mm.db.Update(func(tx *bolt.Tx) error {
+		v1bkt := tx.Bucket([]byte("v1"))
+		if v1bkt == nil {
+			return fmt.Errorf("missing v1 bucket: %w", errdefs.ErrUnknown)
+		}
+
+		nsbkt := v1bkt.Bucket([]byte(namespace))
+		if nsbkt == nil {
+			return fmt.Errorf("missing namespace %q bucket: %w", namespace, errdefs.ErrUnknown)
+		}
+
+		mbkt := nsbkt.Bucket(bucketKeyMounts)
+		if mbkt == nil {
+			return fmt.Errorf("missing mounts bucket: %w", errdefs.ErrUnknown)
+		}
+		bkt := mbkt.Bucket([]byte(name))
+		if bkt == nil {
+			return fmt.Errorf("missing mount %q bucket: %w", name, errdefs.ErrUnknown)
+		}
+
+		mid = readID(bkt)
+
+		lid := bkt.Get(bucketKeyLease)
+		if lid != nil {
+			lssbkt := nsbkt.Bucket(bucketKeyLeases)
+			if lssbkt != nil {
+				lsbkt := lssbkt.Bucket(lid)
+				if lsbkt != nil {
+					if err = lsbkt.Delete([]byte(name)); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		abkt := bkt.Bucket(bucketKeyActive)
+		if abkt != nil {
+			abkt.ForEachBucket(func(k []byte) error {
+				active, err := readActiveMount(abkt.Bucket(k))
+				if err != nil {
+					return err
+				}
+				allActive = append(allActive, active)
+				return nil
+			})
+		}
+
+		if err = mbkt.DeleteBucket([]byte(name)); err != nil {
+			return err
+		}
+
+		// TODO: Is unmountq really needed or just delete?
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// TODO: Should this also be backgrounded, no much can do on failure to unmount
+	var mountErrors error
+	for i := len(allActive) - 1; i >= 0; i-- {
+		var err error
+		if h := mm.handlers[allActive[i].Type]; h != nil {
+			err = h.Unmount(ctx, allActive[i].MountPoint)
+		} else {
+			err = mount.Unmount(allActive[i].MountPoint, 0)
+		}
+		if err != nil {
+			mountErrors = errors.Join(mountErrors, err)
+		}
+	}
+	if mountErrors != nil {
+		// Don't try to cleanup, GC will need to do the rest
+		return mountErrors
+	}
+
+	// Run in background, GC would handle leftovers?
+	// Make configurable?
+	if err := os.RemoveAll(filepath.Join(mm.targets, fmt.Sprintf("%d", mid))); err != nil {
+		// TODO: Only log here, cleanup would have to occur later
+	}
+
 	return nil
 }
 
 func (mm *mountManager) Info(context.Context, string) (mount.ActivationInfo, error) {
-	return mount.ActivationInfo{}, nil
+	return mount.ActivationInfo{}, errdefs.ErrNotImplemented
 }
 
 func (mm *mountManager) Update(context.Context, mount.ActivationInfo, ...string) (mount.ActivationInfo, error) {
-	return mount.ActivationInfo{}, nil
+	return mount.ActivationInfo{}, errdefs.ErrNotImplemented
 }
 
 func (mm *mountManager) List(context.Context, ...string) ([]mount.ActivationInfo, error) {
-	return nil, nil
+	return nil, errdefs.ErrNotImplemented
 }
 
 func (mm *mountManager) StartCollection(ctx context.Context) (metadata.CollectionContext, error) {
@@ -591,6 +699,7 @@ func (cc *collectionContext) Finish() error {
 		return err
 	}
 
+	// TODO: Consider using unmount q
 	cleanup, err := cc.getCleanupDirectories(remaining)
 
 	cc.manager.rwlock.Unlock()
@@ -599,7 +708,7 @@ func (cc *collectionContext) Finish() error {
 		return err
 	}
 
-	return cc.cleanupAll(cleanup)
+	return cleanupAll(cc.ctx, cleanup, cc.manager.handlers)
 }
 
 func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
@@ -681,17 +790,17 @@ func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}
 	return cleanup, nil
 }
 
-func (cc *collectionContext) cleanupAll(roots []string) error {
+func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.MountHandler) error {
 	var errs []error
 	for _, root := range roots {
-		if err := cc.unmountAll(root); err != nil {
+		if err := unmountAll(ctx, root, handlers); err != nil {
 			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func (cc *collectionContext) unmountAll(root string) error {
+func unmountAll(ctx context.Context, root string, handlers map[string]mount.MountHandler) error {
 	fd, err := os.Open(root)
 	if err != nil {
 		return err
@@ -702,6 +811,9 @@ func (cc *collectionContext) unmountAll(root string) error {
 	if err != nil {
 		return err
 	}
+
+	var mountErrs error
+	// TODO : Reverse order
 	for _, d := range dirs {
 		if strings.HasSuffix(d, ".type") {
 			continue
@@ -710,21 +822,21 @@ func (cc *collectionContext) unmountAll(root string) error {
 		p := filepath.Join(root, d)
 		var h mount.MountHandler
 		if b, rerr := os.ReadFile(p + ".type"); rerr == nil {
-			h = cc.manager.handlers[string(b)]
+			h = handlers[string(b)]
 		} else if !os.IsNotExist(rerr) {
 			return rerr
 		}
 		if h != nil {
-			err = h.Unmount(cc.ctx, p)
-
+			err = h.Unmount(ctx, p)
 		} else {
 			err = mount.Unmount(p, 0)
 		}
 		if err != nil {
-			// TODO: Ignore some errors such as not mounted?
-			return err
+			mountErrs = errors.Join(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
 		}
-
+	}
+	if mountErrs != nil {
+		return mountErrs
 	}
 	return os.RemoveAll(root)
 }
