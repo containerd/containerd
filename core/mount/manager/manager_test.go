@@ -57,19 +57,19 @@ func TestManager(t *testing.T) {
 	}
 
 	t.Run("ActivateNoMounts", func(t *testing.T) {
-		handlers := map[string]mount.MountHandler{}
+		handlers := map[string]mount.Handler{}
 		_, err = NewManager(db, targetdir, handlers).Activate(ctx, "id1", []mount.Mount{})
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOnly", func(t *testing.T) {
-		handlers := map[string]mount.MountHandler{}
+		handlers := map[string]mount.Handler{}
 		_, err = NewManager(db, targetdir, handlers).Activate(ctx, "id1", mounts)
 		assert.ErrorIs(t, err, errdefs.ErrNotImplemented)
 	})
 
 	t.Run("SystemOverride", func(t *testing.T) {
-		handlers := map[string]mount.MountHandler{
+		handlers := map[string]mount.Handler{
 			"bind": nil,
 		}
 		m := NewManager(db, targetdir, handlers)
