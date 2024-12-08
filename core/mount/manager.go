@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// MountManager handles activating a mount array to be mounted by the
+// Manager handles activating a mount array to be mounted by the
 // system. It supports custom mount types that can be handled by
 // plugins and don't need to be directly mountable. For example, this
 // can be used to do device activation and setting up process or
@@ -30,7 +30,7 @@ import (
 // which must be performed by the system, likely in a container's
 // mount namespace. Any mounts or devices activated by the mount
 // manager will be done outside the container's namespace.
-type MountManager interface {
+type Manager interface {
 	Activate(context.Context, string, []Mount, ...ActivateOpt) (ActivationInfo, error)
 	Deactivate(context.Context, string) error
 	Info(context.Context, string) (ActivationInfo, error)
@@ -38,12 +38,12 @@ type MountManager interface {
 	List(context.Context, ...string) ([]ActivationInfo, error)
 }
 
-// MountHandler is an interface for plugins to perform a mount which is managed
-// by a MountManager. The MountManager will will be responsible for associating
+// Handler is an interface for plugins to perform a mount which is managed
+// by a MountManager. The MountManager will be responsible for associating
 // mount types to MountHandlers and determining what the plugin should be used.
-// The MountHandler interface is intended to be used for custom mount plugins
+// The Handler interface is intended to be used for custom mount plugins
 // and does not replace the mount calls for system mounts.
-type MountHandler interface {
+type Handler interface {
 	Mount(context.Context, Mount, string, []ActiveMount) (ActiveMount, error)
 	Unmount(context.Context, string) error
 }
@@ -54,15 +54,25 @@ type ActivateOptions struct {
 	// Labels are the labels to use for the activation
 	Labels map[string]string
 
-	// TempMount specifies that the mount will be used temporarily
+	// Temporary specifies that the mount will be used temporarily
 	// and all mounts should be performed
-	TempMount bool
+	Temporary bool
 
 	// Final target with option to perform all mounts, normally the runtime will perform the root filesystem mount
 	// Custom temp directory for temporary mounts (for example devices mounted and used as overlay lowers)
 }
 
 type ActivateOpt func(*ActivateOptions)
+
+func WithTemporary(o *ActivateOptions) {
+	o.Temporary = true
+}
+
+func WithLabels(labels map[string]string) ActivateOpt {
+	return func(o *ActivateOptions) {
+		o.Labels = labels
+	}
+}
 
 // ActiveMount represents a mount which has been mounted by a
 // MountHandler or directly mounted by a mount manager.
@@ -84,7 +94,7 @@ type ActiveMount struct {
 type ActivationInfo struct {
 	Name string
 
-	// Active are the mounts which was successfully moounted on activate
+	// Active are the mounts which was successfully mounted on activate
 	Active []ActiveMount
 
 	// System is the list of system mounts to access the filesystem root

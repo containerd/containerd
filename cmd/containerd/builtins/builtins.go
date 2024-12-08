@@ -37,6 +37,7 @@ import (
 	_ "github.com/containerd/containerd/v2/plugins/services/images"
 	_ "github.com/containerd/containerd/v2/plugins/services/introspection"
 	_ "github.com/containerd/containerd/v2/plugins/services/leases"
+	_ "github.com/containerd/containerd/v2/plugins/services/mounts"
 	_ "github.com/containerd/containerd/v2/plugins/services/namespaces"
 	_ "github.com/containerd/containerd/v2/plugins/services/opt"
 	_ "github.com/containerd/containerd/v2/plugins/services/sandbox"
