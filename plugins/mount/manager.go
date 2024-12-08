@@ -52,9 +52,9 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-			handlers := make(map[string]mount.MountHandler, len(hp))
+			handlers := make(map[string]mount.Handler, len(hp))
 			for k, v := range hp {
-				handlers[k] = v.(mount.MountHandler)
+				handlers[k] = v.(mount.Handler)
 			}
 
 			root := ic.Properties[plugins.PropertyStateDir]
