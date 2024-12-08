@@ -25,7 +25,7 @@ import (
 	"github.com/containerd/log"
 )
 
-func LoopbackHandler() MountHandler {
+func LoopbackHandler() Handler {
 	return loopbackHandler{}
 }
 

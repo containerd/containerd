@@ -41,12 +41,12 @@ import (
 )
 
 type BoltManager interface {
-	mount.MountManager
+	mount.Manager
 	metadata.Collector
 	Sync(context.Context) error
 }
 
-func NewManager(db *bolt.DB, targetDir string, handlers map[string]mount.MountHandler) mount.MountManager {
+func NewManager(db *bolt.DB, targetDir string, handlers map[string]mount.Handler) mount.Manager {
 	return &mountManager{
 		db:       db,
 		targets:  targetDir,
@@ -57,7 +57,7 @@ func NewManager(db *bolt.DB, targetDir string, handlers map[string]mount.MountHa
 type mountManager struct {
 	db       *bolt.DB
 	targets  string
-	handlers map[string]mount.MountHandler
+	handlers map[string]mount.Handler
 
 	rwlock sync.RWMutex
 }
@@ -69,9 +69,9 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	}
 
 	lid, leased := leases.FromContext(ctx)
-	if !leased {
-		// TODO: Set a default expiration? Otherwise will be immediately available for GC if nothing references
-	}
+	//if !leased {
+	// TODO: Set a default expiration? Otherwise will be immediately available for GC if nothing references
+	//}
 
 	var config mount.ActivateOptions
 	for _, opt := range opts {
@@ -82,7 +82,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	// first system mount is the first index which should be mounted by the system
 	var firstSystemMount = -1
 	var mountConv []mountConverter
-	var handlers []mount.MountHandler
+	var handlers []mount.Handler
 	for i := range mounts {
 		// Check is the source needs formatting, any formatting requires
 		// mounting with the mount manager.
@@ -95,7 +95,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			// by the mount manager
 			firstSystemMount = i
 			if handlers == nil {
-				handlers = make([]mount.MountHandler, len(mounts))
+				handlers = make([]mount.Handler, len(mounts))
 			}
 
 			// Strip "format/" from beginning before looking for handler
@@ -111,11 +111,14 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			}
 
 			mountConv[i] = mv
-		} else if mm.handlers != nil {
-			handler, ok := mm.handlers[mounts[i].Type]
-			if ok {
+		} else {
+			var handler mount.Handler
+			if mm.handlers != nil {
+				handler = mm.handlers[mounts[i].Type]
+			}
+			if handler != nil || config.Temporary {
 				if handlers == nil {
-					handlers = make([]mount.MountHandler, len(mounts))
+					handlers = make([]mount.Handler, len(mounts))
 				}
 				handlers[i] = handler
 				firstSystemMount = i + 1
@@ -434,6 +437,7 @@ func readActiveMount(bkt *bolt.Bucket) (mount.ActiveMount, error) {
 	return active, nil
 }
 
+/*
 func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) {
 	bkt, err := tx.CreateBucketIfNotExists(keys[0])
 	if err != nil {
@@ -449,6 +453,7 @@ func createBucketIfNotExists(tx *bolt.Tx, keys ...[]byte) (*bolt.Bucket, error) 
 
 	return bkt, nil
 }
+*/
 
 func getBucket(tx *bolt.Tx, keys ...[]byte) *bolt.Bucket {
 	bkt := tx.Bucket(keys[0])
@@ -558,6 +563,7 @@ func (mm *mountManager) Deactivate(ctx context.Context, name string) error {
 	// Make configurable?
 	if err := os.RemoveAll(filepath.Join(mm.targets, fmt.Sprintf("%d", mid))); err != nil {
 		// TODO: Only log here, cleanup would have to occur later
+		log.G(ctx).WithError(err).WithField("mountid", mid).Error("failed to cleanup mount target")
 	}
 
 	return nil
@@ -592,7 +598,7 @@ func (mm *mountManager) StartCollection(ctx context.Context) (metadata.Collectio
 	}, nil
 }
 
-func (sm *mountManager) ReferenceLabel() string {
+func (mm *mountManager) ReferenceLabel() string {
 	return "mount"
 }
 
@@ -673,7 +679,7 @@ func (cc *collectionContext) Remove(n gc.Node) {
 		}
 	} else {
 		cc.removed[n.Namespace] = map[string]struct{}{
-			n.Key: struct{}{},
+			n.Key: {},
 		}
 	}
 }
@@ -748,7 +754,7 @@ func (cc *collectionContext) applyRemove() (map[uint64]struct{}, error) {
 						if lbkt != nil {
 							lbkt.Delete(msk)
 							if k, _ := lbkt.Cursor().First(); k == nil {
-								lsbkt.DeleteBucket([]byte(lid))
+								lsbkt.DeleteBucket(lid)
 							}
 						}
 					}
@@ -790,7 +796,7 @@ func (cc *collectionContext) getCleanupDirectories(remaining map[uint64]struct{}
 	return cleanup, nil
 }
 
-func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.MountHandler) error {
+func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.Handler) error {
 	var errs []error
 	for _, root := range roots {
 		if err := unmountAll(ctx, root, handlers); err != nil {
@@ -800,7 +806,7 @@ func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.M
 	return errors.Join(errs...)
 }
 
-func unmountAll(ctx context.Context, root string, handlers map[string]mount.MountHandler) error {
+func unmountAll(ctx context.Context, root string, handlers map[string]mount.Handler) error {
 	fd, err := os.Open(root)
 	if err != nil {
 		return err
@@ -820,7 +826,7 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Moun
 		}
 
 		p := filepath.Join(root, d)
-		var h mount.MountHandler
+		var h mount.Handler
 		if b, rerr := os.ReadFile(p + ".type"); rerr == nil {
 			h = handlers[string(b)]
 		} else if !os.IsNotExist(rerr) {

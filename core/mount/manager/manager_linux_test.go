@@ -72,7 +72,7 @@ func TestLoopbackMount(t *testing.T) {
 		},
 	}
 
-	handlers := map[string]mount.MountHandler{
+	handlers := map[string]mount.Handler{
 		"loop": mount.LoopbackHandler(),
 	}
 	m := NewManager(db, targetdir, handlers)
@@ -282,7 +282,7 @@ func TestLoopbackOverlay(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			handlers := map[string]mount.MountHandler{
+			handlers := map[string]mount.Handler{
 				"loop": mount.LoopbackHandler(),
 			}
 			m := NewManager(db, targetdir, handlers)
