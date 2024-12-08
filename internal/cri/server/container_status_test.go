@@ -296,6 +296,8 @@ func (s *fakeImageService) GetSnapshot(key, snapshotter string) (snapshotstore.S
 	return snapshotstore.Snapshot{}, errors.New("not implemented")
 }
 
+func (s *fakeImageService) PinnedImage(name string) string { return "" }
+
 func (s *fakeImageService) LocalResolve(refOrID string) (imagestore.Image, error) {
 	return imagestore.Image{}, errors.New("not implemented")
 }
