@@ -27,6 +27,12 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/log"
+	digest "github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/content"
 	"github.com/containerd/containerd/diff"
@@ -34,10 +40,6 @@ import (
 	"github.com/containerd/containerd/pkg/progress"
 	"github.com/containerd/containerd/rootfs"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/log"
-	digest "github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/urfave/cli"
 )
 
 // Command is the cli command for managing snapshots
@@ -533,7 +535,12 @@ var unpackCommand = cli.Command{
 	Name:      "unpack",
 	Usage:     "Unpack applies layers from a manifest to a snapshot",
 	ArgsUsage: "[flags] <digest>",
-	Flags:     commands.SnapshotterFlags,
+	Flags: append([]cli.Flag{
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
+	}, commands.SnapshotterFlags...),
 	Action: func(context *cli.Context) error {
 		dgst, err := digest.Parse(context.Args().First())
 		if err != nil {
@@ -554,7 +561,7 @@ var unpackCommand = cli.Command{
 		for _, image := range images {
 			if image.Target().Digest == dgst {
 				fmt.Printf("unpacking %s (%s)...", dgst, image.Target().MediaType)
-				if err := image.Unpack(ctx, context.String("snapshotter")); err != nil {
+				if err := image.Unpack(ctx, context.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(context.Bool("sync-fs")))); err != nil {
 					fmt.Println()
 					return err
 				}

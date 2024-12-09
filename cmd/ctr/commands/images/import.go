@@ -25,14 +25,16 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
 
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/images/archive"
 	"github.com/containerd/containerd/pkg/transfer"
 	tarchive "github.com/containerd/containerd/pkg/transfer/archive"
 	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
 )
 
 var importCommand = cli.Command{
@@ -97,6 +99,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		cli.BoolFlag{
 			Name:  "discard-unpacked-layers",
 			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
+		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, commands.SnapshotterFlags...),
 
@@ -273,7 +279,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
-				err = image.Unpack(ctx, context.String("snapshotter"))
+				err = image.Unpack(ctx, context.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(context.Bool("sync-fs"))))
 				if err != nil {
 					return err
 				}

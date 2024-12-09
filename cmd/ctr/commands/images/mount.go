@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/leases"
 	"github.com/containerd/containerd/mount"
@@ -48,6 +49,10 @@ When you are done, use the unmount command.
 			Name:  "platform",
 			Usage: "Mount the image for the specified platform",
 			Value: platforms.Format(platforms.DefaultSpec()), // For 1.7 continue using the old format without os-version included.
+		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
 	Action: func(context *cli.Context) (retErr error) {
@@ -102,7 +107,7 @@ When you are done, use the unmount command.
 		}
 
 		i := containerd.NewImageWithPlatform(client, img, platforms.Only(p))
-		if err := i.Unpack(ctx, snapshotter); err != nil {
+		if err := i.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(context.Bool("sync-fs")))); err != nil {
 			return fmt.Errorf("error unpacking image: %w", err)
 		}
 

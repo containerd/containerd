@@ -24,6 +24,7 @@ import (
 	"github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options"
 	"github.com/containerd/console"
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/oci"
 	"github.com/containerd/containerd/pkg/netns"
@@ -91,7 +92,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 			return nil, err
 		}
 		if !unpacked {
-			if err := image.Unpack(ctx, snapshotter); err != nil {
+			if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
 				return nil, err
 			}
 		}
