@@ -22,6 +22,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/containerd/log"
 
@@ -214,12 +215,38 @@ func (c *ContainerIO) Attach(opts AttachOptions) {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stdout)
 		c.stdoutGroup.Add(stdoutKey, wc)
+		//check stdout stream is ok
+		go func() {
+			for {
+				data := []byte("")
+				time.Sleep(time.Second * 1)
+				_, err := wc.Write(data)
+				if err == nil {
+					continue
+				}
+				c.stderrGroup.Remove(stdoutKey)
+				return
+			}
+		}()
 		go attachStream(stdoutKey, close)
 	}
 	if !opts.Tty && opts.Stderr != nil {
 		wg.Add(1)
 		wc, close := cioutil.NewWriteCloseInformer(opts.Stderr)
 		c.stderrGroup.Add(stderrKey, wc)
+		//check stderror stream is ok
+		go func() {
+			for {
+				data := []byte("")
+				time.Sleep(time.Second * 1)
+				_, err := wc.Write(data)
+				if err == nil {
+					continue
+				}
+				c.stderrGroup.Remove(stderrKey)
+				return
+			}
+		}()
 		go attachStream(stderrKey, close)
 	}
 	wg.Wait()
