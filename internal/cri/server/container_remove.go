@@ -60,8 +60,24 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		return &runtime.RemoveContainerResponse{}, nil
 	}
 
-	// Forcibly stop the containers if they are in running or unknown state
+	// Forcibly stop the containers if they are in running or unknown state.
+	// Judgement container if it's in EXITED state.If Exited,but task is created.
+	// We should do clean that container.
 	state := container.Status.Get().State()
+	if state == runtime.ContainerState_CONTAINER_EXITED {
+		task, err := container.Container.Task(ctx, nil)
+		if err == nil {
+			s, err := task.Status(ctx)
+			// This is an abnormal state
+			if err == nil && s.Status == containerd.Created {
+				log.G(ctx).WithError(err).Warn("task status is created, but container is exited")
+				container.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+					status.Unknown = true
+					return status, nil
+				})
+			}
+		}
+	}
 	if state == runtime.ContainerState_CONTAINER_RUNNING ||
 		state == runtime.ContainerState_CONTAINER_UNKNOWN {
 		log.L.Infof("Forcibly stopping container %q", id)

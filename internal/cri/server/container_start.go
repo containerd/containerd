@@ -137,6 +137,13 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 
 	task, err := container.NewTask(ctx, ioCreation, taskOpts...)
 	if err != nil {
+		// Set container to unknown state if fail to create task.Because if the task is Exited status.
+		// The containerd will not try to delete the task again.
+		// refs: https://github.com/containerd/containerd/issues/11037
+		cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+			status.Unknown = true
+			return status, nil
+		})
 		return nil, fmt.Errorf("failed to create containerd task: %w", err)
 	}
 	defer func() {
