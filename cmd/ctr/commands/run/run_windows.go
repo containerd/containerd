@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/console"
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -91,7 +92,7 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 			return nil, err
 		}
 		if !unpacked {
-			if err := image.Unpack(ctx, snapshotter); err != nil {
+			if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs")))); err != nil {
 				return nil, err
 			}
 		}

@@ -127,6 +127,10 @@ var Command = &cli.Command{
 			Name:  "cni",
 			Usage: "Enable cni networking for the container",
 		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
 	}, append(platformRunFlags,
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
