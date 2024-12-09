@@ -28,6 +28,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images/archive"
 	"github.com/containerd/containerd/v2/core/transfer"
 	tarchive "github.com/containerd/containerd/v2/core/transfer/archive"
@@ -98,6 +99,10 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		&cli.BoolFlag{
 			Name:  "discard-unpacked-layers",
 			Usage: "Allow the garbage collector to clean layers up from the content store after unpacking, cannot be used with --no-unpack, false by default",
+		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	}, append(commands.SnapshotterFlags, commands.LabelFlag)...),
 
@@ -290,7 +295,7 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 
 				// TODO: Show unpack status
 				fmt.Printf("unpacking %s (%s)...", img.Name, img.Target.Digest)
-				err = image.Unpack(ctx, cliContext.String("snapshotter"))
+				err = image.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
 				if err != nil {
 					return err
 				}
