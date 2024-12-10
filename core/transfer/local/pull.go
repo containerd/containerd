@@ -91,8 +91,19 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			// Digest: img.Target.Digest.String(),
 		})
 	}
-
-	fetcher, err := ir.Fetcher(ctx, name)
+	opts := []remotes.FetcherOpt{
+		remotes.WithLimiter(ts.limiterD),
+	}
+	if ts.config.MaxConcurrentDownloads > 0 {
+		opts = append(opts, remotes.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads))
+	}
+	if ts.config.MaxConcurrentDownloadsPerLayer > 0 {
+		opts = append(opts, remotes.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer))
+	}
+	if ts.config.ConcurrentFetchChunksSizeMB > 0 {
+		opts = append(opts, remotes.WithConcurrentFetchChunksSizeMB(ts.config.ConcurrentFetchChunksSizeMB))
+	}
+	fetcher, err := ir.Fetcher(ctx, name, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
@@ -190,8 +201,8 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 				}
 			}
 
-			if ts.limiterD != nil {
-				uopts = append(uopts, unpack.WithLimiter(ts.limiterD))
+			if ts.limiterOperationD != nil {
+				uopts = append(uopts, unpack.WithLimiter(ts.limiterOperationD))
 			}
 
 			if ts.config.DuplicationSuppressor != nil {
@@ -206,7 +217,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	if err := images.Dispatch(ctx, handler, ts.limiterD, desc); err != nil {
+	if err := images.Dispatch(ctx, handler, ts.limiterOperationD, desc); err != nil {
 		if unpacker != nil {
 			// wait for unpacker to cleanup
 			unpacker.Wait()

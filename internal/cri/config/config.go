@@ -309,6 +309,15 @@ type ImageConfig struct {
 	// TODO: Migrate to transfer service
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 
+	// MaxConcurrentDownloadOperations restricts the number of concurrent download operations for each image.
+	MaxConcurrentDownloadOperations int `toml:"max_concurrent_download_operations" json:"maxConcurrentDownloadOperations"`
+
+	// MaxConcurrentDownloadsPerLayer restricts the number of concurrent downloads per layer for each image.
+	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer" json:"maxConcurrentDownloadsPerLayer"`
+
+	// ConcurrentFetchChunksSizeMB restricts the maximum concurrent fetch chunks size in MB for each image.
+	ConcurrentFetchChunksSizeMB int `toml:"concurrent_fetch_chunks_size_mb" json:"concurrentFetchChunksSizeMB"`
+
 	// ImagePullProgressTimeout is the maximum duration that there is no
 	// image data read from image registry in the open connection. It will
 	// be reset whatever a new byte has been read. If timeout, the image
