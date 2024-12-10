@@ -40,7 +40,7 @@ import (
 )
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -68,12 +68,20 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 		sort.Stable(orderedMounts(mounts))
 
 		// Mount cgroup into the container as readonly, which inherits docker's behavior.
-		s.Mounts = append(s.Mounts, runtimespec.Mount{
+		rspecMount := runtimespec.Mount{
 			Source:      "cgroup",
 			Destination: "/sys/fs/cgroup",
 			Type:        "cgroup",
-			Options:     []string{"nosuid", "noexec", "nodev", "relatime", "ro"},
-		})
+			Options:     []string{"nosuid", "noexec", "nodev", "relatime"},
+		}
+
+		mode := "ro"
+		if cgroupWritable {
+			mode = "rw"
+		}
+		rspecMount.Options = append(rspecMount.Options, mode)
+
+		s.Mounts = append(s.Mounts, rspecMount)
 
 		// Copy all mounts from default mounts, except for
 		// - mounts overridden by supplied mount;
