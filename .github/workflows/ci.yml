@@ -499,6 +499,14 @@ jobs:
           env
           sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
+      - name: Checkpoint/Restore via CRI
+        env:
+          TEST_RUNTIME: ${{ matrix.runtime }}
+          CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
+        run: |
+          env
+          sudo -E PATH=$PATH ./contrib/checkpoint/checkpoint-restore-cri-test.sh
+
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969
       - name: Host Status
