@@ -106,7 +106,8 @@ func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 			)
 			// Create the host path if it doesn't exist.
 			// TODO(random-liu): Add CRI validation test for this case.
-			if _, err := osi.Stat(src); err != nil {
+
+			if err := osi.StatWithoutFileInfo(src); err != nil {
 				if !os.IsNotExist(err) {
 					return fmt.Errorf("failed to stat %q: %w", src, err)
 				}
