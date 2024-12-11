@@ -18,7 +18,7 @@ ARG BASE_IMAGE=ubuntu:${UBUNTU_VERSION}
 ARG GO_VERSION
 ARG GO_IMAGE=golang:${GO_VERSION}
 FROM --platform=$BUILDPLATFORM $GO_IMAGE AS go
-FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.2.1@sha256:8879a398dedf0aadaacfbd332b29ff2f84bc39ae6d4e9c0a1109db27ac5ba012 AS xx
+FROM --platform=$BUILDPLATFORM tonistiigi/xx:1.6.1@sha256:923441d7c25f1e2eb5789f82d987693c47b8ed987c4ab3b075d6ed2b5d6779a3 AS xx
 
 FROM --platform=$BUILDPLATFORM ${BASE_IMAGE} AS base
 COPY --from=xx / /
