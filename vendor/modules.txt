@@ -21,8 +21,8 @@ github.com/Microsoft/go-winio/pkg/fs
 github.com/Microsoft/go-winio/pkg/guid
 github.com/Microsoft/go-winio/pkg/security
 github.com/Microsoft/go-winio/vhd
-# github.com/Microsoft/hcsshim v0.12.9
-## explicit; go 1.22
+# github.com/Microsoft/hcsshim v0.13.0-rc.2
+## explicit; go 1.21
 github.com/Microsoft/hcsshim
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/options
 github.com/Microsoft/hcsshim/cmd/containerd-shim-runhcs-v1/stats
@@ -54,7 +54,6 @@ github.com/Microsoft/hcsshim/internal/runhcs
 github.com/Microsoft/hcsshim/internal/safefile
 github.com/Microsoft/hcsshim/internal/security
 github.com/Microsoft/hcsshim/internal/timeout
-github.com/Microsoft/hcsshim/internal/vhdx
 github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/wclayer/cim
@@ -107,6 +106,9 @@ github.com/containerd/cgroups/v3/cgroup2/stats
 # github.com/containerd/console v1.0.4
 ## explicit; go 1.13
 github.com/containerd/console
+# github.com/containerd/containerd v1.7.23
+## explicit; go 1.21
+github.com/containerd/containerd/errdefs
 # github.com/containerd/containerd/api v1.8.0
 ## explicit; go 1.21
 github.com/containerd/containerd/api/events

@@ -79,15 +79,17 @@ func WithParentLayers(p []string) WriteDiffOpt {
 	}
 }
 
-func applyWindowsCimLayer(ctx context.Context, root string, r io.Reader, options ApplyOptions) (size int64, err error) {
-	return ocicimlayer.ImportCimLayerFromTar(ctx, r, root, options.Parents)
+func applyWindowsCimLayer(cimPath string, parentLayerCimPaths []string) func(context.Context, string, io.Reader, ApplyOptions) (int64, error) {
+	return func(ctx context.Context, root string, r io.Reader, options ApplyOptions) (int64, error) {
+		return ocicimlayer.ImportCimLayerFromTar(ctx, r, root, cimPath, options.Parents, parentLayerCimPaths)
+	}
 }
 
 // AsCimContainerLayer indicates that the tar stream to apply is that of a Windows container Layer written in
 // the cim format.
-func AsCimContainerLayer() ApplyOpt {
+func AsCimContainerLayer(cimPath string, parentLayerCimPaths []string) ApplyOpt {
 	return func(options *ApplyOptions) error {
-		options.applyFunc = applyWindowsCimLayer
+		options.applyFunc = applyWindowsCimLayer(cimPath, parentLayerCimPaths)
 		return nil
 	}
 }

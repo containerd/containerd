@@ -81,4 +81,7 @@ const (
 
 	// V22H2Win11 corresponds to Windows 11 (2022 Update).
 	V22H2Win11 = 22621
+
+	// Windows Server 2025 build 26100
+	V25H1Server = 26100
 )

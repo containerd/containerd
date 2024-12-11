@@ -23,26 +23,25 @@ import (
 )
 
 // ImportCimLayerFromTar reads a layer from an OCI layer tar stream and extracts it into
-// the CIM format at the specified path. The caller must specify the parent layers, if
-// any, ordered from lowest to highest layer.
-// This function expects that the layer paths (both the layer that is being imported & the parent layers) are
-// formatted like `.../snapshots/<id>` and the corresponding layer CIMs are located/will be created at
-// `.../snapshots/cim-layers/<id>.cim`. Each CIM file also has corresponding region & objectID files and those
-// files will also be stored inside the `cim-layers` directory.
+// the CIM format at the specified path.
+// `layerPath` is the directory which can be used to store intermediate files generated during layer extraction (and these file are also used when extracting children layers of this layer)
+// `cimPath` is the path to the CIM in which layer files must be stored. Note that region & object files are created when writing to a CIM, these files will be created next to the `cimPath`.
+// `parentLayerCimPaths` are paths to the parent layer CIMs, ordered from highest to lowest, i.e the CIM at `parentLayerCimPaths[0]` will be the immediate parent of the layer that is being extracted here.
+// `parentLayerPaths` are paths to the parent layer directories. Ordered from highest to lowest.
 //
 // This function returns the total size of the layer's files, in bytes.
-func ImportCimLayerFromTar(ctx context.Context, r io.Reader, layerPath string, parentLayerPaths []string) (int64, error) {
+func ImportCimLayerFromTar(ctx context.Context, r io.Reader, layerPath, cimPath string, parentLayerPaths, parentLayerCimPaths []string) (int64, error) {
 	err := os.MkdirAll(layerPath, 0)
 	if err != nil {
 		return 0, err
 	}
 
-	w, err := cim.NewCimLayerWriter(ctx, layerPath, parentLayerPaths)
+	w, err := cim.NewCimLayerWriter(ctx, layerPath, cimPath, parentLayerPaths, parentLayerCimPaths)
 	if err != nil {
 		return 0, err
 	}
 
-	n, err := writeCimLayerFromTar(ctx, r, w, layerPath)
+	n, err := writeCimLayerFromTar(ctx, r, w)
 	cerr := w.Close(ctx)
 	if err != nil {
 		return 0, err
@@ -53,7 +52,7 @@ func ImportCimLayerFromTar(ctx context.Context, r io.Reader, layerPath string, p
 	return n, nil
 }
 
-func writeCimLayerFromTar(ctx context.Context, r io.Reader, w *cim.CimLayerWriter, layerPath string) (int64, error) {
+func writeCimLayerFromTar(ctx context.Context, r io.Reader, w *cim.CimLayerWriter) (int64, error) {
 	tr := tar.NewReader(r)
 	buf := bufio.NewWriter(w)
 	size := int64(0)
@@ -159,8 +158,4 @@ func writeCimLayerFromTar(ctx context.Context, r io.Reader, w *cim.CimLayerWrite
 		return 0, loopErr
 	}
 	return size, nil
-}
-
-func DestroyCimLayer(layerPath string) error {
-	return cim.DestroyCimLayer(context.Background(), layerPath)
 }

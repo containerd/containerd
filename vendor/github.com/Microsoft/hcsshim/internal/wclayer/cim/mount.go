@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/Microsoft/go-winio/pkg/guid"
@@ -86,4 +87,16 @@ func CleanupContainerMounts(containerID string) error {
 		}
 	}
 	return nil
+}
+
+func LayerID(cimPath, containerID string) (string, error) {
+	cimMountMapLock.Lock()
+	defer cimMountMapLock.Unlock()
+	if vol, ok := cimMounts[fmt.Sprintf("%s_%s", containerID, cimPath)]; !ok {
+		return "", fmt.Errorf("cim %s not mounted", cimPath)
+	} else if !strings.HasPrefix(vol, "\\\\?\\Volume{") || !strings.HasSuffix(vol, "}\\") {
+		return "", fmt.Errorf("volume path %s is not in the expected format", vol)
+	} else {
+		return strings.TrimSuffix(strings.TrimPrefix(vol, "\\\\?\\Volume{"), "}\\"), nil
+	}
 }
