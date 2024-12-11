@@ -186,8 +186,17 @@ func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
 		tracing.WithAttribute("container.id", c.id),
 	)
 	defer span.End()
-	if _, err := c.loadTask(ctx, nil); err == nil {
-		return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
+	ts, err := c.loadTask(ctx, nil)
+	if err == nil {
+		// Make error print more accurate
+		s, err := ts.Status(ctx)
+		if err != nil {
+			return fmt.Errorf("cannot delete task %v: %w", c.id, err)
+		}
+		if s.Status == Running {
+			return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
+		}
+		return fmt.Errorf("cannot delete task %v: %w, task status %v", c.id, errdefs.ErrFailedPrecondition, s.Status)
 	}
 	r, err := c.get(ctx)
 	if err != nil {
