@@ -171,7 +171,8 @@ func (c *criService) recover(ctx context.Context) error {
 	for _, container := range containers {
 		container := container
 		eg.Go(func() error {
-			cntr, err := c.loadContainer(ctx2, container)
+			added := make(chan struct{})
+			cntr, err := c.loadContainer(ctx2, container, added)
 			if err != nil {
 				log.G(ctx2).
 					WithError(err).
@@ -184,6 +185,7 @@ func (c *criService) recover(ctx context.Context) error {
 			if err := c.containerStore.Add(cntr); err != nil {
 				return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
 			}
+			close(added)
 			if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
 				return fmt.Errorf("failed to reserve container name %q: %w", cntr.Name, err)
 			}
@@ -251,7 +253,7 @@ func (c *criService) recover(ctx context.Context) error {
 const loadContainerTimeout = 10 * time.Second
 
 // loadContainer loads container from containerd and status checkpoint.
-func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (containerstore.Container, error) {
+func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container, added <-chan struct{}) (containerstore.Container, error) {
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
 	id := cntr.ID()
@@ -387,7 +389,10 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.Reason = unknownExitReason
 				} else {
 					// Start exit monitor.
-					c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
+					go func() {
+						<-added
+						c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
+					}()
 				}
 			case containerd.Stopped:
 				// Task is stopped. Update status and delete the task.
