@@ -58,29 +58,9 @@ func init() {
 			plugins.TransferPlugin,
 			plugins.WarningPlugin,
 		},
-		Config: &defaultConfig,
-		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
-			if configVersion >= version.ConfigVersion {
-				return nil
-			}
-			const pluginName = string(plugins.GRPCPlugin) + ".cri"
-			original, ok := pluginConfigs[pluginName]
-			if !ok {
-				return nil
-			}
-			src := original.(map[string]interface{})
-
-			// Currently only a single key migrated
-			if val, ok := src["disable_tcp_service"]; ok {
-				pluginConfigs[pluginName] = map[string]interface{}{
-					"disable_tcp_service": val,
-				}
-			} else {
-				delete(pluginConfigs, pluginName)
-			}
-			return nil
-		},
-		InitFn: initCRIService,
+		Config:          &defaultConfig,
+		ConfigMigration: configMigration,
+		InitFn:          initCRIService,
 	})
 }
 
@@ -254,4 +234,32 @@ func getSandboxControllers(ic *plugin.InitContext) (map[string]sandbox.Controlle
 		sc[name] = p.(sandbox.Controller)
 	}
 	return sc, nil
+}
+
+func configMigration(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
+	if configVersion >= version.ConfigVersion {
+		return nil
+	}
+	const pluginName = string(plugins.GRPCPlugin) + ".cri"
+	src, ok := pluginConfigs[pluginName].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	dst := map[string]interface{}{}
+	for _, k := range []string{
+		"disable_tcp_service",
+		"stream_server_address",
+		"stream_server_port",
+		"stream_idle_timeout",
+		"enable_tls_streaming",
+		"x509_key_pair_streaming",
+	} {
+		if val, ok := src[k]; ok {
+			dst[k] = val
+		}
+	}
+
+	pluginConfigs[pluginName] = dst
+	return nil
 }
