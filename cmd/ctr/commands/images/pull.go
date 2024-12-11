@@ -28,6 +28,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/image"
@@ -83,6 +84,10 @@ command. As part of this process, we do the following:
 		&cli.BoolFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
+		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
 	Action: func(cliContext *cli.Context) error {
@@ -204,7 +209,7 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, cliContext.String("snapshotter"))
+			err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
 			if err != nil {
 				return err
 			}
