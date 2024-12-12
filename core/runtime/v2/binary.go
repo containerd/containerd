@@ -195,7 +195,7 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	cmd.Stdout = out
 	cmd.Stderr = errb
 	if err := cmd.Run(); err != nil {
-		log.G(ctx).WithField("cmd", cmd).WithError(err).Error("failed to delete")
+		log.G(ctx).WithField("cmd", cmd.String()).WithError(err).Error("failed to delete")
 		return nil, fmt.Errorf("%s: %w", errb.String(), err)
 	}
 	s := errb.String()
