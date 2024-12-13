@@ -12,7 +12,7 @@ require (
 	github.com/containerd/btrfs/v2 v2.0.0
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd/api v1.7.19
+	github.com/containerd/containerd/api v1.8.0
 	github.com/containerd/continuity v0.4.2
 	github.com/containerd/errdefs v0.3.0
 	github.com/containerd/fifo v1.1.0
@@ -75,7 +75,7 @@ require (
 	golang.org/x/sync v0.5.0
 	golang.org/x/sys v0.18.0
 	google.golang.org/genproto v0.0.0-20231211222908-989df2bf70f3
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231212172506-995d672761c0
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.33.0
 	k8s.io/api v0.26.2
