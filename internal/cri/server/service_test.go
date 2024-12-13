@@ -26,6 +26,7 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/core/introspection"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -134,6 +135,13 @@ type testOpt func(*criService)
 func withRuntimeService(rs RuntimeService) testOpt {
 	return func(service *criService) {
 		service.RuntimeService = rs
+	}
+}
+
+func withClientIntrospectionService(is introspection.Service) testOpt {
+	return func(service *criService) {
+		client, _ := containerd.New("", containerd.WithServices(containerd.WithIntrospectionService(is)))
+		service.client = client
 	}
 }
 
