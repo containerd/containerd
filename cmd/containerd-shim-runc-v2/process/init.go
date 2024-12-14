@@ -161,6 +161,7 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 			return fmt.Errorf("failed to start console copy: %w", err)
 		}
 		p.console = console
+		p.closers = append(p.closers, p.console)
 	} else {
 		if err := pio.Copy(ctx, &p.wg); err != nil {
 			return fmt.Errorf("failed to start io pipe copy: %w", err)
@@ -302,10 +303,10 @@ func (p *Init) delete(ctx context.Context) error {
 			err = p.runtimeError(err, "failed to delete task")
 		}
 	}
+	for _, c := range p.closers {
+		c.Close()
+	}
 	if p.io != nil {
-		for _, c := range p.closers {
-			c.Close()
-		}
 		p.io.Close()
 	}
 	if err2 := mount.UnmountRecursive(p.Rootfs, 0); err2 != nil {

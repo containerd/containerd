@@ -107,10 +107,10 @@ func (e *execProcess) Delete(ctx context.Context) error {
 
 func (e *execProcess) delete(ctx context.Context) error {
 	waitTimeout(ctx, &e.wg, 2*time.Second)
+	for _, c := range e.closers {
+		c.Close()
+	}
 	if e.io != nil {
-		for _, c := range e.closers {
-			c.Close()
-		}
 		e.io.Close()
 	}
 	pidfile := filepath.Join(e.path, fmt.Sprintf("%s.pid", e.id))
@@ -223,6 +223,7 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 		if e.console, err = e.parent.Platform.CopyConsole(ctx, console, e.id, e.stdio.Stdin, e.stdio.Stdout, e.stdio.Stderr, &e.wg); err != nil {
 			return fmt.Errorf("failed to start console copy: %w", err)
 		}
+		e.closers = append(e.closers, e.console)
 	} else {
 		if err := pio.Copy(ctx, &e.wg); err != nil {
 			return fmt.Errorf("failed to start io pipe copy: %w", err)
