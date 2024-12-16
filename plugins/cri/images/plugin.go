@@ -96,39 +96,32 @@ func init() {
 			} else {
 				return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
 			}
-			var snapshotRoot string
-			if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, defaultSnapshotter); plugin != nil {
-				snapshotRoot = plugin.Meta.Exports["root"]
+
+			snapshotRoot := func(snapshotter string) (snapshotRoot string) {
+				if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
+					snapshotRoot = plugin.Meta.Exports["root"]
+				}
+				if snapshotRoot == "" {
+					// Try a root in the same parent as this plugin
+					snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+snapshotter)
+				}
+				return snapshotRoot
 			}
-			if snapshotRoot == "" {
-				// Try a root in the same parent as this plugin
-				snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+defaultSnapshotter)
-			}
-			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
-			log.L.Infof("Get image filesystem path %q for snapshotter %q", snapshotRoot, defaultSnapshotter)
+
+			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
+			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
 
 			for runtimeName, rp := range config.RuntimePlatforms {
 				snapshotter := rp.Snapshotter
 				if snapshotter == "" {
 					snapshotter = defaultSnapshotter
-				} else if _, ok := options.ImageFSPaths[snapshotter]; !ok {
-					if s, ok := options.Snapshotters[defaultSnapshotter]; ok {
-						options.Snapshotters[defaultSnapshotter] = s
-					} else {
-						return nil, fmt.Errorf("failed to find snapshotter %q", defaultSnapshotter)
-					}
-					var snapshotRoot string
-					if plugin := ic.Plugins().Get(plugins.SnapshotPlugin, snapshotter); plugin != nil {
-						snapshotRoot = plugin.Meta.Exports["root"]
-					}
-					if snapshotRoot == "" {
-						// Try a root in the same parent as this plugin
-						snapshotRoot = filepath.Join(filepath.Dir(ic.Properties[plugins.PropertyRootDir]), plugins.SnapshotPlugin.String()+"."+snapshotter)
-					}
+				}
 
-					options.ImageFSPaths[defaultSnapshotter] = snapshotRoot
+				if _, ok := options.ImageFSPaths[snapshotter]; !ok {
+					options.ImageFSPaths[snapshotter] = snapshotRoot(snapshotter)
 					log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[snapshotter], snapshotter)
 				}
+
 				platform := platforms.DefaultSpec()
 				if rp.Platform != "" {
 					p, err := platforms.Parse(rp.Platform)
@@ -137,6 +130,7 @@ func init() {
 					}
 					platform = p
 				}
+
 				options.RuntimePlatforms[runtimeName] = images.ImagePlatform{
 					Snapshotter: snapshotter,
 					Platform:    platform,
