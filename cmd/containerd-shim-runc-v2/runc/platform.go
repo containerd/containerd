@@ -139,6 +139,10 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 		go func() {
 			cwg.Done()
 			io.Copy(outW, epollConsole)
+			// if stdin is empty epollConsole will be closed
+			if stdin == "" {
+				defer epollConsole.Close()
+			}
 			outW.Close()
 			wg.Done()
 		}()
@@ -175,7 +179,10 @@ func (p *linuxPlatform) CopyConsole(ctx context.Context, console console.Console
 			buf := bufPool.Get().(*[]byte)
 			defer bufPool.Put(buf)
 			io.CopyBuffer(outw, epollConsole, *buf)
-
+			// if stdin is empty epollConsole will be closed
+			if stdin == "" {
+				defer epollConsole.Close()
+			}
 			outw.Close()
 			outr.Close()
 			wg.Done()
