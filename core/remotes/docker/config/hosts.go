@@ -28,7 +28,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -144,19 +143,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			defaultTLSConfig = &tls.Config{}
 		}
 
-		defaultTransport := &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:       30 * time.Second,
-				KeepAlive:     30 * time.Second,
-				FallbackDelay: 300 * time.Millisecond,
-			}).DialContext,
-			MaxIdleConns:          10,
-			IdleConnTimeout:       30 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			TLSClientConfig:       defaultTLSConfig,
-			ExpectContinueTimeout: 5 * time.Second,
-		}
+		defaultTransport := docker.DefaultHTTPTransport(defaultTLSConfig)
 
 		client := &http.Client{
 			Transport: defaultTransport,
