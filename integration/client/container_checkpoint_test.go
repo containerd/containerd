@@ -114,6 +114,7 @@ func TestCheckpointRestorePTY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer direct.Delete()
 
 	var (
 		wg  sync.WaitGroup
