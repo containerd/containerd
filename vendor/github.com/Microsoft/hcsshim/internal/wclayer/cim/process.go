@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/internal/wclayer"
@@ -34,10 +33,6 @@ func processBaseLayerHives(layerPath string) ([]pendingCimOp, error) {
 	}
 
 	hivesDirInfo := &winio.FileBasicInfo{
-		CreationTime:   windows.NsecToFiletime(time.Now().UnixNano()),
-		LastAccessTime: windows.NsecToFiletime(time.Now().UnixNano()),
-		LastWriteTime:  windows.NsecToFiletime(time.Now().UnixNano()),
-		ChangeTime:     windows.NsecToFiletime(time.Now().UnixNano()),
 		FileAttributes: windows.FILE_ATTRIBUTE_DIRECTORY,
 	}
 	pendingOps = append(pendingOps, &addOp{
@@ -71,10 +66,6 @@ func processLayoutFile(layerPath string) ([]pendingCimOp, error) {
 	}
 
 	layoutFileInfo := &winio.FileBasicInfo{
-		CreationTime:   windows.NsecToFiletime(time.Now().UnixNano()),
-		LastAccessTime: windows.NsecToFiletime(time.Now().UnixNano()),
-		LastWriteTime:  windows.NsecToFiletime(time.Now().UnixNano()),
-		ChangeTime:     windows.NsecToFiletime(time.Now().UnixNano()),
 		FileAttributes: windows.FILE_ATTRIBUTE_NORMAL,
 	}
 
@@ -89,7 +80,7 @@ func processLayoutFile(layerPath string) ([]pendingCimOp, error) {
 // Some of the layer files that are generated during the processBaseLayer call must be added back
 // inside the cim, some registry file links must be updated. This function takes care of all those
 // steps. This function opens the cim file for writing and updates it.
-func (cw *CimLayerWriter) processBaseLayer(ctx context.Context, processUtilityVM bool) (err error) {
+func (cw *cimLayerWriter) processBaseLayer(ctx context.Context, processUtilityVM bool) (err error) {
 	if processUtilityVM {
 		if err = processUtilityVMLayer(ctx, cw.layerPath); err != nil {
 			return fmt.Errorf("process utilityVM layer: %w", err)
@@ -113,7 +104,7 @@ func (cw *CimLayerWriter) processBaseLayer(ctx context.Context, processUtilityVM
 // processNonBaseLayer takes care of the processing required for a non base layer. As of now
 // the only processing required for non base layer is to merge the delta registry hives of the
 // non-base layer with it's parent layer.
-func (cw *CimLayerWriter) processNonBaseLayer(ctx context.Context, processUtilityVM bool) (err error) {
+func (cw *cimLayerWriter) processNonBaseLayer(ctx context.Context, processUtilityVM bool) (err error) {
 	for _, hv := range hives {
 		baseHive := filepath.Join(wclayer.HivesPath, hv.base)
 		deltaHive := filepath.Join(wclayer.HivesPath, hv.delta)
@@ -134,10 +125,6 @@ func (cw *CimLayerWriter) processNonBaseLayer(ctx context.Context, processUtilit
 				pathInCim: baseHive,
 				hostPath:  filepath.Join(cw.layerPath, baseHive),
 				fileInfo: &winio.FileBasicInfo{
-					CreationTime:   windows.NsecToFiletime(time.Now().UnixNano()),
-					LastAccessTime: windows.NsecToFiletime(time.Now().UnixNano()),
-					LastWriteTime:  windows.NsecToFiletime(time.Now().UnixNano()),
-					ChangeTime:     windows.NsecToFiletime(time.Now().UnixNano()),
 					FileAttributes: windows.FILE_ATTRIBUTE_NORMAL,
 				},
 			})
