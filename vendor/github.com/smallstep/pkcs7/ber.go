@@ -42,7 +42,10 @@ func (p asn1Primitive) EncodeTo(out *bytes.Buffer) error {
 	if err = encodeLength(out, p.length); err != nil {
 		return err
 	}
+	// fmt.Printf("%s--> tag: % X length: %d\n", strings.Repeat("| ", encodeIndent), p.tagBytes, p.length)
+	// fmt.Printf("%s--> content length: %d\n", strings.Repeat("| ", encodeIndent), len(p.content))
 	out.Write(p.content)
+
 	return nil
 }
 
@@ -50,6 +53,7 @@ func ber2der(ber []byte) ([]byte, error) {
 	if len(ber) == 0 {
 		return nil, errors.New("ber2der: input ber is empty")
 	}
+	// fmt.Printf("--> ber2der: Transcoding %d bytes\n", len(ber))
 	out := new(bytes.Buffer)
 
 	obj, _, err := readObject(ber, 0)
@@ -60,7 +64,7 @@ func ber2der(ber []byte) ([]byte, error) {
 
 	// if offset < len(ber) {
 	//	return nil, fmt.Errorf("ber2der: Content longer than expected. Got %d, expected %d", offset, len(ber))
-	//}
+	// }
 
 	return out.Bytes(), nil
 }
@@ -145,7 +149,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 			}
 		}
 		// jvehent 20170227: this doesn't appear to be used anywhere...
-		//tag = tag*128 + ber[offset] - 0x80
+		// tag = tag*128 + ber[offset] - 0x80
 		offset++
 		if offset > berLen {
 			return nil, 0, errors.New("ber2der: cannot move offset forward, end of ber data reached")
@@ -195,7 +199,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 	if length < 0 {
 		return nil, 0, errors.New("ber2der: invalid negative value found in BER tag length")
 	}
-	//fmt.Printf("--> length        : %d\n", length)
+	// fmt.Printf("--> length        : %d\n", length)
 	contentEnd := offset + length
 	if contentEnd > len(ber) {
 		return nil, 0, errors.New("ber2der: BER tag length is more than available data")
@@ -250,7 +254,7 @@ func readObject(ber []byte, offset int) (asn1Object, int, error) {
 }
 
 func isIndefiniteTermination(ber []byte, offset int) (bool, error) {
-	if len(ber) - offset < 2 {
+	if len(ber)-offset < 2 {
 		return false, errors.New("ber2der: Invalid BER format")
 	}
 
@@ -258,5 +262,5 @@ func isIndefiniteTermination(ber []byte, offset int) (bool, error) {
 }
 
 func debugprint(format string, a ...interface{}) {
-	//fmt.Printf(format, a)
+	// fmt.Printf(format, a)
 }
