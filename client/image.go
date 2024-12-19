@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/rootfs"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
@@ -258,6 +259,10 @@ type UnpackConfig struct {
 	// in-flight fetch request or unpack handler for a given descriptor's
 	// digest or chain ID.
 	DuplicationSuppressor kmutex.KeyedLocker
+	// DisableSnapshotAnnotations disables to pass additional annotations (image
+	// related information) to snapshotters. These annotations are required by
+	// remote snapshotter (https://github.com/containerd/stargz-snapshotter).
+	DisableSnapshotAnnotations bool
 }
 
 // UnpackOpt provides configuration for unpack
@@ -287,6 +292,14 @@ func WithUnpackApplyOpts(opts ...diff.ApplyOpt) UnpackOpt {
 	}
 }
 
+// WithDisableSnapshotAnnotations sets `DisableSnapshotAnnotations` on the UnpackConfig
+func WithDisableSnapshotAnnotations(disableSnapshotAnnotations bool) UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.DisableSnapshotAnnotations = disableSnapshotAnnotations
+		return nil
+	}
+}
+
 func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...UnpackOpt) error {
 	ctx, done, err := i.client.WithLease(ctx)
 	if err != nil {
@@ -304,6 +317,23 @@ func (i *image) Unpack(ctx context.Context, snapshotterName string, opts ...Unpa
 	manifest, err := i.getManifest(ctx, i.platform)
 	if err != nil {
 		return err
+	}
+
+	if !config.DisableSnapshotAnnotations {
+		var manifestDigest string
+		if manifest.Annotations != nil {
+			manifestDigest = manifest.Annotations[images.ManifestDigestLabel]
+		}
+		wraper := snpkg.AppendInfoHandlerWrapper(i.Name())
+		handler := wraper(images.HandlerFunc(func(_ context.Context, _ ocispec.Descriptor) (subdescs []ocispec.Descriptor, err error) {
+			return manifest.Layers, nil
+		}))
+		if _, err := handler.Handle(ctx, ocispec.Descriptor{
+			MediaType: manifest.MediaType,
+			Digest:    digest.Digest(manifestDigest),
+		}); err != nil {
+			return err
+		}
 	}
 
 	layers, err := i.getLayers(ctx, manifest)
