@@ -430,6 +430,10 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 		}
 		hostOptions.Credentials = credentials
 		hostOptions.HostDir = hostDirFromRoots(paths)
+		// need to pass cri global headers to per-host authorizers
+		hostOptions.AuthorizerOpts = []docker.AuthorizerOpt{
+			docker.WithAuthHeader(c.config.Registry.Headers),
+		}
 
 		return config.ConfigureHosts(ctx, hostOptions)
 	}
@@ -468,7 +472,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				credentials = func(host string) (string, string, error) {
 					return ParseAuth(auth, host)
 				}
-
 			}
 
 			if updateClientFn != nil {
@@ -479,7 +482,9 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
-				docker.WithAuthCreds(credentials))
+				docker.WithAuthCreds(credentials),
+				docker.WithAuthHeader(c.config.Registry.Headers),
+			)
 
 			if u.Path == "" {
 				u.Path = "/v2"
