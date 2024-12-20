@@ -87,6 +87,8 @@ func TestIdmappedMount(t *testing.T) {
 	t.Run("GetUsernsFD", testGetUsernsFD)
 
 	t.Run("IDMapMount", testIDMapMount)
+
+	t.Run("IDMapMountWithAttrs", testIDMapMountWithAttrs)
 }
 
 func testGetUsernsFD(t *testing.T) {
@@ -132,6 +134,22 @@ func testIDMapMount(t *testing.T) {
 	require.NoError(t, err)
 	defer usernsFD.Close()
 
+	srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps, true)
+	destDir := t.TempDir()
+	defer func() {
+		require.NoError(t, UnmountAll(destDir, 0))
+	}()
+
+	err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
+	require.NoError(t, err)
+	checkFunc(destDir)
+}
+
+func testIDMapMountWithAttrs(t *testing.T) {
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
+
 	type testCase struct {
 		name      string
 		srcDir    string
@@ -162,7 +180,7 @@ func testIDMapMount(t *testing.T) {
 			defer func() {
 				require.NoError(t, UnmountAll(destDir, 0))
 			}()
-			err := IDMapMount(tc.srcDir, destDir, int(usernsFD.Fd()), tc.setAttr, 0)
+			err := IDMapMountWithAttrs(tc.srcDir, destDir, int(usernsFD.Fd()), tc.setAttr, 0)
 			require.NoError(t, err)
 			tc.checkFunc(destDir)
 		})

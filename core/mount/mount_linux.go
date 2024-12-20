@@ -211,7 +211,7 @@ func (m *Mount) mount(target string) (err error) {
 
 	// remap non-overlay mount point
 	if opt.uidmap != "" && opt.gidmap != "" && m.Type != "overlay" {
-		if err := IDMapMount(target, target, int(usernsFd.Fd()), 0, 0); err != nil {
+		if err := IDMapMount(target, target, int(usernsFd.Fd())); err != nil {
 			return err
 		}
 	}
@@ -277,7 +277,7 @@ func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, u
 		if err := os.MkdirAll(tmpLowerDir, 0700); err != nil {
 			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
 		}
-		if err := IDMapMount(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
+		if err := IDMapMountWithAttrs(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
 			return nil, cleanUp, err
 		}
 	}
