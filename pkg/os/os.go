@@ -31,6 +31,7 @@ type OS interface {
 	MkdirAll(path string, perm os.FileMode) error
 	RemoveAll(path string) error
 	Stat(name string) (os.FileInfo, error)
+	StatWithoutFileInfo(name string) error
 	ResolveSymbolicLink(name string) (string, error)
 	FollowSymlinkInScope(path, scope string) (string, error)
 	CopyFile(src, dest string, perm os.FileMode) error
