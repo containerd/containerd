@@ -198,6 +198,10 @@ func (f *fakeContainer) Checkpoint(ctx context.Context, s string, opts ...contai
 	return nil, errdefs.ErrNotImplemented
 }
 
+func (f *fakeContainer) Restore(context.Context, cio.Creator, string) (int, error) {
+	return -1, errdefs.ErrNotImplemented
+}
+
 func sandboxExtension(id string) map[string]typeurl.Any {
 	metadata := sandbox.Metadata{
 		ID: id,
