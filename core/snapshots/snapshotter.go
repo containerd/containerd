@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/docker/go-units"
 )
 
 const (
@@ -38,6 +39,8 @@ const (
 	LabelSnapshotUIDMapping = "containerd.io/snapshot/uidmapping"
 	// LabelSnapshotGIDMapping is the label used for GID mappings
 	LabelSnapshotGIDMapping = "containerd.io/snapshot/gidmapping"
+	// LabelSnapshotQuotaSize is the quota size.
+	LabelSnapshotQuotaSize = "containerd.io/snapshot/quotasize"
 )
 
 // Kind identifies the kind of snapshot.
@@ -377,6 +380,30 @@ func WithLabels(labels map[string]string) Opt {
 
 		return nil
 	}
+}
+
+// WithLabels appends labels to a created snapshot
+func WithQuotaSize(size string) Opt {
+	return func(info *Info) error {
+		if info.Labels == nil {
+			info.Labels = make(map[string]string)
+		}
+		if len(size) == 0 {
+			return nil
+		}
+		if _, err := units.RAMInBytes(size); err != nil {
+			return err
+		}
+		info.Labels[LabelSnapshotQuotaSize] = size
+		return nil
+	}
+}
+
+func QuotaSize(labels map[string]string) string {
+	if labels == nil {
+		return ""
+	}
+	return labels[LabelSnapshotQuotaSize]
 }
 
 // FilterInheritedLabels filters the provided labels by removing any key which
