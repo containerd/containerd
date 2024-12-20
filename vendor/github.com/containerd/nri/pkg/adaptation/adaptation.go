@@ -53,19 +53,20 @@ type UpdateFn func(context.Context, []*ContainerUpdate) ([]*ContainerUpdate, err
 // Adaptation is the NRI abstraction for container runtime NRI adaptation/integration.
 type Adaptation struct {
 	sync.Mutex
-	name       string
-	version    string
-	dropinPath string
-	pluginPath string
-	socketPath string
-	dontListen bool
-	syncFn     SyncFn
-	updateFn   UpdateFn
-	clientOpts []ttrpc.ClientOpts
-	serverOpts []ttrpc.ServerOpt
-	listener   net.Listener
-	plugins    []*plugin
-	syncLock   sync.RWMutex
+	name        string
+	version     string
+	dropinPath  string
+	pluginPath  string
+	socketPath  string
+	dontListen  bool
+	syncFn      SyncFn
+	updateFn    UpdateFn
+	clientOpts  []ttrpc.ClientOpts
+	serverOpts  []ttrpc.ServerOpt
+	listener    net.Listener
+	plugins     []*plugin
+	syncLock    sync.RWMutex
+	wasmService *api.PluginPlugin
 }
 
 var (
@@ -128,15 +129,21 @@ func New(name, version string, syncFn SyncFn, updateFn UpdateFn, opts ...Option)
 		return nil, fmt.Errorf("failed to create NRI adaptation, nil UpdateFn")
 	}
 
+	wasmPlugins, err := api.NewPluginPlugin(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize WASM service: %w", err)
+	}
+
 	r := &Adaptation{
-		name:       name,
-		version:    version,
-		syncFn:     syncFn,
-		updateFn:   updateFn,
-		pluginPath: DefaultPluginPath,
-		dropinPath: DefaultPluginConfigPath,
-		socketPath: DefaultSocketPath,
-		syncLock:   sync.RWMutex{},
+		name:        name,
+		version:     version,
+		syncFn:      syncFn,
+		updateFn:    updateFn,
+		pluginPath:  DefaultPluginPath,
+		dropinPath:  DefaultPluginConfigPath,
+		socketPath:  DefaultSocketPath,
+		syncLock:    sync.RWMutex{},
+		wasmService: wasmPlugins,
 	}
 
 	for _, o := range opts {
