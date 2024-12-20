@@ -23,9 +23,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type testKey struct{}
+
 func TestBackground(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	var k struct{}
+	var k testKey
+
 	v := "incontext"
 	ctx = context.WithValue(ctx, k, v)
 

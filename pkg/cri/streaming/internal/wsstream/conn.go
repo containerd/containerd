@@ -69,7 +69,7 @@ const ChannelWebSocketProtocol = "channel.k8s.io"
 // should prefix their messages with this channel char. When used for remote execution, the channel
 // numbers are by convention defined to match the POSIX file-descriptors assigned to STDIN, STDOUT,
 // and STDERR ('0', '1', and '2'). The data received on the server is base64 decoded (and must be
-// be valid) and data written by the server to the client is base64 encoded.
+// valid) and data written by the server to the client is base64 encoded.
 //
 // Example client session:
 //

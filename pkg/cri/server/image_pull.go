@@ -384,7 +384,7 @@ func (c *criService) getTLSConfig(registryTLSConfig criconfig.TLSConfig) (*tls.C
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 		// TODO(thaJeztah): verify if we should ignore the deprecation; see https://github.com/containerd/containerd/pull/7349/files#r990644833
-		tlsConfig.BuildNameToCertificate() //nolint:staticcheck
+		tlsConfig.BuildNameToCertificate() //nolint:staticcheck // Ignore SA1019.
 	}
 
 	if registryTLSConfig.CAFile != "" {
