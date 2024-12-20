@@ -36,6 +36,7 @@ import (
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
 
 	. "github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -44,7 +45,6 @@ import (
 	"github.com/containerd/containerd/pkg/fifosync"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/sys"
 
 	"github.com/opencontainers/runtime-spec/specs-go"
