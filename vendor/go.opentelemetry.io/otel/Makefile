@@ -14,8 +14,8 @@ TIMEOUT = 60
 .DEFAULT_GOAL := precommit
 
 .PHONY: precommit ci
-precommit: generate license-check misspell go-mod-tidy golangci-lint-fix verify-readmes verify-mods test-default
-ci: generate license-check lint vanity-import-check verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
+precommit: generate toolchain-check license-check misspell go-mod-tidy golangci-lint-fix verify-readmes verify-mods test-default
+ci: generate toolchain-check license-check lint vanity-import-check verify-readmes verify-mods build test-default check-clean-work-tree test-coverage
 
 # Tools
 
@@ -235,6 +235,16 @@ govulncheck/%: $(GOVULNCHECK)
 codespell: $(CODESPELL)
 	@$(DOCKERPY) $(CODESPELL)
 
+.PHONY: toolchain-check
+toolchain-check:
+	@toolchainRes=$$(for f in $(ALL_GO_MOD_DIRS); do \
+	           awk '/^toolchain/ { found=1; next } END { if (found) print FILENAME }' $$f/go.mod; \
+	done); \
+	if [ -n "$${toolchainRes}" ]; then \
+			echo "toolchain checking failed:"; echo "$${toolchainRes}"; \
+			exit 1; \
+	fi
+
 .PHONY: license-check
 license-check:
 	@licRes=$$(for f in $$(find . -type f \( -iname '*.go' -o -iname '*.sh' \) ! -path '**/third_party/*' ! -path './.git/*' ) ; do \
@@ -260,7 +270,7 @@ SEMCONVPKG ?= "semconv/"
 semconv-generate: $(SEMCONVGEN) $(SEMCONVKIT)
 	[ "$(TAG)" ] || ( echo "TAG unset: missing opentelemetry semantic-conventions tag"; exit 1 )
 	[ "$(OTEL_SEMCONV_REPO)" ] || ( echo "OTEL_SEMCONV_REPO unset: missing path to opentelemetry semantic-conventions repo"; exit 1 )
-	$(SEMCONVGEN) -i "$(OTEL_SEMCONV_REPO)/model/." --only=attribute_group -p conventionType=trace -f attribute_group.go -t "$(SEMCONVPKG)/template.j2" -s "$(TAG)"
+	$(SEMCONVGEN) -i "$(OTEL_SEMCONV_REPO)/model/." --only=attribute_group -p conventionType=trace -f attribute_group.go -z "$(SEMCONVPKG)/capitalizations.txt" -t "$(SEMCONVPKG)/template.j2" -s "$(TAG)"
 	$(SEMCONVGEN) -i "$(OTEL_SEMCONV_REPO)/model/." --only=metric  -f metric.go -t "$(SEMCONVPKG)/metric_template.j2" -s "$(TAG)"
 	$(SEMCONVKIT) -output "$(SEMCONVPKG)/$(TAG)" -tag "$(TAG)"
 
