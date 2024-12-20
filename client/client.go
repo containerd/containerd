@@ -37,6 +37,7 @@ import (
 	sandboxsapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	snapshotsapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/containerd/api/services/tasks/v1"
+	transferapi "github.com/containerd/containerd/api/services/transfer/v1"
 	versionservice "github.com/containerd/containerd/api/services/version/v1"
 	apitypes "github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -55,6 +56,8 @@ import (
 	sandboxproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	snproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
+	"github.com/containerd/containerd/v2/core/transfer"
+	transferproxy "github.com/containerd/containerd/v2/core/transfer/proxy"
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -754,6 +757,16 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
 	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
+}
+
+// TranferService returns the underlying transferrer
+func (c *Client) TransferService() transfer.Transferrer {
+	if c.transferService != nil {
+		return c.transferService
+	}
+	c.connMu.Lock()
+	defer c.connMu.Unlock()
+	return transferproxy.NewTransferrer(transferapi.NewTransferClient(c.conn), c.streamCreator())
 }
 
 // VersionService returns the underlying VersionClient
