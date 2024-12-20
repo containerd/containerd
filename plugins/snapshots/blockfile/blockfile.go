@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -49,6 +50,9 @@ type SnapshotterConfig struct {
 	// mountOptions are the base options added to the mount (defaults to ["loop"])
 	mountOptions []string
 
+	// copySparse determine whether sparse files when copy (defaults to true，equivalent to "cp --sparse=always xxx")
+	copySparse bool
+
 	// testViewHookHelper is used to fsck or mount with rw to handle
 	// the recovery. If we mount ro for view snapshot, we might hit
 	// the issue like
@@ -70,7 +74,7 @@ func WithScratchFile(src string) Opt {
 	return func(root string, config *SnapshotterConfig) {
 		config.scratchGenerator = func(dst string) error {
 			// Copy src to dst
-			if err := copyFileWithSync(dst, src); err != nil {
+			if err := copyFileWithSync(dst, src, config.copySparse); err != nil {
 				return fmt.Errorf("failed to copy scratch: %w", err)
 			}
 			return nil
@@ -101,6 +105,13 @@ func WithRecreateScratch(recreate bool) Opt {
 	}
 }
 
+// WithCopySparse is used to determine that create sparse files when copy.
+func WithCopySparse(copySparse bool) Opt {
+	return func(root string, config *SnapshotterConfig) {
+		config.copySparse = copySparse
+	}
+}
+
 // withViewHookHelper introduces hook for preparing snapshot for View. It
 // should be used in test only.
 //
@@ -112,11 +123,12 @@ func withViewHookHelper(fn viewHookHelper) Opt {
 }
 
 type snapshotter struct {
-	root    string
-	scratch string
-	fsType  string
-	options []string
-	ms      *storage.MetaStore
+	root       string
+	scratch    string
+	fsType     string
+	options    []string
+	copySparse bool
+	ms         *storage.MetaStore
 
 	testViewHookHelper viewHookHelper
 }
@@ -170,12 +182,12 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root:    root,
-		scratch: scratch,
-		fsType:  config.fsType,
-		options: config.mountOptions,
-		ms:      ms,
-
+		root:               root,
+		scratch:            scratch,
+		fsType:             config.fsType,
+		options:            config.mountOptions,
+		ms:                 ms,
+		copySparse:         config.copySparse,
 		testViewHookHelper: config.testViewHookHelper,
 	}, nil
 }
@@ -385,11 +397,11 @@ func (o *snapshotter) createSnapshot(ctx context.Context, kind snapshots.Kind, k
 			path = o.getBlockFile(s.ID)
 
 			if len(s.ParentIDs) > 0 {
-				if err = copyFileWithSync(path, o.getBlockFile(s.ParentIDs[0])); err != nil {
+				if err = copyFileWithSync(path, o.getBlockFile(s.ParentIDs[0]), o.copySparse); err != nil {
 					return fmt.Errorf("copying of parent failed: %w", err)
 				}
 			} else {
-				if err = copyFileWithSync(path, o.scratch); err != nil {
+				if err = copyFileWithSync(path, o.scratch, o.copySparse); err != nil {
 					return fmt.Errorf("copying of scratch failed: %w", err)
 				}
 			}
@@ -448,7 +460,7 @@ func (o *snapshotter) Close() error {
 	return o.ms.Close()
 }
 
-func copyFileWithSync(target, source string) error {
+func copyFileWithSync(target, source string, copySparse bool) error {
 	// The Go stdlib does not seem to have an efficient os.File.ReadFrom
 	// routine for other platforms like it does on Linux with
 	// copy_file_range. For Darwin at least we can use clonefile
@@ -473,5 +485,25 @@ func copyFileWithSync(target, source string) error {
 	defer tgt.Sync()
 
 	_, err = io.Copy(tgt, src)
+	if err != nil {
+		return fmt.Errorf("failed to copy file to  target %s: %w", target, err)
+	}
+	if copySparse {
+		if err = fallocate(target); err != nil {
+			return fmt.Errorf("fallocate file %s to sparse file failed: %w", target, err)
+		}
+	}
+
 	return err
+}
+
+// fallocate  can make existing files sparse on supported file systems.
+func fallocate(file string) error {
+	cmd := exec.Command("fallocate", "-d", file)
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to fallocate file %s to sparse files: %v", file, err)
+	}
+	return nil
 }
