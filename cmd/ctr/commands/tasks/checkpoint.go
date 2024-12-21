@@ -21,10 +21,10 @@ import (
 	"fmt"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/plugin"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/urfave/cli"
 )
 

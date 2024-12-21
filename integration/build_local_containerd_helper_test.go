@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/go-digest"
 
+	_ "github.com/containerd/containerd/api/types/runc/options"
 	_ "github.com/containerd/containerd/diff/walking/plugin"
 	"github.com/containerd/containerd/events/exchange"
 	_ "github.com/containerd/containerd/events/plugin"
@@ -40,7 +41,6 @@ import (
 	_ "github.com/containerd/containerd/leases/plugin"
 	_ "github.com/containerd/containerd/metadata/plugin"
 	_ "github.com/containerd/containerd/runtime/v2"
-	_ "github.com/containerd/containerd/runtime/v2/runc/options"
 	_ "github.com/containerd/containerd/services/containers"
 	_ "github.com/containerd/containerd/services/content"
 	_ "github.com/containerd/containerd/services/diff"

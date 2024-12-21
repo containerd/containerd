@@ -28,6 +28,7 @@ import (
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/api/types/task"
 	"github.com/containerd/containerd/archive"
 	"github.com/containerd/containerd/containers"
@@ -48,7 +49,6 @@ import (
 	ptypes "github.com/containerd/containerd/protobuf/types"
 	"github.com/containerd/containerd/runtime"
 	"github.com/containerd/containerd/runtime/linux/runctypes"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/containerd/services"
 	"github.com/containerd/containerd/services/warning"
 

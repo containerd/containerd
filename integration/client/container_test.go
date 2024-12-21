@@ -41,6 +41,7 @@ import (
 
 	. "github.com/containerd/containerd"
 	apievents "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/errdefs"
@@ -50,7 +51,6 @@ import (
 	"github.com/containerd/containerd/plugin"
 	gogotypes "github.com/containerd/containerd/protobuf/types"
 	_ "github.com/containerd/containerd/runtime"
-	"github.com/containerd/containerd/runtime/v2/runc/options"
 )
 
 func empty() cio.Creator {
