@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -20,9 +18,11 @@ package compression
 
 import (
 	"bytes"
+	"testing"
 )
 
-func FuzzDecompressStream(data []byte) int {
-	_, _ = DecompressStream(bytes.NewReader(data))
-	return 1
+func FuzzDecompressStream(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		_, _ = DecompressStream(bytes.NewReader(data))
+	})
 }

@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -21,13 +19,14 @@ package client
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"testing"
 	"time"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -35,27 +34,39 @@ import (
 	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
-var (
-	haveDownloadedbinaries = false
-	haveExtractedBinaries  = false
-	haveChangedPATH        = false
-	haveInitialized        = false
+const (
+	downloadLink   = "https://github.com/containerd/containerd/releases/download/v2.0.1/containerd-2.0.1-linux-amd64.tar.gz"
+	downloadPath   = "/tmp/containerd-2.0.1-linux-amd64.tar.gz"
+	downloadBinDir = "/tmp/containerd-binaries"
+	fuzzBinDir     = "/out/containerd-binaries"
+)
 
-	downloadLink = "https://github.com/containerd/containerd/releases/download/v1.5.4/containerd-1.5.4-linux-amd64.tar.gz"
-	downloadPath = "/tmp/containerd-1.5.4-linux-amd64.tar.gz"
-	binariesDir  = "/tmp/containerd-binaries"
+var (
+	// split a fuzz that requires download into 3 steps to avoid timeout in a
+	// single fuzz iteration in oss-fuzz.
+	// a fuzz should start only if the last step equals to `true`.
+	haveDownloadedbinaries  = false
+	haveExtractedBinaries   = false
+	haveChangedDownloadPATH = false
+
+	// for a fuzz that requires the pre-built containerd binaries, we only need
+	// one step to add the oss fuzz dst directory into PATH.
+	haveChangedOSSFuzzPATH = false
 )
 
 // downloadFile downloads a file from a url
 func downloadFile(filepath string, url string) (err error) {
-
 	out, err := os.Create(filepath)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -74,41 +85,39 @@ func downloadFile(filepath string, url string) (err error) {
 // multiple steps is that each fuzz iteration can maximum
 // take 25 seconds when running through OSS-fuzz.
 // Should an iteration exceed that, then the fuzzer stops.
-func initInSteps() bool {
+func initInSteps(t *testing.T) bool {
 	// Download binaries
 	if !haveDownloadedbinaries {
-		err := downloadFile(downloadPath, downloadLink)
-		if err != nil {
-			panic(err)
+		if err := downloadFile(downloadPath, downloadLink); err != nil {
+			t.Fatalf("failed to download containerd: %v", err)
 		}
 		haveDownloadedbinaries = true
+		return true
 	}
 	// Extract binaries
 	if !haveExtractedBinaries {
-		err := os.MkdirAll(binariesDir, 0777)
-		if err != nil {
+
+		if err := os.MkdirAll(downloadBinDir, 0777); err != nil {
 			return true
 		}
-		cmd := exec.Command("tar", "xvf", downloadPath, "-C", binariesDir)
-		err = cmd.Run()
-		if err != nil {
+		cmd := exec.Command("tar", "xvf", downloadPath, "-C", downloadBinDir)
+
+		if err := cmd.Run(); err != nil {
 			return true
 		}
 		haveExtractedBinaries = true
 		return true
 	}
 	// Add binaries to $PATH:
-	if !haveChangedPATH {
+	if !haveChangedDownloadPATH {
 		oldPathEnv := os.Getenv("PATH")
-		newPathEnv := fmt.Sprintf("%s/bin:%s", binariesDir, oldPathEnv)
-		err := os.Setenv("PATH", newPathEnv)
-		if err != nil {
+		newPathEnv := fmt.Sprintf("%s:%s", filepath.Join(downloadBinDir, "bin"), oldPathEnv)
+		if err := os.Setenv("PATH", newPathEnv); err != nil {
 			return true
 		}
-		haveChangedPATH = true
+		haveChangedDownloadPATH = true
 		return true
 	}
-	haveInitialized = true
 	return false
 }
 
@@ -141,13 +150,13 @@ func checkIfShouldRestart(err error) {
 }
 
 // startDaemon() starts the daemon.
-func startDaemon(ctx context.Context, shouldTearDown bool) {
+func startDaemon(ctx context.Context, t *testing.T, shouldTearDown bool) {
 	buf := bytes.NewBuffer(nil)
 	stdioFile, err := os.CreateTemp("", "")
 	if err != nil {
 		// We panic here as it is a fuzz-blocker that
 		// may need fixing
-		panic(err)
+		t.Fatalf("failed to create temp file: %v", err)
 	}
 	defer func() {
 		stdioFile.Close()
@@ -166,7 +175,7 @@ func startDaemon(ctx context.Context, shouldTearDown bool) {
 		// but if the error is another, then it will be a fuzz blocker,
 		// so we panic
 		if !strings.Contains(err.Error(), "daemon is already running") {
-			fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
+			t.Fatalf("failed to start daemon: %v: %s", err, buf.String())
 		}
 	}
 	if shouldTearDown {
@@ -186,8 +195,7 @@ func startDaemon(ctx context.Context, shouldTearDown bool) {
 		ctrd.Stop()
 		ctrd.Kill()
 		ctrd.Wait()
-		fmt.Fprintf(os.Stderr, "%s: %s\n", err, buf.String())
-		return
+		t.Fatalf("failed to start daemon: %v: %s", err, buf.String())
 	}
 }
 
@@ -215,19 +223,19 @@ func updatePathEnv() error {
 	}
 
 	oldPathEnv := os.Getenv("PATH")
-	newPathEnv := oldPathEnv + ":/out/containerd-binaries"
+	newPathEnv := oldPathEnv + ":" + fuzzBinDir
 	err = os.Setenv("PATH", newPathEnv)
 	if err != nil {
 		return err
 	}
-	haveInitialized = true
+	haveChangedOSSFuzzPATH = true
 	return nil
 }
 
 // checkAndDoUnpack checks if an image is unpacked.
 // If it is not unpacked, then we may or may not
 // unpack it. The fuzzer decides.
-func checkAndDoUnpack(image containerd.Image, ctx context.Context, f *fuzz.ConsumeFuzzer) {
+func checkAndDoUnpack(ctx context.Context, image containerd.Image, f *fuzz.ConsumeFuzzer) {
 	unpacked, err := image.IsUnpacked(ctx, testSnapshotter)
 	if err == nil && unpacked {
 		shouldUnpack, err := f.GetBool()
@@ -240,7 +248,7 @@ func checkAndDoUnpack(image containerd.Image, ctx context.Context, f *fuzz.Consu
 // getImage() returns an image from the client.
 // The fuzzer decides which image is returned.
 func getImage(client *containerd.Client, f *fuzz.ConsumeFuzzer) (containerd.Image, error) {
-	images, err := client.ListImages(nil)
+	images, err := client.ListImages(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -255,8 +263,7 @@ func getImage(client *containerd.Client, f *fuzz.ConsumeFuzzer) (containerd.Imag
 
 // newContainer creates and returns a container
 // The fuzzer decides how the container is created
-func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.Context) (containerd.Container, error) {
-
+func newContainer(ctx context.Context, client *containerd.Client, f *fuzz.ConsumeFuzzer) (containerd.Container, error) {
 	// determiner determines how we should create the container
 	determiner, err := f.GetInt()
 	if err != nil {
@@ -267,7 +274,8 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 		return nil, err
 	}
 
-	if determiner%1 == 0 {
+	switch remainder := determiner % 3; remainder {
+	case 0:
 		// Create a container with oci specs
 		spec := &oci.Spec{}
 		err = f.GenerateStruct(spec)
@@ -280,7 +288,7 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 			return nil, err
 		}
 		return container, nil
-	} else if determiner%2 == 0 {
+	case 1:
 		// Create a container with fuzzed oci specs
 		// and an image
 		image, err := getImage(client, f)
@@ -289,7 +297,7 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 		}
 		// Fuzz a few image APIs
 		_, _ = image.Size(ctx)
-		checkAndDoUnpack(image, ctx, f)
+		checkAndDoUnpack(ctx, image, f)
 
 		spec := &oci.Spec{}
 		err = f.GenerateStruct(spec)
@@ -304,7 +312,7 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 			return nil, err
 		}
 		return container, nil
-	} else {
+	default:
 		// Create a container with an image
 		image, err := getImage(client, f)
 		if err != nil {
@@ -312,7 +320,7 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 		}
 		// Fuzz a few image APIs
 		_, _ = image.Size(ctx)
-		checkAndDoUnpack(image, ctx, f)
+		checkAndDoUnpack(ctx, image, f)
 
 		container, err := client.NewContainer(ctx,
 			id,
@@ -322,7 +330,6 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 		}
 		return container, nil
 	}
-	return nil, errors.New("Could not create container")
 }
 
 // doFuzz() implements the logic of FuzzIntegCreateContainerNoTearDown()
@@ -332,13 +339,13 @@ func newContainer(client *containerd.Client, f *fuzz.ConsumeFuzzer, ctx context.
 // - Creates a client
 // - Imports a bunch of fuzzed tar archives
 // - Creates a bunch of containers
-func doFuzz(data []byte, shouldTearDown bool) int {
+func doFuzz(t *testing.T, data []byte, shouldTearDown bool) {
 	ctx, cancel := testContext(nil)
 	defer cancel()
 
 	// Check if daemon is running and start it if it isn't
 	if ctrd.cmd == nil {
-		startDaemon(ctx, shouldTearDown)
+		startDaemon(ctx, t, shouldTearDown)
 	}
 	client, err := containerd.New(defaultAddress)
 	if err != nil {
@@ -346,7 +353,7 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 		// Deleting it will allow the creation of a new
 		// socket during next fuzz iteration.
 		deleteSocket()
-		return -1
+		return
 	}
 	defer client.Close()
 
@@ -355,16 +362,15 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 	// Begin import tars:
 	noOfImports, err := f.GetInt()
 	if err != nil {
-		return 0
+		return
 	}
 	// maxImports is currently completely arbitrarily defined
 	maxImports := 30
 	for i := 0; i < noOfImports%maxImports; i++ {
-
 		// f.TarBytes() returns valid tar bytes.
 		tarBytes, err := f.TarBytes()
 		if err != nil {
-			return 0
+			return
 		}
 		_, _ = client.Import(ctx, bytes.NewReader(tarBytes))
 	}
@@ -373,26 +379,24 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 	// Begin create containers:
 	existingImages, err := client.ListImages(ctx)
 	if err != nil {
-		return 0
+		return
 	}
 	if len(existingImages) > 0 {
 		noOfContainers, err := f.GetInt()
 		if err != nil {
-			return 0
+			return
 		}
 		// maxNoOfContainers is currently
 		// completely arbitrarily defined
 		maxNoOfContainers := 50
 		for i := 0; i < noOfContainers%maxNoOfContainers; i++ {
-			container, err := newContainer(client, f, ctx)
+			container, err := newContainer(ctx, client, f)
 			if err == nil {
 				defer container.Delete(ctx, containerd.WithSnapshotCleanup)
 			}
 		}
 	}
 	// End create containers
-
-	return 1
 }
 
 // FuzzIntegNoTearDownWithDownload() implements a fuzzer
@@ -405,44 +409,44 @@ func doFuzz(data []byte, shouldTearDown bool) int {
 // This fuzzer is experimental for now and is being run
 // continuously by OSS-fuzz to collect feedback on
 // its sustainability.
-func FuzzIntegNoTearDownWithDownload(data []byte) int {
-	if !haveInitialized {
-		shouldRestart := initInSteps()
-		if shouldRestart {
-			return 0
+func FuzzIntegNoTearDownWithDownload(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if !haveChangedDownloadPATH {
+			if shouldRestart := initInSteps(t); shouldRestart {
+				return
+			}
 		}
-	}
-	ret := doFuzz(data, false)
-	return ret
+		doFuzz(t, data, false)
+	})
 }
 
 // FuzzIntegCreateContainerNoTearDown() implements a fuzzer
-// similar to FuzzIntegCreateContainerWithTearDown() with
+// similar to FuzzIntegCreateContainerWithTearDown()
 // with one minor distinction: One tears down the
 // daemon after each iteration whereas the other doesn't.
 // The two fuzzers' performance will be compared over time.
-func FuzzIntegCreateContainerNoTearDown(data []byte) int {
-	if !haveInitialized {
-		err := updatePathEnv()
-		if err != nil {
-			return 0
+func FuzzIntegCreateContainerNoTearDown(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if !haveChangedOSSFuzzPATH {
+			if err := updatePathEnv(); err != nil {
+				return
+			}
 		}
-	}
-	ret := doFuzz(data, false)
-	return ret
+		doFuzz(t, data, false)
+	})
 }
 
 // FuzzIntegCreateContainerWithTearDown() is similar to
 // FuzzIntegCreateContainerNoTearDown() except that
 // FuzzIntegCreateContainerWithTearDown tears down the daemon
 // after each iteration.
-func FuzzIntegCreateContainerWithTearDown(data []byte) int {
-	if !haveInitialized {
-		err := updatePathEnv()
-		if err != nil {
-			return 0
+func FuzzIntegCreateContainerWithTearDown(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if !haveChangedOSSFuzzPATH {
+			if err := updatePathEnv(); err != nil {
+				return
+			}
 		}
-	}
-	ret := doFuzz(data, true)
-	return ret
+		doFuzz(t, data, true)
+	})
 }

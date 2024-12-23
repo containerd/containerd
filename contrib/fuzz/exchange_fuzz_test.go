@@ -17,6 +17,7 @@ package fuzz
 
 import (
 	"context"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -25,30 +26,31 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
 
-func FuzzExchange(data []byte) int {
-	f := fuzz.NewConsumer(data)
-	namespace, err := f.GetString()
-	if err != nil {
-		return 0
-	}
-	event := &eventstypes.ContainerCreate{}
-	err = f.GenerateStruct(event)
-	if err != nil {
-		return 0
-	}
-	input, err := f.GetString()
-	if err != nil {
-		return 0
-	}
+func FuzzExchange(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		f := fuzz.NewConsumer(data)
+		namespace, err := f.GetString()
+		if err != nil {
+			return
+		}
+		event := &eventstypes.ContainerCreate{}
+		err = f.GenerateStruct(event)
+		if err != nil {
+			return
+		}
+		input, err := f.GetString()
+		if err != nil {
+			return
+		}
 
-	env := &events.Envelope{}
-	err = f.GenerateStruct(env)
-	if err != nil {
-		return 0
-	}
-	ctx := namespaces.WithNamespace(context.Background(), namespace)
-	exch := exchange.NewExchange()
-	exch.Publish(ctx, input, event)
-	exch.Forward(ctx, env)
-	return 1
+		env := &events.Envelope{}
+		err = f.GenerateStruct(env)
+		if err != nil {
+			return
+		}
+		ctx := namespaces.WithNamespace(context.Background(), namespace)
+		exch := exchange.NewExchange()
+		exch.Publish(ctx, input, event)
+		exch.Forward(ctx, env)
+	})
 }

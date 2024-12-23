@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -16,29 +14,27 @@
    limitations under the License.
 */
 
-package config
+package images
 
 import (
-	"os"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func FuzzParseHostsFile(data []byte) int {
-	f := fuzz.NewConsumer(data)
-	dir, err := os.MkdirTemp("", "fuzz-")
-	if err != nil {
-		return 0
-	}
-	err = f.CreateFiles(dir)
-	if err != nil {
-		return 0
-	}
-	defer os.RemoveAll(dir)
-	b, err := f.GetBytes()
-	if err != nil {
-		return 0
-	}
-	_, _ = parseHostsFile(dir, b)
-	return 1
+func FuzzParseAuth(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		f := fuzz.NewConsumer(data)
+		auth := &runtime.AuthConfig{}
+		err := f.GenerateStruct(auth)
+		if err != nil {
+			return
+		}
+		host, err := f.GetString()
+		if err != nil {
+			return
+		}
+		_, _, _ = ParseAuth(auth, host)
+	})
 }

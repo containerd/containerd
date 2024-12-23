@@ -1,4 +1,4 @@
-//go:build gofuzz
+//go:build linux
 
 // Copyright 2022 ADA Logics Ltd
 //
@@ -19,19 +19,21 @@ package apparmor
 
 import (
 	"os"
+	"testing"
 )
 
-func FuzzLoadDefaultProfile(data []byte) int {
-	f, err := os.Create("fuzz_file")
-	if err != nil {
-		return 0
-	}
-	defer f.Close()
-	defer os.Remove("fuzz_file")
-	_, err = f.Write(data)
-	if err != nil {
-		return 0
-	}
-	_ = LoadDefaultProfile("fuzz_file")
-	return 1
+func FuzzLoadDefaultProfile(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		f, err := os.Create("fuzz_file")
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		defer os.Remove("fuzz_file")
+		_, err = f.Write(data)
+		if err != nil {
+			return
+		}
+		_ = LoadDefaultProfile("fuzz_file")
+	})
 }
