@@ -18,7 +18,6 @@ package fuzz
 import (
 	"context"
 	_ "crypto/sha256" // required by go-digest
-	"os"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -50,11 +49,8 @@ func FuzzDiffApply(f *testing.F) {
 		if err != nil {
 			return
 		}
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}
@@ -96,11 +92,8 @@ func FuzzDiffCompare(f *testing.F) {
 		}
 
 		ctx := context.Background()
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}

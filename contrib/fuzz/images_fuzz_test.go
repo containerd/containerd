@@ -17,7 +17,6 @@ package fuzz
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -35,11 +34,8 @@ func FuzzImagesCheck(f *testing.F) {
 		if err != nil {
 			return
 		}
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}

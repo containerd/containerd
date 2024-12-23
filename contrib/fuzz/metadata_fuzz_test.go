@@ -15,8 +15,6 @@ package fuzz
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -36,12 +34,8 @@ import (
 	"github.com/containerd/containerd/v2/plugins/snapshots/native"
 )
 
-func testEnv() (context.Context, *bolt.DB, func(), error) {
-	dirname, err := os.MkdirTemp("", "fuzz-")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
+func testEnv(t *testing.T) (context.Context, *bolt.DB, func(), error) {
+	dirname := t.TempDir()
 	db, err := bolt.Open(filepath.Join(dirname, "meta.db"), 0644, nil)
 	if err != nil {
 		return nil, nil, nil, err
@@ -51,7 +45,6 @@ func testEnv() (context.Context, *bolt.DB, func(), error) {
 	ctx = namespaces.WithNamespace(ctx, "testing")
 	return ctx, db, func() {
 		db.Close()
-		_ = os.RemoveAll(dirname)
 		cancel()
 	}, nil
 }
@@ -65,7 +58,7 @@ func FuzzImageStore(f *testing.F) {
 			3: "Delete",
 		}
 
-		ctx, db, cancel, err := testEnv()
+		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
 			return
 		}
@@ -124,7 +117,7 @@ func FuzzLeaseManager(f *testing.F) {
 			4: "DeleteResource",
 			5: "ListResources",
 		}
-		ctx, db, cancel, err := testEnv()
+		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
 			return
 		}
@@ -213,7 +206,7 @@ func FuzzContainerStore(f *testing.F) {
 			3: "Update",
 			4: "Get",
 		}
-		ctx, db, cancel, err := testEnv()
+		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
 			return
 		}
@@ -277,7 +270,7 @@ type testOptions struct {
 
 type testOpt func(*testOptions)
 
-func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
+func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	ctx = namespaces.WithNamespace(ctx, "testing")
 
@@ -287,11 +280,7 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 		o(&topts)
 	}
 
-	dirname, err := os.MkdirTemp("", "fuzzing-")
-	if err != nil {
-		return ctx, nil, func() { cancel() }, err
-	}
-	defer os.RemoveAll(dirname)
+	dirname := t.TempDir()
 
 	snapshotter, err := native.NewSnapshotter(filepath.Join(dirname, "native"))
 	if err != nil {
@@ -327,9 +316,6 @@ func testDB(opt ...testOpt) (context.Context, *metadata.DB, func(), error) {
 
 	return ctx, db, func() {
 		bdb.Close()
-		if err := os.RemoveAll(dirname); err != nil {
-			fmt.Println("Failed removing temp dir")
-		}
 		cancel()
 	}, nil
 }
@@ -346,7 +332,7 @@ func FuzzContentStore(f *testing.F) {
 			6: "Abort",
 			7: "Commit",
 		}
-		ctx, db, cancel, err := testDB()
+		ctx, db, cancel, err := testDB(t)
 		defer cancel()
 		if err != nil {
 			return

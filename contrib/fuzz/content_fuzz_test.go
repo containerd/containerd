@@ -99,12 +99,8 @@ func FuzzCSWalk(f *testing.F) {
 		ctx := context.Background()
 		expected := map[digest.Digest]struct{}{}
 		found := map[digest.Digest]struct{}{}
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(tmpdir)
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}
@@ -121,7 +117,7 @@ func FuzzCSWalk(f *testing.F) {
 
 		if err := cs.Walk(ctx, func(bi content.Info) error {
 			found[bi.Digest] = struct{}{}
-			err = checkBlobPath(bi.Digest, tmpdir)
+			err = checkBlobPath(bi.Digest, tmpDir)
 			if err != nil {
 				return err
 			}
@@ -144,12 +140,8 @@ func FuzzArchiveExport(f *testing.F) {
 			return
 		}
 		ctx := context.Background()
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(tmpdir)
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}
@@ -157,12 +149,13 @@ func FuzzArchiveExport(f *testing.F) {
 		if err != nil {
 			return
 		}
-		w, err := os.Create("fuzz-output-file")
+
+		// use `t.TempDir` to clean up temp dir and files
+		w, err := os.CreateTemp(t.TempDir(), "fuzz-output-file")
 		if err != nil {
 			return
 		}
 		defer w.Close()
-		defer os.Remove("fuzz-output-file")
 		_ = archive.Export(ctx, cs, w, archive.WithManifest(manifest, "name"))
 	})
 }

@@ -152,16 +152,15 @@ func checkIfShouldRestart(err error) {
 // startDaemon() starts the daemon.
 func startDaemon(ctx context.Context, t *testing.T, shouldTearDown bool) {
 	buf := bytes.NewBuffer(nil)
-	stdioFile, err := os.CreateTemp("", "")
+	tmpDir := t.TempDir()
+	stdioFile, err := os.CreateTemp(tmpDir, "")
 	if err != nil {
 		// We panic here as it is a fuzz-blocker that
 		// may need fixing
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer func() {
-		stdioFile.Close()
-		os.Remove(stdioFile.Name())
-	}()
+	defer stdioFile.Close()
+
 	ctrdStdioFilePath = stdioFile.Name()
 	stdioWriter := io.MultiWriter(stdioFile, buf)
 	err = ctrd.start("containerd", address, []string{

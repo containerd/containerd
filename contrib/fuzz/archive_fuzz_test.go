@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"os"
 	"path"
 	"testing"
 
@@ -49,11 +48,8 @@ func FuzzApply(f *testing.F) {
 			return
 		}
 		maxIters := 20
-		tmpDir, err := os.MkdirTemp("", "prefix-test")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(tmpDir)
+
+		tmpDir := t.TempDir()
 		for i := 0; i < iters%maxIters; i++ {
 			rBytes, err := f.TarBytes()
 			if err != nil {
@@ -132,11 +128,8 @@ func FuzzImportIndex(f *testing.F) {
 				r = bytes.NewReader(buf.Bytes())
 			}
 		}
-		tmpdir, err := os.MkdirTemp("", "fuzzing-")
-		if err != nil {
-			return
-		}
-		cs, err := local.NewStore(tmpdir)
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
 			return
 		}
