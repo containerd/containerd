@@ -98,6 +98,7 @@ type ImageExportStreamer interface {
 
 type ImageUnpacker interface {
 	UnpackPlatforms() []UnpackConfiguration
+	EnableRemoteSnapshotAnntations() bool
 }
 
 // ImagePlatformsGetter is type which returns configured platforms.

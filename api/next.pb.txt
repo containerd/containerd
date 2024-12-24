@@ -7489,6 +7489,13 @@ file {
       type_name: ".containerd.types.transfer.UnpackConfiguration"
       json_name: "unpacks"
     }
+    field {
+      name: "EnableRemoteSnapshotAnntations"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "EnableRemoteSnapshotAnntations"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
