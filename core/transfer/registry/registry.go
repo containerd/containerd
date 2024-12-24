@@ -18,12 +18,9 @@ package registry
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
-	"sync"
 
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -32,6 +29,7 @@ import (
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
+	"github.com/containerd/containerd/v2/core/transfer/registry/auth"
 	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -45,7 +43,7 @@ func init() {
 
 type registryOpts struct {
 	headers       http.Header
-	creds         CredentialHelper
+	creds         auth.CredentialHelper
 	hostDir       string
 	defaultScheme string
 }
@@ -62,7 +60,7 @@ func WithHeaders(headers http.Header) Opt {
 }
 
 // WithCredentials configures a helper that provides credentials for a host.
-func WithCredentials(creds CredentialHelper) Opt {
+func WithCredentials(creds auth.CredentialHelper) Opt {
 	return func(o *registryOpts) error {
 		o.creds = creds
 		return nil
@@ -125,24 +123,12 @@ func NewOCIRegistry(ctx context.Context, ref string, opts ...Opt) (*OCIRegistry,
 	}, nil
 }
 
-// From stream
-type CredentialHelper interface {
-	GetCredentials(ctx context.Context, ref, host string) (Credentials, error)
-}
-
-type Credentials struct {
-	Host     string
-	Username string
-	Secret   string
-	Header   string
-}
-
 // OCI
 type OCIRegistry struct {
 	reference string
 
 	headers http.Header
-	creds   CredentialHelper
+	creds   auth.CredentialHelper
 
 	resolver remotes.Resolver
 
@@ -170,6 +156,10 @@ func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher
 	return r.resolver.Fetcher(ctx, ref)
 }
 
+func (r *OCIRegistry) GetCredentials(ctx context.Context, ref, host string) (transfer.Credentials, error) {
+	return r.creds.GetCredentials(ctx, ref, host)
+}
+
 func (r *OCIRegistry) Pusher(ctx context.Context, desc ocispec.Descriptor) (transfer.Pusher, error) {
 	var ref = r.reference
 	// Annotate ref with digest to push only push tag for single digest
@@ -193,59 +183,7 @@ func (r *OCIRegistry) MarshalAny(ctx context.Context, sm streaming.StreamCreator
 		if err != nil {
 			return nil, err
 		}
-		go func() {
-			// Check for context cancellation as well
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-				}
-
-				req, err := stream.Recv()
-				if err != nil {
-					// If not EOF, log error
-					return
-				}
-
-				var s transfertypes.AuthRequest
-				if err := typeurl.UnmarshalTo(req, &s); err != nil {
-					log.G(ctx).WithError(err).Error("failed to unmarshal credential request")
-					continue
-				}
-				creds, err := r.creds.GetCredentials(ctx, s.Reference, s.Host)
-				if err != nil {
-					log.G(ctx).WithError(err).Error("failed to get credentials")
-					continue
-				}
-				var resp transfertypes.AuthResponse
-				if creds.Header != "" {
-					resp.AuthType = transfertypes.AuthType_HEADER
-					resp.Secret = creds.Header
-				} else if creds.Username != "" {
-					resp.AuthType = transfertypes.AuthType_CREDENTIALS
-					resp.Username = creds.Username
-					resp.Secret = creds.Secret
-				} else {
-					resp.AuthType = transfertypes.AuthType_REFRESH
-					resp.Secret = creds.Secret
-				}
-
-				a, err := typeurl.MarshalAny(&resp)
-				if err != nil {
-					log.G(ctx).WithError(err).Error("failed to marshal credential response")
-					continue
-				}
-
-				if err := stream.Send(a); err != nil {
-					if !errors.Is(err, io.EOF) {
-						log.G(ctx).WithError(err).Error("unexpected send failure")
-					}
-					return
-				}
-			}
-
-		}()
+		go auth.ServeAuthStream(ctx, stream, r.creds.GetCredentials)
 		res.AuthStream = sid
 	}
 	res.HostDir = r.hostDir
@@ -278,9 +216,7 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 				log.G(ctx).WithError(err).WithField("stream", sid).Debug("failed to get auth stream")
 				return err
 			}
-			r.creds = &credCallback{
-				stream: stream,
-			}
+			r.creds = auth.NewCredentialHelper(stream)
 			hostOptions.Credentials = func(host string) (string, string, error) {
 				c, err := r.creds.GetCredentials(context.Background(), s.Reference, host)
 				if err != nil {
@@ -303,48 +239,4 @@ func (r *OCIRegistry) UnmarshalAny(ctx context.Context, sm streaming.StreamGette
 	})
 
 	return nil
-}
-
-type credCallback struct {
-	sync.Mutex
-	stream streaming.Stream
-}
-
-func (cc *credCallback) GetCredentials(ctx context.Context, ref, host string) (Credentials, error) {
-	cc.Lock()
-	defer cc.Unlock()
-
-	ar := &transfertypes.AuthRequest{
-		Host:      host,
-		Reference: ref,
-	}
-	anyType, err := typeurl.MarshalAny(ar)
-	if err != nil {
-		return Credentials{}, err
-	}
-	if err := cc.stream.Send(anyType); err != nil {
-		return Credentials{}, err
-	}
-	resp, err := cc.stream.Recv()
-	if err != nil {
-		return Credentials{}, err
-	}
-	var s transfertypes.AuthResponse
-	if err := typeurl.UnmarshalTo(resp, &s); err != nil {
-		return Credentials{}, err
-	}
-	creds := Credentials{
-		Host: host,
-	}
-	switch s.AuthType {
-	case transfertypes.AuthType_CREDENTIALS:
-		creds.Username = s.Username
-		creds.Secret = s.Secret
-	case transfertypes.AuthType_REFRESH:
-		creds.Secret = s.Secret
-	case transfertypes.AuthType_HEADER:
-		creds.Header = s.Secret
-	}
-
-	return creds, nil
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/streaming"
 )
 
 type Transferrer interface {
@@ -101,6 +102,17 @@ type ImageUnpacker interface {
 	EnableRemoteSnapshotAnntations() bool
 }
 
+type Credentials struct {
+	Host     string
+	Username string
+	Secret   string
+	Header   string
+}
+
+type ImageCredsProvider interface {
+	GetCredentials(ctx context.Context, ref, host string) (Credentials, error)
+}
+
 // ImagePlatformsGetter is type which returns configured platforms.
 type ImagePlatformsGetter interface {
 	Platforms() []ocispec.Platform
@@ -117,7 +129,8 @@ type UnpackConfiguration struct {
 type ProgressFunc func(Progress)
 
 type Config struct {
-	Progress ProgressFunc
+	Progress      ProgressFunc
+	StreamManager streaming.StreamManager
 }
 
 type Opt func(*Config)
@@ -125,6 +138,12 @@ type Opt func(*Config)
 func WithProgress(f ProgressFunc) Opt {
 	return func(opts *Config) {
 		opts.Progress = f
+	}
+}
+
+func WithStreamManager(sm streaming.StreamManager) Opt {
+	return func(opts *Config) {
+		opts.StreamManager = sm
 	}
 }
 
