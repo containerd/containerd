@@ -472,10 +472,6 @@ func (c *Manager) fallbackKill() error {
 }
 
 func (c *Manager) Delete() error {
-	var (
-		tasks    []uint64
-		threaded bool
-	)
 	// Kernel prevents cgroups with running process from being removed,
 	// check the tree is empty.
 	//
@@ -485,13 +481,13 @@ func (c *Manager) Delete() error {
 		if !os.IsNotExist(err) {
 			return err
 		}
-	} else {
-		threaded = cgType == Threaded
 	}
 
-	if threaded {
+	var tasks []uint64
+	switch cgType {
+	case Threaded, DomainThreaded:
 		tasks, err = c.Threads(true)
-	} else {
+	default:
 		tasks, err = c.Procs(true)
 	}
 	if err != nil {
@@ -716,7 +712,7 @@ func (c *Manager) MemoryEventFD() (int, uint32, error) {
 	fpath := filepath.Join(c.path, "memory.events")
 	fd, err := unix.InotifyInit()
 	if err != nil {
-		return 0, 0, errors.New("failed to create inotify fd")
+		return 0, 0, fmt.Errorf("failed to create inotify fd: %w", err)
 	}
 	wd, err := unix.InotifyAddWatch(fd, fpath, unix.IN_MODIFY)
 	if err != nil {
