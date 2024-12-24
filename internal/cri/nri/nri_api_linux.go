@@ -394,7 +394,6 @@ func (a *API) ListContainers() []nri.Container {
 		case cri.ContainerState_CONTAINER_UNKNOWN:
 			continue
 		}
-		ctr := ctr
 		containers = append(containers, a.nriContainer(&ctr, nil))
 	}
 	return containers

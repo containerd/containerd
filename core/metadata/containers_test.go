@@ -148,7 +148,6 @@ func TestContainersList(t *testing.T) {
 			}
 
 			for _, result := range results {
-				result := result
 				checkContainersEqual(t, &result, testset[result.ID], "list results did not match")
 			}
 		})
@@ -618,7 +617,6 @@ func TestContainersCreateUpdateDelete(t *testing.T) {
 			},
 		},
 	} {
-		testcase := testcase
 		t.Run(testcase.name, func(t *testing.T) {
 			testcase.original.ID = testcase.name
 			if testcase.input.ID == "" {

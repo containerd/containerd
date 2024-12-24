@@ -487,7 +487,6 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 			c.Registry.Configs = make(map[string]RegistryConfig)
 		}
 		for endpoint, auth := range c.Registry.Auths {
-			auth := auth
 			u, err := url.Parse(endpoint)
 			if err != nil {
 				return warnings, fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)

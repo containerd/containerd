@@ -65,7 +65,6 @@ func TestWaitContainerStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			container, err := containerstore.NewContainer(

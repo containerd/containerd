@@ -125,7 +125,6 @@ func TestPodSandboxStatus(t *testing.T) {
 			expectedState: runtime.PodSandboxState_SANDBOX_NOTREADY,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			expected.State = test.expectedState
 			got := toCRISandboxStatus(metadata, test.state, createdAt, ip, additionalIPs)

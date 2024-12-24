@@ -131,7 +131,6 @@ func TestPassThroughAnnotationsFilter(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			passthroughAnnotations := GetPassthroughAnnotations(test.podAnnotations, test.runtimePodAnnotations)
 			assert.Equal(t, test.passthroughAnnotations, passthroughAnnotations)

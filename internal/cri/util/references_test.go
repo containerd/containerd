@@ -76,7 +76,6 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 			expectedRepoTag:    "",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			named, err := reference.ParseDockerRef(test.ref)
 			assert.NoError(t, err)

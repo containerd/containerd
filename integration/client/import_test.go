@@ -674,7 +674,6 @@ func TestTransferImport(t *testing.T) {
 			Opts:   []image.StoreOpt{image.WithDigestRef("registry.test/basename", true, false)},
 		},
 	} {
-		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
 			tc := tartest.TarContext{}
 			files := []tartest.WriterToTar{

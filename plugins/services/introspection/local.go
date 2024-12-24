@@ -101,7 +101,6 @@ func (l *Local) Plugins(ctx context.Context, fs ...string) (*api.PluginsResponse
 	var plugins []*api.Plugin
 	allPlugins := l.getPlugins()
 	for _, p := range allPlugins {
-		p := p
 		if filter.Match(adaptPlugin(p)) {
 			plugins = append(plugins, p)
 		}

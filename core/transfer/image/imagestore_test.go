@@ -198,7 +198,6 @@ func TestStore(t *testing.T) {
 			Images:      []string{"registry.test/index:latest"},
 		},
 	} {
-		testCase := testCase
 		for _, a := range testCase.Annotations {
 			name := testCase.Name + "_" + a
 			dgst := digest.Canonical.FromString(name)

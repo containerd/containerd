@@ -39,7 +39,6 @@ func (c *criService) ListPodSandboxStats(
 
 	var wg sync.WaitGroup
 	for i, sandbox := range sandboxes {
-		i, sandbox := i, sandbox
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

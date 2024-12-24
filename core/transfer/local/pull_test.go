@@ -120,7 +120,6 @@ func TestGetSupportedPlatform(t *testing.T) {
 			},
 		},
 	} {
-		testCase := testCase
 		t.Run(testCase.Name, func(t *testing.T) {
 			m, sp := getSupportedPlatform(testCase.UnpackConfig, testCase.SupportedPlatforms)
 

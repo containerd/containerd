@@ -113,7 +113,6 @@ func TestParseAuth(t *testing.T) {
 			expectedSecret: testPasswd,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			u, s, err := ParseAuth(test.auth, test.host)
 			assert.Equal(t, test.expectErr, err != nil)
@@ -272,7 +271,6 @@ func TestRegistryEndpoints(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.Registry.Mirrors = test.mirrors
@@ -340,7 +338,6 @@ func TestDefaultScheme(t *testing.T) {
 			expected: "https",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := defaultScheme(test.host)
 			assert.Equal(t, test.expected, got)
@@ -366,7 +363,6 @@ func TestEncryptedImagePullOpts(t *testing.T) {
 			expectedOpts: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c, _ := newTestCRIService()
 			c.config.ImageDecryption.KeyModel = test.keyModel
