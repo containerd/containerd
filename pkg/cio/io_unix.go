@@ -45,10 +45,15 @@ func NewFIFOSetInDir(root, id string, terminal bool) (*FIFOSet, error) {
 	closer := func() error {
 		return os.RemoveAll(dir)
 	}
+
+	var sdterr string
+	if !terminal {
+		sdterr = filepath.Join(dir, id+"-stderr")
+	}
 	return NewFIFOSet(Config{
 		Stdin:    filepath.Join(dir, id+"-stdin"),
 		Stdout:   filepath.Join(dir, id+"-stdout"),
-		Stderr:   filepath.Join(dir, id+"-stderr"),
+		Stderr:   sdterr,
 		Terminal: terminal,
 	}, closer), nil
 }
