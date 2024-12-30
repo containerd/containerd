@@ -193,7 +193,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	)
 
 	defer pcancel()
-	snapshotter, platformForImagePull, err := c.snapshotterFromPodSandboxConfig(ctx, ref, sandboxConfig, runtimeHandler)
+	snapshotter, platformForImagePull, err := c.snapshotterFromPodSandboxConfig(ctx, sandboxConfig, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
@@ -999,7 +999,7 @@ func (c *CRIImageService) getInfoFromRuntimePlatforms(ctx context.Context, criRu
 		return defaultSnapshotter, defaultPlatform, nil
 	}
 	if _, ok := c.runtimePlatforms[criRuntimeHandler]; !ok {
-		log.G(ctx).Debugf("invalid CRI runtimehandler %v", criRuntimeHandler)
+		log.G(ctx).Debugf("CRI runtimehandler %v not found in CRI image config. Falling back to default runtime %v", criRuntimeHandler, c.defaultRuntimeName)
 		return defaultSnapshotter, defaultPlatform, nil
 	}
 	imagePlatform := c.runtimePlatforms[criRuntimeHandler]
@@ -1010,7 +1010,7 @@ func (c *CRIImageService) getInfoFromRuntimePlatforms(ctx context.Context, criRu
 // Therefore, attempt to read the snapshot and runtimeHandler information from PullImageRequest
 // and if one was not specified, try to look for appropriate annotation key. If none are found,
 // return default values for snapshotter and runtime handler.
-func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context, imageRef string,
+func (c *CRIImageService) snapshotterFromPodSandboxConfig(ctx context.Context,
 	s *runtime.PodSandboxConfig, runtimeHandlerFromCRI string) (string, imagespec.Platform, error) {
 	snapshotter := c.config.Snapshotter
 	platform := platforms.DefaultSpec()

@@ -179,7 +179,7 @@ func TestArgsEscapedImagesOnWindows(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	})
 
-	EnsureImageExists(t, testImage, "")
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	cnConfigWithCtrCmd := ContainerConfig(
 		containerName,

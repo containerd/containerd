@@ -77,9 +77,10 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 
 	sandboxImage := c.getSandboxImageName()
 	// Ensure sandbox container image snapshot.
+	log.G(ctx).Debugf("sandbox runtimeHandler: %v", metadata.RuntimeHandler)
 	image, err := c.ensureImageExists(ctx, sandboxImage, config, metadata.RuntimeHandler)
 	if err != nil {
-		return cin, fmt.Errorf("failed to get sandbox image %q: %w", sandboxImage, err)
+		return cin, fmt.Errorf("failed to get sandbox image %q for runtimeHandler %v: %w", sandboxImage, metadata.RuntimeHandler, err)
 	}
 
 	containerdImage, err := c.toContainerdImage(ctx, *image)

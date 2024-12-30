@@ -45,10 +45,6 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 			// Check if image name is a tuple of (ref, runtimeHandler). If it is not,
 			// use the default runtime handler
 			ref, runtimeHandler := RuntimeHandlerFromImageName(i.Name)
-			if runtimeHandler == "" {
-				// do nothing for root images
-				return
-			}
 			platformForRuntimeHandler := platforms.DefaultSpec()
 			if runtimeHandler != "" && c.config.RuntimePlatforms != nil {
 				if runtimePlatform, ok := c.config.RuntimePlatforms[runtimeHandler]; ok {

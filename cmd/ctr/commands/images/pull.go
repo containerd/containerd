@@ -222,6 +222,7 @@ command. As part of this process, we do the following:
 				fmt.Printf("image chain ID: %s\n", chainID)
 			}
 		}
+
 		_, err = client.CreateImageInContainerd(ctx, img)
 		if err != nil {
 			return fmt.Errorf("failed to create image entries in containerd")

@@ -133,7 +133,8 @@ func init() {
 				platform := platforms.DefaultSpec()
 				if rp.Platform != "" {
 					p, err := platforms.Parse(rp.Platform)
-					if err != nil {
+					// Platform specified for a specific runtime should have minimum of OS and arch specified.
+					if err != nil && isValidPlatformSpec(p) {
 						return nil, fmt.Errorf("unable to parse platform %q: %w", rp.Platform, err)
 					}
 					platform = p

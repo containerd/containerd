@@ -262,7 +262,7 @@ func TestCreateContainer(t *testing.T) {
 	t.Cleanup(func() { removePodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
 	t.Cleanup(func() { stopPodSandbox(ctx, t, client, sandBoxResponse.PodSandboxId) })
 
-	EnsureImageExists(t, testImage, "")
+	EnsureImageExists(t, testImage, "runhcs-wcow-process")
 
 	t.Log("Create a container")
 	createCtrRequest := &runtime.CreateContainerRequest{

@@ -103,6 +103,11 @@ if [ $IS_WINDOWS -eq 0 ]; then
 
   # Add runtime with failpoint
   cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+# Needed to pull image for a given runtime class. See KEP4216
+[plugins."io.containerd.grpc.v1.images"]
+  [plugins."io.containerd.grpc.v1.images".runtime_platforms]
+    [plugins."io.containerd.cri.v1.images".runtime_platforms.runc-fp]
+      platform = "linux/amd64"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
   cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
   cni_max_conf_num = 1
