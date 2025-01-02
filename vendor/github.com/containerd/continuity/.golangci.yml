@@ -12,5 +12,11 @@ linters:
   disable:
     - errcheck
 
+issues:
+  exclude-rules:
+    - linters:
+        - revive
+      text: "unused-parameter"
+
 run:
   timeout: 3m

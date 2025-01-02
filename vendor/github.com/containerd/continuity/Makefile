@@ -57,7 +57,7 @@ test:
 
 root-test:
 	@echo "+ $@"
-	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root
+	@go test -exec sudo ${TEST_REQUIRES_ROOT_PACKAGES} -test.root -test.v
 
 test-compile:
 	@echo "+ $@"

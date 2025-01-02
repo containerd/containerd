@@ -9,7 +9,7 @@ require (
 	github.com/containerd/cgroups/v3 v3.0.2
 	github.com/containerd/containerd v1.7.17 // see replace; the actual version of containerd is replaced with the code at the root of this repository
 	github.com/containerd/containerd/api v1.8.0
-	github.com/containerd/continuity v0.4.2
+	github.com/containerd/continuity v0.4.4
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/log v0.1.0
 	github.com/containerd/platforms v0.2.1
@@ -69,7 +69,7 @@ require (
 	google.golang.org/genproto v0.0.0-20231211222908-989df2bf70f3 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/grpc v1.59.0 // indirect
-	google.golang.org/protobuf v1.33.0 // indirect
+	google.golang.org/protobuf v1.35.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
