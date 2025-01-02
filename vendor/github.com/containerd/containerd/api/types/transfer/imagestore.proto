@@ -40,6 +40,10 @@ message ImageStore {
 	// Unpack Configuration, multiple allowed
 
 	repeated UnpackConfiguration unpacks = 10;
+
+	// enable_remote_snapshot_anntations enables remote snapshotter annotations to be passed
+	// to the snapshotter.
+	bool EnableRemoteSnapshotAnntations = 11;
 }
 
 message UnpackConfiguration {

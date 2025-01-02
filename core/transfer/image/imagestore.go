@@ -53,6 +53,8 @@ type Store struct {
 	extraReferences []Reference
 
 	unpacks []transfer.UnpackConfiguration
+
+	enableRemoteSnapshotAnntations bool
 }
 
 // Reference is used to create or find a reference for an image
@@ -169,6 +171,12 @@ func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
 			Snapshotter: snapshotter,
 		})
 	}
+}
+
+// WithEnableRemoteSnapshotAnntations allows propagating image information
+// to snapshotters as image annotations
+func WithEnableRemoteSnapshotAnntations(s *Store) {
+	s.enableRemoteSnapshotAnntations = true
 }
 
 // NewStore creates a new image store source or Destination
@@ -361,15 +369,20 @@ func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	return unpacks
 }
 
+func (is *Store) EnableRemoteSnapshotAnntations() bool {
+	return is.enableRemoteSnapshotAnntations
+}
+
 func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
 	s := &transfertypes.ImageStore{
-		Name:            is.imageName,
-		Labels:          is.imageLabels,
-		ManifestLimit:   uint32(is.manifestLimit),
-		AllMetadata:     is.allMetadata,
-		Platforms:       types.OCIPlatformToProto(is.platforms),
-		ExtraReferences: referencesToProto(is.extraReferences),
-		Unpacks:         unpackToProto(is.unpacks),
+		Name:                           is.imageName,
+		Labels:                         is.imageLabels,
+		ManifestLimit:                  uint32(is.manifestLimit),
+		AllMetadata:                    is.allMetadata,
+		Platforms:                      types.OCIPlatformToProto(is.platforms),
+		ExtraReferences:                referencesToProto(is.extraReferences),
+		Unpacks:                        unpackToProto(is.unpacks),
+		EnableRemoteSnapshotAnntations: is.enableRemoteSnapshotAnntations,
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -387,6 +400,7 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.platforms = types.OCIPlatformFromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
+	is.enableRemoteSnapshotAnntations = s.EnableRemoteSnapshotAnntations
 
 	return nil
 }
