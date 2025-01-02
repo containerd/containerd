@@ -42,6 +42,8 @@ type CreateOpts struct {
 	IO IO
 	// Checkpoint digest to restore container state
 	Checkpoint string
+	// Mark this as a restore via CRI
+	RestoreFromCRI bool
 	// RuntimeOptions for the runtime
 	RuntimeOptions typeurl.Any
 	// TaskOptions received for the task
