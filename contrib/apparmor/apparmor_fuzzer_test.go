@@ -25,12 +25,12 @@ import (
 
 func FuzzLoadDefaultProfile(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		f, err := os.Create("fuzz_file")
+		tmpDir := t.TempDir()
+		f, err := os.CreateTemp(tmpDir, "fuzz_file")
 		if err != nil {
 			return
 		}
 		defer f.Close()
-		defer os.Remove("fuzz_file")
 		_, err = f.Write(data)
 		if err != nil {
 			return

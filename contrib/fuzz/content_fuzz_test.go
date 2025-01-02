@@ -20,12 +20,12 @@ import (
 	_ "crypto/sha256" // required by go-digest
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -125,9 +125,8 @@ func FuzzCSWalk(f *testing.F) {
 		}); err != nil {
 			return
 		}
-		if !reflect.DeepEqual(expected, found) {
-			t.Fatalf("%v != %v but should be equal", found, expected)
-		}
+
+		require.Equal(t, expected, found)
 	})
 }
 

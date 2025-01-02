@@ -17,7 +17,6 @@
 package config
 
 import (
-	"os"
 	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
@@ -26,15 +25,11 @@ import (
 func FuzzParseHostsFile(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
 		f := fuzz.NewConsumer(data)
-		dir, err := os.MkdirTemp("", "fuzz-")
+		dir := t.TempDir()
+		err := f.CreateFiles(dir)
 		if err != nil {
 			return
 		}
-		err = f.CreateFiles(dir)
-		if err != nil {
-			return
-		}
-		defer os.RemoveAll(dir)
 		b, err := f.GetBytes()
 		if err != nil {
 			return
