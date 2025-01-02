@@ -348,6 +348,10 @@ func (is *Store) Lookup(ctx context.Context, store images.Store) ([]images.Image
 	return imgs, nil
 }
 
+func (is *Store) Platforms() []ocispec.Platform {
+	return is.platforms
+}
+
 func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	unpacks := make([]transfer.UnpackConfiguration, len(is.unpacks))
 	for i, uc := range is.unpacks {

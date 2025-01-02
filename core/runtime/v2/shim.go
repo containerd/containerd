@@ -28,9 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/atomicfile"
-	"github.com/containerd/containerd/v2/pkg/dialer"
-	"github.com/containerd/ttrpc"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
@@ -38,15 +36,22 @@ import (
 	eventstypes "github.com/containerd/containerd/api/events"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
+	"github.com/containerd/otelttrpc"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
+
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/runtime"
+	"github.com/containerd/containerd/v2/pkg/atomicfile"
+	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/identifiers"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 const (
@@ -99,7 +104,7 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 
 	params, err := restoreBootstrapParams(bundle.Path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read boostrap.json when restoring bundle %q: %w", bundle.ID, err)
+		return nil, fmt.Errorf("failed to read bootstrap.json when restoring bundle %q: %w", bundle.ID, err)
 	}
 
 	conn, err := makeConnection(ctx, bundle.ID, params, onCloseWithShimLog)
@@ -272,16 +277,18 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 			}
 		}()
 
-		return ttrpc.NewClient(conn, ttrpc.WithOnClose(onClose)), nil
+		return ttrpc.NewClient(
+			conn,
+			ttrpc.WithOnClose(onClose),
+			ttrpc.WithUnaryClientInterceptor(otelttrpc.UnaryClientInterceptor()),
+		), nil
 	case "grpc":
-		ctx, cancel := context.WithTimeout(ctx, time.Second*100)
-		defer cancel()
-
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.WithBlock(),
+			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),   //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
+			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor()), //nolint:staticcheck // Ignore SA1019. Deprecation assumes use of [grpc.NewClient] but we are not using that here.
 		}
-		return grpcDialContext(ctx, params.Address, onClose, gopts...)
+		return grpcDialContext(params.Address, onClose, gopts...)
 	default:
 		return nil, fmt.Errorf("unexpected protocol: %q", params.Protocol)
 	}
@@ -291,7 +298,6 @@ func makeConnection(ctx context.Context, id string, params client.BootstrapParam
 // so we can have something similar to ttrpc.WithOnClose to have
 // a callback run when the connection is severed or explicitly closed.
 func grpcDialContext(
-	ctx context.Context,
 	address string,
 	onClose func(),
 	gopts ...grpc.DialOption,
@@ -315,7 +321,7 @@ func grpcDialContext(
 	conn.Close()
 
 	target := dialer.DialAddress(address)
-	client, err := grpc.DialContext(ctx, target, gopts...)
+	client, err := grpc.NewClient(target, gopts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create GRPC connection: %w", err)
 	}
@@ -463,7 +469,7 @@ func (s *shimTask) Shutdown(ctx context.Context) error {
 		ID: s.ID(),
 	})
 	if err != nil && !errors.Is(err, ttrpc.ErrClosed) {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -480,7 +486,7 @@ func (s *shimTask) PID(ctx context.Context) (uint32, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return 0, errdefs.FromGRPC(err)
+		return 0, errgrpc.ToNative(err)
 	}
 
 	return response.TaskPid, nil
@@ -493,7 +499,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 	if shimErr != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
 		if !errors.Is(shimErr, ttrpc.ErrClosed) {
-			shimErr = errdefs.FromGRPC(shimErr)
+			shimErr = errgrpc.ToNative(shimErr)
 			if !errdefs.IsNotFound(shimErr) {
 				return nil, shimErr
 			}
@@ -564,7 +570,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
-		Options:    protobuf.FromAny(topts),
+		Options:    typeurl.MarshalProto(topts),
 	}
 	for _, m := range opts.Rootfs {
 		request.Rootfs = append(request.Rootfs, &types.Mount{
@@ -577,7 +583,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 
 	_, err := s.task.Create(ctx, request)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 
 	return s, nil
@@ -587,7 +593,7 @@ func (s *shimTask) Pause(ctx context.Context) error {
 	if _, err := s.task.Pause(ctx, &task.PauseRequest{
 		ID: s.ID(),
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -596,7 +602,7 @@ func (s *shimTask) Resume(ctx context.Context) error {
 	if _, err := s.task.Resume(ctx, &task.ResumeRequest{
 		ID: s.ID(),
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -606,7 +612,7 @@ func (s *shimTask) Start(ctx context.Context) error {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -617,7 +623,7 @@ func (s *shimTask) Kill(ctx context.Context, signal uint32, all bool) error {
 		Signal: signal,
 		All:    all,
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -636,7 +642,7 @@ func (s *shimTask) Exec(ctx context.Context, id string, opts runtime.ExecOpts) (
 		Spec:     opts.Spec,
 	}
 	if _, err := s.task.Exec(ctx, request); err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &process{
 		id:   id,
@@ -649,7 +655,7 @@ func (s *shimTask) Pids(ctx context.Context) ([]runtime.ProcessInfo, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	var processList []runtime.ProcessInfo
 	for _, p := range resp.Processes {
@@ -668,7 +674,7 @@ func (s *shimTask) ResizePty(ctx context.Context, size runtime.ConsoleSize) erro
 		Height: size.Height,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -679,7 +685,7 @@ func (s *shimTask) CloseIO(ctx context.Context) error {
 		Stdin: true,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -693,7 +699,7 @@ func (s *shimTask) Wait(ctx context.Context) (*runtime.Exit, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &runtime.Exit{
 		Pid:       taskPid,
@@ -709,7 +715,7 @@ func (s *shimTask) Checkpoint(ctx context.Context, path string, options *ptypes.
 		Options: options,
 	}
 	if _, err := s.task.Checkpoint(ctx, request); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -720,7 +726,7 @@ func (s *shimTask) Update(ctx context.Context, resources *ptypes.Any, annotation
 		Resources:   resources,
 		Annotations: annotations,
 	}); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -730,7 +736,7 @@ func (s *shimTask) Stats(ctx context.Context) (*ptypes.Any, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return response.Stats, nil
 }
@@ -752,7 +758,7 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 	})
 	if err != nil {
 		if !errors.Is(err, ttrpc.ErrClosed) {
-			return runtime.State{}, errdefs.FromGRPC(err)
+			return runtime.State{}, errgrpc.ToNative(err)
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}

@@ -25,8 +25,15 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
+	"sync"
+
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -35,10 +42,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 var (
@@ -282,8 +285,16 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 		firstErr         error
 		firstErrPriority int
 	)
+
+	nextHostOrFail := func(i int) string {
+		if i < len(hosts)-1 {
+			return "trying next host"
+		}
+		return "fetch failed"
+	}
+
 	for _, u := range paths {
-		for _, host := range hosts {
+		for i, host := range hosts {
 			ctx := log.WithLogger(ctx, log.G(ctx).WithField("host", host.Host))
 
 			req := base.request(host, http.MethodHead, u...)
@@ -305,7 +316,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					firstErr = err
 					firstErrPriority = 1
 				}
-				log.G(ctx).WithError(err).Info("trying next host")
+				log.G(ctx).WithError(err).Info(nextHostOrFail(i))
 				continue // try another host
 			}
 			resp.Body.Close() // don't care about body contents.
@@ -316,7 +327,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = fmt.Errorf("%s: %w", ref, errdefs.ErrNotFound)
 						firstErrPriority = 2
 					}
-					log.G(ctx).Info("trying next host - response was http.StatusNotFound")
+					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue
 				}
 				if resp.StatusCode > 399 {
@@ -324,7 +335,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 						firstErr = remoteerrors.NewUnexpectedStatusErr(resp)
 						firstErrPriority = 3
 					}
-					log.G(ctx).Infof("trying next host - response was %s", resp.Status)
+					log.G(ctx).Infof("%s after status: %s", nextHostOrFail(i), resp.Status)
 					continue // try another host
 				}
 				return "", ocispec.Descriptor{}, remoteerrors.NewUnexpectedStatusErr(resp)
@@ -726,13 +737,18 @@ func NewHTTPFallback(transport http.RoundTripper) http.RoundTripper {
 type httpFallback struct {
 	super http.RoundTripper
 	host  string
+	mu    sync.Mutex
 }
 
 func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
+	f.mu.Lock()
+	fallback := f.host == r.URL.Host
+	f.mu.Unlock()
+
 	// only fall back if the same host had previously fell back
-	if f.host != r.URL.Host {
+	if !fallback {
 		resp, err := f.super.RoundTrip(r)
-		if !isTLSError(err) {
+		if !isTLSError(err) && !isPortError(err, r.URL.Host) {
 			return resp, err
 		}
 	}
@@ -743,8 +759,12 @@ func (f *httpFallback) RoundTrip(r *http.Request) (*http.Response, error) {
 	plainHTTPRequest := *r
 	plainHTTPRequest.URL = &plainHTTPUrl
 
-	if f.host != r.URL.Host {
-		f.host = r.URL.Host
+	if !fallback {
+		f.mu.Lock()
+		if f.host != r.URL.Host {
+			f.host = r.URL.Host
+		}
+		f.mu.Unlock()
 
 		// update body on the second attempt
 		if r.Body != nil && r.GetBody != nil {
@@ -768,6 +788,18 @@ func isTLSError(err error) bool {
 		return true
 	}
 	if strings.Contains(err.Error(), "TLS handshake timeout") {
+		return true
+	}
+
+	return false
+}
+
+func isPortError(err error, host string) bool {
+	if isConnError(err) || os.IsTimeout(err) {
+		if _, port, _ := net.SplitHostPort(host); port != "" {
+			// Port is specified, will not retry on different port with scheme change
+			return false
+		}
 		return true
 	}
 

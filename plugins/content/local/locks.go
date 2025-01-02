@@ -18,7 +18,6 @@ package local
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/containerd/errdefs"
@@ -30,17 +29,11 @@ type lock struct {
 	since time.Time
 }
 
-var (
-	// locks lets us lock in process
-	locks   = make(map[string]*lock)
-	locksMu sync.Mutex
-)
+func (s *store) tryLock(ref string) error {
+	s.locksMu.Lock()
+	defer s.locksMu.Unlock()
 
-func tryLock(ref string) error {
-	locksMu.Lock()
-	defer locksMu.Unlock()
-
-	if v, ok := locks[ref]; ok {
+	if v, ok := s.locks[ref]; ok {
 		// Returning the duration may help developers distinguish dead locks (long duration) from
 		// lock contentions (short duration).
 		now := time.Now()
@@ -50,13 +43,13 @@ func tryLock(ref string) error {
 		)
 	}
 
-	locks[ref] = &lock{time.Now()}
+	s.locks[ref] = &lock{time.Now()}
 	return nil
 }
 
-func unlock(ref string) {
-	locksMu.Lock()
-	defer locksMu.Unlock()
+func (s *store) unlock(ref string) {
+	s.locksMu.Lock()
+	defer s.locksMu.Unlock()
 
-	delete(locks, ref)
+	delete(s.locks, ref)
 }

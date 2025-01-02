@@ -30,7 +30,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/sys/reaper"
 	"github.com/containerd/fifo"
 	"github.com/containerd/log"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -50,13 +49,13 @@ func setupDumpStacks(dump chan<- os.Signal) {
 	signal.Notify(dump, syscall.SIGUSR1)
 }
 
-func serveListener(path string) (net.Listener, error) {
+func serveListener(path string, fd uintptr) (net.Listener, error) {
 	var (
 		l   net.Listener
 		err error
 	)
 	if path == "" {
-		l, err = net.FileListener(os.NewFile(3, "socket"))
+		l, err = net.FileListener(os.NewFile(fd, "socket"))
 		path = "[inherited from parent]"
 	} else {
 		if len(path) > socketPathLimit {
@@ -71,7 +70,7 @@ func serveListener(path string) (net.Listener, error) {
 	return l, nil
 }
 
-func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) error {
+func reap(ctx context.Context, logger *log.Entry, signals chan os.Signal) error {
 	logger.Debug("starting signal loop")
 
 	for {
@@ -92,7 +91,7 @@ func reap(ctx context.Context, logger *logrus.Entry, signals chan os.Signal) err
 	}
 }
 
-func handleExitSignals(ctx context.Context, logger *logrus.Entry, cancel context.CancelFunc) {
+func handleExitSignals(ctx context.Context, logger *log.Entry, cancel context.CancelFunc) {
 	ch := make(chan os.Signal, 32)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 

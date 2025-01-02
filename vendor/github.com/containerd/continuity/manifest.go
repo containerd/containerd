@@ -56,8 +56,8 @@ func Unmarshal(p []byte) (*Manifest, error) {
 
 func Marshal(m *Manifest) ([]byte, error) {
 	var bm pb.Manifest
-	for _, resource := range m.Resources {
-		bm.Resource = append(bm.Resource, toProto(resource))
+	for _, rsrc := range m.Resources {
+		bm.Resource = append(bm.Resource, toProto(rsrc))
 	}
 
 	return proto.Marshal(&bm)
@@ -65,8 +65,8 @@ func Marshal(m *Manifest) ([]byte, error) {
 
 func MarshalText(w io.Writer, m *Manifest) error {
 	var bm pb.Manifest
-	for _, resource := range m.Resources {
-		bm.Resource = append(bm.Resource, toProto(resource))
+	for _, rsrc := range m.Resources {
+		bm.Resource = append(bm.Resource, toProto(rsrc))
 	}
 
 	b, err := prototext.Marshal(&bm)
@@ -78,11 +78,11 @@ func MarshalText(w io.Writer, m *Manifest) error {
 }
 
 // BuildManifest creates the manifest for the given context
-func BuildManifest(ctx Context) (*Manifest, error) {
+func BuildManifest(fsContext Context) (*Manifest, error) {
 	resourcesByPath := map[string]Resource{}
 	hardLinks := newHardlinkManager()
 
-	if err := ctx.Walk(func(p string, fi os.FileInfo, err error) error {
+	if err := fsContext.Walk(func(p string, fi os.FileInfo, err error) error {
 		if err != nil {
 			return fmt.Errorf("error walking %s: %w", p, err)
 		}
@@ -92,7 +92,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			return nil
 		}
 
-		resource, err := ctx.Resource(p, fi)
+		rsrc, err := fsContext.Resource(p, fi)
 		if err != nil {
 			if err == ErrNotFound {
 				return nil
@@ -101,7 +101,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 		}
 
 		// add to the hardlink manager
-		if err := hardLinks.Add(fi, resource); err == nil {
+		if err := hardLinks.Add(fi, rsrc); err == nil {
 			// Resource has been accepted by hardlink manager so we don't add
 			// it to the resourcesByPath until we merge at the end.
 			return nil
@@ -110,7 +110,7 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 			return fmt.Errorf("adding hardlink %s: %w", p, err)
 		}
 
-		resourcesByPath[p] = resource
+		resourcesByPath[p] = rsrc
 
 		return nil
 	}); err != nil {
@@ -123,13 +123,13 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 		return nil, err
 	}
 
-	for _, resource := range hardLinked {
-		resourcesByPath[resource.Path()] = resource
+	for _, rsrc := range hardLinked {
+		resourcesByPath[rsrc.Path()] = rsrc
 	}
 
 	var resources []Resource
-	for _, resource := range resourcesByPath {
-		resources = append(resources, resource)
+	for _, rsrc := range resourcesByPath {
+		resources = append(resources, rsrc)
 	}
 
 	sort.Stable(ByPath(resources))
@@ -141,9 +141,9 @@ func BuildManifest(ctx Context) (*Manifest, error) {
 
 // VerifyManifest verifies all the resources in a manifest
 // against files from the given context.
-func VerifyManifest(ctx Context, manifest *Manifest) error {
-	for _, resource := range manifest.Resources {
-		if err := ctx.Verify(resource); err != nil {
+func VerifyManifest(fsContext Context, manifest *Manifest) error {
+	for _, rsrc := range manifest.Resources {
+		if err := fsContext.Verify(rsrc); err != nil {
 			return err
 		}
 	}
@@ -153,9 +153,9 @@ func VerifyManifest(ctx Context, manifest *Manifest) error {
 
 // ApplyManifest applies on the resources in a manifest to
 // the given context.
-func ApplyManifest(ctx Context, manifest *Manifest) error {
-	for _, resource := range manifest.Resources {
-		if err := ctx.Apply(resource); err != nil {
+func ApplyManifest(fsContext Context, manifest *Manifest) error {
+	for _, rsrc := range manifest.Resources {
+		if err := fsContext.Apply(rsrc); err != nil {
 			return err
 		}
 	}

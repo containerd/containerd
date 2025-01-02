@@ -23,9 +23,12 @@ import (
 	"io"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/containerd/plugin"
 
 	. "github.com/containerd/containerd/v2/client"
 )
@@ -79,6 +82,21 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 				}
 				continue
 			}
+			resp, perr := client.IntrospectionService().Plugins(ctx)
+			if perr != nil {
+				return nil, fmt.Errorf("failed to get plugin list: %w", perr)
+			}
+			var loadErr error
+			for _, p := range resp.Plugins {
+				if p.InitErr != nil && !strings.Contains(p.InitErr.Message, plugin.ErrSkipPlugin.Error()) {
+					pluginErr := fmt.Errorf("failed to load %s.%s: %s", p.Type, p.ID, p.InitErr.Message)
+					loadErr = errors.Join(loadErr, pluginErr)
+				}
+			}
+			if loadErr != nil {
+				return nil, loadErr
+			}
+
 			return client, err
 		case <-ctx.Done():
 			return nil, fmt.Errorf("context deadline exceeded: %w", err)

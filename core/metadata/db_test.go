@@ -140,6 +140,42 @@ func TestMigrations(t *testing.T) {
 			bref: "",
 		},
 	}
+
+	testSandboxes := []struct {
+		id        string
+		keyValues [][3]string // {bucket, key, value}
+	}{
+		{
+			id: "sb1",
+			keyValues: [][3]string{
+				{
+					"", // is not sub bucket
+					"created", "2dayago",
+				},
+				{
+					"", // is not sub bucket
+					"updated", "1dayago",
+				},
+				{
+					"extension",
+					"labels", strings.Repeat("whoknows", 10),
+				},
+			},
+		},
+		{
+			id: "sb2",
+			keyValues: [][3]string{
+				{
+					"", // is not sub bucket
+					"sandboxer", "default",
+				},
+				{
+					"labels", "hello", "panic",
+				},
+			},
+		},
+	}
+
 	migrationTests := []struct {
 		name  string
 		init  func(*bolt.Tx) error
@@ -282,13 +318,71 @@ func TestMigrations(t *testing.T) {
 				return nil
 			},
 		},
-
 		{
 			name: "NoOp",
 			init: func(tx *bolt.Tx) error {
 				return nil
 			},
 			check: func(tx *bolt.Tx) error {
+				return nil
+			},
+		},
+		{
+			name: "MigrateSandboxes",
+			init: func(tx *bolt.Tx) error {
+				allsbbkt, err := createBucketIfNotExists(tx, []byte("kubernetes"), bucketKeyObjectSandboxes)
+				if err != nil {
+					return err
+				}
+
+				for _, sbDef := range testSandboxes {
+					sbbkt, err := allsbbkt.CreateBucket([]byte(sbDef.id))
+					if err != nil {
+						return err
+					}
+
+					for _, keyValues := range sbDef.keyValues {
+						bkt := sbbkt
+						if keyValues[0] != "" {
+							bkt, err = sbbkt.CreateBucketIfNotExists([]byte(keyValues[0]))
+							if err != nil {
+								return err
+							}
+						}
+
+						if err = bkt.Put([]byte(keyValues[1]), []byte(keyValues[2])); err != nil {
+							return err
+						}
+					}
+				}
+				return nil
+			},
+			check: func(tx *bolt.Tx) error {
+				allsbbkt := getSandboxBucket(tx, "kubernetes")
+
+				for _, sbDef := range testSandboxes {
+					sbbkt := allsbbkt.Bucket([]byte(sbDef.id))
+
+					for _, keyValues := range sbDef.keyValues {
+						bkt := sbbkt
+						if keyValues[0] != "" {
+							bkt = sbbkt.Bucket([]byte(keyValues[0]))
+						}
+
+						key := []byte(keyValues[1])
+						expected := keyValues[2]
+
+						value := string(bkt.Get(key))
+						if value != expected {
+							return fmt.Errorf("expected %s, but got %s in sandbox %s", expected, value, sbDef.id)
+						}
+					}
+				}
+
+				allsbbkt = getBucket(tx, []byte("kubernetes"), bucketKeyObjectSandboxes)
+				if allsbbkt != nil {
+					return errors.New("old sandboxes bucket still exists")
+				}
 				return nil
 			},
 		},

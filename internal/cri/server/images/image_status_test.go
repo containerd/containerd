@@ -26,7 +26,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
-	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 func TestImageStatus(t *testing.T) {
@@ -72,22 +71,6 @@ func TestImageStatus(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 	assert.Equal(t, expected, resp.GetImage())
-}
-
-func TestParseImageReferences(t *testing.T) {
-	refs := []string{
-		"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"gcr.io/library/busybox:1.2",
-		"sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582",
-		"arbitrary-ref",
-	}
-	expectedTags := []string{
-		"gcr.io/library/busybox:1.2",
-	}
-	expectedDigests := []string{"gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582"}
-	tags, digests := util.ParseImageReferences(refs)
-	assert.Equal(t, expectedTags, tags)
-	assert.Equal(t, expectedDigests, digests)
 }
 
 // TestGetUserFromImage tests the logic of getting image uid or user name of image user.

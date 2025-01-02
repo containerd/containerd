@@ -65,7 +65,7 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/metrics/$1$2"github.com\/containerd\/containerd\/v2\/core\/metrics/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/runtime/$1$2"github.com\/containerd\/containerd\/v2\/core\/runtime/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/core\/runtime\/v2\/runc\/options/$1$2"github.com\/containerd\/containerd\/api\/types\/runc\/options/g' $GOFILE
-  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/runtimeoptions/$1$2"github.com\/containerd\/containerd\/v2\/types\/runtimeoptions/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/runtimeoptions/$1$2"github.com\/containerd\/containerd\/api\/types\/runtimeoptions/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/protobuf/$1$2"github.com\/containerd\/containerd\/v2\/pkg\/protobuf/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/api/$1$2"github.com\/containerd\/containerd\/api/g' $GOFILE
 
@@ -73,6 +73,7 @@ for GOFILE in $(find . -name "*.go" | grep -v "./vendor/" ); do
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/platforms/$1$2"github.com\/containerd\/platforms/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/errdefs/$1$2"github.com\/containerd\/errdefs/g' $GOFILE
   perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/plugin(\/|")/$1$2"github.com\/containerd\/plugin$3/g' $GOFILE
+  perl -pi -e 's/([\t]|[ ]{2,8}|import )([_a-zA-Z0-9]+ )?"github\.com\/containerd\/containerd\/v2\/pkg\/userns/$1$2"github.com\/moby\/sys\/user\/userns/g' $GOFILE
 
   gofmt -s -w $GOFILE
 done

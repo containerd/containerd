@@ -93,25 +93,22 @@ func (CodeGeneratorResponse_Feature) EnumDescriptor() ([]byte, []int) {
 
 // The version number of protocol compiler.
 type Version struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Major *int32 `protobuf:"varint,1,opt,name=major" json:"major,omitempty"`
-	Minor *int32 `protobuf:"varint,2,opt,name=minor" json:"minor,omitempty"`
-	Patch *int32 `protobuf:"varint,3,opt,name=patch" json:"patch,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Major *int32                 `protobuf:"varint,1,opt,name=major" json:"major,omitempty"`
+	Minor *int32                 `protobuf:"varint,2,opt,name=minor" json:"minor,omitempty"`
+	Patch *int32                 `protobuf:"varint,3,opt,name=patch" json:"patch,omitempty"`
 	// A suffix for alpha, beta or rc release, e.g., "alpha-1", "rc2". It should
 	// be empty for mainline stable releases.
-	Suffix *string `protobuf:"bytes,4,opt,name=suffix" json:"suffix,omitempty"`
+	Suffix        *string `protobuf:"bytes,4,opt,name=suffix" json:"suffix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Version) Reset() {
 	*x = Version{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Version) String() string {
@@ -122,7 +119,7 @@ func (*Version) ProtoMessage() {}
 
 func (x *Version) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -167,10 +164,7 @@ func (x *Version) GetSuffix() string {
 
 // An encoded CodeGeneratorRequest is written to the plugin's stdin.
 type CodeGeneratorRequest struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The .proto files that were explicitly listed on the command-line.  The
 	// code generator should generate code only for these files.  Each file's
 	// descriptor will be included in proto_file, below.
@@ -203,15 +197,15 @@ type CodeGeneratorRequest struct {
 	SourceFileDescriptors []*descriptorpb.FileDescriptorProto `protobuf:"bytes,17,rep,name=source_file_descriptors,json=sourceFileDescriptors" json:"source_file_descriptors,omitempty"`
 	// The version number of protocol compiler.
 	CompilerVersion *Version `protobuf:"bytes,3,opt,name=compiler_version,json=compilerVersion" json:"compiler_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CodeGeneratorRequest) Reset() {
 	*x = CodeGeneratorRequest{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *CodeGeneratorRequest) String() string {
@@ -222,7 +216,7 @@ func (*CodeGeneratorRequest) ProtoMessage() {}
 
 func (x *CodeGeneratorRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -274,10 +268,7 @@ func (x *CodeGeneratorRequest) GetCompilerVersion() *Version {
 
 // The plugin writes an encoded CodeGeneratorResponse to stdout.
 type CodeGeneratorResponse struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Error message.  If non-empty, code generation failed.  The plugin process
 	// should exit with status code zero even if it reports an error in this way.
 	//
@@ -301,15 +292,15 @@ type CodeGeneratorResponse struct {
 	// effect for plugins that have FEATURE_SUPPORTS_EDITIONS set.
 	MaximumEdition *int32                        `protobuf:"varint,4,opt,name=maximum_edition,json=maximumEdition" json:"maximum_edition,omitempty"`
 	File           []*CodeGeneratorResponse_File `protobuf:"bytes,15,rep,name=file" json:"file,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CodeGeneratorResponse) Reset() {
 	*x = CodeGeneratorResponse{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *CodeGeneratorResponse) String() string {
@@ -320,7 +311,7 @@ func (*CodeGeneratorResponse) ProtoMessage() {}
 
 func (x *CodeGeneratorResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -372,10 +363,7 @@ func (x *CodeGeneratorResponse) GetFile() []*CodeGeneratorResponse_File {
 
 // Represents a single generated file.
 type CodeGeneratorResponse_File struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// The file name, relative to the output directory.  The name must not
 	// contain "." or ".." components and must be relative, not be absolute (so,
 	// the file cannot lie outside the output directory).  "/" must be used as
@@ -436,15 +424,15 @@ type CodeGeneratorResponse_File struct {
 	// point is used, this information will be appropriately offset and inserted
 	// into the code generation metadata for the generated files.
 	GeneratedCodeInfo *descriptorpb.GeneratedCodeInfo `protobuf:"bytes,16,opt,name=generated_code_info,json=generatedCodeInfo" json:"generated_code_info,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CodeGeneratorResponse_File) Reset() {
 	*x = CodeGeneratorResponse_File{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[3]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *CodeGeneratorResponse_File) String() string {
@@ -455,7 +443,7 @@ func (*CodeGeneratorResponse_File) ProtoMessage() {}
 
 func (x *CodeGeneratorResponse_File) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_compiler_plugin_proto_msgTypes[3]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -591,7 +579,7 @@ func file_google_protobuf_compiler_plugin_proto_rawDescGZIP() []byte {
 
 var file_google_protobuf_compiler_plugin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_google_protobuf_compiler_plugin_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_google_protobuf_compiler_plugin_proto_goTypes = []interface{}{
+var file_google_protobuf_compiler_plugin_proto_goTypes = []any{
 	(CodeGeneratorResponse_Feature)(0),       // 0: google.protobuf.compiler.CodeGeneratorResponse.Feature
 	(*Version)(nil),                          // 1: google.protobuf.compiler.Version
 	(*CodeGeneratorRequest)(nil),             // 2: google.protobuf.compiler.CodeGeneratorRequest
@@ -617,56 +605,6 @@ func init() { file_google_protobuf_compiler_plugin_proto_init() }
 func file_google_protobuf_compiler_plugin_proto_init() {
 	if File_google_protobuf_compiler_plugin_proto != nil {
 		return
-	}
-	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_compiler_plugin_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Version); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_google_protobuf_compiler_plugin_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CodeGeneratorRequest); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_google_protobuf_compiler_plugin_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CodeGeneratorResponse); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_google_protobuf_compiler_plugin_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CodeGeneratorResponse_File); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

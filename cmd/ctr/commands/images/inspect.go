@@ -36,14 +36,14 @@ var inspectCommand = &cli.Command{
 			Usage: "Show JSON content",
 		},
 	},
-	Action: func(clicontext *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(clicontext)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		var (
-			ref        = clicontext.Args().First()
+			ref        = cliContext.Args().First()
 			imageStore = client.ImageService()
 			cs         = client.ContentStore()
 		)
@@ -56,7 +56,7 @@ var inspectCommand = &cli.Command{
 		opts := []display.PrintOpt{
 			display.WithWriter(os.Stdout),
 		}
-		if clicontext.Bool("content") {
+		if cliContext.Bool("content") {
 			opts = append(opts, display.Verbose)
 		}
 

@@ -38,15 +38,15 @@ var unmountCommand = &cli.Command{
 			Usage: "Remove the snapshot after a successful unmount",
 		},
 	),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			target = context.Args().First()
+			target = cliContext.Args().First()
 		)
 		if target == "" {
 			return errors.New("please provide a target path to unmount from")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -56,8 +56,8 @@ var unmountCommand = &cli.Command{
 			return err
 		}
 
-		if context.Bool("rm") {
-			snapshotter := context.String("snapshotter")
+		if cliContext.Bool("rm") {
+			snapshotter := cliContext.String("snapshotter")
 			s := client.SnapshotService(snapshotter)
 			if err := client.LeasesService().Delete(ctx, leases.Lease{ID: target}); err != nil && !errdefs.IsNotFound(err) {
 				return fmt.Errorf("error deleting lease: %w", err)
@@ -67,7 +67,7 @@ var unmountCommand = &cli.Command{
 			}
 		}
 
-		fmt.Fprintln(context.App.Writer, target)
+		fmt.Fprintln(cliContext.App.Writer, target)
 		return nil
 	},
 }

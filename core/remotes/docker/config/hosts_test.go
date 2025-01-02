@@ -26,8 +26,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/remotes/docker"
 	"github.com/containerd/log/logtest"
+
+	"github.com/containerd/containerd/v2/core/remotes/docker"
 )
 
 const allCaps = docker.HostCapabilityPull | docker.HostCapabilityResolve | docker.HostCapabilityPush
@@ -361,8 +362,8 @@ func TestHTTPFallback(t *testing.T) {
 					InsecureSkipVerify: true,
 				},
 			},
-			expectedScheme: "http",
-			usesFallback:   false,
+			expectedScheme: "https",
+			usesFallback:   true,
 		},
 		{
 			host: "localhost",
@@ -402,8 +403,8 @@ func TestHTTPFallback(t *testing.T) {
 					InsecureSkipVerify: true,
 				},
 			},
-			expectedScheme: "http",
-			usesFallback:   false,
+			expectedScheme: "https",
+			usesFallback:   true,
 		},
 		{
 			host: "example.com:5000",

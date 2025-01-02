@@ -18,6 +18,7 @@ package gc
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -49,6 +50,28 @@ func TestTricolorBasic(t *testing.T) {
 
 	if !reflect.DeepEqual(sweeped, expected) {
 		t.Fatalf("incorrect unreachable set: %v != %v", sweeped, expected)
+	}
+}
+
+func BenchmarkTricolor(b *testing.B) {
+	roots := []string{"A", "C"}
+	refs := map[string][]string{
+		"A": {"B", "C"},
+		"B": {"A", "C"},
+		"C": {"D", "F", "B"},
+		"E": {"F", "G", "C"},
+		"F": {"H", "C"},
+	}
+	// assume 100 nodes can reach D.
+	for i := 0; i < 100; i++ {
+		ref := fmt.Sprintf("X%d", i)
+		refs["A"] = append(refs["A"], ref)
+		refs[ref] = []string{"D"}
+	}
+
+	// Run the Add function b.N times to benchmark it.
+	for i := 0; i < b.N; i++ {
+		Tricolor(toNodes(roots), lookup(refs))
 	}
 }
 

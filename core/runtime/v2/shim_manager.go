@@ -26,11 +26,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -38,19 +33,20 @@ import (
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/log"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/typeurl/v2"
 )
 
-// Config for the shim
-type Config struct {
-	// Supported platforms
-	Platforms []string `toml:"platforms"`
-	// SchedCore enabled linux core scheduling
-	SchedCore bool `toml:"sched_core"`
+// ShimConfig for the shim
+type ShimConfig struct {
+	// Env is environment variables added to shim processes
+	Env []string `toml:"env"`
 }
 
 func init() {
@@ -59,21 +55,14 @@ func init() {
 	// so we make it an independent plugin
 	registry.Register(&plugin.Registration{
 		Type: plugins.ShimPlugin,
-		ID:   "shim",
+		ID:   "manager",
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 			plugins.MetadataPlugin,
 		},
-		Config: &Config{
-			Platforms: defaultPlatforms(),
-		},
+		Config: &ShimConfig{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			config := ic.Config.(*Config)
-			supportedPlatforms, err := platforms.ParseAll(config.Platforms)
-			if err != nil {
-				return nil, err
-			}
-			ic.Meta.Platforms = supportedPlatforms
+			config := ic.Config.(*ShimConfig)
 
 			m, err := ic.GetSingle(plugins.MetadataPlugin)
 			if err != nil {
@@ -91,13 +80,13 @@ func init() {
 				TTRPCAddress: ic.Properties[plugins.PropertyTTRPCAddress],
 				Events:       events,
 				Store:        cs,
-				SchedCore:    config.SchedCore,
+				ShimEnv:      config.Env,
 				SandboxStore: ss,
 			})
 		},
 		ConfigMigration: func(ctx context.Context, configVersion int, pluginConfigs map[string]interface{}) error {
 			// Migrate configurations from io.containerd.runtime.v2.task
-			// if the configVersion >= 3 please make sure the config is under io.containerd.shim.v1.shim.
+			// if the configVersion >= 3 please make sure the config is under io.containerd.shim.v1.manager.
 			if configVersion >= version.ConfigVersion {
 				return nil
 			}
@@ -106,9 +95,22 @@ func init() {
 			if !ok {
 				return nil
 			}
-			const newPluginName = string(plugins.ShimPlugin) + ".shim"
-			pluginConfigs[originalPluginName] = nil
-			pluginConfigs[newPluginName] = original
+			src := original.(map[string]interface{})
+			dest := map[string]interface{}{}
+
+			if v, ok := src["sched_core"]; ok {
+				if schedCore, ok := v.(bool); schedCore {
+					dest["env"] = []string{"SCHED_CORE=1"}
+				} else if !ok {
+					log.G(ctx).Warnf("skipping migration for non-boolean 'sched_core' value %v", v)
+				}
+
+				delete(src, "sched_core")
+			}
+
+			const newPluginName = string(plugins.ShimPlugin) + ".manager"
+			pluginConfigs[originalPluginName] = src
+			pluginConfigs[newPluginName] = dest
 			return nil
 		},
 	})
@@ -119,8 +121,8 @@ type ManagerConfig struct {
 	Events       *exchange.Exchange
 	Address      string
 	TTRPCAddress string
-	SchedCore    bool
 	SandboxStore sandbox.Store
+	ShimEnv      []string
 }
 
 // NewShimManager creates a manager for v2 shims
@@ -131,7 +133,7 @@ func NewShimManager(config *ManagerConfig) (*ShimManager, error) {
 		shims:                  runtime.NewNSMap[ShimInstance](),
 		events:                 config.Events,
 		containers:             config.Store,
-		schedCore:              config.SchedCore,
+		env:                    config.ShimEnv,
 		sandboxStore:           config.SandboxStore,
 	}
 
@@ -145,7 +147,7 @@ func NewShimManager(config *ManagerConfig) (*ShimManager, error) {
 type ShimManager struct {
 	containerdAddress      string
 	containerdTTRPCAddress string
-	schedCore              bool
+	env                    []string
 	shims                  *runtime.NSMap[ShimInstance]
 	events                 *exchange.Exchange
 	containers             containers.Store
@@ -156,7 +158,7 @@ type ShimManager struct {
 
 // ID of the shim manager
 func (m *ShimManager) ID() string {
-	return plugins.ShimPlugin.String() + ".shim"
+	return plugins.ShimPlugin.String() + ".manager"
 }
 
 // Start launches a new shim instance
@@ -251,9 +253,9 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		runtime:      runtimePath,
 		address:      m.containerdAddress,
 		ttrpcAddress: m.containerdTTRPCAddress,
-		schedCore:    m.schedCore,
+		env:          m.env,
 	})
-	shim, err := b.Start(ctx, protobuf.FromAny(topts), func() {
+	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)

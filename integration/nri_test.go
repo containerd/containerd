@@ -401,6 +401,7 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 	)
 
 	t.Log("Test that NRI plugins can update linux cpusets of existing containers.")
+	t.Logf("availableCpuset values is %v", availableCpuset)
 
 	var (
 		out = t.TempDir()
@@ -423,10 +424,12 @@ func TestNriLinuxCpusetAdjustmentUpdate(t *testing.T) {
 					Type:        "bind",
 					Options:     []string{"bind"},
 				})
+				t.Logf("ctr0 availableCpuset values is %v", availableCpuset)
 				adjust.SetLinuxCPUSetCPUs(availableCpuset[0])
 			} else {
 				update = []*api.ContainerUpdate{{}}
 				update[0].SetContainerId(ctr0)
+				t.Logf("ctr1 availableCpuset values is %v", availableCpuset)
 				update[0].SetLinuxCPUSetCPUs(availableCpuset[1])
 			}
 			return adjust, update, nil

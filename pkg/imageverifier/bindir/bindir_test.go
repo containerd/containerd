@@ -175,7 +175,7 @@ func TestBinDirVerifyImage(t *testing.T) {
 		})
 
 		j, err := v.VerifyImage(ctx, "registry.example.com/image:abc", ocispec.Descriptor{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, j.OK, "expected OK, got not OK with reason: %v", j.Reason)
 		assert.Less(t, len(j.Reason), len(bins)*(outputLimitBytes+1024), "reason is: %v", j.Reason) // 1024 leaves margin for the formatting around the reason.
 	})

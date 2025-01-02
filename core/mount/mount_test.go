@@ -250,7 +250,7 @@ func TestRemoveVolatileTempMount(t *testing.T) {
 
 	for _, tc := range testCases {
 		original := copyMounts(tc.input)
-		actual := removeVolatileTempMount(tc.input)
+		actual := RemoveVolatileOption(tc.input)
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Fatalf("incorrectly modified mounts: %s.\n\n Expected: %v\n\n, Actual: %v", tc.desc, tc.expected, actual)
 		}

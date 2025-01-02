@@ -25,10 +25,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
 )
 
-func getRunPodSandboxTestData() (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
+func getRunPodSandboxTestData(criCfg criconfig.Config) (*runtime.PodSandboxConfig, *imagespec.ImageConfig, func(*testing.T, string, *runtimespec.Spec)) {
 	config := &runtime.PodSandboxConfig{
 		Metadata: &runtime.PodSandboxMetadata{
 			Name:      "test-name",
@@ -100,7 +101,7 @@ func TestSandboxWindowsNetworkNamespace(t *testing.T) {
 	nsPath := "test-cni"
 	c := newControllerService()
 
-	config, imageConfig, specCheck := getRunPodSandboxTestData()
+	config, imageConfig, specCheck := getRunPodSandboxTestData(c.config)
 	spec, err := c.sandboxContainerSpec(testID, config, imageConfig, nsPath, nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, spec)

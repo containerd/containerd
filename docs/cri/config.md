@@ -9,6 +9,18 @@ for more information about containerd config.
 Note that the `[plugins."io.containerd.grpc.v1.cri"]` section is specific to CRI,
 and not recognized by other containerd clients such as `ctr`, `nerdctl`, and Docker/Moby.
 
+## Config versions
+The content of `/etc/containerd/config.toml` must start with a version header, for example:
+```toml
+version = 3
+```
+
+The config version 3 was introduced in containerd v2.0.
+The config version 2 used in containerd 1.x is still supported and automatically
+converted to the config version 3.
+
+For the further information, see [`../PLUGINS.md`](../PLUGINS.md).
+
 ## Basic configuration
 ### Cgroup Driver
 While containerd and Kubernetes use the legacy `cgroupfs` driver for managing cgroups by default,
@@ -16,6 +28,13 @@ it is recommended to use the `systemd` driver on systemd-based hosts for complia
 [the "single-writer" rule](https://systemd.io/CGROUP_DELEGATION/) of cgroups.
 
 To configure containerd to use the `systemd` driver, set the following option in `/etc/containerd/config.toml`:
++ In containerd 2.x
+```toml
+version = 3
+[plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
@@ -51,6 +70,13 @@ kubeadm users should also see [the kubeadm documentation](https://kubernetes.io/
 ### Snapshotter
 
 The default snapshotter is set to `overlayfs` (akin to Docker's `overlay2` storage driver):
++ In containerd 2.x
+```toml
+version = 3
+[plugins.'io.containerd.cri.v1.images']
+  snapshotter = "overlayfs"
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd]
@@ -62,6 +88,25 @@ See [here](https://github.com/containerd/containerd/blob/main/docs/snapshotters)
 ### Runtime classes
 
 The following example registers custom runtimes into containerd:
++ In containerd 2.x
+```toml
+version = 3
+[plugins."io.containerd.cri.v1.runtime".containerd]
+  default_runtime_name = "crun"
+  [plugins."io.containerd.cri.v1.runtime".containerd.runtimes]
+    # crun: https://github.com/containers/crun
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.crun.options]
+        BinaryName = "/usr/local/bin/crun"
+    # gVisor: https://gvisor.dev/
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.gvisor]
+      runtime_type = "io.containerd.runsc.v1"
+    # Kata Containers: https://katacontainers.io/
+    [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.kata]
+      runtime_type = "io.containerd.kata.v2"
+```
++ In containerd 1.x
 ```toml
 version = 2
 [plugins."io.containerd.grpc.v1.cri".containerd]
@@ -116,14 +161,128 @@ See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/cont
 
 ## Full configuration
 The explanation and default value of each configuration item are as follows:
++ In containerd 2.x
 <details>
 
 <p>
 
 ```toml
-# Use config version 2 to enable new configuration fields.
-# Config file is parsed as version 1 by default.
-# Version 2 uses long plugin names, i.e. "io.containerd.grpc.v1.cri" vs "cri".
+# containerd has several configuration versions:
+# - Version 3 (Recommended for containerd 2.x): Introduced in containerd 2.0.
+#   Several plugin IDs have changed in this version.
+# - Version 2 (Recommended for containerd 1.x): Introduced in containerd 1.3.
+#   Still supported in containerd v2.x.
+#   Plugin IDs are changed to have prefixes like "io.containerd.".
+# - Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
+version = 3
+
+[plugins]
+  [plugins.'io.containerd.cri.v1.images']
+    snapshotter = 'overlayfs'
+    disable_snapshot_annotations = true
+    discard_unpacked_layers = false
+    max_concurrent_downloads = 3
+    image_pull_progress_timeout = '5m0s'
+    image_pull_with_sync_fs = false
+    stats_collect_period = 10
+
+    [plugins.'io.containerd.cri.v1.images'.pinned_images]
+      sandbox = 'registry.k8s.io/pause:3.10'
+
+    [plugins.'io.containerd.cri.v1.images'.registry]
+      config_path = ''
+
+    [plugins.'io.containerd.cri.v1.images'.image_decryption]
+      key_model = 'node'
+
+  [plugins.'io.containerd.cri.v1.runtime']
+    enable_selinux = false
+    selinux_category_range = 1024
+    max_container_log_line_size = 16384
+    disable_cgroup = false
+    disable_apparmor = false
+    restrict_oom_score_adj = false
+    disable_proc_mount = false
+    unset_seccomp_profile = ''
+    tolerate_missing_hugetlb_controller = true
+    disable_hugetlb_controller = true
+    device_ownership_from_security_context = false
+    ignore_image_defined_volumes = false
+    netns_mounts_under_state_dir = false
+    enable_unprivileged_ports = true
+    enable_unprivileged_icmp = true
+    enable_cdi = true
+    cdi_spec_dirs = ['/etc/cdi', '/var/run/cdi']
+    drain_exec_sync_io_timeout = '0s'
+    ignore_deprecation_warnings = []
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd]
+      default_runtime_name = 'runc'
+      ignore_blockio_not_enabled_errors = false
+      ignore_rdt_not_enabled_errors = false
+
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes]
+        [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+          runtime_type = 'io.containerd.runc.v2'
+          runtime_path = ''
+          pod_annotations = []
+          container_annotations = []
+          privileged_without_host_devices = false
+          privileged_without_host_devices_all_devices_allowed = false
+          base_runtime_spec = ''
+          cni_conf_dir = ''
+          cni_max_conf_num = 0
+          snapshotter = ''
+          sandboxer = 'podsandbox'
+          io_type = ''
+
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+            BinaryName = ''
+            CriuImagePath = ''
+            CriuWorkPath = ''
+            IoGid = 0
+            IoUid = 0
+            NoNewKeyring = false
+            Root = ''
+            ShimCgroup = ''
+
+    [plugins.'io.containerd.cri.v1.runtime'.cni]
+      bin_dir = '/opt/cni/bin'
+      conf_dir = '/etc/cni/net.d'
+      max_conf_num = 1
+      setup_serially = false
+      conf_template = ''
+      ip_pref = ''
+      use_internal_loopback = false
+
+  [plugins.'io.containerd.grpc.v1.cri']
+    disable_tcp_service = true
+    stream_server_address = '127.0.0.1'
+    stream_server_port = '0'
+    stream_idle_timeout = '4h0m0s'
+    enable_tls_streaming = false
+
+    [plugins.'io.containerd.grpc.v1.cri'.x509_key_pair_streaming]
+      tls_cert_file = ''
+      tls_key_file = ''
+```
+
+</p>
+</details>
+
++ In containerd 1.x
+<details>
+
+<p>
+
+```toml
+# containerd has several configuration versions:
+# - Version 3 (Recommended for containerd 2.x): Introduced in containerd 2.0.
+#   Several plugin IDs have changed in this version.
+# - Version 2 (Recommended for containerd 1.x): Introduced in containerd 1.3.
+#   Still supported in containerd v2.x.
+#   Plugin IDs are changed to have prefixes like "io.containerd.".
+# - Version 1 (Default): Introduced in containerd 1.0. Removed in containerd 2.0.
 version = 2
 
 # The 'plugins."io.containerd.grpc.v1.cri"' table contains all of the server options.

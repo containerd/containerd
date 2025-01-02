@@ -256,8 +256,8 @@ func onUntarBlob(ctx context.Context, r io.Reader, store content.Ingester, size 
 
 func resolveLayers(ctx context.Context, store content.Store, layerFiles []string, blobs map[string]ocispec.Descriptor, compress bool) ([]ocispec.Descriptor, error) {
 	layers := make([]ocispec.Descriptor, len(layerFiles))
+	filters := make([]string, len(layerFiles))
 	descs := map[digest.Digest]*ocispec.Descriptor{}
-	filters := []string{}
 	for i, f := range layerFiles {
 		desc, ok := blobs[f]
 		if !ok {
@@ -265,7 +265,7 @@ func resolveLayers(ctx context.Context, store content.Store, layerFiles []string
 		}
 		layers[i] = desc
 		descs[desc.Digest] = &layers[i]
-		filters = append(filters, fmt.Sprintf("labels.\"%s\"==%s", labels.LabelUncompressed, desc.Digest.String()))
+		filters[i] = fmt.Sprintf("labels.\"%s\"==%s", labels.LabelUncompressed, desc.Digest.String())
 	}
 
 	err := store.Walk(ctx, func(info content.Info) error {

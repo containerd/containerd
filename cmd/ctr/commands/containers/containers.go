@@ -55,21 +55,21 @@ var createCommand = &cli.Command{
 	Usage:     "Create container",
 	ArgsUsage: "[flags] Image|RootFS CONTAINER [COMMAND] [ARG...]",
 	Flags:     append(commands.RuntimeFlags, append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...), commands.ContainerFlags...)...),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
 			id     string
 			ref    string
-			config = context.IsSet("config")
+			config = cliContext.IsSet("config")
 		)
 
 		if config {
-			id = context.Args().First()
-			if context.NArg() > 1 {
+			id = cliContext.Args().First()
+			if cliContext.NArg() > 1 {
 				return fmt.Errorf("with spec config file, only container id should be provided: %w", errdefs.ErrInvalidArgument)
 			}
 		} else {
-			id = context.Args().Get(1)
-			ref = context.Args().First()
+			id = cliContext.Args().Get(1)
+			ref = cliContext.Args().First()
 			if ref == "" {
 				return fmt.Errorf("image ref must be provided: %w", errdefs.ErrInvalidArgument)
 			}
@@ -77,12 +77,12 @@ var createCommand = &cli.Command{
 		if id == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		_, err = run.NewContainer(ctx, client, context)
+		_, err = run.NewContainer(ctx, client, cliContext)
 		if err != nil {
 			return err
 		}
@@ -102,12 +102,12 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the container id",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			filters = context.Args().Slice()
-			quiet   = context.Bool("quiet")
+			filters = cliContext.Args().Slice()
+			quiet   = cliContext.Bool("quiet")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -156,22 +156,22 @@ var deleteCommand = &cli.Command{
 			Usage: "Do not clean up snapshot with container",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var exitErr error
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		deleteOpts := []containerd.DeleteOpts{}
-		if !context.Bool("keep-snapshot") {
+		if !cliContext.Bool("keep-snapshot") {
 			deleteOpts = append(deleteOpts, containerd.WithSnapshotCleanup)
 		}
 
-		if context.NArg() == 0 {
+		if cliContext.NArg() == 0 {
 			return fmt.Errorf("must specify at least one container to delete: %w", errdefs.ErrInvalidArgument)
 		}
-		for _, arg := range context.Args().Slice() {
+		for _, arg := range cliContext.Args().Slice() {
 			if err := deleteContainer(ctx, client, arg, deleteOpts...); err != nil {
 				if exitErr == nil {
 					exitErr = err
@@ -212,12 +212,12 @@ var setLabelsCommand = &cli.Command{
 	ArgsUsage:   "[flags] CONTAINER [<key>=<value>, ...]",
 	Description: "set and clear labels for a container",
 	Flags:       []cli.Flag{},
-	Action: func(context *cli.Context) error {
-		containerID, labels := commands.ObjectWithLabelArgs(context)
+	Action: func(cliContext *cli.Context) error {
+		containerID, labels := commands.ObjectWithLabelArgs(cliContext)
 		if containerID == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -254,12 +254,12 @@ var infoCommand = &cli.Command{
 			Usage: "Only display the spec",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+	Action: func(cliContext *cli.Context) error {
+		id := cliContext.Args().First()
 		if id == "" {
 			return fmt.Errorf("container id must be provided: %w", errdefs.ErrInvalidArgument)
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -272,7 +272,7 @@ var infoCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		if context.Bool("spec") {
+		if cliContext.Bool("spec") {
 			v, err := typeurl.UnmarshalAny(info.Spec)
 			if err != nil {
 				return err

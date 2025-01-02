@@ -47,26 +47,26 @@ var tagCommand = &cli.Command{
 			Usage: "Skip the strict check for reference names",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			ref = context.Args().First()
+			ref = cliContext.Args().First()
 		)
 		if ref == "" {
 			return errors.New("please provide an image reference to tag from")
 		}
-		if context.NArg() <= 1 {
+		if cliContext.NArg() <= 1 {
 			return errors.New("please provide an image reference to tag to")
 		}
 
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 
-		if !context.Bool("local") {
-			for _, targetRef := range context.Args().Slice()[1:] {
-				if !context.Bool("skip-reference-check") {
+		if !cliContext.Bool("local") {
+			for _, targetRef := range cliContext.Args().Slice()[1:] {
+				if !cliContext.Bool("skip-reference-check") {
 					if _, err := reference.ParseAnyReference(targetRef); err != nil {
 						return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
 					}
@@ -92,8 +92,8 @@ var tagCommand = &cli.Command{
 			return err
 		}
 		// Support multiple references for one command run
-		for _, targetRef := range context.Args().Slice()[1:] {
-			if !context.Bool("skip-reference-check") {
+		for _, targetRef := range cliContext.Args().Slice()[1:] {
+			if !cliContext.Bool("skip-reference-check") {
 				if _, err := reference.ParseAnyReference(targetRef); err != nil {
 					return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
 				}
@@ -103,7 +103,7 @@ var tagCommand = &cli.Command{
 			if _, err = imageService.Create(ctx, image); err != nil {
 				// If user has specified force and the image already exists then
 				// delete the original image and attempt to create the new one
-				if errdefs.IsAlreadyExists(err) && context.Bool("force") {
+				if errdefs.IsAlreadyExists(err) && cliContext.Bool("force") {
 					if err = imageService.Delete(ctx, targetRef); err != nil {
 						return err
 					}

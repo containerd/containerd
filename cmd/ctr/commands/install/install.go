@@ -44,25 +44,25 @@ var Command = &cli.Command{
 			Usage: "Set an optional install path other than the managed opt directory",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
-		ref := context.Args().First()
+		ref := cliContext.Args().First()
 		image, err := client.GetImage(ctx, ref)
 		if err != nil {
 			return err
 		}
 		var opts []containerd.InstallOpts
-		if context.Bool("libs") {
+		if cliContext.Bool("libs") {
 			opts = append(opts, containerd.WithInstallLibs)
 		}
-		if context.Bool("replace") {
+		if cliContext.Bool("replace") {
 			opts = append(opts, containerd.WithInstallReplace)
 		}
-		if path := context.String("path"); path != "" {
+		if path := cliContext.String("path"); path != "" {
 			opts = append(opts, containerd.WithInstallPath(path))
 		}
 		return client.Install(ctx, image, opts...)

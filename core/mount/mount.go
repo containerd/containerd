@@ -19,11 +19,15 @@ package mount
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/continuity/fs"
 )
+
+// HasBindMounts This is a flag to conditionally disable code that relies on working bind-mount support, so such code is easier to find across codebase.
+const HasBindMounts = runtime.GOOS != "darwin" && runtime.GOOS != "openbsd"
 
 // Mount is the lingua franca of containerd. A mount represents a
 // serialized mount syscall. Components either emit or consume mounts.

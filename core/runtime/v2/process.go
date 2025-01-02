@@ -22,10 +22,12 @@ import (
 
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	tasktypes "github.com/containerd/containerd/api/types/task"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/ttrpc"
+
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/ttrpc"
 )
 
 type process struct {
@@ -44,7 +46,7 @@ func (p *process) Kill(ctx context.Context, signal uint32, _ bool) error {
 		ExecID: p.id,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -73,7 +75,7 @@ func (p *process) State(ctx context.Context) (runtime.State, error) {
 	})
 	if err != nil {
 		if !errors.Is(err, ttrpc.ErrClosed) {
-			return runtime.State{}, errdefs.FromGRPC(err)
+			return runtime.State{}, errgrpc.ToNative(err)
 		}
 		return runtime.State{}, errdefs.ErrNotFound
 	}
@@ -98,7 +100,7 @@ func (p *process) ResizePty(ctx context.Context, size runtime.ConsoleSize) error
 		Height: size.Height,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -111,7 +113,7 @@ func (p *process) CloseIO(ctx context.Context) error {
 		Stdin:  true,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -123,7 +125,7 @@ func (p *process) Start(ctx context.Context) error {
 		ExecID: p.id,
 	})
 	if err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -135,7 +137,7 @@ func (p *process) Wait(ctx context.Context) (*runtime.Exit, error) {
 		ExecID: p.id,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &runtime.Exit{
 		Timestamp: protobuf.FromTimestamp(response.ExitedAt),
@@ -149,7 +151,7 @@ func (p *process) Delete(ctx context.Context) (*runtime.Exit, error) {
 		ExecID: p.id,
 	})
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
 	return &runtime.Exit{
 		Status:    response.ExitStatus,

@@ -21,15 +21,14 @@ import (
 	"encoding/base64"
 	"testing"
 
-	docker "github.com/distribution/reference"
-	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	"github.com/containerd/platforms"
 
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/labels"
-	"github.com/containerd/platforms"
 )
 
 func TestParseAuth(t *testing.T) {
@@ -350,32 +349,32 @@ func TestDefaultScheme(t *testing.T) {
 }
 
 // Temporarily remove for v2 upgrade
-//func TestEncryptedImagePullOpts(t *testing.T) {
-//	for _, test := range []struct {
-//		desc         string
-//		keyModel     string
-//		expectedOpts int
-//	}{
-//		{
-//			desc:         "node key model should return one unpack opt",
-//			keyModel:     criconfig.KeyModelNode,
-//			expectedOpts: 1,
-//		},
-//		{
-//			desc:         "no key model selected should default to node key model",
-//			keyModel:     "",
-//			expectedOpts: 0,
-//		},
-//	} {
-//		test := test
-//		t.Run(test.desc, func(t *testing.T) {
-//			c, _ := newTestCRIService()
-//			c.config.ImageDecryption.KeyModel = test.keyModel
-//			got := len(c.encryptedImagesPullOpts())
-//			assert.Equal(t, test.expectedOpts, got)
-//		})
-//	}
-//}
+func TestEncryptedImagePullOpts(t *testing.T) {
+	for _, test := range []struct {
+		desc         string
+		keyModel     string
+		expectedOpts int
+	}{
+		{
+			desc:         "node key model should return one unpack opt",
+			keyModel:     criconfig.KeyModelNode,
+			expectedOpts: 1,
+		},
+		{
+			desc:         "no key model selected should default to node key model",
+			keyModel:     "",
+			expectedOpts: 0,
+		},
+	} {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			c, _ := newTestCRIService()
+			c.config.ImageDecryption.KeyModel = test.keyModel
+			got := len(c.encryptedImagesPullOpts())
+			assert.Equal(t, test.expectedOpts, got)
+		})
+	}
+}
 
 func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 	defaultSnapshotter := "native"
@@ -435,52 +434,6 @@ func TestSnapshotterFromPodSandboxConfig(t *testing.T) {
 			if tt.expectedErr {
 				assert.Error(t, err)
 			}
-		})
-	}
-}
-
-func TestGetRepoDigestAndTag(t *testing.T) {
-	digest := digest.Digest("sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59582")
-	for _, test := range []struct {
-		desc               string
-		ref                string
-		schema1            bool
-		expectedRepoDigest string
-		expectedRepoTag    string
-	}{
-		{
-			desc:               "repo tag should be empty if original ref has no tag",
-			ref:                "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-		},
-		{
-			desc:               "repo tag should not be empty if original ref has tag",
-			ref:                "gcr.io/library/busybox:latest",
-			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		{
-			desc:               "repo digest should be empty if original ref is schema1 and has no digest",
-			ref:                "gcr.io/library/busybox:latest",
-			schema1:            true,
-			expectedRepoDigest: "",
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		{
-			desc:               "repo digest should not be empty if original ref is schema1 but has digest",
-			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			schema1:            true,
-			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			expectedRepoTag:    "",
-		},
-	} {
-		test := test
-		t.Run(test.desc, func(t *testing.T) {
-			named, err := docker.ParseDockerRef(test.ref)
-			assert.NoError(t, err)
-			repoDigest, repoTag := getRepoDigestAndTag(named, digest, test.schema1)
-			assert.Equal(t, test.expectedRepoDigest, repoDigest)
-			assert.Equal(t, test.expectedRepoTag, repoTag)
 		})
 	}
 }

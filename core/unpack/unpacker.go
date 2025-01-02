@@ -296,13 +296,6 @@ func (u *Unpacker) unpack(
 		}
 		defer unlock()
 
-		if _, err := sn.Stat(ctx, chainID); err == nil {
-			// no need to handle
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("failed to stat snapshot %s: %w", chainID, err)
-		}
-
 		// inherits annotations which are provided as snapshot labels.
 		snapshotLabels := snapshots.FilterInheritedLabels(desc.Annotations)
 		if snapshotLabels == nil {

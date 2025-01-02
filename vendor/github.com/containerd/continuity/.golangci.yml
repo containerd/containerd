@@ -1,16 +1,22 @@
 linters:
   enable:
-    - staticcheck
-    - unconvert
     - gofmt
     - goimports
+    - govet
     - ineffassign
-    - revive
-    - vet
-    - unused
     - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
   disable:
     - errcheck
+
+issues:
+  exclude-rules:
+    - linters:
+        - revive
+      text: "unused-parameter"
 
 run:
   timeout: 3m

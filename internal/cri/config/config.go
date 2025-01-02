@@ -220,15 +220,18 @@ type Registry struct {
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0, supported in 1.x releases.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
@@ -340,9 +343,6 @@ type RuntimeConfig struct {
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
 	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
-	// DisableCgroup indicates to disable the cgroup support.
-	// This is useful when the containerd does not have permission to access cgroup.
-	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
 	// DisableApparmor indicates to disable the apparmor support.
 	// This is useful when the containerd does not have permission to access Apparmor.
 	DisableApparmor bool `toml:"disable_apparmor" json:"disableApparmor"`

@@ -232,10 +232,10 @@ var (
 )
 
 // ObjectWithLabelArgs returns the first arg and a LabelArgs object
-func ObjectWithLabelArgs(clicontext *cli.Context) (string, map[string]string) {
+func ObjectWithLabelArgs(cliContext *cli.Context) (string, map[string]string) {
 	var (
-		first        = clicontext.Args().First()
-		labelStrings = clicontext.Args().Tail()
+		first        = cliContext.Args().First()
+		labelStrings = cliContext.Args().Tail()
 	)
 
 	return first, LabelArgs(labelStrings)

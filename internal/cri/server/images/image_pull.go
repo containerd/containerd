@@ -32,9 +32,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/imgcrypt/v2"
+	"github.com/containerd/imgcrypt/v2/images/encryption"
 	"github.com/containerd/log"
 	distribution "github.com/distribution/reference"
-	imagedigest "github.com/opencontainers/go-digest"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -46,9 +48,9 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
 )
 
 // For image management:
@@ -130,6 +132,20 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	inProgressImagePulls.Inc()
 	defer inProgressImagePulls.Dec()
 	startTime := time.Now()
+
+	if credentials == nil {
+		credentials = func(host string) (string, string, error) {
+			var hostauth *runtime.AuthConfig
+
+			config := c.config.Registry.Configs[host]
+			if config.Auth != nil {
+				hostauth = toRuntimeAuthConfig(*config.Auth)
+
+			}
+
+			return ParseAuth(hostauth, host)
+		}
+	}
 
 	namedRef, err := distribution.ParseDockerRef(name)
 	if err != nil {
@@ -218,7 +234,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	imageID := configDesc.Digest.String()
 
-	repoDigest, repoTag := getRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
@@ -248,21 +264,6 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// check the actual state in containerd before using the image or returning status of the
 	// image.
 	return imageID, nil
-}
-
-// getRepoDigestAngTag returns image repoDigest and repoTag of the named image reference.
-func getRepoDigestAndTag(namedRef distribution.Named, digest imagedigest.Digest, schema1 bool) (string, string) {
-	var repoTag, repoDigest string
-	if _, ok := namedRef.(distribution.NamedTagged); ok {
-		repoTag = namedRef.String()
-	}
-	if _, ok := namedRef.(distribution.Canonical); ok {
-		repoDigest = namedRef.String()
-	} else if !schema1 {
-		// digest is not actual repo digest for schema1 image.
-		repoDigest = namedRef.Name() + "@" + digest.String()
-	}
-	return repoDigest, repoTag
 }
 
 // ParseAuth parses AuthConfig and returns username and password/secret required by containerd.
@@ -583,15 +584,15 @@ func newTransport() *http.Transport {
 // encryptedImagesPullOpts returns the necessary list of pull options required
 // for decryption of encrypted images based on the cri decryption configuration.
 // Temporarily removed for v2 upgrade
-//func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-//	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
-//		ltdd := imgcrypt.Payload{}
-//		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
-//		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
-//		return []containerd.RemoteOpt{opt}
-//	}
-//	return nil
-//}
+func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
+	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
+		ltdd := imgcrypt.Payload{}
+		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
+		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})
+		return []containerd.RemoteOpt{opt}
+	}
+	return nil
+}
 
 const (
 	// defaultPullProgressReportInterval represents that how often the

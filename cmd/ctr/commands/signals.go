@@ -17,7 +17,7 @@
 package commands
 
 import (
-	gocontext "context"
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,11 +28,11 @@ import (
 )
 
 type killer interface {
-	Kill(gocontext.Context, syscall.Signal, ...containerd.KillOpts) error
+	Kill(context.Context, syscall.Signal, ...containerd.KillOpts) error
 }
 
 // ForwardAllSignals forwards signals
-func ForwardAllSignals(ctx gocontext.Context, task killer) chan os.Signal {
+func ForwardAllSignals(ctx context.Context, task killer) chan os.Signal {
 	sigc := make(chan os.Signal, 128)
 	signal.Notify(sigc)
 	go func() {

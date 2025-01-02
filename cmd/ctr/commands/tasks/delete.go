@@ -17,7 +17,7 @@
 package tasks
 
 import (
-	gocontext "context"
+	"context"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
@@ -42,12 +42,12 @@ var deleteCommand = &cli.Command{
 			Usage: "Process ID to kill",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			execID = context.String("exec-id")
-			force  = context.Bool("force")
+			execID = cliContext.String("exec-id")
+			force  = cliContext.Bool("force")
 		)
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ var deleteCommand = &cli.Command{
 		}
 		var exitErr error
 		if execID != "" {
-			task, err := loadTask(ctx, client, context.Args().First())
+			task, err := loadTask(ctx, client, cliContext.Args().First())
 			if err != nil {
 				return err
 			}
@@ -74,7 +74,7 @@ var deleteCommand = &cli.Command{
 				return cli.Exit("", int(ec))
 			}
 		} else {
-			for _, target := range context.Args().Slice() {
+			for _, target := range cliContext.Args().Slice() {
 				task, err := loadTask(ctx, client, target)
 				if err != nil {
 					if exitErr == nil {
@@ -100,7 +100,7 @@ var deleteCommand = &cli.Command{
 	},
 }
 
-func loadTask(ctx gocontext.Context, client *containerd.Client, containerID string) (containerd.Task, error) {
+func loadTask(ctx context.Context, client *containerd.Client, containerID string) (containerd.Task, error) {
 	container, err := client.LoadContainer(ctx, containerID)
 	if err != nil {
 		return nil, err

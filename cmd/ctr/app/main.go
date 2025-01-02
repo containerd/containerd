@@ -52,8 +52,8 @@ func init() {
 	// Discard grpc logs so that they don't mess with our stdio
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 
-	cli.VersionPrinter = func(c *cli.Context) {
-		fmt.Println(c.App.Name, version.Package, c.App.Version)
+	cli.VersionPrinter = func(cliContext *cli.Context) {
+		fmt.Println(cliContext.App.Name, version.Package, cliContext.App.Version)
 	}
 	cli.VersionFlag = &cli.BoolFlag{
 		Name:    "version",
@@ -135,8 +135,8 @@ containerd CLI
 		info.Command,
 		deprecations.Command,
 	}, extraCmds...)
-	app.Before = func(context *cli.Context) error {
-		if context.Bool("debug") {
+	app.Before = func(cliContext *cli.Context) error {
+		if cliContext.Bool("debug") {
 			return log.SetLevel("debug")
 		}
 		return nil

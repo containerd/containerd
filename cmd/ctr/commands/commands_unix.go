@@ -59,37 +59,37 @@ func init() {
 	})
 }
 
-func getRuncOptions(context *cli.Context) (*options.Options, error) {
+func getRuncOptions(cliContext *cli.Context) (*options.Options, error) {
 	runtimeOpts := &options.Options{}
-	if runcBinary := context.String("runc-binary"); runcBinary != "" {
+	if runcBinary := cliContext.String("runc-binary"); runcBinary != "" {
 		runtimeOpts.BinaryName = runcBinary
 	}
-	if context.Bool("runc-systemd-cgroup") {
-		if context.String("cgroup") == "" {
+	if cliContext.Bool("runc-systemd-cgroup") {
+		if cliContext.String("cgroup") == "" {
 			// runc maps "machine.slice:foo:deadbeef" to "/machine.slice/foo-deadbeef.scope"
 			return nil, errors.New("option --runc-systemd-cgroup requires --cgroup to be set, e.g. \"machine.slice:foo:deadbeef\"")
 		}
 		runtimeOpts.SystemdCgroup = true
 	}
-	if root := context.String("runc-root"); root != "" {
+	if root := cliContext.String("runc-root"); root != "" {
 		runtimeOpts.Root = root
 	}
 
 	return runtimeOpts, nil
 }
 
-func RuntimeOptions(context *cli.Context) (interface{}, error) {
+func RuntimeOptions(cliContext *cli.Context) (interface{}, error) {
 	// validate first
-	if (context.String("runc-binary") != "" || context.Bool("runc-systemd-cgroup")) &&
-		context.String("runtime") != "io.containerd.runc.v2" {
+	if (cliContext.String("runc-binary") != "" || cliContext.Bool("runc-systemd-cgroup")) &&
+		cliContext.String("runtime") != "io.containerd.runc.v2" {
 		return nil, errors.New("specifying runc-binary and runc-systemd-cgroup is only supported for \"io.containerd.runc.v2\" runtime")
 	}
 
-	if context.String("runtime") == "io.containerd.runc.v2" {
-		return getRuncOptions(context)
+	if cliContext.String("runtime") == "io.containerd.runc.v2" {
+		return getRuncOptions(cliContext)
 	}
 
-	if configPath := context.String("runtime-config-path"); configPath != "" {
+	if configPath := cliContext.String("runtime-config-path"); configPath != "" {
 		return &runtimeoptions.Options{
 			ConfigPath: configPath,
 		}, nil

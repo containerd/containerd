@@ -32,11 +32,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/containerd/errdefs"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/content/testsuite"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/internal/randutil"
 	"github.com/containerd/containerd/v2/pkg/testutil"
-	"github.com/containerd/errdefs"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -106,16 +108,16 @@ func TestContentWriter(t *testing.T) {
 	defer cleanup()
 	defer testutil.DumpDirOnFailure(t, tmpdir)
 
-	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
-		t.Fatal("ingest dir should be created", err)
-	}
-
 	cw, err := cs.Writer(ctx, content.WithRef("myref"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := cw.Close(); err != nil {
 		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(tmpdir, "ingest")); os.IsNotExist(err) {
+		t.Fatal("ingest dir should be created", err)
 	}
 
 	// reopen, so we can test things
@@ -191,6 +193,18 @@ func TestContentWriter(t *testing.T) {
 
 	if !bytes.Equal(p, pp) {
 		t.Fatal("mismatched data written to disk")
+	}
+
+	// ensure fsverity is enabled on blob if fsverity is supported
+	ok, err := fsverity.IsSupported(tmpdir)
+	if !ok || err != nil {
+		t.Log("fsverity not supported, skipping fsverity check")
+		return
+	}
+
+	ok, err = fsverity.IsEnabled(path)
+	if !ok || err != nil {
+		t.Fatal(err)
 	}
 
 }

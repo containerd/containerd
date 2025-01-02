@@ -304,6 +304,125 @@ func TestPodUserNS(t *testing.T) {
 	}
 }
 
+// TestIssue10598 tests a case[1] that init processes in container should be able
+// to open /dev/stdout or /dev/stderr if init processes are running in their
+// user namespace instead of root user.
+//
+// The shim server creates pipe for init processes' standard output. By default,
+// the owner of pipe is the same to shim server (root user). Let's say, the init
+// process is running with uid=1000/gid=1000 user. Init processes inherits the
+// pipe created by shim server so that it can just write data into that pipe.
+// However, if that init process tries to open /dev/stderr, the kernel will
+// return no permission error.
+//
+// The following output is from retsnoop[2].
+//
+//	→ do_open
+//	         → inode_permission
+//	             → generic_permission
+//	                 ↔ make_vfsuid      [0]                     0.500us
+//	                 ↔ make_vfsuid      [0]                     6.501us
+//	                 ↔ from_kuid        [0xffffffff]            0.700us
+//	             ← generic_permission   [-EACCES]              13.501us
+//
+// Since uid_map/gid_map doesn't cover uid=0/gid=0, the kernel can't convert
+// uid=0 into valid uid in that uid_map. So, `from_kuid` returns invalid uid
+// value and then `do_open` returns EACCES error.
+//
+// [1]: https://github.com/containerd/containerd/issues/10598
+// [2]: https://github.com/anakryiko/retsnoop
+func TestIssue10598(t *testing.T) {
+	if !supportsUserNS() {
+		t.Skip("User namespaces are not supported")
+	}
+	if !supportsIDMap(defaultRoot) {
+		t.Skipf("ID mappings are not supported on: %v", defaultRoot)
+	}
+	if err := supportsRuncIDMap(); err != nil {
+		t.Skipf("OCI runtime doesn't support idmap mounts: %v", err)
+	}
+
+	testPodLogDir := t.TempDir()
+
+	containerID := uint32(0)
+	hostID := uint32(65536)
+	size := uint32(65536)
+
+	t.Log("Create a sandbox with userns")
+	sandboxOpts := []PodSandboxOpts{
+		WithPodUserNs(containerID, hostID, size),
+		WithPodLogDirectory(testPodLogDir),
+	}
+	sbConfig := PodSandboxConfig("issue10598", "userns", sandboxOpts...)
+	sb, err := runtimeService.RunPodSandbox(sbConfig, *runtimeHandler)
+	require.NoError(t, err)
+
+	// Make sure the sandbox is cleaned up.
+	defer func() {
+		assert.NoError(t, runtimeService.StopPodSandbox(sb))
+		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
+	}()
+
+	t.Log("Create a container for userns")
+
+	containerName := "nginx-userns"
+	testImage := images.Get(images.Nginx)
+
+	EnsureImageExists(t, testImage)
+
+	containerOpts := []ContainerOpts{
+		WithUserNamespace(containerID, hostID, size),
+		WithLogPath(containerName),
+		// The SELinux policy enforced by container-selinux prevents
+		// NGINX from opening the /proc/self/fd/2 pipe. This scenario
+		// is not intended to verify SELinux behavior in the user namespace
+		// but rather to confirm the ownership of the standard output
+		// file descriptor. The following option demonstrates how to
+		// disable the restrictive SELinux rule for the NGINX process.
+		WithSELinuxOptions(
+			"unconfined_u",
+			"unconfined_r",
+			"container_runtime_t",
+			"s0",
+		),
+	}
+
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		containerOpts...,
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+
+	t.Log("Wait for container to start")
+	require.NoError(t, Eventually(func() (bool, error) {
+		content, err := os.ReadFile(filepath.Join(testPodLogDir, containerName))
+		if err != nil {
+			return false, err
+		}
+
+		s, err := runtimeService.ContainerStatus(cn)
+		if err != nil {
+			return false, err
+		}
+
+		if state := s.GetState(); state != runtime.ContainerState_CONTAINER_RUNNING {
+			return false, fmt.Errorf("%s is not running\nstate: %s\nlog: %s",
+				containerName, state, string(content))
+		}
+
+		started := strings.Contains(string(content), "start worker processes")
+		if started {
+			t.Log(string(content))
+		}
+		return started, nil
+	}, time.Second, 30*time.Second))
+}
+
 func supportsRuncIDMap() error {
 	var r runc.Runc
 	features, err := r.Features(context.Background())

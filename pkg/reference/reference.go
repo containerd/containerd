@@ -18,7 +18,6 @@ package reference
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"path"
 	"regexp"
@@ -136,8 +135,12 @@ func (r Spec) Hostname() string {
 // Digest returns the digest portion of the reference spec. This may be a
 // partial or invalid digest, which may be used to lookup a complete digest.
 func (r Spec) Digest() digest.Digest {
-	_, dgst := SplitObject(r.Object)
-	return dgst
+	i := strings.Index(r.Object, "@")
+
+	if i < 0 {
+		return ""
+	}
+	return digest.Digest(r.Object[i+1:])
 }
 
 // String returns the normalized string for the ref.
@@ -146,21 +149,8 @@ func (r Spec) String() string {
 		return r.Locator
 	}
 	if r.Object[:1] == "@" {
-		return fmt.Sprintf("%v%v", r.Locator, r.Object)
+		return r.Locator + r.Object
 	}
 
-	return fmt.Sprintf("%v:%v", r.Locator, r.Object)
-}
-
-// SplitObject provides two parts of the object spec, delimited by an `@`
-// symbol.
-//
-// Either may be empty and it is the callers job to validate them
-// appropriately.
-func SplitObject(obj string) (tag string, dgst digest.Digest) {
-	parts := strings.SplitAfterN(obj, "@", 2)
-	if len(parts) < 2 {
-		return parts[0], ""
-	}
-	return parts[0], digest.Digest(parts[1])
+	return r.Locator + ":" + r.Object
 }

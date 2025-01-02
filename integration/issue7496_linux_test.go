@@ -157,7 +157,7 @@ func injectDelayToUmount2(ctx context.Context, t *testing.T, shimCli apitask.TTR
 }
 
 func connectToShim(ctx context.Context, t *testing.T, ctrdEndpoint string, version int, id string) shimcore.TaskServiceClient {
-	addr, err := shim.SocketAddress(ctx, ctrdEndpoint, id)
+	addr, err := shim.SocketAddress(ctx, ctrdEndpoint, id, false)
 	require.NoError(t, err)
 	addr = strings.TrimPrefix(addr, "unix://")
 

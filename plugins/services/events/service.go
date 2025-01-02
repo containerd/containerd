@@ -23,17 +23,21 @@ import (
 	api "github.com/containerd/containerd/api/services/events/v1"
 	apittrpc "github.com/containerd/containerd/api/services/ttrpc/events/v1"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/containerd/ttrpc"
+	"github.com/containerd/typeurl/v2"
+	"google.golang.org/grpc"
+
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/events/exchange"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/containerd/ttrpc"
-	"google.golang.org/grpc"
 )
+
+var empty = &ptypes.Empty{}
 
 func init() {
 	registry.Register(&plugin.Registration{
@@ -80,18 +84,18 @@ func (s *service) RegisterTTRPC(server *ttrpc.Server) error {
 
 func (s *service) Publish(ctx context.Context, r *api.PublishRequest) (*ptypes.Empty, error) {
 	if err := s.events.Publish(ctx, r.Topic, r.Event); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) Forward(ctx context.Context, r *api.ForwardRequest) (*ptypes.Empty, error) {
 	if err := s.events.Forward(ctx, fromProto(r.Envelope)); err != nil {
-		return nil, errdefs.ToGRPC(err)
+		return nil, errgrpc.ToGRPC(err)
 	}
 
-	return &ptypes.Empty{}, nil
+	return empty, nil
 }
 
 func (s *service) Subscribe(req *api.SubscribeRequest, srv api.Events_SubscribeServer) error {
@@ -120,7 +124,7 @@ func toProto(env *events.Envelope) *types.Envelope {
 		Timestamp: protobuf.ToTimestamp(env.Timestamp),
 		Namespace: env.Namespace,
 		Topic:     env.Topic,
-		Event:     protobuf.FromAny(env.Event),
+		Event:     typeurl.MarshalProto(env.Event),
 	}
 }
 

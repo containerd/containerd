@@ -28,17 +28,19 @@ import (
 	"github.com/containerd/containerd/api/types"
 	"github.com/containerd/containerd/api/types/runc/options"
 	tasktypes "github.com/containerd/containerd/api/types/task"
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/cio"
-	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/fifo"
 	"github.com/containerd/typeurl/v2"
 	ver "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/selinux/go-selinux/label"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 )
 
 const (
@@ -141,6 +143,10 @@ func (c *container) Labels(ctx context.Context) (map[string]string, error) {
 }
 
 func (c *container) SetLabels(ctx context.Context, labels map[string]string) (map[string]string, error) {
+	ctx, span := tracing.StartSpan(ctx, "container.SetLabels",
+		tracing.WithAttribute("container.id", c.id),
+	)
+	defer span.End()
 	container := containers.Container{
 		ID:     c.id,
 		Labels: labels,
@@ -176,6 +182,10 @@ func (c *container) Spec(ctx context.Context) (*oci.Spec, error) {
 // Delete deletes an existing container
 // an error is returned if the container has running tasks
 func (c *container) Delete(ctx context.Context, opts ...DeleteOpts) error {
+	ctx, span := tracing.StartSpan(ctx, "container.Delete",
+		tracing.WithAttribute("container.id", c.id),
+	)
+	defer span.End()
 	if _, err := c.loadTask(ctx, nil); err == nil {
 		return fmt.Errorf("cannot delete running task %v: %w", c.id, errdefs.ErrFailedPrecondition)
 	}
@@ -212,6 +222,8 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 }
 
 func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {
+	ctx, span := tracing.StartSpan(ctx, "container.NewTask")
+	defer span.End()
 	i, err := ioCreate(c.id)
 	if err != nil {
 		return nil, err
@@ -288,7 +300,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		if err != nil {
 			return nil, err
 		}
-		request.Options = protobuf.FromAny(o)
+		request.Options = typeurl.MarshalProto(o)
 	}
 	t := &task{
 		client: c.client,
@@ -299,16 +311,28 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	if info.Checkpoint != nil {
 		request.Checkpoint = info.Checkpoint
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("task.container.id", request.ContainerID),
+		tracing.Attribute("task.request.options", request.Options.String()),
+		tracing.Attribute("task.runtime.name", info.runtime),
+	)
 	response, err := c.client.TaskService().Create(ctx, request)
 	if err != nil {
-		return nil, errdefs.FromGRPC(err)
+		return nil, errgrpc.ToNative(err)
 	}
+
+	span.AddEvent("task created",
+		tracing.Attribute("task.process.id", int(response.Pid)),
+	)
 	t.pid = response.Pid
 	return t, nil
 }
 
 func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) error {
 	// fetch the current container config before updating it
+	ctx, span := tracing.StartSpan(ctx, "container.Update")
+	defer span.End()
 	r, err := c.get(ctx)
 	if err != nil {
 		return err
@@ -319,7 +343,7 @@ func (c *container) Update(ctx context.Context, opts ...UpdateContainerOpts) err
 		}
 	}
 	if _, err := c.client.ContainerService().Update(ctx, r); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -365,7 +389,7 @@ func (c *container) Checkpoint(ctx context.Context, ref string, opts ...Checkpoi
 	// process remaining opts
 	for _, o := range opts {
 		if err := o(ctx, c.client, &info, index, copts); err != nil {
-			err = errdefs.FromGRPC(err)
+			err = errgrpc.ToNative(err)
 			if !errdefs.IsAlreadyExists(err) {
 				return nil, err
 			}
@@ -393,7 +417,7 @@ func (c *container) loadTask(ctx context.Context, ioAttach cio.Attach) (Task, er
 		ContainerID: c.id,
 	})
 	if err != nil {
-		err = errdefs.FromGRPC(err)
+		err = errgrpc.ToNative(err)
 		if errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("no running task found: %w", err)
 		}

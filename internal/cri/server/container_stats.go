@@ -49,5 +49,5 @@ func (c *criService) ContainerStats(ctx context.Context, in *runtime.ContainerSt
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode container metrics: %w", err)
 	}
-	return &runtime.ContainerStatsResponse{Stats: cs}, nil
+	return &runtime.ContainerStatsResponse{Stats: cs.stats}, nil
 }

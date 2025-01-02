@@ -95,6 +95,7 @@ service Controller {
 	rpc Status(ControllerStatusRequest) returns (ControllerStatusResponse);
 	rpc Shutdown(ControllerShutdownRequest) returns (ControllerShutdownResponse);
 	rpc Metrics(ControllerMetricsRequest) returns (ControllerMetricsResponse);
+	rpc Update(ControllerUpdateRequest) returns (ControllerUpdateResponse);
 }
 
 message ControllerCreateRequest {
@@ -103,6 +104,7 @@ message ControllerCreateRequest {
 	google.protobuf.Any options = 3;
 	string netns_path = 4;
 	map<string, string> annotations = 5;
+	containerd.types.Sandbox sandbox = 6;
 	string sandboxer = 10;
 }
 
@@ -189,4 +191,14 @@ message ControllerMetricsRequest {
 
 message ControllerMetricsResponse {
 	types.Metric metrics = 1;
+}
+
+message ControllerUpdateRequest {
+	string sandbox_id = 1;
+	string sandboxer = 2;
+	containerd.types.Sandbox sandbox = 3;
+	repeated string fields = 4;
+}
+
+message ControllerUpdateResponse {
 }

@@ -222,15 +222,6 @@ func WithoutAmbientCaps(_ context.Context, _ oci.Client, c *containers.Container
 	return nil
 }
 
-// WithDisabledCgroups clears the Cgroups Path from the spec
-func WithDisabledCgroups(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
-	if s.Linux == nil {
-		s.Linux = &runtimespec.Linux{}
-	}
-	s.Linux.CgroupsPath = ""
-	return nil
-}
-
 // WithSelinuxLabels sets the mount and process labels
 func WithSelinuxLabels(process, mount string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) (err error) {
@@ -307,6 +298,23 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 		}
 		s.Linux.Namespaces = namespaces
 		return nil
+	}
+}
+
+// WithNamespacePath updates namespace with existing path.
+func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
+	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		if s.Linux == nil {
+			return fmt.Errorf("Linux spec is required")
+		}
+
+		for i, ns := range s.Linux.Namespaces {
+			if ns.Type == t {
+				s.Linux.Namespaces[i].Path = nsPath
+				return nil
+			}
+		}
+		return fmt.Errorf("no such namespace %s", t)
 	}
 }
 

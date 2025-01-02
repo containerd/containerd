@@ -68,17 +68,17 @@ var execCommand = &cli.Command{
 			Usage: "User id or name",
 		},
 	},
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
-			id     = context.Args().First()
-			args   = context.Args().Tail()
-			tty    = context.Bool("tty")
-			detach = context.Bool("detach")
+			id     = cliContext.Args().First()
+			args   = cliContext.Args().Tail()
+			tty    = cliContext.Bool("tty")
+			detach = cliContext.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -91,7 +91,7 @@ var execCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		if user := context.String("user"); user != "" {
+		if user := cliContext.String("user"); user != "" {
 			c, err := container.Info(ctx)
 			if err != nil {
 				return err
@@ -105,7 +105,7 @@ var execCommand = &cli.Command{
 		pspec.Terminal = tty
 		pspec.Args = args
 
-		if cwd := context.String("cwd"); cwd != "" {
+		if cwd := cliContext.String("cwd"); cwd != "" {
 			pspec.Cwd = cwd
 		}
 
@@ -122,8 +122,8 @@ var execCommand = &cli.Command{
 			con console.Console
 		)
 
-		fifoDir := context.String("fifo-dir")
-		logURI := context.String("log-uri")
+		fifoDir := cliContext.String("fifo-dir")
+		logURI := cliContext.String("log-uri")
 		ioOpts := []cio.Opt{cio.WithFIFODir(fifoDir)}
 		switch {
 		case tty && logURI != "":
@@ -150,7 +150,7 @@ var execCommand = &cli.Command{
 			ioCreator = cio.NewCreator(append([]cio.Opt{cio.WithStreams(stdinC, os.Stdout, os.Stderr)}, ioOpts...)...)
 		}
 
-		process, err := task.Exec(ctx, context.String("exec-id"), pspec, ioCreator)
+		process, err := task.Exec(ctx, cliContext.String("exec-id"), pspec, ioCreator)
 		if err != nil {
 			return err
 		}

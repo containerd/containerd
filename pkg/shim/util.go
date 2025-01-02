@@ -44,9 +44,9 @@ type CommandConfig struct {
 	Address      string
 	TTRPCAddress string
 	Path         string
-	SchedCore    bool
 	Args         []string
 	Opts         *types.Any
+	Env          []string
 }
 
 // Command returns the shim command with the provided args and configuration
@@ -75,8 +75,8 @@ func Command(ctx context.Context, config *CommandConfig) (*exec.Cmd, error) {
 		fmt.Sprintf("%s=%s", grpcAddressEnv, config.Address),
 		fmt.Sprintf("%s=%s", namespaceEnv, ns),
 	)
-	if config.SchedCore {
-		cmd.Env = append(cmd.Env, "SCHED_CORE=1")
+	if len(config.Env) > 0 {
+		cmd.Env = append(cmd.Env, config.Env...)
 	}
 	cmd.SysProcAttr = getSysProcAttr()
 	if config.Opts != nil {

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/typeurl/v2"
@@ -164,7 +163,7 @@ func WriteExtensions(bkt *bolt.Bucket, extensions map[string]typeurl.Any) error 
 	}
 
 	for name, ext := range extensions {
-		ext := protobuf.FromAny(ext)
+		ext := typeurl.MarshalProto(ext)
 		p, err := proto.Marshal(ext)
 		if err != nil {
 			return err
@@ -206,7 +205,7 @@ func ReadExtensions(bkt *bolt.Bucket) (map[string]typeurl.Any, error) {
 
 // WriteAny write a protobuf's Any type to the bucket
 func WriteAny(bkt *bolt.Bucket, name []byte, any typeurl.Any) error {
-	pbany := protobuf.FromAny(any)
+	pbany := typeurl.MarshalProto(any)
 	if pbany == nil {
 		return nil
 	}

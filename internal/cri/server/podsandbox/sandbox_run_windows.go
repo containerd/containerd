@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
+	"github.com/containerd/containerd/v2/internal/cri/util"
 )
 
 func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxConfig,
@@ -75,7 +76,7 @@ func (c *Controller) sandboxContainerSpec(id string, config *runtime.PodSandboxC
 	// when trying to run the init process.
 	specOpts = append(specOpts, oci.WithUser(username))
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(config.Annotations,
 		runtimePodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}

@@ -33,22 +33,12 @@ import (
 )
 
 func (ts *localTransferService) push(ctx context.Context, ig transfer.ImageGetter, p transfer.ImagePusher, tops *transfer.Config) error {
-	/*
-		// TODO: Platform matching
-		if pushCtx.PlatformMatcher == nil {
-			if len(pushCtx.Platforms) > 0 {
-				ps, err := platforms.ParseAll(pushCtx.Platforms)
-				if err != nil {
-					return err
-				}
-				pushCtx.PlatformMatcher = platforms.Any(ps...)
-			} else {
-				pushCtx.PlatformMatcher = platforms.All
-			}
-		}
-	*/
 	matcher := platforms.All
-	// Filter push
+	if ipg, ok := ig.(transfer.ImagePlatformsGetter); ok {
+		if ps := ipg.Platforms(); len(ps) > 0 {
+			matcher = platforms.Any(ps...)
+		}
+	}
 
 	img, err := ig.Get(ctx, ts.images)
 	if err != nil {
@@ -158,7 +148,13 @@ func (p *progressPusher) WrapHandler(h images.Handler) images.Handler {
 func (p *progressPusher) Push(ctx context.Context, d ocispec.Descriptor) (content.Writer, error) {
 	ref := remotes.MakeRefKey(ctx, d)
 	p.status.add(ref, d)
-	cw, err := p.Pusher.Push(ctx, d)
+	var cw content.Writer
+	var err error
+	if cs, ok := p.Pusher.(content.Ingester); ok {
+		cw, err = content.OpenWriter(ctx, cs, content.WithRef(ref), content.WithDescriptor(d))
+	} else {
+		cw, err = p.Pusher.Push(ctx, d)
+	}
 	if err != nil {
 		if errdefs.IsAlreadyExists(err) {
 			p.progress.MarkExists(d)

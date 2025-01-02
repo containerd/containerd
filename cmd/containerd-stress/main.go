@@ -29,6 +29,7 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/integration/remote"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
@@ -137,7 +138,7 @@ func main() {
 		&cli.StringFlag{
 			Name:    "address",
 			Aliases: []string{"a"},
-			Value:   "/run/containerd/containerd.sock",
+			Value:   defaults.DefaultAddress,
 			Usage:   "Path to the containerd socket",
 		},
 		&cli.IntFlag{
@@ -187,13 +188,13 @@ func main() {
 			Value: "overlayfs",
 		},
 	}
-	app.Before = func(context *cli.Context) error {
-		if context.Bool("json") {
+	app.Before = func(cliContext *cli.Context) error {
+		if cliContext.Bool("json") {
 			if err := log.SetLevel("warn"); err != nil {
 				return err
 			}
 		}
-		if context.Bool("debug") {
+		if cliContext.Bool("debug") {
 			if err := log.SetLevel("debug"); err != nil {
 				return err
 			}
@@ -203,18 +204,18 @@ func main() {
 	app.Commands = []*cli.Command{
 		densityCommand,
 	}
-	app.Action = func(context *cli.Context) error {
+	app.Action = func(cliContext *cli.Context) error {
 		config := config{
-			Address:     context.String("address"),
-			Duration:    context.Duration("duration"),
-			Concurrency: context.Int("concurrent"),
-			CRI:         context.Bool("cri"),
-			Exec:        context.Bool("exec"),
-			Image:       context.String("image"),
-			JSON:        context.Bool("json"),
-			Metrics:     context.String("metrics"),
-			Runtime:     context.String("runtime"),
-			Snapshotter: context.String("snapshotter"),
+			Address:     cliContext.String("address"),
+			Duration:    cliContext.Duration("duration"),
+			Concurrency: cliContext.Int("concurrent"),
+			CRI:         cliContext.Bool("cri"),
+			Exec:        cliContext.Bool("exec"),
+			Image:       cliContext.String("image"),
+			JSON:        cliContext.Bool("json"),
+			Metrics:     cliContext.String("metrics"),
+			Runtime:     cliContext.String("runtime"),
+			Snapshotter: cliContext.String("snapshotter"),
 		}
 		if config.Metrics != "" {
 			return serve(config)

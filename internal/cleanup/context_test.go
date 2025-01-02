@@ -27,7 +27,7 @@ func TestBackground(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	var k struct{}
 	v := "incontext"
-	ctx = context.WithValue(ctx, k, v)
+	ctx = context.WithValue(ctx, k, v) //nolint:staticcheck
 
 	assert.Nil(t, contextError(ctx))
 	assert.Equal(t, ctx.Value(k), v)

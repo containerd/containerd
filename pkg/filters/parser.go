@@ -208,7 +208,7 @@ func (p *parser) field() (string, error) {
 	case tokenQuoted:
 		return p.unquote(pos, s, false)
 	case tokenIllegal:
-		return "", p.mkerr(pos, p.scanner.err)
+		return "", p.mkerr(pos, "%s", p.scanner.err)
 	}
 
 	return "", p.mkerr(pos, "expected field or quoted")
@@ -229,7 +229,7 @@ func (p *parser) operator() (operator, error) {
 			return 0, p.mkerr(pos, "unsupported operator %q", s)
 		}
 	case tokenIllegal:
-		return 0, p.mkerr(pos, p.scanner.err)
+		return 0, p.mkerr(pos, "%s", p.scanner.err)
 	}
 
 	return 0, p.mkerr(pos, `expected an operator ("=="|"!="|"~=")`)
@@ -244,7 +244,7 @@ func (p *parser) value(allowAltQuotes bool) (string, error) {
 	case tokenQuoted:
 		return p.unquote(pos, s, allowAltQuotes)
 	case tokenIllegal:
-		return "", p.mkerr(pos, p.scanner.err)
+		return "", p.mkerr(pos, "%s", p.scanner.err)
 	}
 
 	return "", p.mkerr(pos, "expected value or quoted")

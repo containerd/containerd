@@ -48,10 +48,10 @@ type Transactor interface {
 
 // Snapshot hold the metadata for an active or view snapshot transaction. The
 // ParentIDs hold the snapshot identifiers for the committed snapshots this
-// active or view is based on. The ParentIDs are ordered from the lowest base
-// to highest, meaning they should be applied in order from the first index to
-// the last index. The last index should always be considered the active
-// snapshots immediate parent.
+// active or view is based on. The ParentIDs are ordered from the highest to the
+// lowest base, meaning they should be applied in order from the last index to
+// the first index. The first index should always be considered the active
+// snapshot's immediate parent.
 type Snapshot struct {
 	Kind      snapshots.Kind
 	ID        string

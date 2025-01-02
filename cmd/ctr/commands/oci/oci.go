@@ -45,12 +45,12 @@ var defaultSpecCommand = &cli.Command{
 			Usage: "Platform of the spec to print (Examples: 'linux/arm64', 'windows/amd64')",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		ctx, cancel := commands.AppContext(context)
+	Action: func(cliContext *cli.Context) error {
+		ctx, cancel := commands.AppContext(cliContext)
 		defer cancel()
 
 		platform := platforms.DefaultString()
-		if plat := context.String("platform"); plat != "" {
+		if plat := cliContext.String("platform"); plat != "" {
 			platform = plat
 		}
 

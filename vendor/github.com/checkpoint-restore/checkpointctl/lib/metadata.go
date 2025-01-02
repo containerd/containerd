@@ -16,6 +16,7 @@ const (
 	// container archive
 	ConfigDumpFile             = "config.dump"
 	SpecDumpFile               = "spec.dump"
+	StatusDumpFile             = "status.dump"
 	NetworkStatusFile          = "network.status"
 	CheckpointDirectory        = "checkpoint"
 	CheckpointVolumesDirectory = "volumes"
@@ -46,6 +47,10 @@ type ContainerConfig struct {
 	CheckpointedAt  time.Time `json:"checkpointedTime"`
 	RestoredAt      time.Time `json:"restoredTime"`
 	Restored        bool      `json:"restored"`
+}
+
+type Spec struct {
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type ContainerdStatus struct {

@@ -96,14 +96,14 @@ func init() {
 				return nil, err
 			}
 
-			//get TracingProcessorPlugin which is a dependency
-			plugins, err := ic.GetByType(plugins.TracingProcessorPlugin)
+			// get TracingProcessorPlugin which is a dependency
+			tracingProcessors, err := ic.GetByType(plugins.TracingProcessorPlugin)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get tracing processors: %w", err)
 			}
 
-			procs := make([]trace.SpanProcessor, 0, len(plugins))
-			for _, p := range plugins {
+			procs := make([]trace.SpanProcessor, 0, len(tracingProcessors))
+			for _, p := range tracingProcessors {
 				procs = append(procs, p.(trace.SpanProcessor))
 			}
 
@@ -203,6 +203,9 @@ func newTracer(ctx context.Context, procs []trace.SpanProcessor) (io.Closer, err
 }
 
 func warnTraceConfig(ic *plugin.InitContext) error {
+	if ic.Config == nil {
+		return nil
+	}
 	ctx := ic.Context
 	cfg := ic.Config.(*TraceConfig)
 	var warn bool
@@ -227,6 +230,9 @@ func warnTraceConfig(ic *plugin.InitContext) error {
 }
 
 func warnOTLPConfig(ic *plugin.InitContext) error {
+	if ic.Config == nil {
+		return nil
+	}
 	ctx := ic.Context
 	cfg := ic.Config.(*OTLPConfig)
 	var warn bool

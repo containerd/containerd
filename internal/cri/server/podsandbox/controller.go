@@ -46,7 +46,7 @@ import (
 
 func init() {
 	registry.Register(&plugin.Registration{
-		Type: plugins.SandboxControllerPlugin,
+		Type: plugins.PodSandboxPlugin,
 		ID:   "podsandbox",
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
@@ -154,6 +154,14 @@ func (c *Controller) Wait(ctx context.Context, sandboxID string) (sandbox.ExitSt
 		ExitedAt:   exit.ExitTime(),
 	}, err
 
+}
+
+func (c *Controller) Update(
+	ctx context.Context,
+	sandboxID string,
+	sandbox sandbox.Sandbox,
+	fields ...string) error {
+	return nil
 }
 
 func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, exitCh <-chan containerd.ExitStatus) error {

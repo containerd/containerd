@@ -45,6 +45,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/platforms"
 )
 
@@ -55,6 +56,7 @@ func init() {
 
 // CreateContainer creates a new container in the given PodSandbox.
 func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateContainerRequest) (_ *runtime.CreateContainerResponse, retErr error) {
+	span := tracing.SpanFromContext(ctx)
 	config := r.GetConfig()
 	log.G(ctx).Debugf("Container config %+v", config)
 	sandboxConfig := r.GetSandboxConfig()
@@ -72,7 +74,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxID  = cstatus.SandboxID
 		sandboxPid = cstatus.Pid
 	)
-
+	span.SetAttributes(
+		tracing.Attribute("sandbox.id", sandboxID),
+		tracing.Attribute("sandbox.pid", sandboxPid),
+	)
 	// Generate unique id and name for the container and reserve the name.
 	// Reserve the container name to avoid concurrent `CreateContainer` request creating
 	// the same container.
@@ -87,6 +92,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
+	span.SetAttributes(
+		tracing.Attribute("container.id", id),
+		tracing.Attribute("container.name", name),
+	)
 	defer func() {
 		// Release the name if the function returns with an error.
 		if retErr != nil {
@@ -112,7 +121,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err != nil {
 		return nil, fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
 	}
-
+	span.SetAttributes(
+		tracing.Attribute("container.image.ref", containerdImage.Name()),
+	)
 	start := time.Now()
 
 	// Create container root directory.
@@ -172,6 +183,10 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	log.G(ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, sandboxID, id)
 
+	imageName := containerdImage.Name()
+	if name := config.GetImage().GetUserSpecifiedImage(); name != "" {
+		imageName = name
+	}
 	spec, err := c.buildContainerSpec(
 		platform,
 		id,
@@ -179,7 +194,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		sandboxPid,
 		sandbox.NetNSPath,
 		containerName,
-		containerdImage.Name(),
+		imageName,
 		config,
 		sandboxConfig,
 		&image.ImageSpec.Config,
@@ -272,7 +287,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		return nil, fmt.Errorf("failed to get container spec opts: %w", err)
 	}
 
-	containerLabels := buildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindContainer)
+	containerLabels := util.BuildLabels(config.Labels, image.ImageSpec.Config.Labels, crilabels.ContainerKindContainer)
 
 	// TODO the sandbox in the cache should hold this info
 	runtimeName, runtimeOption, err := c.runtimeInfo(ctx, sandboxID)
@@ -345,6 +360,9 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	containerCreateTimer.WithValues(ociRuntime.Type).UpdateSince(start)
 
+	span.AddEvent("container created",
+		tracing.Attribute("container.create.duration", time.Since(start).String()),
+	)
 	return &runtime.CreateContainerResponse{ContainerId: id}, nil
 }
 
@@ -747,14 +765,10 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithRootFSReadonly())
 	}
 
-	if c.config.DisableCgroup {
-		specOpts = append(specOpts, customopts.WithDisabledCgroups)
-	} else {
-		specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
-		if sandboxConfig.GetLinux().GetCgroupParent() != "" {
-			cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
-			specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
-		}
+	specOpts = append(specOpts, customopts.WithResources(config.GetLinux().GetResources(), c.config.TolerateMissingHugetlbController, c.config.DisableHugetlbController))
+	if sandboxConfig.GetLinux().GetCgroupParent() != "" {
+		cgroupsPath := getCgroupsPath(sandboxConfig.GetLinux().GetCgroupParent(), id)
+		specOpts = append(specOpts, oci.WithCgroup(cgroupsPath))
 	}
 
 	supplementalGroups := securityContext.GetSupplementalGroups()
@@ -781,12 +795,12 @@ func (c *criService) buildLinuxSpec(
 		specOpts = append(specOpts, oci.WithRdt(rdtClass, "", ""))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(config.Annotations,
 		ociRuntime.ContainerAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
@@ -916,12 +930,12 @@ func (c *criService) buildWindowsSpec(
 	// when trying to run the init process.
 	specOpts = append(specOpts, oci.WithUser(username))
 
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(config.Annotations,
 		ociRuntime.ContainerAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
@@ -968,12 +982,12 @@ func (c *criService) buildDarwinSpec(
 
 	specOpts = append(specOpts, customopts.WithDarwinMounts(c.os, config, extraMounts))
 
-	for pKey, pValue := range getPassthroughAnnotations(sandboxConfig.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}
 
-	for pKey, pValue := range getPassthroughAnnotations(config.Annotations,
+	for pKey, pValue := range util.GetPassthroughAnnotations(config.Annotations,
 		ociRuntime.ContainerAnnotations) {
 		specOpts = append(specOpts, customopts.WithAnnotation(pKey, pValue))
 	}

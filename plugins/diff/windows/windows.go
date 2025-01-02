@@ -28,6 +28,14 @@ import (
 	"time"
 
 	"github.com/Microsoft/go-winio"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -37,13 +45,6 @@ import (
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func init() {
@@ -197,11 +198,13 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		config.MediaType = ocispec.MediaTypeImageLayerGzip
 	}
 
-	var isCompressed bool
+	compressionType := compression.Uncompressed
 	switch config.MediaType {
 	case ocispec.MediaTypeImageLayer:
 	case ocispec.MediaTypeImageLayerGzip:
-		isCompressed = true
+		compressionType = compression.Gzip
+	case ocispec.MediaTypeImageLayerZstd:
+		compressionType = compression.Zstd
 	default:
 		return emptyDesc, fmt.Errorf("unsupported diff media type: %v: %w", config.MediaType, errdefs.ErrNotImplemented)
 	}
@@ -245,10 +248,10 @@ func (s windowsDiff) Compare(ctx context.Context, lower, upper []mount.Mount, op
 		return emptyDesc, err
 	}
 
-	if isCompressed {
+	if compressionType != compression.Uncompressed {
 		dgstr := digest.SHA256.Digester()
 		var compressed io.WriteCloser
-		compressed, err = compression.CompressStream(cw, compression.Gzip)
+		compressed, err = compression.CompressStream(cw, compressionType)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to get compressed stream: %w", err)
 		}

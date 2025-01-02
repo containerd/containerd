@@ -76,7 +76,7 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 			podCriuVersion,
 			r.GetContainerId(),
 		)
-		log.G(ctx).WithError(err).Errorf(errorMessage)
+		log.G(ctx).WithError(err).Error(errorMessage)
 		return nil, fmt.Errorf(
 			"%s: %w",
 			errorMessage,

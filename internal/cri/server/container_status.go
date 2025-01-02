@@ -24,6 +24,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -60,7 +61,10 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 			imageRef = repoDigests[0]
 		}
 	}
-	status := toCRIContainerStatus(container, spec, imageRef)
+	status, err := toCRIContainerStatus(ctx, container, spec, imageRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ContainerStatus: %w", err)
+	}
 	if status.GetCreatedAt() == 0 {
 		// CRI doesn't allow CreatedAt == 0.
 		info, err := container.Container.Info(ctx)
@@ -82,7 +86,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 }
 
 // toCRIContainerStatus converts internal container object to CRI container status.
-func toCRIContainerStatus(container containerstore.Container, spec *runtime.ImageSpec, imageRef string) *runtime.ContainerStatus {
+func toCRIContainerStatus(ctx context.Context, container containerstore.Container, spec *runtime.ImageSpec, imageRef string) (*runtime.ContainerStatus, error) {
 	meta := container.Metadata
 	status := container.Status.Get()
 	reason := status.Reason
@@ -104,6 +108,12 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		st, ft = status.StartedAt, status.FinishedAt
 	}
 
+	runtimeUser, err := toCRIContainerUser(ctx, container)
+	if err != nil {
+		log.G(ctx).WithField("Id", meta.ID).WithError(err).Debug("failed to get ContainerUser. returning an empty ContainerUser")
+		runtimeUser = &runtime.ContainerUser{}
+	}
+
 	return &runtime.ContainerStatus{
 		Id:          meta.ID,
 		Metadata:    meta.Config.GetMetadata(),
@@ -121,7 +131,8 @@ func toCRIContainerStatus(container containerstore.Container, spec *runtime.Imag
 		Mounts:      meta.Config.GetMounts(),
 		LogPath:     meta.LogPath,
 		Resources:   status.Resources,
-	}
+		User:        runtimeUser,
+	}, nil
 }
 
 // ContainerInfo is extra information for a container.

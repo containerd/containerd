@@ -28,7 +28,6 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/oci"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/image-spec/identity"
@@ -321,7 +320,7 @@ func WithSpec(s *oci.Spec, opts ...oci.SpecOpts) NewContainerOpts {
 		}
 
 		var err error
-		c.Spec, err = protobuf.MarshalAnyToProto(s)
+		c.Spec, err = typeurl.MarshalAnyToProto(s)
 		return err
 	}
 }

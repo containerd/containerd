@@ -38,9 +38,9 @@ var listCommand = &cli.Command{
 			Usage:   "Print only the task id",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		quiet := context.Bool("quiet")
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		quiet := cliContext.Bool("quiet")
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}

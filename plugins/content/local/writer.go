@@ -26,10 +26,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
+
+	"github.com/containerd/containerd/v2/core/content"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 )
 
 // writer represents a write transaction against the blob store.
@@ -76,7 +78,7 @@ func (w *writer) Write(p []byte) (n int, err error) {
 
 func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Ensure even on error the writer is fully closed
-	defer unlock(w.ref)
+	defer w.s.unlock(w.ref)
 
 	var base content.Info
 	for _, opt := range opts {
@@ -137,6 +139,14 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 		return err
 	}
 
+	// Enable content blob integrity verification if supported
+
+	if w.s.integritySupported {
+		if err := fsverity.Enable(target); err != nil {
+			log.G(ctx).Warnf("failed to enable integrity for blob %v: %s", target, err.Error())
+		}
+	}
+
 	// Ingest has now been made available in the content store, attempt to complete
 	// setting metadata but errors should only be logged and not returned since
 	// the content store cannot be cleanly rolled back.
@@ -188,7 +198,7 @@ func (w *writer) Close() (err error) {
 		err = w.fp.Close()
 		writeTimestampFile(filepath.Join(w.path, "updatedat"), w.updatedAt)
 		w.fp = nil
-		unlock(w.ref)
+		w.s.unlock(w.ref)
 		return
 	}
 

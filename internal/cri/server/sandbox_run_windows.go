@@ -16,6 +16,17 @@
 
 package server
 
+import (
+	"fmt"
+
+	"github.com/containerd/containerd/v2/pkg/netns"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+)
+
 func (c *criService) bringUpLoopback(string) error {
 	return nil
+}
+
+func (c *criService) setupNetnsWithinUserns(basedir string, cfg *runtime.UserNamespace) (*netns.NetNS, error) {
+	return nil, fmt.Errorf("unsupported to setup netns within userns on windows platform")
 }

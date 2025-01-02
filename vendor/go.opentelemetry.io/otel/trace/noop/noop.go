@@ -67,10 +67,12 @@ func (t Tracer) Start(ctx context.Context, _ string, _ ...trace.SpanStartOption)
 		span = Span{sc: sc}
 	} else {
 		// No parent, return a No-Op span with an empty span context.
-		span = Span{}
+		span = noopSpanInstance
 	}
 	return trace.ContextWithSpan(ctx, span), span
 }
+
+var noopSpanInstance trace.Span = Span{}
 
 // Span is an OpenTelemetry No-Op Span.
 type Span struct {

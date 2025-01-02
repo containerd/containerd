@@ -92,7 +92,7 @@ func (c *netConv) Host(address string) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, n)
 	attrs = append(attrs, c.HostName(h))
 	if p > 0 {
-		attrs = append(attrs, c.HostPort(int(p)))
+		attrs = append(attrs, c.HostPort(p))
 	}
 	return attrs
 }
@@ -138,7 +138,7 @@ func (c *netConv) Peer(address string) []attribute.KeyValue {
 	attrs := make([]attribute.KeyValue, 0, n)
 	attrs = append(attrs, c.PeerName(h))
 	if p > 0 {
-		attrs = append(attrs, c.PeerPort(int(p)))
+		attrs = append(attrs, c.PeerPort(p))
 	}
 	return attrs
 }
@@ -195,7 +195,7 @@ func splitHostPort(hostport string) (host string, port int) {
 	if err != nil {
 		return
 	}
-	return host, int(p)
+	return host, int(p) // nolint: gosec  // Bitsize checked to be 16 above.
 }
 
 func netProtocol(proto string) (name string, version string) {

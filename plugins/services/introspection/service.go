@@ -22,15 +22,16 @@ import (
 	"fmt"
 
 	api "github.com/containerd/containerd/api/services/introspection/v1"
-	"github.com/containerd/containerd/v2/core/introspection"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/services"
-	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/v2/core/introspection"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/v2/plugins/services"
 )
 
 func init() {
@@ -71,12 +72,12 @@ func (s *server) Register(server *grpc.Server) error {
 
 func (s *server) Plugins(ctx context.Context, req *api.PluginsRequest) (resp *api.PluginsResponse, err error) {
 	resp, err = s.local.Plugins(ctx, req.Filters...)
-	return resp, errdefs.ToGRPC(err)
+	return resp, errgrpc.ToGRPC(err)
 }
 
 func (s *server) Server(ctx context.Context, _ *ptypes.Empty) (resp *api.ServerResponse, err error) {
 	resp, err = s.local.Server(ctx)
-	return resp, errdefs.ToGRPC(err)
+	return resp, errgrpc.ToGRPC(err)
 }
 
 func (s *server) PluginInfo(ctx context.Context, req *api.PluginInfoRequest) (resp *api.PluginInfoResponse, err error) {
@@ -84,10 +85,10 @@ func (s *server) PluginInfo(ctx context.Context, req *api.PluginInfoRequest) (re
 	if req.Options != nil {
 		options, err = typeurl.UnmarshalAny(req.Options)
 		if err != nil {
-			return resp, errdefs.ToGRPC(fmt.Errorf("failed to unmarshal plugin info Options: %w", err))
+			return resp, errgrpc.ToGRPC(fmt.Errorf("failed to unmarshal plugin info Options: %w", err))
 		}
 	}
 
 	resp, err = s.local.PluginInfo(ctx, req.Type, req.ID, options)
-	return resp, errdefs.ToGRPC(err)
+	return resp, errgrpc.ToGRPC(err)
 }

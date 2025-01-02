@@ -82,8 +82,8 @@ var killCommand = &cli.Command{
 			Usage:   "Send signal to all processes inside the container",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+	Action: func(cliContext *cli.Context) error {
+		id := cliContext.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
@@ -92,14 +92,14 @@ var killCommand = &cli.Command{
 			return err
 		}
 		var (
-			all    = context.Bool("all")
-			execID = context.String("exec-id")
+			all    = cliContext.Bool("all")
+			execID = cliContext.String("exec-id")
 			opts   []containerd.KillOpts
 		)
 		if all && execID != "" {
 			return errors.New("specify an exec-id or all; not both")
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -114,8 +114,8 @@ var killCommand = &cli.Command{
 		if err != nil {
 			return err
 		}
-		if context.String("signal") != "" {
-			sig, err = signal.ParseSignal(context.String("signal"))
+		if cliContext.String("signal") != "" {
+			sig, err = signal.ParseSignal(cliContext.String("signal"))
 			if err != nil {
 				return err
 			}

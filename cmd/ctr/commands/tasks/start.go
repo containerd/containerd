@@ -55,16 +55,16 @@ var startCommand = &cli.Command{
 			Usage:   "Detach from the task after it has started execution",
 		},
 	}...),
-	Action: func(context *cli.Context) error {
+	Action: func(cliContext *cli.Context) error {
 		var (
 			err    error
-			id     = context.Args().Get(0)
-			detach = context.Bool("detach")
+			id     = cliContext.Args().Get(0)
+			detach = cliContext.Bool("detach")
 		)
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -80,8 +80,8 @@ var startCommand = &cli.Command{
 		}
 		var (
 			tty    = spec.Process.Terminal
-			opts   = GetNewTaskOpts(context)
-			ioOpts = []cio.Opt{cio.WithFIFODir(context.String("fifo-dir"))}
+			opts   = GetNewTaskOpts(cliContext)
+			ioOpts = []cio.Opt{cio.WithFIFODir(cliContext.String("fifo-dir"))}
 		)
 		var con console.Console
 		if tty {
@@ -92,7 +92,7 @@ var startCommand = &cli.Command{
 			}
 		}
 
-		task, err := NewTask(ctx, client, container, "", con, context.Bool("null-io"), context.String("log-uri"), ioOpts, opts...)
+		task, err := NewTask(ctx, client, container, "", con, cliContext.Bool("null-io"), cliContext.String("log-uri"), ioOpts, opts...)
 		if err != nil {
 			return err
 		}
@@ -108,8 +108,8 @@ var startCommand = &cli.Command{
 				return err
 			}
 		}
-		if context.IsSet("pid-file") {
-			if err := commands.WritePidFile(context.String("pid-file"), int(task.Pid())); err != nil {
+		if cliContext.IsSet("pid-file") {
+			if err := commands.WritePidFile(cliContext.String("pid-file"), int(task.Pid())); err != nil {
 				return err
 			}
 		}

@@ -13,7 +13,7 @@ on:
 name: Release
 
 env:
-  GO_VERSION: "1.22.3"
+  GO_VERSION: "1.23.4"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -22,14 +22,14 @@ jobs:
   check:
     name: Check Signed Tag
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.ref }}
           path: src/github.com/containerd/containerd
@@ -57,7 +57,7 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
@@ -93,7 +93,7 @@ jobs:
           releasever="${releasever#refs/tags/}"
           echo "RELEASE_VER=${releasever}" >> $GITHUB_ENV
       - name: Checkout containerd
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Intentionally use github.repository instead of containerd/containerd to
           # make this action runnable on forks.
@@ -103,10 +103,10 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
         with:
           use: true
-      - uses: crazy-max/ghaction-github-runtime@v3 # sets up needed vars for caching to github
+      - uses: crazy-max/ghaction-github-runtime@b3a9207c0e1ef41f4cf215303c976869d0c2c1c4 # v3.0.0
       - name: Make
         shell: bash
         run: |
@@ -127,7 +127,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
@@ -137,16 +137,25 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    runs-on: ubuntu-20.04
+      id-token: write
+      attestations: write
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           path: builds
+      - name: Attest Artifacts
+        id: attest
+        uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
+        with:
+          subject-path: ./builds/release-tars-**/*.tar.gz
+      - name: Rename attestation artifact
+        run: mv ${{ steps.attest.outputs.bundle-path }} containerd-${{ needs.check.outputs.stringver }}-attestation.intoto.jsonl
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048 # v2.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true
@@ -156,3 +165,5 @@ jobs:
           body_path: ./builds/containerd-release-notes/release-notes.md
           files: |
             builds/release-tars-**/*
+            containerd-*-attestation.intoto.jsonl
+          make_latest: false

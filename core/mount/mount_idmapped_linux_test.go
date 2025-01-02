@@ -20,14 +20,42 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
 
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/unix"
 )
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent1(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(1)
+	}
+}
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent10(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(10)
+	}
+}
+
+func benchmarkBatchRunGetUsernsFD(n int) {
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			fd, err := getUsernsFD(testUIDMaps, testGIDMaps)
+			if err != nil {
+				panic(err)
+			}
+			fd.Close()
+		}()
+	}
+	wg.Wait()
+}
 
 var (
 	testUIDMaps = []syscall.SysProcIDMap{
@@ -43,7 +71,7 @@ var (
 	}
 )
 
-func TestGetUsernsFD(t *testing.T) {
+func TestIdmappedMount(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	k512 := kernel.KernelVersion{Kernel: 5, Major: 12}
@@ -53,15 +81,12 @@ func TestGetUsernsFD(t *testing.T) {
 		t.Skip("GetUsernsFD requires kernel >= 5.12")
 	}
 
-	t.Run("basic", testGetUsernsFDBasic)
+	t.Run("GetUsernsFD", testGetUsernsFD)
 
-	t.Run("when kill child process before write u[g]id maps", testGetUsernsFDKillChildWhenWriteUGIDMaps)
-
-	t.Run("when kill child process after open u[g]id_map file", testGetUsernsFDKillChildAfterOpenUGIDMapFiles)
-
+	t.Run("IDMapMount", testIDMapMount)
 }
 
-func testGetUsernsFDBasic(t *testing.T) {
+func testGetUsernsFD(t *testing.T) {
 	for idx, tc := range []struct {
 		uidMaps string
 		gidMaps string
@@ -99,108 +124,21 @@ func testGetUsernsFDBasic(t *testing.T) {
 	}
 }
 
-func testGetUsernsFDKillChildWhenWriteUGIDMaps(t *testing.T) {
-	hookFunc := func(reap bool) func(uintptr, *os.File) {
-		return func(_pid uintptr, pidFD *os.File) {
-			err := unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
-			require.NoError(t, err)
+func testIDMapMount(t *testing.T) {
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
 
-			if reap {
-				pidfdWaitid(pidFD)
-			}
-		}
-	}
+	srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps)
+	destDir := t.TempDir()
+	defer func() {
+		require.NoError(t, UnmountAll(destDir, 0))
+	}()
 
-	for _, tcReap := range []bool{true, false} {
-		t.Run(fmt.Sprintf("#reap=%v", tcReap), func(t *testing.T) {
-			updateTestHookKillForGetUsernsFD(t, nil, hookFunc(tcReap))
-
-			usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
-			require.NoError(t, err)
-			defer usernsFD.Close()
-
-			srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps)
-			destDir := t.TempDir()
-			defer func() {
-				require.NoError(t, UnmountAll(destDir, 0))
-			}()
-
-			err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
-			usernsFD.Close()
-			require.NoError(t, err)
-			checkFunc(destDir)
-		})
-	}
-
-}
-
-func testGetUsernsFDKillChildAfterOpenUGIDMapFiles(t *testing.T) {
-	hookFunc := func(reap bool) func(uintptr, *os.File) {
-		return func(_pid uintptr, pidFD *os.File) {
-			err := unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
-			require.NoError(t, err)
-
-			if reap {
-				pidfdWaitid(pidFD)
-			}
-		}
-	}
-
-	for _, tc := range []struct {
-		reap     bool
-		expected error
-	}{
-		{
-			reap:     false,
-			expected: nil,
-		},
-		{
-			reap:     true,
-			expected: syscall.ESRCH,
-		},
-	} {
-		t.Run(fmt.Sprintf("#reap=%v", tc.reap), func(t *testing.T) {
-			updateTestHookKillForGetUsernsFD(t, hookFunc(tc.reap), nil)
-
-			usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
-			if tc.expected != nil {
-				require.Error(t, tc.expected, err)
-				return
-			}
-
-			require.NoError(t, err)
-			defer usernsFD.Close()
-
-			srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps)
-			destDir := t.TempDir()
-			defer func() {
-				require.NoError(t, UnmountAll(destDir, 0))
-			}()
-
-			err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
-			usernsFD.Close()
-			require.NoError(t, err)
-			checkFunc(destDir)
-		})
-	}
-}
-
-func updateTestHookKillForGetUsernsFD(t *testing.T, newBeforeFunc, newAfterFunc func(uintptr, *os.File)) {
-	testHookLock.Lock()
-
-	oldBefore := testHookKillChildBeforePidfdSendSignal
-	oldAfter := testHookKillChildAfterPidfdSendSignal
-	t.Cleanup(func() {
-		testHookKillChildBeforePidfdSendSignal = oldBefore
-		testHookKillChildAfterPidfdSendSignal = oldAfter
-		testHookLock.Unlock()
-	})
-	if newBeforeFunc != nil {
-		testHookKillChildBeforePidfdSendSignal = newBeforeFunc
-	}
-	if newAfterFunc != nil {
-		testHookKillChildAfterPidfdSendSignal = newAfterFunc
-	}
+	err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
+	usernsFD.Close()
+	require.NoError(t, err)
+	checkFunc(destDir)
 }
 
 func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap) (_srcDir string, _verifyFunc func(destDir string)) {

@@ -74,6 +74,7 @@ func WithVolumes(volumeMounts map[string]string, platform imagespec.Platform) co
 		if len(mounts) == 1 && mounts[0].Type == "overlay" {
 			mounts[0].Options = append(mounts[0].Options, "ro")
 		}
+		mounts = mount.RemoveVolatileOption(mounts)
 
 		root, err := os.MkdirTemp("", "ctd-volume")
 		if err != nil {

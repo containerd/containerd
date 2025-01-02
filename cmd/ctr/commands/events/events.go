@@ -35,14 +35,14 @@ var Command = &cli.Command{
 	Name:    "events",
 	Aliases: []string{"event"},
 	Usage:   "Display containerd events",
-	Action: func(context *cli.Context) error {
-		client, ctx, cancel, err := commands.NewClient(context)
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
 		defer cancel()
 		eventsClient := client.EventService()
-		eventsCh, errCh := eventsClient.Subscribe(ctx, context.Args().Slice()...)
+		eventsCh, errCh := eventsClient.Subscribe(ctx, cliContext.Args().Slice()...)
 		for {
 			var e *events.Envelope
 			select {

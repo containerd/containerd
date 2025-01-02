@@ -38,6 +38,7 @@ type ImageList struct {
 	VolumeOwnership  string
 	ArgsEscaped      string
 	DockerSchema1    string
+	Nginx            string
 }
 
 var (
@@ -57,6 +58,7 @@ func initImages(imageListFile string) {
 		VolumeOwnership:  "ghcr.io/containerd/volume-ownership:2.1",
 		ArgsEscaped:      "cplatpublic.azurecr.io/args-escaped-test-image-ns:1.0",
 		DockerSchema1:    "registry.k8s.io/busybox@sha256:4bdd623e848417d96127e16037743f0cd8b528c026e9175e22a84f639eca58ff",
+		Nginx:            "ghcr.io/containerd/nginx:1.27.0",
 	}
 
 	if imageListFile != "" {
@@ -96,6 +98,8 @@ const (
 	ArgsEscaped
 	// DockerSchema1 image with docker schema 1
 	DockerSchema1
+	// Nginx image
+	Nginx
 )
 
 func initImageMap(imageList ImageList) map[int]string {
@@ -108,6 +112,7 @@ func initImageMap(imageList ImageList) map[int]string {
 	images[VolumeOwnership] = imageList.VolumeOwnership
 	images[ArgsEscaped] = imageList.ArgsEscaped
 	images[DockerSchema1] = imageList.DockerSchema1
+	images[Nginx] = imageList.Nginx
 	return images
 }
 

@@ -27,7 +27,13 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
+
+func TestEmpty(t *testing.T) {
+	// NOTE: It's used to register -test.root for all platforms.
+	testutil.RequiresRoot(t)
+}
 
 func TestSandboxContainerSpec(t *testing.T) {
 	switch goruntime.GOOS {
@@ -97,7 +103,7 @@ func TestSandboxContainerSpec(t *testing.T) {
 		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
-			config, imageConfig, specCheck := getRunPodSandboxTestData()
+			config, imageConfig, specCheck := getRunPodSandboxTestData(c.config)
 			if test.configChange != nil {
 				test.configChange(config)
 			}
@@ -154,7 +160,9 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 				Name:      "sandbox_1",
 				NetNSPath: "/home/cloud",
 			}
-			meta.Config, _, _ = getRunPodSandboxTestData()
+
+			c := newControllerService()
+			meta.Config, _, _ = getRunPodSandboxTestData(c.config)
 			if test.configChange != nil {
 				test.configChange(meta.Config)
 			}

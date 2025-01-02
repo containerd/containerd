@@ -43,16 +43,16 @@ var restoreCommand = &cli.Command{
 			Usage: "Restore the runtime and memory data from the checkpoint",
 		},
 	},
-	Action: func(context *cli.Context) error {
-		id := context.Args().First()
+	Action: func(cliContext *cli.Context) error {
+		id := cliContext.Args().First()
 		if id == "" {
 			return errors.New("container id must be provided")
 		}
-		ref := context.Args().Get(1)
+		ref := cliContext.Args().Get(1)
 		if ref == "" {
 			return errors.New("ref must be provided")
 		}
-		client, ctx, cancel, err := commands.NewClient(context)
+		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ var restoreCommand = &cli.Command{
 			containerd.WithRestoreSpec,
 			containerd.WithRestoreRuntime,
 		}
-		if context.Bool("rw") {
+		if cliContext.Bool("rw") {
 			opts = append(opts, containerd.WithRestoreRW)
 		}
 
@@ -85,7 +85,7 @@ var restoreCommand = &cli.Command{
 			return err
 		}
 		topts := []containerd.NewTaskOpts{}
-		if context.Bool("live") {
+		if cliContext.Bool("live") {
 			topts = append(topts, containerd.WithTaskCheckpoint(checkpoint))
 		}
 		spec, err := ctr.Spec(ctx)

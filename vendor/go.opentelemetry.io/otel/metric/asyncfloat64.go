@@ -39,7 +39,7 @@ type Float64ObservableCounter interface {
 }
 
 // Float64ObservableCounterConfig contains options for asynchronous counter
-// instruments that record int64 values.
+// instruments that record float64 values.
 type Float64ObservableCounterConfig struct {
 	description string
 	unit        string
@@ -97,7 +97,7 @@ type Float64ObservableUpDownCounter interface {
 }
 
 // Float64ObservableUpDownCounterConfig contains options for asynchronous
-// counter instruments that record int64 values.
+// counter instruments that record float64 values.
 type Float64ObservableUpDownCounterConfig struct {
 	description string
 	unit        string
@@ -154,7 +154,7 @@ type Float64ObservableGauge interface {
 }
 
 // Float64ObservableGaugeConfig contains options for asynchronous counter
-// instruments that record int64 values.
+// instruments that record float64 values.
 type Float64ObservableGaugeConfig struct {
 	description string
 	unit        string
@@ -213,7 +213,7 @@ type Float64Observer interface {
 }
 
 // Float64Callback is a function registered with a Meter that makes
-// observations for a Float64Observerable instrument it is registered with.
+// observations for a Float64Observable instrument it is registered with.
 // Calls to the Float64Observer record measurement values for the
 // Float64Observable.
 //

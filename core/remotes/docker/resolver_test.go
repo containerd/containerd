@@ -33,13 +33,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
-	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/errdefs"
 	digest "github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/remotes/docker/auth"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 func TestHTTPResolver(t *testing.T) {
@@ -479,6 +480,34 @@ func TestHTTPFallbackTimeoutResolver(t *testing.T) {
 	}
 
 	runBasicTest(t, "testname", sf)
+}
+
+func TestHTTPFallbackPortError(t *testing.T) {
+	// This test only checks the isPortError since testing the whole http fallback would
+	// require listening on 80 and making sure nothing is listening on 443.
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	host := l.Addr().String()
+	err = l.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = net.Dial("tcp", host)
+	if err == nil {
+		t.Fatal("Dial should fail after close")
+	}
+
+	if isPortError(err, host) {
+		t.Fatalf("Expected no port error for %s with %v", host, err)
+	}
+	if !isPortError(err, "127.0.0.1") {
+		t.Fatalf("Expected port error for 127.0.0.1 with %v", err)
+	}
+
 }
 
 func TestResolveProxy(t *testing.T) {
