@@ -51,12 +51,13 @@ func testEnv(t *testing.T) (context.Context, *bolt.DB, func(), error) {
 
 func FuzzImageStore(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		imageStoreOptions := map[int]string{
-			0: "Create",
-			1: "List",
-			2: "Update",
-			3: "Delete",
-		}
+		const (
+			opCreate = "Create"
+			opList   = "List"
+			opUpdate = "Update"
+			opDelete = "Delete"
+		)
+		imageStoreOptions := []string{opCreate, opList, opUpdate, opDelete}
 
 		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
@@ -76,27 +77,27 @@ func FuzzImageStore(f *testing.F) {
 				return
 			}
 			switch imageStoreOptions[opType%len(imageStoreOptions)] {
-			case "Create":
+			case opCreate:
 				i := images.Image{}
 				err := f.GenerateStruct(&i)
 				if err != nil {
 					return
 				}
 				_, _ = store.Create(ctx, i)
-			case "List":
+			case opList:
 				newFs, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_, _ = store.List(ctx, newFs)
-			case "Update":
+			case opUpdate:
 				i := images.Image{}
 				err := f.GenerateStruct(&i)
 				if err != nil {
 					return
 				}
 				_, _ = store.Update(ctx, i)
-			case "Delete":
+			case opDelete:
 				name, err := f.GetString()
 				if err != nil {
 					return
@@ -109,14 +110,15 @@ func FuzzImageStore(f *testing.F) {
 
 func FuzzLeaseManager(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		leaseManagerOptions := map[int]string{
-			0: "Create",
-			1: "List",
-			2: "AddResource",
-			3: "Delete",
-			4: "DeleteResource",
-			5: "ListResources",
-		}
+		const (
+			opCreate         = "Create"
+			opList           = "List"
+			opAddResource    = "AddResource"
+			opDelete         = "Delete"
+			opDeleteResource = "DeleteResource"
+			opListResources  = "ListResources"
+		)
+		leaseManagerOptions := []string{opCreate, opList, opAddResource, opDelete, opDeleteResource, opListResources}
 		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
 			return
@@ -136,7 +138,7 @@ func FuzzLeaseManager(f *testing.F) {
 				return
 			}
 			switch leaseManagerOptions[opType%len(leaseManagerOptions)] {
-			case "Create":
+			case opCreate:
 				err := db.Update(func(tx *bolt.Tx) error {
 					sm := make(map[string]string)
 					err2 := f.FuzzMap(&sm)
@@ -149,9 +151,9 @@ func FuzzLeaseManager(f *testing.F) {
 				if err != nil {
 					return
 				}
-			case "List":
+			case opList:
 				_, _ = lm.List(ctx)
-			case "AddResource":
+			case opAddResource:
 				l := leases.Lease{}
 				err := f.GenerateStruct(&l)
 				if err != nil {
@@ -166,14 +168,14 @@ func FuzzLeaseManager(f *testing.F) {
 					_ = lm.AddResource(metadata.WithTransactionContext(ctx, tx), l, r)
 					return nil
 				})
-			case "Delete":
+			case opDelete:
 				l := leases.Lease{}
 				err = f.GenerateStruct(&l)
 				if err != nil {
 					return
 				}
 				_ = lm.Delete(ctx, l)
-			case "DeleteResource":
+			case opDeleteResource:
 				l := leases.Lease{}
 				err := f.GenerateStruct(&l)
 				if err != nil {
@@ -185,7 +187,7 @@ func FuzzLeaseManager(f *testing.F) {
 					return
 				}
 				_ = lm.DeleteResource(ctx, l, r)
-			case "ListResources":
+			case opListResources:
 				l := leases.Lease{}
 				err := f.GenerateStruct(&l)
 				if err != nil {
@@ -199,13 +201,14 @@ func FuzzLeaseManager(f *testing.F) {
 
 func FuzzContainerStore(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		containerStoreOptions := map[int]string{
-			0: "Create",
-			1: "List",
-			2: "Delete",
-			3: "Update",
-			4: "Get",
-		}
+		const (
+			opCreate = "Create"
+			opList   = "List"
+			opDelete = "Delete"
+			opUpdate = "Update"
+			opGet    = "Get"
+		)
+		containerStoreOptions := []string{opCreate, opList, opDelete, opUpdate, opGet}
 		ctx, db, cancel, err := testEnv(t)
 		if err != nil {
 			return
@@ -226,7 +229,7 @@ func FuzzContainerStore(f *testing.F) {
 				return
 			}
 			switch containerStoreOptions[opType%len(containerStoreOptions)] {
-			case "Create":
+			case opCreate:
 				err := f.GenerateStruct(&c)
 				if err != nil {
 					return
@@ -235,25 +238,25 @@ func FuzzContainerStore(f *testing.F) {
 					_, _ = store.Create(metadata.WithTransactionContext(ctx, tx), c)
 					return nil
 				})
-			case "List":
+			case opList:
 				filt, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_, _ = store.List(ctx, filt)
-			case "Delete":
+			case opDelete:
 				id, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_ = store.Delete(ctx, id)
-			case "Update":
+			case opUpdate:
 				fieldpaths, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_, _ = store.Update(ctx, c, fieldpaths)
-			case "Get":
+			case opGet:
 				id, err := f.GetString()
 				if err != nil {
 					return
@@ -322,16 +325,17 @@ func testDB(t *testing.T, opt ...testOpt) (context.Context, *metadata.DB, func()
 
 func FuzzContentStore(f *testing.F) {
 	f.Fuzz(func(t *testing.T, data []byte) {
-		contentStoreOptions := map[int]string{
-			0: "Info",
-			1: "Update",
-			2: "Walk",
-			3: "Delete",
-			4: "ListStatuses",
-			5: "Status",
-			6: "Abort",
-			7: "Commit",
-		}
+		const (
+			opInfo         = "Info"
+			opUpdate       = "Update"
+			opWalk         = "Walk"
+			opDelete       = "Delete"
+			opListStatuses = "ListStatuses"
+			opStatus       = "Status"
+			opAbort        = "Abort"
+			opCommit       = "Commit"
+		)
+		contentStoreOptions := []string{opInfo, opUpdate, opWalk, opDelete, opListStatuses, opStatus, opAbort, opCommit}
 		ctx, db, cancel, err := testDB(t)
 		defer cancel()
 		if err != nil {
@@ -351,7 +355,7 @@ func FuzzContentStore(f *testing.F) {
 				return
 			}
 			switch contentStoreOptions[opType%len(contentStoreOptions)] {
-			case "Info":
+			case opInfo:
 				blob, err := f.GetBytes()
 				if err != nil {
 					return
@@ -362,19 +366,19 @@ func FuzzContentStore(f *testing.F) {
 					return
 				}
 				_, _ = cs.Info(ctx, dgst)
-			case "Update":
+			case opUpdate:
 				info := content.Info{}
 				err = f.GenerateStruct(&info)
 				if err != nil {
 					return
 				}
 				_, _ = cs.Update(ctx, info)
-			case "Walk":
+			case opWalk:
 				walkFn := func(info content.Info) error {
 					return nil
 				}
 				_ = cs.Walk(ctx, walkFn)
-			case "Delete":
+			case opDelete:
 				blob, err := f.GetBytes()
 				if err != nil {
 					return
@@ -385,21 +389,21 @@ func FuzzContentStore(f *testing.F) {
 					return
 				}
 				_ = cs.Delete(ctx, dgst)
-			case "ListStatuses":
+			case opListStatuses:
 				_, _ = cs.ListStatuses(ctx)
-			case "Status":
+			case opStatus:
 				ref, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_, _ = cs.Status(ctx, ref)
-			case "Abort":
+			case opAbort:
 				ref, err := f.GetString()
 				if err != nil {
 					return
 				}
 				_ = cs.Abort(ctx, ref)
-			case "Commit":
+			case opCommit:
 				desc := ocispec.Descriptor{}
 				err = f.GenerateStruct(&desc)
 				if err != nil {
