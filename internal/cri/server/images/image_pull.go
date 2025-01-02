@@ -999,8 +999,8 @@ func (c *CRIImageService) getInfoFromRuntimePlatforms(ctx context.Context, criRu
 		return defaultSnapshotter, defaultPlatform, nil
 	}
 	if _, ok := c.runtimePlatforms[criRuntimeHandler]; !ok {
-		log.G(ctx).Debugf("CRI runtimehandler %v not found in CRI image config. Falling back to default runtime %v", criRuntimeHandler, c.defaultRuntimeName)
-		return defaultSnapshotter, defaultPlatform, nil
+		log.G(ctx).Debugf("CRI runtimehandler %v not found in CRI image config", criRuntimeHandler)
+		return defaultSnapshotter, defaultPlatform, fmt.Errorf("CRI runtimehandler %v not found in CRI image config", criRuntimeHandler)
 	}
 	imagePlatform := c.runtimePlatforms[criRuntimeHandler]
 	return imagePlatform.Snapshotter, imagePlatform.Platform, nil
