@@ -34,7 +34,7 @@ import (
 
 func TestAdditionalGids(t *testing.T) {
 	testImage := images.Get(images.BusyBox)
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 	type testCase struct {
 		description string
 		opts        []ContainerOpts

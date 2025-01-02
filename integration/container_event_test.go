@@ -79,7 +79,7 @@ func TestContainerEvents(t *testing.T) {
 
 	t.Logf("Step 2: CreateContainer and check events")
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 	containerConfig := ContainerConfig(
 		"container1",
 		pauseImage,

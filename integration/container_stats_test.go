@@ -35,7 +35,7 @@ func TestContainerStats(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
@@ -77,7 +77,7 @@ func TestContainerConsumedStats(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "stats")
 
 	testImage := images.Get(images.ResourceConsumer)
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
@@ -154,7 +154,7 @@ func TestContainerListStats(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -209,7 +209,7 @@ func TestContainerListStatsWithIdFilter(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -269,7 +269,7 @@ func TestContainerListStatsWithSandboxIdFilter(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
@@ -330,7 +330,7 @@ func TestContainerListStatsWithIdSandboxIdFilter(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "running-pod", "statsls")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create container config and run containers in a pod")
 	containerConfigMap := make(map[string]*runtime.ContainerConfig)
