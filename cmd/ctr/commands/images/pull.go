@@ -89,6 +89,10 @@ command. As part of this process, we do the following:
 			Name:  "sync-fs",
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
+		&cli.BoolFlag{
+			Name:  "remote-snapshot-annotations",
+			Usage: "Propagate image information to snapshotters as image annotations",
+		},
 	),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -160,6 +164,10 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
+			if cliContext.Bool("remote-snapshot-annotations") {
+				sopts = append(sopts, image.WithEnableRemoteSnapshotAnntations)
+			}
+
 			is := image.NewStore(ref, sopts...)
 
 			pf, done := ProgressHandler(ctx, os.Stdout)
