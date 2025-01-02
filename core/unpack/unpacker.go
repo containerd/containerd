@@ -453,7 +453,6 @@ func (u *Unpacker) fetch(ctx context.Context, h images.Handler, layers []ocispec
 			tracing.Attribute("layer.media.size", desc.Size),
 			tracing.Attribute("layer.media.digest", desc.Digest.String()),
 		)
-		desc := desc
 		var ch chan struct{}
 		if done != nil {
 			ch = done[i]

@@ -79,7 +79,6 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			actualUID, actualName := getUserFromImage(test.user)
 			assert.Equal(t, test.uid, actualUID)
@@ -148,7 +147,6 @@ systemd_cgroup = true
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			opts, err := criconfig.GenerateRuntimeOptions(test.r)
 			assert.NoError(t, err)
@@ -221,7 +219,6 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {
@@ -344,7 +341,6 @@ func TestValidateTargetContainer(t *testing.T) {
 			expectError:       true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			targetContainer, err := c.validateTargetContainer(testSandboxID, test.targetContainerID)
 			if test.expectError {
@@ -408,7 +404,6 @@ func TestHostNetwork(t *testing.T) {
 			t.Skip()
 		}
 
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if hostNetwork(tt.c) != tt.expected {
 				t.Errorf("failed hostNetwork got %t expected %t", hostNetwork(tt.c), tt.expected)

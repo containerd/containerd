@@ -91,7 +91,6 @@ func TestRuntimeConfig(t *testing.T) {
 			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.config.RuntimeConfig.ContainerdConfig.DefaultRuntimeName = test.defaultRuntime

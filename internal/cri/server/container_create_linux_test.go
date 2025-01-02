@@ -247,7 +247,6 @@ func TestContainerCapabilities(t *testing.T) {
 			excludes: util.SubtractStringSlice(allCaps, "CAP_SYS_ADMIN"),
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig, sandboxConfig, imageConfig, specCheck := getCreateContainerTestData()
 			ociRuntime := config.Runtime{}
@@ -429,7 +428,6 @@ func TestContainerAndSandboxPrivileged(t *testing.T) {
 			expectError:         false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.Privileged = test.containerPrivileged
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
@@ -471,7 +469,6 @@ func TestPrivilegedBindMount(t *testing.T) {
 			expectedCgroupFSRO: false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.Privileged = test.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = test.privileged
@@ -588,7 +585,6 @@ func TestMountPropagation(t *testing.T) {
 			expectErr:         true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			c.os.(*ostesting.FakeOS).LookupMountFn = test.fakeLookupMountFn
@@ -645,7 +641,6 @@ func TestPidNamespace(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{Pid: test.pidNS}
 			spec, err := c.buildContainerSpec(currentPlatform, testID, testSandboxID, testPid, "", testContainerName, testImageName, containerConfig, sandboxConfig, imageConfig, nil, ociRuntime, nil)
@@ -811,7 +806,6 @@ func TestUserNamespace(t *testing.T) {
 			err: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.NamespaceOptions = &runtime.NamespaceOption{UsernsOptions: test.userNS}
 			// By default, set sandbox and container config to the same (this is
@@ -991,7 +985,6 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			cri := &criService{}
 			cri.config.UnsetSeccompProfile = test.defaultProfile
@@ -1167,7 +1160,6 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			asp := test.sp
 			csp, err := generateApparmorSecurityProfile(test.profile)
@@ -1273,7 +1265,6 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 			privileged:       true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c.config.DisableProcMount = test.disableProcMount
 			containerConfig.Linux.SecurityContext.MaskedPaths = test.masked
@@ -1329,7 +1320,6 @@ func TestHostname(t *testing.T) {
 			expectedEnv: "HOSTNAME=real-hostname",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			sandboxConfig.Hostname = test.hostname
 			sandboxConfig.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{
@@ -1510,7 +1500,6 @@ additional-group-for-root:x:22222:root
 			expected: runtimespec.User{UID: 1000, GID: 2000, AdditionalGids: []uint32{2000, 3333}},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig, sandboxConfig, imageConfig, _ := getCreateContainerTestData()
 			containerConfig.Linux.SecurityContext = test.securityContext
@@ -1579,7 +1568,6 @@ func TestNonRootUserAndDevices(t *testing.T) {
 			expectedDeviceGID:                  *testDevice.GID,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c.config.DeviceOwnershipFromSecurityContext = test.deviceOwnershipFromSecurityContext
 			containerConfig.Linux.SecurityContext.RunAsUser = test.uid
@@ -1657,7 +1645,6 @@ func TestPrivilegedDevices(t *testing.T) {
 			expectAllDevicesAllowed: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Linux.SecurityContext.Privileged = test.privileged
 			sandboxConfig.Linux.SecurityContext.Privileged = test.privileged

@@ -145,7 +145,6 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 
 			metadata, ctnr, status, _, expected := getContainerStatusTestData(t)
@@ -240,7 +239,6 @@ func TestContainerStatus(t *testing.T) {
 			expectErr:  true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			metadata, ctnr, status, image, expected := getContainerStatusTestData(t)

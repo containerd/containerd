@@ -116,7 +116,6 @@ func TestValidateStreamServer(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			tlsMode, err := getStreamListenerMode(&test.config)
 			if test.expectErr {

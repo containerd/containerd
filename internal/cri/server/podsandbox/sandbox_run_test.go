@@ -100,7 +100,6 @@ func TestSandboxContainerSpec(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newControllerService()
 			config, imageConfig, specCheck := getRunPodSandboxTestData(c.config)
@@ -153,7 +152,6 @@ func TestTypeurlMarshalUnmarshalSandboxMeta(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			meta := &sandboxstore.Metadata{
 				ID:        "1",

@@ -175,7 +175,6 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	}
 	var runtimeHandler *runtime.RuntimeHandler
 	for _, f := range c.runtimeHandlers {
-		f := f
 		if f.Name == sandbox.Metadata.RuntimeHandler {
 			runtimeHandler = f
 			break

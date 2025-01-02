@@ -299,7 +299,6 @@ func TestHostAccessingSandbox(t *testing.T) {
 		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := hostAccessingSandbox(tt.config); got != tt.want {
 				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)

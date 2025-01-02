@@ -82,7 +82,6 @@ func TestContainerSymlinkVolumes(t *testing.T) {
 			createFileFn: symlinkedFileInSymlinkedFolder,
 		},
 	} {
-		testCase := testCase // capture range variable
 		t.Run(name, func(t *testing.T) {
 			testPodLogDir := t.TempDir()
 			testVolDir := t.TempDir()

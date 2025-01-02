@@ -90,7 +90,6 @@ func TestEnvDeduplication(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var spec runtimespec.Spec
 			if len(test.existing) > 0 {

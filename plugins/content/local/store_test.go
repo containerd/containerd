@@ -255,7 +255,6 @@ func BenchmarkIngests(b *testing.B) {
 		512 << 10,
 		1 << 20,
 	} {
-		size := size
 		b.Run(fmt.Sprint(size), func(b *testing.B) {
 			b.StopTimer()
 			blobs := generateBlobs(b, int64(b.N), size)

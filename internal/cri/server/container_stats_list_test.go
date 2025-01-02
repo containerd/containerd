@@ -68,7 +68,6 @@ func TestContainerMetricsCPUNanoCoreUsage(t *testing.T) {
 			expectedNanoCoreUsageSecond: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: test.id},
@@ -126,7 +125,6 @@ func TestGetWorkingSet(t *testing.T) {
 			expected: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getWorkingSet(test.memory)
 			assert.Equal(t, test.expected, got)
@@ -162,7 +160,6 @@ func TestGetWorkingSetV2(t *testing.T) {
 			expected: 0,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getWorkingSetV2(test.memory)
 			assert.Equal(t, test.expected, got)
@@ -200,7 +197,6 @@ func TestGetAvailableBytes(t *testing.T) {
 			expected:        5000 - 500,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getAvailableBytes(test.memory, test.workingSetBytes)
 			assert.Equal(t, test.expected, got)
@@ -234,7 +230,6 @@ func TestGetAvailableBytesV2(t *testing.T) {
 			expected:        5000 - 500,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got := getAvailableBytesV2(test.memory, test.workingSetBytes)
 			assert.Equal(t, test.expected, got)
@@ -342,7 +337,6 @@ func TestContainerMetricsMemory(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
 			assert.NoError(t, err)
