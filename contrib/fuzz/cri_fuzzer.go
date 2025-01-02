@@ -25,8 +25,6 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/server"
-	"github.com/containerd/containerd/v2/internal/cri/server/images"
-	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
@@ -62,13 +60,13 @@ var (
 func printExecutions() {
 	if r := recover(); r != nil {
 		var err string
-		switch r.(type) {
+		switch res := r.(type) {
 		case string:
-			err = r.(string)
+			err = res
 		case golangruntime.Error:
-			err = r.(golangruntime.Error).Error()
+			err = res.Error()
 		case error:
-			err = r.(error).Error()
+			err = res.Error()
 		default:
 			err = "uknown error type"
 		}
@@ -87,9 +85,6 @@ type fuzzCRIService interface {
 }
 
 func fuzzCRI(f *fuzz.ConsumeFuzzer, c fuzzCRIService) int {
-	executionOrder = make([]string, 0)
-	defer printExecutions()
-
 	calls, err := f.GetInt()
 	if err != nil {
 		return 0
@@ -511,36 +506,4 @@ func updateRuntimeConfigFuzz(c fuzzCRIService, f *fuzz.ConsumeFuzzer) error {
 	reqString := fmt.Sprintf("%+v", r)
 	logExecution("c.UpdateRuntimeConfig", reqString)
 	return nil
-}
-
-// This creates a container directly in the store.
-func getContainer(f *fuzz.ConsumeFuzzer) (containerstore.Container, error) {
-	metadata := containerstore.Metadata{}
-	status := containerstore.Status{}
-
-	err := f.GenerateStruct(&metadata)
-	if err != nil {
-		return containerstore.Container{}, err
-	}
-	err = f.GenerateStruct(&status)
-	if err != nil {
-		return containerstore.Container{}, err
-	}
-	container, err := containerstore.NewContainer(metadata, containerstore.WithFakeStatus(status))
-	return container, err
-}
-
-func FuzzParseAuth(data []byte) int {
-	f := fuzz.NewConsumer(data)
-	auth := &runtime.AuthConfig{}
-	err := f.GenerateStruct(auth)
-	if err != nil {
-		return 0
-	}
-	host, err := f.GetString()
-	if err != nil {
-		return 0
-	}
-	_, _, _ = images.ParseAuth(auth, host)
-	return 1
 }

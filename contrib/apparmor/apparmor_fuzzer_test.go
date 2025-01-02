@@ -1,4 +1,4 @@
-//go:build gofuzz
+//go:build linux
 
 /*
    Copyright The containerd Authors.
@@ -16,11 +16,25 @@
    limitations under the License.
 */
 
-package client
+package apparmor
 
 import (
-	"github.com/AdamKorcz/go-118-fuzz-build/testing"
+	"os"
+	"testing"
 )
 
-// To keep this package in go.mod.
-var _ = testing.F{}
+func FuzzLoadDefaultProfile(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		tmpDir := t.TempDir()
+		f, err := os.CreateTemp(tmpDir, "fuzz_file")
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		_, err = f.Write(data)
+		if err != nil {
+			return
+		}
+		_ = LoadDefaultProfile("fuzz_file")
+	})
+}

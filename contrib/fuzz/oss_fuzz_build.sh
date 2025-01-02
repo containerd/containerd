@@ -51,6 +51,7 @@ tar -C temp-go/ -xzf go1.23.4.linux-amd64.tar.gz
 mv temp-go/go/* /root/.go/
 cd $SRC/containerd
 
+printf "package client\nimport _ \"github.com/AdamKorcz/go-118-fuzz-build/testing\"\n" > client/registerfuzzdep.go
 go mod tidy
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -95,7 +96,7 @@ sed -i 's/\/run\/containerd-test/\/tmp\/containerd-test/g' $SRC/containerd/integ
 
 cd integration/client
 
-compile_fuzzers '^func FuzzInteg.*data' compile_go_fuzzer vendor
+compile_fuzzers '^func FuzzInteg.*testing\.F' compile_native_go_fuzzer vendor
 
 cp $SRC/containerd/contrib/fuzz/*.options $OUT/
 cp $SRC/containerd/contrib/fuzz/*.dict $OUT/

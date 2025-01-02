@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -20,7 +18,7 @@ package docker
 
 import (
 	"context"
-	"os"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/containerd/containerd/v2/plugins/content/local"
@@ -28,27 +26,25 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func FuzzConvertManifest(data []byte) int {
-	ctx := context.Background()
+func FuzzConvertManifest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ctx := context.Background()
 
-	// Do not log the message below
-	// level=warning msg="do nothing for media type: ..."
-	log.G(ctx).Logger.SetLevel(log.PanicLevel)
+		// Do not log the message below
+		// level=warning msg="do nothing for media type: ..."
+		log.G(ctx).Logger.SetLevel(log.PanicLevel)
 
-	f := fuzz.NewConsumer(data)
-	desc := ocispec.Descriptor{}
-	err := f.GenerateStruct(&desc)
-	if err != nil {
-		return 0
-	}
-	tmpdir, err := os.MkdirTemp("", "fuzzing-")
-	if err != nil {
-		return 0
-	}
-	cs, err := local.NewStore(tmpdir)
-	if err != nil {
-		return 0
-	}
-	_, _ = ConvertManifest(ctx, cs, desc)
-	return 1
+		f := fuzz.NewConsumer(data)
+		desc := ocispec.Descriptor{}
+		err := f.GenerateStruct(&desc)
+		if err != nil {
+			return
+		}
+		tmpdir := t.TempDir()
+		cs, err := local.NewStore(tmpdir)
+		if err != nil {
+			return
+		}
+		_, _ = ConvertManifest(ctx, cs, desc)
+	})
 }

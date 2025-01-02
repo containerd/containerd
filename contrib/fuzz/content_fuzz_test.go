@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,14 +18,14 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256" // required by go-digest
-	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -96,73 +94,67 @@ func populateBlobStore(ctx context.Context, cs content.Store, f *fuzz.ConsumeFuz
 }
 
 // FuzzCSWalk implements a fuzzer that targets contentStore.Walk()
-func FuzzCSWalk(data []byte) int {
-	ctx := context.Background()
-	expected := map[digest.Digest]struct{}{}
-	found := map[digest.Digest]struct{}{}
-	tmpdir, err := os.MkdirTemp("", "fuzzing-")
-	if err != nil {
-		return 0
-	}
-	defer os.RemoveAll(tmpdir)
-	cs, err := local.NewStore(tmpdir)
-	if err != nil {
-		return 0
-	}
-
-	f := fuzz.NewConsumer(data)
-	blobs, err := populateBlobStore(ctx, cs, f)
-	if err != nil {
-		return 0
-	}
-
-	for dgst := range blobs {
-		expected[dgst] = struct{}{}
-	}
-
-	if err := cs.Walk(ctx, func(bi content.Info) error {
-		found[bi.Digest] = struct{}{}
-		err = checkBlobPath(bi.Digest, tmpdir)
+func FuzzCSWalk(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		ctx := context.Background()
+		expected := map[digest.Digest]struct{}{}
+		found := map[digest.Digest]struct{}{}
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
 		if err != nil {
-			return err
+			return
 		}
-		return nil
-	}); err != nil {
-		return 0
-	}
-	if !reflect.DeepEqual(expected, found) {
-		panic(fmt.Sprintf("%v != %v but should be equal", found, expected))
-	}
-	return 1
+
+		f := fuzz.NewConsumer(data)
+		blobs, err := populateBlobStore(ctx, cs, f)
+		if err != nil {
+			return
+		}
+
+		for dgst := range blobs {
+			expected[dgst] = struct{}{}
+		}
+
+		if err := cs.Walk(ctx, func(bi content.Info) error {
+			found[bi.Digest] = struct{}{}
+			err = checkBlobPath(bi.Digest, tmpDir)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return
+		}
+
+		require.Equal(t, expected, found)
+	})
 }
 
-func FuzzArchiveExport(data []byte) int {
-	f := fuzz.NewConsumer(data)
-	manifest := ocispec.Descriptor{}
-	err := f.GenerateStruct(&manifest)
-	if err != nil {
-		return 0
-	}
-	ctx := context.Background()
-	tmpdir, err := os.MkdirTemp("", "fuzzing-")
-	if err != nil {
-		return 0
-	}
-	defer os.RemoveAll(tmpdir)
-	cs, err := local.NewStore(tmpdir)
-	if err != nil {
-		return 0
-	}
-	_, err = populateBlobStore(ctx, cs, f)
-	if err != nil {
-		return 0
-	}
-	w, err := os.Create("fuzz-output-file")
-	if err != nil {
-		return 0
-	}
-	defer w.Close()
-	defer os.Remove("fuzz-output-file")
-	_ = archive.Export(ctx, cs, w, archive.WithManifest(manifest, "name"))
-	return 1
+func FuzzArchiveExport(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		f := fuzz.NewConsumer(data)
+		manifest := ocispec.Descriptor{}
+		err := f.GenerateStruct(&manifest)
+		if err != nil {
+			return
+		}
+		ctx := context.Background()
+		tmpDir := t.TempDir()
+		cs, err := local.NewStore(tmpDir)
+		if err != nil {
+			return
+		}
+		_, err = populateBlobStore(ctx, cs, f)
+		if err != nil {
+			return
+		}
+
+		// use `t.TempDir` to clean up temp dir and files
+		w, err := os.CreateTemp(t.TempDir(), "fuzz-output-file")
+		if err != nil {
+			return
+		}
+		defer w.Close()
+		_ = archive.Export(ctx, cs, w, archive.WithManifest(manifest, "name"))
+	})
 }

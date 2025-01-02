@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
@@ -23,6 +21,7 @@ import (
 	"bytes"
 	"context"
 	_ "crypto/sha256"
+	"fmt"
 	"io"
 	"testing"
 
@@ -31,36 +30,39 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 )
 
-func FuzzContentStoreWriter(data []byte) int {
-	t := &testing.T{}
-	ctx := context.Background()
-	ctx, _, cs, cleanup := contentStoreEnv(t)
-	defer cleanup()
+func FuzzContentStoreWriter(f *testing.F) {
+	f.Fuzz(func(t *testing.T, data []byte) {
+		cs, err := NewStore(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	cw, err := cs.Writer(ctx, content.WithRef("myref"))
-	if err != nil {
-		return 0
-	}
-	if err := cw.Close(); err != nil {
-		return 0
-	}
+		cw, err := cs.Writer(ctx, content.WithRef("myref"))
+		if err != nil {
+			return
+		}
+		if err := cw.Close(); err != nil {
+			return
+		}
 
-	// reopen, so we can test things
-	cw, err = cs.Writer(ctx, content.WithRef("myref"))
-	if err != nil {
-		return 0
-	}
+		// reopen, so we can test things
+		cw, err = cs.Writer(ctx, content.WithRef("myref"))
+		if err != nil {
+			return
+		}
 
-	err = checkCopyFuzz(int64(len(data)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(data))))
-	if err != nil {
-		return 0
-	}
-	expected := digest.FromBytes(data)
+		err = checkCopyFuzz(int64(len(data)), cw, bufio.NewReader(io.NopCloser(bytes.NewReader(data))))
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected := digest.FromBytes(data)
 
-	if err = cw.Commit(ctx, int64(len(data)), expected); err != nil {
-		return 0
-	}
-	return 1
+		if err = cw.Commit(ctx, int64(len(data)), expected); err != nil {
+			return
+		}
+	})
 }
 
 func checkCopyFuzz(size int64, dst io.Writer, src io.Reader) error {
@@ -70,7 +72,7 @@ func checkCopyFuzz(size int64, dst io.Writer, src io.Reader) error {
 	}
 
 	if nn != size {
-		return err
+		return fmt.Errorf("short write, expected: %d, got %d", size, nn)
 	}
 	return nil
 }
