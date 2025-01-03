@@ -273,8 +273,6 @@ func (u *Unpacker) unpack(
 		a  = unpack.Applier
 		cs = u.content
 
-		chain []digest.Digest
-
 		fetchOffset int
 		fetchC      []chan struct{}
 		fetchErr    chan error
@@ -285,10 +283,17 @@ func (u *Unpacker) unpack(
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// pre-calculate chain ids for each layer
+	chainIDs := make([]digest.Digest, len(diffIDs))
+	copy(chainIDs, diffIDs)
+	chainIDs = identity.ChainIDs(chainIDs)
+
 	doUnpackFn := func(i int, desc ocispec.Descriptor) error {
-		parent := identity.ChainID(chain)
-		chain = append(chain, diffIDs[i])
-		chainID := identity.ChainID(chain).String()
+		var parent string
+		if i > 0 {
+			parent = chainIDs[i-1].String()
+		}
+		chainID := chainIDs[i].String()
 
 		unlock, err := u.lockSnChainID(ctx, chainID, unpack.SnapshotterKey)
 		if err != nil {
@@ -312,7 +317,7 @@ func (u *Unpacker) unpack(
 		for try := 1; try <= 3; try++ {
 			// Prepare snapshot with from parent, label as root
 			key = fmt.Sprintf(snapshots.UnpackKeyFormat, uniquePart(), chainID)
-			mounts, err = sn.Prepare(ctx, key, parent.String(), opts...)
+			mounts, err = sn.Prepare(ctx, key, parent, opts...)
 			if err != nil {
 				if errdefs.IsAlreadyExists(err) {
 					if _, err := sn.Stat(ctx, chainID); err != nil {
@@ -424,7 +429,10 @@ func (u *Unpacker) unpack(
 		}).Debug("layer unpacked")
 	}
 
-	chainID := identity.ChainID(chain).String()
+	var chainID string
+	if len(chainIDs) > 0 {
+		chainID = chainIDs[len(chainIDs)-1].String()
+	}
 	cinfo := content.Info{
 		Digest: config.Digest,
 		Labels: map[string]string{
