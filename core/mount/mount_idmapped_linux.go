@@ -61,14 +61,19 @@ func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
 	}, nil
 }
 
-// IDMapMount applies GID/UID shift according to gidmap/uidmap for target path
+// IDMapMount clones the mount at source to target, applying GID/UID idmapping of the user namespace for target path
 func IDMapMount(source, target string, usernsFd int) (err error) {
+	return IDMapMountWithAttrs(source, target, usernsFd, 0, 0)
+}
+
+// IDMapMountWithAttrs clones the mount at source to target with the provided mount options and idmapping of the user namespace.
+func IDMapMountWithAttrs(source, target string, usernsFd int, attrSet uint64, attrClr uint64) (err error) {
 	var (
 		attr unix.MountAttr
 	)
 
-	attr.Attr_set = unix.MOUNT_ATTR_IDMAP
-	attr.Attr_clr = 0
+	attr.Attr_set = unix.MOUNT_ATTR_IDMAP | attrSet
+	attr.Attr_clr = attrClr
 	attr.Propagation = 0
 	attr.Userns_fd = uint64(usernsFd)
 
@@ -79,7 +84,7 @@ func IDMapMount(source, target string, usernsFd int) (err error) {
 
 	defer unix.Close(dFd)
 	if err = unix.MountSetattr(dFd, "", unix.AT_EMPTY_PATH, &attr); err != nil {
-		return fmt.Errorf("Unable to shift GID/UID for %s: %w", target, err)
+		return fmt.Errorf("Unable to shift GID/UID or set mount attrs for %s: %w", target, err)
 	}
 
 	if err = unix.MoveMount(dFd, "", -int(unix.EBADF), target, unix.MOVE_MOUNT_F_EMPTY_PATH); err != nil {

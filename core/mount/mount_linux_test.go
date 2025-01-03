@@ -18,11 +18,17 @@ package mount
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"syscall"
 	"testing"
+
+	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/containerd/continuity/testutil"
 	"golang.org/x/sys/unix"
@@ -198,6 +204,109 @@ func TestUnmountRecursive(t *testing.T) {
 	}
 }
 
+func TestDoPrepareIDMappedOverlay(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	k512 := kernel.KernelVersion{Kernel: 5, Major: 12}
+	ok, err := kernel.GreaterEqualThan(k512)
+	require.NoError(t, err)
+	if !ok {
+		t.Skip("GetUsernsFD requires kernel >= 5.12")
+	}
+
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
+
+	type testCase struct {
+		name              string
+		injectUmountFault bool
+	}
+
+	tcases := []testCase{
+		{
+			name:              "normal",
+			injectUmountFault: false,
+		},
+		{
+			name:              "umount-fault",
+			injectUmountFault: true,
+		},
+	}
+
+	for _, tc := range tcases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeLowerDirsDir := t.TempDir()
+			if !supportsIDMap(fakeLowerDirsDir) {
+				t.Skip("IDmapped mounts not supported on filesystem selected by t.TempDir()")
+			}
+
+			lowerDirs := []string{filepath.Join(fakeLowerDirsDir, "lower1"), filepath.Join(fakeLowerDirsDir, "lower2")}
+			for _, dir := range lowerDirs {
+				require.NoError(t, os.Mkdir(dir, 0755))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, filepath.Base(dir)), []byte("foo"), 0644))
+			}
+
+			remountsLocation := t.TempDir()
+
+			tmpLowerDirs, cleanup, err := doPrepareIDMappedOverlay(remountsLocation, lowerDirs, int(usernsFD.Fd()))
+			require.NoError(t, err)
+			require.Len(t, tmpLowerDirs, len(lowerDirs))
+
+			lowerContents := make([][]byte, len(lowerDirs))
+
+			for i, dir := range lowerDirs {
+				correspondingRemount := tmpLowerDirs[i]
+				filename := filepath.Base(dir)
+
+				expectedFile, err := os.ReadFile(filepath.Join(dir, filename))
+				require.NoError(t, err, "reading comparison test fixture file")
+				lowerContents[i] = expectedFile
+
+				actualFile, err := os.ReadFile(filepath.Join(correspondingRemount, filename))
+				require.NoError(t, err, "reading file in temporary remount")
+
+				assert.Equal(t, expectedFile, actualFile, "file content in temporary remount")
+			}
+
+			var busyDh *os.File
+			if tc.injectUmountFault {
+				busyDh, err = os.Open(tmpLowerDirs[0])
+				require.NoError(t, err)
+				defer busyDh.Close()
+			}
+
+			cleanup()
+
+			_, err = os.Stat(remountsLocation)
+
+			if tc.injectUmountFault {
+				// We should have failed to remove the remounts location if the unmount failed.
+				assert.NoError(t, err, "expected remounts location to still exist after unmount failure")
+			} else {
+				pathErr, isPathErr := err.(*fs.PathError)
+				require.True(t, isPathErr, "expected a PathError")
+				assert.Equal(t, unix.ENOENT, pathErr.Err, "temporary remounts should be cleaned up")
+			}
+
+			// Original lowerdirs should be unaffected.
+			for i, dir := range lowerDirs {
+				filename := filepath.Base(dir)
+
+				actualFile, err := os.ReadFile(filepath.Join(dir, filename))
+				require.NoError(t, err, "reading file in original lowerdir")
+				assert.Equal(t, lowerContents[i], actualFile, "file content in original lowerdir")
+			}
+
+			// If we blocked cleanup, allow it now so the test stays tidy.
+			if tc.injectUmountFault {
+				require.NoError(t, busyDh.Close())
+				cleanup()
+			}
+		})
+	}
+}
+
 func setupMounts(t *testing.T) (target string, mounts []Mount) {
 	dir1 := t.TempDir()
 	dir2 := t.TempDir()
@@ -242,4 +351,47 @@ func setupMounts(t *testing.T) (target string, mounts []Mount) {
 	}
 
 	return target, mounts
+}
+
+func supportsIDMap(path string) bool {
+	treeFD, err := unix.OpenTree(-1, path, uint(unix.OPEN_TREE_CLONE|unix.OPEN_TREE_CLOEXEC))
+	if err != nil {
+		return false
+	}
+	defer unix.Close(treeFD)
+
+	// We want to test if idmap mounts are supported.
+	// So we use just some random mapping, it doesn't really matter which one.
+	// For the helper command, we just need something that is alive while we
+	// test this, a sleep 5 will do it.
+	cmd := exec.Command("sleep", "5")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Cloneflags:  syscall.CLONE_NEWUSER,
+		UidMappings: []syscall.SysProcIDMap{{ContainerID: 0, HostID: 65536, Size: 65536}},
+		GidMappings: []syscall.SysProcIDMap{{ContainerID: 0, HostID: 65536, Size: 65536}},
+	}
+	if err := cmd.Start(); err != nil {
+		return false
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+
+	usernsFD := fmt.Sprintf("/proc/%d/ns/user", cmd.Process.Pid)
+	var usernsFile *os.File
+	if usernsFile, err = os.Open(usernsFD); err != nil {
+		return false
+	}
+	defer usernsFile.Close()
+
+	attr := unix.MountAttr{
+		Attr_set:  unix.MOUNT_ATTR_IDMAP,
+		Userns_fd: uint64(usernsFile.Fd()),
+	}
+	if err := unix.MountSetattr(treeFD, "", unix.AT_EMPTY_PATH, &attr); err != nil {
+		return false
+	}
+
+	return true
 }
