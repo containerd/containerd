@@ -369,6 +369,9 @@ func (s *service) Delete(ctx context.Context, r *taskAPI.DeleteRequest) (*taskAP
 			ExitStatus:  uint32(p.ExitStatus()),
 			ExitedAt:    protobuf.ToTimestamp(p.ExitedAt()),
 		})
+		s.lifecycleMu.Lock()
+		delete(s.containerInitExit, container)
+		s.lifecycleMu.Unlock()
 	}
 	return &taskAPI.DeleteResponse{
 		ExitStatus: uint32(p.ExitStatus()),
