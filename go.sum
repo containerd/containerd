@@ -687,8 +687,8 @@ github.com/containerd/imgcrypt/v2 v2.0.0 h1:vd2ByN6cXeearzXCQljH1eYe77FgFO5/B9+d
 github.com/containerd/imgcrypt/v2 v2.0.0/go.mod h1:S4kOVvPZRerVueZULagcwkJK7sKc/wQI/ixcmyj26uY=
 github.com/containerd/log v0.1.0 h1:TCJt7ioM2cr/tfR8GPbGf9/VRAX8D2B4PjzCpfX540I=
 github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3EhrzVo=
-github.com/containerd/nri v0.8.0 h1:n1S753B9lX8RFrHYeSgwVvS1yaUcHjxbB+f+xzEncRI=
-github.com/containerd/nri v0.8.0/go.mod h1:uSkgBrCdEtAiEz4vnrq8gmAC4EnVAM5Klt0OuK5rZYQ=
+github.com/containerd/nri v0.9.0 h1:jribDJs/oQ95vLO4Yn19HKFYriZGWKiG6nKWjl9Y/x4=
+github.com/containerd/nri v0.9.0/go.mod h1:sDRoMy5U4YolsWthg7TjTffAwPb6LEr//83O+D3xVU4=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723 h1:swk9KxrmARZjSMrHc1Lzb39XhcDwAhYpqkBhinCFLCQ=
 github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723/go.mod h1:ZKzztepTSz/LKtbUSzfBNVwgqBEPABVZV9PQF/l53+Q=
 github.com/containerd/platforms v1.0.0-rc.0 h1:GuHWSKgVVO3POn6nRBB4sH63uPOLa87yuuhsGLWaXAA=
@@ -951,6 +951,8 @@ github.com/klauspost/compress v1.15.9/go.mod h1:PhcZ0MbTNciWF3rruxRgKxI5NkcHHrHU
 github.com/klauspost/compress v1.17.11 h1:In6xLpyWOi1+C7tXUUWv2ot1QvBjxevKAaI6IXrJmUc=
 github.com/klauspost/compress v1.17.11/go.mod h1:pMDklpSncoRMuLFrf1W9Ss9KT+0rH90U12bZKk7uwG0=
 github.com/klauspost/cpuid/v2 v2.0.9/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
+github.com/knqyf263/go-plugin v0.8.1-0.20240827022226-114c6257e441 h1:Q/sZeuWkXprbKJSs7AwXryuZKSEL/a8ltC7e7xSspN0=
+github.com/knqyf263/go-plugin v0.8.1-0.20240827022226-114c6257e441/go.mod h1:CvCrNDMiKFlAlLFLmcoEfsTROEfNKbEZAMMrwQnLXCM=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/fs v0.1.0/go.mod h1:FFnZGqtBN9Gxj7eW1uZ42v5BccTP0vu6NEaFoC2HwRg=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
@@ -1118,6 +1120,8 @@ github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 h1:kdXcSzyDtse
 github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635/go.mod h1:hkRG7XYTFWNJGYcbNJQlaLq0fg1yr4J4t/NcTQtrfww=
 github.com/tchap/go-patricia/v2 v2.3.1 h1:6rQp39lgIYZ+MHmdEq4xzuk1t7OdC35z/xm0BGhTkes=
 github.com/tchap/go-patricia/v2 v2.3.1/go.mod h1:VZRHKAb53DLaG+nA9EaYYiaEx6YztwDlLElMsnSHD4k=
+github.com/tetratelabs/wazero v1.8.2-0.20241030035603-dc08732e57d5 h1:F+AT6Jxxww3j4/B/wXU01Raq4J8fg/Cg2HD4XsETGaU=
+github.com/tetratelabs/wazero v1.8.2-0.20241030035603-dc08732e57d5/go.mod h1:yAI0XTsMBhREkM/YDAK/zNou3GoiAce1P6+rp/wQhjs=
 github.com/urfave/cli v1.19.1/go.mod h1:70zkFmudgCuE/ngEzBv17Jvp/497gISqfk5gWijbERA=
 github.com/urfave/cli/v2 v2.27.5 h1:WoHEJLdsXr6dDWoJgMq/CboDmyY/8HMMH1fTECbih+w=
 github.com/urfave/cli/v2 v2.27.5/go.mod h1:3Sevf16NykTbInEnD0yKkjDAeZDS0A6bzhBH5hrMvTQ=
