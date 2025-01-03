@@ -709,7 +709,14 @@ func (c *criService) buildLinuxSpec(
 		}
 	}()
 
-	specOpts = append(specOpts, customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler))
+	var ociSpecOpts oci.SpecOpts
+	if ociRuntime.CgroupWritable {
+		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
+	} else {
+		ociSpecOpts = customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler)
+	}
+
+	specOpts = append(specOpts, ociSpecOpts)
 
 	if !c.config.DisableProcMount {
 		// Change the default masked/readonly paths to empty slices

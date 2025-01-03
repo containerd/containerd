@@ -32,6 +32,7 @@ import (
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -102,6 +103,8 @@ type Runtime struct {
 	// to the runtime spec when the container when PrivilegedWithoutHostDevices is already enabled. Requires
 	// PrivilegedWithoutHostDevices to be enabled. Defaults to false.
 	PrivilegedWithoutHostDevicesAllDevicesAllowed bool `toml:"privileged_without_host_devices_all_devices_allowed" json:"privileged_without_host_devices_all_devices_allowed"`
+	// CgroupWritable enables writable cgroups in non-privileged containers
+	CgroupWritable bool `toml:"cgroup_writable" json:"cgroupWritable"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
@@ -529,6 +532,10 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {
+		if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
+			return warnings, fmt.Errorf("runtime %s: `cgroup_writable` is only supported on cgroup v2", k)
+		}
+
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}
