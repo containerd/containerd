@@ -51,7 +51,6 @@ import (
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/dynamic"
 	"github.com/containerd/plugin/registry"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -476,7 +475,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 	if path == "" {
 		path = filepath.Join(config.Root, "plugins")
 	}
-	if count, err := dynamic.Load(path); err != nil {
+	if count, err := loadDynamic(path); err != nil {
 		return nil, err
 	} else if count > 0 || config.PluginDir != "" { //nolint:staticcheck
 		config.PluginDir = path //nolint:staticcheck
