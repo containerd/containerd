@@ -189,4 +189,8 @@ type TransferConfig struct {
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string
+
+	// EnableRemoteSnapshotAnnotations enables remote snapshotter annotations to be passed
+	// to the snapshotter.
+	EnableRemoteSnapshotAnnotations bool
 }

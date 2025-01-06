@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -201,6 +202,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)
 			if err != nil {
 				return fmt.Errorf("unable to initialize unpacker: %w", err)
+			}
+			if ts.config.EnableRemoteSnapshotAnnotations {
+				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
 			}
 			handler = unpacker.Unpack(handler)
 		}
