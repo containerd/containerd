@@ -18,13 +18,18 @@ package local
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/containerd/v2/core/transfer/registry/auth"
+	tstreaming "github.com/containerd/containerd/v2/core/transfer/streaming"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
 	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
@@ -205,6 +210,16 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			}
 			if ts.config.EnableRemoteSnapshotAnnotations {
 				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
+				var sid string
+				if ic, ok := ir.(transfer.ImageCredsProvider); ok && tops.StreamManager != nil {
+					sid, err = handleAuthStream(ctx, ic, tops.StreamManager)
+					if err != nil {
+						log.G(ctx).WithError(err).Debug("failed to handle stream auth")
+					}
+				}
+				if sid != "" {
+					handler = snpkg.AppendCredsStreamHandlerWrapper(sid)(handler)
+				}
 			}
 			handler = unpacker.Unpack(handler)
 		}
@@ -295,4 +310,26 @@ func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []
 		}
 	}
 	return false, u
+}
+
+func handleAuthStream(ctx context.Context, ic transfer.ImageCredsProvider, sm streaming.StreamGetter) (sid string, _ error) {
+	sid = tstreaming.GenerateID("snapshotter-creds")
+	go func() {
+		var stream streaming.Stream
+		var err error
+		for {
+			stream, err = sm.Get(ctx, sid)
+			if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+				log.G(ctx).WithError(err).Error("failed to get auth stream")
+				return
+			}
+			if stream != nil {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		auth.ServeAuthStream(ctx, stream, ic.GetCredentials)
+
+	}()
+	return sid, nil
 }

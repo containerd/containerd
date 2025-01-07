@@ -89,6 +89,7 @@ func (s *service) Register(gs *grpc.Server) error {
 
 func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest) (*emptypb.Empty, error) {
 	var transferOpts []transfer.Opt
+	transferOpts = append(transferOpts, transfer.WithStreamManager(s.streamManager))
 	if req.Options != nil {
 		if req.Options.ProgressStream != "" {
 			stream, err := s.streamManager.Get(ctx, req.Options.ProgressStream)
