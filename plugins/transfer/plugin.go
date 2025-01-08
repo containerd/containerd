@@ -143,6 +143,7 @@ func init() {
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
+			lc.EnableRemoteSnapshotAnnotations = config.EnableRemoteSnapshotAnnotations
 
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
@@ -161,6 +162,10 @@ type transferConfig struct {
 
 	// RegistryConfigPath is a path to the root directory containing registry-specific configurations
 	RegistryConfigPath string `toml:"config_path"`
+
+	// EnableRemoteSnapshotAnnotations enables remote snapshotter annotations to be passed
+	// to the snapshotter.
+	EnableRemoteSnapshotAnnotations bool `toml:"enable_remote_snapshot_annotations"`
 }
 
 type unpackConfiguration struct {
