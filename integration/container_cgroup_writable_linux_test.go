@@ -53,8 +53,6 @@ version = 3
 }
 
 func TestContainerCgroupWritable(t *testing.T) {
-	t.Parallel()
-
 	if cgroups.Mode() != cgroups.Unified {
 		t.Skip("requires cgroup v2")
 	}
