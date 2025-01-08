@@ -19,6 +19,12 @@ package transfer
 import (
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/registry"
+
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -26,11 +32,6 @@ import (
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/registry"
 
 	// Load packages with type registrations
 	_ "github.com/containerd/containerd/v2/core/transfer/archive"
@@ -48,6 +49,7 @@ func init() {
 			plugins.MetadataPlugin,
 			plugins.DiffPlugin,
 			plugins.ImageVerifierPlugin,
+			plugins.SnapshotPlugin,
 		},
 		Config: defaultConfig(),
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
@@ -96,6 +98,10 @@ func init() {
 				if sn == nil {
 					return nil, fmt.Errorf("snapshotter %q not found: %w", uc.Snapshotter, errdefs.ErrNotFound)
 				}
+				var snExports map[string]string
+				if p := ic.Plugins().Get(plugins.SnapshotPlugin, uc.Snapshotter); p != nil {
+					snExports = p.Meta.Exports
+				}
 
 				var applier diff.Applier
 				target := platforms.Only(p)
@@ -135,10 +141,11 @@ func init() {
 				}
 
 				up := unpack.Platform{
-					Platform:       target,
-					SnapshotterKey: uc.Snapshotter,
-					Snapshotter:    sn,
-					Applier:        applier,
+					Platform:           target,
+					SnapshotterKey:     uc.Snapshotter,
+					Snapshotter:        sn,
+					SnapshotterExports: snExports,
+					Applier:            applier,
 				}
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}

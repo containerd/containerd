@@ -28,6 +28,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	"github.com/containerd/platforms"
+	"github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
@@ -37,14 +46,6 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/tracing"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/identity"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -71,9 +72,10 @@ type unpackerConfig struct {
 type Platform struct {
 	Platform platforms.Matcher
 
-	SnapshotterKey string
-	Snapshotter    snapshots.Snapshotter
-	SnapshotOpts   []snapshots.Opt
+	SnapshotterKey     string
+	Snapshotter        snapshots.Snapshotter
+	SnapshotOpts       []snapshots.Opt
+	SnapshotterExports map[string]string
 
 	Applier   diff.Applier
 	ApplyOpts []diff.ApplyOpt
