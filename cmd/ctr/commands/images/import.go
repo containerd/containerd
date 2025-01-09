@@ -23,7 +23,6 @@ import (
 	"os"
 	"time"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -146,33 +145,26 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 				opts = append(opts, image.WithNamedPrefix(prefix, overwrite))
 			}
 
-			var platSpec ocispec.Platform
-			// Only when all-platforms not specified, we will check platform value
-			// Implicitly if the platforms is empty, it means all-platforms
+			// Even with --all-platforms, only the default platform layers are unpacked,
+			// for compatibility with --local.
+			//
+			// This is still not fully compatible with --local, which only unpacks
+			// the strict-default platform layers.
+			platUnpack := platforms.DefaultSpec()
 			if !cliContext.Bool("all-platforms") {
 				// If platform specified, use that one, if not use default
 				if platform := cliContext.String("platform"); platform != "" {
-					platSpec, err = platforms.Parse(platform)
+					platUnpack, err = platforms.Parse(platform)
 					if err != nil {
 						return err
 					}
-				} else {
-					platSpec = platforms.DefaultSpec()
 				}
-				opts = append(opts, image.WithPlatforms(platSpec))
+				opts = append(opts, image.WithPlatforms(platUnpack))
 			}
 
 			if !cliContext.Bool("no-unpack") {
 				snapshotter := cliContext.String("snapshotter")
-				// If OS field is not empty, it means platSpec was updated in the above block
-				// i.e all-platforms was not specified
-				if platSpec.OS != "" {
-					opts = append(opts, image.WithUnpack(platSpec, snapshotter))
-				} else {
-					// Empty spec means all platforms
-					var emptySpec ocispec.Platform
-					opts = append(opts, image.WithUnpack(emptySpec, snapshotter))
-				}
+				opts = append(opts, image.WithUnpack(platUnpack, snapshotter))
 			}
 
 			is := image.NewStore(cliContext.String("index-name"), opts...)
