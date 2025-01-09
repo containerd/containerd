@@ -20,6 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -27,9 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
