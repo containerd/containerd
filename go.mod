@@ -23,10 +23,10 @@ require (
 	github.com/containerd/imgcrypt/v2 v2.0.0-rc.1
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.8.0
-	github.com/containerd/otelttrpc v0.0.0-20240305015340-ea5083fda723
+	github.com/containerd/otelttrpc v0.1.0
 	github.com/containerd/platforms v1.0.0-rc.0
 	github.com/containerd/plugin v1.0.0
-	github.com/containerd/ttrpc v1.2.6
+	github.com/containerd/ttrpc v1.2.7
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/containerd/zfs/v2 v2.0.0-rc.0
 	github.com/containernetworking/cni v1.2.3
@@ -59,7 +59,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/tchap/go-patricia/v2 v2.3.1
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/vishvananda/netlink v1.3.0
