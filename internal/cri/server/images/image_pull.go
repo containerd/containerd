@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -448,7 +447,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			}
 
 			var (
-				transport = newTransport()
+				transport = docker.DefaultHTTPTransport(nil) // no tls config
 				client    = &http.Client{Transport: transport}
 				config    = c.config.Registry.Configs[u.Host]
 			)
@@ -562,23 +561,6 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 		}
 	}
 	return append(endpoints, defaultScheme(defaultHost)+"://"+defaultHost), nil
-}
-
-// newTransport returns a new HTTP transport used to pull image.
-// TODO(random-liu): Create a library and share this code with `ctr`.
-func newTransport() *http.Transport {
-	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:       30 * time.Second,
-			KeepAlive:     30 * time.Second,
-			FallbackDelay: 300 * time.Millisecond,
-		}).DialContext,
-		MaxIdleConns:          10,
-		IdleConnTimeout:       30 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 5 * time.Second,
-	}
 }
 
 // encryptedImagesPullOpts returns the necessary list of pull options required
