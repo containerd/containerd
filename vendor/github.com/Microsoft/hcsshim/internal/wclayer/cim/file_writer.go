@@ -86,5 +86,8 @@ func (sfw *stdFileWriter) Close(ctx context.Context) error {
 	if err := sfw.closeActiveFile(); err != nil {
 		return fmt.Errorf("failed to close active file %s : %w", sfw.activeFile.Name(), err)
 	}
+	if err := sfw.root.Close(); err != nil {
+		return fmt.Errorf("failed to close root dir: %w", err)
+	}
 	return nil
 }
