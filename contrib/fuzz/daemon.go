@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
 
