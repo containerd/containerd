@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,46 +16,93 @@ package fuzz
 import (
 	"context"
 	"fmt"
+	"os"
 	golangruntime "runtime"
 	"strings"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
-	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-
+	containerd "github.com/containerd/containerd/v2/client"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
+	"github.com/containerd/containerd/v2/internal/cri/instrument"
 	"github.com/containerd/containerd/v2/internal/cri/server"
-	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/internal/cri/server/images"
+	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/errdefs"
+	"google.golang.org/grpc"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-var (
-	// The APIs the fuzzer can call:
-	ops = map[int]string{
-		0:  "createContainer",
-		1:  "removeContainer",
-		2:  "addSandboxes",
-		3:  "listContainers",
-		4:  "startContainer",
-		5:  "containerStats",
-		6:  "listContainerStats",
-		7:  "containerStatus",
-		8:  "stopContainer",
-		9:  "updateContainerResources",
-		10: "listImages",
-		11: "removeImages",
-		12: "imageStatus",
-		13: "imageFsInfo",
-		14: "listPodSandbox",
-		15: "portForward",
-		16: "removePodSandbox",
-		17: "runPodSandbox",
-		18: "podSandboxStatus",
-		19: "stopPodSandbox",
-		20: "status",
-		21: "updateRuntimeConfig",
+func FuzzCRIServer(f *testing.F) {
+	if os.Getuid() != 0 {
+		f.Skip("skipping fuzz test that requires root")
 	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		initDaemon.Do(startDaemon)
+
+		f := fuzz.NewConsumer(data)
+
+		client, err := containerd.New(defaultAddress)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer client.Close()
+
+		imageConfig := criconfig.ImageConfig{}
+
+		imageService, err := images.NewService(imageConfig, &images.CRIImageServiceOptions{
+			Client: client,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		c, rs, err := server.NewCRIService(&server.CRIServiceOptions{
+			RuntimeService: &fakeRuntimeService{},
+			ImageService:   imageService,
+			Client:         client,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		fuzzCRI(t, f, &service{
+			CRIService:           c,
+			RuntimeServiceServer: rs,
+			ImageServiceServer:   imageService.GRPCService(),
+		})
+	})
+}
+
+type fakeRuntimeService struct{}
+
+func (fakeRuntimeService) Config() criconfig.Config {
+	return criconfig.Config{}
+}
+
+func (fakeRuntimeService) LoadOCISpec(string) (*oci.Spec, error) {
+	return nil, errdefs.ErrNotFound
+}
+
+type service struct {
+	server.CRIService
+	runtime.RuntimeServiceServer
+	runtime.ImageServiceServer
+}
+
+func (c *service) Register(s *grpc.Server) error {
+	instrumented := instrument.NewService(c)
+	runtime.RegisterRuntimeServiceServer(s, instrumented)
+	runtime.RegisterImageServiceServer(s, instrumented)
+	return nil
+}
+
+var (
 	executionOrder []string
 )
 
-func printExecutions() {
+func printExecutions(t *testing.T) {
 	if r := recover(); r != nil {
 		var err string
 		switch res := r.(type) {
@@ -70,11 +115,11 @@ func printExecutions() {
 		default:
 			err = "uknown error type"
 		}
-		fmt.Println("Executions:")
+		t.Log("Executions:")
 		for _, eo := range executionOrder {
-			fmt.Println(eo)
+			t.Log(eo)
 		}
-		panic(err)
+		t.Fatal(err)
 	}
 }
 
@@ -84,68 +129,45 @@ type fuzzCRIService interface {
 	runtime.ImageServiceServer
 }
 
-func fuzzCRI(f *fuzz.ConsumeFuzzer, c fuzzCRIService) int {
+func fuzzCRI(t *testing.T, f *fuzz.ConsumeFuzzer, c fuzzCRIService) int {
+	ops := []func(c fuzzCRIService, f *fuzz.ConsumeFuzzer) error{
+		createContainerFuzz,
+		removeContainerFuzz,
+		listContainersFuzz,
+		startContainerFuzz,
+		containerStatsFuzz,
+		listContainerStatsFuzz,
+		containerStatusFuzz,
+		stopContainerFuzz,
+		updateContainerResourcesFuzz,
+		listImagesFuzz,
+		removeImagesFuzz,
+		imageStatusFuzz,
+		imageFsInfoFuzz,
+		listPodSandboxFuzz,
+		portForwardFuzz,
+		removePodSandboxFuzz,
+		runPodSandboxFuzz,
+		podSandboxStatusFuzz,
+		stopPodSandboxFuzz,
+		statusFuzz,
+		updateRuntimeConfigFuzz,
+	}
+
 	calls, err := f.GetInt()
 	if err != nil {
 		return 0
 	}
 
 	executionOrder = make([]string, 0)
-	defer printExecutions()
+	defer printExecutions(t)
 
 	for i := 0; i < calls%40; i++ {
 		op, err := f.GetInt()
 		if err != nil {
 			return 0
 		}
-		opType := op % len(ops)
-
-		switch ops[opType] {
-		case "createContainer":
-			createContainerFuzz(c, f)
-		case "removeContainer":
-			removeContainerFuzz(c, f)
-		case "addSandboxes":
-			addSandboxesFuzz(c, f)
-		case "listContainers":
-			listContainersFuzz(c, f)
-		case "startContainer":
-			startContainerFuzz(c, f)
-		case "containerStats":
-			containerStatsFuzz(c, f)
-		case "listContainerStats":
-			listContainerStatsFuzz(c, f)
-		case "containerStatus":
-			containerStatusFuzz(c, f)
-		case "stopContainer":
-			stopContainerFuzz(c, f)
-		case "updateContainerResources":
-			updateContainerResourcesFuzz(c, f)
-		case "listImages":
-			listImagesFuzz(c, f)
-		case "removeImages":
-			removeImagesFuzz(c, f)
-		case "imageStatus":
-			imageStatusFuzz(c, f)
-		case "imageFsInfo":
-			imageFsInfoFuzz(c, f)
-		case "listPodSandbox":
-			listPodSandboxFuzz(c, f)
-		case "portForward":
-			portForwardFuzz(c, f)
-		case "removePodSandbox":
-			removePodSandboxFuzz(c, f)
-		case "runPodSandbox":
-			runPodSandboxFuzz(c, f)
-		case "podSandboxStatus":
-			podSandboxStatusFuzz(c, f)
-		case "stopPodSandbox":
-			stopPodSandboxFuzz(c, f)
-		case "status":
-			statusFuzz(c, f)
-		case "updateRuntimeConfig":
-			updateRuntimeConfigFuzz(c, f)
-		}
+		ops[op%len(ops)](c, f)
 	}
 	return 1
 }
@@ -182,67 +204,6 @@ func removeContainerFuzz(c fuzzCRIService, f *fuzz.ConsumeFuzzer) error {
 	reqString := fmt.Sprintf("%+v", r)
 	logExecution("c.RemoveContainer", reqString)
 	return nil
-}
-
-func sandboxStore(cs fuzzCRIService) (*sandboxstore.Store, error) {
-	var (
-		ss  *sandboxstore.Store
-		err error
-	)
-
-	ss, err = server.SandboxStore(cs)
-	if err != nil {
-		ss, err = server.SandboxStore(cs)
-		if err != nil {
-			return nil, err
-		}
-		return ss, nil
-	}
-	return ss, nil
-}
-
-// addSandboxesFuzz creates a sandbox and adds it to the sandboxstore
-func addSandboxesFuzz(c fuzzCRIService, f *fuzz.ConsumeFuzzer) error {
-	quantity, err := f.GetInt()
-	if err != nil {
-		return err
-	}
-
-	ss, err := sandboxStore(c)
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < quantity%20; i++ {
-		newSandbox, err := getSandboxFuzz(f)
-		if err != nil {
-			return err
-		}
-		err = ss.Add(newSandbox)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// getSandboxFuzz creates a sandbox
-func getSandboxFuzz(f *fuzz.ConsumeFuzzer) (sandboxstore.Sandbox, error) {
-	metadata := sandboxstore.Metadata{}
-	status := sandboxstore.Status{}
-	err := f.GenerateStruct(&metadata)
-	if err != nil {
-		return sandboxstore.Sandbox{}, err
-	}
-	err = f.GenerateStruct(&status)
-	if err != nil {
-		return sandboxstore.Sandbox{}, err
-	}
-
-	reqString := fmt.Sprintf("metadata: %+v\nstatus: %+v\n", metadata, status)
-	logExecution("sandboxstore.NewSandbox", reqString)
-
-	return sandboxstore.NewSandbox(metadata, status), nil
 }
 
 // listContainersFuzz creates a ListContainersRequest and passes

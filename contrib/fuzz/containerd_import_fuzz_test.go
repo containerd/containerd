@@ -41,7 +41,7 @@ func FuzzContainerdImport(f *testing.F) {
 
 		client, err := containerd.New(defaultAddress)
 		if err != nil {
-			return
+			t.Fatal(err)
 		}
 		defer client.Close()
 
