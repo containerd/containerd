@@ -223,10 +223,21 @@ func updatePathEnv() error {
 
 	oldPathEnv := os.Getenv("PATH")
 	newPathEnv := oldPathEnv + ":" + fuzzBinDir
+
+	if ghWorkspace := os.Getenv("GITHUB_WORKSPACE"); ghWorkspace != "" {
+		// In `oss_fuzz_build.sh`, we build and install containerd binaries to
+		// `$OUT/containerd-binaries`, where `OUT=/out` in oss-fuzz environment.
+		// However in GitHub Actions, oss-fuzz maps `OUT` to `$GITHUB_WORKSPACE/build-out`.
+		// So here we add this to `$PATH` at the end of `PATH` so the fuzz works on
+		// both environments.
+		newPathEnv = newPathEnv + ":" + filepath.Join(ghWorkspace, "build-out", "containerd-binaries")
+	}
+
 	err = os.Setenv("PATH", newPathEnv)
 	if err != nil {
 		return err
 	}
+
 	haveChangedOSSFuzzPATH = true
 	return nil
 }
