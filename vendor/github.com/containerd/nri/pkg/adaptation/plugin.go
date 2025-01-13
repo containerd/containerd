@@ -63,10 +63,10 @@ type plugin struct {
 	rpcs   *ttrpc.Server
 	events EventMask
 	closed bool
-	stub   api.PluginService
 	regC   chan error
 	closeC chan struct{}
 	r      *Adaptation
+	impl   *pluginType
 }
 
 // SetPluginRegistrationTimeout sets the timeout for plugin registration.
@@ -95,9 +95,27 @@ func getPluginRequestTimeout() time.Duration {
 	return pluginRequestTimeout
 }
 
-// Launch a pre-installed plugin with a pre-connected socketpair.
+// newLaunchedPlugin launches a pre-installed plugin with a pre-connected socketpair.
+// If the plugin is a wasm binary, then it will use the internal wasm service
+// to setup the plugin.
 func (r *Adaptation) newLaunchedPlugin(dir, idx, base, cfg string) (p *plugin, retErr error) {
 	name := idx + "-" + base
+	fullPath := filepath.Join(dir, name)
+
+	if isWasm(fullPath) {
+		log.Infof(noCtx, "Found WASM plugin: %s", fullPath)
+		wasm, err := r.wasmService.Load(context.Background(), fullPath, wasmHostFunctions{})
+		if err != nil {
+			return nil, fmt.Errorf("load WASM plugin %s: %w", fullPath, err)
+		}
+		return &plugin{
+			cfg:  cfg,
+			idx:  idx,
+			base: base,
+			r:    r,
+			impl: &pluginType{wasmImpl: wasm},
+		}, nil
+	}
 
 	sockets, err := net.NewSocketPair()
 	if err != nil {
@@ -118,7 +136,7 @@ func (r *Adaptation) newLaunchedPlugin(dir, idx, base, cfg string) (p *plugin, r
 		}
 	}()
 
-	cmd := exec.Command(filepath.Join(dir, name))
+	cmd := exec.Command(fullPath)
 	cmd.ExtraFiles = []*os.File{peerFile}
 	cmd.Env = []string{
 		api.PluginNameEnvVar + "=" + base,
@@ -145,6 +163,30 @@ func (r *Adaptation) newLaunchedPlugin(dir, idx, base, cfg string) (p *plugin, r
 	}
 
 	return p, nil
+}
+
+func isWasm(path string) bool {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Errorf(noCtx, "Unable to open file %s: %v", path, err)
+		return false
+	}
+	defer file.Close()
+
+	const headerLen = 8
+	buf := make([]byte, headerLen)
+	if _, err := file.Read(buf); err != nil {
+		log.Errorf(noCtx, "Unable to read file %s: %v", path, err)
+		return false
+	}
+
+	// WASM has starts with `\0asm`, followed by the version.
+	// http://webassembly.github.io/spec/core/binary/modules.html#binary-magic
+	return len(buf) >= headerLen &&
+		buf[0] == 0x00 && buf[1] == 0x61 &&
+		buf[2] == 0x73 && buf[3] == 0x6D &&
+		buf[4] == 0x01 && buf[5] == 0x00 &&
+		buf[6] == 0x00 && buf[7] == 0x00
 }
 
 // Create a plugin (stub) for an accepted external plugin connection.
@@ -215,7 +257,6 @@ func (p *plugin) connect(conn stdnet.Conn) (retErr error) {
 			rpcc.Close()
 		}
 	}()
-	stub := api.NewPluginClient(rpcc)
 
 	rpcs, err := ttrpc.NewServer(p.r.serverOpts...)
 	if err != nil {
@@ -236,7 +277,7 @@ func (p *plugin) connect(conn stdnet.Conn) (retErr error) {
 	p.rpcc = rpcc
 	p.rpcl = rpcl
 	p.rpcs = rpcs
-	p.stub = stub
+	p.impl = &pluginType{ttrpcImpl: api.NewPluginClient(rpcc)}
 
 	p.pid, err = getPeerPid(p.mux.Trunk())
 	if err != nil {
@@ -249,33 +290,37 @@ func (p *plugin) connect(conn stdnet.Conn) (retErr error) {
 }
 
 // Start Runtime service, wait for plugin to register, then configure it.
-func (p *plugin) start(name, version string) error {
-	var (
-		err     error
-		timeout = getPluginRegistrationTimeout()
-	)
+func (p *plugin) start(name, version string) (err error) {
+	// skip start for WASM plugins and head right to the registration for
+	// events config
+	if p.impl.isTtrpc() {
+		var (
+			err     error
+			timeout = getPluginRegistrationTimeout()
+		)
 
-	go func() {
-		err := p.rpcs.Serve(context.Background(), p.rpcl)
-		if err != ttrpc.ErrServerClosed {
-			log.Infof(noCtx, "ttrpc server for plugin %q closed (%v)", p.name(), err)
+		go func() {
+			err := p.rpcs.Serve(context.Background(), p.rpcl)
+			if err != ttrpc.ErrServerClosed {
+				log.Infof(noCtx, "ttrpc server for plugin %q closed (%v)", p.name(), err)
+			}
+			p.close()
+		}()
+
+		p.mux.Unblock()
+
+		select {
+		case err = <-p.regC:
+			if err != nil {
+				return fmt.Errorf("failed to register plugin: %w", err)
+			}
+		case <-p.closeC:
+			return fmt.Errorf("failed to register plugin, connection closed")
+		case <-time.After(timeout):
+			p.close()
+			p.stop()
+			return errors.New("plugin registration timed out")
 		}
-		p.close()
-	}()
-
-	p.mux.Unblock()
-
-	select {
-	case err = <-p.regC:
-		if err != nil {
-			return fmt.Errorf("failed to register plugin: %w", err)
-		}
-	case <-p.closeC:
-		return fmt.Errorf("failed to register plugin, connection closed")
-	case <-time.After(timeout):
-		p.close()
-		p.stop()
-		return errors.New("plugin registration timed out")
 	}
 
 	err = p.configure(context.Background(), name, version, p.cfg)
@@ -290,6 +335,10 @@ func (p *plugin) start(name, version string) error {
 
 // close a plugin shutting down its multiplexed ttrpc connections.
 func (p *plugin) close() {
+	if p.impl.isWasm() {
+		return
+	}
+
 	p.Lock()
 	defer p.Unlock()
 	if p.closed {
@@ -311,7 +360,7 @@ func (p *plugin) isClosed() bool {
 
 // stop a plugin (if it was launched by us)
 func (p *plugin) stop() error {
-	if p.isExternal() || p.cmd.Process == nil {
+	if p.isExternal() || p.cmd.Process == nil || p.impl.isWasm() {
 		return nil
 	}
 
@@ -381,17 +430,19 @@ func (p *plugin) UpdateContainers(ctx context.Context, req *UpdateContainersRequ
 }
 
 // configure the plugin and subscribe it for the events it requested.
-func (p *plugin) configure(ctx context.Context, name, version, config string) error {
+func (p *plugin) configure(ctx context.Context, name, version, config string) (err error) {
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	rpl, err := p.stub.Configure(ctx, &ConfigureRequest{
+	req := &ConfigureRequest{
 		Config:              config,
 		RuntimeName:         name,
 		RuntimeVersion:      version,
 		RegistrationTimeout: getPluginRegistrationTimeout().Milliseconds(),
 		RequestTimeout:      getPluginRequestTimeout().Milliseconds(),
-	})
+	}
+
+	rpl, err := p.impl.Configure(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to configure plugin: %w", err)
 	}
@@ -436,7 +487,7 @@ func (p *plugin) synchronize(ctx context.Context, pods []*PodSandbox, containers
 		log.Debugf(ctx, "sending sync message, %d/%d, %d/%d (more: %v)",
 			len(req.Pods), len(podsToSend), len(req.Containers), len(ctrsToSend), req.More)
 
-		rpl, err = p.stub.Synchronize(ctx, req)
+		rpl, err = p.impl.Synchronize(ctx, req)
 		if err == nil {
 			if !req.More {
 				break
@@ -520,7 +571,7 @@ func (p *plugin) createContainer(ctx context.Context, req *CreateContainerReques
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	rpl, err := p.stub.CreateContainer(ctx, req)
+	rpl, err := p.impl.CreateContainer(ctx, req)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle CreateContainer request: %v",
@@ -543,7 +594,7 @@ func (p *plugin) updateContainer(ctx context.Context, req *UpdateContainerReques
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	rpl, err := p.stub.UpdateContainer(ctx, req)
+	rpl, err := p.impl.UpdateContainer(ctx, req)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle UpdateContainer request: %v",
@@ -558,7 +609,7 @@ func (p *plugin) updateContainer(ctx context.Context, req *UpdateContainerReques
 }
 
 // Relay StopContainer request to the plugin.
-func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (*StopContainerResponse, error) {
+func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (rpl *StopContainerResponse, err error) {
 	if !p.events.IsSet(Event_STOP_CONTAINER) {
 		return nil, nil
 	}
@@ -566,7 +617,7 @@ func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	rpl, err := p.stub.StopContainer(ctx, req)
+	rpl, err = p.impl.StopContainer(ctx, req)
 	if err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle StopContainer request: %v",
@@ -581,7 +632,7 @@ func (p *plugin) stopContainer(ctx context.Context, req *StopContainerRequest) (
 }
 
 // Relay other pod or container state change events to the plugin.
-func (p *plugin) StateChange(ctx context.Context, evt *StateChangeEvent) error {
+func (p *plugin) StateChange(ctx context.Context, evt *StateChangeEvent) (err error) {
 	if !p.events.IsSet(evt.Event) {
 		return nil
 	}
@@ -589,8 +640,7 @@ func (p *plugin) StateChange(ctx context.Context, evt *StateChangeEvent) error {
 	ctx, cancel := context.WithTimeout(ctx, getPluginRequestTimeout())
 	defer cancel()
 
-	_, err := p.stub.StateChange(ctx, evt)
-	if err != nil {
+	if err = p.impl.StateChange(ctx, evt); err != nil {
 		if isFatalError(err) {
 			log.Errorf(ctx, "closing plugin %s, failed to handle event %d: %v",
 				p.name(), evt.Event, err)
@@ -616,4 +666,22 @@ func isFatalError(err error) bool {
 		return true
 	}
 	return false
+}
+
+// wasmHostFunctions implements the webassembly host functions
+type wasmHostFunctions struct{}
+
+func (wasmHostFunctions) Log(ctx context.Context, request *api.LogRequest) (*api.Empty, error) {
+	switch request.GetLevel() {
+	case api.LogRequest_LEVEL_INFO:
+		log.Infof(ctx, request.GetMsg())
+	case api.LogRequest_LEVEL_WARN:
+		log.Warnf(ctx, request.GetMsg())
+	case api.LogRequest_LEVEL_ERROR:
+		log.Errorf(ctx, request.GetMsg())
+	default:
+		log.Debugf(ctx, request.GetMsg())
+	}
+
+	return &api.Empty{}, nil
 }

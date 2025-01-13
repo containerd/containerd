@@ -73,6 +73,7 @@ message UpdateContainersResponse {
 // can be used by plugins to discover the full extent of changes applied to
 // the container, including any changes made by other active plugins.
 //
+// go:plugin type=plugin version=1
 service Plugin {
   // Configure the plugin and get its event subscription.
   rpc Configure(ConfigureRequest) returns (ConfigureResponse);
@@ -105,6 +106,25 @@ service Plugin {
   // plugin-specific processing which needs to occur in connection with any of
   // these events.
   rpc StateChange(StateChangeEvent) returns (Empty);
+}
+
+// go:plugin type=host
+service HostFunctions {
+  // Log displays a log message
+  rpc Log(LogRequest) returns (Empty) {}
+}
+
+message LogRequest {
+  string msg = 1;
+
+  enum Level {
+    LEVEL_UNSPECIFIED = 0;
+    LEVEL_DEBUG = 1;
+    LEVEL_INFO = 2;
+    LEVEL_WARN = 3;
+    LEVEL_ERROR = 4;
+  }
+  Level level = 2;
 }
 
 message ConfigureRequest {
