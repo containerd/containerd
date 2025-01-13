@@ -106,12 +106,12 @@ func (m *Mount) Mount(target string) error {
 	return m.mount(target)
 }
 
-// readonlyMounts modifies the received mount options
+// MakeReadonly modifies the received mount options
 // to make them readonly
-func readonlyMounts(mounts []Mount) []Mount {
+func MakeReadonly(mounts []Mount) []Mount {
 	for i, m := range mounts {
 		if m.Type == "overlay" {
-			mounts[i].Options = readonlyOverlay(m.Options)
+			mounts[i].Options = ReadonlyOverlay(m.Options)
 			continue
 		}
 		opts := make([]string, 0, len(m.Options))
@@ -126,10 +126,10 @@ func readonlyMounts(mounts []Mount) []Mount {
 	return mounts
 }
 
-// readonlyOverlay takes mount options for overlay mounts and makes them readonly by
+// ReadonlyOverlay takes mount options for overlay mounts and makes them readonly by
 // removing workdir and upperdir (and appending the upperdir layer to lowerdir) - see:
 // https://www.kernel.org/doc/html/latest/filesystems/overlayfs.html#multiple-lower-layers
-func readonlyOverlay(opt []string) []string {
+func ReadonlyOverlay(opt []string) []string {
 	out := make([]string, 0, len(opt))
 	upper := ""
 	for _, o := range opt {

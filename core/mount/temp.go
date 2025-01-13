@@ -115,7 +115,7 @@ func copyMounts(in []Mount) []Mount {
 // and pass the temp dir to f. The mounts are valid during the call to the f.
 // Finally we will unmount and remove the temp dir regardless of the result of f.
 func WithReadonlyTempMount(ctx context.Context, mounts []Mount, f func(root string) error) (err error) {
-	return WithTempMount(ctx, readonlyMounts(mounts), f)
+	return WithTempMount(ctx, MakeReadonly(mounts), f)
 }
 
 func getTempDir() string {

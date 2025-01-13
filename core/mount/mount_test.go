@@ -143,7 +143,7 @@ func TestReadonlyMounts(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if !reflect.DeepEqual(readonlyMounts(tc.input), tc.expected) {
+		if !reflect.DeepEqual(MakeReadonly(tc.input), tc.expected) {
 			t.Fatalf("incorrectly modified mounts: %s", tc.desc)
 		}
 	}
