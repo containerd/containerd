@@ -269,7 +269,7 @@ var Command = &cli.Command{
 	},
 }
 
-// buildLabel builds the labels from command line labels and the image labels
+// buildLabels builds the labels from command line labels and the image labels
 func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 	labels := make(map[string]string)
 	for k, v := range imageLabels {
