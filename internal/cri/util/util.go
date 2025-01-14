@@ -67,7 +67,7 @@ func GetPassthroughAnnotations(podAnnotations map[string]string,
 	return passthroughAnnotations
 }
 
-// BuildLabel builds the labels from config to be passed to containerd
+// BuildLabels builds the labels from config to be passed to containerd
 func BuildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
 	labels := make(map[string]string)
 

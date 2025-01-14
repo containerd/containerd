@@ -68,7 +68,7 @@ func generateBlobs(f *fuzz.ConsumeFuzzer) (map[digest.Digest][]byte, error) {
 	return blobs, nil
 }
 
-// checkwrite is a wrapper around content.WriteBlob()
+// checkWrite is a wrapper around content.WriteBlob()
 func checkWrite(ctx context.Context, cs content.Store, dgst digest.Digest, p []byte) (digest.Digest, error) {
 	if err := content.WriteBlob(ctx, cs, dgst.String(), bytes.NewReader(p),
 		ocispec.Descriptor{Size: int64(len(p)), Digest: dgst}); err != nil {
