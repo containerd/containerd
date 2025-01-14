@@ -31,9 +31,11 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"tags.cncf.io/container-device-interface/pkg/cdi"
 
-	"github.com/containerd/containerd/v2/core/containers"
-	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/log"
+
+	"github.com/containerd/containerd/v2/core/containers"
+	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
+	"github.com/containerd/containerd/v2/pkg/oci"
 )
 
 // Linux dependent OCI spec opts.
@@ -172,6 +174,6 @@ func WithCDI(annotations map[string]string, CDIDevices []*runtime.CDIDevice) oci
 			log.G(ctx).Debug("Passing CDI devices as annotations will be deprecated soon, please use CRI CDIDevices instead")
 		}
 
-		return oci.WithCDIDevices(devices...)(ctx, client, c, s)
+		return cdispec.WithCDIDevices(devices...)(ctx, client, c, s)
 	}
 }
