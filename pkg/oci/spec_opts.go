@@ -1642,14 +1642,3 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 		return nil
 	}
 }
-
-// WithCDIDevices should be used from the cdi package. This version is used for
-// compatibility to point to the non-deprecated version but will return an error if used.
-// This function will be removed in 2.1.
-//
-// Deprecated: Use [github.com/containerd/containerd/v2/pkg/cdi.WithCDIDevices] instead.
-func WithCDIDevices(devices ...string) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
-		return errors.New("must use cdi package for CDI device injection")
-	}
-}
