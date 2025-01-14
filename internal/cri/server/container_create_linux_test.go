@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -1210,13 +1209,30 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 					asp = csp
 				}
 				specOpts, err := generateApparmorSpecOpts(asp, test.privileged, !test.disable)
-				assert.Equal(t,
-					reflect.ValueOf(test.specOpts).Pointer(),
-					reflect.ValueOf(specOpts).Pointer())
 				if test.expectErr {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
+					if test.specOpts == nil && specOpts == nil {
+						return
+					}
+					if test.specOpts == nil || specOpts == nil {
+						t.Fatalf("unexpected nil specOpts, expected nil: %t, actual nil: %t", test.specOpts == nil, specOpts == nil)
+					}
+					// `specOpts` for seccomp only uses/modifies `*specs.Spec`, not
+					// `oci.Client` or `*containers.Container`, so let's construct a
+					// `*specs.Spec` and compare if the results are the same.
+					expected := runtimespec.Spec{
+						Linux:   &runtimespec.Linux{},
+						Process: &runtimespec.Process{},
+					}
+					var actual runtimespec.Spec
+					err := util.DeepCopy(&actual, &expected)
+					assert.NoError(t, err)
+
+					test.specOpts(context.TODO(), nil, nil, &expected)
+					specOpts(context.TODO(), nil, nil, &actual)
+					assert.Equal(t, expected, actual)
 				}
 			}
 		})
