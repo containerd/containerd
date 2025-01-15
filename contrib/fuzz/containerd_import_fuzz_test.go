@@ -1,5 +1,3 @@
-//go:build gofuzz
-
 /*
    Copyright The containerd Authors.
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +16,8 @@ package fuzz
 import (
 	"bytes"
 	"context"
+	"os"
+	"testing"
 
 	fuzz "github.com/AdaLogics/go-fuzz-headers"
 
@@ -31,30 +31,35 @@ func fuzzContext() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func FuzzContainerdImport(data []byte) int {
-	initDaemon.Do(startDaemon)
-
-	client, err := containerd.New(defaultAddress)
-	if err != nil {
-		return 0
+func FuzzContainerdImport(f *testing.F) {
+	if os.Getuid() != 0 {
+		f.Skip("skipping fuzz test that requires root")
 	}
-	defer client.Close()
 
-	f := fuzz.NewConsumer(data)
+	f.Fuzz(func(t *testing.T, data []byte) {
+		initDaemon.Do(startDaemon)
 
-	noOfImports, err := f.GetInt()
-	if err != nil {
-		return 0
-	}
-	maxImports := 20
-	ctx, cancel := fuzzContext()
-	defer cancel()
-	for i := 0; i < noOfImports%maxImports; i++ {
-		tarBytes, err := f.GetBytes()
+		client, err := containerd.New(defaultAddress)
 		if err != nil {
-			return 0
+			t.Fatal(err)
 		}
-		_, _ = client.Import(ctx, bytes.NewReader(tarBytes))
-	}
-	return 1
+		defer client.Close()
+
+		f := fuzz.NewConsumer(data)
+
+		noOfImports, err := f.GetInt()
+		if err != nil {
+			return
+		}
+		maxImports := 20
+		ctx, cancel := fuzzContext()
+		defer cancel()
+		for i := 0; i < noOfImports%maxImports; i++ {
+			tarBytes, err := f.GetBytes()
+			if err != nil {
+				return
+			}
+			_, _ = client.Import(ctx, bytes.NewReader(tarBytes))
+		}
+	})
 }
