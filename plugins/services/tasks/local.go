@@ -158,7 +158,7 @@ type local struct {
 	v2Runtime runtime.PlatformRuntime
 }
 
-func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (*api.CreateTaskResponse, error) {
+func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.CallOption) (retRes *api.CreateTaskResponse, retErr error) {
 	container, err := l.getContainer(ctx, r.ContainerID)
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
@@ -245,6 +245,14 @@ func (l *local) Create(ctx context.Context, r *api.CreateTaskRequest, _ ...grpc.
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
+	// Error handling for rtime should be added here, as the task was successfully created during runtime.
+	defer func() {
+		if retErr != nil {
+			if _, err := rtime.Delete(ctx, r.ContainerID); err != nil && !errdefs.IsNotFound(err) {
+				log.G(ctx).WithError(err).Errorf("Failed to delete runtime task %q", r.ContainerID)
+			}
+		}
+	}()
 	labels := map[string]string{"runtime": container.Runtime.Name}
 	if err := l.monitor.Monitor(c, labels); err != nil {
 		return nil, fmt.Errorf("monitor task: %w", err)
