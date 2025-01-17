@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/containerd/log"
 	"github.com/containerd/nri"
@@ -136,6 +137,22 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 	if err != nil {
 		return cin, fmt.Errorf("failed to generate sandbox container spec: %w", err)
 	}
+
+	// If privileged is enabled, sysfs should have the rw attribute
+	if config.GetLinux().GetSecurityContext().GetPrivileged() {
+		for i, k := range spec.Mounts {
+			if filepath.Clean(k.Destination) == "/sys" {
+				for j, v := range spec.Mounts[i].Options {
+					if v == "ro" {
+						spec.Mounts[i].Options[j] = "rw"
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
 	log.G(ctx).WithField("podsandboxid", id).Debugf("sandbox container spec: %#+v", spew.NewFormatter(spec))
 
 	metadata.ProcessLabel = spec.Process.SelinuxLabel
