@@ -103,6 +103,11 @@ func testGetUsernsFD(t *testing.T) {
 			hasErr:  false,
 		},
 		{
+			uidMaps: "0:1000:100,100:2000:200",
+			gidMaps: "0:1000:100,100:2000:200",
+			hasErr:  false,
+		},
+		{
 			uidMaps: "100:1000:100",
 			gidMaps: "0:-1:100",
 			hasErr:  true,
@@ -115,6 +120,11 @@ func testGetUsernsFD(t *testing.T) {
 		{
 			uidMaps: "100:1000:100",
 			gidMaps: "0:1000:-1",
+			hasErr:  true,
+		},
+		{
+			uidMaps: "100:1000:100",
+			gidMaps: "0:1000:-1,100:1000:100",
 			hasErr:  true,
 		},
 	} {

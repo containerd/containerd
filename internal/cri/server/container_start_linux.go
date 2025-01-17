@@ -56,10 +56,11 @@ func updateContainerIOOwner(ctx context.Context, cntr containerd.Container, conf
 		return nil, fmt.Errorf("invalid linux platform oci runtime spec")
 	}
 
-	hostID, err := userns.IDMap{
+	idMap := userns.IDMap{
 		UidMap: spec.Linux.UIDMappings,
 		GidMap: spec.Linux.GIDMappings,
-	}.ToHost(userns.User{
+	}
+	hostID, err := idMap.ToHost(userns.User{
 		Uid: spec.Process.User.UID,
 		Gid: spec.Process.User.GID,
 	})

@@ -26,39 +26,55 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// TODO: Support multiple mappings in future
-func parseIDMapping(mapping string) ([]syscall.SysProcIDMap, error) {
+func parseIDMapping(mapping string) (syscall.SysProcIDMap, error) {
+	var retval syscall.SysProcIDMap
+
 	parts := strings.Split(mapping, ":")
 	if len(parts) != 3 {
-		return nil, fmt.Errorf("user namespace mappings require the format `container-id:host-id:size`")
+		return retval, fmt.Errorf("user namespace mappings require the format `container-id:host-id:size`")
 	}
 
 	cID, err := strconv.Atoi(parts[0])
 	if err != nil {
-		return nil, fmt.Errorf("invalid container id for user namespace remapping, %w", err)
+		return retval, fmt.Errorf("invalid container id for user namespace remapping, %w", err)
 	}
 
 	hID, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return nil, fmt.Errorf("invalid host id for user namespace remapping, %w", err)
+		return retval, fmt.Errorf("invalid host id for user namespace remapping, %w", err)
 	}
 
 	size, err := strconv.Atoi(parts[2])
 	if err != nil {
-		return nil, fmt.Errorf("invalid size for user namespace remapping, %w", err)
+		return retval, fmt.Errorf("invalid size for user namespace remapping, %w", err)
 	}
 
 	if cID < 0 || hID < 0 || size < 0 {
-		return nil, fmt.Errorf("invalid mapping %s, all IDs and size must be positive integers", mapping)
+		return retval, fmt.Errorf("invalid mapping %s, all IDs and size must be positive integers", mapping)
 	}
 
-	return []syscall.SysProcIDMap{
-		{
-			ContainerID: cID,
-			HostID:      hID,
-			Size:        size,
-		},
-	}, nil
+	retval = syscall.SysProcIDMap{
+		ContainerID: cID,
+		HostID:      hID,
+		Size:        size,
+	}
+
+	return retval, nil
+}
+
+func parseIDMappingList(mappings string) ([]syscall.SysProcIDMap, error) {
+	var (
+		res     []syscall.SysProcIDMap
+		maplist = strings.Split(mappings, ",")
+	)
+	for _, m := range maplist {
+		r, err := parseIDMapping(m)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, r)
+	}
+	return res, nil
 }
 
 // IDMapMount clones the mount at source to target, applying GID/UID idmapping of the user namespace for target path
@@ -93,15 +109,15 @@ func IDMapMountWithAttrs(source, target string, usernsFd int, attrSet uint64, at
 	return nil
 }
 
-// GetUsernsFD forks the current process and creates a user namespace using
-// the specified mappings.
+// GetUsernsFD forks the current process and creates a user namespace using the specified mappings.
+// Expected syntax of ID mapping parameter is "%d:%d:%d[,%d:%d:%d,...]"
 func GetUsernsFD(uidmap, gidmap string) (_usernsFD *os.File, _ error) {
-	uidMaps, err := parseIDMapping(uidmap)
+	uidMaps, err := parseIDMappingList(uidmap)
 	if err != nil {
 		return nil, err
 	}
 
-	gidMaps, err := parseIDMapping(gidmap)
+	gidMaps, err := parseIDMappingList(gidmap)
 	if err != nil {
 		return nil, err
 	}
