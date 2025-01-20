@@ -59,7 +59,7 @@ require (
 	github.com/prometheus/client_golang v1.20.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	github.com/tchap/go-patricia/v2 v2.3.1
+	github.com/tchap/go-patricia/v2 v2.3.2
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/vishvananda/netlink v1.3.0
 	go.etcd.io/bbolt v1.3.11
