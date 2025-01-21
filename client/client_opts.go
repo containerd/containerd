@@ -34,6 +34,7 @@ type clientOpts struct {
 	defaultPlatform platforms.MatchComparer
 	services        *services
 	dialOptions     []grpc.DialOption
+	extraDialOpts   []grpc.DialOption
 	callOptions     []grpc.CallOption
 	timeout         time.Duration
 }
@@ -72,6 +73,19 @@ func WithDefaultPlatform(platform platforms.MatchComparer) Opt {
 func WithDialOpts(opts []grpc.DialOption) Opt {
 	return func(c *clientOpts) error {
 		c.dialOptions = opts
+		return nil
+	}
+}
+
+// WithExtraDialOpts allows additional grpc.DialOptions to be set on the
+// connection. Unlike [WithDialOpts], options set here are appended to,
+// instead of overriding previous options, which allows setting options
+// to extend containerd client's defaults.
+//
+// This option can be used multiple times to set additional dial options.
+func WithExtraDialOpts(opts []grpc.DialOption) Opt {
+	return func(c *clientOpts) error {
+		c.extraDialOpts = append(c.extraDialOpts, opts...)
 		return nil
 	}
 }
