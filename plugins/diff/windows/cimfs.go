@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/plugins"
+	winsn "github.com/containerd/containerd/v2/plugins/snapshots/windows"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
@@ -77,11 +78,26 @@ func NewCimDiff(store content.Store) (CompareApplier, error) {
 // provided mounts. Archive content will be extracted and decompressed if
 // necessary.
 func (c cimDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
-	layer, parentLayerPaths, err := cimMountsToLayerAndParents(mounts)
+	if len(mounts) != 1 {
+		return emptyDesc, fmt.Errorf("number of mounts should always be 1 for CimFS layers: %w", errdefs.ErrInvalidArgument)
+	} else if mounts[0].Type != "CimFS" {
+		return emptyDesc, fmt.Errorf("cimDiff does not support layer type %s: %w", mounts[0].Type, errdefs.ErrNotImplemented)
+	}
+
+	m := mounts[0]
+	parentLayerPaths, err := m.GetParentPaths()
 	if err != nil {
 		return emptyDesc, err
 	}
-	return applyDiffCommon(ctx, c.store, desc, layer, parentLayerPaths, archive.AsCimContainerLayer(), opts...)
+	parentLayerCimPaths, err := winsn.GetParentCimPaths(&m)
+	if err != nil {
+		return emptyDesc, err
+	}
+	cimPath, err := winsn.GetCimPath(&m)
+	if err != nil {
+		return emptyDesc, err
+	}
+	return applyDiffCommon(ctx, c.store, desc, m.Source, parentLayerPaths, archive.AsCimContainerLayer(cimPath, parentLayerCimPaths), opts...)
 }
 
 // Compare creates a diff between the given mounts and uploads the result
@@ -89,23 +105,4 @@ func (c cimDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mo
 func (c cimDiff) Compare(ctx context.Context, lower, upper []mount.Mount, opts ...diff.Opt) (d ocispec.Descriptor, err error) {
 	// support for generating layer diff of cimfs layers will be added later.
 	return emptyDesc, errdefs.ErrNotImplemented
-}
-
-func cimMountsToLayerAndParents(mounts []mount.Mount) (string, []string, error) {
-	if len(mounts) != 1 {
-		return "", nil, fmt.Errorf("%w: number of mounts should always be 1 for Windows layers", errdefs.ErrInvalidArgument)
-	}
-	mnt := mounts[0]
-	if mnt.Type != "CimFS" {
-		// This is a special case error. When this is received the diff service
-		// will attempt the next differ in the chain.
-		return "", nil, errdefs.ErrNotImplemented
-	}
-
-	parentLayerPaths, err := mnt.GetParentPaths()
-	if err != nil {
-		return "", nil, err
-	}
-
-	return mnt.Source, parentLayerPaths, nil
 }

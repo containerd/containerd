@@ -11,8 +11,11 @@
 
 package hcsschema
 
-type Topology struct {
-	Memory        *VirtualMachineMemory                `json:"Memory,omitempty"`
-	Processor     *VirtualMachineProcessor             `json:"Processor,omitempty"`
-	Numa          *Numa                                `json:"Numa,omitempty"`
+type NumaProcessors struct {
+	CountPerNode  Range  `json:"count_per_node,omitempty"`
+	NodePerSocket uint32 `json:"node_per_socket,omitempty"`
+}
+
+type Range struct {
+	Max uint32 `json:"max,omitempty"`
 }
