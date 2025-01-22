@@ -173,8 +173,13 @@ func (c *criService) recover(ctx context.Context) error {
 				log.G(ctx2).
 					WithError(err).
 					WithField("container", container.ID()).
-					Error("Failed to load container")
-
+					Error("Failed to load container, and try to delete")
+				err = c.client.ContainerService().Delete(ctx2, container.ID())
+				if err != nil {
+					if !errdefs.IsNotFound(err) {
+						return fmt.Errorf("failed to delete container %q: %w", container.ID(), err)
+					}
+				}
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
