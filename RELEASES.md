@@ -247,10 +247,13 @@ no compatibility guarantees for upgrades that span multiple, _minor_ releases.
 For example, 1.0.0 to 1.2.0 is not supported. One should first upgrade to 1.1,
 then 1.2.
 
-There are no compatibility guarantees with upgrades to _major_ versions. For
-example, upgrading from 1.0.0 to 2.0.0 may require resources to migrated or
-integrations to change. Each major version will be supported for at least 1
-year with bug fixes and security patches.
+There are no compatibility guarantees with upgrades to _major_ versions. For 2.0, migration was
+added to ensure upgrading from 1.6 or 1.7 to 2.0 is easy. The latest releases of 1.6 and 1.7 provide
+deprecation warnings if any configuration is used which is incompatible with 2.0. If deprecation
+warnings are showing up, the configuration can be safely migrated in 1.6 or 1.7 before upgrading to
+2.0. Once no deprecation warnings are showing up, the upgrade to 2.0 should be smooth. Always
+check the release notes, breaking changes are listed there, and test your configuration before
+upgrading.
 
 ## Public API Stability
 
