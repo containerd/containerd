@@ -276,6 +276,12 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 		status = unknownContainerStatus()
 	}
 
+	spec, err := cntr.Spec(ctx)
+	if err != nil {
+		return container, fmt.Errorf("failed to get container spec %w for %q", err, id)
+	}
+	status = copyResourcesToStatus(spec, status)
+
 	var containerIO *cio.ContainerIO
 	err = func() error {
 		// Load up-to-date status from containerd.

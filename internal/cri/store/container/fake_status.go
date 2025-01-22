@@ -16,7 +16,11 @@
 
 package container
 
-import "sync"
+import (
+	"sync"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+)
 
 // WithFakeStatus adds fake status to the container.
 func WithFakeStatus(status Status) Opts {
@@ -58,5 +62,9 @@ func (f *fakeStatusStorage) Update(u UpdateFunc) error {
 }
 
 func (f *fakeStatusStorage) Delete() error {
+	return nil
+}
+
+func (f *fakeStatusStorage) UpdateResource(resource *runtime.ContainerResources) error {
 	return nil
 }

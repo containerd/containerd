@@ -154,6 +154,7 @@ type StatusStorage interface {
 	// Update the container status. Note that the update MUST be applied
 	// in one transaction.
 	Update(UpdateFunc) error
+	UpdateResource(resources *runtime.ContainerResources) error
 	// Delete the container status.
 	// Note:
 	// * Delete should be idempotent.
@@ -165,7 +166,9 @@ type StatusStorage interface {
 // specified id.
 // The status MUST be created in one transaction.
 func StoreStatus(root, id string, status Status) (StatusStorage, error) {
-	data, err := status.encode()
+	tmpStatus := status
+	tmpStatus.Resources = nil
+	data, err := tmpStatus.encode()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode status: %w", err)
 	}
@@ -195,6 +198,8 @@ func LoadStatus(root, id string) (Status, error) {
 }
 
 type statusStorage struct {
+	//lock status's resource
+	mu sync.RWMutex
 	sync.RWMutex
 	path   string
 	status Status
@@ -266,12 +271,8 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 	if err != nil {
 		return err
 	}
-	data, err := newStatus.encode()
-	if err != nil {
-		return fmt.Errorf("failed to encode status: %w", err)
-	}
-	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
-		return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
+	if _, err := StoreStatus(filepath.Dir(s.path), "", newStatus); err != nil {
+		return err
 	}
 	s.status = newStatus
 	return nil
@@ -286,6 +287,13 @@ func (s *statusStorage) Update(u UpdateFunc) error {
 		return err
 	}
 	s.status = newStatus
+	return nil
+}
+
+func (s *statusStorage) UpdateResource(resources *runtime.ContainerResources) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.status.Resources = resources
 	return nil
 }
 

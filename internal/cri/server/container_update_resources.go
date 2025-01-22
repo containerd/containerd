@@ -59,12 +59,14 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 	// Update resources in status update transaction, so that:
 	// 1) There won't be race condition with container start.
 	// 2) There won't be concurrent resource update to the same container.
-	if err := container.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
-		return c.updateContainerResources(ctx, container, r, status)
-	}); err != nil {
+	newStatus, err := c.updateContainerResources(ctx, container, r, container.Status.Get())
+	if err != nil {
 		return nil, fmt.Errorf("failed to update resources: %w", err)
 	}
-
+	err = container.Status.UpdateResource(newStatus.Resources)
+	if err != nil {
+		return nil, fmt.Errorf("failed to updateResources: %w", err)
+	}
 	err = c.nri.PostUpdateContainerResources(ctx, &sandbox, &container)
 	if err != nil {
 		log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
