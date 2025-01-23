@@ -279,7 +279,7 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 		// see: https://github.com/kubernetes/kubernetes/issues/74551 for detail
 		//
 		// In both cases, we should RESET the httpStream.
-		klog.ErrorS(err, "forwarding port", "conn", h.conn, "request", p.requestID, "port", portString)
+		klog.Errorf("(conn=%p, request=%s) forwarding port %s failed: %v", h.conn, p.requestID, portString, err)
 		resetStreams = true
 		return
 	}
