@@ -47,6 +47,8 @@ func (c *criService) UpdateContainerResources(ctx context.Context, r *runtime.Up
 		return nil, err
 	}
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	resources := r.GetLinux()
 	updated, err := c.nri.UpdateContainerResources(ctx, &sandbox, &container, resources)
 	if err != nil {
