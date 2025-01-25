@@ -15,7 +15,10 @@
 # For details, see https://github.com/devcontainers/images/tree/main/src/base-ubuntu
 FROM mcr.microsoft.com/devcontainers/base:1-ubuntu-22.04
 
+COPY .go-version /tmp/.go-version
+
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && export VERSION=$(cat /tmp/.go-version) \
     && apt-get -y install --no-install-recommends \
         gperf \
         dmsetup \
