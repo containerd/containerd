@@ -109,6 +109,11 @@ func (s *snapshotsSyncer) sync() error {
 			usage, err := snapshotter.Usage(ctx, info.Name)
 			if err != nil {
 				if !errdefs.IsNotFound(err) {
+					// delete the snapshot stats if it's not found, this can happen
+					// when the snapshot fs is removed.
+					if err := snapshotter.Remove(ctx, info.Name); err != nil {
+						log.L.WithError(err).Errorf("Failed to remove snapshot %q", info.Name)
+					}
 					log.L.WithError(err).Errorf("Failed to get usage for snapshot %q", info.Name)
 				}
 				continue
