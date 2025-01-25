@@ -428,3 +428,49 @@ func testStats(t *testing.T,
 		require.NotEmpty(t, s.GetWritableLayer().GetInodesUsed().GetValue())
 	}
 }
+
+func TestContainerSysfsStatsWithPrivilegedPod(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("Doesn't care about filesystem properties on windows")
+	}
+	sb, sbConfig := PodSandboxConfigWithCleanup(
+		t,
+		"sandbox",
+		"sysfs-stats-with-privileged",
+		WithPodSecurityContext(true),
+	)
+
+	var (
+		testImage     = images.Get(images.BusyBox)
+		containerName = "test-container"
+	)
+
+	EnsureImageExists(t, testImage)
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "top"),
+		WithSecurityContext(true),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+
+	require.NoError(t, err)
+	t.Log("Start the container")
+	require.NoError(t, runtimeService.StartContainer(cn))
+	defer func() {
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+
+	t.Logf("Execute cmd in container by sync")
+	mountinfo, _, err := runtimeService.ExecSync(cn, []string{
+		"sh",
+		"-c",
+		"mount |grep sysfs",
+	}, 10)
+	assert.NoError(t, err)
+	assert.Contains(t, string(mountinfo), "rw")
+}
