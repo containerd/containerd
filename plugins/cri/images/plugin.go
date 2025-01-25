@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/metadata"
@@ -58,7 +59,8 @@ func init() {
 			}
 			mdb := m.(*metadata.DB)
 
-			if warnings, err := criconfig.ValidateImageConfig(ic.Context, &config); err != nil {
+			config := ic.Config.(*criconfig.ImageConfig)
+			if warnings, err := criconfig.ValidateImageConfig(ic.Context, config); err != nil {
 				return nil, fmt.Errorf("invalid cri image config: %w", err)
 			} else if len(warnings) > 0 {
 				ws, err := ic.GetSingle(plugins.WarningPlugin)
@@ -137,7 +139,12 @@ func init() {
 				}
 			}
 
-			service, err := images.NewService(config, options)
+			ic.Meta.Exports = map[string]string{
+				"registry.configPath":   config.Registry.ConfigPath,
+				"discardUnpackedLayers": strconv.FormatBool(config.DiscardUnpackedLayers),
+			}
+
+			service, err := images.NewService(*config, options)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create image service: %w", err)
 			}
