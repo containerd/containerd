@@ -18,8 +18,12 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"path"
+	"strconv"
 	"time"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
@@ -86,4 +90,42 @@ func BuildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	}
 	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
+}
+
+// GenerateUserString generates valid user string based on OCI Image Spec
+// v1.0.0.
+//
+// CRI defines that the following combinations are valid:
+//
+// (none) -> ""
+// username -> username
+// username, uid -> username
+// username, uid, gid -> username:gid
+// username, gid -> username:gid
+// uid -> uid
+// uid, gid -> uid:gid
+// gid -> error
+//
+// TODO(random-liu): Add group name support in CRI.
+func GenerateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
+	var userstr, groupstr string
+	if uid != nil {
+		userstr = strconv.FormatInt(uid.GetValue(), 10)
+	}
+	if username != "" {
+		userstr = username
+	}
+	if gid != nil {
+		groupstr = strconv.FormatInt(gid.GetValue(), 10)
+	}
+	if userstr == "" {
+		if groupstr != "" {
+			return "", fmt.Errorf("user group %q is specified without user", groupstr)
+		}
+		return "", nil
+	}
+	if groupstr != "" {
+		userstr = userstr + ":" + groupstr
+	}
+	return userstr, nil
 }
