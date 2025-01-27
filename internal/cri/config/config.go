@@ -152,7 +152,15 @@ type ContainerdConfig struct {
 // CniConfig contains toml config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	//
+	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
+	//
+	// TODO(djdongjin): mark this field as deprecated in favor of NetworkPluginBinDirs.
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
+	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
+	//
+	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
+	NetworkPluginBinDirs []string `toml:"bin_dirs" json:"binDirs"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
 	// NetworkPluginMaxConfNum is the max number of plugin config files that will
@@ -526,6 +534,17 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	}
+
+	// Validation for CNI config
+	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
+	}
+	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		// Before `NetworkPluginBinDir` is deprecated, we manually merge it
+		// into `NetworkPluginBinDirs` so that we can use it in the rest of the code.
+		c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
+		c.CniConfig.NetworkPluginBinDir = ""
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {

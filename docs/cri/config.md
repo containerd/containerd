@@ -248,6 +248,7 @@ version = 3
 
     [plugins.'io.containerd.cri.v1.runtime'.cni]
       bin_dir = '/opt/cni/bin'
+      bin_dirs = []
       conf_dir = '/etc/cni/net.d'
       max_conf_num = 1
       setup_serially = false
