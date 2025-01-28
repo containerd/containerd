@@ -41,6 +41,10 @@ type config struct {
 	// correct output, allowing any ordering to be used to prefer
 	// more optimimal implementations.
 	Order []string `toml:"default"`
+	// sync_fs is an experimental setting. It's to force sync
+	// filesystem during unpacking to ensure that data integrity.
+	// It is effective for all containerd client.
+	SyncFs bool `toml:"sync_fs"`
 }
 
 type differ interface {
@@ -61,7 +65,7 @@ func init() {
 			if err != nil {
 				return nil, err
 			}
-
+			syncFs := ic.Config.(*config).SyncFs
 			orderedNames := ic.Config.(*config).Order
 			ordered := make([]differ, len(orderedNames))
 			for i, n := range orderedNames {
@@ -82,6 +86,7 @@ func init() {
 
 			return &local{
 				differs: ordered,
+				syncfs:  syncFs,
 			}, nil
 		},
 	})
@@ -89,6 +94,7 @@ func init() {
 
 type local struct {
 	differs []differ
+	syncfs  bool
 }
 
 var _ diffapi.DiffClient = &local{}
@@ -108,6 +114,9 @@ func (l *local) Apply(ctx context.Context, er *diffapi.ApplyRequest, _ ...grpc.C
 			payloads[k] = v
 		}
 		opts = append(opts, diff.WithPayloads(payloads))
+	}
+	if l.syncfs {
+		er.SyncFs = true
 	}
 	opts = append(opts, diff.WithSyncFs(er.SyncFs))
 
