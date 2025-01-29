@@ -166,8 +166,8 @@ func (r *OCIRegistry) Resolve(ctx context.Context) (name string, desc ocispec.De
 	return r.resolver.Resolve(ctx, r.reference)
 }
 
-func (r *OCIRegistry) Fetcher(ctx context.Context, ref string) (transfer.Fetcher, error) {
-	return r.resolver.Fetcher(ctx, ref)
+func (r *OCIRegistry) Fetcher(ctx context.Context, ref string, opts ...remotes.FetcherOpt) (transfer.Fetcher, error) {
+	return r.resolver.Fetcher(ctx, ref, opts...)
 }
 
 func (r *OCIRegistry) Pusher(ctx context.Context, desc ocispec.Descriptor) (transfer.Pusher, error) {

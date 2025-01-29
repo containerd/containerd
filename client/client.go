@@ -394,8 +394,34 @@ type RemoteContext struct {
 	// preference.
 	Platforms []string
 
-	// MaxConcurrentDownloads is the max concurrent content downloads for each pull.
+	// MaxConcurrentDownloads restricts the total number of concurrent downloads
+	// across all layers during an image pull operation. This helps control the
+	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
+
+	// MaxConcurrentDownloadOperations limits the number of parallel operations
+	// during an image pull to prevent system resource exhaustion.
+	//
+	// These operations include:
+	// - Downloading a layer
+	// - Unpacking a layer into the snapshotter
+	// - Moving an unpacked layer to its final location
+	MaxConcurrentDownloadOperations int
+
+	// MaxConcurrentDownloadsPerLayer controls parallel downloading of image layers
+	// by splitting them into chunks.
+	//
+	// - Values <= 1: Layers are downloaded using a single connection (default).
+	// - Values > 1: Layers are divided into chunks and downloaded in parallel,
+	//   which can significantly reduce pull times for large layers.
+	MaxConcurrentDownloadsPerLayer int
+
+	// ConcurrentDownloadChunkSize sets the maximum size in bytes for each
+	// chunk when downloading layers in parallel. Larger chunks reduce
+	// coordination overhead but use more memory. When
+	// ConcurrentDownloadChunkSize is bellow 512 bytes or
+	// MaxConcurrentDownloadsPerLayer is bellow 2, chunking is disabled.
+	ConcurrentDownloadChunkSize int
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int
