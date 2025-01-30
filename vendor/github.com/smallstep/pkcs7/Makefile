@@ -1,7 +1,7 @@
 all: vet staticcheck test
 
 test:
-	go test -race -covermode=atomic -count=1 -coverprofile=coverage.out .
+	go test -covermode=count -coverprofile=coverage.out .
 
 showcoverage: test
 	go tool cover -html=coverage.out
