@@ -57,3 +57,14 @@ func IsMarkedForRemoval(key string) (string, bool) {
 func MarkForRemoval(key string) string {
 	return "-" + key
 }
+
+// ClearRemovalMarker returns a key cleared from any removal marker.
+func ClearRemovalMarker(key string) string {
+	if key == "" {
+		return ""
+	}
+	if key[0] == '-' {
+		return key[1:]
+	}
+	return key
+}

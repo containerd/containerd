@@ -20,9 +20,9 @@ require (
 	github.com/containerd/go-runc v1.0.0
 	github.com/containerd/imgcrypt v1.1.8
 	github.com/containerd/log v0.1.0
-	github.com/containerd/nri v0.6.1
+	github.com/containerd/nri v0.8.0
 	github.com/containerd/platforms v0.2.1
-	github.com/containerd/ttrpc v1.2.5
+	github.com/containerd/ttrpc v1.2.7
 	github.com/containerd/typeurl/v2 v2.1.1
 	github.com/containerd/zfs v1.1.0
 	github.com/containernetworking/cni v1.1.2
@@ -101,7 +101,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
-	github.com/go-logr/logr v1.3.0 // indirect
+	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect

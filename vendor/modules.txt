@@ -158,8 +158,8 @@ github.com/containerd/imgcrypt/images/encryption
 ## explicit; go 1.20
 github.com/containerd/log
 github.com/containerd/log/logtest
-# github.com/containerd/nri v0.6.1
-## explicit; go 1.19
+# github.com/containerd/nri v0.8.0
+## explicit; go 1.21
 github.com/containerd/nri
 github.com/containerd/nri/pkg/adaptation
 github.com/containerd/nri/pkg/api
@@ -172,7 +172,7 @@ github.com/containerd/nri/types/v1
 # github.com/containerd/platforms v0.2.1
 ## explicit; go 1.20
 github.com/containerd/platforms
-# github.com/containerd/ttrpc v1.2.5
+# github.com/containerd/ttrpc v1.2.7
 ## explicit; go 1.19
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl v1.0.2
@@ -254,7 +254,7 @@ github.com/fsnotify/fsnotify
 github.com/go-jose/go-jose/v3
 github.com/go-jose/go-jose/v3/cipher
 github.com/go-jose/go-jose/v3/json
-# github.com/go-logr/logr v1.3.0
+# github.com/go-logr/logr v1.4.2
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr

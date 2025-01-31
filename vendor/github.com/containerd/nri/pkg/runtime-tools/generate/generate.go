@@ -40,6 +40,7 @@ type Generator struct {
 	filterAnnotations func(map[string]string) (map[string]string, error)
 	resolveBlockIO    func(string) (*rspec.LinuxBlockIO, error)
 	resolveRdt        func(string) (*rspec.LinuxIntelRdt, error)
+	injectCDIDevices  func(*rspec.Spec, []string) error
 	checkResources    func(*rspec.LinuxResources) error
 }
 
@@ -91,6 +92,14 @@ func WithResourceChecker(fn func(*rspec.LinuxResources) error) GeneratorOption {
 	}
 }
 
+// WithCDIDeviceInjector specifies a runtime-specific function to use for CDI
+// device resolution and injection into an OCI Spec.
+func WithCDIDeviceInjector(fn func(*rspec.Spec, []string) error) GeneratorOption {
+	return func(g *Generator) {
+		g.injectCDIDevices = fn
+	}
+}
+
 // Adjust adjusts all aspects of the OCI Spec that NRI knows/cares about.
 func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	if adjust == nil {
@@ -102,8 +111,12 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	}
 	g.AdjustEnv(adjust.GetEnv())
 	g.AdjustHooks(adjust.GetHooks())
+	if err := g.InjectCDIDevices(adjust.GetCDIDevices()); err != nil {
+		return err
+	}
 	g.AdjustDevices(adjust.GetLinux().GetDevices())
 	g.AdjustCgroupsPath(adjust.GetLinux().GetCgroupsPath())
+	g.AdjustOomScoreAdj(adjust.GetLinux().GetOomScoreAdj())
 
 	resources := adjust.GetLinux().GetResources()
 	if err := g.AdjustResources(resources); err != nil {
@@ -252,7 +265,9 @@ func (g *Generator) AdjustResources(r *nri.LinuxResources) error {
 	for k, v := range r.Unified {
 		g.AddLinuxResourcesUnified(k, v)
 	}
-
+	if v := r.GetPids(); v != nil {
+		g.SetLinuxResourcesPidsLimit(v.GetLimit())
+	}
 	if g.checkResources != nil {
 		if err := g.checkResources(g.Config.Linux.Resources); err != nil {
 			return fmt.Errorf("failed to adjust resources in OCI Spec: %w", err)
@@ -309,6 +324,14 @@ func (g *Generator) AdjustCgroupsPath(path string) {
 	}
 }
 
+// AdjustOomScoreAdj adjusts the kernel's Out-Of-Memory (OOM) killer score for the container.
+// This may override kubelet's settings for OOM score.
+func (g *Generator) AdjustOomScoreAdj(score *nri.OptionalInt) {
+	if score != nil {
+		g.SetProcessOOMScoreAdj(int(score.Value))
+	}
+}
+
 // AdjustDevices adjusts the (Linux) devices in the OCI Spec.
 func (g *Generator) AdjustDevices(devices []*nri.LinuxDevice) {
 	for _, d := range devices {
@@ -321,6 +344,23 @@ func (g *Generator) AdjustDevices(devices []*nri.LinuxDevice) {
 		major, minor, access := &d.Major, &d.Minor, d.AccessString()
 		g.AddLinuxResourcesDevice(true, d.Type, major, minor, access)
 	}
+}
+
+// InjectCDIDevices injects the requested CDI devices into the OCI Spec.
+// Devices are given by their fully qualified CDI device names. The
+// actual device injection is done using a runtime-specific CDI
+// injection function, set using the WithCDIDeviceInjector option.
+func (g *Generator) InjectCDIDevices(devices []*nri.CDIDevice) error {
+	if len(devices) == 0 || g.injectCDIDevices == nil {
+		return nil
+	}
+
+	names := []string{}
+	for _, d := range devices {
+		names = append(names, d.Name)
+	}
+
+	return g.injectCDIDevices(g.Config, names)
 }
 
 func (g *Generator) AdjustRlimits(rlimits []*nri.POSIXRlimit) error {
