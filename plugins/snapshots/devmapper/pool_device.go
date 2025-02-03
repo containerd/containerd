@@ -54,12 +54,11 @@ func NewPoolDevice(ctx context.Context, config *Config) (*PoolDevice, error) {
 	log.G(ctx).Infof("using dmsetup:\n%s", version)
 
 	if config.DiscardBlocks {
-		blkdiscardVersion, err := blkdiscard.Version()
+		err := blkdiscard.CheckBinary()
 		if err != nil {
-			log.G(ctx).Error("blkdiscard is not available")
+			log.G(ctx).Errorf("blkdiscard is not available:%v", err)
 			return nil, err
 		}
-		log.G(ctx).Infof("using blkdiscard:\n%s", blkdiscardVersion)
 	}
 
 	dbpath := filepath.Join(config.RootPath, config.PoolName+".db")
