@@ -482,6 +482,11 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
 				pod.Container.ID())
 		}
+		// the containers no longer exist but the oci.Spec may still be available to use on the StopPodSandbox hook
+		spec, err := pod.Container.Spec(ctx)
+		if err == nil {
+			criPod.spec = spec
+		}
 		return criPod
 	}
 
