@@ -156,6 +156,8 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
 	}
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	defer func() {
 		if retErr != nil {
 			deferCtx, deferCancel := ctrdutil.DeferContext()
