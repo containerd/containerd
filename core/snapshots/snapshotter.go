@@ -112,6 +112,8 @@ type Info struct {
 	Labels  map[string]string `json:",omitempty"`
 	Created time.Time         `json:",omitempty"` // Created time
 	Updated time.Time         `json:",omitempty"` // Last update time
+
+	ID string `json:",omitempty"`
 }
 
 // Usage defines statistics for disk resources consumed by the snapshot.

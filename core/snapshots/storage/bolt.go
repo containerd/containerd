@@ -89,7 +89,7 @@ func GetInfo(ctx context.Context, key string) (string, snapshots.Info, snapshots
 	if err != nil {
 		return "", snapshots.Info{}, snapshots.Usage{}, err
 	}
-
+	si.ID = strconv.FormatUint(id, 10)
 	return strconv.FormatUint(id, 10), si, su, nil
 }
 

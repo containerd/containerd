@@ -6212,6 +6212,13 @@ file {
       type_name: ".containerd.services.snapshots.v1.Info.LabelsEntry"
       json_name: "labels"
     }
+    field {
+      name: "id"
+      number: 7
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "id"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
