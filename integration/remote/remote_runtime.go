@@ -144,6 +144,28 @@ func (r *RuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runt
 	return resp.PodSandboxId, nil
 }
 
+// UpdatePodSandboxResources updates the cgroup resources for the sandbox.
+func (r *RuntimeService) UpdatePodSandboxResources(podSandBoxID string, overhead *runtimeapi.LinuxContainerResources, resources *runtimeapi.LinuxContainerResources, opts ...grpc.CallOption) error {
+	log.L.Infof("[RuntimeService] UpdatePodSandboxResources (podSandboxID=%v, timeout=%v)", podSandBoxID, r.timeout)
+
+	ctx, cancel := getContextWithTimeout(r.timeout)
+	defer cancel()
+
+	_, err := r.runtimeClient.UpdatePodSandboxResources(ctx, &runtimeapi.UpdatePodSandboxResourcesRequest{
+		PodSandboxId: podSandBoxID,
+		Overhead:     overhead,
+		Resources:    resources,
+	}, opts...)
+	if err != nil {
+		log.L.WithError(err).Errorf("UpdatePodSandboxResources %q from runtime service failed", podSandBoxID)
+		return err
+	}
+
+	log.L.Infof("[RuntimeService] UpdatePodSandboxResources Response (podSandboxID=%v)", podSandBoxID)
+
+	return nil
+}
+
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forced to termination.
 func (r *RuntimeService) StopPodSandbox(podSandBoxID string, opts ...grpc.CallOption) error {
