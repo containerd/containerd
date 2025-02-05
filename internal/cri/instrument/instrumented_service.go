@@ -18,6 +18,7 @@ package instrument
 
 import (
 	"context"
+	"errors"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
@@ -341,6 +342,10 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 	}()
 	res, err = in.c.UpdateContainerResources(ctrdutil.WithNamespace(ctx), r)
 	return res, errgrpc.ToGRPC(err)
+}
+
+func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
+	return nil, errors.New("unimplemented")
 }
 
 func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (res *runtime.PullImageResponse, err error) {
