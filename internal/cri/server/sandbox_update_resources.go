@@ -18,11 +18,50 @@ package server
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+
+	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/tracing"
+	"github.com/containerd/log"
 )
 
 func (c *criService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (*runtime.UpdatePodSandboxResourcesResponse, error) {
-	return nil, errors.New("not implemented yet")
+	span := tracing.SpanFromContext(ctx)
+	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandbox: %w", err)
+	}
+
+	span.SetAttributes(tracing.Attribute("sandbox.id", sandbox.ID))
+
+	overhead := r.GetOverhead()
+	resources := r.GetResources()
+	err = c.nri.UpdatePodSandboxResources(ctx, &sandbox, overhead, resources)
+	if err != nil {
+		return nil, fmt.Errorf("NRI sandbox update failed: %w", err)
+	}
+
+	err = sandbox.Status.Update(
+		func(status sstore.Status) (sstore.Status, error) {
+			status.Overhead = &runtime.ContainerResources{
+				Linux: overhead,
+			}
+			status.Resources = &runtime.ContainerResources{
+				Linux: resources,
+			}
+			return status, nil
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update sandbox store: %w", err)
+	}
+
+	err = c.nri.PostUpdatePodSandboxResources(ctx, &sandbox)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("NRI post-update notification failed")
+	}
+
+	return &runtime.UpdatePodSandboxResourcesResponse{}, nil
 }
