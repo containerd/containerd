@@ -16,6 +16,8 @@
 
 package api
 
+import "slices"
+
 //
 // Notes:
 //   Adjustment of metadata that is stored in maps (labels and annotations)
@@ -80,6 +82,17 @@ func (a *ContainerAdjustment) RemoveEnv(key string) {
 	})
 }
 
+// SetArgs overrides the container command with the given arguments.
+func (a *ContainerAdjustment) SetArgs(args []string) {
+	a.Args = slices.Clone(args)
+}
+
+// UpdateArgs overrides the container command with the given arguments.
+// It won't fail if another plugin has already set the command line.
+func (a *ContainerAdjustment) UpdateArgs(args []string) {
+	a.Args = append([]string{""}, args...)
+}
+
 // AddHooks records the addition of the given hooks to a container.
 func (a *ContainerAdjustment) AddHooks(h *Hooks) {
 	a.initHooks()
@@ -132,6 +145,20 @@ func (a *ContainerAdjustment) RemoveDevice(path string) {
 // AddCDIDevice records the addition of the given CDI device to a container.
 func (a *ContainerAdjustment) AddCDIDevice(d *CDIDevice) {
 	a.CDIDevices = append(a.CDIDevices, d) // TODO: should we dup d here ?
+}
+
+// AddOrReplaceNamespace records the addition or replacement of the given namespace to a container.
+func (a *ContainerAdjustment) AddOrReplaceNamespace(n *LinuxNamespace) {
+	a.initLinuxNamespaces()
+	a.Linux.Namespaces = append(a.Linux.Namespaces, n) // TODO: should we dup n here ?
+}
+
+// RemoveNamespace records the removal of the given namespace from a container.
+func (a *ContainerAdjustment) RemoveNamespace(n *LinuxNamespace) {
+	a.initLinuxNamespaces()
+	a.Linux.Namespaces = append(a.Linux.Namespaces, &LinuxNamespace{
+		Type: MarkForRemoval(n.Type),
+	})
 }
 
 // SetLinuxMemoryLimit records setting the memory limit for a container.
@@ -270,6 +297,18 @@ func (a *ContainerAdjustment) SetLinuxOomScoreAdj(value *int) {
 	a.Linux.OomScoreAdj = Int(value) // using Int(value) from ./options.go to optionally allocate a pointer to normalized copy of value
 }
 
+// SetLinuxIOPriority records setting the I/O priority for a container.
+func (a *ContainerAdjustment) SetLinuxIOPriority(ioprio *LinuxIOPriority) {
+	a.initLinux()
+	a.Linux.IoPriority = ioprio
+}
+
+// SetLinuxSeccompPolicy overrides the container seccomp policy with the given arguments.
+func (a *ContainerAdjustment) SetLinuxSeccompPolicy(seccomp *LinuxSeccomp) {
+	a.initLinux()
+	a.Linux.SeccompPolicy = seccomp
+}
+
 //
 // Initializing a container adjustment and container update.
 //
@@ -295,6 +334,13 @@ func (a *ContainerAdjustment) initRlimits() {
 func (a *ContainerAdjustment) initLinux() {
 	if a.Linux == nil {
 		a.Linux = &LinuxContainerAdjustment{}
+	}
+}
+
+func (a *ContainerAdjustment) initLinuxNamespaces() {
+	a.initLinux()
+	if a.Linux.Namespaces == nil {
+		a.Linux.Namespaces = []*LinuxNamespace{}
 	}
 }
 
