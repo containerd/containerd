@@ -513,7 +513,7 @@ jobs:
 
   vagrant:
     name: Vagrant
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     needs: [linters, protos, man]
     strategy:
@@ -597,7 +597,7 @@ jobs:
 
   cgroup2-misc:
     name: CGroupsV2 - rootless CRI test
-    runs-on: ubuntu-latest-4-cores
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     needs: [linters, protos, man]
     steps:
@@ -624,7 +624,7 @@ jobs:
           sudo systemctl enable --now libvirtd
           sudo apt-get build-dep -y vagrant ruby-libvirt
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
-          sudo vagrant plugin install vagrant-libvirt vagrant-scp
+          sudo vagrant plugin install vagrant-libvirt
 
       - name: Vagrant start
         run: |
