@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/containerd/containerd/pkg/systemd"
+	"github.com/containerd/containerd/runtime/linux/runctypes"
 	runcoptions "github.com/containerd/containerd/runtime/v2/runc/options"
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -48,7 +49,7 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 	})
 
 	for _, handler := range handlerNames {
-		opts, err := generateRuntimeOptions(c.config.ContainerdConfig.Runtimes[handler])
+		opts, err := generateRuntimeOptions(c.config.ContainerdConfig.Runtimes[handler], c.config)
 		if err != nil {
 			log.G(ctx).Debugf("failed to parse runtime handler options for %q", handler)
 			continue
@@ -69,13 +70,16 @@ func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 }
 
 func getCgroupDriverFromRuntimeHandlerOpts(opts interface{}) (runtime.CgroupDriver, bool) {
+	systemdCgroupToCgroupDriver := map[bool]runtime.CgroupDriver{
+		true:  runtime.CgroupDriver_SYSTEMD,
+		false: runtime.CgroupDriver_CGROUPFS,
+	}
 	switch v := opts.(type) {
 	case *runcoptions.Options:
-		systemdCgroup := v.SystemdCgroup
-		if systemdCgroup {
-			return runtime.CgroupDriver_SYSTEMD, true
-		}
-		return runtime.CgroupDriver_CGROUPFS, true
+		return systemdCgroupToCgroupDriver[v.SystemdCgroup], true
+	case *runctypes.RuncOptions:
+		return systemdCgroupToCgroupDriver[v.SystemdCgroup], true
+
 	}
 	return runtime.CgroupDriver_SYSTEMD, false
 }

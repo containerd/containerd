@@ -27,10 +27,10 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-func newFakeRuntimeConfig(runcV2, systemdCgroup bool) criconfig.Runtime {
-	r := criconfig.Runtime{Type: "default", Options: map[string]interface{}{}}
-	if runcV2 {
-		r.Type = plugin.RuntimeRuncV2
+func newFakeRuntimeConfig(t string, systemdCgroup bool) criconfig.Runtime {
+	r := criconfig.Runtime{Type: t, Options: map[string]interface{}{}}
+	switch t {
+	case plugin.RuntimeRuncV1, plugin.RuntimeRuncV2, plugin.RuntimeLinuxV1:
 		if systemdCgroup {
 			r.Options["SystemdCgroup"] = true
 		}
@@ -57,16 +57,16 @@ func TestRuntimeConfig(t *testing.T) {
 		{
 			desc:                 "non-runc runtime",
 			defaultRuntime:       "non-runc",
-			runtimes:             map[string]criconfig.Runtime{"non-runc": newFakeRuntimeConfig(false, false)},
+			runtimes:             map[string]criconfig.Runtime{"non-runc": newFakeRuntimeConfig("default", false)},
 			expectedCgroupDriver: autoDetected,
 		},
 		{
 			desc: "no default, pick first in alphabetical order",
 			runtimes: map[string]criconfig.Runtime{
-				"non-runc":   newFakeRuntimeConfig(false, false),
-				"runc-2":     newFakeRuntimeConfig(true, true),
-				"runc":       newFakeRuntimeConfig(true, false),
-				"non-runc-2": newFakeRuntimeConfig(false, false),
+				"non-runc":   newFakeRuntimeConfig("default", false),
+				"runc-2":     newFakeRuntimeConfig(plugin.RuntimeRuncV2, true),
+				"runc":       newFakeRuntimeConfig(plugin.RuntimeRuncV2, false),
+				"non-runc-2": newFakeRuntimeConfig("default", false),
 			},
 			expectedCgroupDriver: runtime.CgroupDriver_CGROUPFS,
 		},
@@ -74,9 +74,9 @@ func TestRuntimeConfig(t *testing.T) {
 			desc:           "pick default, cgroupfs",
 			defaultRuntime: "runc-2",
 			runtimes: map[string]criconfig.Runtime{
-				"non-runc": newFakeRuntimeConfig(false, false),
-				"runc":     newFakeRuntimeConfig(true, true),
-				"runc-2":   newFakeRuntimeConfig(true, false),
+				"non-runc": newFakeRuntimeConfig("default", false),
+				"runc":     newFakeRuntimeConfig(plugin.RuntimeRuncV2, true),
+				"runc-2":   newFakeRuntimeConfig(plugin.RuntimeRuncV2, false),
 			},
 			expectedCgroupDriver: runtime.CgroupDriver_CGROUPFS,
 		},
@@ -84,9 +84,27 @@ func TestRuntimeConfig(t *testing.T) {
 			desc:           "pick default, systemd",
 			defaultRuntime: "runc-2",
 			runtimes: map[string]criconfig.Runtime{
-				"non-runc": newFakeRuntimeConfig(false, false),
-				"runc":     newFakeRuntimeConfig(true, false),
-				"runc-2":   newFakeRuntimeConfig(true, true),
+				"non-runc": newFakeRuntimeConfig("default", false),
+				"runc":     newFakeRuntimeConfig(plugin.RuntimeRuncV2, false),
+				"runc-2":   newFakeRuntimeConfig(plugin.RuntimeRuncV2, true),
+			},
+			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
+		},
+		{
+			desc:           "pick default, runcv1 systemd",
+			defaultRuntime: "runcv1",
+			runtimes: map[string]criconfig.Runtime{
+				"runc":   newFakeRuntimeConfig(plugin.RuntimeRuncV2, false),
+				"runcv1": newFakeRuntimeConfig(plugin.RuntimeRuncV1, true),
+			},
+			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
+		},
+		{
+			desc:           "pick default, linuxv1 systemd",
+			defaultRuntime: "linuxv1",
+			runtimes: map[string]criconfig.Runtime{
+				"runc":    newFakeRuntimeConfig(plugin.RuntimeRuncV2, false),
+				"linuxv1": newFakeRuntimeConfig(plugin.RuntimeLinuxV1, true),
 			},
 			expectedCgroupDriver: runtime.CgroupDriver_SYSTEMD,
 		},
