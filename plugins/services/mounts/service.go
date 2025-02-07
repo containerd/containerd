@@ -21,6 +21,7 @@ import (
 
 	api "github.com/containerd/containerd/api/services/mounts/v1"
 	"github.com/containerd/errdefs/pkg/errgrpc"
+	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
 	"google.golang.org/grpc"
@@ -62,6 +63,7 @@ func (s *service) Register(server *grpc.Server) error {
 }
 
 func (s *service) Activate(ctx context.Context, in *api.ActivateRequest) (*api.ActivateResponse, error) {
+	log.G(ctx).WithFields(log.Fields{"name": in.Name, "temp": in.Temporary, "mounts": len(in.Mounts)}).Debug("activate mounts")
 	var opts []mount.ActivateOpt
 	if in.Temporary {
 		opts = append(opts, mount.WithTemporary)
@@ -81,6 +83,7 @@ func (s *service) Activate(ctx context.Context, in *api.ActivateRequest) (*api.A
 }
 
 func (s *service) Deactivate(ctx context.Context, in *api.DeactivateRequest) (*emptypb.Empty, error) {
+	log.G(ctx).WithField("name", in.Name).Debug("deactivate mounts")
 	if err := s.mm.Deactivate(ctx, in.Name); err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
@@ -88,6 +91,7 @@ func (s *service) Deactivate(ctx context.Context, in *api.DeactivateRequest) (*e
 }
 
 func (s *service) Info(ctx context.Context, in *api.InfoRequest) (*api.InfoResponse, error) {
+	log.G(ctx).WithField("name", in.Name).Debug("mount info")
 	info, err := s.mm.Info(ctx, in.Name)
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
@@ -108,6 +112,7 @@ func (s *service) Update(ctx context.Context, in *api.UpdateRequest) (*api.Updat
 }
 
 func (s *service) List(in *api.ListRequest, ms api.Mounts_ListServer) error {
+	log.G(ms.Context()).Debug("list mounts")
 	infos, err := s.mm.List(ms.Context(), in.Filters...)
 	if err != nil {
 		return errgrpc.ToGRPC(err)
