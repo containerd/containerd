@@ -18,6 +18,7 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func init() {
 				return nil, err
 			}
 			hp, err := ic.GetByType(plugins.MountHandlerPlugin)
-			if err != nil {
+			if err != nil && !errors.Is(err, plugin.ErrPluginNotFound) {
 				return nil, err
 			}
 			handlers := make(map[string]mount.Handler, len(hp))
