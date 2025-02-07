@@ -28,6 +28,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -380,6 +381,12 @@ var mountCommand = &cli.Command{
 	Aliases:   []string{"m", "mount"},
 	Usage:     "Mount gets mount commands for the snapshots",
 	ArgsUsage: "<target> <key>",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "temp",
+			Usage: "Mounts the snapshot mounts as a temp mount and returns a bind mount",
+		},
+	},
 	Action: func(cliContext *cli.Context) error {
 		if cliContext.NArg() != 2 {
 			return cli.ShowSubcommandHelp(cliContext)
@@ -397,6 +404,19 @@ var mountCommand = &cli.Command{
 		mounts, err := snapshotter.Mounts(ctx, key)
 		if err != nil {
 			return err
+		}
+
+		mm := client.MountManager()
+
+		var opts []mount.ActivateOpt
+		if cliContext.Bool("temp") {
+			opts = append(opts, mount.WithTemporary)
+		}
+		info, err := mm.Activate(ctx, "ctr"+key, mounts, opts...)
+		if err == nil {
+			mounts = info.System
+		} else if !errdefs.IsNotImplemented(err) {
+			return fmt.Errorf("activate error: %w", err)
 		}
 
 		printMounts(target, mounts)
