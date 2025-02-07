@@ -33,6 +33,9 @@ type Config struct {
 
 	// MountOptions are options used for the EROFS overlayfs mount
 	OvlOptions []string `toml:"ovl_mount_options"`
+
+	// EnableFsverity enables fsverity for EROFS layers
+	EnableFsverity bool `toml:"enable_fsverity"`
 }
 
 func init() {
@@ -56,6 +59,10 @@ func init() {
 
 			if len(config.OvlOptions) > 0 {
 				opts = append(opts, erofs.WithOvlOptions(config.OvlOptions))
+			}
+
+			if config.EnableFsverity {
+				opts = append(opts, erofs.WithFsverity())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root

@@ -28,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/core/snapshots/storage"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/plugins/snapshots/erofs/erofsutils"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
@@ -39,6 +40,8 @@ import (
 type SnapshotterConfig struct {
 	// ovlOptions are the base options added to the overlayfs mount (defaults to [""])
 	ovlOptions []string
+	// enableFsverity enables fsverity for EROFS layers
+	enableFsverity bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -51,6 +54,13 @@ func WithOvlOptions(options []string) Opt {
 	}
 }
 
+// WithFsverity enables fsverity for EROFS layers
+func WithFsverity() Opt {
+	return func(config *SnapshotterConfig) {
+		config.enableFsverity = true
+	}
+}
+
 type MetaStore interface {
 	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
 	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
@@ -58,9 +68,10 @@ type MetaStore interface {
 }
 
 type snapshotter struct {
-	root       string
-	ms         *storage.MetaStore
-	ovlOptions []string
+	root           string
+	ms             *storage.MetaStore
+	ovlOptions     []string
+	enableFsverity bool
 }
 
 // check if EROFS kernel filesystem is registered or not
@@ -108,6 +119,17 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		return nil, fmt.Errorf("EROFS unsupported, please `modprobe erofs`: %w", plugin.ErrSkipPlugin)
 	}
 
+	// Check fsverity support if enabled
+	if config.enableFsverity {
+		supported, err := fsverity.IsSupported(root)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check fsverity support on %q: %w", root, err)
+		}
+		if !supported {
+			return nil, fmt.Errorf("fsverity is not supported on the filesystem of %q", root)
+		}
+	}
+
 	ms, err := storage.NewMetaStore(filepath.Join(root, "metadata.db"))
 	if err != nil {
 		return nil, err
@@ -118,9 +140,10 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 	}
 
 	return &snapshotter{
-		root:       root,
-		ms:         ms,
-		ovlOptions: config.ovlOptions,
+		root:           root,
+		ms:             ms,
+		ovlOptions:     config.ovlOptions,
+		enableFsverity: config.enableFsverity,
 	}, nil
 }
 
@@ -182,11 +205,15 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 	var options []string
 
 	if len(snap.ParentIDs) == 0 {
-		// If the EROFS layer blob is valid, only snapshots.KindView is allowed.
 		m, _, err := s.lowerPath(snap.ID)
 		if err == nil {
 			if snap.Kind != snapshots.KindView {
 				return nil, fmt.Errorf("only works for snapshots.KindView on a committed snapshot: %w", err)
+			}
+			if s.enableFsverity {
+				if err := s.verifyFsverity(m.Source); err != nil {
+					return nil, err
+				}
 			}
 			// We have to force a loop device here since mount[] is static.
 			m.Options = append(m.Options, "loop")
@@ -369,6 +396,14 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 				}
 			}
 		}
+
+		// Enable fsverity on the EROFS layer if configured
+		if s.enableFsverity {
+			if err := fsverity.Enable(layerBlob); err != nil {
+				return fmt.Errorf("failed to enable fsverity: %w", err)
+			}
+		}
+
 		return nil
 	})
 
@@ -535,4 +570,19 @@ func (s *snapshotter) Usage(ctx context.Context, key string) (_ snapshots.Usage,
 		usage = snapshots.Usage(du)
 	}
 	return usage, nil
+}
+
+// Add a method to verify fsverity
+func (s *snapshotter) verifyFsverity(path string) error {
+	if !s.enableFsverity {
+		return nil
+	}
+	enabled, err := fsverity.IsEnabled(path)
+	if err != nil {
+		return fmt.Errorf("failed to check fsverity status: %w", err)
+	}
+	if !enabled {
+		return fmt.Errorf("fsverity is not enabled on %s", path)
+	}
+	return nil
 }

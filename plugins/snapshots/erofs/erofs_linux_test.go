@@ -18,11 +18,16 @@ package erofs
 
 import (
 	"context"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/core/snapshots"
+	"github.com/containerd/containerd/v2/core/snapshots/storage"
 	"github.com/containerd/containerd/v2/core/snapshots/testsuite"
+	"github.com/containerd/containerd/v2/internal/fsverity"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
@@ -50,4 +55,79 @@ func newSnapshotter(t *testing.T) func(ctx context.Context, root string) (snapsh
 func TestErofs(t *testing.T) {
 	testutil.RequiresRoot(t)
 	testsuite.SnapshotterSuite(t, "erofs", newSnapshotter(t))
+}
+
+func TestErofsFsverity(t *testing.T) {
+	testutil.RequiresRoot(t)
+	ctx := context.Background()
+
+	root := t.TempDir()
+
+	// Skip if fsverity is not supported
+	supported, err := fsverity.IsSupported(root)
+	if !supported || err != nil {
+		t.Skip("fsverity not supported, skipping test")
+	}
+
+	// Create snapshotter with fsverity enabled
+	s, err := NewSnapshotter(root, WithFsverity())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	// Create a test snapshot
+	key := "test-snapshot"
+	mounts, err := s.Prepare(ctx, key, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(root, key)
+	if err := os.MkdirAll(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := mount.All(mounts, target); err != nil {
+		t.Fatal(err)
+	}
+	defer testutil.Unmount(t, target)
+
+	// Write test data
+	if err := os.WriteFile(filepath.Join(target, "foo"), []byte("test data"), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	// Commit the snapshot
+	commitKey := "test-commit"
+	if err := s.Commit(ctx, commitKey, key); err != nil {
+		t.Fatal(err)
+	}
+
+	snap := s.(*snapshotter)
+
+	// Get the internal ID from the snapshotter
+	var id string
+	if err := snap.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
+		id, _, _, err = storage.GetInfo(ctx, commitKey)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify fsverity is enabled on the EROFS layer
+
+	layerPath := snap.layerBlobPath(id)
+
+	enabled, err := fsverity.IsEnabled(layerPath)
+	if err != nil {
+		t.Fatalf("Failed to check fsverity status: %v", err)
+	}
+	if !enabled {
+		t.Fatal("Expected fsverity to be enabled on committed layer")
+	}
+
+	// Try to modify the layer file directly (should fail)
+	if err := os.WriteFile(layerPath, []byte("tampered data"), 0666); err == nil {
+		t.Fatal("Expected direct write to fsverity-enabled layer to fail")
+	}
 }
