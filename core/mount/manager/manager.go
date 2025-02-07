@@ -619,7 +619,11 @@ func (cc *collectionContext) All(fn func(gc.Node)) {
 		if nsv != nil {
 			continue
 		}
-		mc := v1bkt.Bucket(nsk).Cursor()
+		mntsbkt := v1bkt.Bucket(nsk).Bucket(bucketKeyMounts)
+		if mntsbkt == nil {
+			continue
+		}
+		mc := mntsbkt.Cursor()
 		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
 			if mv != nil {
 				continue
@@ -669,11 +673,12 @@ func (cc *collectionContext) Leased(ns, lease string, fn func(gc.Node)) {
 }
 
 func (cc *collectionContext) Remove(n gc.Node) {
+	log.G(cc.ctx).WithFields(log.Fields{"namespace": n.Namespace, "name": n.Key}).Debugf("remove mount")
 	if n.Type != metadata.ResourceMount {
 		return
 	}
 	nmap, ok := cc.removed[n.Namespace]
-	if !ok {
+	if ok {
 		if _, ok = nmap[n.Key]; !ok {
 			nmap[n.Key] = struct{}{}
 		}
@@ -801,6 +806,8 @@ func cleanupAll(ctx context.Context, roots []string, handlers map[string]mount.H
 	for _, root := range roots {
 		if err := unmountAll(ctx, root, handlers); err != nil {
 			errs = append(errs, err)
+		} else {
+			log.G(ctx).WithField("root", root).Debugf("unmounted")
 		}
 	}
 	return errors.Join(errs...)
