@@ -82,6 +82,13 @@ The following configuration can be used in your containerd `config.toml`. Don't
 forget to restart containerd after changing the configuration.
 
 ```
+  [plugins."io.containerd.snapshotter.v1.erofs"]
+      # Enable fsverity support for EROFS layers, default is false
+      enable_fsverity = true
+
+      # Optional: Additional mount options for overlayfs
+      ovl_mount_options = []
+
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["erofs","walking"]
 ```
@@ -135,6 +142,13 @@ In other words, the EROFS differ can only be used with the EROFS snapshotter;
 otherwise, it will skip to the next differ.  The EROFS snapshotter can work
 with or without the EROFS differ.
 
+## Data Integrity with fsverity
+
+The EROFS snapshotter supports fsverity for data integrity verification of EROFS layers.
+When enabled via `enable_fsverity = true`, the snapshotter will:
+- Enable fsverity on EROFS layers during commit
+- Verify fsverity status before mounting layers
+- Skip fsverity if the filesystem or kernel does not support it
 
 ## TODO
 
