@@ -144,6 +144,13 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		processes:       make(map[string]process.Process),
 		reservedProcess: make(map[string]struct{}),
 	}
+
+	// ensure /etc/mtab is a soft link.
+	judgeErr := ensureMtabLink(r.Bundle)
+	if judgeErr != nil {
+		logrus.WithError(err).Warn("judge /etc/mtab file in rootfs")
+	}
+
 	pid := p.Pid()
 	if pid > 0 {
 		if cg, err := loadProcessCgroup(ctx, pid); err == nil {
@@ -154,6 +161,42 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 }
 
 const optionsFilename = "options.json"
+
+// ensureMtabLink checks if /etc/mtab is a symlink, and creates one if it's not.
+// This function is primarily used to ensure compatibility with legacy distros
+// such as CentOS 6 and others.
+func ensureMtabLink(bundlePath string) error {
+	targetPath := bundlePath + "/rootfs/etc/mtab"
+	sourcePath := "/proc/mounts"
+
+	// check /etc/mtab is softlink or not
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		logrus.WithError(err).Errorf("check file: /etc/mtab status")
+		return err
+	}
+
+	// Alrealy is a softlink, do nothing
+	if info.Mode()&os.ModeSymlink != 0 {
+		logrus.Infof("etc/mtab alrealy is a softlink, do nothing")
+		return nil
+	}
+
+	// Not a softlink, remove the filepath
+	err = os.Remove(targetPath)
+	if err != nil {
+		logrus.WithError(err).Errorf("remove physical file: etc/mtab")
+		return err
+	}
+
+	// Create soft link
+	err = os.Symlink(sourcePath, targetPath)
+	if err != nil {
+		logrus.WithError(err).Errorf("create soft link")
+		return err
+	}
+	return nil
+}
 
 // ReadOptions reads the option information from the path.
 // When the file does not exist, ReadOptions returns nil without an error.
