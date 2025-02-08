@@ -220,7 +220,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, arm64-8core-32gb, macos-13, windows-2019, windows-2022]
-        go-version: ["1.22.10", "1.23.4"]
+        go-version: ["1.22.11", "1.23.5"]
         exclude:
           - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
     steps:
@@ -549,13 +549,13 @@ jobs:
           # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
           sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
           # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
           sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
           sudo systemctl enable --now libvirtd
-          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get build-dep -y ruby-libvirt
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo vagrant plugin install vagrant-libvirt vagrant-scp
 
@@ -615,14 +615,14 @@ jobs:
           # So we have to install Vagrant >= 2.3.1 from the upstream: https://github.com/opencontainers/runc/blob/v1.1.8/.cirrus.yml#L41-L49
           curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
           sudo apt-get update
           # Pinned to 2.4.1-1 until https://github.com/hashicorp/vagrant/pull/13532 in released version
           sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant=2.4.1-1 ovmf
           # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
           sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
           sudo systemctl enable --now libvirtd
-          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get build-dep -y ruby-libvirt
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo vagrant plugin install vagrant-libvirt
 
