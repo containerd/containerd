@@ -123,7 +123,7 @@ func (w *writer) Commit(ctx context.Context, size int64, expected digest.Digest,
 	)
 
 	// make sure parent directories of blob exist
-	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
 		return err
 	}
 

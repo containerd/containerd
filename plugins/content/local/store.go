@@ -547,7 +547,7 @@ func (s *store) writer(ctx context.Context, ref string, total int64, expected di
 	}
 
 	// ensure that the ingest path has been created.
-	if err := os.Mkdir(path, 0755); err != nil {
+	if err := os.Mkdir(path, 0700); err != nil {
 		if !os.IsExist(err) {
 			return nil, err
 		}
@@ -657,7 +657,7 @@ func (s *store) ingestPaths(ref string) (string, string, string) {
 }
 
 func (s *store) ensureIngestRoot() error {
-	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0777)
+	return os.MkdirAll(filepath.Join(s.root, "ingest"), 0700)
 }
 
 func readFileString(path string) (string, error) {

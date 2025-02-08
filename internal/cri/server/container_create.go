@@ -128,7 +128,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 
 	// Create container root directory.
 	containerRootDir := c.getContainerRootDir(id)
-	if err = c.os.MkdirAll(containerRootDir, 0755); err != nil {
+	if err = c.os.MkdirAll(containerRootDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create container root directory %q: %w",
 			containerRootDir, err)
 	}
@@ -142,7 +142,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 		}
 	}()
 	volatileContainerRootDir := c.getVolatileContainerRootDir(id)
-	if err = c.os.MkdirAll(volatileContainerRootDir, 0755); err != nil {
+	if err = c.os.MkdirAll(volatileContainerRootDir, 0700); err != nil {
 		return nil, fmt.Errorf("failed to create volatile container root directory %q: %w",
 			volatileContainerRootDir, err)
 	}
