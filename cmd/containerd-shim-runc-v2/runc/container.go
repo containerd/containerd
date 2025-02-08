@@ -146,9 +146,9 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 	}
 
 	// ensure /etc/mtab is a soft link.
-	judgeErr := ensureMtabLink(r.Bundle)
-	if judgeErr != nil {
-		logrus.WithError(err).Warn("judge /etc/mtab file in rootfs")
+	err = ensureMtabSymLink(ctx, r.Bundle)
+	if err != nil {
+		log.G(ctx).WithError(err).Warnf("failed to determine /etc/mtab file in rootfs")
 	}
 
 	pid := p.Pid()
@@ -162,39 +162,46 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 
 const optionsFilename = "options.json"
 
-// ensureMtabLink checks if /etc/mtab is a symlink, and creates one if it's not.
-// This function is primarily used to ensure compatibility with legacy distros
-// such as CentOS 6 and others.
-func ensureMtabLink(bundlePath string) error {
+// ensureMtabSymLink ensures /etc/mtab is a symlink to /proc/mounts
+// for compatibility with legacy systems like CentOS 6.
+func ensureMtabSymLink(ctx context.Context, bundlePath string) error {
 	targetPath := bundlePath + "/rootfs/etc/mtab"
 	sourcePath := "/proc/mounts"
 
-	// check /etc/mtab is softlink or not
+	// Determine /etc/mtab file type and whether it exists
 	info, err := os.Lstat(targetPath)
 	if err != nil {
-		logrus.WithError(err).Errorf("check file: /etc/mtab status")
+		if os.IsNotExist(err) {
+			log.G(ctx).WithError(err).Warnf("target %s does not exist, creating symlink", targetPath)
+			return createSymlink(ctx, sourcePath, targetPath)
+		}
+		log.G(ctx).WithError(err).Errorf("failed to check file")
 		return err
 	}
 
-	// Alrealy is a softlink, do nothing
+	// Do nothing If already a symlink
 	if info.Mode()&os.ModeSymlink != 0 {
-		logrus.Infof("etc/mtab alrealy is a softlink, do nothing")
+		log.G(ctx).Debugf("%s is already a symlink, no need to link again", targetPath)
 		return nil
 	}
 
-	// Not a softlink, remove the filepath
+	// Remove the entity file and create a new one if not a symlink
 	err = os.Remove(targetPath)
 	if err != nil {
-		logrus.WithError(err).Errorf("remove physical file: etc/mtab")
+		log.G(ctx).WithError(err).Errorf("failed to remove entity file %s", targetPath)
 		return err
 	}
 
-	// Create soft link
-	err = os.Symlink(sourcePath, targetPath)
-	if err != nil {
-		logrus.WithError(err).Errorf("create soft link")
+	return createSymlink(ctx, sourcePath, targetPath)
+}
+
+// createSymlink creates a symbolic link.
+func createSymlink(ctx context.Context, source, target string) error {
+	if err := os.Symlink(source, target); err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to create symlink from %s to %s", source, target)
 		return err
 	}
+	log.G(ctx).Infof("Successfully created symlink: %s -> %s", target, source)
 	return nil
 }
 
