@@ -22,7 +22,6 @@ import (
 
 	"github.com/Microsoft/go-winio"
 	"github.com/Microsoft/hcsshim/pkg/ociwclayer"
-	ocicimlayer "github.com/Microsoft/hcsshim/pkg/ociwclayer/cim"
 )
 
 // applyWindowsLayer applies a tar stream of an OCI style diff tar of a Windows layer
@@ -75,21 +74,6 @@ func AsWindowsContainerLayerPair() WriteDiffOpt {
 func WithParentLayers(p []string) WriteDiffOpt {
 	return func(options *WriteDiffOptions) error {
 		options.ParentLayers = p
-		return nil
-	}
-}
-
-func applyWindowsCimLayer(cimPath string, parentLayerCimPaths []string) func(context.Context, string, io.Reader, ApplyOptions) (int64, error) {
-	return func(ctx context.Context, root string, r io.Reader, options ApplyOptions) (int64, error) {
-		return ocicimlayer.ImportCimLayerFromTar(ctx, r, root, cimPath, options.Parents, parentLayerCimPaths)
-	}
-}
-
-// AsCimContainerLayer indicates that the tar stream to apply is that of a Windows container Layer written in
-// the cim format.
-func AsCimContainerLayer(cimPath string, parentLayerCimPaths []string) ApplyOpt {
-	return func(options *ApplyOptions) error {
-		options.applyFunc = applyWindowsCimLayer(cimPath, parentLayerCimPaths)
 		return nil
 	}
 }
