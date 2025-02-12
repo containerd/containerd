@@ -30,7 +30,7 @@ import (
 
 // deferCleanupTimeout is the default timeout for containerd cleanup operations
 // in defer.
-const deferCleanupTimeout = 1 * time.Minute
+const deferCleanupTimeout = 5 * time.Minute
 
 // DeferContext returns a context for containerd cleanup operations in defer.
 // A default timeout is applied to avoid cleanup operation pending forever.
