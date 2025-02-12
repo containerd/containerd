@@ -328,13 +328,16 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 			// to generate container status.
 			switch status.State() {
 			case runtime.ContainerState_CONTAINER_CREATED:
-				// NOTE: Another possibility is that we've tried to start the container, but
-				// containerd got restarted during that. In that case, we still
-				// treat the container as `CREATED`.
-				containerIO, err = c.createContainerIO(id, meta.SandboxID, meta.Config)
-				if err != nil {
-					return fmt.Errorf("failed to create container io: %w", err)
+				if container.IO.FifosIsNill() {
+					// NOTE: Another possibility is that we've tried to start the container, but
+					// containerd got restarted during that. In that case, we still
+					// treat the container as `CREATED`.
+					containerIO, err = c.createContainerIO(id, meta.SandboxID, meta.Config)
+					if err != nil {
+						return fmt.Errorf("failed to create container io: %w", err)
+					}
 				}
+
 			case runtime.ContainerState_CONTAINER_RUNNING:
 				// Container was in running state, but its task has been deleted,
 				// set unknown exited state. Container io is not needed in this case.

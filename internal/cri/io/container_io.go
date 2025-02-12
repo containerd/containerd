@@ -260,3 +260,7 @@ func (c *ContainerIO) Close() error {
 	}
 	return nil
 }
+
+func (c *ContainerIO) FifosIsNill() bool {
+	return c.fifos == nil
+}
