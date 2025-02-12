@@ -328,6 +328,11 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 			// to generate container status.
 			switch status.State() {
 			case runtime.ContainerState_CONTAINER_CREATED:
+				ioDir := filepath.Join(c.getVolatileContainerRootDir(id), "io")
+				if _, err := os.Stat(ioDir); err == nil {
+					log.G(ctx).Warnf("delete leak io dir %s", ioDir)
+					os.RemoveAll(ioDir)
+				}
 				// NOTE: Another possibility is that we've tried to start the container, but
 				// containerd got restarted during that. In that case, we still
 				// treat the container as `CREATED`.
