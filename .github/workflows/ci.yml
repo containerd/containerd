@@ -34,7 +34,7 @@ jobs:
       - uses: golangci/golangci-lint-action@2226d7cb06a077cd73e56eedd38eecad18e5d837 # v6.5.0
         with:
           only-new-issues: true
-          version: v1.60.3
+          version: v1.64.2
           skip-cache: true
           args: --timeout=8m
 
