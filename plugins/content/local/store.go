@@ -27,12 +27,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/content"
+  "github.com/containerd/containerd/v2/internal/fsverity"
+	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/v2/pkg/integrity"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
-
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/internal/fsverity"
-	"github.com/containerd/containerd/v2/pkg/filters"
 
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -67,6 +67,7 @@ type store struct {
 	root               string
 	ls                 LabelStore
 	integritySupported bool
+	iv   integrity.Verifier
 
 	locksMu              sync.Mutex
 	locks                map[string]*lock
@@ -74,8 +75,8 @@ type store struct {
 }
 
 // NewStore returns a local content store
-func NewStore(root string) (content.Store, error) {
-	return NewLabeledStore(root, nil)
+func NewStore(root string, iv integrity.Verifier) (content.Store, error) {
+	return NewLabeledStore(root, nil, iv)
 }
 
 // NewLabeledStore returns a new content store using the provided label store
@@ -83,13 +84,14 @@ func NewStore(root string) (content.Store, error) {
 // Note: content stores which are used underneath a metadata store may not
 // require labels and should use `NewStore`. `NewLabeledStore` is primarily
 // useful for tests or standalone implementations.
-func NewLabeledStore(root string, ls LabelStore) (content.Store, error) {
+func NewLabeledStore(root string, ls LabelStore, iv integrity.Verifier) (content.Store, error) {
 	supported, _ := fsverity.IsSupported(root)
 
 	s := &store{
 		root:               root,
 		ls:                 ls,
 		integritySupported: supported,
+		iv:                 iv,
 		locks:              map[string]*lock{},
 	}
 	s.ensureIngestRootOnce = sync.OnceValue(s.ensureIngestRoot)
@@ -137,6 +139,12 @@ func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.
 		return nil, fmt.Errorf("calculating blob path for ReaderAt: %w", err)
 	}
 
+	// check blob integrity before openning for reading
+	valid, err := s.iv.IsValid(p)
+	if err != nil || !valid {
+		return nil, fmt.Errorf("blob integrity verification failed: %w", err)
+	}
+
 	reader, err := OpenReader(p)
 	if err != nil {
 		return nil, fmt.Errorf("blob %s expected at %s: %w", desc.Digest, p, err)
@@ -161,6 +169,10 @@ func (s *store) Delete(ctx context.Context, dgst digest.Digest) error {
 		}
 
 		return fmt.Errorf("content %v: %w", dgst, errdefs.ErrNotFound)
+	}
+
+	if err := s.iv.Unregister(bp); err != nil {
+		return fmt.Errorf("failed to unregister blob integrity verification: %w", err)
 	}
 
 	return nil
