@@ -108,6 +108,14 @@ func (*API) WithContainerExit(*cstore.Container) containerd.ProcessDeleteOpts {
 	}
 }
 
+type PluginSyncBlock struct{}
+
+func (*API) BlockPluginSync() *PluginSyncBlock {
+	return nil
+}
+
+func (*PluginSyncBlock) Unblock() {}
+
 //
 // NRI-CRI no-op 'domain' interface
 //
