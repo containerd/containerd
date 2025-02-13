@@ -92,6 +92,11 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
 	}
+
+	err = c.deleteConflictContainers(ctx, r.GetPodSandboxId(), config.GetMetadata().Name)
+	if err != nil {
+		return nil, err
+	}
 	span.SetAttributes(
 		tracing.Attribute("container.id", id),
 		tracing.Attribute("container.name", name),
@@ -1110,4 +1115,35 @@ func (c *criService) runtimeInfo(ctx context.Context, id string) (string, typeur
 	}
 
 	return "", nil, err
+}
+
+func (c *criService) deleteConflictContainers(ctx context.Context, sid string, cname string) error {
+	listContainerStatsRequest := &runtime.ListContainerStatsRequest{Filter: &runtime.ContainerStatsFilter{PodSandboxId: sid}}
+	resp, err := c.ListContainerStats(ctx, listContainerStatsRequest)
+	if err != nil {
+		return fmt.Errorf("failed to fetch containers and stats: %w", err)
+	}
+	for _, container := range resp.Stats {
+		metaName := container.Attributes.Metadata.Name
+		if metaName == cname {
+			cid := container.Attributes.Id
+			cntr, err := c.containerStore.Get(cid)
+			if err != nil {
+				return fmt.Errorf("failed to find container %q in store: %w in sandbox %s", cid, err, sid)
+			}
+			state := cntr.Status.Get().State()
+			if state == runtime.ContainerState_CONTAINER_RUNNING {
+				if _, err := c.StopContainer(ctx, &runtime.StopContainerRequest{ContainerId: cid}); err != nil {
+					log.G(ctx).WithError(err).Errorf("failed to stop conflicting container %s", cid)
+					return fmt.Errorf("failed to stop conflicting container %s:%w", cid, err)
+				}
+			}
+			if _, err := c.RemoveContainer(ctx, &runtime.RemoveContainerRequest{ContainerId: cid}); err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to remove conflicting container %s", cid)
+				return fmt.Errorf("failed to remove conflicting container %s", cid)
+			}
+			log.G(ctx).Warnf("conflicting container %s is deleted", cid)
+		}
+	}
+	return nil
 }
