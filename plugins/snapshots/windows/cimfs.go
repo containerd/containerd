@@ -341,7 +341,7 @@ func (s *cimFSSnapshotter) mounts(sn storage.Snapshot, key string) []mount.Mount
 	mounts := []mount.Mount{
 		{
 			Source:  s.getSnapshotDir(sn.ID),
-			Type:    "CimFS",
+			Type:    CimFSMountType,
 			Options: options,
 		},
 	}
@@ -435,6 +435,15 @@ const (
 	// Similar to ParentLayerPathsFlag this is the optinos flag used to represent the JSON encoded list of
 	// parent layer CIMs
 	ParentLayerCimPathsFlag = "parentCimPaths="
+
+	// string to specify the standard cimfs type of mount
+	CimFSMountType string = "CimFS"
+
+	// string to specify the block CIM type of mount
+	BlockCIMMountType string = "BlockCIM"
+
+	// a flag that specifies the type of a block CIM in case of BlockCIM mounts
+	BlockCIMTypeFlag string = "blockCIMType="
 )
 
 // getOptionByPrefix finds an option that has the provided prefix, cuts the prefix from
@@ -452,7 +461,7 @@ func getOptionByPrefix(m *mount.Mount, prefix string) (string, bool) {
 
 // gets the paths of the parent cims of this mount
 func GetParentCimPaths(m *mount.Mount) ([]string, error) {
-	if m.Type != "CimFS" {
+	if m.Type != CimFSMountType {
 		return nil, fmt.Errorf("invalid mount type: '%s'", m.Type)
 	}
 	var parentCimPaths []string
@@ -467,7 +476,7 @@ func GetParentCimPaths(m *mount.Mount) ([]string, error) {
 // Only applies to a snapshot created for image extraction, for such a snapshot provides the
 // path to a cim in which image layer will be extracted.
 func GetCimPath(m *mount.Mount) (string, error) {
-	if m.Type != "CimFS" {
+	if m.Type != CimFSMountType {
 		return "", fmt.Errorf("invalid mount type: '%s'", m.Type)
 	}
 	cimPath, found := getOptionByPrefix(m, LayerCimPathFlag)
