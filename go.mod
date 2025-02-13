@@ -1,6 +1,7 @@
 module github.com/containerd/containerd/v2
 
 go 1.22.0
+toolchain go1.23.6
 
 require (
 	dario.cat/mergo v1.0.1
@@ -63,7 +64,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.5
 	github.com/vishvananda/netlink v1.3.0
 	github.com/vishvananda/netns v0.0.4
-	go.etcd.io/bbolt v1.3.11
+	go.etcd.io/bbolt v1.4.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.59.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0
 	go.opentelemetry.io/otel v1.34.0
