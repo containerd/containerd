@@ -50,6 +50,8 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		return &runtime.StopContainerResponse{}, nil
 	}
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err
 	}

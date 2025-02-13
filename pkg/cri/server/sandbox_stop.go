@@ -50,6 +50,8 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		return &runtime.StopPodSandboxResponse{}, nil
 	}
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, err
 	}
