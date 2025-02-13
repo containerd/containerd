@@ -130,7 +130,6 @@ func toCRIContainerStatus(ctx context.Context, container containerstore.Containe
 		Annotations: meta.Config.GetAnnotations(),
 		Mounts:      meta.Config.GetMounts(),
 		LogPath:     meta.LogPath,
-		Resources:   status.Resources,
 		User:        runtimeUser,
 	}, nil
 }
