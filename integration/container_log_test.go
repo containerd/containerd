@@ -142,7 +142,7 @@ func checkContainerLog(t *testing.T, log string, messages []string) {
 	require.Len(t, lines, len(messages), "log line number should match")
 	for i, line := range lines {
 		ts, msg, ok := strings.Cut(line, " ")
-		require.True(t, ok)
+		require.True(t, ok, log)
 		_, err := time.Parse(time.RFC3339Nano, ts)
 		assert.NoError(t, err, "timestamp should be in RFC3339Nano format")
 		assert.Equal(t, messages[i], msg, "log content should match")
