@@ -165,9 +165,10 @@ func (c *criService) recover(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
+
 	eg, ctx2 = errgroup.WithContext(ctx)
 	for _, container := range containers {
-		eg.Go(func() error {
+		eg.Go(func() (egErr error) {
 			cntr, err := c.loadContainer(ctx2, container)
 			if err != nil {
 				log.G(ctx2).
@@ -177,12 +178,24 @@ func (c *criService) recover(ctx context.Context) error {
 
 				return nil
 			}
+
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
-			if err := c.containerStore.Add(cntr); err != nil {
-				return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
-			}
+			defer func() {
+				if egErr != nil && cntr.IO != nil {
+					errClose := cntr.IO.Close()
+					log.G(ctx2).WithError(errClose).Errorf("Failed to close container io %q", cntr.ID)
+				}
+			}()
+
+			// If there are several containers with same name, first come (reservation) first serve.
+			// TODO(ningmingxiao) delete conflict containers.
 			if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
 				return fmt.Errorf("failed to reserve container name %q: %w", cntr.Name, err)
+			}
+
+			if err := c.containerStore.Add(cntr); err != nil {
+				c.containerNameIndex.ReleaseByName(cntr.ID)
+				return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
 			}
 			return nil
 		})
