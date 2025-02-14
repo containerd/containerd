@@ -182,6 +182,9 @@ func (c *criService) recover(ctx context.Context) error {
 				return fmt.Errorf("failed to add container %q to store: %w", container.ID(), err)
 			}
 			if err := c.containerNameIndex.Reserve(cntr.Name, cntr.ID); err != nil {
+				if errClose := cntr.IO.Close(); errClose != nil {
+					log.G(ctx).WithError(errClose).Errorf("Failed to close container io %q", cntr.ID)
+				}
 				return fmt.Errorf("failed to reserve container name %q: %w", cntr.Name, err)
 			}
 			return nil
