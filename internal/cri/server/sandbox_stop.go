@@ -127,6 +127,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	}
 
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
+
+	err = c.cleanupImageMounts(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup image mounts for sandbox %q: %w", id, err)
+	}
 	return nil
 }
 
