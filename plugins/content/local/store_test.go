@@ -94,7 +94,7 @@ func (mls *memoryLabelStore) Update(d digest.Digest, update map[string]string) (
 
 func TestContent(t *testing.T) {
 	testsuite.ContentSuite(t, "fs", func(ctx context.Context, root string) (context.Context, content.Store, func() error, error) {
-		cs, err := NewLabeledStore(root, newMemoryLabelStore())
+		cs, err := NewLabeledStore(root, newMemoryLabelStore(), nil)
 		assert.NoError(t, err)
 		return ctx, cs, func() error {
 			return nil
@@ -390,7 +390,7 @@ func checkWrite(ctx context.Context, t checker, cs content.Store, dgst digest.Di
 }
 
 func TestWriterTruncateRecoversFromIncompleteWrite(t *testing.T) {
-	cs, err := NewStore(t.TempDir())
+	cs, err := NewStore(t.TempDir(), nil)
 	assert.NoError(t, err)
 
 	ctx := t.Context()

@@ -36,7 +36,7 @@ func FuzzImagesCheck(f *testing.F) {
 			return
 		}
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}
