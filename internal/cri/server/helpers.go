@@ -33,6 +33,7 @@ import (
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/errdefs"
@@ -61,6 +62,8 @@ const (
 	sandboxesDir = "sandboxes"
 	// containersDir contains all container root.
 	containersDir = "containers"
+	// imageVolumeDir contains all image volume root.
+	imageVolumeDir = "image-volumes"
 	// Delimiter used to construct container/sandbox names.
 	nameDelimiter = "_"
 
@@ -137,6 +140,16 @@ func makeContainerName(c *runtime.ContainerMetadata, s *runtime.PodSandboxMetada
 // e.g. state checkpoint.
 func (c *criService) getContainerRootDir(id string) string {
 	return filepath.Join(c.config.RootDir, containersDir, id)
+}
+
+// getImageVolumeHostPath returns the image volume directory for share.
+func (c *criService) getImageVolumeHostPath(podID, imageID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID, imageID)
+}
+
+// getImageVolumeBaseDir returns the image volume base directory for cleanup.
+func (c *criService) getImageVolumeBaseDir(podID string) string {
+	return filepath.Join(c.config.StateDir, imageVolumeDir, podID)
 }
 
 // getVolatileContainerRootDir returns the root directory for managing volatile container files,
@@ -354,6 +367,18 @@ func (c *criService) generateAndSendContainerEvent(ctx context.Context, containe
 	}
 
 	c.containerEventsQ.Send(event)
+}
+
+func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.Runtime, err error) {
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	runtime, err = c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return criconfig.Runtime{}, err
+	}
+	return runtime, nil
 }
 
 func (c *criService) getPodSandboxStatus(ctx context.Context, podSandboxID string) (*runtime.PodSandboxStatus, error) {

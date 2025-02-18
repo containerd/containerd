@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/bandwidth"
@@ -84,6 +85,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		// When cleanupErr != nil, the name will be cleaned in sandbox_remove.
 		if retErr != nil && cleanupErr == nil {
 			c.sandboxNameIndex.ReleaseByName(name)
+		}
+	}()
+
+	leaseSvc := c.client.LeasesService()
+	ls, lerr := leaseSvc.Create(ctx, leases.WithID(id))
+	if lerr != nil {
+		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
+	}
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+
+			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
+				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
+			}
 		}
 	}()
 
