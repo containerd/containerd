@@ -17,6 +17,7 @@
 package sandbox
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -176,7 +177,7 @@ func TestSandboxStore(t *testing.T) {
 		assert.Equal(errdefs.ErrAlreadyExists, s.Add(v))
 
 		t.Logf("should be able to delete sandbox")
-		s.Delete(truncID)
+		s.Delete(context.Background(), truncID)
 		sbNum--
 		sbs = s.List()
 		assert.Len(sbs, sbNum)

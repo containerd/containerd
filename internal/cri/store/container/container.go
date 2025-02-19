@@ -17,6 +17,8 @@
 package container
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -26,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/stats"
 	"github.com/containerd/containerd/v2/internal/truncindex"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -194,20 +197,29 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 }
 
 // Delete deletes the container from store with specified id.
-func (s *Store) Delete(id string) {
+func (s *Store) Delete(ctx context.Context, cid string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	id, err := s.idIndex.Get(id)
+	id, err := s.idIndex.Get(cid)
 	if err != nil {
-		// Note: The idIndex.Delete and delete doesn't handle truncated index.
-		// So we need to return if there are error.
-		return
+		if errors.Is(err, truncindex.ErrNotExist) {
+			return
+		}
+		_, ok := err.(truncindex.ErrAmbiguousPrefix)
+		if ok {
+			return
+		}
+		log.G(ctx).WithError(err).Errorf("Failed to get container %s from store", cid)
+		id = cid
 	}
 	c := s.containers[id]
 	if c.IO != nil {
 		c.IO.Close()
 	}
 	s.labels.Release(c.ProcessLabel)
-	s.idIndex.Delete(id)
+	err = s.idIndex.Delete(id)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("Failed to delete container %s from store", id)
+	}
 	delete(s.containers, id)
 }

@@ -17,6 +17,8 @@
 package sandbox
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	containerd "github.com/containerd/containerd/v2/client"
@@ -26,6 +28,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/truncindex"
 	"github.com/containerd/containerd/v2/pkg/netns"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 )
 
 // Sandbox contains all resources associated with the sandbox. All methods to
@@ -163,16 +166,25 @@ func (s *Store) UpdateContainerStats(id string, newContainerStats *stats.Contain
 }
 
 // Delete deletes the sandbox with specified id.
-func (s *Store) Delete(id string) {
+func (s *Store) Delete(ctx context.Context, sid string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	id, err := s.idIndex.Get(id)
+	id, err := s.idIndex.Get(sid)
 	if err != nil {
-		// Note: The idIndex.Delete and delete doesn't handle truncated index.
-		// So we need to return if there are error.
-		return
+		if errors.Is(err, truncindex.ErrNotExist) {
+			return
+		}
+		_, ok := err.(truncindex.ErrAmbiguousPrefix)
+		if ok {
+			return
+		}
+		log.G(ctx).WithError(err).Errorf("Failed to get sandbox %s from store when delete", id)
+		id = sid
 	}
 	s.labels.Release(s.sandboxes[id].ProcessLabel)
-	s.idIndex.Delete(id)
+	err = s.idIndex.Delete(id)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("Failed to delete sandbox %s from store", id)
+	}
 	delete(s.sandboxes, id)
 }

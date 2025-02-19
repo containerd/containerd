@@ -55,7 +55,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		// we should try to recover from this state by removing entry for this container
 		// from the container store as well and return successfully.
 		log.G(ctx).WithError(err).Warn("get container info failed")
-		c.containerStore.Delete(ctrID)
+		c.containerStore.Delete(ctx, ctrID)
 		c.containerNameIndex.ReleaseByKey(ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
 	}
@@ -124,7 +124,7 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 			volatileContainerRootDir, err)
 	}
 
-	c.containerStore.Delete(id)
+	c.containerStore.Delete(ctx, id)
 
 	c.containerNameIndex.ReleaseByKey(id)
 

@@ -17,6 +17,7 @@
 package container
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -220,7 +221,7 @@ func TestContainerStore(t *testing.T) {
 		assert.Equal(errdefs.ErrAlreadyExists, s.Add(v))
 
 		t.Logf("should be able to delete container")
-		s.Delete(truncID)
+		s.Delete(context.Background(), truncID)
 		cntrNum--
 		cs = s.List()
 		assert.Len(cs, cntrNum)
