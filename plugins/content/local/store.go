@@ -152,9 +152,11 @@ func (s *store) ReaderAt(ctx context.Context, desc ocispec.Descriptor) (content.
 	}
 
 	// check blob integrity before openning for reading
-	valid, err := s.iv.IsValid(p)
-	if err != nil || !valid {
-		return nil, fmt.Errorf("blob integrity verification failed: %w", err)
+	if s.integritySupported {
+		valid, err := s.iv.IsValid(p)
+		if err != nil || !valid {
+			return nil, fmt.Errorf("blob integrity verification failed: %w", err)
+		}
 	}
 
 	reader, err := OpenReader(p)
@@ -183,8 +185,10 @@ func (s *store) Delete(ctx context.Context, dgst digest.Digest) error {
 		return fmt.Errorf("content %v: %w", dgst, errdefs.ErrNotFound)
 	}
 
-	if err := s.iv.Unregister(bp); err != nil {
-		return fmt.Errorf("failed to unregister blob integrity verification: %w", err)
+	if s.integritySupported {
+		if err := s.iv.Unregister(bp); err != nil {
+			return fmt.Errorf("failed to unregister blob integrity verification: %w", err)
+		}
 	}
 
 	return nil
