@@ -35,9 +35,7 @@ type Config struct {
 	StorePath string `toml:"store_path"`
 }
 
-var _ integrity.Verifier = validator{}
-
-func NewValidator(config Config) validator {
+func NewValidator(config Config) integrity.Verifier {
 	return validator{integrityStorePath: config.StorePath}
 }
 
