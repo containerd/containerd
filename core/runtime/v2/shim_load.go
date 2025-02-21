@@ -91,6 +91,8 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 			// does not have a namespace
 			return err
 		}
+
+		// reconnect shim in parallel, avoid serial timeout waiting
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
