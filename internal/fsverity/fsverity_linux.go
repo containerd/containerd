@@ -139,13 +139,13 @@ func Measure(path string) (string, error) {
 	var verityDigest string
 	f, err := os.Open(path)
 	if err != nil {
-		return verityDigest, fmt.Errorf("Error opening file: %s\n", err.Error())
+		return verityDigest, fmt.Errorf("error opening file: %s", err.Error())
 	}
 
-	var d *fsverityDigest = &fsverityDigest{digestSize: maxDigestSize}
+	d := &fsverityDigest{digetsSize: maxDigetSize}
 	_, _, errno := unix.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(unix.FS_IOC_MEASURE_VERITY), uintptr(unsafe.Pointer(d)))
 	if errno != 0 {
-		return verityDigest, fmt.Errorf("Measure fsverity failed: %w\n", errno)
+		return verityDigest, fmt.Errorf("measure fsverity failed: %w", errno)
 	}
 
 	var i uint16
