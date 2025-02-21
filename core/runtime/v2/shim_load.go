@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -72,6 +73,9 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 	if err != nil {
 		return err
 	}
+
+	wg := &sync.WaitGroup{}
+
 	for _, sd := range shimDirs {
 		if !sd.IsDir() {
 			continue
@@ -87,32 +91,38 @@ func (m *ShimManager) loadShims(ctx context.Context, stateDir string) error {
 			// does not have a namespace
 			return err
 		}
-		// fast path
-		f, err := os.Open(bundle.Path)
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// fast path
+			f, err := os.Open(bundle.Path)
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return
+			}
 
-		bf, err := f.Readdirnames(-1)
-		f.Close()
-		if err != nil {
-			bundle.Delete()
-			log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
-			continue
-		}
-		if len(bf) == 0 {
-			bundle.Delete()
-			continue
-		}
-		if err := m.loadShim(ctx, bundle); err != nil {
-			log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
-			bundle.Delete()
-			continue
-		}
-
+			bf, err := f.Readdirnames(-1)
+			f.Close()
+			if err != nil {
+				bundle.Delete()
+				log.G(ctx).WithError(err).Errorf("fast path read bundle path for %s", bundle.Path)
+				return
+			}
+			if len(bf) == 0 {
+				bundle.Delete()
+				return
+			}
+			if err := m.loadShim(ctx, bundle); err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to load shim %s", bundle.Path)
+				bundle.Delete()
+				return
+			}
+		}()
 	}
+
+	wg.Wait()
+
 	return nil
 }
 
