@@ -142,7 +142,7 @@ func Measure(path string) (string, error) {
 		return verityDigest, fmt.Errorf("error opening file: %s", err.Error())
 	}
 
-	d := &fsverityDigest{digetsSize: maxDigetSize}
+	d := &fsverityDigest{digestSize: maxDigestSize}
 	_, _, errno := unix.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(unix.FS_IOC_MEASURE_VERITY), uintptr(unsafe.Pointer(d)))
 	if errno != 0 {
 		return verityDigest, fmt.Errorf("measure fsverity failed: %w", errno)
