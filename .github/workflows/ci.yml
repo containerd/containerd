@@ -218,7 +218,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
-        go-version: ["1.22.10", "1.23.4"]
+        go-version: ["1.23.7", "1.24.1"]
     steps:
       - name: Install dependencies
         if: matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04-arm'
