@@ -85,7 +85,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.31.2
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
-	tags.cncf.io/container-device-interface v0.8.0
+	tags.cncf.io/container-device-interface v0.8.1
 )
 
 require (
