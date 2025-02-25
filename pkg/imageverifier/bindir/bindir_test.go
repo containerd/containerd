@@ -367,8 +367,13 @@ func TestBinDirVerifyImage(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if strings.Contains(string(b), "verifier-") {
-			t.Fatalf("killing the verifier binary didn't kill all its children:\n%v", string(b))
+		lines := strings.Split(string(b), "\n")
+		for _, l := range lines {
+			// Ignore defunct (zombie) verifier processes if PID 1 hasn't reaped them.
+			// TODO: Remove defunct check once containerd serves as subreaper for verifier processes.
+			if strings.Contains(l, "verifier-") && !strings.Contains(l, "<defunct>") {
+				t.Fatalf("killing the verifier binary didn't kill all its children:\n%v", string(b))
+			}
 		}
 	})
 
