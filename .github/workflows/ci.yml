@@ -23,9 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, arm64-8core-32gb, macos-13, windows-2019]
-        exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019]
 
 
     steps:
@@ -190,10 +188,8 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, arm64-8core-32gb, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
         go-version: ["1.24.0", "1.23.6"]
-        exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/install-go
@@ -388,9 +384,7 @@ jobs:
         runtime:
           - io.containerd.runc.v2
         runc: [runc]  # crun can be added here to debug crun issues
-        os: [ubuntu-22.04, ubuntu-24.04, arm64-8core-32gb]
-        exclude:
-          - os: ${{ github.repository != 'containerd/containerd' && 'arm64-8core-32gb' }}
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm]
         cgroup_driver: [cgroupfs, systemd]
 
     env:
@@ -412,10 +406,6 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
-        # NOTE: Required arm64 enable CONFIG_CHECKPOINT_RESTORE (need to confirm GitHub action runners config)
-        #
-        # REF: https://criu.org/Linux_kernel
-        if: matrix.os != 'arm64-8core-32gb'
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
