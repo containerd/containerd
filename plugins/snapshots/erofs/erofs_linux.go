@@ -247,6 +247,8 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		if err != nil {
 			return nil, err
 		}
+		// We have to force a loop device here too since mount[] is static.
+		m.Options = append(m.Options, "loop")
 		return []mount.Mount{m}, nil
 	}
 
