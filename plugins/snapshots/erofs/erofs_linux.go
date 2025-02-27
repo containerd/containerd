@@ -355,6 +355,31 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 	return s.createSnapshot(ctx, snapshots.KindView, key, parent, opts)
 }
 
+func setImmutable(path string, enable bool) error {
+	//nolint:revive	// silence "don't use ALL_CAPS in Go names; use CamelCase"
+	const (
+		FS_IMMUTABLE_FL = 0x10
+	)
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("failed to open: %w", err)
+	}
+	defer f.Close()
+
+	oldattr, err := unix.IoctlGetInt(int(f.Fd()), unix.FS_IOC_GETFLAGS)
+	if err != nil {
+		return fmt.Errorf("error getting inode flags: %w", err)
+	}
+	newattr := oldattr | FS_IMMUTABLE_FL
+	if !enable {
+		newattr ^= FS_IMMUTABLE_FL
+	}
+	if newattr == oldattr {
+		return nil
+	}
+	return unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, newattr)
+}
+
 func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snapshots.Opt) error {
 	var layerBlob, upperDir string
 
@@ -403,7 +428,10 @@ func (s *snapshotter) Commit(ctx context.Context, name, key string, opts ...snap
 				return fmt.Errorf("failed to enable fsverity: %w", err)
 			}
 		}
-
+		// Set IMMUTABLE_FL on the EROFS layer to avoid artificial data loss
+		if err := setImmutable(layerBlob, true); err != nil {
+			log.G(ctx).WithError(err).Warnf("failed to set IMMUTABLE_FL for %s", layerBlob)
+		}
 		return nil
 	})
 
@@ -506,6 +534,11 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		removals, err = s.getCleanupDirectories(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get directories for removal: %w", err)
+		}
+		// Clear IMMUTABLE_FL before removal, since this flag avoids it.
+		err = setImmutable(s.layerBlobPath(id), false)
+		if err != nil {
+			return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
 		}
 		return nil
 	})
