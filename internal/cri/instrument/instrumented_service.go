@@ -343,6 +343,22 @@ func (in *instrumentedService) UpdateContainerResources(ctx context.Context, r *
 	return res, errgrpc.ToGRPC(err)
 }
 
+func (in *instrumentedService) UpdatePodSandboxResources(ctx context.Context, r *runtime.UpdatePodSandboxResourcesRequest) (res *runtime.UpdatePodSandboxResourcesResponse, err error) {
+	if err := in.checkInitialized(); err != nil {
+		return nil, err
+	}
+	log.G(ctx).Infof("UpdatePodSandboxResources for %q with Overhead: %+v / Resources: %+v", r.GetPodSandboxId(), r.GetOverhead(), r.GetResources())
+	defer func() {
+		if err != nil {
+			log.G(ctx).WithError(err).Errorf("UpdatePodSandboxResources for %q failed", r.GetPodSandboxId())
+		} else {
+			log.G(ctx).Infof("UpdatePodSandboxResources for %q returns successfully", r.GetPodSandboxId())
+		}
+	}()
+	res, err = in.c.UpdatePodSandboxResources(ctrdutil.WithNamespace(ctx), r)
+	return res, errgrpc.ToGRPC(err)
+}
+
 func (in *instrumentedService) PullImage(ctx context.Context, r *runtime.PullImageRequest) (res *runtime.PullImageResponse, err error) {
 	if err := in.checkInitialized(); err != nil {
 		return nil, err

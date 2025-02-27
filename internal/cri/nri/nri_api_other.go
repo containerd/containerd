@@ -57,6 +57,14 @@ func (*API) RunPodSandbox(context.Context, *sstore.Sandbox) error {
 	return nil
 }
 
+func (a *API) UpdatePodSandboxResources(context.Context, *sstore.Sandbox, *cri.LinuxContainerResources, *cri.LinuxContainerResources) error {
+	return nil
+}
+
+func (a *API) PostUpdatePodSandboxResources(context.Context, *sstore.Sandbox) error {
+	return nil
+}
+
 func (*API) StopPodSandbox(context.Context, *sstore.Sandbox) error {
 	return nil
 }

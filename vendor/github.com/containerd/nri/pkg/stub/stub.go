@@ -69,6 +69,12 @@ type RunPodInterface interface {
 	RunPodSandbox(context.Context, *api.PodSandbox) error
 }
 
+// UpdatePodInterface handles UpdatePodSandbox API requests.
+type UpdatePodInterface interface {
+	// UpdatePodSandbox relays an UpdatePodSandbox request to the plugin.
+	UpdatePodSandbox(context.Context, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
+}
+
 // StopPodInterface handles StopPodSandbox API events.
 type StopPodInterface interface {
 	// StopPodSandbox relays a StopPodSandbox event to the plugin.
@@ -79,6 +85,12 @@ type StopPodInterface interface {
 type RemovePodInterface interface {
 	// RemovePodSandbox relays a RemovePodSandbox event to the plugin.
 	RemovePodSandbox(context.Context, *api.PodSandbox) error
+}
+
+// PostUpdatePodInterface handles PostUpdatePodSandbox API events.
+type PostUpdatePodInterface interface {
+	// PostUpdatePodSandbox relays a PostUpdatePodSandbox event to the plugin.
+	PostUpdatePodSandbox(context.Context, *api.PodSandbox) error
 }
 
 // CreateContainerInterface handles CreateContainer API requests.
@@ -281,20 +293,22 @@ type stub struct {
 
 // Handlers for NRI plugin event and request.
 type handlers struct {
-	Configure           func(context.Context, string, string, string) (api.EventMask, error)
-	Synchronize         func(context.Context, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
-	Shutdown            func(context.Context)
-	RunPodSandbox       func(context.Context, *api.PodSandbox) error
-	StopPodSandbox      func(context.Context, *api.PodSandbox) error
-	RemovePodSandbox    func(context.Context, *api.PodSandbox) error
-	CreateContainer     func(context.Context, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
-	StartContainer      func(context.Context, *api.PodSandbox, *api.Container) error
-	UpdateContainer     func(context.Context, *api.PodSandbox, *api.Container, *api.LinuxResources) ([]*api.ContainerUpdate, error)
-	StopContainer       func(context.Context, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
-	RemoveContainer     func(context.Context, *api.PodSandbox, *api.Container) error
-	PostCreateContainer func(context.Context, *api.PodSandbox, *api.Container) error
-	PostStartContainer  func(context.Context, *api.PodSandbox, *api.Container) error
-	PostUpdateContainer func(context.Context, *api.PodSandbox, *api.Container) error
+	Configure            func(context.Context, string, string, string) (api.EventMask, error)
+	Synchronize          func(context.Context, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
+	Shutdown             func(context.Context)
+	RunPodSandbox        func(context.Context, *api.PodSandbox) error
+	UpdatePodSandbox     func(context.Context, *api.PodSandbox, *api.LinuxResources, *api.LinuxResources) error
+	StopPodSandbox       func(context.Context, *api.PodSandbox) error
+	RemovePodSandbox     func(context.Context, *api.PodSandbox) error
+	PostUpdatePodSandbox func(context.Context, *api.PodSandbox) error
+	CreateContainer      func(context.Context, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
+	StartContainer       func(context.Context, *api.PodSandbox, *api.Container) error
+	UpdateContainer      func(context.Context, *api.PodSandbox, *api.Container, *api.LinuxResources) ([]*api.ContainerUpdate, error)
+	StopContainer        func(context.Context, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
+	RemoveContainer      func(context.Context, *api.PodSandbox, *api.Container) error
+	PostCreateContainer  func(context.Context, *api.PodSandbox, *api.Container) error
+	PostStartContainer   func(context.Context, *api.PodSandbox, *api.Container) error
+	PostUpdateContainer  func(context.Context, *api.PodSandbox, *api.Container) error
 }
 
 // New creates a stub with the given plugin and options.
@@ -739,12 +753,26 @@ func (stub *stub) StopContainer(ctx context.Context, req *api.StopContainerReque
 	}, err
 }
 
+// UpdatePodSandbox request handler.
+func (stub *stub) UpdatePodSandbox(ctx context.Context, req *api.UpdatePodSandboxRequest) (*api.UpdatePodSandboxResponse, error) {
+	handler := stub.handlers.UpdatePodSandbox
+	if handler == nil {
+		return nil, nil
+	}
+	err := handler(ctx, req.Pod, req.OverheadLinuxResources, req.LinuxResources)
+	return &api.UpdatePodSandboxResponse{}, err
+}
+
 // StateChange event handler.
 func (stub *stub) StateChange(ctx context.Context, evt *api.StateChangeEvent) (*api.Empty, error) {
 	var err error
 	switch evt.Event {
 	case api.Event_RUN_POD_SANDBOX:
 		if handler := stub.handlers.RunPodSandbox; handler != nil {
+			err = handler(ctx, evt.Pod)
+		}
+	case api.Event_POST_UPDATE_POD_SANDBOX:
+		if handler := stub.handlers.PostUpdatePodSandbox; handler != nil {
 			err = handler(ctx, evt.Pod)
 		}
 	case api.Event_STOP_POD_SANDBOX:
@@ -818,6 +846,10 @@ func (stub *stub) setupHandlers() error {
 		stub.handlers.RunPodSandbox = plugin.RunPodSandbox
 		stub.events.Set(api.Event_RUN_POD_SANDBOX)
 	}
+	if plugin, ok := stub.plugin.(UpdatePodInterface); ok {
+		stub.handlers.UpdatePodSandbox = plugin.UpdatePodSandbox
+		stub.events.Set(api.Event_UPDATE_POD_SANDBOX)
+	}
 	if plugin, ok := stub.plugin.(StopPodInterface); ok {
 		stub.handlers.StopPodSandbox = plugin.StopPodSandbox
 		stub.events.Set(api.Event_STOP_POD_SANDBOX)
@@ -825,6 +857,10 @@ func (stub *stub) setupHandlers() error {
 	if plugin, ok := stub.plugin.(RemovePodInterface); ok {
 		stub.handlers.RemovePodSandbox = plugin.RemovePodSandbox
 		stub.events.Set(api.Event_REMOVE_POD_SANDBOX)
+	}
+	if plugin, ok := stub.plugin.(PostUpdatePodInterface); ok {
+		stub.handlers.PostUpdatePodSandbox = plugin.PostUpdatePodSandbox
+		stub.events.Set(api.Event_POST_UPDATE_POD_SANDBOX)
 	}
 	if plugin, ok := stub.plugin.(CreateContainerInterface); ok {
 		stub.handlers.CreateContainer = plugin.CreateContainer

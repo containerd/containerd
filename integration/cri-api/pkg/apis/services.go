@@ -85,6 +85,8 @@ type PodSandboxManager interface {
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 	// the sandbox is in ready state.
 	RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string, opts ...grpc.CallOption) (string, error)
+	// UpdatePodSandboxResources updates the cgroup resources for the sandbox.
+	UpdatePodSandboxResources(podSandboxID string, overhead *runtimeapi.LinuxContainerResources, resources *runtimeapi.LinuxContainerResources, opts ...grpc.CallOption) error
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
 	StopPodSandbox(podSandboxID string, opts ...grpc.CallOption) error

@@ -1,6 +1,6 @@
 module github.com/containerd/containerd/v2
 
-go 1.22.0
+go 1.23.0
 
 require (
 	dario.cat/mergo v1.0.1
@@ -21,7 +21,8 @@ require (
 	github.com/containerd/go-runc v1.1.0
 	github.com/containerd/imgcrypt/v2 v2.0.0
 	github.com/containerd/log v0.1.0
-	github.com/containerd/nri v0.8.0
+	// TODO: Replace once version is cut.
+	github.com/containerd/nri v0.9.1-0.20250219030224-e597e7849f24 // https://github.com/containerd/nri/pull/141
 	github.com/containerd/otelttrpc v0.1.0
 	github.com/containerd/platforms v1.0.0-rc.1
 	github.com/containerd/plugin v1.0.0
@@ -110,6 +111,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/knqyf263/go-plugin v0.8.1-0.20240827022226-114c6257e441 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/mistifyio/go-zfs/v3 v3.0.1 // indirect
@@ -129,6 +131,7 @@ require (
 	github.com/smallstep/pkcs7 v0.1.1 // indirect
 	github.com/stefanberger/go-pkcs11uri v0.0.0-20230803200340-78284954bff6 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
+	github.com/tetratelabs/wazero v1.8.2-0.20241030035603-dc08732e57d5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	go.opencensus.io v0.24.0 // indirect
@@ -168,3 +171,6 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
+
+// TODO: Replace once version is cut.
+replace k8s.io/cri-api => github.com/felipeagger/kubernetes/staging/src/k8s.io/cri-api v0.0.0-20241106125232-27bfa7ebcb34 // https://github.com/kubernetes/kubernetes/pull/128123
