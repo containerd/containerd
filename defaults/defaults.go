@@ -30,3 +30,8 @@ const (
 	// default snapshotter
 	DefaultSnapshotterNSLabel = "containerd.io/defaults/snapshotter"
 )
+
+var (
+	// DefaultImports is the default imports for config files.
+	DefaultImports = []string{"conf/*.toml"}
+)
