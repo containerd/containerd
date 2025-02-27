@@ -46,6 +46,9 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L45-L46
 		return &runtime.StopPodSandboxResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandbox.ID))
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, err

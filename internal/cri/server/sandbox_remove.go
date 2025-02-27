@@ -45,6 +45,9 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	// Use the full sandbox id.
 	id := sandbox.ID
 	span.SetAttributes(tracing.Attribute("sandbox.id", id))

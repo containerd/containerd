@@ -358,6 +358,15 @@ func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDele
 	}
 }
 
+type PluginSyncBlock = nri.PluginSyncBlock
+
+func (a *API) BlockPluginSync() *PluginSyncBlock {
+	if a.IsDisabled() {
+		return nil
+	}
+	return a.nri.BlockPluginSync()
+}
+
 //
 // NRI-CRI 'domain' interface
 //
