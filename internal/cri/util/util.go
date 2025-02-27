@@ -25,17 +25,21 @@ import (
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/log"
 )
 
-// deferCleanupTimeout is the default timeout for containerd cleanup operations
-// in defer.
-const deferCleanupTimeout = 1 * time.Minute
+// deferCleanupTimeout is the timeout for containerd cleanup operations in defer.
+const deferCleanupTimeout = "io.containerd.timeout.cri.defercleanup"
+
+func init() {
+	timeout.Set(deferCleanupTimeout, 1*time.Minute)
+}
 
 // DeferContext returns a context for containerd cleanup operations in defer.
 // A default timeout is applied to avoid cleanup operation pending forever.
 func DeferContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(NamespacedContext(), deferCleanupTimeout)
+	return context.WithTimeout(NamespacedContext(), timeout.Get(deferCleanupTimeout))
 }
 
 // NamespacedContext returns a context with kubernetes namespace set.
