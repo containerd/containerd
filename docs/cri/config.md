@@ -475,6 +475,11 @@ version = 2
       # The default value was "io.containerd.runc.v1" in containerd 1.3, "io.containerd.runtime.v1.linux" in prior releases.
       runtime_type = "io.containerd.runc.v2"
 
+      # runtime_path is an optional field that can be used to overwrite path to a shim runtime binary.
+      # When specified, containerd will ignore runtime name field when resolving shim location.
+      # Path must be abs.
+      runtime_path = ""
+
       # pod_annotations is a list of pod annotations passed to both pod
       # sandbox as well as container OCI annotations. Pod_annotations also
       # supports golang path match pattern - https://golang.org/pkg/path/#Match.
