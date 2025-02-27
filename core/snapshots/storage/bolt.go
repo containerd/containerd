@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/filters"
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
 )
 
 var (
@@ -242,7 +243,7 @@ func CreateSnapshot(ctx context.Context, kind snapshots.Kind, key, parent string
 		}
 		sbkt, err := bkt.CreateBucket([]byte(key))
 		if err != nil {
-			if err == bolt.ErrBucketExists {
+			if err == errbolt.ErrBucketExists {
 				err = fmt.Errorf("snapshot %v: %w", key, errdefs.ErrAlreadyExists)
 			}
 			return err
@@ -360,7 +361,7 @@ func CommitActive(ctx context.Context, key, name string, usage snapshots.Usage, 
 	if err := withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		dbkt, err := bkt.CreateBucket([]byte(name))
 		if err != nil {
-			if err == bolt.ErrBucketExists {
+			if err == errbolt.ErrBucketExists {
 				err = errdefs.ErrAlreadyExists
 			}
 			return fmt.Errorf("committed snapshot %v: %w", name, err)

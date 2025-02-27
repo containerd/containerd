@@ -31,6 +31,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
@@ -609,7 +610,7 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 		}
 		bkt := getIngestsBucket(tx, nw.namespace)
 		if bkt != nil {
-			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != bolt.ErrBucketNotFound {
+			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
 				return err
 			}
 		}
@@ -678,7 +679,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {
-		if err == bolt.ErrBucketExists {
+		if err == errbolt.ErrBucketExists {
 			return actual, fmt.Errorf("content %v: %w", actual, errdefs.ErrAlreadyExists)
 		}
 		return "", err
