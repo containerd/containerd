@@ -175,6 +175,13 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 	}
 	defer w4.Close()
 
+	c5, d5 := createContent(16 << 21)
+	w5, err := content.OpenWriter(ctx, cs, content.WithRef("c5"), content.WithDescriptor(ocispec.Descriptor{Size: int64(len(c5)), Digest: d5}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w5.Close()
+
 	smallbuf := make([]byte, 32)
 	for _, s := range []struct {
 		content []byte
@@ -200,6 +207,11 @@ func checkContentStoreWriter(ctx context.Context, t *testing.T, cs content.Store
 			content: c4,
 			digest:  d4,
 			writer:  w4,
+		},
+		{
+			content: c5,
+			digest:  d5,
+			writer:  w5,
 		},
 	} {
 		n, err := io.CopyBuffer(s.writer, bytes.NewReader(s.content), smallbuf)
@@ -647,7 +659,6 @@ func checkLabels(ctx context.Context, t *testing.T, cs content.Store) {
 	if err := checkInfo(ctx, cs, d1, info, preCommit, postCommit, preUpdate, postUpdate); err != nil {
 		t.Fatalf("Check info failed: %+v", err)
 	}
-
 }
 
 func checkResume(rf func(context.Context, content.Writer, []byte, int64, int64, digest.Digest) error) func(ctx context.Context, t *testing.T, cs content.Store) {
@@ -734,7 +745,6 @@ func resumeDiscard(ctx context.Context, w content.Writer, b []byte, written, siz
 	}
 	if err := w.Commit(ctx, size, dgst); err != nil {
 		return fmt.Errorf("commit failed: %w", err)
-
 	}
 	return nil
 }
@@ -931,7 +941,6 @@ func checkCrossNSAppend(ctx context.Context, t *testing.T, cs content.Store) {
 	if err := checkContent(ctx2, cs, d2, info2, t1, t3, t1, t3); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 func checkCrossNSIsolate(ctx context.Context, t *testing.T, cs content.Store) {
@@ -1129,6 +1138,7 @@ func checkInfo(ctx context.Context, cs content.Store, d digest.Digest, expected 
 
 	return nil
 }
+
 func checkContent(ctx context.Context, cs content.Store, d digest.Digest, expected content.Info, c1, c2, u1, u2 time.Time) error {
 	if err := checkInfo(ctx, cs, d, expected, c1, c2, u1, u2); err != nil {
 		return err
