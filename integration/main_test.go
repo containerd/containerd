@@ -234,6 +234,19 @@ func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 	}
 }
 
+// WithSecurityContext set container privileged.
+func WithPodSecurityContext(privileged bool) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		p.Linux.SecurityContext.Privileged = privileged
+	}
+}
+
 // PodSandboxConfig generates a pod sandbox config for test.
 func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandboxConfig {
 	var cgroupParent string
@@ -496,6 +509,19 @@ func WithSupplementalGroups(gids []int64) ContainerOpts {
 			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
 		}
 		c.Linux.SecurityContext.SupplementalGroups = gids
+	}
+}
+
+// WithSecurityContext set container privileged.
+func WithSecurityContext(privileged bool) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.Privileged = privileged
 	}
 }
 
