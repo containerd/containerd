@@ -192,3 +192,8 @@ func (c *CRIImageService) PinnedImage(name string) string {
 func (c *CRIImageService) GRPCService() runtime.ImageServiceServer {
 	return &GRPCCRIImageService{c}
 }
+
+// ImageConfig returns the image config.
+func (c *CRIImageService) ImageConfig() criconfig.ImageConfig {
+	return c.config
+}
