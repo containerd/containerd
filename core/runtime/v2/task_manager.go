@@ -266,12 +266,12 @@ func (m *TaskManager) validateRuntimeFeatures(ctx context.Context, opts runtime.
 		return nil
 	}
 
-	topts := opts.TaskOptions
-	if topts == nil || topts.GetValue() == nil {
-		topts = opts.RuntimeOptions
+	ropts := opts.RuntimeOptions
+	if ropts == nil || ropts.GetValue() == nil {
+		ropts = opts.TaskOptions
 	}
 
-	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime, Options: typeurl.MarshalProto(topts)})
+	pInfo, err := m.PluginInfo(ctx, &apitypes.RuntimeRequest{RuntimePath: opts.Runtime, Options: typeurl.MarshalProto(ropts)})
 	if err != nil {
 		return fmt.Errorf("runtime info: %w", err)
 	}
