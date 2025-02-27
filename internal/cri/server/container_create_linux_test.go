@@ -1018,24 +1018,7 @@ func TestGenerateSeccompSecurityProfileSpecOpts(t *testing.T) {
 					expected := runtimespec.Spec{
 						Linux: &runtimespec.Linux{},
 						Process: &runtimespec.Process{
-							Capabilities: &runtimespec.LinuxCapabilities{
-								Bounding: []string{
-									"CAP_DAC_READ_SEARCH",
-									"CAP_SYS_ADMIN",
-									"CAP_SYS_BOOT",
-									"CAP_SYS_CHROOT",
-									"CAP_SYS_MODULE",
-									"CAP_SYS_PACCT",
-									"CAP_SYS_PTRACE",
-									"CAP_SYS_RAWIO",
-									"CAP_SYS_TIME",
-									"CAP_SYS_TTY_CONFIG",
-									"CAP_SYS_NICE",
-									"CAP_SYSLOG",
-									"CAP_BPF",
-									"CAP_PERFMON",
-								},
-							},
+							Capabilities: &runtimespec.LinuxCapabilities{},
 						},
 					}
 					var actual runtimespec.Spec
@@ -1219,7 +1202,7 @@ func TestGenerateApparmorSpecOpts(t *testing.T) {
 					if test.specOpts == nil || specOpts == nil {
 						t.Fatalf("unexpected nil specOpts, expected nil: %t, actual nil: %t", test.specOpts == nil, specOpts == nil)
 					}
-					// `specOpts` for seccomp only uses/modifies `*specs.Spec`, not
+					// `specOpts` for apparmor only uses/modifies `*specs.Spec`, not
 					// `oci.Client` or `*containers.Container`, so let's construct a
 					// `*specs.Spec` and compare if the results are the same.
 					expected := runtimespec.Spec{
