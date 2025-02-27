@@ -46,6 +46,8 @@ func arches() []specs.Arch {
 	case "riscv64":
 		// ArchRISCV32 (SCMP_ARCH_RISCV32) does not exist
 		return []specs.Arch{specs.ArchRISCV64}
+	case "loong64":
+		return []specs.Arch{specs.ArchLOONGARCH64}
 	default:
 		return []specs.Arch{}
 	}
