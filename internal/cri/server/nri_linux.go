@@ -27,7 +27,12 @@ import (
 )
 
 func (i *criImplementation) UpdateContainerResources(ctx context.Context, ctr cstore.Container, req *cri.UpdateContainerResourcesRequest, status cstore.Status) (cstore.Status, error) {
-	return i.c.updateContainerResources(ctx, ctr, req, status)
+	err := i.c.updateContainerResources(ctx, ctr, req, status)
+	if err != nil {
+		return cstore.Status{}, err
+	}
+	return status, nil
+
 }
 
 func (i *criImplementation) StopContainer(ctx context.Context, ctr cstore.Container, timeout time.Duration) error {
