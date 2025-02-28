@@ -157,6 +157,31 @@ func Apply(ctx context.Context, root string, r io.Reader, opts ...ApplyOpt) (int
 	return options.applyFunc(ctx, root, r, options)
 }
 
+// cachedRootPath will memoize root paths, avoiding redundant checks.
+type cachedRootPath struct {
+	root  string
+	cache map[string]string
+}
+
+func newCachedRootPath(root string) *cachedRootPath {
+	return &cachedRootPath{
+		root:  root,
+		cache: make(map[string]string),
+	}
+}
+
+func (c *cachedRootPath) get(path string) (string, error) {
+	if hit, ok := c.cache[path]; ok {
+		return hit, nil
+	}
+	p, err := fs.RootPath(c.root, path)
+	if err != nil {
+		return "", err
+	}
+	c.cache[path] = p
+	return p, nil
+}
+
 // applyNaive applies a tar stream of an OCI style diff tar to a directory
 // applying each file as either a whole file or whiteout.
 // See https://github.com/opencontainers/image-spec/blob/main/layer.md#applying-changesets
@@ -214,6 +239,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	}
 
 	// Iterate through the files in the archive.
+	rootPath := newCachedRootPath(root)
 	for {
 		select {
 		case <-ctx.Done():
@@ -250,7 +276,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 
 		// Split name and resolve symlinks for root directory.
 		ppath, base := filepath.Split(hdr.Name)
-		ppath, err = fs.RootPath(root, ppath)
+		ppath, err = rootPath.get(ppath)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get root path: %w", err)
 		}
@@ -302,7 +328,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 		srcData := io.Reader(tr)
 		srcHdr := hdr
 
-		if err := createTarFile(ctx, path, root, srcHdr, srcData, options.NoSameOwner); err != nil {
+		if err := rootPath.createTarFile(ctx, path, srcHdr, srcData, options.NoSameOwner); err != nil {
 			return 0, err
 		}
 
@@ -315,7 +341,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	}
 
 	for _, hdr := range dirs {
-		path, err := fs.RootPath(root, hdr.Name)
+		path, err := rootPath.get(hdr.Name)
 		if err != nil {
 			return 0, err
 		}
@@ -327,7 +353,7 @@ func applyNaive(ctx context.Context, root string, r io.Reader, options ApplyOpti
 	return size, nil
 }
 
-func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
+func (c *cachedRootPath) createTarFile(ctx context.Context, path string, hdr *tar.Header, reader io.Reader, noSameOwner bool) error {
 	// hdr.Mode is in linux format, which we can use for syscalls,
 	// but for os.Foo() calls we need the mode converted to os.FileMode,
 	// so use hdrInfo.Mode() (they differ for e.g. setuid bits)
@@ -371,7 +397,7 @@ func createTarFile(ctx context.Context, path, extractDir string, hdr *tar.Header
 		}
 
 	case tar.TypeLink:
-		targetPath, err := hardlinkRootPath(extractDir, hdr.Linkname)
+		targetPath, err := c.hardlinkRootPath(hdr.Linkname)
 		if err != nil {
 			return err
 		}
@@ -766,7 +792,6 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 		}
 	}
 	return written, err
-
 }
 
 // hardlinkRootPath returns target linkname, evaluating and bounding any
@@ -779,16 +804,16 @@ func copyBuffered(ctx context.Context, dst io.Writer, src io.Reader) (written in
 //	ln /tmp/xxx /tmp/yyy
 //
 // /tmp/yyy should be softlink which be same of /tmp/xxx, not /tmp/zzz.
-func hardlinkRootPath(root, linkname string) (string, error) {
+func (c *cachedRootPath) hardlinkRootPath(linkname string) (string, error) {
 	ppath, base := filepath.Split(linkname)
-	ppath, err := fs.RootPath(root, ppath)
+	ppath, err := c.get(ppath)
 	if err != nil {
 		return "", err
 	}
 
 	targetPath := filepath.Join(ppath, base)
-	if !strings.HasPrefix(targetPath, root) {
-		targetPath = root
+	if !strings.HasPrefix(targetPath, c.root) {
+		targetPath = c.root
 	}
 	return targetPath, nil
 }
