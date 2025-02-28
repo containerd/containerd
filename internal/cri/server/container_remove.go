@@ -44,6 +44,9 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		log.G(ctx).Tracef("RemoveContainer called for container %q that does not exist", ctrID)
 		return &runtime.RemoveContainerResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	id := container.ID
 	span.SetAttributes(tracing.Attribute("container.id", id))
 	i, err := container.Container.Info(ctx)

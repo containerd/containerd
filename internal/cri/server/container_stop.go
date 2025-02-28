@@ -51,6 +51,9 @@ func (c *criService) StopContainer(ctx context.Context, r *runtime.StopContainer
 		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L67-L68
 		return &runtime.StopContainerResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	span.SetAttributes(tracing.Attribute("container.id", container.ID))
 	if err := c.stopContainer(ctx, container, time.Duration(r.GetTimeout())*time.Second); err != nil {
 		return nil, err

@@ -317,6 +317,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 
 	sandbox.ProcessLabel = labels["selinux_label"]
 
+	defer c.nri.BlockPluginSync().Unblock()
+
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
