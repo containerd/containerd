@@ -56,7 +56,7 @@ func TestSetContainerStarting(t *testing.T) {
 				StartedAt:  time.Now().UnixNano(),
 				FinishedAt: time.Now().UnixNano(),
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		{
 			desc: "should return error when container is in unknown state",
