@@ -22,6 +22,7 @@ import (
 
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	"github.com/stretchr/testify/assert"
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestPassThroughAnnotationsFilter(t *testing.T) {
@@ -159,4 +160,75 @@ func TestBuildLabels(t *testing.T) {
 	newLabels["a"] = "e"
 	assert.Empty(t, configLabels[crilabels.ContainerKindLabel], "should not add new labels into original label")
 	assert.Equal(t, "b", configLabels["a"], "change in new labels should not affect original label")
+}
+
+func TestGenerateUserString(t *testing.T) {
+	type testcase struct {
+		// the name of the test case
+		name string
+
+		u        string
+		uid, gid *runtime.Int64Value
+
+		result        string
+		expectedError bool
+	}
+	testcases := []testcase{
+		{
+			name:   "Empty",
+			result: "",
+		},
+		{
+			name:   "Username Only",
+			u:      "testuser",
+			result: "testuser",
+		},
+		{
+			name:   "Username, UID",
+			u:      "testuser",
+			uid:    &runtime.Int64Value{Value: 1},
+			result: "testuser",
+		},
+		{
+			name:   "Username, UID, GID",
+			u:      "testuser",
+			uid:    &runtime.Int64Value{Value: 1},
+			gid:    &runtime.Int64Value{Value: 10},
+			result: "testuser:10",
+		},
+		{
+			name:   "Username, GID",
+			u:      "testuser",
+			gid:    &runtime.Int64Value{Value: 10},
+			result: "testuser:10",
+		},
+		{
+			name:   "UID only",
+			uid:    &runtime.Int64Value{Value: 1},
+			result: "1",
+		},
+		{
+			name:   "UID, GID",
+			uid:    &runtime.Int64Value{Value: 1},
+			gid:    &runtime.Int64Value{Value: 10},
+			result: "1:10",
+		},
+		{
+			name:          "GID only",
+			gid:           &runtime.Int64Value{Value: 10},
+			result:        "",
+			expectedError: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r, err := GenerateUserString(tc.u, tc.uid, tc.gid)
+			if tc.expectedError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.result, r)
+		})
+	}
 }
