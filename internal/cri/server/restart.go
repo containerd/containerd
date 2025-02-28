@@ -174,7 +174,10 @@ func (c *criService) recover(ctx context.Context) error {
 					WithError(err).
 					WithField("container", container.ID()).
 					Error("Failed to load container")
-
+				if _, ok := err.(containerstore.StoreStatusError); ok {
+					return err
+				}
+				// should not happen
 				return nil
 			}
 			log.G(ctx2).Debugf("Loaded container %+v", cntr)
@@ -248,7 +251,7 @@ func (c *criService) recover(ctx context.Context) error {
 const loadContainerTimeout = 10 * time.Second
 
 // loadContainer loads container from containerd and status checkpoint.
-func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (containerstore.Container, error) {
+func (c *criService) loadContainer(ctx context.Context, cntr containerd.Container) (cstore containerstore.Container, retErr error) {
 	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
 	defer cancel()
 	id := cntr.ID()
@@ -413,6 +416,11 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 	if containerIO != nil {
 		opts = append(opts, containerstore.WithContainerIO(containerIO))
 	}
+	defer func() {
+		if retErr != nil && containerIO != nil {
+			containerIO.Close()
+		}
+	}()
 	return containerstore.NewContainer(*meta, opts...)
 }
 
