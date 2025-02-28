@@ -28,9 +28,9 @@ on the backing filesystem, it applies OCI layers into EROFS blobs, therefore:
  - Improved image unpacking performance (~14% for WordPress image with the
    latest erofs-utils 1.8.2) due to reduced metadata overhead;
 
- - Full data protection for each snapshot using the S_IMMUTABLE file attribute
-   or fsverity. Currently, fsverity can only protect blob data in the content
-   store;
+ - Full data protection for each snapshot using the FS_IMMUTABLE_FL file
+   attribute and fsverity.  For other snapshotters, fsverity can only protect
+   blob data in the content store;
 
  - Parallel unpacking can be supported in a more reliable way (fsync) compared
    to the overlayfs snapshotter (syncfs);
