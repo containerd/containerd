@@ -24,19 +24,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/cmd/ctr/commands"
-	"github.com/containerd/containerd/cmd/ctr/commands/content"
-	"github.com/containerd/containerd/images"
-	"github.com/containerd/containerd/pkg/progress"
-	"github.com/containerd/containerd/pkg/transfer"
-	"github.com/containerd/containerd/pkg/transfer/image"
-	"github.com/containerd/containerd/pkg/transfer/registry"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/cmd/ctr/commands"
+	"github.com/containerd/containerd/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/diff"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/pkg/progress"
+	"github.com/containerd/containerd/pkg/transfer"
+	"github.com/containerd/containerd/pkg/transfer/image"
+	"github.com/containerd/containerd/pkg/transfer/registry"
 )
 
 var pullCommand = cli.Command{
@@ -77,6 +79,10 @@ command. As part of this process, we do the following:
 		cli.BoolTFlag{
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
+		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
 	),
 	Action: func(context *cli.Context) error {
@@ -185,7 +191,7 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, context.String("snapshotter"))
+			err = i.Unpack(ctx, context.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(context.Bool("sync-fs"))))
 			if err != nil {
 				return err
 			}
