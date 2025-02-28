@@ -169,7 +169,7 @@ absolute path to the rootfs you just chowned.
 Then create and start the container with:
 
 ```
-sudo ctr create --config <path>/config.json userns-test
+sudo ctr run --config <path>/config.json userns-test
 sudo ctr t start userns-test
 ```
 
