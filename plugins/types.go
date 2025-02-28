@@ -69,6 +69,8 @@ const (
 	SandboxControllerPlugin plugin.Type = "io.containerd.sandbox.controller.v1"
 	// ImageVerifierPlugin implements an image verifier service
 	ImageVerifierPlugin plugin.Type = "io.containerd.image-verifier.v1"
+	// IntegrityVerifier implements a content integrity verifier
+	IntegrityVerifierPlugin plugin.Type = "io.containerd.integrity-verifier.v1"
 	// WarningPlugin implements a warning service
 	WarningPlugin plugin.Type = "io.containerd.warning.v1"
 	// CRIServicePlugin implements a cri service
