@@ -26,11 +26,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019]
 
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04-arm'
+        if: matrix.os == 'ubuntu-24.04' || matrix.os == 'ubuntu-24.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -49,7 +49,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -77,7 +77,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     defaults:
@@ -111,7 +111,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -124,7 +124,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [linters, protos, man]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -217,11 +217,11 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
         go-version: ["1.23.7", "1.24.1"]
     steps:
       - name: Install dependencies
-        if: matrix.os == 'ubuntu-20.04' || matrix.os == 'ubuntu-24.04-arm'
+        if: matrix.os == 'ubuntu-24.04' || matrix.os == 'ubuntu-24.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y libbtrfs-dev
@@ -350,7 +350,7 @@ jobs:
       matrix:
         runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
         runc: [runc, crun]
-        os: [ubuntu-20.04, ubuntu-24.04-arm]
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
         exclude:
           - runtime: io.containerd.runc.v1
             runc: crun
