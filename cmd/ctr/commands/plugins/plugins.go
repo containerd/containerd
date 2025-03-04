@@ -41,6 +41,7 @@ var Command = &cli.Command{
 	Subcommands: []*cli.Command{
 		listCommand,
 		inspectRuntimeCommand,
+		inspectConfigComand,
 	},
 }
 
@@ -193,5 +194,37 @@ var inspectRuntimeCommand = &cli.Command{
 		}
 		_, err = fmt.Fprintln(cliContext.App.Writer, string(j))
 		return err
+	},
+}
+
+var inspectConfigComand = &cli.Command{
+	Name:      "inspect",
+	Usage:     "Inspect plugin config",
+	ArgsUsage: "[flags]",
+	Action: func(cliContext *cli.Context) error {
+		pluginName := cliContext.Args().First()
+		client, ctx, cancel, err := commands.NewClient(cliContext)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		ps := client.IntrospectionService()
+		filters := []string{fmt.Sprintf("id==%s", pluginName)}
+		response, err := ps.Plugins(ctx, filters...)
+		if err != nil {
+			return err
+		}
+		for _, plugin := range response.Plugins {
+			id := plugin.ID
+			pluginConfig := plugin.Exports[id]
+			var config interface{}
+			err := json.Unmarshal([]byte(pluginConfig), &config)
+			if err != nil {
+				fmt.Println("Error parsing JSON:", err)
+				return err
+			}
+			commands.PrintAsJSON(config)
+		}
+		return nil
 	},
 }
