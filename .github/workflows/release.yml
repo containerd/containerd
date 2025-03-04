@@ -149,7 +149,7 @@ jobs:
           path: builds
       - name: Attest Artifacts
         id: attest
-        uses: actions/attest-build-provenance@520d128f165991a6c774bcb264f323e3d70747f4 # v2.2.0
+        uses: actions/attest-build-provenance@bd77c077858b8d561b7a36cbe48ef4cc642ca39d # v2.2.2
         with:
           subject-path: ./builds/release-tars-**/*.tar.gz
       - name: Rename attestation artifact
