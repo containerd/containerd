@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/containerd/ttrpc v1.2.5
 	github.com/containerd/typeurl/v2 v2.1.1
-	github.com/opencontainers/image-spec v1.1.0
+	github.com/opencontainers/image-spec v1.1.1
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.33.0
