@@ -25,6 +25,15 @@ func Version() (string, error) {
 	return blkdiscard("--version")
 }
 
+// Search blkdiscard binary.
+func CheckBinary() error {
+	_, err := exec.LookPath("blkdiscard")
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // BlkDiscard discards all blocks of a device.
 // devicePath is expected to be a fully qualified path.
 // BlkDiscard expects the caller to verify that the device is not in use.
