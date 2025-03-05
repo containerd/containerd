@@ -29,6 +29,7 @@ import (
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -102,6 +103,36 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}
 
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
+	}
+
+	switch ociRuntime.IOType {
+	case criconfig.IOTypeStreaming:
+		cntr.IO, err = cio.NewContainerIO(id,
+			cio.WithStreams(sandbox.Endpoint.Address, config.GetTty(), config.GetStdin()))
+	default:
+		volatileContainerRootDir := c.getVolatileContainerRootDir(id)
+		cntr.IO, err = cio.NewContainerIO(id,
+			cio.WithNewFIFOs(volatileContainerRootDir, config.GetTty(), config.GetStdin()))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to create container io: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			if err := cntr.IO.Close(); err != nil {
+				log.G(ctx).WithError(err).Errorf("Failed to close container io %q", id)
+			}
+		}
+	}()
+
+	if err = c.containerStore.UpdateContainerStdio(id, cntr.IO); err != nil {
+		log.G(ctx).WithError(err).Errorf("Failed UpdateContainerStdio %q", id)
+		return nil, err
+	}
+
 	ioCreation := func(id string) (_ containerdio.IO, err error) {
 		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
 		if err != nil {
@@ -110,11 +141,6 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
 		cntr.IO.Pipe()
 		return cntr.IO, nil
-	}
-
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
 
 	var taskOpts []containerd.NewTaskOpts
