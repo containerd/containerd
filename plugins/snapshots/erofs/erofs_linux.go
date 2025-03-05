@@ -247,6 +247,8 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		if err != nil {
 			return nil, err
 		}
+		// We have to force a loop device here too since mount[] is static.
+		m.Options = append(m.Options, "loop")
 		return []mount.Mount{m}, nil
 	}
 
@@ -526,7 +528,9 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		}
 	}()
 	return s.ms.WithTransaction(ctx, true, func(ctx context.Context) error {
-		id, _, err = storage.Remove(ctx, key)
+		var k snapshots.Kind
+
+		id, k, err = storage.Remove(ctx, key)
 		if err != nil {
 			return fmt.Errorf("failed to remove snapshot %s: %w", key, err)
 		}
@@ -535,10 +539,13 @@ func (s *snapshotter) Remove(ctx context.Context, key string) (err error) {
 		if err != nil {
 			return fmt.Errorf("unable to get directories for removal: %w", err)
 		}
-		// Clear IMMUTABLE_FL before removal, since this flag avoids it.
-		err = setImmutable(s.layerBlobPath(id), false)
-		if err != nil {
-			return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
+		// The layer blob is only persisted for committed snapshots.
+		if k == snapshots.KindCommitted {
+			// Clear IMMUTABLE_FL before removal, since this flag avoids it.
+			err = setImmutable(s.layerBlobPath(id), false)
+			if err != nil {
+				return fmt.Errorf("failed to clear IMMUTABLE_FL: %w", err)
+			}
 		}
 		return nil
 	})

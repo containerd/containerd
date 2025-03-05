@@ -64,20 +64,22 @@ io.containerd.snapshotter.v1           erofs                    linux/amd64    o
 io.containerd.differ.v1                erofs                    linux/amd64    ok
 ```
 
-### Ensure that EROFS is available
+### Ensure that EROFS filesystem is available
 
-On newer Ubuntu/Debian systems, it can be installed directly using the apt
-command, and on Fedora it can be installed directly using the dnf command.
+On newer Ubuntu/Debian systems, erofs-utils can be installed directly using the
+apt command, and on Fedora it can be installed directly using the dnf command.
 
+```bash
 # Debian/Ubuntu
 $ apt install erofs-utils
 # Fedora
 $ dnf install erofs-utils
+```
 
 Make sure that erofs-utils version is 1.7 or higher.
 
 Before using EROFS snapshotter, also make sure the _EROFS kernel module_ is
-loaded: it can be loaded with `modprobe erofs`.
+loaded (Linux 5.4 or later is required): it can be loaded with `modprobe erofs`.
 
 ### Configuration
 
