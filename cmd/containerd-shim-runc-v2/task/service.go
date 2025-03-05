@@ -580,7 +580,10 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
-	p.Wait()
+
+	if err = p.Wait(ctx); err != nil {
+		return nil, errgrpc.ToGRPC(err)
+	}
 
 	return &taskAPI.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),

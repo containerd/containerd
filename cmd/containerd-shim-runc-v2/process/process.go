@@ -42,7 +42,7 @@ type Process interface {
 	// Status returns the process status
 	Status(context.Context) (string, error)
 	// Wait blocks until the process has exited
-	Wait()
+	Wait(context.Context) error
 	// Resize resizes the process console
 	Resize(ws console.WinSize) error
 	// Start execution of the process
