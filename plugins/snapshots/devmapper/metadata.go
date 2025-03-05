@@ -27,6 +27,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
 )
 
 type (
@@ -329,7 +330,7 @@ func (m *PoolMetadata) GetDeviceNames(ctx context.Context) ([]string, error) {
 
 // Close closes metadata store
 func (m *PoolMetadata) Close() error {
-	if err := m.db.Close(); err != nil && err != bolt.ErrDatabaseNotOpen {
+	if err := m.db.Close(); err != nil && err != errbolt.ErrDatabaseNotOpen {
 		return err
 	}
 

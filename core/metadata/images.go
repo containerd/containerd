@@ -36,6 +36,7 @@ import (
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
 )
 
 type imageStore struct {
@@ -143,7 +144,7 @@ func (s *imageStore) Create(ctx context.Context, image images.Image) (images.Ima
 
 		ibkt, err := bkt.CreateBucket([]byte(image.Name))
 		if err != nil {
-			if err != bolt.ErrBucketExists {
+			if err != errbolt.ErrBucketExists {
 				return err
 			}
 
@@ -319,7 +320,7 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 		}
 
 		if err = bkt.DeleteBucket([]byte(name)); err != nil {
-			if err == bolt.ErrBucketNotFound {
+			if err == errbolt.ErrBucketNotFound {
 				err = fmt.Errorf("image %q: %w", name, errdefs.ErrNotFound)
 			}
 			return err
