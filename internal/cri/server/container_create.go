@@ -466,44 +466,6 @@ const (
 	hostnameEnv = "HOSTNAME"
 )
 
-// generateUserString generates valid user string based on OCI Image Spec
-// v1.0.0.
-//
-// CRI defines that the following combinations are valid:
-//
-// (none) -> ""
-// username -> username
-// username, uid -> username
-// username, uid, gid -> username:gid
-// username, gid -> username:gid
-// uid -> uid
-// uid, gid -> uid:gid
-// gid -> error
-//
-// TODO(random-liu): Add group name support in CRI.
-func generateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
-	var userstr, groupstr string
-	if uid != nil {
-		userstr = strconv.FormatInt(uid.GetValue(), 10)
-	}
-	if username != "" {
-		userstr = username
-	}
-	if gid != nil {
-		groupstr = strconv.FormatInt(gid.GetValue(), 10)
-	}
-	if userstr == "" {
-		if groupstr != "" {
-			return "", fmt.Errorf("user group %q is specified without user", groupstr)
-		}
-		return "", nil
-	}
-	if groupstr != "" {
-		userstr = userstr + ":" + groupstr
-	}
-	return userstr, nil
-}
-
 // platformSpecOpts adds additional runtime spec options that may rely on
 // runtime information (rootfs mounted), or platform specific checks with
 // no defined workaround (yet) to specify for other platforms.
@@ -525,7 +487,7 @@ func (c *criService) platformSpecOpts(
 		// access to the container rootfs. Pass user name to containerd, and let it overwrite
 		// the spec for us.
 		securityContext := config.GetLinux().GetSecurityContext()
-		userstr, err := generateUserString(
+		userstr, err := util.GenerateUserString(
 			securityContext.GetRunAsUsername(),
 			securityContext.GetRunAsUser(),
 			securityContext.GetRunAsGroup())
