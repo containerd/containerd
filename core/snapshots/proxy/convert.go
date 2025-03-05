@@ -56,6 +56,7 @@ func InfoToProto(info snapshots.Info) *snapshotsapi.Info {
 		CreatedAt: protobuf.ToTimestamp(info.Created),
 		UpdatedAt: protobuf.ToTimestamp(info.Updated),
 		Labels:    info.Labels,
+		ID:        info.ID,
 	}
 }
 
@@ -69,6 +70,7 @@ func InfoFromProto(info *snapshotsapi.Info) snapshots.Info {
 		Created: protobuf.FromTimestamp(info.CreatedAt),
 		Updated: protobuf.FromTimestamp(info.UpdatedAt),
 		Labels:  info.Labels,
+		ID:      info.ID,
 	}
 }
 
