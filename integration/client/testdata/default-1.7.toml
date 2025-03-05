@@ -297,6 +297,7 @@ version = 2
     returns = "application/vnd.oci.image.layer.v1.tar+gzip"
 
 [timeouts]
+  "io.containerd.timeout.cri.defercleanup" = "1m0s"
   "io.containerd.timeout.bolt.open" = "0s"
   "io.containerd.timeout.metrics.shimstats" = "2s"
   "io.containerd.timeout.shim.cleanup" = "5s"
