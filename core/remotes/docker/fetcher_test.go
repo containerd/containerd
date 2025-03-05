@@ -35,10 +35,11 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/containerd/containerd/v2/core/transfer"
 )
 
 func TestFetcherOpen(t *testing.T) {
@@ -78,7 +79,7 @@ func TestFetcherOpen(t *testing.T) {
 	checkReader := func(o int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", o)
+		rc, err := f.open(ctx, req, "", o, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -118,7 +119,7 @@ func TestFetcherOpen(t *testing.T) {
 	// Check that server returning a different content range
 	// then requested errors
 	start = 30
-	_, err = f.open(ctx, req, "", 20)
+	_, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -205,7 +206,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	checkReader := func(offset int64) {
 		t.Helper()
 
-		rc, err := f.open(ctx, req, "", offset)
+		rc, err := f.open(ctx, req, "", offset, true)
 		if err != nil {
 			t.Fatalf("failed to open: %+v", err)
 		}
@@ -246,7 +247,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	// Check that server returning a different content range
 	// than requested errors
 	forceRange = []httpRange{{start: 10, length: size - 20}}
-	_, err = f.open(ctx, req, "", 20)
+	_, err = f.open(ctx, req, "", 20, true)
 	if err == nil {
 		t.Fatal("expected error opening with invalid server response")
 	}
@@ -258,14 +259,14 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	failAfter = 1
 	forceRange = []httpRange{{start: 20}}
-	_, err = f.open(ctx, req, "", 20)
+	_, err = f.open(ctx, req, "", 20, true)
 	assert.ErrorContains(t, err, "unexpected status")
 	forceRange = nil
 	failAfter = 0
 
 	// test a case when a subsequent request fails and shouldn't have
 	failAfter = 1 * 1024 * 1024
-	body, err := f.open(ctx, req, "", 0)
+	body, err := f.open(ctx, req, "", 0, true)
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
 	assert.Error(t, err, "this should have failed")
@@ -393,7 +394,7 @@ func TestContentEncoding(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			rc, err := f.open(context.Background(), req, "", 0)
+			rc, err := f.open(context.Background(), req, "", 0, true)
 			if err != nil {
 				t.Fatalf("failed to open for encoding %s: %+v", tc.encodingHeader, err)
 			}
@@ -427,10 +428,11 @@ func TestDockerFetcherOpen(t *testing.T) {
 		wantServerMessageError bool
 		wantPlainError         bool
 		retries                int
+		lastHost               bool
 	}{
 		{
 			name:         "should return status and error.message if it exists if the registry request fails",
-			mockedStatus: 500,
+			mockedStatus: http.StatusInternalServerError,
 			mockedErr: Errors{Error{
 				Code:    ErrorCodeUnknown,
 				Message: "Test Error",
@@ -438,14 +440,16 @@ func TestDockerFetcherOpen(t *testing.T) {
 			want:                   nil,
 			wantErr:                true,
 			wantServerMessageError: true,
+			lastHost:               false,
 		},
 		{
 			name:           "should return just status if the registry request fails and does not return a docker error",
-			mockedStatus:   500,
+			mockedStatus:   http.StatusInternalServerError,
 			mockedErr:      errors.New("Non-docker error"),
 			want:           nil,
 			wantErr:        true,
 			wantPlainError: true,
+			lastHost:       false,
 		}, {
 			name:           "should return StatusRequestTimeout after 5 retries",
 			mockedStatus:   http.StatusRequestTimeout,
@@ -454,6 +458,7 @@ func TestDockerFetcherOpen(t *testing.T) {
 			wantErr:        true,
 			wantPlainError: true,
 			retries:        5,
+			lastHost:       true,
 		}, {
 			name:           "should return StatusTooManyRequests after 5 retries",
 			mockedStatus:   http.StatusTooManyRequests,
@@ -462,13 +467,42 @@ func TestDockerFetcherOpen(t *testing.T) {
 			wantErr:        true,
 			wantPlainError: true,
 			retries:        5,
+			lastHost:       true,
+		},
+		{
+			name:         "should retry once after 500",
+			mockedStatus: http.StatusInternalServerError,
+			mockedErr: Errors{Error{
+				Code:    ErrorCodeUnknown,
+				Message: "Test Error",
+			}},
+			want:                   nil,
+			wantErr:                true,
+			wantServerMessageError: true,
+			lastHost:               true,
+			retries:                1,
+		},
+		{
+			name:         "should retry once after 504",
+			mockedStatus: http.StatusGatewayTimeout,
+			mockedErr: Errors{Error{
+				Code:    ErrorCodeUnknown,
+				Message: "Test Error",
+			}},
+			want:                   nil,
+			wantErr:                true,
+			wantServerMessageError: true,
+			lastHost:               true,
+			retries:                1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			firstRequst := true
 			s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-				if tt.retries > 0 {
+				if firstRequst {
+					firstRequst = false
+				} else {
 					tt.retries--
 				}
 				rw.WriteHeader(tt.mockedStatus)
@@ -495,10 +529,10 @@ func TestDockerFetcherOpen(t *testing.T) {
 
 			req := f.request(host, http.MethodGet)
 
-			got, err := f.open(context.TODO(), req, "", 0)
+			got, err := f.open(context.TODO(), req, "", 0, tt.lastHost)
 			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.want, got)
-			assert.Equal(t, tt.retries, 0)
+			assert.Equal(t, 0, tt.retries)
 			if tt.wantErr {
 				var expectedError error
 				if tt.wantServerMessageError {
