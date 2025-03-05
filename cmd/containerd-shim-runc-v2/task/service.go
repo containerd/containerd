@@ -580,8 +580,14 @@ func (s *service) Wait(ctx context.Context, r *taskAPI.WaitRequest) (*taskAPI.Wa
 	if err != nil {
 		return nil, errgrpc.ToGRPC(err)
 	}
-	p.Wait()
 
+	p.Wait(ctx)
+	select {
+	case <-ctx.Done():
+		// connection closed, discard the result
+		return nil, nil
+	default:
+	}
 	return &taskAPI.WaitResponse{
 		ExitStatus: uint32(p.ExitStatus()),
 		ExitedAt:   protobuf.ToTimestamp(p.ExitedAt()),
