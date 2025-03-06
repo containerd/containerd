@@ -230,6 +230,7 @@ disabled_plugins = ["io.containerd.internal.v1.restart"]
   default_runtime_name = "${CONTAINERD_DEFAULT_RUNTIME:-"runc"}"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
   runtime_type = "io.containerd.runc.v2"
+  runtime_path = "${CONTAINERD_HOME}/usr/local/bin/containerd-shim-runc-v2"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
   BinaryName = "${CONTAINERD_HOME}/usr/local/sbin/runc"
   SystemdCgroup = ${systemdCgroup}
