@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	ptypes "github.com/gogo/protobuf/types"
-	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )
 
@@ -216,23 +215,23 @@ func (s *shim) Close() error {
 
 func (s *shim) delete(ctx context.Context) error {
 	var (
-		result *multierror.Error
+		result []error
 	)
 
 	if err := s.Close(); err != nil {
-		result = multierror.Append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
+		result = append(result, fmt.Errorf("failed to close ttrpc client: %w", err))
 	}
 
 	if err := s.client.UserOnCloseWait(ctx); err != nil {
-		result = multierror.Append(result, fmt.Errorf("close wait error: %w", err))
+		result = append(result, fmt.Errorf("close wait error: %w", err))
 	}
 
 	if err := s.bundle.Delete(); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete bundle")
-		result = multierror.Append(result, fmt.Errorf("failed to delete bundle: %w", err))
+		result = append(result, fmt.Errorf("failed to delete bundle: %w", err))
 	}
 
-	return result.ErrorOrNil()
+	return errors.Join(result...)
 }
 
 var _ runtime.Task = &shimTask{}
