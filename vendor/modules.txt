@@ -494,9 +494,12 @@ github.com/x448/float16
 # github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1
 ## explicit; go 1.15
 github.com/xrash/smetrics
-# go.etcd.io/bbolt v1.3.11
-## explicit; go 1.22
+# go.etcd.io/bbolt v1.4.0
+## explicit; go 1.23
 go.etcd.io/bbolt
+go.etcd.io/bbolt/errors
+go.etcd.io/bbolt/internal/common
+go.etcd.io/bbolt/internal/freelist
 # go.opencensus.io v0.24.0
 ## explicit; go 1.13
 go.opencensus.io
