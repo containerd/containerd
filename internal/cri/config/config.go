@@ -153,9 +153,7 @@ type ContainerdConfig struct {
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	//
-	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
-	//
-	// TODO(djdongjin): mark this field as deprecated in favor of NetworkPluginBinDirs.
+	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
 	//
