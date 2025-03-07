@@ -18,10 +18,10 @@ package sbserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/containerd/log"
-	"github.com/hashicorp/go-multierror"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/errdefs"
@@ -35,7 +35,7 @@ func (c *criService) ListPodSandboxStats(
 ) (*runtime.ListPodSandboxStatsResponse, error) {
 	sandboxes := c.sandboxesForListPodSandboxStatsRequest(r)
 
-	var errs *multierror.Error
+	var errs []error
 	podSandboxStats := new(runtime.ListPodSandboxStatsResponse)
 	for _, sandbox := range sandboxes {
 		sandboxStats, err := c.podSandboxStats(ctx, sandbox)
@@ -43,13 +43,13 @@ func (c *criService) ListPodSandboxStats(
 		case errdefs.IsUnavailable(err):
 			log.G(ctx).WithField("podsandboxid", sandbox.ID).Debugf("failed to get pod sandbox stats, this is likely a transient error: %v", err)
 		case err != nil:
-			errs = multierror.Append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
+			errs = append(errs, fmt.Errorf("failed to decode sandbox container metrics for sandbox %q: %w", sandbox.ID, err))
 		default:
 			podSandboxStats.Stats = append(podSandboxStats.Stats, sandboxStats)
 		}
 	}
 
-	return podSandboxStats, errs.ErrorOrNil()
+	return podSandboxStats, errors.Join(errs...)
 }
 
 func (c *criService) sandboxesForListPodSandboxStatsRequest(r *runtime.ListPodSandboxStatsRequest) []sandboxstore.Sandbox {
