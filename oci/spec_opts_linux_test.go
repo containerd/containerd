@@ -34,6 +34,98 @@ import (
 )
 
 //nolint:gosec
+func TestWithUser(t *testing.T) {
+	t.Parallel()
+
+	expectedPasswd := `root:x:0:0:root:/root:/bin/ash
+guest:x:405:100:guest:/dev/null:/sbin/nologin
+`
+	expectedGroup := `root:x:0:root
+bin:x:1:root,bin,daemon
+daemon:x:2:root,bin,daemon
+sys:x:3:root,bin,adm
+guest:x:100:guest
+`
+	td := t.TempDir()
+	apply := fstest.Apply(
+		fstest.CreateDir("/etc", 0777),
+		fstest.CreateFile("/etc/passwd", []byte(expectedPasswd), 0777),
+		fstest.CreateFile("/etc/group", []byte(expectedGroup), 0777),
+	)
+	if err := apply.Apply(td); err != nil {
+		t.Fatalf("failed to apply: %v", err)
+	}
+	c := containers.Container{ID: t.Name()}
+	testCases := []struct {
+		user        string
+		expectedUID uint32
+		expectedGID uint32
+		err         string
+	}{
+		{
+			user:        "0",
+			expectedUID: 0,
+			expectedGID: 0,
+		},
+		{
+			user:        "root:root",
+			expectedUID: 0,
+			expectedGID: 0,
+		},
+		{
+			user:        "guest",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user:        "guest:guest",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user: "guest:nobody",
+			err:  "no groups found",
+		},
+		{
+			user:        "405:100",
+			expectedUID: 405,
+			expectedGID: 100,
+		},
+		{
+			user: "405:2147483648",
+			err:  "no groups found",
+		},
+		{
+			user: "-1000",
+			err:  "no users found",
+		},
+		{
+			user: "2147483648",
+			err:  "no users found",
+		},
+	}
+	for _, testCase := range testCases {
+		testCase := testCase
+		t.Run(testCase.user, func(t *testing.T) {
+			t.Parallel()
+			s := Spec{
+				Version: specs.Version,
+				Root: &specs.Root{
+					Path: td,
+				},
+				Linux: &specs.Linux{},
+			}
+			err := WithUser(testCase.user)(context.Background(), nil, &c, &s)
+			if err != nil {
+				assert.EqualError(t, err, testCase.err)
+			}
+			assert.Equal(t, testCase.expectedUID, s.Process.User.UID)
+			assert.Equal(t, testCase.expectedGID, s.Process.User.GID)
+		})
+	}
+}
+
+//nolint:gosec
 func TestWithUserID(t *testing.T) {
 	t.Parallel()
 
