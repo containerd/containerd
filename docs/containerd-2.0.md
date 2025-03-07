@@ -87,6 +87,10 @@ This features needs [runc](https://github.com/opencontainers/runc) v1.2.0 or lat
 
 The CRI plugin now supports [recursive read-only mounts](https://kubernetes.io/docs/concepts/storage/volumes/#read-only-mounts) so as to prohibit accidentally having writable submounts.
 
+### Unprivileged ports and ICMP by default for CRI
+
+The CRI plugin now enables `net.ipv4.ip_unprivileged-port-start=0` and `net.ipv4.ping_group_range=0 2147483647` for containers that do not use the host network namespace or user namespaces.  This enables containers to bind to ports below 1024 without granting `CAP_NET_BIND_SERVICE` and to run `ping` without `CAP_NET_RAW`.  This default behavior change can be reverted by setting the `enable_unprivileged_ports` and `enable_unprivileged_icmp` options to `false` in the CRI plugin configuration.
+
 ### Deprecation warnings can now be discovered via the Introspection API
 
 Deprecations warnings have been added to the `ServerResponse` for the introspection service (`/containerd.services.introspection.v1.Introspection/Server`) and to the `ctr` tool via `ctr deprecation list`.
