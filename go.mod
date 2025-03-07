@@ -1,6 +1,6 @@
 module github.com/containerd/containerd
 
-go 1.19
+go 1.20
 
 require (
 	dario.cat/mergo v1.0.0
@@ -37,7 +37,6 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/intel/goresctrl v0.2.0
 	github.com/klauspost/compress v1.15.9
 	github.com/moby/locker v1.0.1
@@ -97,7 +96,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/miekg/pkcs11 v1.1.1 // indirect
