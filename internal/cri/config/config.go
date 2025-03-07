@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/containerd/log"
@@ -153,9 +154,7 @@ type ContainerdConfig struct {
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
 	//
-	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
-	//
-	// TODO(djdongjin): mark this field as deprecated in favor of NetworkPluginBinDirs.
+	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
 	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
 	//
@@ -537,14 +536,25 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 
 	// Validation for CNI config
+	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		warnings = append(warnings, deprecation.CRICNIBinDir)
+		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
+
+		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
+			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
+			// to avoid the unexpected conflict between the two since we don't allow setting both.
+			c.CniConfig.NetworkPluginBinDirs = nil
+		}
+		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
+			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
+			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
+			// so that we can use it in the rest of the code.
+			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
+			c.CniConfig.NetworkPluginBinDir = ""
+		}
+	}
 	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
 		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
-	}
-	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
-		// Before `NetworkPluginBinDir` is deprecated, we manually merge it
-		// into `NetworkPluginBinDirs` so that we can use it in the rest of the code.
-		c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
-		c.CniConfig.NetworkPluginBinDir = ""
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {

@@ -61,11 +61,12 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 				CniConfig: CniConfig{
-					NetworkPluginBinDir:  "/opt/cni/bin",
-					NetworkPluginBinDirs: []string{"/opt/cni/bin"},
+					NetworkPluginBinDir:  "/opt/mycni/bin",
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
 				},
 			},
 			runtimeExpectedErr: "`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time",
+			warnings:           []deprecation.Warning{deprecation.CRICNIBinDir},
 		},
 		"cni.bin_dir, if used, is moved to cni.bin_dirs": {
 			runtimeConfig: &RuntimeConfig{
@@ -76,7 +77,7 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 				CniConfig: CniConfig{
-					NetworkPluginBinDir: "/opt/cni/bin",
+					NetworkPluginBinDir: "/opt/mycni/bin",
 				},
 			},
 			runtimeExpected: &RuntimeConfig{
@@ -89,9 +90,10 @@ func TestValidateConfig(t *testing.T) {
 					},
 				},
 				CniConfig: CniConfig{
-					NetworkPluginBinDirs: []string{"/opt/cni/bin"},
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
 				},
 			},
+			warnings: []deprecation.Warning{deprecation.CRICNIBinDir},
 		},
 
 		"deprecated auths": {
@@ -300,6 +302,7 @@ func TestValidateConfig(t *testing.T) {
 			if test.runtimeConfig != nil {
 				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
+					assert.Error(t, err)
 					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {
 					assert.NoError(t, err)
