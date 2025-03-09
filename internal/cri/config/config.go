@@ -345,7 +345,7 @@ type RuntimeConfig struct {
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
-	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
+	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogLineSize"`
 	// DisableApparmor indicates to disable the apparmor support.
 	// This is useful when the containerd does not have permission to access Apparmor.
 	DisableApparmor bool `toml:"disable_apparmor" json:"disableApparmor"`
