@@ -19,7 +19,6 @@ package nri
 import (
 	"context"
 	"fmt"
-	"path"
 	"sync"
 
 	"github.com/containerd/log"
@@ -117,7 +116,7 @@ func New(cfg *Config) (API, error) {
 	}
 
 	var (
-		name     = path.Base(version.Package)
+		name     = version.Name
 		version  = version.Version
 		opts     = cfg.toOptions()
 		syncFn   = l.syncPlugin
