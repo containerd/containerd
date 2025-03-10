@@ -192,7 +192,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
-        go-version: ["1.23.6", "1.24.0"]
+        go-version: ["1.23.7", "1.24.1"]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-go
