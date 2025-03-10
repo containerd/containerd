@@ -395,3 +395,9 @@ func (c *fakeSpecOnlyContainer) Update(context.Context, ...containerd.UpdateCont
 	c.t.Error("fakeSpecOnlyContainer.Update: not implemented")
 	return errors.New("not implemented")
 }
+
+// Restore implements client.Container.
+func (c *fakeSpecOnlyContainer) Restore(context.Context, cio.Creator, string) (int, error) {
+	c.t.Error("fakeSpecOnlyContainer.Restore: not implemented")
+	return -1, errors.New("not implemented")
+}
