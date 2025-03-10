@@ -19,6 +19,7 @@ package version
 import "runtime"
 
 var (
+	Name = "containerd"
 	// Package is filled at linking time
 	Package = "github.com/containerd/containerd/v2"
 
