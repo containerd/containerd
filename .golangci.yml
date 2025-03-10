@@ -13,7 +13,7 @@ linters:
     - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
     - unused
-    - vet
+    - govet
     - dupword # Checks for duplicate words in the source code
   disable:
     - errcheck
@@ -23,6 +23,16 @@ issues:
     - EXC0002
   max-issues-per-linter: 0
   max-same-issues: 0
+
+  exclude-dirs:
+    - api
+    - cluster
+    - design
+    - docs
+    - docs/man
+    - releases
+    - reports
+    - test # e2e scripts
 
   # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
   exclude-rules:
@@ -74,12 +84,3 @@ linters-settings:
 
 run:
   timeout: 8m
-  skip-dirs:
-    - api
-    - cluster
-    - design
-    - docs
-    - docs/man
-    - releases
-    - reports
-    - test # e2e scripts
