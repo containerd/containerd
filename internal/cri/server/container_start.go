@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -28,6 +30,8 @@ import (
 	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
+	"github.com/checkpoint-restore/go-criu/v7/stats"
 	containerd "github.com/containerd/containerd/v2/client"
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
@@ -91,6 +95,91 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 	}
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandboxID))
 
+	ioCreation := func(id string) (_ containerdio.IO, err error) {
+		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
+		if err != nil {
+			return nil, fmt.Errorf("failed to create container loggers: %w", err)
+		}
+		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
+		cntr.IO.Pipe()
+		return cntr.IO, nil
+	}
+
+	if cntr.Status.Get().Restore {
+		// If during start the container is detected as a checkpoint the container
+		// will be marked with Restore() == true. In this case not the normal
+		// start code is needed but this code which does a restore.
+		pid, err := container.Restore(
+			ctx,
+			ioCreation,
+			filepath.Join(c.getContainerRootDir(r.GetContainerId()), crmetadata.CheckpointDirectory),
+		)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to restore containerd task: %w", err)
+		}
+		// Update container start timestamp.
+		if err := cntr.Status.UpdateSync(func(status containerstore.Status) (containerstore.Status, error) {
+			if pid < 0 {
+				return status, fmt.Errorf("restore returned a PID < 0 (%d); that should not happen", pid)
+			}
+			status.Pid = uint32(pid)
+			status.StartedAt = time.Now().UnixNano()
+			return status, nil
+		}); err != nil {
+			return nil, fmt.Errorf("failed to update container %q state: %w", id, err)
+		}
+
+		c.generateAndSendContainerEvent(ctx, id, sandboxID, runtime.ContainerEventType_CONTAINER_STARTED_EVENT)
+
+		task, err := cntr.Container.Task(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get task for container %q: %w", id, err)
+		}
+		// wait is a long running background request, no timeout needed.
+		exitCh, err := task.Wait(ctrdutil.NamespacedContext())
+		if err != nil {
+			return nil, fmt.Errorf("failed to wait for containerd task: %w", err)
+		}
+
+		defer func() {
+			if retErr != nil {
+				deferCtx, deferCancel := ctrdutil.DeferContext()
+				defer deferCancel()
+				err = c.nri.StopContainer(deferCtx, &sandbox, &cntr)
+				if err != nil {
+					log.G(ctx).WithError(err).Errorf("NRI stop failed for failed container %q", id)
+				}
+			}
+		}()
+		// It handles the TaskExit event and update container state after this.
+		c.startContainerExitMonitor(context.Background(), id, task.Pid(), exitCh)
+
+		// cleanup checkpoint artifacts after restore
+		cleanup := [...]string{
+			crmetadata.RestoreLogFile,
+			crmetadata.DumpLogFile,
+			stats.StatsDump,
+			stats.StatsRestore,
+			crmetadata.NetworkStatusFile,
+			crmetadata.RootFsDiffTar,
+			crmetadata.DeletedFilesFile,
+			crmetadata.CheckpointDirectory,
+			crmetadata.StatusDumpFile,
+			crmetadata.ConfigDumpFile,
+			crmetadata.SpecDumpFile,
+			"container.log",
+		}
+		for _, del := range cleanup {
+			file := filepath.Join(c.getContainerRootDir(r.GetContainerId()), del)
+			err = os.RemoveAll(file)
+			if err != nil {
+				log.G(ctx).Infof("Non-fatal: removal of checkpoint file (%s) failed: %v", file, err)
+			}
+		}
+		log.G(ctx).Infof("Restored container %s successfully", r.GetContainerId())
+		return &runtime.StartContainerResponse{}, nil
+	}
 	// Recheck target container validity in Linux namespace options.
 	if linux := config.GetLinux(); linux != nil {
 		nsOpts := linux.GetSecurityContext().GetNamespaceOptions()
@@ -100,16 +189,6 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 				return nil, fmt.Errorf("invalid target container: %w", err)
 			}
 		}
-	}
-
-	ioCreation := func(id string) (_ containerdio.IO, err error) {
-		stdoutWC, stderrWC, err := c.createContainerLoggers(meta.LogPath, config.GetTty())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create container loggers: %w", err)
-		}
-		cntr.IO.AddOutput("log", stdoutWC, stderrWC)
-		cntr.IO.Pipe()
-		return cntr.IO, nil
 	}
 
 	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
