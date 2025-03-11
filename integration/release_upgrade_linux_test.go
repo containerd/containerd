@@ -546,8 +546,7 @@ func (pCtx *podTCtx) shimPid() uint32 {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// NOTE: use version 2 to be compatible with previous release
-	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 2, pCtx.id)
+	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 3, pCtx.id)
 	return shimPid(ctx, t, shimCli)
 }
 
@@ -634,7 +633,8 @@ func previousReleaseCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir st
 version = 2
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-  runtime_type = "%s/bin/containerd-shim-runc-v2"
+  runtime_type = "io.containerd.runc.v2"
+  runtime_path = "%s/bin/containerd-shim-runc-v2"
 `,
 		previousReleaseBinDir)
 
