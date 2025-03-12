@@ -149,6 +149,7 @@ of containerd for every supported version of Kubernetes.
 | 1.29               | 1.7.11+, 1.6.27+              | v1              |
 | 1.30               | 2.0.0+, 1.7.13+, 1.6.28+      | v1              |
 | 1.31               | 2.0.0+, 1.7.20+, 1.6.34+      | v1              |
+| 1.32               | 2.0.1+, 1.7.24+, 1.6.36+      | v1              |
 
 Deprecated containerd and kubernetes versions
 
@@ -162,7 +163,7 @@ Deprecated containerd and kubernetes versions
 | v1.5                     | 1.20+              | v1 (1.23+), v1alpha2 (until 1.25) ** |
 | v1.6.15+, v1.7.0+        | 1.26+              | v1                                   |
 
-** Note: containerd v1.6.*, and v1.7.* support CRI v1 and v1alpha2 through EOL as those releases continue to support older versions of k8s, cloud providers, and other clients using CRI v1alpha2. CRI v1alpha2 is deprecated in v1.7 and will be removed in containerd v2.0.
+** Note: containerd v1.6.*, and v1.7.* support CRI v1 and v1alpha2 through EOL as those releases continue to support older versions of k8s, cloud providers, and other clients using CRI v1alpha2. CRI v1alpha2 is deprecated in v1.7 and is not present in containerd v2.0.
 
 ### Backporting
 
