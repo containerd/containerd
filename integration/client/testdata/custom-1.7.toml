@@ -294,8 +294,8 @@ version = 2
     path = "ctd-decoder"
     returns = "application/vnd.oci.image.layer.v1.tar+gzip"
 
+  # delete io.containerd.timeout.bolt.open to test migrate
 [timeouts]
-  "io.containerd.timeout.bolt.open" = "0s"
   "io.containerd.timeout.metrics.shimstats" = "2s"
   "io.containerd.timeout.shim.cleanup" = "5s"
   "io.containerd.timeout.shim.load" = "5s"
