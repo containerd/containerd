@@ -19,12 +19,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/services/tasks/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/typeurl/v2"
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -63,6 +63,12 @@ type containerMetrics struct {
 	metrics *runtime.ContainerMetrics
 }
 
+type containerCPUMetrics struct {
+	UsageUsec  uint64
+	UserUsec   uint64
+	SystemUsec uint64
+}
+
 // gives the metrics for a given container in a sandbox
 func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*runtime.ContainerMetrics, error) {
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
@@ -84,6 +90,9 @@ func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string,
 func (c *criService) toContainerMetrics(ctx context.Context, containerdID string, metrics *types.Metric) (containerMetrics, error) {
 	var cm runtime.ContainerMetrics
 	var metric runtime.Metric
+
+	cm.ContainerId = containerdID
+
 	//var pids uint64
 	if metrics != nil {
 		var data interface{}
@@ -104,15 +113,39 @@ func (c *criService) toContainerMetrics(ctx context.Context, containerdID string
 			return containerMetrics{}, fmt.Errorf("cannot convert metric data to cgroups.Metrics")
 		}
 
-		cpuStats, err := c.cpuContainerStats(containerdID, false /* not a sandbox */, data, protobuf.FromTimestamp(metrics.Timestamp))
+		cpuMetrics, err := c.cpuMetrics(ctx, metrics)
 		if err != nil {
-			return containerMetrics{}, fmt.Errorf("failed to obtain cpu stats: %w", err)
+			return containerMetrics{}, err
 		}
-		metric.MetricType = runtime.MetricType_GAUGE
 		metric.Name = "container_cpu_usage_seconds_total"
-		metric.Value = cpuStats.UsageCoreNanoSeconds
+		metric.Value = &runtime.UInt64Value{Value: cpuMetrics.UsageUsec}
 		cm.Metrics = append(cm.Metrics, &metric)
 
 	}
 	return containerMetrics{metrics: &cm}, nil
+}
+
+func (c *criService) cpuMetrics(ctx context.Context, stats interface{}) (*containerCPUMetrics, error) {
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		metrics.GetCPU().GetUsage()
+		if metrics.CPU != nil && metrics.CPU.Usage != nil {
+			return &containerCPUMetrics{
+				UserUsec:   metrics.CPU.Usage.User,
+				SystemUsec: metrics.CPU.Usage.Kernel,
+				UsageUsec:  metrics.CPU.Usage.Total,
+			}, nil
+		}
+	case *cg2.Metrics:
+		if metrics.CPU != nil {
+			return &containerCPUMetrics{
+				UserUsec:   metrics.CPU.UserUsec * 1000,
+				SystemUsec: metrics.CPU.SystemUsec * 1000,
+				UsageUsec:  metrics.CPU.UsageUsec * 1000,
+			}, nil
+		}
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
 }
