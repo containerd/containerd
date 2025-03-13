@@ -1,0 +1,34 @@
+# commit to be tagged for new release
+commit = "HEAD"
+
+project_name = "containerd"
+github_repo = "containerd/containerd"
+match_deps = "^github.com/(containerd/[a-zA-Z0-9-]+)$"
+ignore_deps = [ "github.com/containerd/containerd" ]
+
+# previous release
+previous = "v2.0.0"
+
+pre_release = true
+
+preface = """\
+The 2.1 beta series is here, see the [2.1 milestone](https://github.com/containerd/containerd/milestone/48) to track
+ongoing efforts. Please try out the beta and report any issues!
+
+The first minor release of containerd 2.x focuses on continued stability alongside
+new features and improvements. This is the first time-based released for containerd.
+Most the feature set and core functionality has long been stable and harderened in production
+environments, so now we transition to a balance of timely delivery of new functionality
+with the same high confidence in stability and performance.
+"""
+
+postface = """\
+### Which file should I download?
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
+
+In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
+and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
+
+See also the [Getting Started](https://github.com/containerd/containerd/blob/main/docs/getting-started.md) documentation.
+"""
