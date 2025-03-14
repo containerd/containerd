@@ -23,7 +23,11 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 )
+
+// default number of parallel requests used to download a layer
+const defaultLayerParallelism = int64(1)
 
 // Resolver provides remotes based on a locator.
 type Resolver interface {
@@ -43,7 +47,7 @@ type Resolver interface {
 	// Fetcher returns a new fetcher for the provided reference.
 	// All content fetched from the returned fetcher will be
 	// from the namespace referred to by ref.
-	Fetcher(ctx context.Context, ref string) (Fetcher, error)
+	Fetcher(ctx context.Context, ref string, opts ...FetcherOpt) (Fetcher, error)
 
 	// Pusher returns a new pusher for the provided reference
 	// The returned Pusher should satisfy content.Ingester and concurrent attempts
@@ -107,5 +111,79 @@ func WithMediaType(mediatype string) FetchByDigestOpts {
 	return func(ctx context.Context, cfg *FetchByDigestConfig) error {
 		cfg.Mediatype = mediatype
 		return nil
+	}
+}
+
+////
+// Layer fetch config
+////
+
+type FetcherConfig struct {
+	MaxConcurrentDownloads         int
+	MaxConcurrentDownloadsPerLayer int
+	ConcurrentDownloadChunkSize    int
+	Limiter                        limiter
+}
+
+type limiter interface {
+	Acquire(ctx context.Context, n int64) error
+	Release(n int64)
+	TryAcquire(n int64) bool
+}
+
+var _ limiter = noOpLimiter{}
+
+type noOpLimiter struct{}
+
+func (noOpLimiter) Acquire(ctx context.Context, n int64) error { return nil }
+func (noOpLimiter) Release(n int64)                            {}
+func (noOpLimiter) TryAcquire(n int64) bool                    { return true }
+
+func (cfg FetcherConfig) Parallelism() int64 {
+	// parallel layer fetching remains off when MaxConcurrentDownloadsPerLayer
+	// is <= 1. This could be changed in the future if/when the feature is
+	// successful and widely adopted.
+	if cfg.MaxConcurrentDownloads <= 0 || cfg.MaxConcurrentDownloadsPerLayer <= 0 {
+		return defaultLayerParallelism
+	}
+	if cfg.MaxConcurrentDownloadsPerLayer > 0 && cfg.MaxConcurrentDownloadsPerLayer < cfg.MaxConcurrentDownloads {
+		return int64(cfg.MaxConcurrentDownloadsPerLayer)
+	}
+	return int64(cfg.MaxConcurrentDownloads)
+}
+
+type FetcherOpt func(*FetcherConfig)
+
+type FetcherOpts []FetcherOpt
+
+func (opts FetcherOpts) Config() (cfg FetcherConfig) {
+	cfg.Limiter = noOpLimiter{}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	return
+}
+
+func WithConcurrentDownloadChunkSize(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.ConcurrentDownloadChunkSize = max
+	}
+}
+
+func WithMaxConcurrentDownloads(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.MaxConcurrentDownloads = max
+	}
+}
+
+func WithMaxConcurrentDownloadsPerLayer(max int) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.MaxConcurrentDownloadsPerLayer = max
+	}
+}
+
+func WithLimiter(limiter *semaphore.Weighted) FetcherOpt {
+	return func(opts *FetcherConfig) {
+		opts.Limiter = limiter
 	}
 }
