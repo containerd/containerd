@@ -28,13 +28,14 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
 )
 
 type dockerFetcher struct {
@@ -84,7 +85,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 				req.path = req.path + "?" + u.RawQuery
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset)
+			rc, err := r.open(ctx, req, desc.MediaType, offset, false)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					continue // try one of the other urls.
@@ -101,13 +102,13 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 			desc.MediaType == images.MediaTypeDockerSchema1Manifest {
 
 			var firstErr error
-			for _, host := range r.hosts {
+			for i, host := range r.hosts {
 				req := r.request(host, http.MethodGet, "manifests", desc.Digest.String())
 				if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 					return nil, err
 				}
 
-				rc, err := r.open(ctx, req, desc.MediaType, offset)
+				rc, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 				if err != nil {
 					// Store the error for referencing later
 					if firstErr == nil {
@@ -124,13 +125,13 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 
 		// Finally use blobs endpoints
 		var firstErr error
-		for _, host := range r.hosts {
+		for i, host := range r.hosts {
 			req := r.request(host, http.MethodGet, "blobs", desc.Digest.String())
 			if err := req.addNamespace(r.refspec.Hostname()); err != nil {
 				return nil, err
 			}
 
-			rc, err := r.open(ctx, req, desc.MediaType, offset)
+			rc, err := r.open(ctx, req, desc.MediaType, offset, i == len(r.hosts)-1)
 			if err != nil {
 				// Store the error for referencing later
 				if firstErr == nil {
@@ -153,7 +154,7 @@ func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.R
 	})
 }
 
-func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, mediatype string, ps ...string) (*request, int64, error) {
+func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, lastHost bool, mediatype string, ps ...string) (*request, int64, error) {
 	headReq := r.request(host, http.MethodHead, ps...)
 	if err := headReq.addNamespace(r.refspec.Hostname()); err != nil {
 		return nil, 0, err
@@ -165,7 +166,7 @@ func (r dockerFetcher) createGetReq(ctx context.Context, host RegistryHost, medi
 		headReq.header.Set("Accept", strings.Join([]string{mediatype, `*/*`}, ", "))
 	}
 
-	headResp, err := headReq.doWithRetries(ctx, nil)
+	headResp, err := headReq.doWithRetries(ctx, nil, lastHost)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -209,8 +210,8 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 		firstErr error
 	)
 
-	for _, host := range r.hosts {
-		getReq, sz, err = r.createGetReq(ctx, host, config.Mediatype, "blobs", dgst.String())
+	for i, host := range r.hosts {
+		getReq, sz, err = r.createGetReq(ctx, host, i < len(r.hosts)-1, config.Mediatype, "blobs", dgst.String())
 		if err == nil {
 			break
 		}
@@ -222,8 +223,8 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 
 	if getReq == nil {
 		// Fall back to the "manifests" endpoint
-		for _, host := range r.hosts {
-			getReq, sz, err = r.createGetReq(ctx, host, config.Mediatype, "manifests", dgst.String())
+		for i, host := range r.hosts {
+			getReq, sz, err = r.createGetReq(ctx, host, i < len(r.hosts)-1, config.Mediatype, "manifests", dgst.String())
 			if err == nil {
 				break
 			}
@@ -245,7 +246,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	}
 
 	seeker, err := newHTTPReadSeeker(sz, func(offset int64) (io.ReadCloser, error) {
-		return r.open(ctx, getReq, config.Mediatype, offset)
+		return r.open(ctx, getReq, config.Mediatype, offset, true)
 	})
 	if err != nil {
 		return nil, desc, err
@@ -262,7 +263,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 	return seeker, desc, nil
 }
 
-func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
+func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64, lastHost bool) (_ io.ReadCloser, retErr error) {
 	if mediatype == "" {
 		req.header.Set("Accept", "*/*")
 	} else {
@@ -277,7 +278,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		req.header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 	}
 
-	resp, err := req.doWithRetries(ctx, nil)
+	resp, err := req.doWithRetries(ctx, nil, lastHost)
 	if err != nil {
 		return nil, err
 	}
