@@ -27,20 +27,22 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/platforms"
+	"github.com/intel/goresctrl/pkg/blockio"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/urfave/cli"
+
+	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cmd/ctr/commands"
 	"github.com/containerd/containerd/containers"
 	"github.com/containerd/containerd/contrib/apparmor"
 	"github.com/containerd/containerd/contrib/nvidia"
 	"github.com/containerd/containerd/contrib/seccomp"
+	"github.com/containerd/containerd/diff"
 	"github.com/containerd/containerd/oci"
 	runtimeoptions "github.com/containerd/containerd/pkg/runtimeoptions/v1"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/containerd/platforms"
-	"github.com/intel/goresctrl/pkg/blockio"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"github.com/urfave/cli"
 )
 
 var platformRunFlags = []cli.Flag{
@@ -151,7 +153,7 @@ func NewContainer(ctx gocontext.Context, client *containerd.Client, context *cli
 				return nil, err
 			}
 			if !unpacked {
-				if err := image.Unpack(ctx, snapshotter); err != nil {
+				if err := image.Unpack(ctx, snapshotter, containerd.WithUnpackApplyOpts(diff.WithSyncFs(context.Bool("sync-fs")))); err != nil {
 					return nil, err
 				}
 			}
