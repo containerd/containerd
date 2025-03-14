@@ -42,7 +42,7 @@ func DefaultImageConfig() ImageConfig {
 func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
+			NetworkPluginBinDirs:       []string{filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin")},
 			NetworkPluginConfDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
 			NetworkPluginMaxConfNum:    1,
 			NetworkPluginSetupSerially: false,

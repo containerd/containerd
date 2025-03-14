@@ -72,7 +72,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        "/opt/cni/bin",
+			NetworkPluginBinDirs:       []string{"/opt/cni/bin"},
 			NetworkPluginConfDir:       "/etc/cni/net.d",
 			NetworkPluginMaxConfNum:    1, // only one CNI plugin config file will be loaded
 			NetworkPluginSetupSerially: false,
