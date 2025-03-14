@@ -28,6 +28,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -50,6 +51,8 @@ type hostConfig struct {
 	caCerts     []string
 	clientPairs [][2]string
 	skipVerify  *bool
+
+	dialTimeout *time.Duration
 
 	header http.Header
 
@@ -166,7 +169,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			// Allow setting for each host as well
 			explicitTLS := tlsConfigured
 
-			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil {
+			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil || host.dialTimeout != nil {
 				explicitTLS = true
 				tr := defaultTransport.Clone()
 				tlsConfig := tr.TLSClientConfig
@@ -213,6 +216,14 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 					}
 
 					tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+				}
+
+				if host.dialTimeout != nil {
+					tr.DialContext = (&net.Dialer{
+						Timeout:       *host.dialTimeout,
+						KeepAlive:     30 * time.Second,
+						FallbackDelay: 300 * time.Millisecond,
+					}).DialContext
 				}
 
 				c := *client
@@ -338,6 +349,10 @@ type hostFileConfig struct {
 	// This may be used with non-compliant OCI registries to override the
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
+
+	// DialTimeout is the maximum amount of time a dial will wait for
+	// a connect to complete.
+	DialTimeout string `toml:"dial_timeout"`
 
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
@@ -497,6 +512,14 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 			}
 		}
 		result.header = header
+	}
+
+	if config.DialTimeout != "" {
+		dialTimeout, err := time.ParseDuration(config.DialTimeout)
+		if err != nil {
+			return hostConfig{}, err
+		}
+		result.dialTimeout = &dialTimeout
 	}
 
 	return result, nil
