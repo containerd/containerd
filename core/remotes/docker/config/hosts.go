@@ -167,10 +167,10 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
-			explicitTLS := tlsConfigured
+			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
+			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil || host.dialTimeout != nil {
-				explicitTLS = true
+			if explicitTLSFromHost || host.dialTimeout != nil {
 				tr := defaultTransport.Clone()
 				tlsConfig := tr.TLSClientConfig
 				if host.skipVerify != nil {
