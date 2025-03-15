@@ -30,13 +30,12 @@ import (
 	"golang.org/x/mod/semver"
 
 	"github.com/containerd/containerd/v2/pkg/archive"
-	"github.com/containerd/containerd/v2/version"
 )
 
 // downloadPreviousLatestReleaseBinary downloads the latest version of previous
 // release into the target dir.
-func downloadPreviousLatestReleaseBinary(t *testing.T, targetDir string) {
-	ver := previousReleaseVersion(t)
+func downloadPreviousLatestReleaseBinary(t *testing.T, version, targetDir string) {
+	ver := previousReleaseVersion(t, version)
 
 	downloadReleaseBinary(t, targetDir, ver)
 }
@@ -62,35 +61,13 @@ func downloadReleaseBinary(t *testing.T, targetDir string, ver string) {
 }
 
 // previousReleaseVersion returns the latest version of previous release.
-func previousReleaseVersion(t *testing.T) string {
-	majorMinor := ctrdPreviousMajorMinor(t)
-
-	tags := gitLsRemoteCtrdTags(t, fmt.Sprintf("refs/tags/%s.*", majorMinor))
+func previousReleaseVersion(t *testing.T, version string) string {
+	tags := gitLsRemoteCtrdTags(t, fmt.Sprintf("refs/tags/v%s.*", version))
 	require.True(t, len(tags) >= 1)
 
 	// sort them and get the latest version
 	semver.Sort(tags)
 	return tags[len(tags)-1]
-}
-
-// ctrdPreviousMajorMinor gets the current version of running containerd.
-//
-// TODO(fuweid): We should parse containerd --version to get the result.
-func ctrdPreviousMajorMinor(t *testing.T) string {
-	currentVer := "v" + version.Version
-
-	version := semver.MajorMinor(currentVer)
-	switch version {
-	case "v2.1":
-		return "v2.0"
-	case "v2.0":
-		return "v1.7"
-	case "v1.7":
-		return "v1.6"
-	default:
-		t.Fatalf("unexpected containerd version: %s", currentVer)
-		panic("unreachable")
-	}
 }
 
 // gitLsRemoteTags lists containerd tags based on pattern.
