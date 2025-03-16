@@ -64,9 +64,14 @@ type containerMetrics struct {
 }
 
 type containerCPUMetrics struct {
-	UsageUsec  uint64
-	UserUsec   uint64
-	SystemUsec uint64
+	UsageUsec          uint64
+	UserUsec           uint64
+	SystemUsec         uint64
+	NRPeriods          uint64
+	NRThrottledPeriods uint64
+	ThrottledUsec      uint64
+	LoadAverage10      uint64
+	TasksState         uint64
 }
 
 // gives the metrics for a given container in a sandbox
@@ -128,20 +133,26 @@ func (c *criService) toContainerMetrics(ctx context.Context, containerdID string
 func (c *criService) cpuMetrics(ctx context.Context, stats interface{}) (*containerCPUMetrics, error) {
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
-		metrics.GetCPU().GetUsage()
+		//metrics.GetCPU().GetUsage()
 		if metrics.CPU != nil && metrics.CPU.Usage != nil {
 			return &containerCPUMetrics{
-				UserUsec:   metrics.CPU.Usage.User,
-				SystemUsec: metrics.CPU.Usage.Kernel,
-				UsageUsec:  metrics.CPU.Usage.Total,
+				UserUsec:           metrics.CPU.Usage.User,
+				SystemUsec:         metrics.CPU.Usage.Kernel,
+				UsageUsec:          metrics.CPU.Usage.Total,
+				NRPeriods:          metrics.CPU.Throttling.Periods,
+				NRThrottledPeriods: metrics.CPU.Throttling.ThrottledPeriods,
+				ThrottledUsec:      metrics.CPU.Throttling.ThrottledTime,
 			}, nil
 		}
 	case *cg2.Metrics:
 		if metrics.CPU != nil {
 			return &containerCPUMetrics{
-				UserUsec:   metrics.CPU.UserUsec * 1000,
-				SystemUsec: metrics.CPU.SystemUsec * 1000,
-				UsageUsec:  metrics.CPU.UsageUsec * 1000,
+				UserUsec:           metrics.CPU.UserUsec * 1000,
+				SystemUsec:         metrics.CPU.SystemUsec * 1000,
+				UsageUsec:          metrics.CPU.UsageUsec * 1000,
+				NRPeriods:          metrics.CPU.NRPeriods * 1000,
+				NRThrottledPeriods: metrics.CPU.NRThrottled * 1000,
+				ThrottledUsec:      metrics.CPU.ThorttledUsec * 1000,
 			}, nil
 		}
 	default:
