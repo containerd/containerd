@@ -74,6 +74,22 @@ type containerCPUMetrics struct {
 	TasksState         uint64
 }
 
+type containerMemoryMetrics struct {
+	Cache        uint64
+	RSS          uint64
+	Swap         uint64
+	KernelUsage  uint64
+	FileMapped   uint64
+	FailCount    uint64
+	MemoryUsage  uint64
+	MaxUsage     uint64
+	WorkingSet   uint64
+	ActiveFile   uint64
+	InactiveFile uint64
+	PgFault      uint64
+	PgMajFault   uint64
+}
+
 // gives the metrics for a given container in a sandbox
 func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*runtime.ContainerMetrics, error) {
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
@@ -155,6 +171,53 @@ func (c *criService) cpuMetrics(ctx context.Context, stats interface{}) (*contai
 				ThrottledUsec:      metrics.CPU.ThorttledUsec * 1000,
 			}, nil
 		}
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
+}
+
+func (c *criService) memoryMetrics(ctx context.Context, stats interface{}) (*containerMemoryMetrics, error) {
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		cm := &containerMemoryMetrics{}
+		if metrics.Memory != nil && metrics.Memory.Usage != nil {
+			cm.Cache = metrics.Memory.TotalCache
+			cm.RSS = metrics.Memory.TotalRSS
+			cm.FileMapped = metrics.Memory.MappedFile
+			cm.FailCount = metrics.Memory.Usage.Failcnt
+			cm.MemoryUsage = metrics.Memory.Usage.Usage
+			cm.MaxUsage = metrics.Memory.Usage.Max
+			cm.WorkingSet = getWorkingSet(metrics.Memory)
+			cm.ActiveFile = metrics.Memory.TotalActiveFile
+			cm.InactiveFile = metrics.Memory.TotalInactiveFile
+			cm.PgFault = metrics.Memory.PgFault
+			cm.PgMajFault = metrics.Memory.PgMajFault
+			if metrics.Memory.Kernel != nil {
+				cm.KernelUsage = metrics.Memory.Kernel.Usage
+			}
+			if metrics.Memory.Swap != nil {
+				cm.Swap = metrics.Memory.Swap.Usage
+			}
+		}
+		return cm, nil
+	case *cg2.Metrics:
+		cm := &containerMemoryMetrics{}
+		cm.Cache = metrics.Memory.File
+		cm.RSS = metrics.Memory.Anon
+		cm.KernelUsage = metrics.Memory.KernelStack
+		cm.FileMapped = metrics.Memory.FileMapped
+		cm.Swap = metrics.Memory.SwapUsage - metrics.Memory.Usage
+		cm.MemoryUsage = metrics.Memory.Usage
+		cm.MaxUsage = metrics.Memory.MaxUsage
+		cm.WorkingSet = getWorkingSetV2(metrics.Memory)
+		cm.ActiveFile = metrics.Memory.ActiveFile
+		cm.PgFault = metrics.Memory.Pgfault
+		cm.PgMajFault = metrics.Memory.Pgmajfault
+		if metrics.MemoryEvents != nil {
+			cm.FailCount = metrics.MemoryEvents.Max
+		}
+		return cm, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
