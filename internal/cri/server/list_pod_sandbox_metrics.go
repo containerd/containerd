@@ -41,7 +41,7 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 
 		containers := c.containerStore.List()
 		for _, container := range containers {
-			metrics, err := c.listContainerMetrics(sandbox.ID, container.ID)
+			metrics, err := c.listContainerMetrics(ctx, sandbox.ID, container.ID)
 			if err != nil {
 				logrus.Debug("failed to fetch metrics %v", err)
 			}
