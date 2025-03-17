@@ -316,6 +316,10 @@ func loadHostDir(ctx context.Context, hostsDir string) ([]hostConfig, error) {
 }
 
 type hostFileConfig struct {
+	// Server specifies the URL for this host.
+	// If not set in per-host configuration, the URL is taken from the table key.
+	Server string `toml:"server"`
+
 	// Capabilities determine what operations a host is
 	// capable of performing. Allowed values
 	//  - pull
@@ -365,9 +369,6 @@ func parseHostsFile(baseDir string, b []byte) ([]hostConfig, error) {
 
 	c := struct {
 		hostFileConfig
-		// Server specifies the default server. When `host` is
-		// also specified, those hosts are tried first.
-		Server string `toml:"server"`
 		// HostConfigs store the per-host configuration
 		HostConfigs map[string]hostFileConfig `toml:"host"`
 	}{}
@@ -406,6 +407,10 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 		result = hostConfig{}
 		err    error
 	)
+
+	if config.Server != "" {
+		server = config.Server
+	}
 
 	if server != "" {
 		if !strings.HasPrefix(server, "http") {
