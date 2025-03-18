@@ -105,7 +105,6 @@ guest:x:100:guest
 		},
 	}
 	for _, testCase := range testCases {
-		testCase := testCase
 		t.Run(testCase.user, func(t *testing.T) {
 			t.Parallel()
 			s := Spec{
