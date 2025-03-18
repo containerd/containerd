@@ -96,6 +96,10 @@ ca = "/etc/path/default"
 [host."http://mirror.registry"]
   capabilities = ["pull"]
 
+[host."https://[0:0:0::0:0:0]:443"]
+  capabilities = ["pull"]
+	client = "/etc/certs/client.pem"
+
 [host."https://test-1.registry"]
   capabilities = ["pull", "resolve", "push"]
   ca = ["/etc/certs/test-1-ca.pem", "/etc/certs/special.pem"]
@@ -145,6 +149,15 @@ ca = "/etc/path/default"
 			host:         "mirror.registry",
 			path:         "/v2",
 			capabilities: docker.HostCapabilityPull,
+		},
+		{
+			scheme:       "https",
+			host:         "[0:0:0::0:0:0]:443",
+			path:         "/v2",
+			capabilities: docker.HostCapabilityPull,
+			clientPairs: [][2]string{
+				{filepath.FromSlash("/etc/certs/client.pem")},
+			},
 		},
 		{
 			scheme:       "https",
