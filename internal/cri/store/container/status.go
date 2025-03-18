@@ -97,7 +97,8 @@ type Status struct {
 	// This field doesn't need to be checkpointed.
 	Unknown bool `json:"-"`
 	// Resources has container runtime resource constraints
-	Resources *runtime.ContainerResources
+	// This field doesn't need to be checkpointed.
+	Resources *runtime.ContainerResources `json:"-"`
 	// Restore marks this container as a container to be restored from a
 	// checkpoint and not started.
 	Restore bool
