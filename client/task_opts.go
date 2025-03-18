@@ -50,6 +50,21 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 	}
 }
 
+// WithRuntimeBinaryName will force task service to use a custom binary name
+func WithRuntimeBinaryName(absBinaryName string) NewTaskOpts {
+	return func(ctx context.Context, client *Client, info *TaskInfo) error {
+		if info.Options == nil {
+			info.Options = &options.Options{}
+		}
+		opts, ok := info.Options.(*options.Options)
+		if !ok {
+			return errors.New("invalid runtime v2 options format")
+		}
+		opts.BinaryName = absBinaryName
+		return nil
+	}
+}
+
 // WithTaskAPIEndpoint allow task service to manage a task through a given endpoint,
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {

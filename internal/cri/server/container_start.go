@@ -201,6 +201,10 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		taskOpts = append(taskOpts, containerd.WithRuntimePath(ociRuntime.Path))
 	}
 
+	if ociRuntime.Options["BinaryName"] != "" {
+		taskOpts = append(taskOpts, containerd.WithRuntimeBinaryName(ociRuntime.Options["BinaryName"].(string)))
+	}
+
 	// append endpoint to the options so that task manager can get task api endpoint directly
 	endpoint := sandbox.Endpoint
 	if endpoint.IsValid() {
