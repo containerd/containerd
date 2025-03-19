@@ -124,32 +124,7 @@ var configCommand = &cli.Command{
 						}
 					}
 				}
-
-				plugins, err := server.LoadPlugins(ctx, config)
-				if err != nil {
-					return err
-				}
-				if len(plugins) != 0 {
-					if config.Plugins == nil {
-						config.Plugins = make(map[string]interface{})
-					}
-					for _, p := range plugins {
-						if p.Config == nil {
-							continue
-						}
-
-						pc, err := config.Decode(ctx, p.URI(), p.Config)
-						if err != nil {
-							return err
-						}
-
-						config.Plugins[p.URI()] = pc
-					}
-				}
-
-				config.Version = version.ConfigVersion
-
-				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+				return outputConfig(ctx, config)
 			},
 		},
 	},
