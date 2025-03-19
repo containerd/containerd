@@ -19,7 +19,7 @@ require (
 	github.com/containerd/fifo v1.1.0
 	github.com/containerd/go-cni v1.1.12
 	github.com/containerd/go-runc v1.1.0
-	github.com/containerd/imgcrypt/v2 v2.0.0
+	github.com/containerd/imgcrypt/v2 v2.0.1
 	github.com/containerd/log v0.1.0
 	github.com/containerd/nri v0.8.0
 	github.com/containerd/otelttrpc v0.1.0
@@ -137,7 +137,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
-	golang.org/x/net v0.35.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/term v0.30.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
