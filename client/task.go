@@ -146,11 +146,35 @@ type TaskInfo struct {
 
 	// runtime is the runtime name for the container, and cannot be changed.
 	runtime string
+
+	// runtimeOptions is the runtime options for the container, and it will be used
+	// as the default taskOptions when taskOptions is modified.
+	// https://github.com/containerd/containerd/issues/11568
+	runtimeOptions typeurl.Any
 }
 
 // Runtime name for the container
 func (i *TaskInfo) Runtime() string {
 	return i.runtime
+}
+
+func (i *TaskInfo) getRuncOptions() (*options.Options, error) {
+	if i.Options != nil {
+		opts, ok := i.Options.(*options.Options)
+		if !ok {
+			return nil, errors.New("invalid runtime v2 options format")
+		}
+		return opts, nil
+	}
+
+	opts := &options.Options{}
+	if i.runtimeOptions != nil && i.runtimeOptions.GetValue() != nil {
+		if err := typeurl.UnmarshalTo(i.runtimeOptions, opts); err != nil {
+			return nil, err
+		}
+	}
+	i.Options = opts
+	return opts, nil
 }
 
 // Task is the executable object within containerd
