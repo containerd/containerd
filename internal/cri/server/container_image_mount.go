@@ -31,6 +31,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 )
 
 func (c *criService) mutateMounts(
@@ -48,7 +49,7 @@ func (c *criService) mutateMounts(
 	for _, m := range extraMounts {
 		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, platform)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", crierrors.ErrImageVolumeMountFailed, err)
 		}
 	}
 	return nil
@@ -101,46 +102,52 @@ func (c *criService) mutateImageMount(
 
 	target := c.getImageVolumeHostPath(sandboxID, imageID)
 
-	// Already mounted in another container on the same pod
-	if stat, err := os.Stat(target); err == nil && stat.IsDir() {
-		extraMount.HostPath = target
-		return nil
-	}
-
-	img, err := c.client.ImageService().Get(ctx, ref)
-	if err != nil {
-		return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
-	}
-
-	i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
-	if err := i.Unpack(ctx, snapshotter); err != nil {
-		return fmt.Errorf("failed to unpack image volume: %w", err)
-	}
-
-	diffIDs, err := i.RootFS(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get diff IDs for image volume %q: %w", ref, err)
-	}
-	chainID := identity.ChainID(diffIDs).String()
-
-	s := c.client.SnapshotService(snapshotter)
-	mounts, err := s.Prepare(ctx, target, chainID)
-	if err != nil {
-		return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
-	}
-	defer func() {
-		if retErr != nil {
-			_ = s.Remove(ctx, target)
+	// First time mounting the image into a container of the sandbox, prepare
+	// the image rootfs first.
+	if stat, err := os.Stat(target); !(err == nil && stat.IsDir()) {
+		img, err := c.client.ImageService().Get(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
 		}
-	}()
 
-	err = os.MkdirAll(target, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
+		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		if err := i.Unpack(ctx, snapshotter); err != nil {
+			return fmt.Errorf("failed to unpack image volume: %w", err)
+		}
+
+		diffIDs, err := i.RootFS(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get diff IDs for image volume %q: %w", ref, err)
+		}
+		chainID := identity.ChainID(diffIDs).String()
+
+		s := c.client.SnapshotService(snapshotter)
+		mounts, err := s.Prepare(ctx, target, chainID)
+		if err != nil {
+			return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
+		}
+		defer func() {
+			if retErr != nil {
+				_ = s.Remove(ctx, target)
+			}
+		}()
+
+		err = os.MkdirAll(target, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
+		}
+
+		if err := mount.All(mounts, target); err != nil {
+			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
+		}
 	}
 
-	if err := mount.All(mounts, target); err != nil {
-		return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
+	if imageSubPath := extraMount.GetImageSubPath(); imageSubPath != "" {
+		mountPoint, err := ensureImageSubPath(target, imageSubPath)
+		if err != nil {
+			return fmt.Errorf("failed to ensure image subpath %q in %q: %w", imageSubPath, target, err)
+		}
+		target = mountPoint
 	}
 
 	extraMount.HostPath = target
@@ -193,4 +200,30 @@ func (c *criService) cleanupImageMounts(
 		return fmt.Errorf("failed to remove directory to cleanup image volume mounts: %w", err)
 	}
 	return nil
+}
+
+// ensureImageSubPath ensures the subPath exists **within** the mountPoint (i.e.
+// not escape outside of mountPoint) and is not a symlink file.
+// It returns the final absolute path of `subPath`.
+func ensureImageSubPath(mountPoint, subPath string) (string, error) {
+	if subPath == "" {
+		return mountPoint, nil
+	}
+
+	file, err := os.OpenInRoot(mountPoint, subPath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	if stat.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("subPath %q in %q is a symlink", subPath, mountPoint)
+	}
+
+	return file.Name(), nil
+
 }
