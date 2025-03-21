@@ -111,6 +111,8 @@ type Store struct {
 	containers map[string]Container
 	idIndex    *truncindex.TruncIndex
 	labels     *label.Store
+	// check containers are all added when restart
+	Added chan struct{}
 }
 
 // NewStore creates a container store.
@@ -119,6 +121,7 @@ func NewStore(labels *label.Store) *Store {
 		containers: make(map[string]Container),
 		idIndex:    truncindex.NewTruncIndex([]string{}),
 		labels:     labels,
+		Added:      make(chan struct{}),
 	}
 }
 

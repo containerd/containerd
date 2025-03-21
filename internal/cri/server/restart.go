@@ -190,7 +190,7 @@ func (c *criService) recover(ctx context.Context) error {
 	if err := eg.Wait(); err != nil {
 		return err
 	}
-
+	close(c.containerStore.Added)
 	// Recover all images.
 	if err := c.ImageService.CheckImages(ctx); err != nil {
 		return fmt.Errorf("failed to check images: %w", err)
@@ -383,8 +383,11 @@ func (c *criService) loadContainer(ctx context.Context, cntr containerd.Containe
 					status.ExitCode = unknownExitCode
 					status.Reason = unknownExitReason
 				} else {
-					// Start exit monitor.
-					c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
+					go func() {
+						<-c.containerStore.Added
+						// Start exit monitor.
+						c.startContainerExitMonitor(context.Background(), id, status.Pid, exitCh)
+					}()
 				}
 			case containerd.Stopped:
 				// Task is stopped. Update status and delete the task.
