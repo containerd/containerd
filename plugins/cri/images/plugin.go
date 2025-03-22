@@ -73,13 +73,12 @@ func init() {
 
 			options := &images.CRIImageServiceOptions{
 				Content:          mdb.ContentStore(),
-				Images:           metadata.NewImageStore(mdb),
 				RuntimePlatforms: map[string]images.ImagePlatform{},
 				Snapshotters:     map[string]snapshots.Snapshotter{},
 				ImageFSPaths:     map[string]string{},
 			}
 
-			options.Client, err = containerd.New(
+			ctrdCli, err := containerd.New(
 				"",
 				containerd.WithDefaultNamespace(constants.K8sContainerdNamespace),
 				containerd.WithDefaultPlatform(platforms.Default()),
@@ -88,6 +87,8 @@ func init() {
 			if err != nil {
 				return nil, fmt.Errorf("unable to init client for cri image service: %w", err)
 			}
+			options.Images = ctrdCli.ImageService()
+			options.Client = ctrdCli
 
 			allSnapshotters := mdb.Snapshotters()
 			defaultSnapshotter := config.Snapshotter
