@@ -85,7 +85,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.32.3
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	tags.cncf.io/container-device-interface v1.0.0
+	tags.cncf.io/container-device-interface v1.0.1
 )
 
 require (
@@ -144,7 +144,6 @@ require (
 	golang.org/x/time v0.7.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.32.3 // indirect
 	k8s.io/apiserver v0.32.3 // indirect
