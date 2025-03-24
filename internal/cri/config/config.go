@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/containerd/log"
@@ -152,7 +153,13 @@ type ContainerdConfig struct {
 // CniConfig contains toml config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	//
+	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
+	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
+	//
+	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
+	NetworkPluginBinDirs []string `toml:"bin_dirs" json:"binDirs"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
 	// NetworkPluginMaxConfNum is the max number of plugin config files that will
@@ -526,6 +533,28 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
 		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	}
+
+	// Validation for CNI config
+	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		warnings = append(warnings, deprecation.CRICNIBinDir)
+		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
+
+		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
+			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
+			// to avoid the unexpected conflict between the two since we don't allow setting both.
+			c.CniConfig.NetworkPluginBinDirs = nil
+		}
+		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
+			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
+			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
+			// so that we can use it in the rest of the code.
+			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
+			c.CniConfig.NetworkPluginBinDir = ""
+		}
+	}
+	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {

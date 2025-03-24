@@ -23,6 +23,10 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 )
 
+func defaultNetworkPluginBinDirs() []string {
+	return []string{filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin")}
+}
+
 func DefaultImageConfig() ImageConfig {
 	return ImageConfig{
 		Snapshotter:            defaults.DefaultSnapshotter,
@@ -42,7 +46,7 @@ func DefaultImageConfig() ImageConfig {
 func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{
 		CniConfig: CniConfig{
-			NetworkPluginBinDir:        filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "bin"),
+			NetworkPluginBinDirs:       defaultNetworkPluginBinDirs(),
 			NetworkPluginConfDir:       filepath.Join(os.Getenv("ProgramFiles"), "containerd", "cni", "conf"),
 			NetworkPluginMaxConfNum:    1,
 			NetworkPluginSetupSerially: false,

@@ -52,6 +52,49 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
 		},
+		"specify both cni.bin_dir and cni_bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir:  "/opt/mycni/bin",
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			runtimeExpectedErr: "`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time",
+			warnings:           []deprecation.Warning{deprecation.CRICNIBinDir},
+		},
+		"cni.bin_dir, if used, is moved to cni.bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir: "/opt/mycni/bin",
+				},
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRICNIBinDir},
+		},
 
 		"deprecated auths": {
 			runtimeConfig: &RuntimeConfig{
@@ -259,6 +302,7 @@ func TestValidateConfig(t *testing.T) {
 			if test.runtimeConfig != nil {
 				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
+					assert.Error(t, err)
 					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {
 					assert.NoError(t, err)
