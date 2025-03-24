@@ -139,6 +139,7 @@ func (c *criService) mutateImageMount(
 		return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 	}
 
+	mounts = addVolatileOptionOnImageVolumeMount(mounts)
 	if err := mount.All(mounts, target); err != nil {
 		return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 	}

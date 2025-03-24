@@ -559,6 +559,15 @@ func (pCtx *podTCtx) dataDir() string {
 	return filepath.Join(rootDir, "sandboxes", pCtx.id)
 }
 
+// imageVolumeDir returns the image volume directory for this pod.
+func (pCtx *podTCtx) imageVolumeDir() string {
+	t := pCtx.t
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+	stateDir := cfg["stateDir"].(string)
+	return filepath.Join(stateDir, "image-volumes", pCtx.id)
+}
+
 // stop stops that pod.
 func (pCtx *podTCtx) stop(remove bool) {
 	t := pCtx.t
