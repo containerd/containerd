@@ -39,12 +39,12 @@ RemoveStartingProcess(shim, id) == [ shim EXCEPT
 StartNewTask(shim, taskId) ==
     AddSubscriber(AddStartingProcess(shim, taskId), taskId)
 
-IncPendingExecs(shim) == [ shim EXCEPT 
-        !.pendingExecs = shim.pendingExecs+1
+IncRunningExecs(shim) == [ shim EXCEPT 
+        !.runningExecs = shim.runningExecs+1
     ]
 
-DecPendingExecs(shim) == [ shim EXCEPT 
-        !.pendingExecs = shim.pendingExecs-1
+DecRunningExecs(shim) == [ shim EXCEPT 
+        !.runningExecs = shim.runningExecs-1
     ]
 -------------------------------------------------------------------------------
 
@@ -68,10 +68,11 @@ InitStart ==
 ExecStart ==
     /\ UNCHANGED << events, exits >>
     /\ { t \in tasks : t.type = init /\ t.state = running } # { }
+    /\ shimState.containerInitExit = {}
     /\ \E tsk \in { t \in tasks : t.state = unstarted } :
         /\ UpdateTasks(tsk :> [tsk EXCEPT !.state = starting])
         /\ AddProcess(NewProcess(tsk.id, exec))
-        /\ shimState' = StartNewTask(IncPendingExecs(shimState), tsk.id)
+        /\ shimState' = StartNewTask(IncRunningExecs(shimState), tsk.id)
 
 (* After a process has started, it either:
     - failed to start, in which case we update `tasks' 
@@ -106,33 +107,25 @@ HandleStarted(startingProcess) ==
                                             RemoveSubscriber(AddRunning(shimState, process.pid), process.id), process.id)
                                     /\ UpdateTasks(task :> [task EXCEPT !.state = running ])
             ELSE 
-                /\  LET newShimState == DecPendingExecs(shimState)
-                    IN  /\ \E subscriber \in { s \in shimState.exitSubscribers : s.id = process.id }:
-                            /\  IF process.state = failed
-                                THEN \* process failed to start
+                /\ \E subscriber \in { s \in shimState.exitSubscribers : s.id = process.id }:
+                    /\  IF process.state = failed
+                        THEN \* process failed to start
+                            /\ UNCHANGED events
+                            /\ shimState' = DecRunningExecs(RemoveStartingProcess(
+                                RemoveSubscriber(shimState, process.id), process.id))
+                            /\ UpdateTasks(task :> [task EXCEPT !.state = failed])
+                        ELSE \* start was successful and we have a pid
+                            /\  IF Cardinality({ exit \in subscriber.exits : exit = process.pid }) > 0
+                                THEN \* we received an exit in the meantime for this pid
+                                    /\ PublishEvents(<<NewEvent(process.pid, taskStart), NewEvent(process.pid, taskExit)>>)
+                                    /\ shimState' = DecRunningExecs(
+                                        RemoveStartingProcess(RemoveSubscriber(shimState, process.id), process.id))
+                                    /\ UpdateTasks(task :> [task EXCEPT !.state = exited ])
+                                ELSE \* no exit received, add to running
+                                    /\ PublishEvents(<<NewEvent(process.pid, taskStart)>>)
                                     /\ shimState' = RemoveStartingProcess(
-                                        RemoveSubscriber(newShimState, process.id), process.id)
-                                    /\ UpdateTasks(task :> [task EXCEPT !.state = failed])
-                                    /\  IF Cardinality({ exit \in subscriber.exits : exit = 1}) # 0 /\ shimState.pendingExecs = 1 
-                                        THEN /\ PublishEvents(<<NewEvent(1, taskExit)>>)
-                                        ELSE /\ UNCHANGED events
-                                ELSE \* start was successful and we have a pid
-                                    /\  IF Cardinality({ exit \in subscriber.exits : exit = process.pid }) > 0
-                                        THEN \* we received an exit in the meantime for this pid
-                                            /\  IF Cardinality({ exit \in subscriber.exits : exit = 1}) # 0 /\ shimState.pendingExecs = 1 THEN
-                                                    /\ PublishEvents(<<
-                                                        NewEvent(process.pid, taskStart), 
-                                                        NewEvent(process.pid, taskExit),
-                                                        NewEvent(1, taskExit)>>)
-                                                ELSE
-                                                    /\ PublishEvents(<<NewEvent(process.pid, taskStart), NewEvent(process.pid, taskExit)>>)
-                                            /\ shimState' = RemoveStartingProcess(RemoveSubscriber(shimState, process.id), process.id)
-                                            /\ UpdateTasks(task :> [task EXCEPT !.state = exited ])
-                                        ELSE \* no exit received, add to running
-                                            /\ PublishEvents(<<NewEvent(process.pid, taskStart)>>)
-                                            /\ shimState' = RemoveStartingProcess(RemoveSubscriber(
-                                                AddRunning(newShimState, process.pid), process.id), process.id)
-                                            /\ UpdateTasks(task :> [task EXCEPT !.state = running ])
+                                            RemoveSubscriber(AddRunning(shimState, process.pid), process.id), process.id)
+                                    /\ UpdateTasks(task :> [task EXCEPT !.state = running ])
 
 HandleProcessExit(exit, task) ==
     /\ UpdateTasks(task :> [ task EXCEPT !.state = exited ])
@@ -147,17 +140,20 @@ HandleExit(exit) ==
             \E p \in { q \in processes : q.pid = exit }:
                     \E tsk \in { q \in tasks: q.id = p.id }:
                         IF tsk.type = exec THEN
-                            /\ shimState' = BroadcastExit(RemoveRunning(shimState, exit), exit)
+                            /\ shimState' = DecRunningExecs(
+                                BroadcastExit(RemoveRunning(shimState, exit), exit))
                             /\ HandleProcessExit(exit, tsk)
                         ELSE
-                            /\ IF shimState.pendingExecs = 0 THEN
+                            /\ IF shimState.runningExecs = 0 THEN
                                     /\ shimState' = BroadcastExit(
                                         RemoveRunning(shimState, exit), exit)
                                     /\ HandleProcessExit(exit, tsk)
                                 ELSE
                                     /\ UNCHANGED << events, tasks >>
                                     /\ shimState' = BroadcastExit(RemoveRunning(
-                                        shimState, exit), exit)
+                                        [ shimState EXCEPT 
+                                            !.containerInitExit = shimState.containerInitExit \cup {exit}
+                                        ], exit), exit)
 
 \* Processes that have been started, and we can now call `HandleStarted' for:
 LOCAL startedProcesses ==
@@ -171,6 +167,13 @@ ShimService ==
     \/ \E startingProcess \in startedProcesses:
         /\ HandleStarted(startingProcess)
     \/ NextExit(HandleExit)
+    \/ \E initExit \in shimState.containerInitExit:
+        /\ UNCHANGED << exits, processes, shimState >>
+        /\ shimState.runningExecs = 0
+        /\ \E p \in { p \in processes: p.pid = initExit}: 
+            /\ \E task \in { t \in tasks: t.id = p.id /\ t.state = running }:
+                /\ PublishEvents(<<NewEvent(initExit, taskExit)>>)
+                /\ UpdateTasks(task :> [task EXCEPT !.state = exited])
 
 
 =============================================================================
@@ -203,7 +206,8 @@ Init ==
         running |-> {},
         startingProcesses |-> {},
         exitSubscribers |-> {},
-        pendingExecs |-> 0
+        runningExecs |-> 0,
+        containerInitExit |-> {}
     ]
 
 Next ==
