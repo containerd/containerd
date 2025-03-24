@@ -46,7 +46,7 @@ func (p *podSandboxEventHandler) HandleEvent(any interface{}) error {
 		log.L.Infof("TaskExit event in podsandbox handler %+v", e)
 		// Use ID instead of ContainerID to rule out TaskExit event for exec.
 		sb := p.controller.store.Get(e.ID)
-		if sb == nil {
+		if sb == nil || sb.Container == nil {
 			return nil
 		}
 		ctx := ctrdutil.NamespacedContext()
