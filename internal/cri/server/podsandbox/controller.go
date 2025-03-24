@@ -189,6 +189,10 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 // handleSandboxTaskExit handles TaskExit event for sandbox.
 func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
+	if sb.Container == nil {
+		log.G(ctx).Warnf("sb container is nill in sandbox %s", sb.ID)
+		return nil
+	}
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
