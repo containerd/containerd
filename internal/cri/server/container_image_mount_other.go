@@ -18,10 +18,27 @@
 
 package server
 
-import "github.com/containerd/containerd/v2/core/mount"
+import (
+	"fmt"
+	"os"
+
+	"github.com/containerd/containerd/v2/core/mount"
+)
 
 // addVolatileOptionOnImageVolumeMount is no-op on non-linux platforms.
 func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 	// no-op
 	return mounts
+}
+
+// ensureImageVolumeMounted ensures target volume is mounted.
+func ensureImageVolumeMounted(target string) (bool, error) {
+	_, err := os.Stat(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat %s: %w", target, err)
+	}
+	return true, nil
 }

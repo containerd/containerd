@@ -17,14 +17,19 @@
 package integration
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/integration/images"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/stretchr/testify/require"
+	criruntime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestImageVolumeCheckVolatileOption(t *testing.T) {
@@ -37,7 +42,7 @@ func TestImageVolumeCheckVolatileOption(t *testing.T) {
 		t.Skip("Skip since kernel version < 5.10")
 	}
 
-	containerImage := "ghcr.io/containerd/alpine:3.14.0"
+	containerImage := images.Get(images.Alpine)
 	podCtx, _ := setupRunningContainerWithImageVolume(t, "", containerImage, containerImage, "/alpine")
 	t.Cleanup(func() {
 		podCtx.stop(true)
@@ -54,4 +59,80 @@ func TestImageVolumeCheckVolatileOption(t *testing.T) {
 	require.Equal(t, mpInfo.Mountpoint, imageVolumeMount)
 	require.Equal(t, "overlay", mpInfo.FSType)
 	require.Contains(t, strings.Split(mpInfo.VFSOptions, ","), "volatile")
+}
+
+func TestImageVolumeSetupIfContainerdRestarts(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+
+	alpineImage := images.Get(images.Alpine)
+	pullImagesByCRI(t, imageService, alpineImage)
+
+	img, err := containerdClient.GetImage(ctx, alpineImage)
+	require.NoError(t, err)
+
+	diffIDs, err := img.RootFS(ctx)
+	require.NoError(t, err)
+
+	alpineImageChainID := identity.ChainID(diffIDs).String()
+	alpineImageTarget := img.Target().Digest.Encoded()
+
+	snSrv := containerdClient.SnapshotService("overlayfs")
+	for _, tc := range []struct {
+		name                  string
+		beforeCreateContainer func(t *testing.T, podCtx *podTCtx)
+	}{
+		{
+			name: "create target snapshot first",
+			beforeCreateContainer: func(t *testing.T, podCtx *podTCtx) {
+				target := filepath.Join(podCtx.imageVolumeDir(), alpineImageTarget)
+
+				_, err := snSrv.Prepare(ctx, target, alpineImageChainID)
+				require.NoError(t, err)
+			},
+		},
+		{
+			name: "create target snapshot/dir first",
+			beforeCreateContainer: func(t *testing.T, podCtx *podTCtx) {
+				target := filepath.Join(podCtx.imageVolumeDir(), alpineImageTarget)
+
+				_, err := snSrv.Prepare(ctx, target, alpineImageChainID)
+				require.NoError(t, err)
+
+				require.NoError(t, os.MkdirAll(target, 0755))
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			podCtx := newPodTCtx(t, runtimeService, t.Name(), "image-voloume")
+
+			defer func() {
+				podCtx.stop(true)
+			}()
+
+			targetVolumeMount := filepath.Join(podCtx.imageVolumeDir(), alpineImageTarget)
+
+			tc.beforeCreateContainer(t, podCtx)
+
+			podCtx.createContainer("running-1",
+				alpineImage,
+				criruntime.ContainerState_CONTAINER_RUNNING,
+				WithCommand("sleep", "1d"),
+				WithImageVolumeMount(alpineImage, "/alpine-2"))
+
+			mpInfo1, err := mount.Lookup(targetVolumeMount)
+			require.NoError(t, err)
+			require.Equal(t, targetVolumeMount, mpInfo1.Mountpoint)
+
+			podCtx.createContainer("running-2",
+				alpineImage,
+				criruntime.ContainerState_CONTAINER_RUNNING,
+				WithCommand("sleep", "1d"),
+				WithImageVolumeMount(alpineImage, "/alpine-2"))
+
+			mpInfo2, err := mount.Lookup(targetVolumeMount)
+			require.NoError(t, err)
+
+			require.Equal(t, mpInfo1, mpInfo2, "should not mount twice")
+		})
+	}
 }

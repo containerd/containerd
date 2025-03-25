@@ -19,6 +19,8 @@
 package server
 
 import (
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/containerd/containerd/v2/core/mount"
@@ -64,4 +66,27 @@ func addVolatileOptionOnImageVolumeMount(mounts []mount.Mount) []mount.Mount {
 		mounts[i].Options = append(mounts[i].Options, "volatile")
 	}
 	return mounts
+}
+
+// ensureImageVolumeMounted ensures target volume is mounted.
+//
+// NOTE: Currently, kubelet creates containers in pod sequencially. It won't
+// cause multiple mountpoints on same target path.
+func ensureImageVolumeMounted(target string) (bool, error) {
+	_, err := os.Stat(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to stat %s: %w", target, err)
+	}
+	mpInfo, err := mount.Lookup(target)
+	if err != nil {
+		return false, fmt.Errorf("failed to check %s mountpoint: %w", target, err)
+	}
+
+	if mpInfo.Mountpoint != target {
+		return false, nil
+	}
+	return true, nil
 }
