@@ -22,11 +22,13 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/integration/images"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/errdefs"
 	"github.com/opencontainers/image-spec/identity"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/stretchr/testify/require"
@@ -34,6 +36,9 @@ import (
 )
 
 func TestImageVolumeBasic(t *testing.T) {
+	ctx := namespaces.WithNamespace(context.Background(), "k8s.io")
+
+	snSrv := containerdClient.SnapshotService("overlayfs")
 	for _, tc := range []struct {
 		name                              string
 		containerImage                    string
@@ -79,9 +84,36 @@ func TestImageVolumeBasic(t *testing.T) {
 			}
 
 			podCtx, cnID := setupRunningContainerWithImageVolume(t, tc.selinuxLevel, tc.containerImage, tc.imageVolumeImage, tc.imageVolumePath)
-			t.Cleanup(func() {
+
+			cleanup := true
+			defer func() {
+				if cleanup {
+					podCtx.stop(true)
+				}
+			}()
+
+			volumeImg, err := containerdClient.GetImage(ctx, tc.imageVolumeImage)
+			require.NoError(t, err)
+
+			volumeImgTarget := filepath.Join(podCtx.imageVolumeDir(), volumeImg.Target().Digest.Encoded())
+			_, err = snSrv.Mounts(ctx, volumeImgTarget)
+			require.NoError(t, err)
+
+			defer func() {
 				podCtx.stop(true)
-			})
+
+				cleanup = false
+
+				t.Log("Check snapshot after deleting pod")
+				for i := 0; i < 30; i++ {
+					_, err := snSrv.Mounts(ctx, volumeImgTarget)
+					if errdefs.IsNotFound(err) {
+						return
+					}
+					time.Sleep(1 * time.Second)
+				}
+				t.Fatalf("%s should be deleted", volumeImgTarget)
+			}()
 
 			stdout, stderr, err := runtimeService.ExecSync(cnID, tc.execSyncCommands, 0)
 			if tc.execSyncError != "" {
