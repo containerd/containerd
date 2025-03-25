@@ -90,6 +90,18 @@ type containerMemoryMetrics struct {
 	PgMajFault   uint64
 }
 
+type containerNetworkMetrics struct {
+	Name      string
+	RxBytes   uint64
+	RxPackets uint64
+	RxErrors  uint64
+	RxDropped uint64
+	TxBytes   uint64
+	TxPackets uint64
+	TxErrors  uint64
+	TxDropped uint64
+}
+
 // gives the metrics for a given container in a sandbox
 func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*runtime.ContainerMetrics, error) {
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
@@ -166,9 +178,9 @@ func (c *criService) cpuMetrics(ctx context.Context, stats interface{}) (*contai
 				UserUsec:           metrics.CPU.UserUsec * 1000,
 				SystemUsec:         metrics.CPU.SystemUsec * 1000,
 				UsageUsec:          metrics.CPU.UsageUsec * 1000,
-				NRPeriods:          metrics.CPU.NRPeriods * 1000,
-				NRThrottledPeriods: metrics.CPU.NRThrottled * 1000,
-				ThrottledUsec:      metrics.CPU.ThorttledUsec * 1000,
+				NRPeriods:          metrics.CPU.NrPeriods * 1000,
+				NRThrottledPeriods: metrics.CPU.NrThrottled * 1000,
+				ThrottledUsec:      metrics.CPU.ThrottledUsec * 1000,
 			}, nil
 		}
 	default:
@@ -220,6 +232,43 @@ func (c *criService) memoryMetrics(ctx context.Context, stats interface{}) (*con
 		return cm, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
+}
+
+func (c *criService) networkMetrics(ctx context.Context, stats interface{}) ([]containerNetworkMetrics, error) {
+	var cm []containerNetworkMetrics
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		for _, m := range metrics.Network {
+			cm = append(cm, containerNetworkMetrics{
+				Name:      m.Name,
+				RxBytes:   m.RxBytes,
+				TxBytes:   m.TxBytes,
+				RxErrors:  m.RxErrors,
+				TxErrors:  m.TxErrors,
+				RxDropped: m.RxDropped,
+				TxDropped: m.TxDropped,
+				RxPackets: m.RxPackets,
+				TxPackets: m.TxPackets,
+			})
+		}
+		return cm, nil
+	case *cg2.Metrics:
+		for _, m := range metrics.Network {
+			cm = append(cm, containerNetworkMetrics{
+				Name:      m.Name,
+				RxBytes:   m.RxBytes,
+				TxBytes:   m.TxBytes,
+				RxErrors:  m.RxErrors,
+				TxErrors:  m.TxErrors,
+				RxDropped: m.RxDropped,
+				TxDropped: m.TxDropped,
+				RxPackets: m.RxPackets,
+				TxPackets: m.TxPackets,
+			})
+		}
+		return cm, nil
 	}
 	return nil, nil
 }
