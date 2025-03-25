@@ -398,7 +398,11 @@ func NewBinaryIO(ctx context.Context, attach bool, id string, uri *url.URL) (_ r
 				}
 			}
 		}()
-		return nil, binaryFifos, nil
+		return &binaryIO{
+			cmd: cmd,
+			out: binaryOut,
+			err: binarySerr,
+		}, binaryFifos, nil
 	}
 
 	return &binaryIO{
