@@ -380,7 +380,6 @@ func (c *Container) Exec(ctx context.Context, r *task.ExecProcessRequest) (proce
 	process, err := c.process.(*process.Init).Exec(ctx, c.Bundle, &process.ExecConfig{
 		ID:       r.ExecID,
 		Terminal: r.Terminal,
-		Attach:   r.Attach,
 		Stdin:    r.Stdin,
 		Stdout:   r.Stdout,
 		Stderr:   r.Stderr,
