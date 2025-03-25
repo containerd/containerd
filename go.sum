@@ -35,6 +35,8 @@ github.com/containerd/btrfs/v2 v2.0.0 h1:FN4wsx7KQrYoLXN7uLP0vBV4oVWHOIKDRQ1G2Z0
 github.com/containerd/btrfs/v2 v2.0.0/go.mod h1:swkD/7j9HApWpzl8OHfrHNxppPd9l44DFZdF94BUj9k=
 github.com/containerd/cgroups/v3 v3.0.5 h1:44na7Ud+VwyE7LIoJ8JTNQOa549a8543BmzaJHo6Bzo=
 github.com/containerd/cgroups/v3 v3.0.5/go.mod h1:SA5DLYnXO8pTGYiAHXz94qvLQTKfVM5GEVisn4jpins=
+github.com/containerd/cgroups/v3 v3.0.6-0.20250325165333-32dca2330c42 h1:PRLMilsvp13B32IfygVLOb9qGzWh21Eh6Yj6HMZ5hlQ=
+github.com/containerd/cgroups/v3 v3.0.6-0.20250325165333-32dca2330c42/go.mod h1:SA5DLYnXO8pTGYiAHXz94qvLQTKfVM5GEVisn4jpins=
 github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn4ro=
 github.com/containerd/console v1.0.4/go.mod h1:YynlIjWYF8myEu6sdkwKIvGQq+cOckRm6So2avqoYAk=
 github.com/containerd/containerd/api v1.9.0 h1:HZ/licowTRazus+wt9fM6r/9BQO7S0vD5lMcWspGIg0=
