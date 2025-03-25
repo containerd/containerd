@@ -54,7 +54,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/opencontainers/runtime-tools v0.9.1-0.20221107090550-2e043c6bd626
-	github.com/opencontainers/selinux v1.11.1
+	github.com/opencontainers/selinux v1.12.0
 	github.com/pelletier/go-toml/v2 v2.2.3
 	github.com/prometheus/client_golang v1.21.1
 	github.com/sirupsen/logrus v1.9.3
