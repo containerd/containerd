@@ -409,7 +409,6 @@ func (p *Init) exec(ctx context.Context, path string, r *ExecConfig) (Process, e
 			Stderr:   r.Stderr,
 			Terminal: r.Terminal,
 		},
-		attach:    r.Attach,
 		waitBlock: make(chan struct{}),
 	}
 	e.execState = &execCreatedState{p: e}

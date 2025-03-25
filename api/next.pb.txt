@@ -6523,8 +6523,15 @@ file {
       json_name: "terminal"
     }
     field {
-      name: "checkpoint"
+      name: "attach"
       number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "checkpoint"
+      number: 9
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Descriptor"
@@ -6532,7 +6539,7 @@ file {
     }
     field {
       name: "options"
-      number: 9
+      number: 10
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
@@ -6540,7 +6547,7 @@ file {
     }
     field {
       name: "runtime_path"
-      number: 10
+      number: 11
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "runtimePath"
