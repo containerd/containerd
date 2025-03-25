@@ -68,14 +68,19 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 	if mnt.Type == "bind" || mnt.Type == "erofs" {
 		layer = filepath.Dir(mnt.Source)
 	} else if mnt.Type == "overlay" {
-		layer = ""
+		toplower := ""
 		for _, o := range mnt.Options {
 			if strings.HasPrefix(o, "upperdir=") {
 				layer = filepath.Dir(strings.TrimPrefix(o, "upperdir="))
+			} else if strings.HasPrefix(o, "lowerdir=") {
+				toplower = filepath.Dir(strings.Split(strings.TrimPrefix(o, "lowerdir="), ":")[0])
 			}
 		}
 		if layer == "" {
-			return "", fmt.Errorf("unsupported overlay layer for erofs differ: %w", errdefs.ErrNotImplemented)
+			if toplower == "" {
+				return "", fmt.Errorf("unsupported overlay layer for erofs differ: %w", errdefs.ErrNotImplemented)
+			}
+			layer = toplower
 		}
 	} else {
 		return "", fmt.Errorf("invalid filesystem type for erofs differ: %w", errdefs.ErrNotImplemented)
