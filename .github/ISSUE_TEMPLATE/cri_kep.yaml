@@ -1,0 +1,58 @@
+name: SIG-Node Integration
+description: Tracking issue for SIG-Node integration work (including KEPs)
+title: "[SIG-Node]: <KEP-number - Short Description>"
+labels:
+  - kind/feature
+  - area/cri
+assignees:
+  - mikebrow
+  - fuweid
+  - samuelkarp
+body:
+  - type: textarea
+    attributes:
+      label: KEP/SIG-Node References
+      description: |
+        example:
+          - **KEP**: #
+          - **stage**: alpha|beta w/gate off|beta w/gate on|ga
+          - **KEP-Issue**: link
+          - **KEP-PR**: link
+          - **K8s-Release**: version where the KEP stage is scheduled to release or has released
+          - **KEP-Owner: id(s) SIG-Node member(s) that own the KEP of reference
+          - **SIG-Node member liaison: containerd maintainer(s) ensuring interop with sig-node
+          - **KEP-Shepherd: containerd owner assigned to this issue
+      value: |
+          - KEP(s):
+          - stage:
+          - KEP Issue:
+          - KEP PR:
+          - K8s-Release:
+          - KEP-Owner:
+          - SIG-Node member liason:
+          - KEP-Shepherd:
+    render: markdown
+    validations:
+      required: false
+
+  - type: textarea
+    attributes:
+      label: What is the SIG-Node problem you are trying to solve
+      description: |
+        A clear and concise description of the reason for the change(s) required in containerd.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Describe the solution you would like
+      description: |
+        A clear and concise description of design considerations that should be made when making the change(s).
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional context
+      description: |
+        Add any other context about the needed change here.
