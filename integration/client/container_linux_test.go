@@ -1090,6 +1090,19 @@ func TestContainerRuntimeOptionsv2(t *testing.T) {
 	if !strings.Contains(err.Error(), `"no-runc"`) {
 		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
 	}
+
+	// It doesn't matter what the NewTaskOpts function is. We are using an existing function in the client package,
+	// which will cause the TaskOptions in the new task request to be non-empty.
+	// https://github.com/containerd/containerd/issues/11568
+	task, err = container.NewTask(ctx, empty(), WithNoNewKeyring)
+	if err == nil {
+		t.Errorf("task creation should have failed")
+		task.Delete(ctx)
+		return
+	}
+	if !strings.Contains(err.Error(), `"no-runc"`) {
+		t.Errorf("task creation should have failed because of lack of executable. Instead failed with: %v", err.Error())
+	}
 }
 
 func TestContainerKillInitPidHost(t *testing.T) {
