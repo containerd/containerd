@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/cgroups/v3"
 	"github.com/containerd/cgroups/v3/cgroup1"
 	cgroupsv2 "github.com/containerd/cgroups/v3/cgroup2"
+	"github.com/containerd/containerd/v2/internal/nlwrap"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containernetworking/plugins/pkg/ns"
@@ -141,7 +142,7 @@ type interfaceStats struct {
 func getContainerNetIO(ctx context.Context, netNsPath string) (netlink.LinkStatistics64, error) {
 	var stats netlink.LinkStatistics64
 	err := ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
-		link, err := netlink.LinkByName(defaultIfName)
+		link, err := nlwrap.LinkByName(defaultIfName)
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("unable to retrieve network namespace stats for netNsPath: %v, interface: %v", netNsPath, defaultIfName)
 			return err
@@ -160,7 +161,7 @@ func getContainerNetIO(ctx context.Context, netNsPath string) (netlink.LinkStati
 func getAllContainerNetIO(ctx context.Context, netNsPath string) ([]interfaceStats, error) {
 	var allStats []interfaceStats
 	err := ns.WithNetNSPath(netNsPath, func(_ ns.NetNS) error {
-		links, err := netlink.LinkList()
+		links, err := nlwrap.LinkList()
 		if err != nil {
 			log.G(ctx).WithError(err).Errorf("unable to list network interfaces for netNsPath: %v", netNsPath)
 			return err
