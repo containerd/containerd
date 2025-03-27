@@ -31,7 +31,6 @@ body:
           - KEP-Owner:
           - SIG-Node member liason:
           - KEP-Shepherd:
-    render: markdown
     validations:
       required: false
 
