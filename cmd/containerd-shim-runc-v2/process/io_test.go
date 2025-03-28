@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 func TestNewBinaryIO(t *testing.T) {
@@ -35,7 +36,7 @@ func TestNewBinaryIO(t *testing.T) {
 
 	before := descriptorCount(t)
 
-	io, err := NewBinaryIO(ctx, "1", uri)
+	io, _, err := NewBinaryIO(ctx, false, "1", uri)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,12 +52,31 @@ func TestNewBinaryIO(t *testing.T) {
 	}
 }
 
+func TestNewAttachableBinaryIO(t *testing.T) {
+	testutil.RequiresRoot(t)
+
+	ctx := namespaces.WithNamespace(context.Background(), "test")
+	uri, _ := url.Parse("binary:///bin/echo?test")
+
+	before := descriptorCount(t)
+
+	_, _, err := NewBinaryIO(ctx, true, "1", uri)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	after := descriptorCount(t)
+	if after != before+9 {
+		t.Fatalf("descriptors weren't created correctly (%d != %d -1)", before, after)
+	}
+}
+
 func TestNewBinaryIOCleanup(t *testing.T) {
 	ctx := namespaces.WithNamespace(context.Background(), "test")
 	uri, _ := url.Parse("binary:///not/existing")
 
 	before := descriptorCount(t)
-	_, err := NewBinaryIO(ctx, "2", uri)
+	_, _, err := NewBinaryIO(ctx, false, "2", uri)
 	if err == nil {
 		t.Fatal("error expected for invalid binary")
 	}

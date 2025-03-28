@@ -40,6 +40,8 @@ var bufPool = sync.Pool{
 type Config struct {
 	// Terminal is true if one has been allocated
 	Terminal bool
+	// Attach is true if the IO provide an attachable FIFO
+	Attach bool
 	// Stdin path
 	Stdin string
 	// Stdout path

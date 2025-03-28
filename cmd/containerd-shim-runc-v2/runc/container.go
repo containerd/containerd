@@ -85,6 +85,7 @@ func NewContainer(ctx context.Context, platform stdio.Platform, r *task.CreateTa
 		Runtime:          opts.BinaryName,
 		Rootfs:           pmounts,
 		Terminal:         r.Terminal,
+		Attach:           r.Attach,
 		Stdin:            r.Stdin,
 		Stdout:           r.Stdout,
 		Stderr:           r.Stderr,
