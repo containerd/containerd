@@ -49,6 +49,13 @@ func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
 		return nil, err
 	}
 
+	fileInfo, err := os.Stat(path)
+	if err == nil && fileInfo.IsDir() {
+		// This issue occurred because users bound /run/containerd/containerd.sock into a container and set the hostPath volume type to empty.
+		// see https://github.com/containerd/containerd/issues/11609.
+		return nil, fmt.Errorf("path %s is a directory", path)
+	}
+
 	l, err := CreateUnixSocket(path)
 	if err != nil {
 		return l, err
