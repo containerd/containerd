@@ -21,7 +21,8 @@
 #
 set -eu -o pipefail
 
-CNI_COMMIT=${1:-$(go list -f "{{.Version}}" -m github.com/containernetworking/plugins)}
+# FIXME: when https://github.com/containernetworking/plugins/issues/1121 is resolved and released
+CNI_COMMIT=${1:-v1.5.1}
 CNI_DIR=${DESTDIR:=''}/opt/cni
 CNI_CONFIG_DIR=${DESTDIR}/etc/cni/net.d
 : "${CNI_REPO:=https://github.com/containernetworking/plugins.git}"
