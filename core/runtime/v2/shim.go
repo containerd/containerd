@@ -94,9 +94,9 @@ func loadShim(ctx context.Context, bundle *Bundle, onClose func()) (_ ShimInstan
 		// To prevent flood of error messages, the expected error
 		// should be reset, like os.ErrClosed or os.ErrNotExist, which
 		// depends on platform.
-		err = checkCopyShimLogError(ctx, err)
+		err = checkCopyShimLogError(shimCtx, err)
 		if err != nil {
-			log.G(ctx).WithError(err).Error("copy shim log after reload")
+			log.G(shimCtx).WithError(err).Error("copy shim log after reload")
 		}
 	}()
 	onCloseWithShimLog := func() {
