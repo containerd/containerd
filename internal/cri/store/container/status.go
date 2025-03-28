@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/containerd/continuity"
@@ -167,6 +169,7 @@ type StatusStorage interface {
 // StoreStatus creates the storage containing the passed in container status with the
 // specified id.
 // The status MUST be created in one transaction.
+// If atomic writing fail due to no space, try use the in-place modification method, see issue 7247 for details.
 func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	data, err := status.encode()
 	if err != nil {
@@ -174,12 +177,44 @@ func StoreStatus(root, id string, status Status) (StatusStorage, error) {
 	}
 	path := filepath.Join(root, "status")
 	if err := continuity.AtomicWriteFile(path, data, 0600); err != nil {
-		return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
+		if strings.Contains(err.Error(), "no space") {
+			err = writeFileInplace(path, data, 0600)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to checkpoint status to %q: %w", path, err)
+		}
 	}
 	return &statusStorage{
 		path:   path,
 		status: status,
 	}, nil
+}
+
+// writeFileInplace writes the data to the file in-place.
+func writeFileInplace(path string, data []byte, perm os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
+	if err != nil {
+		return err
+	}
+	needClose := true
+	defer func() {
+		if needClose {
+			f.Close()
+		}
+	}()
+	n, err := f.Write(data)
+	if err == nil && n < len(data) {
+		return io.ErrShortWrite
+	}
+	if err != nil {
+		return err
+	}
+	if err = f.Sync(); err != nil {
+		return err
+	}
+
+	needClose = false
+	return f.Close()
 }
 
 // LoadStatus loads container status from checkpoint. There shouldn't be threads
@@ -274,7 +309,12 @@ func (s *statusStorage) UpdateSync(u UpdateFunc) error {
 		return fmt.Errorf("failed to encode status: %w", err)
 	}
 	if err := continuity.AtomicWriteFile(s.path, data, 0600); err != nil {
-		return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
+		if strings.Contains(err.Error(), "no space") {
+			err = writeFileInplace(s.path, data, 0600)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to checkpoint status to %q: %w", s.path, err)
+		}
 	}
 	s.status = newStatus
 	return nil
