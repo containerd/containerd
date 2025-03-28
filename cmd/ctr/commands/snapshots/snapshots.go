@@ -79,12 +79,13 @@ var listCommand = &cli.Command{
 			snapshotter = client.SnapshotService(cliContext.String("snapshotter"))
 			tw          = tabwriter.NewWriter(os.Stdout, 1, 8, 1, ' ', 0)
 		)
-		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\t")
+		fmt.Fprintln(tw, "KEY\tPARENT\tKIND\tID\t")
 		if err := snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
-			fmt.Fprintf(tw, "%v\t%v\t%v\t\n",
+			fmt.Fprintf(tw, "%v\t%v\t%v\t%v\t\n",
 				info.Name,
 				info.Parent,
-				info.Kind)
+				info.Kind,
+				info.ID)
 			return nil
 		}); err != nil {
 			return err
@@ -641,7 +642,7 @@ func printNode(name string, tree *snapshotTree, level int) {
 		prefix += "\\_"
 	}
 
-	fmt.Printf(prefix+" %s\n", node.info.Name)
+	fmt.Printf(prefix+" %s  %s\n", node.info.Name, node.info.ID)
 	level++
 	for _, child := range node.children {
 		printNode(child, tree, level)
