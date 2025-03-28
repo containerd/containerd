@@ -102,7 +102,11 @@ func (c *criService) mutateImageMount(
 	target := c.getImageVolumeHostPath(sandboxID, imageID)
 
 	// Already mounted in another container on the same pod
-	if stat, err := os.Stat(target); err == nil && stat.IsDir() {
+	mounted, err := ensureImageVolumeMounted(target)
+	if err != nil {
+		return fmt.Errorf("failed to ensure %s is mounted: %w", target, err)
+	}
+	if mounted {
 		extraMount.HostPath = target
 		return nil
 	}
@@ -126,6 +130,11 @@ func (c *criService) mutateImageMount(
 	s := c.client.SnapshotService(snapshotter)
 	mounts, err := s.Prepare(ctx, target, chainID)
 	if err != nil {
+		if errdefs.IsAlreadyExists(err) {
+			mounts, err = s.Mounts(ctx, target)
+		}
+	}
+	if err != nil {
 		return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
 	}
 	defer func() {
@@ -139,6 +148,7 @@ func (c *criService) mutateImageMount(
 		return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
 	}
 
+	mounts = addVolatileOptionOnImageVolumeMount(mounts)
 	if err := mount.All(mounts, target); err != nil {
 		return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 	}
