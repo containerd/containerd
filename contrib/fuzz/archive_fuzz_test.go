@@ -129,7 +129,7 @@ func FuzzImportIndex(f *testing.F) {
 			}
 		}
 		tmpDir := t.TempDir()
-		cs, err := local.NewStore(tmpDir)
+		cs, err := local.NewStore(tmpDir, nil)
 		if err != nil {
 			return
 		}
