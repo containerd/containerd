@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
-	"github.com/containerd/typeurl/v2"
 )
 
 // ShimConfig for the shim
@@ -239,9 +238,9 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	}
 	ctx = log.WithLogger(ctx, log.G(ctx).WithField("namespace", ns))
 
-	topts := opts.TaskOptions
-	if topts == nil || topts.GetValue() == nil {
-		topts = opts.RuntimeOptions
+	mergedOpts, err := mergeOptions(opts.RuntimeOptions, opts.TaskOptions)
+	if err != nil {
+		return nil, err
 	}
 
 	runtimePath, err := m.resolveRuntimePath(opts.Runtime)
@@ -255,7 +254,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 		ttrpcAddress: m.containerdTTRPCAddress,
 		env:          m.env,
 	})
-	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
+	shim, err := b.Start(ctx, mergedOpts, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
 		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)

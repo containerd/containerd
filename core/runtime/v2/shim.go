@@ -32,11 +32,14 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	crmetadata "github.com/checkpoint-restore/checkpointctl/lib"
 	eventstypes "github.com/containerd/containerd/api/events"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/api/types"
+	"github.com/containerd/containerd/api/types/runc/options"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/log"
@@ -561,10 +564,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 }
 
 func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime.Task, error) {
-	topts := opts.TaskOptions
-	if topts == nil || topts.GetValue() == nil {
-		topts = opts.RuntimeOptions
+	mergedOpts, err := mergeOptions(opts.RuntimeOptions, opts.TaskOptions)
+	if err != nil {
+		return nil, err
 	}
+
 	request := &task.CreateTaskRequest{
 		ID:         s.ID(),
 		Bundle:     s.Bundle(),
@@ -573,7 +577,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		Stderr:     opts.IO.Stderr,
 		Terminal:   opts.IO.Terminal,
 		Checkpoint: opts.Checkpoint,
-		Options:    typeurl.MarshalProto(topts),
+		Options:    mergedOpts,
 	}
 	for _, m := range opts.Rootfs {
 		request.Rootfs = append(request.Rootfs, &types.Mount{
@@ -584,7 +588,7 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 		})
 	}
 
-	_, err := s.task.Create(ctx, request)
+	_, err = s.task.Create(ctx, request)
 	if err != nil {
 		return nil, errgrpc.ToNative(err)
 	}
@@ -634,6 +638,26 @@ func (s *shimTask) Create(ctx context.Context, opts runtime.CreateOpts) (runtime
 	}
 
 	return s, nil
+}
+
+func mergeOptions(rOpts, tOpts typeurl.Any) (*anypb.Any, error) {
+	if tOpts == nil || tOpts.GetValue() == nil {
+		return typeurl.MarshalProto(rOpts), nil
+	}
+
+	var rOptsPb options.Options
+	if err := typeurl.UnmarshalTo(rOpts, &rOptsPb); err != nil {
+		return nil, err
+	}
+
+	tOptsAny := typeurl.MarshalProto(tOpts)
+	var tOptsPb options.Options
+	if err := tOptsAny.UnmarshalTo(&tOptsPb); err != nil {
+		return nil, err
+	}
+
+	proto.Merge(&rOptsPb, &tOptsPb)
+	return anypb.New(&rOptsPb)
 }
 
 func (s *shimTask) Pause(ctx context.Context) error {

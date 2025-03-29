@@ -22,9 +22,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/containerd/containerd/api/types/runc/options"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 	client "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/typeurl/v2"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 func TestParseStartResponse(t *testing.T) {
@@ -121,4 +127,80 @@ func TestRestoreBootstrapParams(t *testing.T) {
 
 	require.NoError(t, err)
 	require.EqualValues(t, expected, loaded)
+}
+
+func TestMergeOptions(t *testing.T) {
+	testcases := []struct {
+		name   string
+		rOpts  *options.Options
+		tOpts  *options.Options
+		expect *options.Options
+	}{
+		{
+			name: "runtime only",
+			rOpts: &options.Options{
+				BinaryName: "/path/to/custom/binary",
+			},
+			expect: &options.Options{
+				BinaryName: "/path/to/custom/binary",
+			},
+		},
+		{
+			name: "runtime and task",
+			rOpts: &options.Options{
+				BinaryName: "/path/to/custom/binary",
+			},
+			tOpts: &options.Options{
+				IoUid: 1000,
+				IoGid: 1000,
+			},
+			expect: &options.Options{
+				BinaryName: "/path/to/custom/binary",
+				IoUid:      1000,
+				IoGid:      1000,
+			},
+		},
+		{
+			name: "task takes precedence",
+			rOpts: &options.Options{
+				BinaryName: "/path/to/custom/binary",
+				IoUid:      1000,
+				IoGid:      1000,
+			},
+			tOpts: &options.Options{
+				BinaryName: "/path/to/another/binary",
+				IoUid:      2000,
+				IoGid:      2000,
+			},
+			expect: &options.Options{
+				BinaryName: "/path/to/another/binary",
+				IoUid:      2000,
+				IoGid:      2000,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			rOpts, err := typeurl.MarshalAny(tc.rOpts)
+			require.NoError(t, err)
+
+			var tOpts typeurl.Any
+			if tc.tOpts != nil {
+				tOpts, err = typeurl.MarshalAny(tc.tOpts)
+				require.NoError(t, err)
+			}
+
+			actual, err := mergeOptions(rOpts, tOpts)
+			require.NoError(t, err)
+
+			actualOpts := &options.Options{}
+			require.NoError(t, anypb.UnmarshalTo(actual, actualOpts, proto.UnmarshalOptions{}))
+			require.True(t,
+				cmp.Equal(tc.expect, actualOpts, protobuf.Compare),
+				"expect: %+v\nactual: %+v\n%s", tc.expect, actualOpts,
+				cmp.Diff(tc.expect, actualOpts, protobuf.Compare),
+			)
+		})
+	}
 }
