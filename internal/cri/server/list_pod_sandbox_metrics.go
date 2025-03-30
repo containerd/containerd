@@ -159,116 +159,120 @@ func (c *criService) toContainerMetrics(ctx context.Context, containerdID string
 }
 
 func (c *criService) cpuMetrics(ctx context.Context, stats interface{}) (*containerCPUMetrics, error) {
+	cm := &containerCPUMetrics{}
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
-		//metrics.GetCPU().GetUsage()
-		if metrics.CPU != nil && metrics.CPU.Usage != nil {
-			return &containerCPUMetrics{
-				UserUsec:           metrics.CPU.Usage.User,
-				SystemUsec:         metrics.CPU.Usage.Kernel,
-				UsageUsec:          metrics.CPU.Usage.Total,
-				NRPeriods:          metrics.CPU.Throttling.Periods,
-				NRThrottledPeriods: metrics.CPU.Throttling.ThrottledPeriods,
-				ThrottledUsec:      metrics.CPU.Throttling.ThrottledTime,
-			}, nil
+		if metrics.GetCPU() != nil {
+			if usage := metrics.GetCPU().GetUsage(); usage != nil {
+				cm.UserUsec = usage.GetUser()
+				cm.SystemUsec = usage.GetKernel()
+				cm.UsageUsec = usage.GetTotal()
+			}
+			if throttling := metrics.GetCPU().GetThrottling(); throttling != nil {
+				cm.NRPeriods = throttling.GetPeriods()
+				cm.NRThrottledPeriods = throttling.GetThrottledPeriods()
+				cm.ThrottledUsec = throttling.GetThrottledTime()
+			}
 		}
+		return cm, nil
 	case *cg2.Metrics:
-		if metrics.CPU != nil {
-			return &containerCPUMetrics{
-				UserUsec:           metrics.CPU.UserUsec * 1000,
-				SystemUsec:         metrics.CPU.SystemUsec * 1000,
-				UsageUsec:          metrics.CPU.UsageUsec * 1000,
-				NRPeriods:          metrics.CPU.NrPeriods * 1000,
-				NRThrottledPeriods: metrics.CPU.NrThrottled * 1000,
-				ThrottledUsec:      metrics.CPU.ThrottledUsec * 1000,
-			}, nil
+		if metrics.GetCPU() != nil {
+			cm.UserUsec = metrics.CPU.GetUserUsec() * 1000
+			cm.SystemUsec = metrics.CPU.GetSystemUsec() * 1000
+			cm.UsageUsec = metrics.CPU.GetUsageUsec() * 1000
+			cm.NRPeriods = metrics.CPU.GetNrPeriods() * 1000
+			cm.NRThrottledPeriods = metrics.CPU.GetNrThrottled() * 1000
+			cm.ThrottledUsec = metrics.CPU.GetThrottledUsec() * 1000
 		}
+		return cm, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
-	return nil, nil
 }
 
 func (c *criService) memoryMetrics(ctx context.Context, stats interface{}) (*containerMemoryMetrics, error) {
+	cm := &containerMemoryMetrics{}
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
-		cm := &containerMemoryMetrics{}
-		if metrics.Memory != nil && metrics.Memory.Usage != nil {
-			cm.Cache = metrics.Memory.TotalCache
-			cm.RSS = metrics.Memory.TotalRSS
-			cm.FileMapped = metrics.Memory.MappedFile
-			cm.FailCount = metrics.Memory.Usage.Failcnt
-			cm.MemoryUsage = metrics.Memory.Usage.Usage
-			cm.MaxUsage = metrics.Memory.Usage.Max
-			cm.WorkingSet = getWorkingSet(metrics.Memory)
-			cm.ActiveFile = metrics.Memory.TotalActiveFile
-			cm.InactiveFile = metrics.Memory.TotalInactiveFile
-			cm.PgFault = metrics.Memory.PgFault
-			cm.PgMajFault = metrics.Memory.PgMajFault
-			if metrics.Memory.Kernel != nil {
-				cm.KernelUsage = metrics.Memory.Kernel.Usage
+		if metrics.GetMemory() != nil {
+			cm.Cache = metrics.Memory.GetTotalCache()
+			cm.RSS = metrics.Memory.GetTotalRSS()
+			cm.FileMapped = metrics.Memory.GetMappedFile()
+			cm.ActiveFile = metrics.Memory.GetTotalActiveFile()
+			cm.InactiveFile = metrics.Memory.GetTotalInactiveFile()
+			cm.PgFault = metrics.Memory.GetPgFault()
+			cm.PgMajFault = metrics.Memory.GetPgMajFault()
+			cm.WorkingSet = getWorkingSet(metrics.GetMemory())
+			if usage := metrics.GetMemory().GetUsage(); usage != nil {
+				cm.FailCount = usage.GetFailcnt()
+				cm.MemoryUsage = usage.GetUsage()
+				cm.MaxUsage = usage.GetMax()
 			}
-			if metrics.Memory.Swap != nil {
-				cm.Swap = metrics.Memory.Swap.Usage
+			if metrics.GetMemory().GetKernel() != nil {
+				cm.KernelUsage = metrics.GetMemory().GetKernel().GetUsage()
+			}
+			if metrics.GetMemory().GetSwap() != nil {
+				cm.Swap = metrics.GetMemory().GetSwap().GetUsage()
 			}
 		}
 		return cm, nil
 	case *cg2.Metrics:
-		cm := &containerMemoryMetrics{}
-		cm.Cache = metrics.Memory.File
-		cm.RSS = metrics.Memory.Anon
-		cm.KernelUsage = metrics.Memory.KernelStack
-		cm.FileMapped = metrics.Memory.FileMapped
-		cm.Swap = metrics.Memory.SwapUsage - metrics.Memory.Usage
-		cm.MemoryUsage = metrics.Memory.Usage
-		cm.MaxUsage = metrics.Memory.MaxUsage
-		cm.WorkingSet = getWorkingSetV2(metrics.Memory)
-		cm.ActiveFile = metrics.Memory.ActiveFile
-		cm.PgFault = metrics.Memory.Pgfault
-		cm.PgMajFault = metrics.Memory.Pgmajfault
-		if metrics.MemoryEvents != nil {
-			cm.FailCount = metrics.MemoryEvents.Max
+		if metrics.GetMemory() != nil {
+			cm.Cache = metrics.GetMemory().GetFile()
+			cm.RSS = metrics.GetMemory().GetAnon()
+			cm.KernelUsage = metrics.GetMemory().GetKernelStack()
+			cm.FileMapped = metrics.GetMemory().GetFileMapped()
+			cm.Swap = metrics.GetMemory().GetSwapUsage() - metrics.GetMemory().GetUsage()
+			cm.MemoryUsage = metrics.GetMemory().GetUsage()
+			cm.MaxUsage = metrics.GetMemory().GetMaxUsage()
+			cm.ActiveFile = metrics.GetMemory().GetActiveFile()
+			cm.PgFault = metrics.GetMemory().GetPgfault()
+			cm.PgMajFault = metrics.GetMemory().GetPgmajfault()
+			cm.WorkingSet = getWorkingSetV2(metrics.Memory)
+		}
+		if metrics.GetMemoryEvents() != nil {
+			cm.FailCount = metrics.GetMemoryEvents().GetMax()
 		}
 		return cm, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
-	return nil, nil
 }
 
 func (c *criService) networkMetrics(ctx context.Context, stats interface{}) ([]containerNetworkMetrics, error) {
-	var cm []containerNetworkMetrics
+	cm := make([]containerNetworkMetrics, 0)
 	switch metrics := stats.(type) {
 	case *cg1.Metrics:
-		for _, m := range metrics.Network {
+		for _, m := range metrics.GetNetwork() {
 			cm = append(cm, containerNetworkMetrics{
-				Name:      m.Name,
-				RxBytes:   m.RxBytes,
-				TxBytes:   m.TxBytes,
-				RxErrors:  m.RxErrors,
-				TxErrors:  m.TxErrors,
-				RxDropped: m.RxDropped,
-				TxDropped: m.TxDropped,
-				RxPackets: m.RxPackets,
-				TxPackets: m.TxPackets,
+				Name:      m.GetName(),
+				RxBytes:   m.GetRxBytes(),
+				TxBytes:   m.GetTxBytes(),
+				RxErrors:  m.GetRxErrors(),
+				TxErrors:  m.GetTxErrors(),
+				RxDropped: m.GetRxDropped(),
+				TxDropped: m.GetTxDropped(),
+				RxPackets: m.GetRxPackets(),
+				TxPackets: m.GetTxPackets(),
 			})
 		}
 		return cm, nil
 	case *cg2.Metrics:
-		for _, m := range metrics.Network {
+		for _, m := range metrics.GetNetwork() {
 			cm = append(cm, containerNetworkMetrics{
-				Name:      m.Name,
-				RxBytes:   m.RxBytes,
-				TxBytes:   m.TxBytes,
-				RxErrors:  m.RxErrors,
-				TxErrors:  m.TxErrors,
-				RxDropped: m.RxDropped,
-				TxDropped: m.TxDropped,
-				RxPackets: m.RxPackets,
-				TxPackets: m.TxPackets,
+				Name:      m.GetName(),
+				RxBytes:   m.GetRxBytes(),
+				TxBytes:   m.GetTxBytes(),
+				RxErrors:  m.GetRxErrors(),
+				TxErrors:  m.GetTxErrors(),
+				RxDropped: m.GetRxDropped(),
+				TxDropped: m.GetTxDropped(),
+				RxPackets: m.GetRxPackets(),
+				TxPackets: m.GetTxPackets(),
 			})
 		}
 		return cm, nil
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
-	return nil, nil
 }
