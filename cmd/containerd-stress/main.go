@@ -29,6 +29,7 @@ import (
 	"time"
 
 	containerd "github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/integration/remote"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/plugins"
@@ -137,7 +138,7 @@ func main() {
 		&cli.StringFlag{
 			Name:    "address",
 			Aliases: []string{"a"},
-			Value:   "/run/containerd/containerd.sock",
+			Value:   defaults.DefaultAddress,
 			Usage:   "Path to the containerd socket",
 		},
 		&cli.IntFlag{

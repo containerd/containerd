@@ -49,6 +49,11 @@ import (
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
 	sbapi "github.com/containerd/containerd/api/services/sandbox/v1"
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
+	"github.com/containerd/platforms"
+	"github.com/containerd/plugin"
+	"github.com/containerd/plugin/dynamic"
+	"github.com/containerd/plugin/registry"
+
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
 	csproxy "github.com/containerd/containerd/v2/core/content/proxy"
 	"github.com/containerd/containerd/v2/core/diff"
@@ -61,13 +66,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
-	"github.com/containerd/containerd/v2/plugins/content/local"
 	"github.com/containerd/containerd/v2/plugins/services/warning"
 	"github.com/containerd/containerd/v2/version"
-	"github.com/containerd/platforms"
-	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/dynamic"
-	"github.com/containerd/plugin/registry"
 )
 
 // CreateTopLevelDirectories creates the top-level root and state directories.
@@ -87,6 +87,15 @@ func CreateTopLevelDirectories(config *srvconfig.Config) error {
 
 	if err := sys.MkdirAllWithACL(config.State, 0o711); err != nil {
 		return err
+	}
+	if config.State != defaults.DefaultStateDir {
+		// XXX: socketRoot in pkg/shim is hard-coded to the default state directory.
+		// See https://github.com/containerd/containerd/issues/10502#issuecomment-2249268582 for why it's set up that way.
+		// The default fifo directory in pkg/cio is also configured separately and defaults to the default state directory instead of the configured state directory.
+		// Make sure the default state directory is created with the correct permissions.
+		if err := sys.MkdirAllWithACL(defaults.DefaultStateDir, 0o711); err != nil {
+			return err
+		}
 	}
 
 	if config.TempDir != "" {
@@ -473,16 +482,6 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		config.PluginDir = path //nolint:staticcheck
 		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
 	}
-	// load additional plugins that don't automatically register themselves
-	registry.Register(&plugin.Registration{
-		Type: plugins.ContentPlugin,
-		ID:   "content",
-		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			root := ic.Properties[plugins.PropertyRootDir]
-			ic.Meta.Exports["root"] = root
-			return local.NewStore(root)
-		},
-	})
 
 	clients := &proxyClients{}
 	for name, pp := range config.ProxyPlugins {
@@ -511,7 +510,7 @@ func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Regist
 		case string(plugins.SandboxControllerPlugin), "sandbox":
 			t = plugins.SandboxControllerPlugin
 			f = func(conn *grpc.ClientConn) interface{} {
-				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn))
+				return sbproxy.NewSandboxController(sbapi.NewControllerClient(conn), name)
 			}
 		case string(plugins.DiffPlugin), "diff":
 			t = plugins.DiffPlugin
@@ -587,7 +586,7 @@ func (pc *proxyClients) getClient(address string) (*grpc.ClientConn, error) {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)),
 	}
 
-	conn, err := grpc.Dial(dialer.DialAddress(address), gopts...)
+	conn, err := grpc.NewClient(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}

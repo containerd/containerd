@@ -525,7 +525,6 @@ func Test_dockerPusher_push(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			desc := ocispec.Descriptor{
 				MediaType:   test.args.mediatype,

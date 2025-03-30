@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/leases"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 
@@ -30,6 +32,7 @@ import (
 // RemovePodSandbox removes the sandbox. If there are running containers in the
 // sandbox, they should be forcibly removed.
 func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodSandboxRequest) (*runtime.RemovePodSandboxResponse, error) {
+	span := tracing.SpanFromContext(ctx)
 	start := time.Now()
 	sandbox, err := c.sandboxStore.Get(r.GetPodSandboxId())
 	if err != nil {
@@ -42,8 +45,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	// Use the full sandbox id.
 	id := sandbox.ID
+	span.SetAttributes(tracing.Attribute("sandbox.id", id))
 
 	// If the sandbox is still running, not ready, or in an unknown state, forcibly stop it.
 	// Even if it's in a NotReady state, this will close its network namespace, if open.
@@ -51,6 +58,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	log.G(ctx).Infof("Forcibly stopping sandbox %q", id)
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
+	}
+
+	if err := c.client.LeasesService().Delete(ctx, leases.Lease{ID: id}); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete lease for sandbox %q: %w", id, err)
+		}
 	}
 
 	// Return error if sandbox network namespace is not closed yet.
@@ -109,6 +122,10 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	c.sandboxNameIndex.ReleaseByKey(id)
 
 	sandboxRemoveTimer.WithValues(sandbox.RuntimeHandler).UpdateSince(start)
+
+	span.AddEvent("pod sandbox removed",
+		tracing.Attribute("sandbox.remove.duration", time.Since(start).String()),
+	)
 
 	return &runtime.RemovePodSandboxResponse{}, nil
 }

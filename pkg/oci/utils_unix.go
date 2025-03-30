@@ -24,12 +24,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/containerd/containerd/v2/pkg/userns"
+	"github.com/moby/sys/userns"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 )
 
 // ErrNotADevice denotes that a file is not a valid linux device.
+// When checking this error, use errors.Is(err, oci.ErrNotADevice)
 var ErrNotADevice = errors.New("not a device node")
 
 // Testing dependencies
@@ -53,6 +54,10 @@ func getDevices(path, containerPath string) ([]specs.LinuxDevice, error) {
 	if !stat.IsDir() {
 		dev, err := DeviceFromPath(path)
 		if err != nil {
+			// wrap error with detailed path and container path when it is ErrNotADevice
+			if err == ErrNotADevice {
+				return nil, fmt.Errorf("get device path: %q containerPath: %q error: %w", path, containerPath, err)
+			}
 			return nil, err
 		}
 		if containerPath != "" {

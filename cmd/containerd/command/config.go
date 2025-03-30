@@ -87,7 +87,8 @@ var configCommand = &cli.Command{
 			Name:  "default",
 			Usage: "See the output of the default config",
 			Action: func(cliContext *cli.Context) error {
-				return outputConfig(context.Background(), defaultConfig())
+				ctx := cliContext.Context
+				return outputConfig(ctx, defaultConfig())
 			},
 		},
 		{
@@ -95,7 +96,7 @@ var configCommand = &cli.Command{
 			Usage: "See the output of the final main config with imported in subconfig files",
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := context.Background()
+				ctx := cliContext.Context
 				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
@@ -108,7 +109,7 @@ var configCommand = &cli.Command{
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
 			Action: func(cliContext *cli.Context) error {
 				config := defaultConfig()
-				ctx := context.Background()
+				ctx := cliContext.Context
 				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
 					return err
 				}
@@ -123,32 +124,7 @@ var configCommand = &cli.Command{
 						}
 					}
 				}
-
-				plugins, err := server.LoadPlugins(ctx, config)
-				if err != nil {
-					return err
-				}
-				if len(plugins) != 0 {
-					if config.Plugins == nil {
-						config.Plugins = make(map[string]interface{})
-					}
-					for _, p := range plugins {
-						if p.Config == nil {
-							continue
-						}
-
-						pc, err := config.Decode(ctx, p.URI(), p.Config)
-						if err != nil {
-							return err
-						}
-
-						config.Plugins[p.URI()] = pc
-					}
-				}
-
-				config.Version = version.ConfigVersion
-
-				return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+				return outputConfig(ctx, config)
 			},
 		},
 	},

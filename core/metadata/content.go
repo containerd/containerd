@@ -25,11 +25,13 @@ import (
 	"sync/atomic"
 	"time"
 
+	eventstypes "github.com/containerd/containerd/api/events"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
 
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/metadata/boltutil"
@@ -209,7 +211,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 	cs.l.RLock()
 	defer cs.l.RUnlock()
 
-	return update(ctx, cs.db, func(tx *bolt.Tx) error {
+	if err := update(ctx, cs.db, func(tx *bolt.Tx) error {
 		bkt := getBlobBucket(tx, ns, dgst)
 		if bkt == nil {
 			return fmt.Errorf("content digest %v: %w", dgst, errdefs.ErrNotFound)
@@ -227,7 +229,18 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 		cs.db.dirtyCS = true
 
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+
+	if publisher := cs.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/content/delete", &eventstypes.ContentDelete{
+			Digest: dgst.String(),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (cs *contentStore) ListStatuses(ctx context.Context, fs ...string) ([]content.Status, error) {
@@ -597,7 +610,7 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 		}
 		bkt := getIngestsBucket(tx, nw.namespace)
 		if bkt != nil {
-			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != bolt.ErrBucketNotFound {
+			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
 				return err
 			}
 		}
@@ -666,7 +679,7 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {
-		if err == bolt.ErrBucketExists {
+		if err == errbolt.ErrBucketExists {
 			return actual, fmt.Errorf("content %v: %w", actual, errdefs.ErrAlreadyExists)
 		}
 		return "", err

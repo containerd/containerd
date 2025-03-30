@@ -40,6 +40,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/containerd/v2/internal/cri/seutil"
 	"github.com/containerd/containerd/v2/pkg/seccomp"
+	"github.com/containerd/containerd/v2/pkg/sys"
 )
 
 const (
@@ -86,6 +87,50 @@ func (c *Controller) getResolvPath(id string) string {
 // getSandboxDevShm returns the shm file path inside the sandbox root directory.
 func (c *Controller) getSandboxDevShm(id string) string {
 	return filepath.Join(c.getVolatileSandboxRootDir(id), "shm")
+}
+
+// getSandboxPinnedNamespaces returns the pinned namespaces directory inside the
+// sandbox state directory.
+func (c *Controller) getSandboxPinnedNamespaces(id string) string {
+	return filepath.Join(c.getVolatileSandboxRootDir(id), "pinned-namespaces")
+}
+
+// getSandboxPinnedUserNamespace returns the pinned user namespace file.
+func (c *Controller) getSandboxPinnedUserNamespace(id string) string {
+	return filepath.Join(c.getSandboxPinnedNamespaces(id), "user")
+}
+
+// pinUserNamespace persists user namespace in namespace filesystem.
+func (c *Controller) pinUserNamespace(sandboxID string, netnsPath string) error {
+	nsPath := c.getSandboxPinnedUserNamespace(sandboxID)
+
+	baseDir := filepath.Dir(nsPath)
+	if err := os.MkdirAll(baseDir, 0755); err != nil {
+		return fmt.Errorf("failed to init pinned-namespaces directory %s: %w", baseDir, err)
+	}
+
+	emptyFd, err := os.OpenFile(nsPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to create empty file %s: %w", nsPath, err)
+	}
+	emptyFd.Close()
+
+	netnsFd, err := os.Open(netnsPath)
+	if err != nil {
+		return fmt.Errorf("failed to open netns(%s): %w", netnsPath, err)
+	}
+	defer netnsFd.Close()
+
+	usernsFd, err := sys.GetUsernsForNamespace(netnsFd.Fd())
+	if err != nil {
+		return fmt.Errorf("failed to get user namespace for netns(%s): %w", netnsPath, err)
+	}
+	defer usernsFd.Close()
+
+	if err = unix.Mount(usernsFd.Name(), nsPath, "none", unix.MS_BIND, ""); err != nil {
+		return fmt.Errorf("failed to bind mount ns src: %v at %s: %w", usernsFd.Name(), nsPath, err)
+	}
+	return nil
 }
 
 func toLabel(selinuxOptions *runtime.SELinuxOption) ([]string, error) {

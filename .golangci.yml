@@ -1,7 +1,7 @@
 linters:
   enable:
     - depguard # Checks for dependencies that should not be (re)introduced. See "linter-settings" for further details.
-    - exportloopref # Checks for pointers to enclosing loop variables
+    - copyloopvar # Checks for loop variable copies in Go 1.22+
     - gofmt
     - goimports
     - gosec
@@ -23,6 +23,14 @@ issues:
     - EXC0002
   max-issues-per-linter: 0
   max-same-issues: 0
+
+  exclude-dirs:
+    - api
+    - cluster
+    - docs
+    - docs/man
+    - releases
+    - test # e2e scripts
 
   # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
   exclude-rules:
@@ -73,16 +81,9 @@ linters-settings:
       - G306
       - G402
       - G404
+      - G115
   nolintlint:
     allow-unused: true
-
-  exclude-dirs:
-    - api
-    - cluster
-    - docs
-    - docs/man
-    - releases
-    - test # e2e scripts
 
 run:
   timeout: 8m

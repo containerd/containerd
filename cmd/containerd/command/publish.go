@@ -25,15 +25,17 @@ import (
 	"time"
 
 	eventsapi "github.com/containerd/containerd/api/services/events/v1"
-	"github.com/containerd/containerd/v2/pkg/dialer"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
-	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/containerd/containerd/v2/pkg/dialer"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
+	"github.com/containerd/containerd/v2/pkg/protobuf/types"
 )
 
 var publishCommand = &cli.Command{
@@ -50,7 +52,7 @@ var publishCommand = &cli.Command{
 		},
 	},
 	Action: func(cliContext *cli.Context) error {
-		ctx := namespaces.WithNamespace(context.Background(), cliContext.String("namespace"))
+		ctx := namespaces.WithNamespace(cliContext.Context, cliContext.String("namespace"))
 		topic := cliContext.String("topic")
 		if topic == "" {
 			return fmt.Errorf("topic required to publish event: %w", errdefs.ErrInvalidArgument)
@@ -67,7 +69,7 @@ var publishCommand = &cli.Command{
 			Topic: topic,
 			Event: payload,
 		}); err != nil {
-			return errdefs.FromGRPC(err)
+			return errgrpc.ToNative(err)
 		}
 		return nil
 	},
@@ -100,15 +102,11 @@ func connect(address string, d func(context.Context, string) (net.Conn, error)) 
 		Backoff: backoffConfig,
 	}
 	gopts := []grpc.DialOption{
-		grpc.WithBlock(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(d),
-		grpc.FailOnNonTempDialError(true),
 		grpc.WithConnectParams(connParams),
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
+	conn, err := grpc.NewClient(dialer.DialAddress(address), gopts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 	}

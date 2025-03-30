@@ -23,12 +23,13 @@ import (
 	"io"
 
 	streamingapi "github.com/containerd/containerd/api/services/streaming/v1"
-	"github.com/containerd/containerd/v2/core/streaming"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/v2/core/streaming"
 )
 
 // NewStreamCreator returns a new stream creator which can communicate over a GRPC
@@ -82,10 +83,10 @@ func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Strea
 	if err != nil {
 		return nil, err
 	}
-	err = stream.Send(protobuf.FromAny(a))
+	err = stream.Send(typeurl.MarshalProto(a))
 	if err != nil {
 		if !errors.Is(err, io.EOF) {
-			err = errdefs.FromGRPC(err)
+			err = errgrpc.ToNative(err)
 		}
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func (sc *streamCreator) Create(ctx context.Context, id string) (streaming.Strea
 	// Receive an ack that stream is init and ready
 	if _, err = stream.Recv(); err != nil {
 		if !errors.Is(err, io.EOF) {
-			err = errdefs.FromGRPC(err)
+			err = errgrpc.ToNative(err)
 		}
 		return nil, err
 	}
@@ -108,9 +109,9 @@ type clientStream struct {
 }
 
 func (cs *clientStream) Send(a typeurl.Any) (err error) {
-	err = cs.s.Send(protobuf.FromAny(a))
+	err = cs.s.Send(typeurl.MarshalProto(a))
 	if !errors.Is(err, io.EOF) {
-		err = errdefs.FromGRPC(err)
+		err = errgrpc.ToNative(err)
 	}
 	return
 }
@@ -118,7 +119,7 @@ func (cs *clientStream) Send(a typeurl.Any) (err error) {
 func (cs *clientStream) Recv() (a typeurl.Any, err error) {
 	a, err = cs.s.Recv()
 	if !errors.Is(err, io.EOF) {
-		err = errdefs.FromGRPC(err)
+		err = errgrpc.ToNative(err)
 	}
 	return
 }

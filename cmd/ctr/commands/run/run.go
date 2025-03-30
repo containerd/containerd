@@ -127,6 +127,10 @@ var Command = &cli.Command{
 			Name:  "cni",
 			Usage: "Enable cni networking for the container",
 		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
 	}, append(platformRunFlags,
 		append(commands.RuntimeFlags,
 			append(append(commands.SnapshotterFlags, []cli.Flag{commands.SnapshotterLabels}...),
@@ -265,7 +269,7 @@ var Command = &cli.Command{
 	},
 }
 
-// buildLabel builds the labels from command line labels and the image labels
+// buildLabels builds the labels from command line labels and the image labels
 func buildLabels(cmdLabels, imageLabels map[string]string) map[string]string {
 	labels := make(map[string]string)
 	for k, v := range imageLabels {

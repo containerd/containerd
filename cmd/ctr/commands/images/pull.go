@@ -28,6 +28,7 @@ import (
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands/content"
+	"github.com/containerd/containerd/v2/core/diff"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/image"
@@ -84,6 +85,10 @@ command. As part of this process, we do the following:
 			Name:  "local",
 			Usage: "Fetch content from local client rather than using transfer service",
 		},
+		&cli.BoolFlag{
+			Name:  "sync-fs",
+			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
+		},
 	),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -119,19 +124,20 @@ command. As part of this process, we do the following:
 			if err != nil {
 				return err
 			}
-
-			// Set unpack configuration
+			allPlatforms := cliContext.Bool("all-platforms")
+			if len(p) > 0 && allPlatforms {
+				return errors.New("cannot specify both --platform and --all-platforms")
+			}
+			if len(p) == 0 && !allPlatforms {
+				p = append(p, platforms.DefaultSpec())
+			}
+			// we use an empty `Platform` slice to indicate that we want to pull all platforms
+			sopts = append(sopts, image.WithPlatforms(p...))
+			// TODO: Support unpack for all platforms..?
+			// Pass in a *?
 			for _, platform := range p {
 				sopts = append(sopts, image.WithUnpack(platform, cliContext.String("snapshotter")))
 			}
-			if !cliContext.Bool("all-platforms") {
-				if len(p) == 0 {
-					p = append(p, platforms.DefaultSpec())
-				}
-				sopts = append(sopts, image.WithPlatforms(p...))
-			}
-			// TODO: Support unpack for all platforms..?
-			// Pass in a *?
 
 			if cliContext.Bool("metadata-only") {
 				sopts = append(sopts, image.WithAllMetadata)
@@ -203,7 +209,7 @@ command. As part of this process, we do the following:
 		for _, platform := range p {
 			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
 			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, cliContext.String("snapshotter"))
+			err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
 			if err != nil {
 				return err
 			}

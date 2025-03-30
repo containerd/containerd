@@ -138,6 +138,22 @@ func WithHostNetwork(p *runtime.PodSandboxConfig) {
 	p.Linux.SecurityContext.NamespaceOptions.Network = runtime.NamespaceMode_NODE
 }
 
+// Set selinux level
+func WithSelinuxLevel(level string) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		if p.Linux.SecurityContext.SelinuxOptions == nil {
+			p.Linux.SecurityContext.SelinuxOptions = &runtime.SELinuxOption{}
+		}
+		p.Linux.SecurityContext.SelinuxOptions.Level = level
+	}
+}
+
 // Set pod userns.
 func WithPodUserNs(containerID, hostID, length uint32) PodSandboxOpts {
 	return func(p *runtime.PodSandboxConfig) {
@@ -215,6 +231,19 @@ func WithPodLabels(kvs map[string]string) PodSandboxOpts {
 		for k, v := range kvs {
 			p.Labels[k] = v
 		}
+	}
+}
+
+// WithSecurityContext set container privileged.
+func WithPodSecurityContext(privileged bool) PodSandboxOpts {
+	return func(p *runtime.PodSandboxConfig) {
+		if p.Linux == nil {
+			p.Linux = &runtime.LinuxPodSandboxConfig{}
+		}
+		if p.Linux.SecurityContext == nil {
+			p.Linux.SecurityContext = &runtime.LinuxSandboxSecurityContext{}
+		}
+		p.Linux.SecurityContext.Privileged = privileged
 	}
 }
 
@@ -320,6 +349,27 @@ func WithIDMapVolumeMount(hostPath, containerPath string, uidMaps, gidMaps []*ru
 			SelinuxRelabel: selinux.GetEnabled(),
 			UidMappings:    uidMaps,
 			GidMappings:    gidMaps,
+		}
+		c.Mounts = append(c.Mounts, mount)
+	}
+}
+
+func WithImageVolumeMount(image, containerPath string) ContainerOpts {
+	return WithIDMapImageVolumeMount(image, containerPath, nil, nil)
+}
+
+func WithIDMapImageVolumeMount(image string, containerPath string, uidMaps, gidMaps []*runtime.IDMapping) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		containerPath, _ = filepath.Abs(containerPath)
+		mount := &runtime.Mount{
+			ContainerPath: containerPath,
+			UidMappings:   uidMaps,
+			GidMappings:   gidMaps,
+			Image: &runtime.ImageSpec{
+				Image: image,
+			},
+			Readonly:       true,
+			SelinuxRelabel: true,
 		}
 		c.Mounts = append(c.Mounts, mount)
 	}
@@ -462,12 +512,43 @@ func WithSupplementalGroups(gids []int64) ContainerOpts {
 	}
 }
 
+// WithSecurityContext set container privileged.
+func WithSecurityContext(privileged bool) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.Privileged = privileged
+	}
+}
+
 // WithDevice adds a device mount.
 func WithDevice(containerPath, hostPath, permissions string) ContainerOpts {
 	return func(c *runtime.ContainerConfig) {
 		c.Devices = append(c.Devices, &runtime.Device{
 			ContainerPath: containerPath, HostPath: hostPath, Permissions: permissions,
 		})
+	}
+}
+
+// WithSELinuxOptions allows to set SELinux option for container.
+func WithSELinuxOptions(user, role, typ, level string) ContainerOpts {
+	return func(c *runtime.ContainerConfig) {
+		if c.Linux == nil {
+			c.Linux = &runtime.LinuxContainerConfig{}
+		}
+		if c.Linux.SecurityContext == nil {
+			c.Linux.SecurityContext = &runtime.LinuxContainerSecurityContext{}
+		}
+		c.Linux.SecurityContext.SelinuxOptions = &runtime.SELinuxOption{
+			User:  user,
+			Role:  role,
+			Type:  typ,
+			Level: level,
+		}
 	}
 }
 

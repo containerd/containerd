@@ -26,7 +26,7 @@ import (
 
 	oci "github.com/opencontainers/runtime-spec/specs-go"
 	ocigen "github.com/opencontainers/runtime-tools/generate"
-	"tags.cncf.io/container-device-interface/specs-go"
+	cdi "tags.cncf.io/container-device-interface/specs-go"
 )
 
 const (
@@ -64,7 +64,7 @@ var (
 // to all OCI Specs where at least one devices from the CDI Spec
 // is injected.
 type ContainerEdits struct {
-	*specs.ContainerEdits
+	*cdi.ContainerEdits
 }
 
 // Apply edits to the given OCI Spec. Updates the OCI Spec in place.
@@ -89,7 +89,7 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 		if err != nil {
 			return err
 		}
-		dev := d.ToOCI()
+		dev := dn.toOCI()
 		if dev.UID == nil && spec.Process != nil {
 			if uid := spec.Process.User.UID; uid > 0 {
 				dev.UID = &uid
@@ -116,29 +116,30 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 	if len(e.Mounts) > 0 {
 		for _, m := range e.Mounts {
 			specgen.RemoveMount(m.ContainerPath)
-			specgen.AddMount(m.ToOCI())
+			specgen.AddMount((&Mount{m}).toOCI())
 		}
 		sortMounts(&specgen)
 	}
 
 	for _, h := range e.Hooks {
+		ociHook := (&Hook{h}).toOCI()
 		switch h.HookName {
 		case PrestartHook:
-			specgen.AddPreStartHook(h.ToOCI())
+			specgen.AddPreStartHook(ociHook)
 		case PoststartHook:
-			specgen.AddPostStartHook(h.ToOCI())
+			specgen.AddPostStartHook(ociHook)
 		case PoststopHook:
-			specgen.AddPostStopHook(h.ToOCI())
+			specgen.AddPostStopHook(ociHook)
 			// TODO: Maybe runtime-tools/generate should be updated with these...
 		case CreateRuntimeHook:
 			ensureOCIHooks(spec)
-			spec.Hooks.CreateRuntime = append(spec.Hooks.CreateRuntime, h.ToOCI())
+			spec.Hooks.CreateRuntime = append(spec.Hooks.CreateRuntime, ociHook)
 		case CreateContainerHook:
 			ensureOCIHooks(spec)
-			spec.Hooks.CreateContainer = append(spec.Hooks.CreateContainer, h.ToOCI())
+			spec.Hooks.CreateContainer = append(spec.Hooks.CreateContainer, ociHook)
 		case StartContainerHook:
 			ensureOCIHooks(spec)
-			spec.Hooks.StartContainer = append(spec.Hooks.StartContainer, h.ToOCI())
+			spec.Hooks.StartContainer = append(spec.Hooks.StartContainer, ociHook)
 		default:
 			return fmt.Errorf("unknown hook name %q", h.HookName)
 		}
@@ -148,7 +149,7 @@ func (e *ContainerEdits) Apply(spec *oci.Spec) error {
 		// The specgen is missing functionality to set all parameters so we
 		// just piggy-back on it to initialize all structs and the copy over.
 		specgen.SetLinuxIntelRdtClosID(e.IntelRdt.ClosID)
-		spec.Linux.IntelRdt = e.IntelRdt.ToOCI()
+		spec.Linux.IntelRdt = (&IntelRdt{e.IntelRdt}).toOCI()
 	}
 
 	for _, additionalGID := range e.AdditionalGIDs {
@@ -186,7 +187,7 @@ func (e *ContainerEdits) Validate() error {
 		}
 	}
 	if e.IntelRdt != nil {
-		if err := ValidateIntelRdt(e.IntelRdt); err != nil {
+		if err := (&IntelRdt{e.IntelRdt}).Validate(); err != nil {
 			return err
 		}
 	}
@@ -204,7 +205,7 @@ func (e *ContainerEdits) Append(o *ContainerEdits) *ContainerEdits {
 		e = &ContainerEdits{}
 	}
 	if e.ContainerEdits == nil {
-		e.ContainerEdits = &specs.ContainerEdits{}
+		e.ContainerEdits = &cdi.ContainerEdits{}
 	}
 
 	e.Env = append(e.Env, o.Env...)
@@ -258,7 +259,7 @@ func ValidateEnv(env []string) error {
 
 // DeviceNode is a CDI Spec DeviceNode wrapper, used for validating DeviceNodes.
 type DeviceNode struct {
-	*specs.DeviceNode
+	*cdi.DeviceNode
 }
 
 // Validate a CDI Spec DeviceNode.
@@ -288,7 +289,7 @@ func (d *DeviceNode) Validate() error {
 
 // Hook is a CDI Spec Hook wrapper, used for validating hooks.
 type Hook struct {
-	*specs.Hook
+	*cdi.Hook
 }
 
 // Validate a hook.
@@ -307,7 +308,7 @@ func (h *Hook) Validate() error {
 
 // Mount is a CDI Mount wrapper, used for validating mounts.
 type Mount struct {
-	*specs.Mount
+	*cdi.Mount
 }
 
 // Validate a mount.
@@ -321,8 +322,21 @@ func (m *Mount) Validate() error {
 	return nil
 }
 
+// IntelRdt is a CDI IntelRdt wrapper.
+// This is used for validation and conversion to OCI specifications.
+type IntelRdt struct {
+	*cdi.IntelRdt
+}
+
 // ValidateIntelRdt validates the IntelRdt configuration.
-func ValidateIntelRdt(i *specs.IntelRdt) error {
+//
+// Deprecated: ValidateIntelRdt is deprecated use IntelRdt.Validate() instead.
+func ValidateIntelRdt(i *cdi.IntelRdt) error {
+	return (&IntelRdt{i}).Validate()
+}
+
+// Validate validates the IntelRdt configuration.
+func (i *IntelRdt) Validate() error {
 	// ClosID must be a valid Linux filename
 	if len(i.ClosID) >= 4096 || i.ClosID == "." || i.ClosID == ".." || strings.ContainsAny(i.ClosID, "/\n") {
 		return errors.New("invalid ClosID")
@@ -341,7 +355,7 @@ func ensureOCIHooks(spec *oci.Spec) {
 func sortMounts(specgen *ocigen.Generator) {
 	mounts := specgen.Mounts()
 	specgen.ClearMounts()
-	sort.Sort(orderedMounts(mounts))
+	sort.Stable(orderedMounts(mounts))
 	specgen.Config.Mounts = mounts
 }
 
@@ -361,14 +375,7 @@ func (m orderedMounts) Len() int {
 // mount indexed by parameter 1 is less than that of the mount indexed by
 // parameter 2. Used in sorting.
 func (m orderedMounts) Less(i, j int) bool {
-	ip, jp := m.parts(i), m.parts(j)
-	if ip < jp {
-		return true
-	}
-	if jp < ip {
-		return false
-	}
-	return m[i].Destination < m[j].Destination
+	return m.parts(i) < m.parts(j)
 }
 
 // Swap swaps two items in an array of mounts. Used in sorting

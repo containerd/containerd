@@ -54,12 +54,9 @@ func WithRuntimePath(absRuntimePath string) NewTaskOpts {
 // usually it is served inside a sandbox, and we can get it from sandbox status.
 func WithTaskAPIEndpoint(address string, version uint32) NewTaskOpts {
 	return func(ctx context.Context, client *Client, info *TaskInfo) error {
-		if info.Options == nil {
-			info.Options = &options.Options{}
-		}
-		opts, ok := info.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
+		opts, err := info.getRuncOptions()
+		if err != nil {
+			return err
 		}
 		opts.TaskApiAddress = address
 		opts.TaskApiVersion = version
@@ -119,12 +116,9 @@ func WithCheckpointImagePath(path string) CheckpointTaskOpts {
 // WithRestoreImagePath sets image path for create option
 func WithRestoreImagePath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
-		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
+		opts, err := ti.getRuncOptions()
+		if err != nil {
+			return err
 		}
 		opts.CriuImagePath = path
 		return nil
@@ -134,12 +128,9 @@ func WithRestoreImagePath(path string) NewTaskOpts {
 // WithRestoreWorkPath sets criu work path for create option
 func WithRestoreWorkPath(path string) NewTaskOpts {
 	return func(ctx context.Context, c *Client, ti *TaskInfo) error {
-		if ti.Options == nil {
-			ti.Options = &options.Options{}
-		}
-		opts, ok := ti.Options.(*options.Options)
-		if !ok {
-			return errors.New("invalid runtime v2 options format")
+		opts, err := ti.getRuncOptions()
+		if err != nil {
+			return err
 		}
 		opts.CriuWorkPath = path
 		return nil
@@ -151,6 +142,12 @@ type ProcessDeleteOpts func(context.Context, Process) error
 
 // WithProcessKill will forcefully kill and delete a process
 func WithProcessKill(ctx context.Context, p Process) error {
+	// Skip killing tasks with PID 0
+	// https://github.com/containerd/containerd/issues/10441
+	if p.Pid() == 0 {
+		return nil
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// ignore errors to wait and kill as we are forcefully killing

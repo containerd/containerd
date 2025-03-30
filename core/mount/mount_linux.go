@@ -26,10 +26,9 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
-	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/log"
+	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 )
 
@@ -67,7 +66,12 @@ func prepareIDMappedOverlay(usernsFd int, options []string) ([]string, func(), e
 		return options, nil, fmt.Errorf("failed to parse overlay lowerdir's from given options")
 	}
 
-	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(lowerDirs, usernsFd)
+	tempRemountsLocation, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
+	if err != nil {
+		return options, nil, fmt.Errorf("failed to create temporary overlay lowerdir mount location: %w", err)
+	}
+
+	tmpLowerdirs, idMapCleanUp, err := doPrepareIDMappedOverlay(tempRemountsLocation, lowerDirs, usernsFd)
 	if err != nil {
 		return options, idMapCleanUp, fmt.Errorf("failed to create idmapped mount: %w", err)
 	}
@@ -245,119 +249,39 @@ func getUnprivilegedMountFlags(path string) (int, error) {
 	return flags, nil
 }
 
-func doPrepareIDMappedOverlay(lowerDirs []string, usernsFd int) (tmpLowerDirs []string, _ func(), _ error) {
-	td, err := os.MkdirTemp(tempMountLocation, "ovl-idmapped")
-	if err != nil {
-		return nil, nil, err
-	}
+func doPrepareIDMappedOverlay(tempRemountsLocation string, lowerDirs []string, usernsFd int) ([]string, func(), error) {
+	tmpLowerDirs := make([]string, 0, len(lowerDirs))
+
 	cleanUp := func() {
 		for _, lowerDir := range tmpLowerDirs {
 			if err := unix.Unmount(lowerDir, 0); err != nil {
 				log.L.WithError(err).Warnf("failed to unmount temp lowerdir %s", lowerDir)
+				continue
+			}
+			// Using os.Remove() so if it's not empty, we don't delete files in the
+			// rootfs.
+			if err := os.Remove(lowerDir); err != nil {
+				log.L.WithError(err).Warnf("failed to remove temporary overlay lowerdir")
 			}
 		}
-		if terr := os.RemoveAll(filepath.Clean(filepath.Join(tmpLowerDirs[0], ".."))); terr != nil {
-			log.L.WithError(terr).Warnf("failed to remove temporary overlay lowerdir's")
+
+		// This dir should be empty now. Otherwise, we don't do anything.
+		if err := os.Remove(tempRemountsLocation); err != nil {
+			log.L.WithError(err).Infof("failed to remove temporary overlay dir")
 		}
 	}
 	for i, lowerDir := range lowerDirs {
-		tmpLowerDir := filepath.Join(td, strconv.Itoa(i))
+		tmpLowerDir := filepath.Join(tempRemountsLocation, strconv.Itoa(i))
 		tmpLowerDirs = append(tmpLowerDirs, tmpLowerDir)
 
-		if err = os.MkdirAll(tmpLowerDir, 0700); err != nil {
+		if err := os.MkdirAll(tmpLowerDir, 0700); err != nil {
 			return nil, cleanUp, fmt.Errorf("failed to create temporary dir: %w", err)
 		}
-		if err = IDMapMount(lowerDir, tmpLowerDir, usernsFd); err != nil {
+		if err := IDMapMountWithAttrs(lowerDir, tmpLowerDir, usernsFd, unix.MOUNT_ATTR_RDONLY, 0); err != nil {
 			return nil, cleanUp, err
 		}
 	}
 	return tmpLowerDirs, cleanUp, nil
-}
-
-// Unmount the provided mount path with the flags
-func Unmount(target string, flags int) error {
-	if err := unmount(target, flags); err != nil && err != unix.EINVAL {
-		return err
-	}
-	return nil
-}
-
-// fuseSuperMagic is defined in statfs(2)
-const fuseSuperMagic = 0x65735546
-
-func isFUSE(dir string) bool {
-	var st unix.Statfs_t
-	if err := unix.Statfs(dir, &st); err != nil {
-		return false
-	}
-	return st.Type == fuseSuperMagic
-}
-
-// unmountFUSE attempts to unmount using fusermount/fusermount3 helper binary.
-//
-// For FUSE mounts, using these helper binaries is preferred, see:
-// https://github.com/containerd/containerd/pull/3765#discussion_r342083514
-func unmountFUSE(target string) error {
-	var err error
-	for _, helperBinary := range []string{"fusermount3", "fusermount"} {
-		cmd := exec.Command(helperBinary, "-u", target)
-		err = cmd.Run()
-		if err == nil {
-			return nil
-		}
-	}
-	return err
-}
-
-func unmount(target string, flags int) error {
-	if isFUSE(target) {
-		if err := unmountFUSE(target); err == nil {
-			return nil
-		}
-	}
-	for i := 0; i < 50; i++ {
-		if err := unix.Unmount(target, flags); err != nil {
-			switch err {
-			case unix.EBUSY:
-				time.Sleep(50 * time.Millisecond)
-				continue
-			default:
-				return err
-			}
-		}
-		return nil
-	}
-	return fmt.Errorf("failed to unmount target %s: %w", target, unix.EBUSY)
-}
-
-// UnmountAll repeatedly unmounts the given mount point until there
-// are no mounts remaining (EINVAL is returned by mount), which is
-// useful for undoing a stack of mounts on the same mount point.
-// UnmountAll all is noop when the first argument is an empty string.
-// This is done when the containerd client did not specify any rootfs
-// mounts (e.g. because the rootfs is managed outside containerd)
-// UnmountAll is noop when the mount path does not exist.
-func UnmountAll(mount string, flags int) error {
-	if mount == "" {
-		return nil
-	}
-	if _, err := os.Stat(mount); os.IsNotExist(err) {
-		return nil
-	}
-
-	for {
-		if err := unmount(mount, flags); err != nil {
-			// EINVAL is returned if the target is not a
-			// mount point, indicating that we are
-			// done. It can also indicate a few other
-			// things (such as invalid flags) which we
-			// unfortunately end up squelching here too.
-			if err == unix.EINVAL {
-				return nil
-			}
-			return err
-		}
-	}
 }
 
 // parseMountOptions takes fstab style mount options and parses them for

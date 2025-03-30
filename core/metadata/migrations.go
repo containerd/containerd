@@ -16,7 +16,12 @@
 
 package metadata
 
-import bolt "go.etcd.io/bbolt"
+import (
+	"bytes"
+	"fmt"
+
+	bolt "go.etcd.io/bbolt"
+)
 
 type migration struct {
 	schema  string
@@ -49,6 +54,11 @@ var migrations = []migration{
 		schema:  "v1",
 		version: 3,
 		migrate: noOpMigration,
+	},
+	{
+		schema:  "v1",
+		version: 4,
+		migrate: migrateSandboxes,
 	},
 }
 
@@ -157,6 +167,87 @@ func migrateIngests(tx *bolt.Tx) error {
 		}
 	}
 
+	return nil
+}
+
+// migrateSandboxes moves sandboxes from root bucket into v1 bucket.
+func migrateSandboxes(tx *bolt.Tx) error {
+	v1bkt, err := tx.CreateBucketIfNotExists(bucketKeyVersion)
+	if err != nil {
+		return err
+	}
+
+	deletingBuckets := [][]byte{}
+
+	if merr := tx.ForEach(func(ns []byte, nsbkt *bolt.Bucket) error {
+		// Skip v1 bucket, even if users created sandboxes in v1 namespace.
+		if bytes.Equal(bucketKeyVersion, ns) {
+			return nil
+		}
+
+		deletingBuckets = append(deletingBuckets, ns)
+
+		allsbbkt := nsbkt.Bucket(bucketKeyObjectSandboxes)
+		if allsbbkt == nil {
+			return nil
+		}
+
+		tnsbkt, err := v1bkt.CreateBucketIfNotExists(ns)
+		if err != nil {
+			return fmt.Errorf("failed to create namespace %s in bucket %s: %w",
+				ns, bucketKeyVersion, err)
+		}
+
+		tallsbbkt, err := tnsbkt.CreateBucketIfNotExists(bucketKeyObjectSandboxes)
+		if err != nil {
+			return fmt.Errorf("failed to create bucket sandboxes in namespace %s: %w", ns, err)
+		}
+
+		return allsbbkt.ForEachBucket(func(sb []byte) error {
+			sbbkt := allsbbkt.Bucket(sb) // single sandbox bucket
+
+			tsbbkt, err := tallsbbkt.CreateBucketIfNotExists(sb)
+			if err != nil {
+				return fmt.Errorf("failed to create sandbox object %s in namespace %s: %w",
+					sb, ns, err)
+			}
+
+			// copy single
+			if cerr := sbbkt.ForEach(func(key, value []byte) error {
+				if value == nil {
+					return nil
+				}
+
+				return tsbbkt.Put(key, value)
+			}); cerr != nil {
+				return cerr
+			}
+
+			return sbbkt.ForEachBucket(func(subbkt []byte) error {
+				tsubbkt, err := tsbbkt.CreateBucketIfNotExists(subbkt)
+				if err != nil {
+					return fmt.Errorf("failed to create subbucket %s in sandbox %s (namespace %s): %w",
+						subbkt, sb, ns, err)
+				}
+
+				return sbbkt.Bucket(subbkt).ForEach(func(key, value []byte) error {
+					if value == nil {
+						return fmt.Errorf("unexpected bucket %s", key)
+					}
+					return tsubbkt.Put(key, value)
+				})
+			})
+		})
+	}); merr != nil {
+		return fmt.Errorf("failed to copy sandboxes into v1 bucket: %w", err)
+	}
+
+	for _, ns := range deletingBuckets {
+		derr := tx.DeleteBucket(ns)
+		if derr != nil {
+			return fmt.Errorf("failed to cleanup bucket %s in root: %w", ns, err)
+		}
+	}
 	return nil
 }
 

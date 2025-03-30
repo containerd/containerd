@@ -50,7 +50,7 @@ type beforeUpgradeHookFunc func(*testing.T)
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
 	previousReleaseBinDir := t.TempDir()
-	downloadPreviousReleaseBinary(t, previousReleaseBinDir)
+	downloadPreviousLatestReleaseBinary(t, previousReleaseBinDir)
 
 	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
 	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
@@ -73,7 +73,7 @@ func runUpgradeTestCase(
 
 		t.Log("Starting the previous release's containerd")
 		previousCtrdBinPath := filepath.Join(previousReleaseBinDir, "bin", "containerd")
-		previousProc := newCtrdProc(t, previousCtrdBinPath, workDir)
+		previousProc := newCtrdProc(t, previousCtrdBinPath, workDir, nil)
 
 		ctrdLogPath := previousProc.logPath()
 		t.Cleanup(func() {
@@ -107,7 +107,7 @@ func runUpgradeTestCase(
 		currentReleaseCtrdDefaultConfig(t, workDir)
 
 		t.Log("Starting the current release's containerd")
-		currentProc := newCtrdProc(t, "containerd", workDir)
+		currentProc := newCtrdProc(t, "containerd", workDir, nil)
 		require.NoError(t, currentProc.isReady())
 		t.Cleanup(func() {
 			t.Log("Cleanup all the pods")
@@ -546,8 +546,7 @@ func (pCtx *podTCtx) shimPid() uint32 {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	// NOTE: use version 2 to be compatible with previous release
-	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 2, pCtx.id)
+	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 3, pCtx.id)
 	return shimPid(ctx, t, shimCli)
 }
 
@@ -558,6 +557,15 @@ func (pCtx *podTCtx) dataDir() string {
 	cfg := criRuntimeInfo(t, pCtx.rSvc)
 	rootDir := cfg["rootDir"].(string)
 	return filepath.Join(rootDir, "sandboxes", pCtx.id)
+}
+
+// imageVolumeDir returns the image volume directory for this pod.
+func (pCtx *podTCtx) imageVolumeDir() string {
+	t := pCtx.t
+
+	cfg := criRuntimeInfo(t, pCtx.rSvc)
+	stateDir := cfg["stateDir"].(string)
+	return filepath.Join(stateDir, "image-volumes", pCtx.id)
 }
 
 // stop stops that pod.
@@ -634,7 +642,8 @@ func previousReleaseCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir st
 version = 2
 
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
-  runtime_type = "%s/bin/containerd-shim-runc-v2"
+  runtime_type = "io.containerd.runc.v2"
+  runtime_path = "%s/bin/containerd-shim-runc-v2"
 `,
 		previousReleaseBinDir)
 
@@ -658,7 +667,7 @@ func (p *ctrdProc) criImageService(t *testing.T) cri.ImageManagerService {
 }
 
 // newCtrdProc is to start containerd process.
-func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string) *ctrdProc {
+func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string, envs []string) *ctrdProc {
 	p := &ctrdProc{workDir: ctrdWorkDir}
 
 	var args []string
@@ -673,6 +682,7 @@ func newCtrdProc(t *testing.T, ctrdBin string, ctrdWorkDir string) *ctrdProc {
 	t.Cleanup(func() { f.Close() })
 
 	cmd := exec.Command(ctrdBin, args...)
+	cmd.Env = append(os.Environ(), envs...)
 	cmd.Stdout = f
 	cmd.Stderr = f
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}

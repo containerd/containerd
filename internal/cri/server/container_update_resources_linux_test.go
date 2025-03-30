@@ -236,7 +236,6 @@ func TestUpdateOCILinuxResource(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			config := criconfig.Config{
 				RuntimeConfig: criconfig.RuntimeConfig{

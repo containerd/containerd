@@ -122,7 +122,6 @@ func TestToCNIPortMappings(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			assert.Equal(t, test.cniPortMappings, toCNIPortMappings(test.criPortMappings))
 		})
@@ -176,7 +175,6 @@ func TestSelectPodIP(t *testing.T) {
 			expectedAdditionalIPs: []string{"2001:db8:85a3::8a2e:370:7334", "2001:db8:85a3::8a2e:370:7335", "192.168.17.45"},
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			var ipConfigs []*cni.IPConfig
 			for _, ip := range test.ips {

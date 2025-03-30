@@ -56,7 +56,7 @@ version = 3
 	require.NoError(t, err)
 
 	t.Logf("Starting containerd")
-	currentProc := newCtrdProc(t, "containerd", workDir)
+	currentProc := newCtrdProc(t, "containerd", workDir, nil)
 	require.NoError(t, currentProc.isReady())
 	t.Cleanup(func() {
 		t.Log("Cleanup all the pods")

@@ -5420,6 +5420,14 @@ file {
       json_name: "annotations"
     }
     field {
+      name: "sandbox"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      json_name: "sandbox"
+    }
+    field {
       name: "sandboxer"
       number: 10
       label: LABEL_OPTIONAL
@@ -5793,6 +5801,41 @@ file {
       json_name: "metrics"
     }
   }
+  message_type {
+    name: "ControllerUpdateRequest"
+    field {
+      name: "sandbox_id"
+      number: 1
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxId"
+    }
+    field {
+      name: "sandboxer"
+      number: 2
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "sandboxer"
+    }
+    field {
+      name: "sandbox"
+      number: 3
+      label: LABEL_OPTIONAL
+      type: TYPE_MESSAGE
+      type_name: ".containerd.types.Sandbox"
+      json_name: "sandbox"
+    }
+    field {
+      name: "fields"
+      number: 4
+      label: LABEL_REPEATED
+      type: TYPE_STRING
+      json_name: "fields"
+    }
+  }
+  message_type {
+    name: "ControllerUpdateResponse"
+  }
   service {
     name: "Store"
     method {
@@ -5862,6 +5905,11 @@ file {
       name: "Metrics"
       input_type: ".containerd.services.sandbox.v1.ControllerMetricsRequest"
       output_type: ".containerd.services.sandbox.v1.ControllerMetricsResponse"
+    }
+    method {
+      name: "Update"
+      input_type: ".containerd.services.sandbox.v1.ControllerUpdateRequest"
+      output_type: ".containerd.services.sandbox.v1.ControllerUpdateResponse"
     }
   }
   options {

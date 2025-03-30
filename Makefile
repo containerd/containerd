@@ -96,7 +96,11 @@ GO_BUILDTAGS += ${DEBUG_TAGS}
 ifneq ($(STATIC),)
 	GO_BUILDTAGS += osusergo netgo static_build
 endif
+
+SHIM_GO_BUILDTAGS := $(GO_BUILDTAGS) no_grpc
+
 GO_TAGS=$(if $(GO_BUILDTAGS),-tags "$(strip $(GO_BUILDTAGS))",)
+SHIM_GO_TAGS=$(if $(SHIM_GO_BUILDTAGS),-tags "$(strip $(SHIM_GO_BUILDTAGS))",)
 
 GO_LDFLAGS=-ldflags '-X $(PKG)/version.Version=$(VERSION) -X $(PKG)/version.Revision=$(REVISION) -X $(PKG)/version.Package=$(PACKAGE) $(EXTRA_LDFLAGS)
 ifneq ($(STATIC),)
@@ -150,6 +154,7 @@ GOTEST ?= $(GO) test
 OUTPUTDIR = $(join $(ROOTDIR), _output)
 CRIDIR=$(OUTPUTDIR)/cri
 
+
 .PHONY: clean all AUTHORS build binaries test integration generate protos check-protos coverage ci check help install uninstall vendor release static-release mandir install-man install-doc genman install-cri-deps cri-release cri-cni-release cri-integration install-deps bin/cri-integration.test remove-replace clean-vendor
 .DEFAULT: default
 
@@ -171,7 +176,7 @@ generate: protos
 	@echo "$(WHALE) $@"
 	@PATH="${ROOTDIR}/bin:${PATH}" $(GO) generate -x ${PACKAGES}
 
-protos: bin/protoc-gen-go-fieldpath
+protos: bin/protoc-gen-go-fieldpath bin/go-buildtag
 	@echo "$(WHALE) $@"
 	@find . -path ./vendor -prune -false -o -name '*.pb.go' | xargs rm
 	$(eval TMPDIR := $(shell mktemp -d))
@@ -181,6 +186,7 @@ protos: bin/protoc-gen-go-fieldpath
 	@rm -rf ${TMPDIR} v2
 	go-fix-acronym -w -a '^Os' $(shell find api/ -name '*.pb.go')
 	go-fix-acronym -w -a '(Id|Io|Uuid|Os)$$' $(shell find api/ -name '*.pb.go')
+	bin/go-buildtag -w --tags '!no_grpc' $(shell find api/ -name '*_grpc.pb.go')
 	@test -z "$$(git status --short | grep "api/next.pb.txt" | tee /dev/stderr)" || \
 		$(GO) mod edit -replace=github.com/containerd/containerd/api=./api
 
@@ -230,7 +236,7 @@ cri-integration: binaries bin/cri-integration.test ## run cri integration tests 
 # build runc shimv2 with failpoint control, only used by integration test
 bin/containerd-shim-runc-fp-v1: integration/failpoint/cmd/containerd-shim-runc-fp-v1 FORCE
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ${SHIM_GO_TAGS} ./integration/failpoint/cmd/containerd-shim-runc-fp-v1
 
 # build CNI bridge plugin wrapper with failpoint support, only used by integration test
 bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
@@ -241,6 +247,11 @@ bin/cni-bridge-fp: integration/failpoint/cmd/cni-bridge-fp FORCE
 bin/runc-fp: integration/failpoint/cmd/runc-fp FORCE
 	@echo "$(WHALE) $@"
 	@$(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/runc-fp
+
+# build loopback-v2 with failpoint support, only used by integration test
+bin/loopback-v2: integration/failpoint/cmd/loopback-v2 FORCE
+	@echo "$(WHALE) $@"
+	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ./integration/failpoint/cmd/loopback-v2
 
 benchmark: ## run benchmarks tests
 	@echo "$(WHALE) $@"
@@ -264,12 +275,12 @@ bin/gen-manpages: cmd/gen-manpages FORCE
 
 bin/containerd-shim-runc-v2: cmd/containerd-shim-runc-v2 FORCE # set !cgo and omit pie for a static shim build: https://github.com/golang/go/issues/17789#issuecomment-258542220
 	@echo "$(WHALE) $@"
-	@CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${GO_TAGS} ./cmd/containerd-shim-runc-v2
+	CGO_ENABLED=${SHIM_CGO_ENABLED} $(GO) build ${GO_BUILD_FLAGS} -o $@ ${SHIM_GO_LDFLAGS} ${SHIM_GO_TAGS} ./cmd/containerd-shim-runc-v2
 
 binaries: $(BINARIES) ## build binaries
 	@echo "$(WHALE) $@"
 
-man: mandir $(addprefix man/,$(MANPAGES))
+man: $(addprefix man/,$(MANPAGES))
 	@echo "$(WHALE) $@"
 
 mandir:
@@ -278,15 +289,15 @@ mandir:
 # Kept for backwards compatibility
 genman: man/containerd.8 man/ctr.8
 
-man/containerd.8: bin/gen-manpages FORCE
+man/containerd.8: bin/gen-manpages FORCE | mandir
 	@echo "$(WHALE) $@"
 	$< $(@F) $(@D)
 
-man/ctr.8: bin/gen-manpages FORCE
+man/ctr.8: bin/gen-manpages FORCE | mandir
 	@echo "$(WHALE) $@"
 	$< $(@F) $(@D)
 
-man/%: docs/man/%.md FORCE
+man/%: docs/man/%.md FORCE | mandir
 	@echo "$(WHALE) $@"
 	go-md2man -in "$<" -out "$@"
 

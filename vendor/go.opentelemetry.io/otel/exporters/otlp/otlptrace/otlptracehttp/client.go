@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -151,7 +152,7 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 		resp, err := d.client.Do(request.Request)
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) && urlErr.Temporary() {
-			return newResponseError(http.Header{})
+			return newResponseError(http.Header{}, err)
 		}
 		if err != nil {
 			return err
@@ -165,8 +166,7 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 			}()
 		}
 
-		switch sc := resp.StatusCode; {
-		case sc >= 200 && sc <= 299:
+		if sc := resp.StatusCode; sc >= 200 && sc <= 299 {
 			// Success, do not retry.
 			// Read the partial success message, if any.
 			var respData bytes.Buffer
@@ -193,18 +193,33 @@ func (d *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 				}
 			}
 			return nil
+		}
+		// Error cases.
 
-		case sc == http.StatusTooManyRequests,
-			sc == http.StatusBadGateway,
-			sc == http.StatusServiceUnavailable,
-			sc == http.StatusGatewayTimeout:
-			// Retry-able failures.  Drain the body to reuse the connection.
-			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-				otel.Handle(err)
-			}
-			return newResponseError(resp.Header)
+		// server may return a message with the response
+		// body, so we read it to include in the error
+		// message to be returned. It will help in
+		// debugging the actual issue.
+		var respData bytes.Buffer
+		if _, err := io.Copy(&respData, resp.Body); err != nil {
+			return err
+		}
+		respStr := strings.TrimSpace(respData.String())
+		if len(respStr) == 0 {
+			respStr = "(empty)"
+		}
+		bodyErr := fmt.Errorf("body: %s", respStr)
+
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests,
+			http.StatusBadGateway,
+			http.StatusServiceUnavailable,
+			http.StatusGatewayTimeout:
+			// Retryable failure.
+			return newResponseError(resp.Header, bodyErr)
 		default:
-			return fmt.Errorf("failed to send to %s: %s", request.URL, resp.Status)
+			// Non-retryable failure.
+			return fmt.Errorf("failed to send to %s: %s (%w)", request.URL, resp.Status, bodyErr)
 		}
 	})
 }
@@ -261,7 +276,7 @@ func (d *client) MarshalLog() interface{} {
 		Endpoint string
 		Insecure bool
 	}{
-		Type:     "otlphttphttp",
+		Type:     "otlptracehttp",
 		Endpoint: d.cfg.Endpoint,
 		Insecure: d.cfg.Insecure,
 	}
@@ -291,22 +306,48 @@ func (r *request) reset(ctx context.Context) {
 // retryableError represents a request failure that can be retried.
 type retryableError struct {
 	throttle int64
+	err      error
 }
 
 // newResponseError returns a retryableError and will extract any explicit
-// throttle delay contained in headers.
-func newResponseError(header http.Header) error {
+// throttle delay contained in headers. The returned error wraps wrapped
+// if it is not nil.
+func newResponseError(header http.Header, wrapped error) error {
 	var rErr retryableError
 	if s, ok := header["Retry-After"]; ok {
 		if t, err := strconv.ParseInt(s[0], 10, 64); err == nil {
 			rErr.throttle = t
 		}
 	}
+
+	rErr.err = wrapped
 	return rErr
 }
 
 func (e retryableError) Error() string {
+	if e.err != nil {
+		return "retry-able request failure: " + e.err.Error()
+	}
+
 	return "retry-able request failure"
+}
+
+func (e retryableError) Unwrap() error {
+	return e.err
+}
+
+func (e retryableError) As(target interface{}) bool {
+	if e.err == nil {
+		return false
+	}
+
+	switch v := target.(type) {
+	case **retryableError:
+		*v = &e
+		return true
+	default:
+		return false
+	}
 }
 
 // evaluate returns if err is retry-able. If it is and it includes an explicit
@@ -316,7 +357,10 @@ func evaluate(err error) (bool, time.Duration) {
 		return false, 0
 	}
 
-	rErr, ok := err.(retryableError)
+	// Do not use errors.As here, this should only be flattened one layer. If
+	// there are several chained errors, all the errors above it will be
+	// discarded if errors.As is used instead.
+	rErr, ok := err.(retryableError) //nolint:errorlint
 	if !ok {
 		return false, 0
 	}

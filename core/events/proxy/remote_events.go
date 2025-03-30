@@ -22,12 +22,14 @@ import (
 
 	api "github.com/containerd/containerd/api/services/events/v1"
 	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/errdefs"
+	"github.com/containerd/errdefs/pkg/errgrpc"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"google.golang.org/grpc"
+
+	"github.com/containerd/containerd/v2/core/events"
+	"github.com/containerd/containerd/v2/pkg/protobuf"
 )
 
 type EventService interface {
@@ -70,10 +72,10 @@ func (p *grpcEventsProxy) Publish(ctx context.Context, topic string, event event
 	}
 	req := &api.PublishRequest{
 		Topic: topic,
-		Event: protobuf.FromAny(evt),
+		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := p.client.Publish(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -84,11 +86,11 @@ func (p *grpcEventsProxy) Forward(ctx context.Context, envelope *events.Envelope
 			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
-			Event:     protobuf.FromAny(envelope.Event),
+			Event:     typeurl.MarshalProto(envelope.Event),
 		},
 	}
 	if _, err := p.client.Forward(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -151,10 +153,10 @@ func (p *ttrpcEventsProxy) Publish(ctx context.Context, topic string, event even
 	}
 	req := &api.PublishRequest{
 		Topic: topic,
-		Event: protobuf.FromAny(evt),
+		Event: typeurl.MarshalProto(evt),
 	}
 	if _, err := p.client.Publish(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }
@@ -165,11 +167,11 @@ func (p *ttrpcEventsProxy) Forward(ctx context.Context, envelope *events.Envelop
 			Timestamp: protobuf.ToTimestamp(envelope.Timestamp),
 			Namespace: envelope.Namespace,
 			Topic:     envelope.Topic,
-			Event:     protobuf.FromAny(envelope.Event),
+			Event:     typeurl.MarshalProto(envelope.Event),
 		},
 	}
 	if _, err := p.client.Forward(ctx, req); err != nil {
-		return errdefs.FromGRPC(err)
+		return errgrpc.ToNative(err)
 	}
 	return nil
 }

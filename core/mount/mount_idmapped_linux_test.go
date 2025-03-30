@@ -18,16 +18,47 @@ package mount
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"testing"
+
+	"golang.org/x/sys/unix"
 
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
 	"github.com/containerd/continuity/testutil"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/sys/unix"
 )
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent1(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(1)
+	}
+}
+
+func BenchmarkBatchRunGetUsernsFD_Concurrent10(b *testing.B) {
+	for range b.N {
+		benchmarkBatchRunGetUsernsFD(10)
+	}
+}
+
+func benchmarkBatchRunGetUsernsFD(n int) {
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			fd, err := getUsernsFD(testUIDMaps, testGIDMaps)
+			if err != nil {
+				panic(err)
+			}
+			fd.Close()
+		}()
+	}
+	wg.Wait()
+}
 
 var (
 	testUIDMaps = []syscall.SysProcIDMap{
@@ -43,7 +74,7 @@ var (
 	}
 )
 
-func TestGetUsernsFD(t *testing.T) {
+func TestIdmappedMount(t *testing.T) {
 	testutil.RequiresRoot(t)
 
 	k512 := kernel.KernelVersion{Kernel: 5, Major: 12}
@@ -53,15 +84,14 @@ func TestGetUsernsFD(t *testing.T) {
 		t.Skip("GetUsernsFD requires kernel >= 5.12")
 	}
 
-	t.Run("basic", testGetUsernsFDBasic)
+	t.Run("GetUsernsFD", testGetUsernsFD)
 
-	t.Run("when kill child process before write u[g]id maps", testGetUsernsFDKillChildWhenWriteUGIDMaps)
+	t.Run("IDMapMount", testIDMapMount)
 
-	t.Run("when kill child process after open u[g]id_map file", testGetUsernsFDKillChildAfterOpenUGIDMapFiles)
-
+	t.Run("IDMapMountWithAttrs", testIDMapMountWithAttrs)
 }
 
-func testGetUsernsFDBasic(t *testing.T) {
+func testGetUsernsFD(t *testing.T) {
 	for idx, tc := range []struct {
 		uidMaps string
 		gidMaps string
@@ -70,6 +100,11 @@ func testGetUsernsFDBasic(t *testing.T) {
 		{
 			uidMaps: "0:1000:100",
 			gidMaps: "0:1000:100",
+			hasErr:  false,
+		},
+		{
+			uidMaps: "0:1000:100,100:2000:200",
+			gidMaps: "0:1000:100,100:2000:200",
 			hasErr:  false,
 		},
 		{
@@ -87,6 +122,11 @@ func testGetUsernsFDBasic(t *testing.T) {
 			gidMaps: "0:1000:-1",
 			hasErr:  true,
 		},
+		{
+			uidMaps: "100:1000:100",
+			gidMaps: "0:1000:-1,100:1000:100",
+			hasErr:  true,
+		},
 	} {
 		t.Run(fmt.Sprintf("#%v", idx), func(t *testing.T) {
 			_, err := GetUsernsFD(tc.uidMaps, tc.gidMaps)
@@ -99,111 +139,65 @@ func testGetUsernsFDBasic(t *testing.T) {
 	}
 }
 
-func testGetUsernsFDKillChildWhenWriteUGIDMaps(t *testing.T) {
-	hookFunc := func(reap bool) func(uintptr, *os.File) {
-		return func(_pid uintptr, pidFD *os.File) {
-			err := unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
-			require.NoError(t, err)
+func testIDMapMount(t *testing.T) {
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
 
-			if reap {
-				pidfdWaitid(pidFD)
-			}
-		}
-	}
+	srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps, true)
+	destDir := t.TempDir()
+	defer func() {
+		require.NoError(t, UnmountAll(destDir, 0))
+	}()
 
-	for _, tcReap := range []bool{true, false} {
-		t.Run(fmt.Sprintf("#reap=%v", tcReap), func(t *testing.T) {
-			updateTestHookKillForGetUsernsFD(t, nil, hookFunc(tcReap))
-
-			usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
-			require.NoError(t, err)
-			defer usernsFD.Close()
-
-			srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps)
-			destDir := t.TempDir()
-			defer func() {
-				require.NoError(t, UnmountAll(destDir, 0))
-			}()
-
-			err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
-			usernsFD.Close()
-			require.NoError(t, err)
-			checkFunc(destDir)
-		})
-	}
-
+	err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
+	require.NoError(t, err)
+	checkFunc(destDir)
 }
 
-func testGetUsernsFDKillChildAfterOpenUGIDMapFiles(t *testing.T) {
-	hookFunc := func(reap bool) func(uintptr, *os.File) {
-		return func(_pid uintptr, pidFD *os.File) {
-			err := unix.PidfdSendSignal(int(pidFD.Fd()), unix.SIGKILL, nil, 0)
-			require.NoError(t, err)
+func testIDMapMountWithAttrs(t *testing.T) {
+	usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
+	require.NoError(t, err)
+	defer usernsFD.Close()
 
-			if reap {
-				pidfdWaitid(pidFD)
-			}
-		}
+	type testCase struct {
+		name      string
+		srcDir    string
+		setAttr   uint64
+		checkFunc func(destDir string)
 	}
 
-	for _, tc := range []struct {
-		reap     bool
-		expected error
-	}{
-		{
-			reap:     false,
-			expected: nil,
-		},
-		{
-			reap:     true,
-			expected: syscall.ESRCH,
-		},
-	} {
-		t.Run(fmt.Sprintf("#reap=%v", tc.reap), func(t *testing.T) {
-			updateTestHookKillForGetUsernsFD(t, hookFunc(tc.reap), nil)
-
-			usernsFD, err := getUsernsFD(testUIDMaps, testGIDMaps)
-			if tc.expected != nil {
-				require.Error(t, tc.expected, err)
-				return
-			}
-
-			require.NoError(t, err)
-			defer usernsFD.Close()
-
-			srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps)
-			destDir := t.TempDir()
-			defer func() {
-				require.NoError(t, UnmountAll(destDir, 0))
-			}()
-
-			err = IDMapMount(srcDir, destDir, int(usernsFD.Fd()))
-			usernsFD.Close()
-			require.NoError(t, err)
-			checkFunc(destDir)
-		})
-	}
-}
-
-func updateTestHookKillForGetUsernsFD(t *testing.T, newBeforeFunc, newAfterFunc func(uintptr, *os.File)) {
-	testHookLock.Lock()
-
-	oldBefore := testHookKillChildBeforePidfdSendSignal
-	oldAfter := testHookKillChildAfterPidfdSendSignal
-	t.Cleanup(func() {
-		testHookKillChildBeforePidfdSendSignal = oldBefore
-		testHookKillChildAfterPidfdSendSignal = oldAfter
-		testHookLock.Unlock()
+	cases := make([]testCase, 0)
+	srcDir, checkFunc := initIDMappedChecker(t, testUIDMaps, testGIDMaps, true)
+	cases = append(cases, testCase{
+		name:      "Writable idmapped mount",
+		srcDir:    srcDir,
+		setAttr:   0,
+		checkFunc: checkFunc,
 	})
-	if newBeforeFunc != nil {
-		testHookKillChildBeforePidfdSendSignal = newBeforeFunc
-	}
-	if newAfterFunc != nil {
-		testHookKillChildAfterPidfdSendSignal = newAfterFunc
+
+	srcDir, checkFunc = initIDMappedChecker(t, testUIDMaps, testGIDMaps, false)
+	cases = append(cases, testCase{
+		name:      "Readonly idmapped mount",
+		srcDir:    srcDir,
+		setAttr:   unix.MOUNT_ATTR_RDONLY,
+		checkFunc: checkFunc,
+	})
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			destDir := t.TempDir()
+			defer func() {
+				require.NoError(t, UnmountAll(destDir, 0))
+			}()
+			err := IDMapMountWithAttrs(tc.srcDir, destDir, int(usernsFD.Fd()), tc.setAttr, 0)
+			require.NoError(t, err)
+			tc.checkFunc(destDir)
+		})
 	}
 }
 
-func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap) (_srcDir string, _verifyFunc func(destDir string)) {
+func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap, expectWritable bool) (_srcDir string, _verifyFunc func(destDir string)) {
 	testutil.RequiresRoot(t)
 
 	srcDir := t.TempDir()
@@ -220,6 +214,11 @@ func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap) 
 		err = f.Chown(uid, gid)
 		require.NoError(t, err, fmt.Sprintf("chown %v:%v for file %s", uid, gid, file))
 	}
+
+	writableDir := filepath.Join(srcDir, "write-test")
+	require.NoError(t, os.Mkdir(writableDir, os.ModePerm))
+	require.NoError(t, os.Chmod(writableDir, os.ModePerm))
+	require.NoError(t, os.Chown(writableDir, uidMaps[0].ContainerID, gidMaps[0].ContainerID))
 
 	return srcDir, func(destDir string) {
 		for idx := range uidMaps {
@@ -238,6 +237,19 @@ func initIDMappedChecker(t *testing.T, uidMaps, gidMaps []syscall.SysProcIDMap) 
 			require.Equal(t, uint32(uid), sysStat.Uid, fmt.Sprintf("check file %s uid", file))
 			require.Equal(t, uint32(gid), sysStat.Gid, fmt.Sprintf("check file %s gid", file))
 			t.Logf("IDMapped File %s uid=%v, gid=%v", file, uid, gid)
+		}
+
+		wf, err := os.Create(filepath.Join(destDir, "write-test", "1"))
+		if err == nil {
+			defer wf.Close()
+		}
+		if expectWritable {
+			require.NoError(t, err, "create write-test file")
+		} else {
+			require.Error(t, err)
+			pathErr, isPathErr := err.(*fs.PathError)
+			require.True(t, isPathErr, "Expecting path error")
+			require.Equal(t, unix.EROFS, pathErr.Err, "Expecting read-only filesystem error")
 		}
 	}
 }

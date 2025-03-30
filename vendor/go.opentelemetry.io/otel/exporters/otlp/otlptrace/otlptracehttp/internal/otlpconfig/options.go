@@ -98,7 +98,7 @@ func cleanPath(urlPath string, defaultPath string) string {
 		return defaultPath
 	}
 	if !path.IsAbs(tmp) {
-		tmp = fmt.Sprintf("/%s", tmp)
+		tmp = "/" + tmp
 	}
 	return tmp
 }
@@ -125,7 +125,7 @@ func NewGRPCConfig(opts ...GRPCOption) Config {
 	if cfg.ServiceConfig != "" {
 		cfg.DialOptions = append(cfg.DialOptions, grpc.WithDefaultServiceConfig(cfg.ServiceConfig))
 	}
-	// Priroritize GRPCCredentials over Insecure (passing both is an error).
+	// Prioritize GRPCCredentials over Insecure (passing both is an error).
 	if cfg.Traces.GRPCCredentials != nil {
 		cfg.DialOptions = append(cfg.DialOptions, grpc.WithTransportCredentials(cfg.Traces.GRPCCredentials))
 	} else if cfg.Traces.Insecure {
@@ -256,6 +256,9 @@ func NewGRPCOption(fn func(cfg Config) Config) GRPCOption {
 
 // Generic Options
 
+// WithEndpoint configures the trace host and port only; endpoint should
+// resemble "example.com" or "localhost:4317". To configure the scheme and path,
+// use WithEndpointURL.
 func WithEndpoint(endpoint string) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		cfg.Traces.Endpoint = endpoint
@@ -263,6 +266,8 @@ func WithEndpoint(endpoint string) GenericOption {
 	})
 }
 
+// WithEndpointURL configures the trace scheme, host, port, and path; the
+// provided value should resemble "https://example.com:4318/v1/traces".
 func WithEndpointURL(v string) GenericOption {
 	return newGenericOption(func(cfg Config) Config {
 		u, err := url.Parse(v)
@@ -273,9 +278,7 @@ func WithEndpointURL(v string) GenericOption {
 
 		cfg.Traces.Endpoint = u.Host
 		cfg.Traces.URLPath = u.Path
-		if u.Scheme != "https" {
-			cfg.Traces.Insecure = true
-		}
+		cfg.Traces.Insecure = u.Scheme != "https"
 
 		return cfg
 	})

@@ -19,7 +19,6 @@ package nri
 import (
 	"context"
 	"fmt"
-	"path"
 	"sync"
 
 	"github.com/containerd/log"
@@ -38,7 +37,7 @@ type API interface {
 	// IsEnabled returns true if the NRI interface is enabled and initialized.
 	IsEnabled() bool
 
-	// Start start the NRI interface, allowing external NRI plugins to
+	// Start starts the NRI interface, allowing external NRI plugins to
 	// connect, register, and hook themselves into the lifecycle events
 	// of pods and containers.
 	Start() error
@@ -81,6 +80,9 @@ type API interface {
 
 	// RemoveContainer relays container removal events to NRI.
 	RemoveContainer(context.Context, PodSandbox, Container) error
+
+	// BlockPluginSync blocks plugin synchronization until it is Unblock()ed.
+	BlockPluginSync() *PluginSyncBlock
 }
 
 type State int
@@ -114,7 +116,7 @@ func New(cfg *Config) (API, error) {
 	}
 
 	var (
-		name     = path.Base(version.Package)
+		name     = version.Name
 		version  = version.Version
 		opts     = cfg.toOptions()
 		syncFn   = l.syncPlugin
@@ -433,6 +435,15 @@ func (l *local) RemoveContainer(ctx context.Context, pod PodSandbox, ctr Contain
 	l.setState(request.Container.Id, Removed)
 
 	return err
+}
+
+type PluginSyncBlock = nri.PluginSyncBlock
+
+func (l *local) BlockPluginSync() *PluginSyncBlock {
+	if !l.IsEnabled() {
+		return nil
+	}
+	return l.nri.BlockPluginSync()
 }
 
 func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {

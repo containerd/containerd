@@ -335,7 +335,9 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		algorithm := strings.ToLower(encoding[i])
 		switch algorithm {
 		case "zstd":
-			r, err := zstd.NewReader(body)
+			r, err := zstd.NewReader(body,
+				zstd.WithDecoderLowmem(false),
+			)
 			if err != nil {
 				return nil, err
 			}

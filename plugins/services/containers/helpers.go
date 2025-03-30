@@ -28,7 +28,6 @@ func containersToProto(containers []containers.Container) []*api.Container {
 	var containerspb []*api.Container
 
 	for _, image := range containers {
-		image := image
 		containerspb = append(containerspb, containerToProto(&image))
 	}
 
@@ -38,7 +37,7 @@ func containersToProto(containers []containers.Container) []*api.Container {
 func containerToProto(container *containers.Container) *api.Container {
 	extensions := make(map[string]*types.Any)
 	for k, v := range container.Extensions {
-		extensions[k] = protobuf.FromAny(v)
+		extensions[k] = typeurl.MarshalProto(v)
 	}
 	return &api.Container{
 		ID:     container.ID,
@@ -46,9 +45,9 @@ func containerToProto(container *containers.Container) *api.Container {
 		Image:  container.Image,
 		Runtime: &api.Container_Runtime{
 			Name:    container.Runtime.Name,
-			Options: protobuf.FromAny(container.Runtime.Options),
+			Options: typeurl.MarshalProto(container.Runtime.Options),
 		},
-		Spec:        protobuf.FromAny(container.Spec),
+		Spec:        typeurl.MarshalProto(container.Spec),
 		Snapshotter: container.Snapshotter,
 		SnapshotKey: container.SnapshotKey,
 		CreatedAt:   protobuf.ToTimestamp(container.CreatedAt),
@@ -68,7 +67,6 @@ func containerFromProto(containerpb *api.Container) containers.Container {
 	}
 	extensions := make(map[string]typeurl.Any)
 	for k, v := range containerpb.Extensions {
-		v := v
 		extensions[k] = v
 	}
 	return containers.Container{

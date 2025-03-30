@@ -19,7 +19,26 @@ set -eu -o pipefail
 report_dir=$1
 
 mkdir -p $report_dir
+
+function traverse_path() {
+    local path=$1
+    cd "$path"
+    sudo chmod go+rx "$PWD"
+
+    while [ $PWD != "/" ]; do
+	sudo chmod go+x "$PWD/../"
+	cd ..
+    done
+}
+
 BDIR="$(mktemp -d -p $PWD)"
+# runc needs to traverse (+x) the directories in the path to the rootfs. This is important when we
+# create a user namespace, as the final stage of the runc initialization is not as root on the host.
+# While containerd creates the directories with the right permissions, the right group (so only the
+# hostGID has access, etc.), those directories live below $BDIR. So, to make sure runc can traverse
+# the directories, let's fix the dirs from $BDIR up, as the ones below are managed by containerd
+# that does the right thing.
+traverse_path "$BDIR"
 
 function cleanup() {
     pkill containerd || true
@@ -43,6 +62,14 @@ runtime_type = "${TEST_RUNTIME}"
 # This is safely ignored for kernel >= 5.19.
 slow_chown = true
 EOF
+
+if [ ! -z "$CGROUP_DRIVER" ] && [ "$CGROUP_DRIVER" = "systemd" ];then
+  cat >> ${BDIR}/config.toml <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+   SystemdCgroup = true
+EOF
+fi
+
 ls /etc/cni/net.d
 
 /usr/local/bin/containerd \

@@ -37,11 +37,11 @@ import (
 type API struct {
 }
 
-func NewAPI(nri.API) *API {
+func NewAPI(nri.API, CRIImplementation) *API {
 	return nil
 }
 
-func (a *API) Register(CRIImplementation) error {
+func (a *API) Register() error {
 	return nil
 }
 
@@ -107,6 +107,14 @@ func (*API) WithContainerExit(*cstore.Container) containerd.ProcessDeleteOpts {
 		return nil
 	}
 }
+
+type PluginSyncBlock struct{}
+
+func (*API) BlockPluginSync() *PluginSyncBlock {
+	return nil
+}
+
+func (*PluginSyncBlock) Unblock() {}
 
 //
 // NRI-CRI no-op 'domain' interface

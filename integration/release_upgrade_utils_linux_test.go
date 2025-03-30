@@ -33,11 +33,16 @@ import (
 	"github.com/containerd/containerd/v2/version"
 )
 
-// downloadPreviousReleaseBinary downloads the latest version of previous release
-// into the target dir.
-func downloadPreviousReleaseBinary(t *testing.T, targetDir string) {
+// downloadPreviousLatestReleaseBinary downloads the latest version of previous
+// release into the target dir.
+func downloadPreviousLatestReleaseBinary(t *testing.T, targetDir string) {
 	ver := previousReleaseVersion(t)
 
+	downloadReleaseBinary(t, targetDir, ver)
+}
+
+// downloadReleaseBinary downloads containerd binary with a given release.
+func downloadReleaseBinary(t *testing.T, targetDir string, ver string) {
 	targetURL := fmt.Sprintf("https://github.com/containerd/containerd/releases/download/%s/containerd-%s-linux-%s.tar.gz",
 		ver, strings.TrimPrefix(ver, "v"), runtime.GOARCH,
 	)
@@ -76,6 +81,8 @@ func ctrdPreviousMajorMinor(t *testing.T) string {
 
 	version := semver.MajorMinor(currentVer)
 	switch version {
+	case "v2.1":
+		return "v2.0"
 	case "v2.0":
 		return "v1.7"
 	case "v1.7":

@@ -301,6 +301,7 @@ func getIngestBucket(tx *bolt.Tx, namespace, ref string) *bolt.Bucket {
 func createSandboxBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
 	return createBucketIfNotExists(
 		tx,
+		bucketKeyVersion,
 		[]byte(namespace),
 		bucketKeyObjectSandboxes,
 	)
@@ -309,6 +310,7 @@ func createSandboxBucket(tx *bolt.Tx, namespace string) (*bolt.Bucket, error) {
 func getSandboxBucket(tx *bolt.Tx, namespace string) *bolt.Bucket {
 	return getBucket(
 		tx,
+		bucketKeyVersion,
 		[]byte(namespace),
 		bucketKeyObjectSandboxes,
 	)

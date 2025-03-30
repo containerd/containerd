@@ -109,7 +109,7 @@ func TestExportAllCases(t *testing.T) {
 				return img
 			},
 			check: func(ctx context.Context, t *testing.T, client *Client, dstFile *os.File, img images.Image) {
-				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithPlatform(platforms.All), archive.WithImage(client.ImageService(), testImage))
+				err := client.Export(ctx, dstFile, archive.WithImage(client.ImageService(), testImage), archive.WithPlatform(platforms.All))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -234,7 +234,6 @@ func TestExportAllCases(t *testing.T) {
 			},
 		},
 	} {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := testContext(t)

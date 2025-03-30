@@ -24,11 +24,11 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/moby/sys/userns"
 	"golang.org/x/sys/unix"
 
 	"github.com/containerd/containerd/v2/core/mount"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
-	"github.com/containerd/containerd/v2/pkg/userns"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )
@@ -261,7 +261,8 @@ func SupportsIDMappedMounts() (bool, error) {
 	}
 	defer usernsFd.Close()
 
-	if err = mount.IDMapMount(lowerDir, lowerDir, int(usernsFd.Fd())); err != nil {
+	// MOUNT_ATTR_RDONLY to replicate our actual construction of overlayfs
+	if err = mount.IDMapMountWithAttrs(lowerDir, lowerDir, int(usernsFd.Fd()), unix.MOUNT_ATTR_RDONLY, 0); err != nil {
 		return false, fmt.Errorf("failed to remap lowerdir %s: %w", lowerDir, err)
 	}
 	defer func() {

@@ -33,6 +33,8 @@ type lbConfig struct {
 	childConfig  serviceconfig.LoadBalancingConfig
 }
 
+// ChildName returns the name of the child balancer of the gracefulswitch
+// Balancer.
 func ChildName(l serviceconfig.LoadBalancingConfig) string {
 	return l.(*lbConfig).childBuilder.Name()
 }
@@ -75,7 +77,6 @@ func ParseConfig(cfg json.RawMessage) (serviceconfig.LoadBalancingConfig, error)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing config for policy %q: %v", name, err)
 		}
-
 		return &lbConfig{childBuilder: builder, childConfig: cfg}, nil
 	}
 

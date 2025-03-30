@@ -31,9 +31,15 @@ import (
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	bolt "go.etcd.io/bbolt"
+	errbolt "go.etcd.io/bbolt/errors"
+)
+
+const (
+	spanContainerPrefix = "metadata.containers"
 )
 
 type containerStore struct {
@@ -116,6 +122,11 @@ func (s *containerStore) List(ctx context.Context, fs ...string) ([]containers.C
 }
 
 func (s *containerStore) Create(ctx context.Context, container containers.Container) (containers.Container, error) {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanContainerPrefix, "Create"),
+		tracing.WithAttribute("container.id", container.ID),
+	)
+	defer span.End()
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -133,7 +144,7 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 
 		cbkt, err := bkt.CreateBucket([]byte(container.ID))
 		if err != nil {
-			if err == bolt.ErrBucketExists {
+			if err == errbolt.ErrBucketExists {
 				err = fmt.Errorf("container %q: %w", container.ID, errdefs.ErrAlreadyExists)
 			}
 			return err
@@ -145,6 +156,9 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 			return fmt.Errorf("failed to write container %q: %w", container.ID, err)
 		}
 
+		span.SetAttributes(
+			tracing.Attribute("container.createdAt", container.CreatedAt.Format(time.RFC3339)),
+		)
 		return nil
 	}); err != nil {
 		return containers.Container{}, err
@@ -154,6 +168,11 @@ func (s *containerStore) Create(ctx context.Context, container containers.Contai
 }
 
 func (s *containerStore) Update(ctx context.Context, container containers.Container, fieldpaths ...string) (containers.Container, error) {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanContainerPrefix, "Update"),
+		tracing.WithAttribute("container.id", container.ID),
+	)
+	defer span.End()
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return containers.Container{}, err
@@ -245,6 +264,10 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 			return fmt.Errorf("failed to write container %q: %w", container.ID, err)
 		}
 
+		span.SetAttributes(
+			tracing.Attribute("container.createdAt", updated.CreatedAt.Format(time.RFC3339)),
+			tracing.Attribute("container.updatedAt", updated.UpdatedAt.Format(time.RFC3339)),
+		)
 		return nil
 	}); err != nil {
 		return containers.Container{}, err
@@ -254,6 +277,12 @@ func (s *containerStore) Update(ctx context.Context, container containers.Contai
 }
 
 func (s *containerStore) Delete(ctx context.Context, id string) error {
+	ctx, span := tracing.StartSpan(ctx,
+		tracing.Name(spanContainerPrefix, "Delete"),
+		tracing.WithAttribute("container.id", id),
+	)
+	defer span.End()
+
 	namespace, err := namespaces.NamespaceRequired(ctx)
 	if err != nil {
 		return err
@@ -266,7 +295,7 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 		}
 
 		if err := bkt.DeleteBucket([]byte(id)); err != nil {
-			if err == bolt.ErrBucketNotFound {
+			if err == errbolt.ErrBucketNotFound {
 				err = fmt.Errorf("container %v: %w", id, errdefs.ErrNotFound)
 			}
 			return err

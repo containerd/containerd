@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/containerd/log"
@@ -32,6 +33,7 @@ import (
 	runcoptions "github.com/containerd/containerd/api/types/runc/options"
 	runtimeoptions "github.com/containerd/containerd/api/types/runtimeoptions/v1"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
+	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/plugins"
 )
@@ -102,6 +104,8 @@ type Runtime struct {
 	// to the runtime spec when the container when PrivilegedWithoutHostDevices is already enabled. Requires
 	// PrivilegedWithoutHostDevices to be enabled. Defaults to false.
 	PrivilegedWithoutHostDevicesAllDevicesAllowed bool `toml:"privileged_without_host_devices_all_devices_allowed" json:"privileged_without_host_devices_all_devices_allowed"`
+	// CgroupWritable enables writable cgroups in non-privileged containers
+	CgroupWritable bool `toml:"cgroup_writable" json:"cgroupWritable"`
 	// BaseRuntimeSpec is a json file with OCI spec to use as base spec that all container's will be created from.
 	BaseRuntimeSpec string `toml:"base_runtime_spec" json:"baseRuntimeSpec"`
 	// NetworkPluginConfDir is a directory containing the CNI network information for the runtime class.
@@ -149,7 +153,13 @@ type ContainerdConfig struct {
 // CniConfig contains toml config related to cni
 type CniConfig struct {
 	// NetworkPluginBinDir is the directory in which the binaries for the plugin is kept.
+	//
+	// DEPRECATED: use `NetworkPluginBinDirs` instead.`
 	NetworkPluginBinDir string `toml:"bin_dir" json:"binDir"`
+	// NetworkPluginBinDirs is the directories in which the binaries for the plugin is kept.
+	//
+	// Only use one of NetworkPluginBinDir and NetworkPluginBinDirs, not both.
+	NetworkPluginBinDirs []string `toml:"bin_dirs" json:"binDirs"`
 	// NetworkPluginConfDir is the directory in which the admin places a CNI conf.
 	NetworkPluginConfDir string `toml:"conf_dir" json:"confDir"`
 	// NetworkPluginMaxConfNum is the max number of plugin config files that will
@@ -220,15 +230,18 @@ type Registry struct {
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.0, supported in 1.x releases.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// Supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
 	Headers map[string][]string `toml:"headers" json:"headers"`
@@ -339,10 +352,7 @@ type RuntimeConfig struct {
 	// MaxContainerLogLineSize is the maximum log line size in bytes for a container.
 	// Log line longer than the limit will be split into multiple lines. Non-positive
 	// value means no limit.
-	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogSize"`
-	// DisableCgroup indicates to disable the cgroup support.
-	// This is useful when the containerd does not have permission to access cgroup.
-	DisableCgroup bool `toml:"disable_cgroup" json:"disableCgroup"`
+	MaxContainerLogLineSize int `toml:"max_container_log_line_size" json:"maxContainerLogLineSize"`
 	// DisableApparmor indicates to disable the apparmor support.
 	// This is useful when the containerd does not have permission to access Apparmor.
 	DisableApparmor bool `toml:"disable_apparmor" json:"disableApparmor"`
@@ -378,13 +388,10 @@ type RuntimeConfig struct {
 	// EnableUnprivilegedPorts configures net.ipv4.ip_unprivileged_port_start=0
 	// for all containers which are not using host network
 	// and if it is not overwritten by PodSandboxConfig
-	// Note that currently default is set to disabled but target change it in future, see:
-	//   https://github.com/kubernetes/kubernetes/issues/102612
 	EnableUnprivilegedPorts bool `toml:"enable_unprivileged_ports" json:"enableUnprivilegedPorts"`
 	// EnableUnprivilegedICMP configures net.ipv4.ping_group_range="0 2147483647"
 	// for all containers which are not using host network, are not running in user namespace
 	// and if it is not overwritten by PodSandboxConfig
-	// Note that currently default is set to disabled but target change it in future together with EnableUnprivilegedPorts
 	EnableUnprivilegedICMP bool `toml:"enable_unprivileged_icmp" json:"enableUnprivilegedICMP"`
 	// EnableCDI indicates to enable injection of the Container Device Interface Specifications
 	// into the OCI config
@@ -487,7 +494,6 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 			c.Registry.Configs = make(map[string]RegistryConfig)
 		}
 		for endpoint, auth := range c.Registry.Auths {
-			auth := auth
 			u, err := url.Parse(endpoint)
 			if err != nil {
 				return warnings, fmt.Errorf("failed to parse registry url %q from `registry.auths`: %w", endpoint, err)
@@ -529,7 +535,33 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
 	}
 
+	// Validation for CNI config
+	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		warnings = append(warnings, deprecation.CRICNIBinDir)
+		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
+
+		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
+			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
+			// to avoid the unexpected conflict between the two since we don't allow setting both.
+			c.CniConfig.NetworkPluginBinDirs = nil
+		}
+		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
+			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
+			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
+			// so that we can use it in the rest of the code.
+			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
+			c.CniConfig.NetworkPluginBinDir = ""
+		}
+	}
+	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
+		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
+	}
+
 	for k, r := range c.ContainerdConfig.Runtimes {
+		if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
+			return warnings, fmt.Errorf("runtime %s: `cgroup_writable` is only supported on cgroup v2", k)
+		}
+
 		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
 			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
 		}

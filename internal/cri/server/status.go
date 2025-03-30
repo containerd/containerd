@@ -58,6 +58,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			networkCondition,
 		}},
 		RuntimeHandlers: c.runtimeHandlers,
+		Features:        c.runtimeFeatures,
 	}
 	if r.Verbose {
 		configByt, err := json.Marshal(c.config)

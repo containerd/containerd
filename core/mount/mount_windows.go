@@ -33,11 +33,6 @@ import (
 
 const sourceStreamName = "containerd.io-source"
 
-var (
-	// ErrNotImplementOnWindows is returned when an action is not implemented for windows
-	ErrNotImplementOnWindows = errors.New("not implemented under windows")
-)
-
 // Mount to the provided target.
 func (m *Mount) mount(target string) (retErr error) {
 	if m.Type != "windows-layer" {

@@ -21,10 +21,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"google.golang.org/grpc/resolver"
 
 	containersapi "github.com/containerd/containerd/api/services/containers/v1"
 	diffapi "github.com/containerd/containerd/api/services/diff/v1"
@@ -55,8 +58,8 @@ import (
 	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/pkg/protobuf"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
@@ -80,6 +83,14 @@ func init() {
 	typeurl.Register(&specs.LinuxResources{}, prefix, "opencontainers/runtime-spec", major, "LinuxResources")
 	typeurl.Register(&specs.WindowsResources{}, prefix, "opencontainers/runtime-spec", major, "WindowsResources")
 	typeurl.Register(&features.Features{}, prefix, "opencontainers/runtime-spec", major, "features", "Features")
+
+	if runtime.GOOS == "windows" {
+		// After bumping GRPC to 1.64, Windows tests started failing with: "name resolver error: produced zero addresses".
+		// This is happening because grpc.NewClient uses DNS resolver by default, which apparently not what we want
+		// when using socket paths on Windows.
+		// Using a workaround from https://github.com/grpc/grpc-go/issues/1786#issuecomment-2119088770
+		resolver.SetDefaultScheme("passthrough")
+	}
 }
 
 // New returns a new containerd client that is connected to the containerd
@@ -116,21 +127,21 @@ func New(address string, opts ...Opt) (*Client, error) {
 	}
 	if address != "" {
 		backoffConfig := backoff.DefaultConfig
-		backoffConfig.MaxDelay = 3 * time.Second
+		backoffConfig.MaxDelay = copts.timeout
 		connParams := grpc.ConnectParams{
-			Backoff: backoffConfig,
+			Backoff:           backoffConfig,
+			MinConnectTimeout: copts.timeout,
 		}
 		gopts := []grpc.DialOption{
-			grpc.WithBlock(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
-			grpc.FailOnNonTempDialError(true),
 			grpc.WithConnectParams(connParams),
 			grpc.WithContextDialer(dialer.ContextDialer),
-			grpc.WithReturnConnectionError(),
 		}
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
+		gopts = append(gopts, copts.extraDialOpts...)
+
 		gopts = append(gopts, grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
 			grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
@@ -144,9 +155,7 @@ func New(address string, opts ...Opt) (*Client, error) {
 		}
 
 		connector := func() (*grpc.ClientConn, error) {
-			ctx, cancel := context.WithTimeout(context.Background(), copts.timeout)
-			defer cancel()
-			conn, err := grpc.DialContext(ctx, dialer.DialAddress(address), gopts...)
+			conn, err := grpc.NewClient(dialer.DialAddress(address), gopts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to dial %q: %w", address, err)
 			}
@@ -269,9 +278,9 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 	if err != nil {
 		return nil, err
 	}
-	var out []Container
-	for _, container := range r {
-		out = append(out, containerFromRecord(c, container))
+	out := make([]Container, len(r))
+	for i, container := range r {
+		out[i] = containerFromRecord(c, container)
 	}
 	return out, nil
 }
@@ -279,6 +288,8 @@ func (c *Client) Containers(ctx context.Context, filters ...string) ([]Container
 // NewContainer will create a new container with the provided id.
 // The id must be unique within the namespace.
 func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContainerOpts) (Container, error) {
+	ctx, span := tracing.StartSpan(ctx, "client.NewContainer")
+	defer span.End()
 	ctx, done, err := c.WithLease(ctx)
 	if err != nil {
 		return nil, err
@@ -296,6 +307,13 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 			return nil, err
 		}
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("container.id", container.ID),
+		tracing.Attribute("container.image.ref", container.Image),
+		tracing.Attribute("container.runtime.name", container.Runtime.Name),
+		tracing.Attribute("container.snapshotter.name", container.Snapshotter),
+	)
 	r, err := c.ContainerService().Create(ctx, container)
 	if err != nil {
 		return nil, err
@@ -305,10 +323,21 @@ func (c *Client) NewContainer(ctx context.Context, id string, opts ...NewContain
 
 // LoadContainer loads an existing container from metadata
 func (c *Client) LoadContainer(ctx context.Context, id string) (Container, error) {
+	ctx, span := tracing.StartSpan(ctx, "client.LoadContainer")
+	defer span.End()
 	r, err := c.ContainerService().Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
+	span.SetAttributes(
+		tracing.Attribute("container.id", r.ID),
+		tracing.Attribute("container.image.ref", r.Image),
+		tracing.Attribute("container.runtime.name", r.Runtime.Name),
+		tracing.Attribute("container.snapshotter.name", r.Snapshotter),
+		tracing.Attribute("container.createdAt", r.CreatedAt.Format(time.RFC3339)),
+		tracing.Attribute("container.updatedAt", r.UpdatedAt.Format(time.RFC3339)),
+	)
 	return containerFromRecord(c, r), nil
 }
 
@@ -514,9 +543,9 @@ func (c *Client) Restore(ctx context.Context, id string, checkpoint Image, opts 
 	}
 	defer done(ctx)
 
-	copts := []NewContainerOpts{}
-	for _, o := range opts {
-		copts = append(copts, o(ctx, id, c, checkpoint, index))
+	copts := make([]NewContainerOpts, len(opts))
+	for i, o := range opts {
+		copts[i] = o(ctx, id, c, checkpoint, index)
 	}
 
 	ctr, err := c.NewContainer(ctx, id, copts...)
@@ -727,7 +756,7 @@ func (c *Client) SandboxController(name string) sandbox.Controller {
 	}
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
-	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn))
+	return sandboxproxy.NewSandboxController(sandboxsapi.NewControllerClient(c.conn), name)
 }
 
 // VersionService returns the underlying VersionClient
@@ -898,7 +927,7 @@ func (c *Client) RuntimeInfo(ctx context.Context, runtimePath string, runtimeOpt
 	}
 	var err error
 	if runtimeOptions != nil {
-		rr.Options, err = protobuf.MarshalAnyToProto(runtimeOptions)
+		rr.Options, err = typeurl.MarshalAnyToProto(runtimeOptions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal %T: %w", runtimeOptions, err)
 		}

@@ -37,3 +37,7 @@ sudo install bin/containerd-shim-runc-fp-v1 "${SHIM_BIN_DIR}"
 RUNCFP_BIN_DIR=${RUNCFP_BIN_DIR:-"/usr/local/bin"}
 make bin/runc-fp
 sudo install bin/runc-fp "${RUNCFP_BIN_DIR}"
+
+LOOPBACKV2_BIN_DIR=${LOOPBACKV2_BIN_DIR:-"/usr/local/bin"}
+make bin/loopback-v2
+sudo install bin/loopback-v2 "${LOOPBACKV2_BIN_DIR}"

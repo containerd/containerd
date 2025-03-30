@@ -28,7 +28,8 @@ import (
 	"strings"
 
 	"github.com/containerd/console"
-	"github.com/containerd/containerd/api/runtime/task/v3"
+	taskv2 "github.com/containerd/containerd/api/runtime/task/v2"
+	task "github.com/containerd/containerd/api/runtime/task/v3"
 	"github.com/containerd/containerd/v2/cmd/ctr/commands"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -67,7 +68,7 @@ var Command = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "id",
-			Usage: "Container id",
+			Usage: "shim ID",
 		},
 	},
 	Subcommands: []*cli.Command{
@@ -115,17 +116,55 @@ var deleteCommand = &cli.Command{
 
 var stateCommand = &cli.Command{
 	Name:  "state",
-	Usage: "Get the state of all the processes of the task",
+	Usage: "Get the state of all main process of the task",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "task-id",
+			Aliases: []string{"t"},
+			Usage:   "task ID",
+		},
+		&cli.IntFlag{
+			Name:  "api-version",
+			Usage: "shim API version {2,3}",
+			Value: 3,
+			Action: func(c *cli.Context, v int) error {
+				if v != 2 && v != 3 {
+					return fmt.Errorf("api-version must be 2 or 3")
+				}
+				return nil
+			},
+		},
+	},
 	Action: func(cliContext *cli.Context) error {
-		service, err := getTaskService(cliContext)
-		if err != nil {
-			return err
+		id := cliContext.String("task-id")
+		if id == "" {
+			id = cliContext.String("id")
 		}
-		r, err := service.State(context.Background(), &task.StateRequest{
-			ID: cliContext.String("id"),
-		})
-		if err != nil {
-			return err
+
+		var r any
+		switch cliContext.Int("api-version") {
+		case 2:
+			service, err := getTaskServiceV2(cliContext)
+			if err != nil {
+				return err
+			}
+			r, err = service.State(context.Background(), &taskv2.StateRequest{
+				ID: id,
+			})
+			if err != nil {
+				return err
+			}
+		default:
+			service, err := getTaskService(cliContext)
+			if err != nil {
+				return err
+			}
+			r, err = service.State(context.Background(), &task.StateRequest{
+				ID: id,
+			})
+			if err != nil {
+				return err
+			}
 		}
 		commands.PrintAsJSON(r)
 		return nil
@@ -234,6 +273,21 @@ var execCommand = &cli.Command{
 }
 
 func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
+	client, err := getTTRPCClient(cliContext)
+	if err != nil {
+		return nil, err
+	}
+	return task.NewTTRPCTaskClient(client), nil
+}
+func getTaskServiceV2(cliContext *cli.Context) (taskv2.TaskService, error) {
+	client, err := getTTRPCClient(cliContext)
+	if err != nil {
+		return nil, err
+	}
+	return taskv2.NewTaskClient(client), nil
+}
+
+func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	id := cliContext.String("id")
 	if id == "" {
 		return nil, fmt.Errorf("container id must be specified")
@@ -256,7 +310,7 @@ func getTaskService(cliContext *cli.Context) (task.TTRPCTaskService, error) {
 			// TODO(stevvooe): This actually leaks the connection. We were leaking it
 			// before, so may not be a huge deal.
 
-			return task.NewTTRPCTaskClient(client), nil
+			return client, nil
 		}
 	}
 

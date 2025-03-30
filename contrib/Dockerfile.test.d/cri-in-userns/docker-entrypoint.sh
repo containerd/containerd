@@ -41,6 +41,13 @@ xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs || :
 sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
   > /sys/fs/cgroup/cgroup.subtree_control
 
+if [ ! -z "$IS_SYSTEMD_CGROUP" ] && [ "$IS_SYSTEMD_CGROUP" = true ];then
+  cat >> /etc/containerd/config.toml <<EOF
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+   SystemdCgroup = true
+EOF
+fi
+
 set -x
 echo >&2 "Running containerd in background"
 containerd &
@@ -48,4 +55,9 @@ containerd &
 echo >&2 "Waiting for containerd"
 until ctr plugins list; do sleep 3; done
 
-exec "$@"
+if [ ! -z "$IS_SYSTEMD_CGROUP" ] && [ "$IS_SYSTEMD_CGROUP" = true ];then
+  critest "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"
+  /bin/bash /critest.sh exit
+else
+  exec "$@"
+fi
