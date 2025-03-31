@@ -803,6 +803,32 @@ func RestartContainerd(t *testing.T, signal syscall.Signal) {
 	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
 }
 
+func StopContainerd(t *testing.T, signal syscall.Signal) {
+	require.NoError(t, KillProcess(*containerdBin, signal))
+
+	// Use assert so that the 3rd wait always runs, this makes sure
+	// containerd is running before this function returns.
+	assert.NoError(t, Eventually(func() (bool, error) {
+		pid, err := PidOf(*containerdBin)
+		if err != nil {
+			return false, err
+		}
+		return pid == 0, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be killed")
+}
+
+func StartContainerd(t *testing.T) {
+	require.NoError(t, Eventually(func() (bool, error) {
+		return ConnectDaemons() == nil, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
+}
+
+func StartContainerdFailed(t *testing.T) {
+	require.Error(t, Eventually(func() (bool, error) {
+		return ConnectDaemons() == nil, nil
+	}, time.Second, 30*time.Second), "wait for containerd to be restarted")
+}
+
 // EnsureImageExists pulls the given image, ensures that no error was encountered
 // while pulling it.
 func EnsureImageExists(t *testing.T, imageName string) string {
