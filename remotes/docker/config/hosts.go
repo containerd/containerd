@@ -52,6 +52,7 @@ type hostConfig struct {
 	caCerts     []string
 	clientPairs [][2]string
 	skipVerify  *bool
+	rewrite     map[string]string
 
 	header http.Header
 
@@ -266,6 +267,7 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 			rhosts[i].Path = host.path
 			rhosts[i].Capabilities = host.capabilities
 			rhosts[i].Header = host.header
+			rhosts[i].Rewrites = host.rewrite
 		}
 
 		return rhosts, nil
@@ -355,6 +357,10 @@ type hostFileConfig struct {
 	// API root endpoint.
 	OverridePath bool `toml:"override_path"`
 
+	// Rewrite rules for repository paths
+	// Example: {"^library/(.*)" = "my-org/$1"}
+	Rewrite map[string]string `toml:"rewrite"`
+
 	// TODO: Credentials: helper? name? username? alternate domain? token?
 }
 
@@ -439,6 +445,9 @@ func parseHostConfig(server string, baseDir string, config hostFileConfig) (host
 	}
 
 	result.skipVerify = config.SkipVerify
+
+	// Rewrite rules for repository paths
+	result.rewrite = config.Rewrite
 
 	if len(config.Capabilities) > 0 {
 		for _, c := range config.Capabilities {

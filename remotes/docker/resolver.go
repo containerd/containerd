@@ -27,6 +27,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -483,11 +484,25 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 	if header == nil {
 		header = http.Header{}
 	}
-
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
 	}
-	parts := append([]string{"/", host.Path, r.repository}, ps...)
+	repository := r.repository
+
+	// Configure the host's rewrites to match and replace the repository with regular expressions.
+	for pattern, replace := range host.Rewrites {
+		log.L.WithField("pattern", pattern).WithField("replace", replace).Debugf("rewriting the repository url")
+		exp, err := regexp.Compile(pattern)
+		if err != nil {
+			log.L.Warnf("failed to compile rewrite, `%s`, for %s", pattern, host.Host)
+			continue
+		}
+		if rr := exp.ReplaceAllString(repository, replace); rr != repository {
+			repository = rr
+			break
+		}
+	}
+	parts := append([]string{"/", host.Path, repository}, ps...)
 	p := path.Join(parts...)
 	// Join strips trailing slash, re-add ending "/" if included
 	if len(parts) > 0 && strings.HasSuffix(parts[len(parts)-1], "/") {
