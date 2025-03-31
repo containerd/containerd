@@ -45,6 +45,8 @@ const (
 	Gzip
 	// Zstd is zstd compression algorithm.
 	Zstd
+	// Unknown is used when a plugin handles the algorithm.
+	Unknown
 )
 
 const disablePigzEnv = "CONTAINERD_DISABLE_PIGZ"
@@ -254,7 +256,10 @@ func (compression *Compression) Extension() string {
 		return "gz"
 	case Zstd:
 		return "zst"
+	case Unknown:
+		return "unknown"
 	}
+
 	return ""
 }
 
