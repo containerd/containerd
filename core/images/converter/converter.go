@@ -116,11 +116,10 @@ func Convert(ctx context.Context, client Client, dstRef, srcRef string, opts ...
 		dstImg.Target = *dstDesc
 	}
 	var res images.Image
-	if dstRef != srcRef {
-		_ = is.Delete(ctx, dstRef)
+
+	if res, err = is.Update(ctx, dstImg); err != nil {
 		res, err = is.Create(ctx, dstImg)
-	} else {
-		res, err = is.Update(ctx, dstImg)
 	}
+
 	return &res, err
 }
