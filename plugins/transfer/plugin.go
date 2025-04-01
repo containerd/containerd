@@ -165,6 +165,7 @@ func defaultConfig() *transferConfig {
 			{
 				Platform:    platforms.Format(platforms.DefaultSpec()),
 				Snapshotter: containerd.DefaultSnapshotter,
+				Differ:      containerd.DefaultDiffer,
 			},
 		},
 	}
