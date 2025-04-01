@@ -501,7 +501,7 @@ type namespacedWriter struct {
 	ctx       context.Context
 	ref       string
 	namespace string
-	db        Transactor
+	db        *DB
 	provider  interface {
 		content.Provider
 		content.Ingester
@@ -587,6 +587,8 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	defer nw.l.RUnlock()
 
 	var innerErr error
+	var actualDgst digest.Digest
+	var actualSize int64
 
 	// We pre-sync the in-flight writes to the disk. This avoids the
 	// subsequent fp.Sync() call[1]	from taking too long (10s+) while
@@ -601,13 +603,15 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	}
 
 	if err := update(ctx, nw.db, func(tx *bolt.Tx) error {
-		dgst, err := nw.commit(ctx, tx, size, expected, opts...)
+		dgst, size, err := nw.commit(ctx, tx, size, expected, opts...)
 		if err != nil {
 			if !errdefs.IsAlreadyExists(err) {
 				return err
 			}
 			innerErr = err
 		}
+		actualDgst = dgst
+		actualSize = size
 		bkt := getIngestsBucket(tx, nw.namespace)
 		if bkt != nil {
 			if err := bkt.DeleteBucket([]byte(nw.ref)); err != nil && err != errbolt.ErrBucketNotFound {
@@ -621,8 +625,20 @@ func (nw *namespacedWriter) Commit(ctx context.Context, size int64, expected dig
 	}); err != nil {
 		return err
 	}
+	if innerErr != nil {
+		return innerErr
+	}
 
-	return innerErr
+	if publisher := nw.db.Publisher(ctx); publisher != nil {
+		if err := publisher.Publish(ctx, "/content/create", &eventstypes.ContentCreate{
+			Digest: actualDgst.String(),
+			Size:   actualSize,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (nw *namespacedWriter) Sync() error {
@@ -632,30 +648,30 @@ func (nw *namespacedWriter) Sync() error {
 	return nil
 }
 
-func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, error) {
+func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64, expected digest.Digest, opts ...content.Opt) (digest.Digest, int64, error) {
 	var base content.Info
 	for _, opt := range opts {
 		if err := opt(&base); err != nil {
 			if nw.w != nil {
 				nw.w.Close()
 			}
-			return "", err
+			return "", 0, err
 		}
 	}
 	if err := validateInfo(&base); err != nil {
 		if nw.w != nil {
 			nw.w.Close()
 		}
-		return "", err
+		return "", 0, err
 	}
 
 	var actual digest.Digest
 	if nw.w == nil {
 		if size != 0 && size != nw.desc.Size {
-			return "", fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, nw.desc.Size, size, errdefs.ErrFailedPrecondition)
+			return "", 0, fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, nw.desc.Size, size, errdefs.ErrFailedPrecondition)
 		}
 		if expected != "" && expected != nw.desc.Digest {
-			return "", fmt.Errorf("%q unexpected digest: %w", nw.ref, errdefs.ErrFailedPrecondition)
+			return "", 0, fmt.Errorf("%q unexpected digest: %w", nw.ref, errdefs.ErrFailedPrecondition)
 		}
 		size = nw.desc.Size
 		actual = nw.desc.Digest
@@ -663,16 +679,16 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 		status, err := nw.w.Status()
 		if err != nil {
 			nw.w.Close()
-			return "", err
+			return "", 0, err
 		}
 		if size != 0 && size != status.Offset {
 			nw.w.Close()
-			return "", fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
+			return "", 0, fmt.Errorf("%q failed size validation: %v != %v: %w", nw.ref, status.Offset, size, errdefs.ErrFailedPrecondition)
 		}
 		size = status.Offset
 
 		if err := nw.w.Commit(ctx, size, expected); err != nil && !errdefs.IsAlreadyExists(err) {
-			return "", err
+			return "", 0, err
 		}
 		actual = nw.w.Digest()
 	}
@@ -680,25 +696,25 @@ func (nw *namespacedWriter) commit(ctx context.Context, tx *bolt.Tx, size int64,
 	bkt, err := createBlobBucket(tx, nw.namespace, actual)
 	if err != nil {
 		if err == errbolt.ErrBucketExists {
-			return actual, fmt.Errorf("content %v: %w", actual, errdefs.ErrAlreadyExists)
+			return actual, 0, fmt.Errorf("content %v: %w", actual, errdefs.ErrAlreadyExists)
 		}
-		return "", err
+		return "", 0, err
 	}
 
 	commitTime := time.Now().UTC()
 
 	sizeEncoded, err := encodeInt(size)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	if err := boltutil.WriteTimestamps(bkt, commitTime, commitTime); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if err := boltutil.WriteLabels(bkt, base.Labels); err != nil {
-		return "", err
+		return "", 0, err
 	}
-	return actual, bkt.Put(bucketKeySize, sizeEncoded)
+	return actual, size, bkt.Put(bucketKeySize, sizeEncoded)
 }
 
 func (nw *namespacedWriter) Status() (st content.Status, err error) {
