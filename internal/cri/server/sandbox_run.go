@@ -148,7 +148,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
-
+	// make sure sandbox metadata is not nil.
+	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		return nil, fmt.Errorf("unable to add extension for sandbox %q: %w", id, err)
+	}
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
 	}
