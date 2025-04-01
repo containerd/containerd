@@ -186,6 +186,11 @@ version = 3
     image_pull_with_sync_fs = false
     stats_collect_period = 10
 
+    [plugins."io.containerd.cri.v1.images".runtime_platforms]
+      [plugins."io.containerd.cri.v1.images".runtime_platforms.runc]
+        platform = ''
+        snapshotter = ''
+
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10'
 
