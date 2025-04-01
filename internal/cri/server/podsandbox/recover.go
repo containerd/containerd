@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	goruntime "runtime"
-	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -35,22 +34,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/netns"
 )
 
-// loadContainerTimeout is the default timeout for loading a container/sandbox.
-// One container/sandbox hangs (e.g. containerd#2438) should not affect other
-// containers/sandboxes.
-// Most CRI container/sandbox related operations are per container, the ones
-// which handle multiple containers at a time are:
-// * ListPodSandboxes: Don't talk with containerd services.
-// * ListContainers: Don't talk with containerd services.
-// * ListContainerStats: Not in critical code path, a default timeout will
-// be applied at CRI level.
-// * Recovery logic: We should set a time for each container/sandbox recovery.
-// * Event monitor: We should set a timeout for each container/sandbox event handling.
-const loadContainerTimeout = 10 * time.Second
-
 func (c *Controller) RecoverContainer(ctx context.Context, cntr containerd.Container) (sandboxstore.Sandbox, error) {
-	ctx, cancel := context.WithTimeout(ctx, loadContainerTimeout)
-	defer cancel()
 	var sandbox sandboxstore.Sandbox
 	meta, err := getMetadata(ctx, cntr)
 	if err != nil {
