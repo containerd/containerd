@@ -376,7 +376,7 @@ func dmsetup(args ...string) (string, error) {
 	if err != nil {
 		// Try find Linux error code otherwise return generic error with dmsetup output
 		if errno, ok := tryGetUnixError(output); ok {
-			return "", errno
+			return "", fmt.Errorf("failed to tryGetUnixError %w", errno)
 		}
 
 		return "", fmt.Errorf("dmsetup %s\nerror: %s\n: %w", strings.Join(args, " "), output, err)

@@ -232,7 +232,7 @@ func (m *PoolMetadata) UpdateDevice(ctx context.Context, name string, fn DeviceI
 		)
 
 		if err := getObject(bucket, name, device); err != nil {
-			return err
+			return fmt.Errorf("failed to get object %w", err)
 		}
 
 		// Don't allow changing these values, keep things in sync with devmapper
@@ -240,7 +240,7 @@ func (m *PoolMetadata) UpdateDevice(ctx context.Context, name string, fn DeviceI
 		devID := device.DeviceID
 
 		if err := fn(device); err != nil {
-			return err
+			return fmt.Errorf("failed to run DeviceInfoCallback %w", err)
 		}
 
 		if name != device.Name {
