@@ -49,8 +49,9 @@ import (
 )
 
 const (
-	labelSnapshotRef = "containerd.io/snapshot.ref"
-	unpackSpanPrefix = "pkg.unpack.unpacker"
+	labelSnapshotRef  = "containerd.io/snapshot.ref"
+	labelGCContentRef = "containerd.io/gc.ref.content.l"
+	unpackSpanPrefix  = "pkg.unpack.unpacker"
 )
 
 // Result returns information about the unpacks which were completed.
@@ -309,6 +310,7 @@ func (u *Unpacker) unpack(
 			snapshotLabels = make(map[string]string)
 		}
 		snapshotLabels[labelSnapshotRef] = chainID
+		snapshotLabels[labelGCContentRef] = desc.Digest.String()
 
 		var (
 			key    string
