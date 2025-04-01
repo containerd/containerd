@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
@@ -29,6 +30,15 @@ import (
 	"github.com/sirupsen/logrus"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+type MetricsServer struct {
+	collectionPeriod time.Duration
+	sandboxMetrics   map[string]*SandboxMetrics
+}
+
+type SandboxMetrics struct {
+	metric *runtime.PodSandboxMetrics
+}
 
 func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
 	sandboxList := c.sandboxStore.List()
