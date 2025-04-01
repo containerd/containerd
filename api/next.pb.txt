@@ -2250,43 +2250,50 @@ file {
       json_name: "terminal"
     }
     field {
-      name: "stdin"
+      name: "attach"
       number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "stdin"
+      number: 6
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "stdin"
     }
     field {
       name: "stdout"
-      number: 6
+      number: 7
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "stdout"
     }
     field {
       name: "stderr"
-      number: 7
+      number: 8
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "stderr"
     }
     field {
       name: "checkpoint"
-      number: 8
+      number: 9
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "checkpoint"
     }
     field {
       name: "parent_checkpoint"
-      number: 9
+      number: 10
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "parentCheckpoint"
     }
     field {
       name: "options"
-      number: 10
+      number: 11
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
@@ -6516,8 +6523,15 @@ file {
       json_name: "terminal"
     }
     field {
-      name: "checkpoint"
+      name: "attach"
       number: 8
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "attach"
+    }
+    field {
+      name: "checkpoint"
+      number: 9
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".containerd.types.Descriptor"
@@ -6525,7 +6539,7 @@ file {
     }
     field {
       name: "options"
-      number: 9
+      number: 10
       label: LABEL_OPTIONAL
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Any"
@@ -6533,7 +6547,7 @@ file {
     }
     field {
       name: "runtime_path"
-      number: 10
+      number: 11
       label: LABEL_OPTIONAL
       type: TYPE_STRING
       json_name: "runtimePath"
