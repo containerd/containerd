@@ -307,7 +307,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 			}
 
 			log.G(ctx).Debug("resolving")
-			resp, err := req.doWithRetries(ctx, nil)
+			resp, err := req.doWithRetries(ctx, nil, i == len(hosts)-1)
 			if err != nil {
 				if errors.Is(err, ErrInvalidAuthorization) {
 					err = fmt.Errorf("pull access denied, repository does not exist or may require authorization: %w", err)
@@ -371,7 +371,7 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					req.header[key] = append(req.header[key], value...)
 				}
 
-				resp, err := req.doWithRetries(ctx, nil)
+				resp, err := req.doWithRetries(ctx, nil, true)
 				if err != nil {
 					return "", ocispec.Descriptor{}, err
 				}
@@ -617,26 +617,26 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 	return resp, nil
 }
 
-func (r *request) doWithRetries(ctx context.Context, responses []*http.Response) (*http.Response, error) {
+func (r *request) doWithRetries(ctx context.Context, responses []*http.Response, lastHost bool) (*http.Response, error) {
 	resp, err := r.do(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	responses = append(responses, resp)
-	retry, err := r.retryRequest(ctx, responses)
+	retry, err := r.retryRequest(ctx, responses, lastHost)
 	if err != nil {
 		resp.Body.Close()
 		return nil, err
 	}
 	if retry {
 		resp.Body.Close()
-		return r.doWithRetries(ctx, responses)
+		return r.doWithRetries(ctx, responses, lastHost)
 	}
 	return resp, err
 }
 
-func (r *request) retryRequest(ctx context.Context, responses []*http.Response) (bool, error) {
+func (r *request) retryRequest(ctx context.Context, responses []*http.Response, lastHost bool) (bool, error) {
 	if len(responses) > 5 {
 		return false, nil
 	}
@@ -662,9 +662,17 @@ func (r *request) retryRequest(ctx context.Context, responses []*http.Response) 
 		}
 	case http.StatusRequestTimeout, http.StatusTooManyRequests:
 		return true, nil
+	case http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
+		// Do not retry if the same error was seen in the last request
+		if len(responses) > 1 && responses[len(responses)-2].StatusCode == last.StatusCode {
+			return false, nil
+		}
+		// Only retry if this is the last host that will be attempted
+		if lastHost {
+			return true, nil
+		}
 	}
 
-	// TODO: Handle 50x errors accounting for attempt history
 	return false, nil
 }
 
