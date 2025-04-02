@@ -156,7 +156,7 @@ func (c *criService) CRImportCheckpoint(
 			return "", err
 		}
 		chainID := identity.ChainID(diffIDs).String()
-		ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.Metadata.RuntimeHandler)
+		ociRuntime, err := c.config.GetSandboxRuntime(sandboxConfig, sandbox.RuntimeHandler)
 		if err != nil {
 			return "", fmt.Errorf("failed to get sandbox runtime: %w", err)
 		}
@@ -387,7 +387,7 @@ func (c *criService) CRImportCheckpoint(
 			containerConfig:       meta.Config,
 			imageConfig:           &imageConfig,
 			podSandboxConfig:      sandboxConfig,
-			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
+			sandboxRuntimeHandler: sandbox.RuntimeHandler,
 			sandboxPid:            cstatus.Pid,
 			NetNSPath:             sandbox.NetNSPath,
 			containerName:         containerName,

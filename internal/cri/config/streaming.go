@@ -40,21 +40,21 @@ const (
 
 func getStreamListenerMode(config *ServerConfig) (streamListenerMode, error) {
 	if config.EnableTLSStreaming {
-		if config.X509KeyPairStreaming.TLSCertFile != "" && config.X509KeyPairStreaming.TLSKeyFile != "" {
+		if config.TLSCertFile != "" && config.TLSKeyFile != "" {
 			return x509KeyPairTLS, nil
 		}
-		if config.X509KeyPairStreaming.TLSCertFile != "" && config.X509KeyPairStreaming.TLSKeyFile == "" {
+		if config.TLSCertFile != "" && config.TLSKeyFile == "" {
 			return -1, errors.New("must set X509KeyPairStreaming.TLSKeyFile")
 		}
-		if config.X509KeyPairStreaming.TLSCertFile == "" && config.X509KeyPairStreaming.TLSKeyFile != "" {
+		if config.TLSCertFile == "" && config.TLSKeyFile != "" {
 			return -1, errors.New("must set X509KeyPairStreaming.TLSCertFile")
 		}
 		return selfSignTLS, nil
 	}
-	if config.X509KeyPairStreaming.TLSCertFile != "" {
+	if config.TLSCertFile != "" {
 		return -1, errors.New("X509KeyPairStreaming.TLSCertFile is set but EnableTLSStreaming is not set")
 	}
-	if config.X509KeyPairStreaming.TLSKeyFile != "" {
+	if config.TLSKeyFile != "" {
 		return -1, errors.New("X509KeyPairStreaming.TLSKeyFile is set but EnableTLSStreaming is not set")
 	}
 	return withoutTLS, nil
@@ -89,7 +89,7 @@ func (c *ServerConfig) StreamingConfig() (streaming.Config, error) {
 	}
 	switch tlsMode {
 	case x509KeyPairTLS:
-		tlsCert, err := tls.LoadX509KeyPair(c.X509KeyPairStreaming.TLSCertFile, c.X509KeyPairStreaming.TLSKeyFile)
+		tlsCert, err := tls.LoadX509KeyPair(c.TLSCertFile, c.TLSKeyFile)
 		if err != nil {
 			return streaming.Config{}, fmt.Errorf("failed to load x509 key pair for stream server: %w", err)
 		}

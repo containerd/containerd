@@ -191,7 +191,7 @@ func (c *criService) StartContainer(ctx context.Context, r *runtime.StartContain
 		}
 	}
 
-	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}
