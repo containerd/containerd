@@ -110,10 +110,9 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		return "", "", err
 	}
 
-	switch u.Scheme {
-	case "tcp":
+	if u.Scheme == "tcp" {
 		return "tcp", u.Host, nil
-	case "npipe":
+	} else if u.Scheme == "npipe" {
 		if strings.HasPrefix(u.Path, "//./pipe") {
 			return "npipe", u.Path, nil
 		}
@@ -124,8 +123,8 @@ func parseEndpoint(endpoint string) (string, string, error) {
 			host = "."
 		}
 		return "npipe", fmt.Sprintf("//%s%s", host, u.Path), nil
-	case "":
-		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
+	} else if u.Scheme == "" {
+		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
 	}
 	return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 }
