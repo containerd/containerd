@@ -99,7 +99,7 @@ type local struct {
 	cfg *Config
 	nri *nri.Adaptation
 
-	state map[string]State
+	state sync.Map
 }
 
 var _ API = &local{}
@@ -130,8 +130,6 @@ func New(cfg *Config) (API, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize NRI interface: %w", err)
 	}
-
-	l.state = make(map[string]State)
 
 	log.L.Info("created NRI interface")
 
@@ -172,15 +170,13 @@ func (l *local) RunPodSandbox(ctx context.Context, pod PodSandbox) error {
 		return nil
 	}
 
-	l.Lock()
-	defer l.Unlock()
-
 	request := &nri.RunPodSandboxRequest{
 		Pod: podSandboxToNRI(pod),
 	}
 
 	err := l.nri.RunPodSandbox(ctx, request)
 	l.setState(pod.GetID(), Running)
+
 	return err
 }
 
@@ -188,9 +184,6 @@ func (l *local) StopPodSandbox(ctx context.Context, pod PodSandbox) error {
 	if !l.IsEnabled() {
 		return nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	if !l.needsStopping(pod.GetID()) {
 		return nil
@@ -202,6 +195,7 @@ func (l *local) StopPodSandbox(ctx context.Context, pod PodSandbox) error {
 
 	err := l.nri.StopPodSandbox(ctx, request)
 	l.setState(pod.GetID(), Stopped)
+
 	return err
 }
 
@@ -209,9 +203,6 @@ func (l *local) RemovePodSandbox(ctx context.Context, pod PodSandbox) error {
 	if !l.IsEnabled() {
 		return nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	if !l.needsRemoval(pod.GetID()) {
 		return nil
@@ -223,6 +214,7 @@ func (l *local) RemovePodSandbox(ctx context.Context, pod PodSandbox) error {
 
 	err := l.nri.RemovePodSandbox(ctx, request)
 	l.setState(pod.GetID(), Removed)
+
 	return err
 }
 
@@ -230,9 +222,6 @@ func (l *local) CreateContainer(ctx context.Context, pod PodSandbox, ctr Contain
 	if !l.IsEnabled() {
 		return nil, nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	request := &nri.CreateContainerRequest{
 		Pod:       podSandboxToNRI(pod),
@@ -264,9 +253,6 @@ func (l *local) PostCreateContainer(ctx context.Context, pod PodSandbox, ctr Con
 		return nil
 	}
 
-	l.Lock()
-	defer l.Unlock()
-
 	request := &nri.PostCreateContainerRequest{
 		Pod:       podSandboxToNRI(pod),
 		Container: containerToNRI(ctr),
@@ -279,9 +265,6 @@ func (l *local) StartContainer(ctx context.Context, pod PodSandbox, ctr Containe
 	if !l.IsEnabled() {
 		return nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	request := &nri.StartContainerRequest{
 		Pod:       podSandboxToNRI(pod),
@@ -299,9 +282,6 @@ func (l *local) PostStartContainer(ctx context.Context, pod PodSandbox, ctr Cont
 		return nil
 	}
 
-	l.Lock()
-	defer l.Unlock()
-
 	request := &nri.PostStartContainerRequest{
 		Pod:       podSandboxToNRI(pod),
 		Container: containerToNRI(ctr),
@@ -314,9 +294,6 @@ func (l *local) UpdateContainer(ctx context.Context, pod PodSandbox, ctr Contain
 	if !l.IsEnabled() {
 		return nil, nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	request := &nri.UpdateContainerRequest{
 		Pod:            podSandboxToNRI(pod),
@@ -356,9 +333,6 @@ func (l *local) PostUpdateContainer(ctx context.Context, pod PodSandbox, ctr Con
 		return nil
 	}
 
-	l.Lock()
-	defer l.Unlock()
-
 	request := &nri.PostUpdateContainerRequest{
 		Pod:       podSandboxToNRI(pod),
 		Container: containerToNRI(ctr),
@@ -372,16 +346,11 @@ func (l *local) StopContainer(ctx context.Context, pod PodSandbox, ctr Container
 		return nil
 	}
 
-	l.Lock()
-	defer l.Unlock()
-
 	return l.stopContainer(ctx, pod, ctr)
 }
 
 func (l *local) NotifyContainerExit(ctx context.Context, pod PodSandbox, ctr Container) {
 	go func() {
-		l.Lock()
-		defer l.Unlock()
 		l.stopContainer(ctx, pod, ctr)
 	}()
 }
@@ -399,6 +368,7 @@ func (l *local) stopContainer(ctx context.Context, pod PodSandbox, ctr Container
 	}
 
 	response, err := l.nri.StopContainer(ctx, request)
+
 	l.setState(request.Container.Id, Stopped)
 	if err != nil {
 		return err
@@ -417,9 +387,6 @@ func (l *local) RemoveContainer(ctx context.Context, pod PodSandbox, ctr Contain
 	if !l.IsEnabled() {
 		return nil
 	}
-
-	l.Lock()
-	defer l.Unlock()
 
 	if !l.needsRemoval(ctr.GetID()) {
 		return nil
@@ -447,9 +414,6 @@ func (l *local) BlockPluginSync() *PluginSyncBlock {
 }
 
 func (l *local) syncPlugin(ctx context.Context, syncFn nri.SyncCB) error {
-	l.Lock()
-	defer l.Unlock()
-
 	log.G(ctx).Info("Synchronizing NRI (plugin) with current runtime state")
 
 	pods := podSandboxesToNRI(domains.listPodSandboxes())
@@ -505,16 +469,16 @@ func (l *local) evictContainers(ctx context.Context, evict []*nri.ContainerEvict
 
 func (l *local) setState(id string, state State) {
 	if state != Removed {
-		l.state[id] = state
+		l.state.Store(id, state)
 		return
 	}
 
-	delete(l.state, id)
+	l.state.Delete(id)
 }
 
 func (l *local) getState(id string) State {
-	if state, ok := l.state[id]; ok {
-		return state
+	if state, ok := l.state.Load(id); ok {
+		return state.(State)
 	}
 
 	return Removed
