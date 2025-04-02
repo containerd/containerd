@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	goruntime "runtime"
 	"strings"
 	"syscall"
@@ -385,6 +386,13 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 			// https://github.com/containerd/containerd/issues/7357
 			break
 		}
+		if _, err := os.Stat(fmt.Sprintf("/proc/%d", t.pid)); err != nil {
+			if os.IsNotExist(err) {
+				break
+			}
+			return nil, fmt.Errorf("failed to check process %d: %v", t.pid, err)
+		}
+
 		fallthrough
 	default:
 		return nil, fmt.Errorf("task must be stopped before deletion: %s: %w", status.Status, errdefs.ErrFailedPrecondition)
