@@ -164,7 +164,7 @@ sudo chown -R 65536:65536 rootfs/
 ```
 
 Copy [this config.json](./config.json) and replace `XXX-path-to-rootfs` with the
-absolute path to the rootfs you just chowned.
+**absolute path** to the rootfs you just chowned.
 
 Then create and start the container with:
 
