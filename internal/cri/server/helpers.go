@@ -201,7 +201,7 @@ func (c *criService) validateTargetContainer(sandboxID, targetContainerID string
 		return containerstore.Container{}, fmt.Errorf("container %q does not exist: %w", targetContainerID, err)
 	}
 
-	targetSandboxID := targetContainer.Metadata.SandboxID
+	targetSandboxID := targetContainer.SandboxID
 	if targetSandboxID != sandboxID {
 		return containerstore.Container{},
 			fmt.Errorf("container %q (sandbox %s) does not belong to sandbox %s", targetContainerID, targetSandboxID, sandboxID)
@@ -374,7 +374,7 @@ func (c *criService) getPodSandboxRuntime(sandboxID string) (runtime criconfig.R
 	if err != nil {
 		return criconfig.Runtime{}, err
 	}
-	runtime, err = c.config.GetSandboxRuntime(sandbox.Config, sandbox.Metadata.RuntimeHandler)
+	runtime, err = c.config.GetSandboxRuntime(sandbox.Config, sandbox.RuntimeHandler)
 	if err != nil {
 		return criconfig.Runtime{}, err
 	}

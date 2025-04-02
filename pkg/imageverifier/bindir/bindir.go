@@ -249,8 +249,8 @@ func (v *ImageVerifier) runVerifier(ctx context.Context, bin string, imageName s
 
 	<-stderrLogDone
 	if err := cmd.Wait(); err != nil {
-		if ee := (&exec.ExitError{}); errors.As(err, &ee) && ee.ProcessState.Exited() {
-			return ee.ProcessState.ExitCode(), reason, nil
+		if ee := (&exec.ExitError{}); errors.As(err, &ee) && ee.Exited() {
+			return ee.ExitCode(), reason, nil
 		}
 		return -1, "", fmt.Errorf("waiting on command to exit: %v", err)
 	}

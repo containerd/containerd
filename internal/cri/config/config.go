@@ -523,41 +523,41 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 // ValidateRuntimeConfig validates the given runtime configuration.
 func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
-	if c.ContainerdConfig.Runtimes == nil {
-		c.ContainerdConfig.Runtimes = make(map[string]Runtime)
+	if c.Runtimes == nil {
+		c.Runtimes = make(map[string]Runtime)
 	}
 
 	// Validation for default_runtime_name
-	if c.ContainerdConfig.DefaultRuntimeName == "" {
+	if c.DefaultRuntimeName == "" {
 		return warnings, errors.New("`default_runtime_name` is empty")
 	}
-	if _, ok := c.ContainerdConfig.Runtimes[c.ContainerdConfig.DefaultRuntimeName]; !ok {
-		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.ContainerdConfig.DefaultRuntimeName)
+	if _, ok := c.Runtimes[c.DefaultRuntimeName]; !ok {
+		return warnings, fmt.Errorf("no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"%s\"", c.DefaultRuntimeName)
 	}
 
 	// Validation for CNI config
-	if len(c.CniConfig.NetworkPluginBinDir) != 0 {
+	if len(c.NetworkPluginBinDir) != 0 {
 		warnings = append(warnings, deprecation.CRICNIBinDir)
 		log.G(ctx).Warning("`bin_dir` is deprecated, please use `bin_dirs` instead")
 
-		if slices.Equal(c.CniConfig.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
+		if slices.Equal(c.NetworkPluginBinDirs, defaultNetworkPluginBinDirs()) {
 			// if a user set `bin_dir` explicitly, we remove the default value of `bin_dirs`
 			// to avoid the unexpected conflict between the two since we don't allow setting both.
-			c.CniConfig.NetworkPluginBinDirs = nil
+			c.NetworkPluginBinDirs = nil
 		}
-		if len(c.CniConfig.NetworkPluginBinDirs) == 0 {
+		if len(c.NetworkPluginBinDirs) == 0 {
 			// Before `NetworkPluginBinDir` is deprecated and removed, we manually move it
 			// into `NetworkPluginBinDirs` (if `NetworkPluginBinDirs` is empty)
 			// so that we can use it in the rest of the code.
-			c.CniConfig.NetworkPluginBinDirs = []string{c.CniConfig.NetworkPluginBinDir}
-			c.CniConfig.NetworkPluginBinDir = ""
+			c.NetworkPluginBinDirs = []string{c.NetworkPluginBinDir}
+			c.NetworkPluginBinDir = ""
 		}
 	}
-	if len(c.CniConfig.NetworkPluginBinDirs) != 0 && len(c.CniConfig.NetworkPluginBinDir) != 0 {
+	if len(c.NetworkPluginBinDirs) != 0 && len(c.NetworkPluginBinDir) != 0 {
 		return warnings, errors.New("`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time")
 	}
 
-	for k, r := range c.ContainerdConfig.Runtimes {
+	for k, r := range c.Runtimes {
 		if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
 			return warnings, fmt.Errorf("runtime %s: `cgroup_writable` is only supported on cgroup v2", k)
 		}
@@ -568,7 +568,7 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		// If empty, use default podSandbox mode
 		if len(r.Sandboxer) == 0 {
 			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
+			c.Runtimes[k] = r
 		}
 
 		if len(r.IOType) == 0 {

@@ -183,7 +183,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			containerConfig:       config,
 			imageConfig:           &image.ImageSpec.Config,
 			podSandboxConfig:      sandboxConfig,
-			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
+			sandboxRuntimeHandler: sandbox.RuntimeHandler,
 			sandboxPid:            sandboxPid,
 			NetNSPath:             sandbox.NetNSPath,
 			containerName:         containerName,
