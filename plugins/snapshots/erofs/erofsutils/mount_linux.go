@@ -65,9 +65,10 @@ func ConvertErofs(ctx context.Context, layerPath string, srcDir string, mkfsExtr
 func MountsToLayer(mounts []mount.Mount) (string, error) {
 	var layer string
 	mnt := mounts[0]
-	if mnt.Type == "bind" || mnt.Type == "erofs" {
+	switch mnt.Type {
+	case "bind", "erofs":
 		layer = filepath.Dir(mnt.Source)
-	} else if mnt.Type == "overlay" {
+	case "overlay":
 		layer = ""
 		for _, o := range mnt.Options {
 			if strings.HasPrefix(o, "upperdir=") {
@@ -77,7 +78,7 @@ func MountsToLayer(mounts []mount.Mount) (string, error) {
 		if layer == "" {
 			return "", fmt.Errorf("unsupported overlay layer for erofs differ: %w", errdefs.ErrNotImplemented)
 		}
-	} else {
+	default:
 		return "", fmt.Errorf("invalid filesystem type for erofs differ: %w", errdefs.ErrNotImplemented)
 	}
 	// If the layer is not prepared by the EROFS snapshotter, fall back to the next differ
