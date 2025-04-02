@@ -229,6 +229,16 @@ func (u *Unpacker) Wait() (Result, error) {
 	}, nil
 }
 
+// unpackConfig is a subset of the OCI config for resolving rootfs and platform,
+// any config type which supports the platform and rootfs field can be supported.
+type unpackConfig struct {
+	// Platform describes the platform which the image in the manifest runs on.
+	ocispec.Platform
+
+	// RootFS references the layer content addresses used by the image.
+	RootFS ocispec.RootFS `json:"rootfs"`
+}
+
 func (u *Unpacker) unpack(
 	h images.Handler,
 	config ocispec.Descriptor,
@@ -243,10 +253,11 @@ func (u *Unpacker) unpack(
 		return err
 	}
 
-	var i ocispec.Image
+	var i unpackConfig
 	if err := json.Unmarshal(p, &i); err != nil {
 		return fmt.Errorf("unmarshal image config: %w", err)
 	}
+
 	diffIDs := i.RootFS.DiffIDs
 	if len(layers) != len(diffIDs) {
 		return fmt.Errorf("number of layers and diffIDs don't match: %d != %d", len(layers), len(diffIDs))
