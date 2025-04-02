@@ -42,7 +42,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
-	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
@@ -482,7 +481,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 // volumeMounts sets up image volumes for container. Rely on the removal of container
 // root directory to do cleanup. Note that image volume will be skipped, if there is criMounts
 // specified with the same destination.
-func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *imagespec.ImageConfig) []*runtime.Mount {
+func (c *criService) volumeMounts(platform v1.Platform, containerRootDir string, containerConfig *runtime.ContainerConfig, config *v1.ImageConfig) []*runtime.Mount {
 	var uidMappings, gidMappings []*runtime.IDMapping
 	if platform.OS == "linux" {
 		if usernsOpts := containerConfig.GetLinux().GetSecurityContext().GetNamespaceOptions().GetUsernsOptions(); usernsOpts != nil {
@@ -530,7 +529,7 @@ func (c *criService) volumeMounts(platform imagespec.Platform, containerRootDir 
 }
 
 // runtimeSpec returns a default runtime spec used in cri-containerd.
-func (c *criService) runtimeSpec(id string, platform imagespec.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
+func (c *criService) runtimeSpec(id string, platform v1.Platform, baseSpecFile string, opts ...oci.SpecOpts) (*runtimespec.Spec, error) {
 	// GenerateSpec needs namespace.
 	ctx := util.NamespacedContext()
 	container := &containers.Container{ID: id}
@@ -575,9 +574,9 @@ const (
 // runtime information (rootfs mounted), or platform specific checks with
 // no defined workaround (yet) to specify for other platforms.
 func (c *criService) platformSpecOpts(
-	platform imagespec.Platform,
+	platform v1.Platform,
 	config *runtime.ContainerConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *v1.ImageConfig,
 ) ([]oci.SpecOpts, error) {
 	var specOpts []oci.SpecOpts
 
@@ -622,7 +621,7 @@ func (c *criService) platformSpecOpts(
 
 // buildContainerSpec build container's OCI spec depending on controller's target platform OS.
 func (c *criService) buildContainerSpec(
-	platform imagespec.Platform,
+	platform v1.Platform,
 	id string,
 	sandboxID string,
 	sandboxPid uint32,
@@ -631,7 +630,7 @@ func (c *criService) buildContainerSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *v1.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 	runtimeHandler *runtime.RuntimeHandler,
@@ -707,7 +706,7 @@ func (c *criService) buildLinuxSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *v1.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 	runtimeHandler *runtime.RuntimeHandler,
@@ -941,7 +940,7 @@ func (c *criService) buildWindowsSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *v1.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
@@ -1036,7 +1035,7 @@ func (c *criService) buildDarwinSpec(
 	imageName string,
 	config *runtime.ContainerConfig,
 	sandboxConfig *runtime.PodSandboxConfig,
-	imageConfig *imagespec.ImageConfig,
+	imageConfig *v1.ImageConfig,
 	extraMounts []*runtime.Mount,
 	ociRuntime criconfig.Runtime,
 ) (_ []oci.SpecOpts, retErr error) {
