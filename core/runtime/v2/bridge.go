@@ -26,30 +26,28 @@ import (
 
 	v2 "github.com/containerd/containerd/api/runtime/task/v2"
 	v3 "github.com/containerd/containerd/api/runtime/task/v3"
-
-	api "github.com/containerd/containerd/api/runtime/task/v3" // Current version used by TaskServiceClient
 )
 
 // TaskServiceClient exposes a client interface to shims, which aims to hide
 // the underlying complexity and backward compatibility (v2 task service vs v3, TTRPC vs GRPC, etc).
 type TaskServiceClient interface {
-	State(context.Context, *api.StateRequest) (*api.StateResponse, error)
-	Create(context.Context, *api.CreateTaskRequest) (*api.CreateTaskResponse, error)
-	Start(context.Context, *api.StartRequest) (*api.StartResponse, error)
-	Delete(context.Context, *api.DeleteRequest) (*api.DeleteResponse, error)
-	Pids(context.Context, *api.PidsRequest) (*api.PidsResponse, error)
-	Pause(context.Context, *api.PauseRequest) (*emptypb.Empty, error)
-	Resume(context.Context, *api.ResumeRequest) (*emptypb.Empty, error)
-	Checkpoint(context.Context, *api.CheckpointTaskRequest) (*emptypb.Empty, error)
-	Kill(context.Context, *api.KillRequest) (*emptypb.Empty, error)
-	Exec(context.Context, *api.ExecProcessRequest) (*emptypb.Empty, error)
-	ResizePty(context.Context, *api.ResizePtyRequest) (*emptypb.Empty, error)
-	CloseIO(context.Context, *api.CloseIORequest) (*emptypb.Empty, error)
-	Update(context.Context, *api.UpdateTaskRequest) (*emptypb.Empty, error)
-	Wait(context.Context, *api.WaitRequest) (*api.WaitResponse, error)
-	Stats(context.Context, *api.StatsRequest) (*api.StatsResponse, error)
-	Connect(context.Context, *api.ConnectRequest) (*api.ConnectResponse, error)
-	Shutdown(context.Context, *api.ShutdownRequest) (*emptypb.Empty, error)
+	State(context.Context, *v3.StateRequest) (*v3.StateResponse, error)
+	Create(context.Context, *v3.CreateTaskRequest) (*v3.CreateTaskResponse, error)
+	Start(context.Context, *v3.StartRequest) (*v3.StartResponse, error)
+	Delete(context.Context, *v3.DeleteRequest) (*v3.DeleteResponse, error)
+	Pids(context.Context, *v3.PidsRequest) (*v3.PidsResponse, error)
+	Pause(context.Context, *v3.PauseRequest) (*emptypb.Empty, error)
+	Resume(context.Context, *v3.ResumeRequest) (*emptypb.Empty, error)
+	Checkpoint(context.Context, *v3.CheckpointTaskRequest) (*emptypb.Empty, error)
+	Kill(context.Context, *v3.KillRequest) (*emptypb.Empty, error)
+	Exec(context.Context, *v3.ExecProcessRequest) (*emptypb.Empty, error)
+	ResizePty(context.Context, *v3.ResizePtyRequest) (*emptypb.Empty, error)
+	CloseIO(context.Context, *v3.CloseIORequest) (*emptypb.Empty, error)
+	Update(context.Context, *v3.UpdateTaskRequest) (*emptypb.Empty, error)
+	Wait(context.Context, *v3.WaitRequest) (*v3.WaitResponse, error)
+	Stats(context.Context, *v3.StatsRequest) (*v3.StatsResponse, error)
+	Connect(context.Context, *v3.ConnectRequest) (*v3.ConnectResponse, error)
+	Shutdown(context.Context, *v3.ShutdownRequest) (*emptypb.Empty, error)
 }
 
 // NewTaskClient returns a new task client interface which handles both GRPC and TTRPC servers depending on the
@@ -93,7 +91,7 @@ type ttrpcV2Bridge struct {
 
 var _ TaskServiceClient = (*ttrpcV2Bridge)(nil)
 
-func (b *ttrpcV2Bridge) State(ctx context.Context, request *api.StateRequest) (*api.StateResponse, error) {
+func (b *ttrpcV2Bridge) State(ctx context.Context, request *v3.StateRequest) (*v3.StateResponse, error) {
 	resp, err := b.client.State(ctx, &v2.StateRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
@@ -114,7 +112,7 @@ func (b *ttrpcV2Bridge) State(ctx context.Context, request *api.StateRequest) (*
 	}, err
 }
 
-func (b *ttrpcV2Bridge) Create(ctx context.Context, request *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
+func (b *ttrpcV2Bridge) Create(ctx context.Context, request *v3.CreateTaskRequest) (*v3.CreateTaskResponse, error) {
 	resp, err := b.client.Create(ctx, &v2.CreateTaskRequest{
 		ID:               request.GetID(),
 		Bundle:           request.GetBundle(),
@@ -128,45 +126,45 @@ func (b *ttrpcV2Bridge) Create(ctx context.Context, request *api.CreateTaskReque
 		Options:          request.GetOptions(),
 	})
 
-	return &api.CreateTaskResponse{Pid: resp.GetPid()}, err
+	return &v3.CreateTaskResponse{Pid: resp.GetPid()}, err
 }
 
-func (b *ttrpcV2Bridge) Start(ctx context.Context, request *api.StartRequest) (*api.StartResponse, error) {
+func (b *ttrpcV2Bridge) Start(ctx context.Context, request *v3.StartRequest) (*v3.StartResponse, error) {
 	resp, err := b.client.Start(ctx, &v2.StartRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
 	})
 
-	return &api.StartResponse{Pid: resp.GetPid()}, err
+	return &v3.StartResponse{Pid: resp.GetPid()}, err
 }
 
-func (b *ttrpcV2Bridge) Delete(ctx context.Context, request *api.DeleteRequest) (*api.DeleteResponse, error) {
+func (b *ttrpcV2Bridge) Delete(ctx context.Context, request *v3.DeleteRequest) (*v3.DeleteResponse, error) {
 	resp, err := b.client.Delete(ctx, &v2.DeleteRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
 	})
 
-	return &api.DeleteResponse{
+	return &v3.DeleteResponse{
 		Pid:        resp.GetPid(),
 		ExitStatus: resp.GetExitStatus(),
 		ExitedAt:   resp.GetExitedAt(),
 	}, err
 }
 
-func (b *ttrpcV2Bridge) Pids(ctx context.Context, request *api.PidsRequest) (*api.PidsResponse, error) {
+func (b *ttrpcV2Bridge) Pids(ctx context.Context, request *v3.PidsRequest) (*v3.PidsResponse, error) {
 	resp, err := b.client.Pids(ctx, &v2.PidsRequest{ID: request.GetID()})
-	return &api.PidsResponse{Processes: resp.GetProcesses()}, err
+	return &v3.PidsResponse{Processes: resp.GetProcesses()}, err
 }
 
-func (b *ttrpcV2Bridge) Pause(ctx context.Context, request *api.PauseRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Pause(ctx context.Context, request *v3.PauseRequest) (*emptypb.Empty, error) {
 	return b.client.Pause(ctx, &v2.PauseRequest{ID: request.GetID()})
 }
 
-func (b *ttrpcV2Bridge) Resume(ctx context.Context, request *api.ResumeRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Resume(ctx context.Context, request *v3.ResumeRequest) (*emptypb.Empty, error) {
 	return b.client.Resume(ctx, &v2.ResumeRequest{ID: request.GetID()})
 }
 
-func (b *ttrpcV2Bridge) Checkpoint(ctx context.Context, request *api.CheckpointTaskRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Checkpoint(ctx context.Context, request *v3.CheckpointTaskRequest) (*emptypb.Empty, error) {
 	return b.client.Checkpoint(ctx, &v2.CheckpointTaskRequest{
 		ID:      request.GetID(),
 		Path:    request.GetPath(),
@@ -174,7 +172,7 @@ func (b *ttrpcV2Bridge) Checkpoint(ctx context.Context, request *api.CheckpointT
 	})
 }
 
-func (b *ttrpcV2Bridge) Kill(ctx context.Context, request *api.KillRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Kill(ctx context.Context, request *v3.KillRequest) (*emptypb.Empty, error) {
 	return b.client.Kill(ctx, &v2.KillRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
@@ -183,7 +181,7 @@ func (b *ttrpcV2Bridge) Kill(ctx context.Context, request *api.KillRequest) (*em
 	})
 }
 
-func (b *ttrpcV2Bridge) Exec(ctx context.Context, request *api.ExecProcessRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Exec(ctx context.Context, request *v3.ExecProcessRequest) (*emptypb.Empty, error) {
 	return b.client.Exec(ctx, &v2.ExecProcessRequest{
 		ID:       request.GetID(),
 		ExecID:   request.GetExecID(),
@@ -195,7 +193,7 @@ func (b *ttrpcV2Bridge) Exec(ctx context.Context, request *api.ExecProcessReques
 	})
 }
 
-func (b *ttrpcV2Bridge) ResizePty(ctx context.Context, request *api.ResizePtyRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) ResizePty(ctx context.Context, request *v3.ResizePtyRequest) (*emptypb.Empty, error) {
 	return b.client.ResizePty(ctx, &v2.ResizePtyRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
@@ -204,7 +202,7 @@ func (b *ttrpcV2Bridge) ResizePty(ctx context.Context, request *api.ResizePtyReq
 	})
 }
 
-func (b *ttrpcV2Bridge) CloseIO(ctx context.Context, request *api.CloseIORequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) CloseIO(ctx context.Context, request *v3.CloseIORequest) (*emptypb.Empty, error) {
 	return b.client.CloseIO(ctx, &v2.CloseIORequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
@@ -212,7 +210,7 @@ func (b *ttrpcV2Bridge) CloseIO(ctx context.Context, request *api.CloseIORequest
 	})
 }
 
-func (b *ttrpcV2Bridge) Update(ctx context.Context, request *api.UpdateTaskRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Update(ctx context.Context, request *v3.UpdateTaskRequest) (*emptypb.Empty, error) {
 	return b.client.Update(ctx, &v2.UpdateTaskRequest{
 		ID:          request.GetID(),
 		Resources:   request.GetResources(),
@@ -220,34 +218,34 @@ func (b *ttrpcV2Bridge) Update(ctx context.Context, request *api.UpdateTaskReque
 	})
 }
 
-func (b *ttrpcV2Bridge) Wait(ctx context.Context, request *api.WaitRequest) (*api.WaitResponse, error) {
+func (b *ttrpcV2Bridge) Wait(ctx context.Context, request *v3.WaitRequest) (*v3.WaitResponse, error) {
 	resp, err := b.client.Wait(ctx, &v2.WaitRequest{
 		ID:     request.GetID(),
 		ExecID: request.GetExecID(),
 	})
 
-	return &api.WaitResponse{
+	return &v3.WaitResponse{
 		ExitStatus: resp.GetExitStatus(),
 		ExitedAt:   resp.GetExitedAt(),
 	}, err
 }
 
-func (b *ttrpcV2Bridge) Stats(ctx context.Context, request *api.StatsRequest) (*api.StatsResponse, error) {
+func (b *ttrpcV2Bridge) Stats(ctx context.Context, request *v3.StatsRequest) (*v3.StatsResponse, error) {
 	resp, err := b.client.Stats(ctx, &v2.StatsRequest{ID: request.GetID()})
-	return &api.StatsResponse{Stats: resp.GetStats()}, err
+	return &v3.StatsResponse{Stats: resp.GetStats()}, err
 }
 
-func (b *ttrpcV2Bridge) Connect(ctx context.Context, request *api.ConnectRequest) (*api.ConnectResponse, error) {
+func (b *ttrpcV2Bridge) Connect(ctx context.Context, request *v3.ConnectRequest) (*v3.ConnectResponse, error) {
 	resp, err := b.client.Connect(ctx, &v2.ConnectRequest{ID: request.GetID()})
 
-	return &api.ConnectResponse{
+	return &v3.ConnectResponse{
 		ShimPid: resp.GetShimPid(),
 		TaskPid: resp.GetTaskPid(),
 		Version: resp.GetVersion(),
 	}, err
 }
 
-func (b *ttrpcV2Bridge) Shutdown(ctx context.Context, request *api.ShutdownRequest) (*emptypb.Empty, error) {
+func (b *ttrpcV2Bridge) Shutdown(ctx context.Context, request *v3.ShutdownRequest) (*emptypb.Empty, error) {
 	return b.client.Shutdown(ctx, &v2.ShutdownRequest{
 		ID:  request.GetID(),
 		Now: request.GetNow(),
@@ -262,70 +260,70 @@ type grpcV3Bridge struct {
 
 var _ TaskServiceClient = (*grpcV3Bridge)(nil)
 
-func (g *grpcV3Bridge) State(ctx context.Context, request *api.StateRequest) (*api.StateResponse, error) {
+func (g *grpcV3Bridge) State(ctx context.Context, request *v3.StateRequest) (*v3.StateResponse, error) {
 	return g.client.State(ctx, request)
 }
 
-func (g *grpcV3Bridge) Create(ctx context.Context, request *api.CreateTaskRequest) (*api.CreateTaskResponse, error) {
+func (g *grpcV3Bridge) Create(ctx context.Context, request *v3.CreateTaskRequest) (*v3.CreateTaskResponse, error) {
 	return g.client.Create(ctx, request)
 }
 
-func (g *grpcV3Bridge) Start(ctx context.Context, request *api.StartRequest) (*api.StartResponse, error) {
+func (g *grpcV3Bridge) Start(ctx context.Context, request *v3.StartRequest) (*v3.StartResponse, error) {
 	return g.client.Start(ctx, request)
 }
 
-func (g *grpcV3Bridge) Delete(ctx context.Context, request *api.DeleteRequest) (*api.DeleteResponse, error) {
+func (g *grpcV3Bridge) Delete(ctx context.Context, request *v3.DeleteRequest) (*v3.DeleteResponse, error) {
 	return g.client.Delete(ctx, request)
 }
 
-func (g *grpcV3Bridge) Pids(ctx context.Context, request *api.PidsRequest) (*api.PidsResponse, error) {
+func (g *grpcV3Bridge) Pids(ctx context.Context, request *v3.PidsRequest) (*v3.PidsResponse, error) {
 	return g.client.Pids(ctx, request)
 }
 
-func (g *grpcV3Bridge) Pause(ctx context.Context, request *api.PauseRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Pause(ctx context.Context, request *v3.PauseRequest) (*emptypb.Empty, error) {
 	return g.client.Pause(ctx, request)
 }
 
-func (g *grpcV3Bridge) Resume(ctx context.Context, request *api.ResumeRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Resume(ctx context.Context, request *v3.ResumeRequest) (*emptypb.Empty, error) {
 	return g.client.Resume(ctx, request)
 }
 
-func (g *grpcV3Bridge) Checkpoint(ctx context.Context, request *api.CheckpointTaskRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Checkpoint(ctx context.Context, request *v3.CheckpointTaskRequest) (*emptypb.Empty, error) {
 	return g.client.Checkpoint(ctx, request)
 }
 
-func (g *grpcV3Bridge) Kill(ctx context.Context, request *api.KillRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Kill(ctx context.Context, request *v3.KillRequest) (*emptypb.Empty, error) {
 	return g.client.Kill(ctx, request)
 }
 
-func (g *grpcV3Bridge) Exec(ctx context.Context, request *api.ExecProcessRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Exec(ctx context.Context, request *v3.ExecProcessRequest) (*emptypb.Empty, error) {
 	return g.client.Exec(ctx, request)
 }
 
-func (g *grpcV3Bridge) ResizePty(ctx context.Context, request *api.ResizePtyRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) ResizePty(ctx context.Context, request *v3.ResizePtyRequest) (*emptypb.Empty, error) {
 	return g.client.ResizePty(ctx, request)
 }
 
-func (g *grpcV3Bridge) CloseIO(ctx context.Context, request *api.CloseIORequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) CloseIO(ctx context.Context, request *v3.CloseIORequest) (*emptypb.Empty, error) {
 	return g.client.CloseIO(ctx, request)
 }
 
-func (g *grpcV3Bridge) Update(ctx context.Context, request *api.UpdateTaskRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Update(ctx context.Context, request *v3.UpdateTaskRequest) (*emptypb.Empty, error) {
 	return g.client.Update(ctx, request)
 }
 
-func (g *grpcV3Bridge) Wait(ctx context.Context, request *api.WaitRequest) (*api.WaitResponse, error) {
+func (g *grpcV3Bridge) Wait(ctx context.Context, request *v3.WaitRequest) (*v3.WaitResponse, error) {
 	return g.client.Wait(ctx, request)
 }
 
-func (g *grpcV3Bridge) Stats(ctx context.Context, request *api.StatsRequest) (*api.StatsResponse, error) {
+func (g *grpcV3Bridge) Stats(ctx context.Context, request *v3.StatsRequest) (*v3.StatsResponse, error) {
 	return g.client.Stats(ctx, request)
 }
 
-func (g *grpcV3Bridge) Connect(ctx context.Context, request *api.ConnectRequest) (*api.ConnectResponse, error) {
+func (g *grpcV3Bridge) Connect(ctx context.Context, request *v3.ConnectRequest) (*v3.ConnectResponse, error) {
 	return g.client.Connect(ctx, request)
 }
 
-func (g *grpcV3Bridge) Shutdown(ctx context.Context, request *api.ShutdownRequest) (*emptypb.Empty, error) {
+func (g *grpcV3Bridge) Shutdown(ctx context.Context, request *v3.ShutdownRequest) (*emptypb.Empty, error) {
 	return g.client.Shutdown(ctx, request)
 }

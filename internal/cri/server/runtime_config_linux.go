@@ -34,22 +34,22 @@ func (c *criService) getLinuxRuntimeConfig(ctx context.Context) *runtime.LinuxRu
 func (c *criService) getCgroupDriver(ctx context.Context) runtime.CgroupDriver {
 	// Go through the runtime handlers in a predictable order, starting from the
 	// default handler, others sorted in alphabetical order
-	handlerNames := make([]string, 0, len(c.config.ContainerdConfig.Runtimes))
-	for n := range c.config.ContainerdConfig.Runtimes {
+	handlerNames := make([]string, 0, len(c.config.Runtimes))
+	for n := range c.config.Runtimes {
 		handlerNames = append(handlerNames, n)
 	}
 	sort.Slice(handlerNames, func(i, j int) bool {
-		if handlerNames[i] == c.config.ContainerdConfig.DefaultRuntimeName {
+		if handlerNames[i] == c.config.DefaultRuntimeName {
 			return true
 		}
-		if handlerNames[j] == c.config.ContainerdConfig.DefaultRuntimeName {
+		if handlerNames[j] == c.config.DefaultRuntimeName {
 			return false
 		}
 		return handlerNames[i] < handlerNames[j]
 	})
 
 	for _, handler := range handlerNames {
-		opts, err := criconfig.GenerateRuntimeOptions(c.config.ContainerdConfig.Runtimes[handler])
+		opts, err := criconfig.GenerateRuntimeOptions(c.config.Runtimes[handler])
 		if err != nil {
 			log.G(ctx).Debugf("failed to parse runtime handler options for %q", handler)
 			continue

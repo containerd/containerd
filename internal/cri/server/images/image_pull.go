@@ -567,7 +567,7 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 // for decryption of encrypted images based on the cri decryption configuration.
 // Temporarily removed for v2 upgrade
 func (c *CRIImageService) encryptedImagesPullOpts() []containerd.RemoteOpt {
-	if c.config.ImageDecryption.KeyModel == criconfig.KeyModelNode {
+	if c.config.KeyModel == criconfig.KeyModelNode {
 		ltdd := imgcrypt.Payload{}
 		decUnpackOpt := encryption.WithUnpackConfigApplyOpts(encryption.WithDecryptedUnpack(&ltdd))
 		opt := containerd.WithUnpackOpts([]containerd.UnpackOpt{decUnpackOpt})

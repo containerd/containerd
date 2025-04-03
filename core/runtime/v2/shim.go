@@ -541,7 +541,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		}
 	}
 
-	if err := s.ShimInstance.Delete(ctx); err != nil {
+	if err := s.Delete(ctx); err != nil {
 		log.G(ctx).WithField("id", s.ID()).WithError(err).Error("failed to delete shim")
 	}
 

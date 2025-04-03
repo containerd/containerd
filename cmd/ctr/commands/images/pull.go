@@ -298,14 +298,14 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 								node.root = false
 							}
 						}
-						node.Progress.Parents = parents
+						node.Parents = parents
 						if node.root {
 							roots = append(roots, node)
 						}
 					}
 					statuses[p.Name] = node
 				} else {
-					if len(node.Progress.Parents) != len(p.Parents) {
+					if len(node.Parents) != len(p.Parents) {
 						var parents []string
 						var removeRoot bool
 						for _, parent := range p.Parents {
@@ -315,7 +315,7 @@ func ProgressHandler(ctx context.Context, out io.Writer) (transfer.ProgressFunc,
 								var found bool
 								for _, child := range pStatus.children {
 
-									if child.Progress.Name == p.Name {
+									if child.Name == p.Name {
 										found = true
 										break
 									}

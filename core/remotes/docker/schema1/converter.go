@@ -69,8 +69,8 @@ type Converter struct {
 	layerBlobs map[digest.Digest]ocispec.Descriptor
 }
 
-var ErrDisabled = fmt.Errorf("Pulling Schema 1 images have been deprecated and disabled by default since containerd v2.0. "+
-	"As a workaround you may set an environment variable `%s=1`, but this will be completely removed in containerd v2.1.",
+var ErrDisabled = fmt.Errorf("pulling Schema 1 images have been deprecated and disabled by default since containerd v2.0. "+
+	"As a workaround you may set an environment variable `%s=1`, but this will be completely removed in containerd v2.1",
 	deprecation.EnvPullSchema1Image)
 
 // NewConverter returns a new converter
