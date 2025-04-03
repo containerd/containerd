@@ -2,8 +2,6 @@ module github.com/containerd/containerd
 
 go 1.23.0
 
-toolchain go1.23.8
-
 require (
 	dario.cat/mergo v1.0.0
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24
