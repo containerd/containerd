@@ -51,6 +51,22 @@ func (m *MetricsServer) updatePodSandboxMetrics(sandboxID string) *SandboxMetric
 			},
 		}
 	}
+
+
+}
+
+// getMetrics is supposed to be called from ListPodSandBoxMetrics
+func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
+	var sm *SandboxMetrics
+	if m.collectionPeriod == 0 {
+		sm = m.updatePodSandboxMetrics(sandBoxID)
+	}
+	// TODO: akhilerm decide if we should query for metrics if this is not available
+	sm, ok := m.sandboxMetrics[sandBoxID]
+	if !ok {
+		sm = m.updatePodSandboxMetrics(sandBoxID)
+	}
+	return sm.metric
 }
 
 func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
