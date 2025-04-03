@@ -40,6 +40,19 @@ type SandboxMetrics struct {
 	metric *runtime.PodSandboxMetrics
 }
 
+func (m *MetricsServer) updatePodSandboxMetrics(sandboxID string) *SandboxMetrics {
+	sm, ok := m.sandboxMetrics[sandboxID]
+	if !ok {
+		sm = &SandboxMetrics{
+			metric: &runtime.PodSandboxMetrics{
+				PodSandboxId:     sandboxID,
+				Metrics:          []*runtime.Metric{},
+				ContainerMetrics: []*runtime.ContainerMetrics{},
+			},
+		}
+	}
+}
+
 func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListPodSandboxMetricsRequest) (*runtime.ListPodSandboxMetricsResponse, error) {
 	sandboxList := c.sandboxStore.List()
 	//metricsList := c.sandboxStore.
