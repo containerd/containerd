@@ -108,6 +108,14 @@ func (c *criService) RemoveContainer(ctx context.Context, r *runtime.RemoveConta
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to delete containerd container %q: %w", id, err)
 		}
+		// If err is ErrNotFound, and can get container from store,delete it again.
+		_, err := c.client.ContainerService().Get(ctx, id)
+		if err == nil {
+			log.G(ctx).Infof("delete leak container %s", id)
+			if err := c.client.ContainerService().Delete(ctx, id); err != nil {
+				return nil, err
+			}
+		}
 		log.G(ctx).Tracef("Remove called for containerd container %q that does not exist", id)
 	}
 
