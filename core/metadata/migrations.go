@@ -239,13 +239,13 @@ func migrateSandboxes(tx *bolt.Tx) error {
 			})
 		})
 	}); merr != nil {
-		return fmt.Errorf("failed to copy sandboxes into v1 bucket: %w", err)
+		return fmt.Errorf("failed to copy sandboxes into v1 bucket: %w", merr)
 	}
 
 	for _, ns := range deletingBuckets {
 		derr := tx.DeleteBucket(ns)
 		if derr != nil {
-			return fmt.Errorf("failed to cleanup bucket %s in root: %w", ns, err)
+			return fmt.Errorf("failed to cleanup bucket %s in root: %w", ns, derr)
 		}
 	}
 	return nil

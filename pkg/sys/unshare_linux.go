@@ -81,7 +81,7 @@ func UnshareAfterEnterUserns(uidMap, gidMap string, unshareFlags uintptr, f func
 		if dupErr != nil {
 			proc.Kill()
 			proc.Wait()
-			return fmt.Errorf("failed to dupfd: %w", err)
+			return fmt.Errorf("failed to dupfd: %w", dupErr)
 		}
 		pidfd = dupPidfd
 	}
