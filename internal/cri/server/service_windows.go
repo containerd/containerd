@@ -17,8 +17,6 @@
 package server
 
 import (
-	"fmt"
-
 	"github.com/containerd/go-cni"
 )
 
@@ -28,39 +26,17 @@ const windowsNetworkAttachCount = 1
 
 // initPlatform handles windows specific initialization for the CRI service.
 func (c *criService) initPlatform() error {
-	pluginDirs := map[string]string{
-		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
-	}
-	for name, conf := range c.config.Runtimes {
-		if conf.NetworkPluginConfDir != "" {
-			pluginDirs[name] = conf.NetworkPluginConfDir
-		}
-	}
-
-	c.netPlugin = make(map[string]cni.CNI)
-	for name, dir := range pluginDirs {
-		max := c.config.NetworkPluginMaxConfNum
-		if name != defaultNetworkPlugin {
-			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
-				max = m
-			}
-		}
-		// For windows, the loopback network is added as default.
-		// There is no need to explicitly add one hence networkAttachCount is 1.
-		// If there are more network configs the pod will be attached to all the
-		// networks but we will only use the ip of the default network interface
-		// as the pod IP.
-		i, err := cni.New(cni.WithMinNetworkCount(windowsNetworkAttachCount),
-			cni.WithPluginConfDir(dir),
-			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir(c.config.NetworkPluginBinDirs))
-		if err != nil {
-			return fmt.Errorf("failed to initialize cni: %w", err)
-		}
-		c.netPlugin[name] = i
-	}
-
 	return nil
+}
+
+// cniOptions returns cni options for windows.
+func (c *criService) cniOptions() []cni.Opt {
+	// For windows, the loopback network is added as default.
+	// There is no need to explicitly add one hence networkAttachCount is 1.
+	// If there are more network configs the pod will be attached to all the
+	// networks but we will only use the ip of the default network interface
+	// as the pod IP.
+	return []cni.Opt{cni.WithMinNetworkCount(windowsNetworkAttachCount)}
 }
 
 // cniLoadOptions returns cni load options for the windows.

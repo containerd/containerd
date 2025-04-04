@@ -56,44 +56,6 @@ func (c *criService) initPlatform() (err error) {
 		selinux.SetDisabled()
 	}
 
-	pluginDirs := map[string]string{
-		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
-	}
-	for name, conf := range c.config.Runtimes {
-		if conf.NetworkPluginConfDir != "" {
-			pluginDirs[name] = conf.NetworkPluginConfDir
-		}
-	}
-
-	networkAttachCount := 2
-
-	if c.Config().UseInternalLoopback {
-		networkAttachCount = 1
-	}
-
-	c.netPlugin = make(map[string]cni.CNI)
-	for name, dir := range pluginDirs {
-		max := c.config.NetworkPluginMaxConfNum
-		if name != defaultNetworkPlugin {
-			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
-				max = m
-			}
-		}
-		// Pod needs to attach to at least loopback network and a non host network,
-		// hence networkAttachCount is 2 if the CNI plugin is used and
-		// 1 if the internal mechanism for setting lo to up is used.
-		// If there are more network configs the pod will be attached to all the networks
-		// but we will only use the ip of the default network interface as the pod IP.
-		i, err := cni.New(cni.WithMinNetworkCount(networkAttachCount),
-			cni.WithPluginConfDir(dir),
-			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir(c.config.NetworkPluginBinDirs))
-		if err != nil {
-			return fmt.Errorf("failed to initialize cni: %w", err)
-		}
-		c.netPlugin[name] = i
-	}
-
 	if c.allCaps == nil {
 		c.allCaps, err = cap.Current()
 		if err != nil {
@@ -109,6 +71,20 @@ func (c *criService) initPlatform() (err error) {
 	}
 
 	return nil
+}
+
+// cniOptions returns cni options for linux.
+func (c *criService) cniOptions() []cni.Opt {
+	// Pod needs to attach to at least loopback network and a non host network,
+	// hence networkAttachCount is 2 if the CNI plugin is used and
+	// 1 if the internal mechanism for setting lo to up is used.
+	// If there are more network configs the pod will be attached to all the networks
+	// but we will only use the ip of the default network interface as the pod IP.
+	networkAttachCount := 2
+	if c.Config().UseInternalLoopback {
+		networkAttachCount = 1
+	}
+	return []cni.Opt{cni.WithMinNetworkCount(networkAttachCount)}
 }
 
 // cniLoadOptions returns cni load options for the linux.
