@@ -369,34 +369,40 @@ func (c *criService) introspectRuntimeHandlers(ctx context.Context) ([]*runtime.
 	var res []*runtime.RuntimeHandler
 	intro := c.client.IntrospectionService()
 	for name, r := range c.config.Runtimes {
-		h := runtime.RuntimeHandler{
-			Name: name,
-		}
-		rawFeatures, err := introspectRuntimeFeatures(ctx, intro, r)
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("failed to introspect features of runtime %q", name)
-		} else {
-			h.Features = &runtime.RuntimeHandlerFeatures{}
-			if slices.Contains(rawFeatures.MountOptions, "rro") {
-				if kernelSupportsRRO {
-					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts", name)
-					h.Features.RecursiveReadOnlyMounts = true
-				} else {
-					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
-				}
-			}
-			userns := supportsCRIUserns(rawFeatures)
-			h.Features.UserNamespaces = userns
-			log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
-		}
-		res = append(res, &h)
+		h := c.introspectRuntimeHandler(ctx, intro, name, r)
+		res = append(res, h)
+
 		if name == c.config.DefaultRuntimeName {
-			defH := h
+			defH := *h
 			defH.Name = "" // denotes default
 			res = append(res, &defH)
 		}
 	}
 	return res, nil
+}
+
+func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r config.Runtime) *runtime.RuntimeHandler {
+	h := &runtime.RuntimeHandler{
+		Name: name,
+	}
+	rawFeatures, err := introspectRuntimeFeatures(ctx, intro, r)
+	if err != nil {
+		log.G(ctx).WithError(err).Debugf("failed to introspect features of runtime %q", name)
+	} else {
+		h.Features = &runtime.RuntimeHandlerFeatures{}
+		if slices.Contains(rawFeatures.MountOptions, "rro") {
+			if kernelSupportsRRO {
+				log.G(ctx).Debugf("runtime %q supports recursive read-only mounts", name)
+				h.Features.RecursiveReadOnlyMounts = true
+			} else {
+				log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
+			}
+		}
+		userns := supportsCRIUserns(rawFeatures)
+		h.Features.UserNamespaces = userns
+		log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
+	}
+	return h
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {

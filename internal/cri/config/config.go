@@ -136,6 +136,16 @@ type ContainerdConfig struct {
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 
+	// RuntimesConfigPath specifies the root directory containing runtime specific
+	// configurations. Unlike `runtimes` specified in containerd cri config,
+	// containerd will watch this directory and update runtimes dynamically.
+	// If `runtime_name` is specified in both `runtimes` and `runtimes_config_path`,
+	// the runtime in `runtimes_config_path` will override the one in `runtimes`.
+	//
+	// The configuration for `runtime_name` should be located at
+	// `<RuntimesConfigPath>/<runtime_name>.toml`.
+	RuntimesConfigPath string `toml:"runtimes_config_path" json:"runtimesConfigPath"`
+
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
@@ -558,25 +568,10 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	}
 
 	for k, r := range c.ContainerdConfig.Runtimes {
-		if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
-			return warnings, fmt.Errorf("runtime %s: `cgroup_writable` is only supported on cgroup v2", k)
+		if err := validateRuntimeClass(&r); err != nil {
+			return warnings, fmt.Errorf("runtime %s: %w", k, err)
 		}
-
-		if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
-			return warnings, errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
-		}
-		// If empty, use default podSandbox mode
-		if len(r.Sandboxer) == 0 {
-			r.Sandboxer = string(ModePodSandbox)
-			c.ContainerdConfig.Runtimes[k] = r
-		}
-
-		if len(r.IOType) == 0 {
-			r.IOType = IOTypeFifo
-		}
-		if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
-			return warnings, errors.New("`io_type` can only be `streaming` or `named_pipe`")
-		}
+		c.ContainerdConfig.Runtimes[k] = r
 	}
 
 	// Validation for drain_exec_sync_io_timeout
@@ -589,6 +584,28 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 		return warnings, err
 	}
 	return warnings, nil
+}
+
+func validateRuntimeClass(r *Runtime) error {
+	if r.CgroupWritable && !opts.IsCgroup2UnifiedMode() {
+		return errors.New("`cgroup_writable` is only supported on cgroup v2")
+	}
+
+	if !r.PrivilegedWithoutHostDevices && r.PrivilegedWithoutHostDevicesAllDevicesAllowed {
+		return errors.New("`privileged_without_host_devices_all_devices_allowed` requires `privileged_without_host_devices` to be enabled")
+	}
+	// If empty, use default podSandbox mode
+	if len(r.Sandboxer) == 0 {
+		r.Sandboxer = string(ModePodSandbox)
+	}
+
+	if len(r.IOType) == 0 {
+		r.IOType = IOTypeFifo
+	}
+	if r.IOType != IOTypeStreaming && r.IOType != IOTypeFifo {
+		return errors.New("`io_type` can only be `streaming` or `named_pipe`")
+	}
+	return nil
 }
 
 // ValidateServerConfig validates the given server configuration.
@@ -632,7 +649,6 @@ func (config *Config) GetSandboxRuntime(podSandboxConfig *runtime.PodSandboxConf
 		return Runtime{}, fmt.Errorf("no runtime for %q is configured", runtimeHandler)
 	}
 	return r, nil
-
 }
 
 // untrustedWorkload returns true if the sandbox contains untrusted workload.
