@@ -189,7 +189,7 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 			p, restoreErr := restoreBootstrapParams(process.Bundle())
 			if restoreErr != nil {
 				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
+					"params of sandbox %s, legacy restore error %v", opts.SandboxID, restoreErr)
 			}
 			params = p
 		}

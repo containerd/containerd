@@ -179,7 +179,7 @@ func migrateSandboxes(tx *bolt.Tx) error {
 
 	deletingBuckets := [][]byte{}
 
-	if merr := tx.ForEach(func(ns []byte, nsbkt *bolt.Bucket) error {
+	if err := tx.ForEach(func(ns []byte, nsbkt *bolt.Bucket) error {
 		// Skip v1 bucket, even if users created sandboxes in v1 namespace.
 		if bytes.Equal(bucketKeyVersion, ns) {
 			return nil
@@ -238,13 +238,13 @@ func migrateSandboxes(tx *bolt.Tx) error {
 				})
 			})
 		})
-	}); merr != nil {
+	}); err != nil {
 		return fmt.Errorf("failed to copy sandboxes into v1 bucket: %w", err)
 	}
 
 	for _, ns := range deletingBuckets {
-		derr := tx.DeleteBucket(ns)
-		if derr != nil {
+		err := tx.DeleteBucket(ns)
+		if err != nil {
 			return fmt.Errorf("failed to cleanup bucket %s in root: %w", ns, err)
 		}
 	}
