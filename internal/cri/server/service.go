@@ -22,7 +22,6 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -130,8 +129,8 @@ type criService struct {
 	// containerNameIndex stores all container names and make sure each
 	// name is unique.
 	containerNameIndex *registrar.Registrar
-	// netPlugin is used to setup and teardown network when run/stop pod sandbox.
-	netPlugin map[string]cni.CNI
+
+	cniNetPlugin *cniNetPlugin
 	// client is an instance of the containerd client
 	client *containerd.Client
 	// streamServer is the streaming server serves container streaming request.
@@ -141,9 +140,6 @@ type criService struct {
 	// initialized indicates whether the server is initialized. All GRPC services
 	// should return error before the server is initialized.
 	initialized atomic.Bool
-	// cniNetConfMonitor is used to reload cni network conf if there is
-	// any valid fs change events from cni network conf dir.
-	cniNetConfMonitor map[string]*cniNetConfSyncer
 	// allCaps is the list of the capabilities.
 	// When nil, parsed from CapEff of /proc/self/status.
 	allCaps []string //nolint:nolintlint,unused // Ignore on non-Linux
@@ -196,8 +192,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin:          make(map[string]cni.CNI),
-		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
+		cniNetPlugin: &cniNetPlugin{
+			netPlugin:         make(map[string]cni.CNI),
+			cniNetConfMonitor: make(map[string]*cniNetConfSyncer),
+		},
+		sandboxService: newCriSandboxService(&config, options.SandboxControllers),
 	}
 
 	// TODO: Make discard time configurable
@@ -213,6 +212,9 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	if err := c.initPlatform(); err != nil {
 		return nil, nil, fmt.Errorf("initialize platform: %w", err)
 	}
+	if err := c.initCNIPlugins(); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize CNI plugins: %w", err)
+	}
 
 	// prepare streaming server
 	c.streamServer, err = streaming.NewServer(options.StreamingConfig, newStreamRuntime(c))
@@ -221,23 +223,6 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 	}
 
 	c.eventMonitor = events.NewEventMonitor(&criEventHandler{c: c})
-
-	c.cniNetConfMonitor = make(map[string]*cniNetConfSyncer)
-	for name, i := range c.netPlugin {
-		path := c.config.NetworkPluginConfDir
-		if name != defaultNetworkPlugin {
-			if rc, ok := c.config.Runtimes[name]; ok {
-				path = rc.NetworkPluginConfDir
-			}
-		}
-		if path != "" {
-			m, err := newCNINetConfSyncer(path, i, c.cniLoadOptions())
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create cni conf monitor for %s: %w", name, err)
-			}
-			c.cniNetConfMonitor[name] = m
-		}
-	}
 
 	c.nri = nri.NewAPI(options.NRI, &criImplementation{c})
 
@@ -270,27 +255,8 @@ func (c *criService) Run(ready func()) error {
 	eventMonitorErrCh := c.eventMonitor.Start()
 
 	// Start CNI network conf syncers
-	cniNetConfMonitorErrCh := make(chan error, len(c.cniNetConfMonitor))
-	var netSyncGroup sync.WaitGroup
-	for name, h := range c.cniNetConfMonitor {
-		netSyncGroup.Add(1)
-		log.L.Infof("Start cni network conf syncer for %s", name)
-		go func(h *cniNetConfSyncer) {
-			cniNetConfMonitorErrCh <- h.syncLoop()
-			netSyncGroup.Done()
-		}(h)
-	}
-	// For platforms that may not support CNI (darwin etc.) there's no
-	// use in launching this as `Wait` will return immediately. Further
-	// down we select on this channel along with some others to determine
-	// if we should Close() the CRI service, so closing this preemptively
-	// isn't good.
-	if len(c.cniNetConfMonitor) > 0 {
-		go func() {
-			netSyncGroup.Wait()
-			close(cniNetConfMonitorErrCh)
-		}()
-	}
+	log.L.Info("Start CNI network conf monitor")
+	cniNetConfMonitorErrCh := c.cniNetPlugin.start()
 
 	// Start streaming server.
 	log.L.Info("Start streaming server")
@@ -348,11 +314,10 @@ func (c *criService) Run(ready func()) error {
 // TODO(random-liu): Make close synchronous.
 func (c *criService) Close() error {
 	log.L.Info("Stop CRI service")
-	for name, h := range c.cniNetConfMonitor {
-		if err := h.stop(); err != nil {
-			log.L.WithError(err).Errorf("failed to stop cni network conf monitor for %s", name)
-		}
+	if err := c.cniNetPlugin.close(); err != nil {
+		log.L.WithError(err).Errorf("failed to stop cni network conf monitor")
 	}
+
 	c.eventMonitor.Stop()
 	if err := c.streamServer.Stop(); err != nil {
 		return fmt.Errorf("failed to stop stream server: %w", err)
@@ -457,4 +422,35 @@ func supportsCRIUserns(f *features.Features) bool {
 
 	// user namespace support in CRI requires userns and idmap support.
 	return userns && idmap
+}
+
+func (c *criService) initCNIPlugins() error {
+	cniOpts := c.cniOptions()
+
+	pluginDirs := map[string]string{
+		defaultNetworkPlugin: c.config.NetworkPluginConfDir,
+	}
+	for name, conf := range c.config.Runtimes {
+		if conf.NetworkPluginConfDir != "" {
+			pluginDirs[name] = conf.NetworkPluginConfDir
+		}
+	}
+	for name, dir := range pluginDirs {
+		max := c.config.NetworkPluginMaxConfNum
+		if name != defaultNetworkPlugin {
+			if m := c.config.Runtimes[name].NetworkPluginMaxConfNum; m != 0 {
+				max = m
+			}
+		}
+		if err := c.cniNetPlugin.addCNIPlugin(name, dir,
+			append(cniOpts,
+				cni.WithPluginConfDir(dir),
+				cni.WithPluginMaxConfNum(max),
+				cni.WithPluginDir(c.config.NetworkPluginBinDirs)),
+			c.cniLoadOptions()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

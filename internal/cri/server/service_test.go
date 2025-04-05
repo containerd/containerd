@@ -147,8 +147,10 @@ func newTestCRIService(opts ...testOpt) *criService {
 		sandboxNameIndex:   registrar.NewRegistrar(),
 		containerStore:     containerstore.NewStore(labels),
 		containerNameIndex: registrar.NewRegistrar(),
-		netPlugin: map[string]cni.CNI{
-			defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
+		cniNetPlugin: &cniNetPlugin{
+			netPlugin: map[string]cni.CNI{
+				defaultNetworkPlugin: servertesting.NewFakeCNIPlugin(),
+			},
 		},
 		sandboxService: &fakeSandboxService{},
 	}

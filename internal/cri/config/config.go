@@ -136,6 +136,16 @@ type ContainerdConfig struct {
 	// DefaultRuntimeName is the default runtime name to use from the runtimes table.
 	DefaultRuntimeName string `toml:"default_runtime_name" json:"defaultRuntimeName"`
 
+	// RuntimesConfigPath specifies the root directory containing runtime specific
+	// configurations. Unlike `runtimes` specified in containerd cri config,
+	// containerd will watch this directory and update runtimes dynamically.
+	// If `runtime_name` is specified in both `runtimes` and `runtimes_config_path`,
+	// the runtime in `runtimes_config_path` will override the one in `runtimes`.
+	//
+	// The configuration for `runtime_name` should be located at
+	// `<RuntimesConfigPath>/<runtime_name>.toml`.
+	RuntimesConfigPath string `toml:"runtimes_config_path" json:"runtimesConfigPath"`
+
 	// Runtimes is a map from CRI RuntimeHandler strings, which specify types of runtime
 	// configurations, to the matching configurations.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
