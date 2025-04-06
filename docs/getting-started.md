@@ -15,7 +15,7 @@ Download the `containerd-<VERSION>-<OS>-<ARCH>.tar.gz` archive from https://gith
 verify its sha256sum, and extract it under `/usr/local`:
 
 ```console
-$ tar Cxzvf /usr/local containerd-1.6.2-linux-amd64.tar.gz
+$ tar -xzvf /usr/local containerd-1.6.2-linux-amd64.tar.gz
 bin/
 bin/containerd-shim-runc-v2
 bin/containerd-shim
