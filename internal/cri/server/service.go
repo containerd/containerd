@@ -40,7 +40,6 @@ import (
 	"github.com/containerd/containerd/v2/core/introspection"
 	_ "github.com/containerd/containerd/v2/core/runtime" // for typeurl init
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cri/config"
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/nri"
 	"github.com/containerd/containerd/v2/internal/cri/server/events"
@@ -399,7 +398,7 @@ func (c *criService) introspectRuntimeHandlers(ctx context.Context) ([]*runtime.
 	return res, nil
 }
 
-func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {
+func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r criconfig.Runtime) (*features.Features, error) {
 	if r.Type != plugins.RuntimeRuncV2 {
 		return nil, fmt.Errorf("introspecting OCI runtime features needs the runtime type to be %q, got %q",
 			plugins.RuntimeRuncV2, r.Type)
@@ -412,7 +411,7 @@ func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service,
 	if r.Path != "" {
 		rr.RuntimePath = r.Path // "/usr/local/bin/crun"
 	}
-	options, err := config.GenerateRuntimeOptions(r)
+	options, err := criconfig.GenerateRuntimeOptions(r)
 	if err != nil {
 		return nil, err
 	}

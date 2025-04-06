@@ -39,9 +39,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/opts"
-	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/internal/cri/util"
-	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/cap"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
@@ -860,7 +858,7 @@ func TestMaskedAndReadonlyPaths(t *testing.T) {
 	ociRuntime := config.Runtime{}
 	c := newTestCRIService()
 
-	defaultSpec, err := oci.GenerateSpec(ctrdutil.NamespacedContext(), nil, &containers.Container{ID: testID})
+	defaultSpec, err := oci.GenerateSpec(util.NamespacedContext(), nil, &containers.Container{ID: testID})
 	require.NoError(t, err)
 
 	for _, test := range []struct {
@@ -1647,7 +1645,7 @@ containerEdits:
 			err = cdi.Configure(cdi.WithSpecDirs(cdiDir))
 			require.NoError(t, err)
 
-			injectFun := customopts.WithCDI(test.annotations, test.cdiDevices)
+			injectFun := opts.WithCDI(test.annotations, test.cdiDevices)
 			err = injectFun(ctx, nil, testContainer, spec)
 			assert.Equal(t, test.expectError, err != nil)
 

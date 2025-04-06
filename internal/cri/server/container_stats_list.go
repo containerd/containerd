@@ -412,9 +412,6 @@ func (c *criService) linuxContainerMetrics(
 			return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		cs.Memory = memoryStats
-		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
-		}
 	}
 
 	return containerStats{&cs, pids}, nil
