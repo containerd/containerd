@@ -385,7 +385,12 @@ func (t *task) Delete(ctx context.Context, opts ...ProcessDeleteOpts) (*ExitStat
 			// https://github.com/containerd/containerd/issues/7357
 			break
 		}
-		fallthrough
+		_, err := t.client.TaskService().Kill(ctx, &tasks.KillRequest{
+			ContainerID: t.id,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to kill task %s:%w", t.id, err)
+		}
 	default:
 		return nil, fmt.Errorf("task must be stopped before deletion: %s: %w", status.Status, errdefs.ErrFailedPrecondition)
 	}
