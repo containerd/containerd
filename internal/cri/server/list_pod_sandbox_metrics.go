@@ -40,6 +40,19 @@ type SandboxMetrics struct {
 	metric *runtime.PodSandboxMetrics
 }
 
+type metricValue struct {
+	value      uint64
+	labels     []string
+	metricType runtime.MetricType
+}
+
+type metricValues []metricValue
+
+type containerMetric struct {
+	desc      *runtime.MetricDescriptor
+	valueFunc func() metricValues
+}
+
 func (m *MetricsServer) updatePodSandboxMetrics(sandboxID string) *SandboxMetrics {
 	sm, ok := m.sandboxMetrics[sandboxID]
 	if !ok {
@@ -52,19 +65,18 @@ func (m *MetricsServer) updatePodSandboxMetrics(sandboxID string) *SandboxMetric
 		}
 	}
 
-
 }
 
 // getMetrics is supposed to be called from ListPodSandBoxMetrics
 func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
 	var sm *SandboxMetrics
-	if m.collectionPeriod == 0 {
+	/*if m.collectionPeriod == 0 {
 		sm = m.updatePodSandboxMetrics(sandBoxID)
-	}
+	}*/
 	// TODO: akhilerm decide if we should query for metrics if this is not available
 	sm, ok := m.sandboxMetrics[sandBoxID]
 	if !ok {
-		sm = m.updatePodSandboxMetrics(sandBoxID)
+		// we should not error, but provide the metrics that are available
 	}
 	return sm.metric
 }
@@ -113,6 +125,24 @@ type containerCPUMetrics struct {
 	TasksState         uint64
 }
 
+// gives the metrics for a given container in a sandbox
+func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*runtime.ContainerMetrics, error) {
+	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
+	resp, err := c.client.TaskService().Metrics(ctx, request)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch metrics for task: %w", err)
+	}
+	if len(resp.Metrics) != 1 {
+		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
+	}
+	metric, err := c.toContainerMetrics(ctx, containerID, resp.Metrics[0])
+	if err != nil {
+		return nil, err
+	}
+	return metric.metrics, nil
+
+}
+
 type containerMemoryMetrics struct {
 	Cache        uint64
 	RSS          uint64
@@ -139,24 +169,6 @@ type containerNetworkMetrics struct {
 	TxPackets uint64
 	TxErrors  uint64
 	TxDropped uint64
-}
-
-// gives the metrics for a given container in a sandbox
-func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*runtime.ContainerMetrics, error) {
-	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
-	resp, err := c.client.TaskService().Metrics(ctx, request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch metrics for task: %w", err)
-	}
-	if len(resp.Metrics) != 1 {
-		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
-	}
-	metric, err := c.toContainerMetrics(ctx, containerID, resp.Metrics[0])
-	if err != nil {
-		return nil, err
-	}
-	return metric.metrics, nil
-
 }
 
 func (c *criService) toContainerMetrics(ctx context.Context, containerdID string, metrics *types.Metric) (containerMetrics, error) {
@@ -313,5 +325,23 @@ func (c *criService) networkMetrics(ctx context.Context, stats interface{}) ([]c
 		return cm, nil
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+}
+
+func generateSandboxNetworkMetrics(metrics []containerNetworkMetrics) []*types.Metric {
+	networkMetrics := []*containerMetric{
+		{
+			desc: &runtime.MetricDescriptor{
+				Name:      "container_network_receive_bytes_total",
+				Help:      "Cumulative count of bytes received",
+				LabelKeys: append(baseLabelKeys, "interface"),
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics[0].RxBytes,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
 	}
 }
