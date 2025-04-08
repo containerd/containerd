@@ -114,6 +114,9 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if uconfig.DuplicationSuppressor != nil {
 			uopts = append(uopts, unpack.WithDuplicationSuppressor(uconfig.DuplicationSuppressor))
 		}
+		if uconfig.FetchMissBlobs {
+			uopts = append(uopts, unpack.WithFetchMissBlobs())
+		}
 		unpacker, err = unpack.NewUnpacker(ctx, c.ContentStore(), uopts...)
 		if err != nil {
 			return nil, fmt.Errorf("unable to initialize unpacker: %w", err)

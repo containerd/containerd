@@ -77,6 +77,9 @@ var pushCommand = &cli.Command{
 	}, &cli.BoolFlag{
 		Name:  "allow-non-distributable-blobs",
 		Usage: "Allow pushing blobs that are marked as non-distributable",
+	}, &cli.BoolFlag{
+		Name:  "fetch-miss-blobs",
+		Usage: "Allow fetch missed blobs before pushing",
 	}),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -205,6 +208,9 @@ var pushCommand = &cli.Command{
 			handler := jobHandler
 			if !cliContext.Bool("allow-non-distributable-blobs") {
 				handler = remotes.SkipNonDistributableBlobs(handler)
+			}
+			if cliContext.Bool("fetch-miss-blobs") {
+				handler = remotes.FetchMissBlobsHandler(handler, resolver, client.ContentStore())
 			}
 
 			ropts := []containerd.RemoteOpt{
