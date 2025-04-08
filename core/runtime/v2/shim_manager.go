@@ -186,10 +186,10 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 			if err != nil {
 				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
 			}
-			p, restoreErr := restoreBootstrapParams(process.Bundle())
-			if restoreErr != nil {
+			p, err := restoreBootstrapParams(process.Bundle())
+			if err != nil {
 				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, %v, legacy restore error %v", opts.SandboxID, err, restoreErr)
+					"params of sandbox %s, legacy restore error %v", opts.SandboxID, err)
 			}
 			params = p
 		}
