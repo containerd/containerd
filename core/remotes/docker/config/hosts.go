@@ -167,55 +167,16 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		rhosts := make([]docker.RegistryHost, len(hosts))
 		for i, host := range hosts {
 			// Allow setting for each host as well
-			explicitTLS := tlsConfigured
+			explicitTLSFromHost := host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil
+			explicitTLS := tlsConfigured || explicitTLSFromHost
 
-			if host.caCerts != nil || host.clientPairs != nil || host.skipVerify != nil || host.dialTimeout != nil {
-				explicitTLS = true
+			if explicitTLSFromHost || host.dialTimeout != nil {
 				tr := defaultTransport.Clone()
-				tlsConfig := tr.TLSClientConfig
-				if host.skipVerify != nil {
-					tlsConfig.InsecureSkipVerify = *host.skipVerify
-				}
-				if host.caCerts != nil {
-					if tlsConfig.RootCAs == nil {
-						rootPool, err := rootSystemPool()
-						if err != nil {
-							return nil, fmt.Errorf("unable to initialize cert pool: %w", err)
-						}
-						tlsConfig.RootCAs = rootPool
-					}
-					for _, f := range host.caCerts {
-						data, err := os.ReadFile(f)
-						if err != nil {
-							return nil, fmt.Errorf("unable to read CA cert %q: %w", f, err)
-						}
-						if !tlsConfig.RootCAs.AppendCertsFromPEM(data) {
-							return nil, fmt.Errorf("unable to load CA cert %q", f)
-						}
-					}
-				}
 
-				for _, pair := range host.clientPairs {
-					certPEMBlock, err := os.ReadFile(pair[0])
-					if err != nil {
-						return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[0], err)
+				if explicitTLSFromHost {
+					if err := updateTLSConfigFromHost(tr.TLSClientConfig, &host); err != nil {
+						return nil, err
 					}
-					var keyPEMBlock []byte
-					if pair[1] != "" {
-						keyPEMBlock, err = os.ReadFile(pair[1])
-						if err != nil {
-							return nil, fmt.Errorf("unable to read CERT file %q: %w", pair[1], err)
-						}
-					} else {
-						// Load key block from same PEM file
-						keyPEMBlock = certPEMBlock
-					}
-					cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
-					if err != nil {
-						return nil, fmt.Errorf("failed to load X509 key pair: %w", err)
-					}
-
-					tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 				}
 
 				if host.dialTimeout != nil {
@@ -266,6 +227,55 @@ func ConfigureHosts(ctx context.Context, options HostOptions) docker.RegistryHos
 		return rhosts, nil
 	}
 
+}
+
+func updateTLSConfigFromHost(tlsConfig *tls.Config, host *hostConfig) error {
+	if host.skipVerify != nil {
+		tlsConfig.InsecureSkipVerify = *host.skipVerify
+	}
+
+	if host.caCerts != nil {
+		if tlsConfig.RootCAs == nil {
+			rootPool, err := rootSystemPool()
+			if err != nil {
+				return fmt.Errorf("unable to initialize cert pool: %w", err)
+			}
+			tlsConfig.RootCAs = rootPool
+		}
+		for _, f := range host.caCerts {
+			data, err := os.ReadFile(f)
+			if err != nil {
+				return fmt.Errorf("unable to read CA cert %q: %w", f, err)
+			}
+			if !tlsConfig.RootCAs.AppendCertsFromPEM(data) {
+				return fmt.Errorf("unable to load CA cert %q", f)
+			}
+		}
+	}
+
+	for _, pair := range host.clientPairs {
+		certPEMBlock, err := os.ReadFile(pair[0])
+		if err != nil {
+			return fmt.Errorf("unable to read CERT file %q: %w", pair[0], err)
+		}
+		var keyPEMBlock []byte
+		if pair[1] != "" {
+			keyPEMBlock, err = os.ReadFile(pair[1])
+			if err != nil {
+				return fmt.Errorf("unable to read CERT file %q: %w", pair[1], err)
+			}
+		} else {
+			// Load key block from same PEM file
+			keyPEMBlock = certPEMBlock
+		}
+		cert, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+		if err != nil {
+			return fmt.Errorf("failed to load X509 key pair: %w", err)
+		}
+		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+	}
+
+	return nil
 }
 
 // HostDirFromRoot returns a function which finds a host directory
