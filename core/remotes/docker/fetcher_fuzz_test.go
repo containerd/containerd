@@ -58,7 +58,7 @@ func FuzzFetcher(f *testing.F) {
 
 		ctx := context.Background()
 		req := f.request(host, http.MethodGet)
-		rc, err := f.open(ctx, req, "", 0)
+		rc, err := f.open(ctx, req, "", 0, true)
 		if err != nil {
 			return
 		}
