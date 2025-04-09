@@ -83,12 +83,13 @@ message CreateTaskRequest {
 	string stdout = 5;
 	string stderr = 6;
 	bool terminal = 7;
+	bool attach = 8;
 
-	containerd.types.Descriptor checkpoint = 8;
+	containerd.types.Descriptor checkpoint = 9;
 
-	google.protobuf.Any options = 9;
+	google.protobuf.Any options = 10;
 
-	string runtime_path = 10;
+	string runtime_path = 11;
 }
 
 message CreateTaskResponse {

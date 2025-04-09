@@ -241,6 +241,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 	request := &tasks.CreateTaskRequest{
 		ContainerID: c.id,
 		Terminal:    cfg.Terminal,
+		Attach:      cfg.Attach,
 		Stdin:       cfg.Stdin,
 		Stdout:      cfg.Stdout,
 		Stderr:      cfg.Stderr,
