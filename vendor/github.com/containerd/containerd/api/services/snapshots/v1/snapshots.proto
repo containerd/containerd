@@ -121,6 +121,7 @@ message Info {
 	//
 	// The combined size of a key/value pair cannot exceed 4096 bytes.
 	map<string, string> labels  = 6;
+	string id = 7;
 }
 
 message StatSnapshotResponse {
