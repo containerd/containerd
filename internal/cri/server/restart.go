@@ -195,7 +195,7 @@ func (c *criService) recover(ctx context.Context) error {
 		return err
 	}
 	// Recover all images.
-	if err := c.ImageService.CheckImages(ctx); err != nil {
+	if err := c.CheckImages(ctx); err != nil {
 		return fmt.Errorf("failed to check images: %w", err)
 	}
 
@@ -472,7 +472,7 @@ func (c *criService) createContainerIO(containerID, sandboxID string, config *ru
 	if err != nil {
 		return nil, fmt.Errorf("an error occurred when try to find sandbox %q: %w", sandboxID, err)
 	}
-	ociRuntime, err := c.config.GetSandboxRuntime(sb.Config, sb.Metadata.RuntimeHandler)
+	ociRuntime, err := c.config.GetSandboxRuntime(sb.Config, sb.RuntimeHandler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sandbox runtime: %w", err)
 	}

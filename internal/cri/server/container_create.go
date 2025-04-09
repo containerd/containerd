@@ -43,7 +43,6 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"github.com/davecgh/go-spew/spew"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/opencontainers/selinux/go-selinux/label"
@@ -183,7 +182,7 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 			containerConfig:       config,
 			imageConfig:           &image.ImageSpec.Config,
 			podSandboxConfig:      sandboxConfig,
-			sandboxRuntimeHandler: sandbox.Metadata.RuntimeHandler,
+			sandboxRuntimeHandler: sandbox.RuntimeHandler,
 			sandboxPid:            sandboxPid,
 			NetNSPath:             sandbox.NetNSPath,
 			containerName:         containerName,
@@ -206,7 +205,7 @@ type createContainerRequest struct {
 	sandboxID             string
 	imageID               string
 	containerConfig       *runtime.ContainerConfig
-	imageConfig           *v1.ImageConfig
+	imageConfig           *imagespec.ImageConfig
 	podSandboxConfig      *runtime.PodSandboxConfig
 	sandboxRuntimeHandler string
 	sandboxPid            uint32

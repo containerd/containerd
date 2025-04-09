@@ -412,7 +412,7 @@ func (c *criService) setupPodNetwork(ctx context.Context, sandbox *sandboxstore.
 	}
 	log.G(ctx).WithField("podsandboxid", id).Debugf("begin cni setup")
 	netStart := time.Now()
-	if c.config.CniConfig.NetworkPluginSetupSerially {
+	if c.config.NetworkPluginSetupSerially {
 		result, err = netPlugin.SetupSerially(ctx, id, path, opts...)
 	} else {
 		result, err = netPlugin.Setup(ctx, id, path, opts...)
