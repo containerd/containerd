@@ -868,6 +868,13 @@ func (c *criContainer) GetCgroupsPath() string {
 	return c.spec.Linux.CgroupsPath
 }
 
+func (c *criContainer) GetIOPriority() *api.LinuxIOPriority {
+	if c.spec.Process == nil {
+		return nil
+	}
+	return api.FromOCILinuxIOPriority(c.spec.Process.IOPriority)
+}
+
 func (c *criContainer) GetPid() uint32 {
 	return c.pid
 }
