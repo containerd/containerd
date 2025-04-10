@@ -29,6 +29,7 @@ import (
 	sstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/pkg/blockio"
+	cdispec "github.com/containerd/containerd/v2/pkg/cdi"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/typeurl/v2"
@@ -281,40 +282,49 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		}
 	}
 
-	resourceCheckOpt := nrigen.WithResourceChecker(
-		func(r *runtimespec.LinuxResources) error {
-			if r != nil {
-				if a.cri.Config().DisableHugetlbController {
-					r.HugepageLimits = nil
+	generatorOptions := []nrigen.GeneratorOption{
+		// resource checker
+		nrigen.WithResourceChecker(
+			func(r *runtimespec.LinuxResources) error {
+				if r != nil {
+					if a.cri.Config().DisableHugetlbController {
+						r.HugepageLimits = nil
+					}
 				}
-			}
-			return nil
-		},
-	)
-
-	rdtResolveOpt := nrigen.WithRdtResolver(
-		func(className string) (*runtimespec.LinuxIntelRdt, error) {
-			if className == "" {
-				return nil, nil
-			}
-			return &runtimespec.LinuxIntelRdt{
-				ClosID: className,
-			}, nil
-		},
-	)
-
-	blkioResolveOpt := nrigen.WithBlockIOResolver(
-		func(className string) (*runtimespec.LinuxBlockIO, error) {
-			if className == "" {
-				return nil, nil
-			}
-			blockIO, err := blockio.ClassNameToLinuxOCI(className)
-			if err != nil {
-				return nil, err
-			}
-			return blockIO, nil
-		},
-	)
+				return nil
+			},
+		),
+		// RDT class resolver
+		nrigen.WithRdtResolver(
+			func(className string) (*runtimespec.LinuxIntelRdt, error) {
+				if className == "" {
+					return nil, nil
+				}
+				return &runtimespec.LinuxIntelRdt{
+					ClosID: className,
+				}, nil
+			},
+		),
+		// Block I/O throttling class resolver
+		nrigen.WithBlockIOResolver(
+			func(className string) (*runtimespec.LinuxBlockIO, error) {
+				if className == "" {
+					return nil, nil
+				}
+				blockIO, err := blockio.ClassNameToLinuxOCI(className)
+				if err != nil {
+					return nil, err
+				}
+				return blockIO, nil
+			},
+		),
+		// CDI injector
+		nrigen.WithCDIDeviceInjector(
+			func(s *runtimespec.Spec, devices []string) error {
+				return cdispec.WithCDIDevices(devices...)(context.TODO(), nil, nil, s)
+			},
+		),
+	}
 
 	return func(ctx context.Context, _ *containerd.Client, c *containers.Container) error {
 		spec := &runtimespec.Spec{}
@@ -328,7 +338,7 @@ func (a *API) WithContainerAdjustment() containerd.NewContainerOpts {
 		}
 
 		sgen := generate.Generator{Config: spec}
-		ngen := nrigen.SpecGenerator(&sgen, resourceCheckOpt, rdtResolveOpt, blkioResolveOpt)
+		ngen := nrigen.SpecGenerator(&sgen, generatorOptions...)
 
 		err = ngen.Adjust(adjust)
 		if err != nil {
