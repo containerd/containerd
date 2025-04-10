@@ -463,8 +463,6 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
 	}
 
-	defer c.nri.BlockPluginSync().Unblock()
-
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
 	if err != nil {
 		return nil, fmt.Errorf("NRI RunPodSandbox failed: %w", err)
