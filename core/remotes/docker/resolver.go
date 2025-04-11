@@ -37,7 +37,6 @@ import (
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
-	"github.com/containerd/containerd/v2/core/remotes/docker/schema1" //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
@@ -387,13 +386,8 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 					}
 
 					if contentType == images.MediaTypeDockerSchema1Manifest {
-						b, err := schema1.ReadStripSignature(&bodyReader)
-						if err != nil {
-							return err
-						}
-
-						dgst = digest.FromBytes(b)
-						return nil
+						return fmt.Errorf("%w: media type %q is no longer supported since containerd v2.0, please rebuild the image as %q or %q",
+							errdefs.ErrNotImplemented, images.MediaTypeDockerSchema1Manifest, images.MediaTypeDockerSchema2Manifest, ocispec.MediaTypeImageManifest)
 					}
 
 					dgst, err = digest.FromReader(&bodyReader)

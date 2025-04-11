@@ -465,7 +465,7 @@ The deprecated features are shown in the following table:
 | Built-in `aufs` snapshotter                                                      | containerd v1.5     | containerd v2.0 ✅                    | Use `overlayfs` snapshotter              |
 | Container label `containerd.io/restart.logpath`                                  | containerd v1.5     | containerd v2.0 ✅                    | Use `containerd.io/restart.loguri` label |
 | `cri-containerd-*.tar.gz` release bundles                                        | containerd v1.6     | containerd v2.0 ✅                    | Use `containerd-*.tar.gz` bundles        |
-| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+prettyjws`) | containerd v1.7     | containerd v2.1 (Disabled in v2.0 ✅) | Use Schema 2 or OCI images               |
+| Pulling Schema 1 images (`application/vnd.docker.distribution.manifest.v1+prettyjws`) | containerd v1.7     | containerd v2.1 (Disabled in v2.0) ✅ | Use Schema 2 or OCI images               |
 | CRI `v1alpha2`                                                                   | containerd v1.7     | containerd v2.0 ✅                    | Use CRI `v1`                             |
 | Legacy CRI implementation of podsandbox support                                  | containerd v2.0     | containerd v2.0 ✅                    |                                          |
 | Go-Plugin library (`*.so`) as containerd runtime plugin                          | containerd v2.0     | containerd v2.1                       | Use external plugins (proxy or binary)   |

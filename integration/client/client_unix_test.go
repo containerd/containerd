@@ -28,13 +28,11 @@ import (
 	"github.com/containerd/containerd/api/types/runc/options"
 	. "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/errdefs/pkg/errgrpc"
-	"github.com/containerd/platforms"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
@@ -59,24 +57,6 @@ var (
 	// So we append `&& exit 0` to force sh shell uses clone-execve.
 	longCommand = withProcessArgs("/bin/sh", "-c", "/bin/sleep inf && exit 0")
 )
-
-func TestImagePullSchema1WithEmptyLayers(t *testing.T) {
-	t.Setenv(deprecation.EnvPullSchema1Image, "1")
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	ctx, cancel := testContext(t)
-	defer cancel()
-
-	schema1TestImageWithEmptyLayers := "gcr.io/google-containers/busybox@sha256:d8d3bc2c183ed2f9f10e7258f84971202325ee6011ba137112e01e30f206de67"
-	_, err = client.Pull(ctx, schema1TestImageWithEmptyLayers, WithPlatform(platforms.DefaultString()), WithSchema1Conversion, WithPullUnpack)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestNewTaskWithRuntimeOption(t *testing.T) {
 	t.Parallel()

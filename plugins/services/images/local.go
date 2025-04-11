@@ -31,7 +31,6 @@ import (
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/metadata"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -131,9 +130,7 @@ func (l *local) Create(ctx context.Context, req *imagesapi.CreateImageRequest, _
 
 	resp.Image = imageToProto(&created)
 
-	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
-
 }
 
 func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _ ...grpc.CallOption) (*imagesapi.UpdateImageResponse, error) {
@@ -163,7 +160,6 @@ func (l *local) Update(ctx context.Context, req *imagesapi.UpdateImageRequest, _
 
 	resp.Image = imageToProto(&updated)
 
-	l.emitSchema1DeprecationWarning(ctx, &image)
 	return &resp, nil
 }
 
@@ -188,16 +184,4 @@ func (l *local) Delete(ctx context.Context, req *imagesapi.DeleteImageRequest, _
 	}
 
 	return empty, nil
-}
-
-func (l *local) emitSchema1DeprecationWarning(ctx context.Context, image *images.Image) {
-	if image == nil {
-		return
-	}
-	dgst, ok := image.Labels[images.ConvertedDockerSchema1LabelKey]
-	if !ok {
-		return
-	}
-	log.G(ctx).WithField("name", image.Name).WithField("schema1digest", dgst).Warn("conversion from schema 1 images is deprecated")
-	l.warnings.Emit(ctx, deprecation.PullSchema1Image)
 }
