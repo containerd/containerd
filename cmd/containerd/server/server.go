@@ -51,7 +51,6 @@ import (
 	ssapi "github.com/containerd/containerd/api/services/snapshots/v1"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
-	"github.com/containerd/plugin/dynamic"
 	"github.com/containerd/plugin/registry"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -61,7 +60,6 @@ import (
 	sbproxy "github.com/containerd/containerd/v2/core/sandbox/proxy"
 	ssproxy "github.com/containerd/containerd/v2/core/snapshots/proxy"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/dialer"
 	"github.com/containerd/containerd/v2/pkg/sys"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -375,9 +373,8 @@ func recordConfigDeprecations(ctx context.Context, config *srvconfig.Config, set
 		return
 	}
 
-	if config.PluginDir != "" { //nolint:staticcheck
-		warn.Emit(ctx, deprecation.GoPluginLibrary)
-	}
+	// warn.Emit(ctx, deprecation...) will be used for future deprecations
+	_ = warn
 }
 
 // Server is the containerd main daemon
@@ -472,17 +469,6 @@ func (s *Server) Wait() {
 // of all plugins.
 func LoadPlugins(ctx context.Context, config *srvconfig.Config) ([]plugin.Registration, error) {
 	// load all plugins into containerd
-	path := config.PluginDir //nolint:staticcheck
-	if path == "" {
-		path = filepath.Join(config.Root, "plugins")
-	}
-	if count, err := dynamic.Load(path); err != nil {
-		return nil, err
-	} else if count > 0 || config.PluginDir != "" { //nolint:staticcheck
-		config.PluginDir = path //nolint:staticcheck
-		log.G(ctx).Warningf("loaded %d dynamic plugins. `go_plugin` is deprecated, please use `external plugins` instead", count)
-	}
-
 	clients := &proxyClients{}
 	for name, pp := range config.ProxyPlugins {
 		var (
