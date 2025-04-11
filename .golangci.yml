@@ -1,89 +1,102 @@
+version: "2"
 linters:
   enable:
-    - depguard # Checks for dependencies that should not be (re)introduced. See "linter-settings" for further details.
-    - copyloopvar # Checks for loop variable copies in Go 1.22+
-    - gofmt
-    - goimports
+    - copyloopvar
+    - depguard
+    - dupword
     - gosec
-    - ineffassign
     - misspell
     - nolintlint
     - revive
-    - staticcheck
-    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
-    - unused
-    - govet
-    - dupword # Checks for duplicate words in the source code
   disable:
     - errcheck
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/opencontainers/runc
+              desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+    gosec:
+      excludes:
+        - G204
+        - G305
+        - G306
+        - G402
+        - G404
+        - G115
+    nolintlint:
+      allow-unused: true
+    staticcheck:
+      checks:
+        - '-QF1003'
+        - '-QF1004'
+        - '-QF1008'
+        - '-ST1013'
+        - '-ST1015'
+        - '-ST1019'
 
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: cmd[\\/]containerd[\\/]builtins[\\/]
+        text: 'blank-imports:'
+      - path: contrib[\\/]fuzz[\\/]
+        text: 'exported: func name will be used as fuzz.Fuzz'
+      - path: archive[\\/]tarheader[\\/]
+        text: unnecessary conversion
+      - path: integration[\\/]client
+        text: 'dot-imports:'
+      - linters:
+          - revive
+        text: if-return
+      - linters:
+          - revive
+        text: empty-block
+      - linters:
+          - revive
+        text: superfluous-else
+      - linters:
+          - revive
+        text: unused-parameter
+      - linters:
+          - revive
+        text: unreachable-code
+      - linters:
+          - revive
+        text: redefines-builtin-id
+    paths:
+      - api
+      - cluster
+      - docs
+      - docs/man
+      - releases
+      - test
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  include:
-    - EXC0002
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  exclude-dirs:
-    - api
-    - cluster
-    - docs
-    - docs/man
-    - releases
-    - test # e2e scripts
-
-  # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
-  exclude-rules:
-    - path: 'cmd[\\/]containerd[\\/]builtins[\\/]'
-      text: "blank-imports:"
-    - path: 'contrib[\\/]fuzz[\\/]'
-      text: "exported: func name will be used as fuzz.Fuzz"
-    - path: 'archive[\\/]tarheader[\\/]'
-      # conversion is necessary on Linux, unnecessary on macOS
-      text: "unnecessary conversion"
-    - path: 'integration[\\/]client'
-      text: "dot-imports:"
-    - linters:
-        - revive
-      text: "if-return"
-    - linters:
-        - revive
-      text: "empty-block"
-    - linters:
-        - revive
-      text: "superfluous-else"
-    - linters:
-        - revive
-      text: "unused-parameter"
-    - linters:
-        - revive
-      text: "unreachable-code"
-    - linters:
-        - revive
-      text: "redefines-builtin-id"
-
-linters-settings:
-  depguard:
-    rules:
-      main:
-        deny:
-          - pkg: github.com/opencontainers/runc
-            desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
-
-  gosec:
-    # The following issues surfaced when `gosec` linter
-    # was enabled. They are temporarily excluded to unblock
-    # the existing workflow, but still to be addressed by
-    # future works.
-    excludes:
-      - G204
-      - G305
-      - G306
-      - G402
-      - G404
-      - G115
-  nolintlint:
-    allow-unused: true
-
-run:
-  timeout: 8m
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - api
+      - cluster
+      - docs
+      - docs/man
+      - releases
+      - test
+      - third_party$
+      - builtin$
+      - examples$
