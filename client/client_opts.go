@@ -243,14 +243,6 @@ func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	}
 }
 
-// WithMaxConcurrentDownloadOperations sets the maximum number of concurrent download operations.
-func WithMaxConcurrentDownloadOperations(max int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
-		c.MaxConcurrentDownloadOperations = max
-		return nil
-	}
-}
-
 // WithMaxConcurrentDownloadsPerLayer sets the maximum number of concurrent downloads per layer.
 func WithMaxConcurrentDownloadsPerLayer(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
