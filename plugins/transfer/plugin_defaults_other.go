@@ -28,6 +28,7 @@ func defaultUnpackConfig() []unpackConfiguration {
 		{
 			Platform:    platforms.Format(platforms.DefaultSpec()),
 			Snapshotter: defaults.DefaultSnapshotter,
+			Differ:      defaults.DefaultDiffer,
 		},
 	}
 }
