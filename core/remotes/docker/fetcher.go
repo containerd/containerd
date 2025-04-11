@@ -439,17 +439,18 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
 	parallelism, chunkSize := r.config.Parallelism(), int64(r.config.ConcurrentDownloadChunkSize)
-
+	log.G(ctx).WithField("parallelism", parallelism).
+		WithField("chunk_size", chunkSize).
+		WithField("offset", offset).
+		Debug("fetching layer")
 	req.setMediaType(mediatype)
 	req.header.Set("Accept-Encoding", "zstd;q=1.0, gzip;q=0.8, deflate;q=0.5")
 	req.setOffset(offset)
 
-	// Ensure immediate reading & prevent keep-alive exhaustion
-	r.config.Limiter.Acquire(ctx, 1)
-	resp, err := req.doWithRetries(ctx,
-		withErrorCheck,
-		withOffsetCheck(offset),
-	)
+	if err := r.config.Limiter.Acquire(ctx, 1); err != nil {
+		return nil, err
+	}
+	resp, err := req.doWithRetries(ctx, withErrorCheck, withOffsetCheck(offset))
 	switch err {
 	case nil:
 		// all good
@@ -458,6 +459,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		parallelism = 1
 		err = nil
 	default:
+		log.G(ctx).WithError(err).Debug("fetch failed")
 		r.config.Limiter.Release(1)
 		return nil, err
 	}
@@ -494,16 +496,14 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			}
 			close(queue)
 		}()
+		r.config.Limiter.Release(1)
 		for range parallelism {
-			// start parallel download workers
-
 			go func() {
 				for i := range queue { // first in first out
-					if i != 0 {
-						// first chunk was already acquired
-						r.config.Limiter.Acquire(ctx, 1)
-					}
 					copy := func() error {
+						if err := r.config.Limiter.Acquire(ctx, 1); err != nil {
+							return err
+						}
 						defer r.config.Limiter.Release(1)
 						select {
 						case <-stopChan:
@@ -548,8 +548,10 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		body = io.NopCloser(io.MultiReader(readers...))
 	} else {
 		body = &fnOnClose{
-			BeforeClose: func() { r.config.Limiter.Release(1) },
-			ReadCloser:  body,
+			BeforeClose: func() {
+				r.config.Limiter.Release(1)
+			},
+			ReadCloser: body,
 		}
 	}
 	for i := len(encoding) - 1; i >= 0; i-- {

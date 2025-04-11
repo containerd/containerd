@@ -146,7 +146,7 @@ func (cfg FetcherConfig) Parallelism() int64 {
 	if cfg.MaxConcurrentDownloads <= 0 || cfg.MaxConcurrentDownloadsPerLayer <= 0 {
 		return defaultLayerParallelism
 	}
-	if cfg.MaxConcurrentDownloadsPerLayer > 0 && cfg.MaxConcurrentDownloadsPerLayer < cfg.MaxConcurrentDownloads {
+	if cfg.MaxConcurrentDownloadsPerLayer > 0 && cfg.MaxConcurrentDownloadsPerLayer <= cfg.MaxConcurrentDownloads {
 		return int64(cfg.MaxConcurrentDownloadsPerLayer)
 	}
 	return int64(cfg.MaxConcurrentDownloads)
