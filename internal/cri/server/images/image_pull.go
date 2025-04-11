@@ -199,6 +199,8 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithMaxConcurrentDownloadsPerLayer(c.config.MaxConcurrentDownloadsPerLayer),
+		containerd.WithConcurrentDownloadChunkSize(c.config.ConcurrentDownloadChunkSize),
 		containerd.WithImageHandler(imageHandler),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),

@@ -81,6 +81,9 @@ func init() {
 
 			// Set configuration based on default or user input
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
+			lc.ConcurrentDownloadChunkSize = config.ConcurrentDownloadChunkSize
+			lc.MaxConcurrentDownloadsPerLayer = config.MaxConcurrentDownloadsPerLayer
+
 			lc.MaxConcurrentUploadedLayers = config.MaxConcurrentUploadedLayers
 
 			// If UnpackConfiguration is not defined, set the default.
@@ -159,6 +162,17 @@ func init() {
 type transferConfig struct {
 	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads"`
+
+	// MaxConcurrentDownloadsPerLayer is the max concurrent download per layer
+	// for a pull. 1 means a layer will be downloaded with one connection. 0
+	// means parallel layer fetching will be turned off, which is the default
+	// behaviour.
+	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer"`
+
+	// ConcurrentDownloadChunkSize is the size of chunks in bytes, when downloading in
+	// chunks, only used when max_concurrent_downloads_per_layer is not 1 and when
+	// concurrent_download_chunk_size > 512.
+	ConcurrentDownloadChunkSize int `toml:"concurrent_download_chunk_size"`
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int `toml:"max_concurrent_uploaded_layers"`
