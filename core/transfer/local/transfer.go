@@ -181,19 +181,19 @@ type TransferConfig struct {
 	// - Unpacking a layer into the snapshotter - Moving an unpacked layer to
 	// its final location This helps prevent system resource exhaustion.
 	MaxConcurrentDownloadOperations int
-
-	// MaxConcurrentDownloadsPerLayer enables parallel downloading of individual
-	// layers by splitting them into chunks: - Values <= 1: Layer downloads use
-	// a single connection (default) - Values > 1: Layer is split into chunks
-	// and downloaded in parallel. Parallel downloads can significantly reduce
-	// pull times for large layers.
+	// MaxConcurrentDownloadsPerLayer controls parallel downloading of image layers
+	// by splitting them into chunks.
+	//
+	// - Values <= 1: Layers are downloaded using a single connection (default).
+	// - Values > 1: Layers are divided into chunks and downloaded in parallel,
+	//   which can significantly reduce pull times for large layers.
 	MaxConcurrentDownloadsPerLayer int
 
 	// ConcurrentDownloadChunkSize sets the maximum size in bytes for each
 	// chunk when downloading layers in parallel. Larger chunks reduce
 	// coordination overhead but use more memory. When
-	// ConcurrentDownloadChunkSize is bellow 512 bytes or
-	// MaxConcurrentDownloadsPerLayer is bellow 2, chunking is disabled.
+	// ConcurrentDownloadChunkSize is below 512 bytes or
+	// MaxConcurrentDownloadsPerLayer is below 2, chunking is disabled.
 	ConcurrentDownloadChunkSize int
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
