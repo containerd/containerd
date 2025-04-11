@@ -24,8 +24,8 @@ with the same high confidence in stability and performance.
 
 postface = """\
 ### Which file should I download?
-* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.31 (Ubuntu 20.04).
-* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on non-glibc Linux distributions. Not position-independent.
+* `containerd-<VERSION>-<OS>-<ARCH>.tar.gz`:         ✅Recommended. Dynamically linked with glibc 2.35 (Ubuntu 22.04).
+* `containerd-static-<VERSION>-<OS>-<ARCH>.tar.gz`:  Statically linked. Expected to be used on Linux distributions that do not use glibc >= 2.35. Not position-independent.
 
 In addition to containerd, typically you will have to install [runc](https://github.com/opencontainers/runc/releases)
 and [CNI plugins](https://github.com/containernetworking/plugins/releases) from their official sites too.
