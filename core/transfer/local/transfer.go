@@ -56,9 +56,6 @@ func NewTransferService(cs content.Store, is images.Store, tc TransferConfig) tr
 	if tc.MaxConcurrentUploadedLayers > 0 {
 		ts.limiterU = semaphore.NewWeighted(int64(tc.MaxConcurrentUploadedLayers))
 	}
-	if tc.MaxConcurrentDownloadOperations > 0 {
-		ts.limiterOperationD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloadOperations))
-	}
 	if tc.MaxConcurrentDownloads > 0 {
 		ts.limiterD = semaphore.NewWeighted(int64(tc.MaxConcurrentDownloads))
 	}
@@ -176,11 +173,6 @@ type TransferConfig struct {
 	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
 
-	// MaxConcurrentDownloadOperations limits how many operations can run in
-	// parallel during an image pull. Operations include: - Downloading a layer
-	// - Unpacking a layer into the snapshotter - Moving an unpacked layer to
-	// its final location This helps prevent system resource exhaustion.
-	MaxConcurrentDownloadOperations int
 	// MaxConcurrentDownloadsPerLayer controls parallel downloading of image layers
 	// by splitting them into chunks.
 	//

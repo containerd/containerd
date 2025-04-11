@@ -81,7 +81,6 @@ func init() {
 
 			// Set configuration based on default or user input
 			lc.MaxConcurrentDownloads = config.MaxConcurrentDownloads
-			lc.MaxConcurrentDownloadOperations = config.MaxConcurrentDownloadOperations
 			lc.ConcurrentDownloadChunkSize = config.ConcurrentDownloadChunkSize
 			lc.MaxConcurrentDownloadsPerLayer = config.MaxConcurrentDownloadsPerLayer
 
@@ -174,11 +173,6 @@ type transferConfig struct {
 	// means parallel layer fetching will be turned off, which is the default
 	// behaviour.
 	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer"`
-
-	// MaxConcurrentDownloadOperations is the max number of operations hapenning at the
-	// same time. An operation can be the download, unpacking or moving of a
-	// layer, it can also be another internal containerd operation.
-	MaxConcurrentDownloadOperations int `toml:"max_concurrent_download_operations"`
 
 	// ConcurrentDownloadChunkSize is the size of chunks in bytes, when downloading in
 	// chunks, only used when max_concurrent_downloads_per_layer is not 1 and when

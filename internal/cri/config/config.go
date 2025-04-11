@@ -320,9 +320,6 @@ type ImageConfig struct {
 	// TODO: Migrate to transfer service
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
 
-	// MaxConcurrentDownloadOperations restricts the number of concurrent download operations for each image.
-	MaxConcurrentDownloadOperations int `toml:"max_concurrent_download_operations" json:"maxConcurrentDownloadOperations"`
-
 	// MaxConcurrentDownloadsPerLayer restricts the number of concurrent downloads per layer for each image.
 	MaxConcurrentDownloadsPerLayer int `toml:"max_concurrent_downloads_per_layer" json:"maxConcurrentDownloadsPerLayer"`
 

@@ -396,15 +396,6 @@ type RemoteContext struct {
 	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
 
-	// MaxConcurrentDownloadOperations limits the number of parallel operations
-	// during an image pull to prevent system resource exhaustion.
-	//
-	// These operations include:
-	// - Downloading a layer
-	// - Unpacking a layer into the snapshotter
-	// - Moving an unpacked layer to its final location
-	MaxConcurrentDownloadOperations int
-
 	// MaxConcurrentDownloadsPerLayer controls parallel downloading of image layers
 	// by splitting them into chunks.
 	//

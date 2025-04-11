@@ -71,7 +71,6 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
 		tracing.Attribute("max.concurrent.downloads.per.layer", pullCtx.MaxConcurrentDownloadsPerLayer),
-		tracing.Attribute("max.concurrent.download.operations", pullCtx.MaxConcurrentDownloadOperations),
 		tracing.Attribute("max.concurrent.download.chunk.size", pullCtx.ConcurrentDownloadChunkSize),
 		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
 	)
@@ -262,10 +261,6 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 
 	if rCtx.HandlerWrapper != nil {
 		handler = rCtx.HandlerWrapper(handler)
-	}
-
-	if rCtx.MaxConcurrentDownloadOperations > 0 {
-		limiter = semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloadOperations))
 	}
 
 	if err := images.Dispatch(ctx, handler, limiter, desc); err != nil {
