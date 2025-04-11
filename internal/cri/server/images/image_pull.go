@@ -169,14 +169,6 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			Headers: c.config.Registry.Headers,
 			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 		})
-		isSchema1    bool
-		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
-			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-				isSchema1 = true
-			}
-			return nil, nil
-		}
 	)
 
 	defer pcancel()
@@ -193,13 +185,11 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	labels := c.getLabels(ctx, ref)
 
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
@@ -233,7 +223,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	imageID := configDesc.Digest.String()
 
-	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue

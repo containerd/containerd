@@ -46,7 +46,6 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 	for _, test := range []struct {
 		desc               string
 		ref                string
-		schema1            bool
 		expectedRepoDigest string
 		expectedRepoTag    string
 	}{
@@ -61,25 +60,11 @@ func TestGetRepoDigestAndTag(t *testing.T) {
 			expectedRepoDigest: "gcr.io/library/busybox@" + digest.String(),
 			expectedRepoTag:    "gcr.io/library/busybox:latest",
 		},
-		{
-			desc:               "repo digest should be empty if original ref is schema1 and has no digest",
-			ref:                "gcr.io/library/busybox:latest",
-			schema1:            true,
-			expectedRepoDigest: "",
-			expectedRepoTag:    "gcr.io/library/busybox:latest",
-		},
-		{
-			desc:               "repo digest should not be empty if original ref is schema1 but has digest",
-			ref:                "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			schema1:            true,
-			expectedRepoDigest: "gcr.io/library/busybox@sha256:e6693c20186f837fc393390135d8a598a96a833917917789d63766cab6c59594",
-			expectedRepoTag:    "",
-		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
 			named, err := reference.ParseDockerRef(test.ref)
 			assert.NoError(t, err)
-			repoDigest, repoTag := GetRepoDigestAndTag(named, digest, test.schema1)
+			repoDigest, repoTag := GetRepoDigestAndTag(named, digest)
 			assert.Equal(t, test.expectedRepoDigest, repoDigest)
 			assert.Equal(t, test.expectedRepoTag, repoTag)
 		})
