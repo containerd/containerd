@@ -276,37 +276,9 @@ func (ce *criEventHandler) HandleEvent(any interface{}) error {
 	switch e := any.(type) {
 	case *eventtypes.TaskExit:
 		log.L.Infof("TaskExit event %+v", e)
-		// Use ID instead of ContainerID to rule out TaskExit event for exec.
-		cntr, err := ce.c.containerStore.Get(e.ID)
-		if err == nil {
-			if err := ce.c.handleContainerExit(ctx, e, cntr, cntr.SandboxID); err != nil {
-				return fmt.Errorf("failed to handle container TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find container for TaskExit event: %w", err)
-		}
-		sb, err := ce.c.sandboxStore.Get(e.ID)
-		if err == nil {
-			if err := ce.c.handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime()); err != nil {
-				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
-		}
 		return nil
 	case *eventtypes.SandboxExit:
 		log.L.Infof("SandboxExit event %+v", e)
-		sb, err := ce.c.sandboxStore.Get(e.GetSandboxID())
-		if err == nil {
-			if err := ce.c.handleSandboxExit(ctx, sb, e.ExitStatus, e.ExitedAt.AsTime()); err != nil {
-				return fmt.Errorf("failed to handle sandbox TaskExit event: %w", err)
-			}
-			return nil
-		} else if !errdefs.IsNotFound(err) {
-			return fmt.Errorf("can't find sandbox for TaskExit event: %w", err)
-		}
 		return nil
 	case *eventtypes.TaskOOM:
 		log.L.Infof("TaskOOM event %+v", e)
