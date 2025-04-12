@@ -40,19 +40,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
-	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 
-	"k8s.io/klog/v2"
+	"github.com/containerd/containerd/v2/internal/lazyregexp"
 )
 
 var (
-	classShowMatcher      = regexp.MustCompile(`class htb (1:\d+)`)
-	classAndHandleMatcher = regexp.MustCompile(`filter parent 1:.*fh (\d+::\d+).*flowid (\d+:\d+)`)
+	classShowMatcher      = lazyregexp.New(`class htb (1:\d+)`)
+	classAndHandleMatcher = lazyregexp.New(`filter parent 1:.*fh (\d+::\d+).*flowid (\d+:\d+)`)
 )
 
 // tcShaper provides an implementation of the Shaper interface on Linux using the 'tc' tool.
