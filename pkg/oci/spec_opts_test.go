@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -326,34 +325,23 @@ func TestWithSpecFromFile(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	fp, err := os.CreateTemp("", "testwithdefaultspec.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Remove(fp.Name()); err != nil {
-			log.Printf("failed to remove tempfile %v: %v", fp.Name(), err)
-		}
-	}()
-	defer fp.Close()
+	fp, err := os.Create(filepath.Join(t.TempDir(), "testwithdefaultspec.json"))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		fp.Close()
+	})
 
 	expected, err := GenerateSpec(ctx, nil, &c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	p, err := json.Marshal(expected)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if _, err := fp.Write(p); err != nil {
-		t.Fatal(err)
-	}
+	_, err = fp.Write(p)
+	require.NoError(t, err)
 
-	if err := ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(fp.Name())); err != nil {
-		t.Fatal(err)
-	}
+	err = ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(fp.Name()))
+	require.NoError(t, err)
 
 	if reflect.DeepEqual(s, Spec{}) {
 		t.Fatalf("spec should not be empty")
