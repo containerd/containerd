@@ -283,12 +283,9 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		log.G(r.ctx).Debugf("Ignoring volumes defined in image %v because IgnoreImageDefinedVolumes is set", r.imageID)
 	}
 
-	var runtimeHandler *runtime.RuntimeHandler
-	for _, f := range c.runtimeHandlers {
-		if f.Name == r.sandboxRuntimeHandler {
-			runtimeHandler = f
-			break
-		}
+	runtimeHandler, ok := c.runtimeHandlers[r.sandboxRuntimeHandler]
+	if !ok {
+		return "", fmt.Errorf("failed to find runtime handler %q", r.sandboxRuntimeHandler)
 	}
 	log.G(r.ctx).Debugf("Use OCI runtime %+v for sandbox %q and container %q", ociRuntime, r.sandboxID, r.containerID)
 
