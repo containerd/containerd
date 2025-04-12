@@ -112,9 +112,7 @@ func initInSteps(t *testing.T) bool {
 	if !haveChangedDownloadPATH {
 		oldPathEnv := os.Getenv("PATH")
 		newPathEnv := fmt.Sprintf("%s:%s", filepath.Join(downloadBinDir, "bin"), oldPathEnv)
-		if err := os.Setenv("PATH", newPathEnv); err != nil {
-			return true
-		}
+		t.Setenv("PATH", newPathEnv)
 		haveChangedDownloadPATH = true
 		return true
 	}

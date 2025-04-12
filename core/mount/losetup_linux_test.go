@@ -29,7 +29,7 @@ var randomData = []byte("randomdata")
 func createTempFile(t *testing.T) string {
 	t.Helper()
 
-	f, err := os.CreateTemp("", "losetup")
+	f, err := os.CreateTemp(t.TempDir(), "losetup")
 	if err != nil {
 		t.Fatal(err)
 	}
