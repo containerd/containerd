@@ -21,6 +21,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -34,6 +35,7 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/google/uuid"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/stretchr/testify/require"
 )
 
 func TestExportAllCases(t *testing.T) {
@@ -241,23 +243,20 @@ func TestExportAllCases(t *testing.T) {
 
 			namespace := uuid.New().String()
 			client, err := newClient(t, address, WithDefaultNamespace(namespace))
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer client.Close()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				client.Close()
+			})
 
 			ctx = namespaces.WithNamespace(ctx, namespace)
 
 			img := tc.prepare(ctx, t, client)
 
-			dstFile, err := os.CreateTemp("", "export-test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer func() {
+			dstFile, err := os.Create(filepath.Join(t.TempDir(), "export-test"))
+			require.NoError(t, err)
+			t.Cleanup(func() {
 				dstFile.Close()
-				os.Remove(dstFile.Name())
-			}()
+			})
 
 			tc.check(ctx, t, client, dstFile, img)
 		})

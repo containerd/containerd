@@ -498,7 +498,7 @@ func TestDropCaps(t *testing.T) {
 func TestGetDevices(t *testing.T) {
 	testutil.RequiresRoot(t)
 
-	dir, err := os.MkdirTemp("/dev", t.Name())
+	dir, err := os.MkdirTemp("/dev", t.Name()) //nolint:usetesting
 	if err != nil {
 		t.Fatal(err)
 	}
