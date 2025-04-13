@@ -81,7 +81,7 @@ require (
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/component-base v0.32.3
-	k8s.io/cri-api v0.32.3
+	k8s.io/cri-api v0.33.0-rc.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.32.3
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
@@ -167,3 +167,8 @@ exclude (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
+
+// Use a modified local copy of k8s.io/cri-api to vendor.
+// The third-party library was modified to have a Go 1.23
+// minimum version.
+replace k8s.io/cri-api => ./internal/cri-api

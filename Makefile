@@ -204,7 +204,8 @@ check-api-descriptors: protos ## check that protobuf changes aren't present.
 
 proto-fmt: ## check format of proto files
 	@echo "$(WHALE) $@"
-	@test -z "$$(find . -path ./vendor -prune -o -path ./protobuf/google/rpc -prune -o -name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
+	@test -z "$$(find . -path ./vendor -prune -o -path ./internal/cri-api -prune -o -path ./protobuf/google/rpc -prune -o \
+		-name '*.proto' -type f -exec grep -Hn -e "^ " {} \; | tee /dev/stderr)" || \
 		(echo "$(ONI) please indent proto files with tabs only" && false)
 
 build: ## build the go packages
