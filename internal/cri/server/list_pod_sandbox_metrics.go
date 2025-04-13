@@ -114,8 +114,8 @@ type containerCPUMetrics struct {
 	NRPeriods          uint64
 	NRThrottledPeriods uint64
 	ThrottledUsec      uint64
-	LoadAverage10      uint64
-	TasksState         uint64
+	//LoadAverage10      uint64
+	//TasksState         uint64
 }
 
 type containerMemoryMetrics struct {
@@ -308,14 +308,14 @@ func generateSandboxNetworkMetrics(metrics []containerNetworkMetrics) []*runtime
 	// TODO? should we have separate metrics per interface with different labels or add them together
 	//  and expose it
 	for _, m := range metrics {
-		nm.RxDropped += m.RxDropped
-		nm.TxDropped += m.TxDropped
-		nm.RxErrors += m.RxErrors
-		nm.TxErrors += m.TxErrors
-		nm.RxPackets += m.RxPackets
-		nm.TxPackets += m.TxPackets
 		nm.RxBytes += m.RxBytes
+		nm.RxPackets += m.RxPackets
+		nm.RxErrors += m.RxErrors
+		nm.RxDropped += m.RxDropped
 		nm.TxBytes += m.TxBytes
+		nm.TxPackets += m.TxPackets
+		nm.TxErrors += m.TxErrors
+		nm.TxDropped += m.TxDropped
 	}
 	networkMetrics := []*containerMetric{
 		{
@@ -331,8 +331,308 @@ func generateSandboxNetworkMetrics(metrics []containerNetworkMetrics) []*runtime
 				}}
 			},
 		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_receive_packets_total",
+				Help: "Cumulative count of packets received",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.RxPackets,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_receive_packets_dropped_total",
+				Help: "Cumulative count of packets dropped while receiving packets",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.RxDropped,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_receive_errors_total",
+				Help: "Cumulative count of errors encountered while receiving",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.RxErrors,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_transmit_bytes_total",
+				Help: "Cumulative count of bytes transmitted",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.TxBytes,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_transmit_packets_total",
+				Help: "Cumulative count of packets transmitted",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.TxPackets,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_transmit_packets_dropped_total",
+				Help: "Cumulative count of packets dropped while transmitting",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.TxDropped,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_network_transmit_errors_total",
+				Help: "Cumulative count of errors encountered while transmitting",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      nm.TxErrors,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
 	}
 	return computeSandboxMetrics(networkMetrics, "network")
+}
+
+func generateContainerCPUMetrics(metrics containerCPUMetrics) []*runtime.Metric {
+	cpuMetrics := []*containerMetric{
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_usage_seconds_total",
+				Help: "Cumulative user CPU time consumed in seconds",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.UsageUsec,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_user_seconds_total",
+				Help: "Cumulative user CPU time consumed in seconds",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.UserUsec,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_system_seconds_total",
+				Help: "Cumulative system CPU time consumed in seconds",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.SystemUsec,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_cfs_periods_total",
+				Help: "Number of elapsed enforcement period intervals.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.NRPeriods,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_cfs_throttled_periods_total",
+				Help: "Number of throttled period intervals.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.NRThrottledPeriods,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_cpu_cfs_throttled_seconds_total",
+				Help: "Total time duration the container has been throttled.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value: metrics.ThrottledUsec,
+				}}
+			},
+		},
+	}
+
+	return computeSandboxMetrics(cpuMetrics, "cpu")
+
+}
+
+func generateContainerMemoryMetrics(metrics containerMemoryMetrics) []*runtime.Metric {
+	memoryMetrics := []*containerMetric{
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_cache",
+				Help: "Number of bytes of page cache memory.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.Cache,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_rss",
+				Help: "Size of RSS in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.RSS,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_swap",
+				Help: "Container swap usage in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.Swap,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_kernel_usage",
+				Help: "Size of kernel memory allocated in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.KernelUsage,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_mapped_file",
+				Help: "Size of memory mapped files in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.FileMapped,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_failcnt",
+				Help: "Number of memory usage hits limits",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.FailCount,
+					metricType: runtime.MetricType_COUNTER,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_usage_bytes",
+				Help: "Current memory usage in bytes, including all memory regardless of when it was accessed",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.MemoryUsage,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_max_usage_bytes",
+				Help: "Maximum memory usage recorded in bytes",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.MaxUsage,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_working_set_bytes",
+				Help: "Current working set in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.WorkingSet,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_total_active_file_bytes",
+				Help: "Current total active file in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value:      metrics.ActiveFile,
+					metricType: runtime.MetricType_GAUGE,
+				}}
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_memory_total_inactive_file_bytes",
+				Help: "Current total inactive file in bytes.",
+			},
+			valueFunc: func() metricValues {
+				return metricValues{{
+					value: metrics.InactiveFile,
+				}}
+			},
+		},
+	}
+	return computeSandboxMetrics(memoryMetrics, "memory")
 }
 
 // computeSandboxMetrics computes the metrics for both pod and container sandbox.
