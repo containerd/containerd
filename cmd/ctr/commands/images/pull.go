@@ -74,6 +74,10 @@ command. As part of this process, we do the following:
 			Usage: "Skips metadata for unused platforms (Image may be unable to be pushed without metadata)",
 		},
 		&cli.BoolFlag{
+			Name:  "no-unpack",
+			Usage: "skip unpacking the images, false by default",
+		},
+		&cli.BoolFlag{
 			Name:  "print-chainid",
 			Usage: "Print the resulting image's chain ID",
 		},
@@ -185,44 +189,46 @@ command. As part of this process, we do the following:
 			return err
 		}
 
-		log.G(ctx).WithField("image", ref).Debug("unpacking")
+		if !cliContext.Bool("no-unpack") {
+			log.G(ctx).WithField("image", ref).Debug("unpacking")
 
-		// TODO: Show unpack status
+			// TODO: Show unpack status
 
-		var p []ocispec.Platform
-		if cliContext.Bool("all-platforms") {
-			p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
-			if err != nil {
-				return fmt.Errorf("unable to resolve image platforms: %w", err)
-			}
-		} else {
-			p, err = platforms.ParseAll(cliContext.StringSlice("platform"))
-			if err != nil {
-				return err
-			}
-		}
-		if len(p) == 0 {
-			p = append(p, platforms.DefaultSpec())
-		}
-
-		start := time.Now()
-		for _, platform := range p {
-			fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
-			i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
-			err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
-			if err != nil {
-				return err
-			}
-			if cliContext.Bool("print-chainid") {
-				diffIDs, err := i.RootFS(ctx)
+			var p []ocispec.Platform
+			if cliContext.Bool("all-platforms") {
+				p, err = images.Platforms(ctx, client.ContentStore(), img.Target)
+				if err != nil {
+					return fmt.Errorf("unable to resolve image platforms: %w", err)
+				}
+			} else {
+				p, err = platforms.ParseAll(cliContext.StringSlice("platform"))
 				if err != nil {
 					return err
 				}
-				chainID := identity.ChainID(diffIDs).String()
-				fmt.Printf("image chain ID: %s\n", chainID)
 			}
+			if len(p) == 0 {
+				p = append(p, platforms.DefaultSpec())
+			}
+
+			start := time.Now()
+			for _, platform := range p {
+				fmt.Printf("unpacking %s %s...\n", platforms.Format(platform), img.Target.Digest)
+				i := containerd.NewImageWithPlatform(client, img, platforms.Only(platform))
+				err = i.Unpack(ctx, cliContext.String("snapshotter"), containerd.WithUnpackApplyOpts(diff.WithSyncFs(cliContext.Bool("sync-fs"))))
+				if err != nil {
+					return err
+				}
+				if cliContext.Bool("print-chainid") {
+					diffIDs, err := i.RootFS(ctx)
+					if err != nil {
+						return err
+					}
+					chainID := identity.ChainID(diffIDs).String()
+					fmt.Printf("image chain ID: %s\n", chainID)
+				}
+			}
+			fmt.Printf("done: %s\t\n", time.Since(start))
 		}
-		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
 	},
 }
