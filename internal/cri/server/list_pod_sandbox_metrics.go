@@ -25,9 +25,7 @@ import (
 	cg1 "github.com/containerd/cgroups/v3/cgroup1/stats"
 	cg2 "github.com/containerd/cgroups/v3/cgroup2/stats"
 	"github.com/containerd/containerd/api/services/tasks/v1"
-	"github.com/containerd/containerd/api/types"
-	"github.com/containerd/typeurl/v2"
-	"github.com/sirupsen/logrus"
+	"github.com/containerd/log"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -55,29 +53,64 @@ type containerMetric struct {
 
 // this is part of the other go routine that updates the map
 // someone should also take care of removing deleted containers and sandboxes from the map
-func (c *criService) updatePodSandboxMetrics(sandboxID string) *SandboxMetrics {
+func (c *criService) updatePodSandboxMetrics(ctx context.Context, sandboxID string) *SandboxMetrics {
 	sm, ok := c.metricsServer.sandboxMetrics[sandboxID]
-	if !ok {
-		sm = &SandboxMetrics{
-			metric: &runtime.PodSandboxMetrics{
-				PodSandboxId:     sandboxID,
-				Metrics:          []*runtime.Metric{},
-				ContainerMetrics: []*runtime.ContainerMetrics{},
-			},
+	if ok {
+		return sm
+	}
+
+	sm = &SandboxMetrics{
+		metric: &runtime.PodSandboxMetrics{
+			PodSandboxId:     sandboxID,
+			Metrics:          []*runtime.Metric{},
+			ContainerMetrics: []*runtime.ContainerMetrics{},
+		},
+	}
+	// generate sandbox metrics
+	request := &tasks.MetricsRequest{Filters: []string{"id==" + sandboxID}}
+	resp, err := c.client.TaskService().Metrics(ctx, request)
+	if err != nil {
+		log.G(ctx).WithError(err).Error("failed to fetch metrics for task")
+	}
+	if len(resp.Metrics) != 1 {
+		log.G(ctx).Errorf("unexpected metrics response: %+v", resp.Metrics)
+	}
+	cpu, err := c.cpuMetrics(ctx, resp.Metrics[0])
+	if err != nil {
+		log.G(ctx).WithError(err)
+	}
+	sm.metric.Metrics = append(sm.metric.Metrics, generateContainerCPUMetrics(cpu)...)
+
+	memory, err := c.memoryMetrics(ctx, resp.Metrics[0])
+	if err != nil {
+		log.G(ctx).WithError(err)
+	}
+	sm.metric.Metrics = append(sm.metric.Metrics, generateContainerMemoryMetrics(memory)...)
+
+	network, err := c.networkMetrics(ctx, resp.Metrics[0])
+	if err != nil {
+		log.G(ctx).WithError(err)
+	}
+	sm.metric.Metrics = append(sm.metric.Metrics, generateSandboxNetworkMetrics(network)...)
+
+	// get metrics for each container in the sandbox
+	containers := c.containerStore.List()
+	for _, container := range containers {
+		if container.SandboxID == sandboxID {
+			metrics, err := c.listContainerMetrics(ctx, container.ID)
+			if err != nil {
+				log.G(ctx).WithError(err).Errorf("failed to list metrics for container %s", container.ID)
+			}
+			sm.metric.ContainerMetrics = append(sm.metric.ContainerMetrics, metrics)
 		}
 	}
-	// list all containers in the given sandbox
-	var containerIDs []string
-	generateSandboxNetworkMetrics()
-
+	c.metricsServer.sandboxMetrics[sandboxID] = sm
+	return sm
 }
 
 // getMetrics is supposed to be called from ListPodSandBoxMetrics
 func (m *MetricsServer) getMetrics(sandBoxID string) *runtime.PodSandboxMetrics {
 	var sm *SandboxMetrics
-	/*if m.collectionPeriod == 0 {
-		sm = m.updatePodSandboxMetrics(sandBoxID)
-	}*/
 	// TODO: akhilerm decide if we should query for metrics if this is not available
 	sm, ok := m.sandboxMetrics[sandBoxID]
 	if !ok {
@@ -99,12 +132,6 @@ func (c *criService) ListPodSandboxMetrics(ctx context.Context, r *runtime.ListP
 	return &runtime.ListPodSandboxMetricsResponse{
 		PodMetrics: podMetrics,
 	}, nil
-}
-
-type containerMetrics struct {
-	*containerCPUMetrics
-	*containerMemoryMetrics
-	cmnetwork []containerNetworkMetrics
 }
 
 type containerCPUMetrics struct {
@@ -147,7 +174,7 @@ type containerNetworkMetrics struct {
 }
 
 // gives the metrics for a given container in a sandbox or a given sandbox
-func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string, containerID string) (*containerMetrics, error) {
+func (c *criService) listContainerMetrics(ctx context.Context, containerID string) (*runtime.ContainerMetrics, error) {
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
 	resp, err := c.client.TaskService().Metrics(ctx, request)
 	if err != nil {
@@ -157,30 +184,25 @@ func (c *criService) listContainerMetrics(ctx context.Context, sandboxID string,
 		return nil, fmt.Errorf("unexpected metrics response: %+v", resp.Metrics)
 	}
 
-	cm := &containerMetrics{}
+	cm := &runtime.ContainerMetrics{
+		ContainerId: containerID,
+		Metrics:     make([]*runtime.Metric, 0),
+	}
 
 	cpu, err := c.cpuMetrics(ctx, resp.Metrics[0])
 	if err != nil {
 		// log error
 	}
-	cm.containerCPUMetrics = cpu
+	cm.Metrics = append(cm.Metrics, generateContainerCPUMetrics(cpu)...)
 
 	memory, err := c.memoryMetrics(ctx, resp.Metrics[0])
 	if err != nil {
 		// log error
 	}
-	cm.containerMemoryMetrics = memory
+	cm.Metrics = append(cm.Metrics, generateContainerMemoryMetrics(memory)...)
 
-	network, err := c.networkMetrics(ctx, resp.Metrics[0])
-	if err != nil {
-		// log error
-	}
-	// TODO: sum up all the metrics together for network interfaces and add
-	cm.cmnetwork = network
+	// network metrics are captured only at sandbox level
 
-	if err != nil {
-		return nil, err
-	}
 	return cm, nil
 }
 
@@ -419,7 +441,7 @@ func generateSandboxNetworkMetrics(metrics []containerNetworkMetrics) []*runtime
 	return computeSandboxMetrics(networkMetrics, "network")
 }
 
-func generateContainerCPUMetrics(metrics containerCPUMetrics) []*runtime.Metric {
+func generateContainerCPUMetrics(metrics *containerCPUMetrics) []*runtime.Metric {
 	cpuMetrics := []*containerMetric{
 		{
 			desc: &runtime.MetricDescriptor{
@@ -498,7 +520,7 @@ func generateContainerCPUMetrics(metrics containerCPUMetrics) []*runtime.Metric 
 
 }
 
-func generateContainerMemoryMetrics(metrics containerMemoryMetrics) []*runtime.Metric {
+func generateContainerMemoryMetrics(metrics *containerMemoryMetrics) []*runtime.Metric {
 	memoryMetrics := []*containerMetric{
 		{
 			desc: &runtime.MetricDescriptor{
