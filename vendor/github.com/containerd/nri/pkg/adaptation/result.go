@@ -18,6 +18,7 @@ package adaptation
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/containerd/nri/pkg/api"
@@ -100,6 +101,7 @@ func collectCreateContainerResult(request *CreateContainerRequest) *result {
 						HugepageLimits: []*HugepageLimit{},
 						Unified:        map[string]string{},
 					},
+					MemoryPolicy: &LinuxMemoryPolicy{},
 				},
 			},
 		},
@@ -203,6 +205,9 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 	if err := r.adjustEnv(rpl.Env, plugin); err != nil {
 		return err
 	}
+	if err := r.adjustArgs(rpl.Args, plugin); err != nil {
+		return err
+	}
 	if err := r.adjustHooks(rpl.Hooks); err != nil {
 		return err
 	}
@@ -217,6 +222,9 @@ func (r *result) adjust(rpl *ContainerAdjustment, plugin string) error {
 			return err
 		}
 		if err := r.adjustOomScoreAdj(rpl.Linux.OomScoreAdj, plugin); err != nil {
+			return err
+		}
+		if err := r.adjustMemoryPolicy(rpl.Linux.MemoryPolicy, plugin); err != nil {
 			return err
 		}
 	}
@@ -504,6 +512,28 @@ func splitEnvVar(s string) (string, string) {
 	return split[0], split[1]
 }
 
+func (r *result) adjustArgs(args []string, plugin string) error {
+	if len(args) == 0 {
+		return nil
+	}
+
+	create, id := r.request.create, r.request.create.Container.Id
+
+	if args[0] == "" {
+		r.owners.clearArgs(id)
+		args = args[1:]
+	}
+
+	if err := r.owners.claimArgs(id, plugin); err != nil {
+		return err
+	}
+
+	r.reply.adjust.Args = slices.Clone(args)
+	create.Container.Args = r.reply.adjust.Args
+
+	return nil
+}
+
 func (r *result) adjustHooks(hooks *Hooks) error {
 	if hooks == nil {
 		return nil
@@ -738,6 +768,22 @@ func (r *result) adjustOomScoreAdj(OomScoreAdj *OptionalInt, plugin string) erro
 	return nil
 }
 
+func (r *result) adjustMemoryPolicy(memoryPolicy *LinuxMemoryPolicy, plugin string) error {
+	if memoryPolicy == nil {
+		return nil
+	}
+
+	id := r.request.create.Container.Id
+
+	if err := r.owners.claimMemoryPolicy(id, plugin); err != nil {
+		return err
+	}
+
+	r.reply.adjust.Linux.MemoryPolicy = memoryPolicy
+
+	return nil
+}
+
 func (r *result) adjustRlimits(rlimits []*POSIXRlimit, plugin string) error {
 	create, id, adjust := r.request.create, r.request.create.Container.Id, r.reply.adjust
 	for _, l := range rlimits {
@@ -954,6 +1000,7 @@ type owners struct {
 	devices             map[string]string
 	cdiDevices          map[string]string
 	env                 map[string]string
+	args                string
 	memLimit            string
 	memReservation      string
 	memSwapLimit        string
@@ -976,6 +1023,7 @@ type owners struct {
 	unified             map[string]string
 	cgroupsPath         string
 	oomScoreAdj         string
+	memoryPolicy        string
 	rlimits             map[string]string
 }
 
@@ -1006,6 +1054,10 @@ func (ro resultOwners) claimCDIDevice(id, path, plugin string) error {
 
 func (ro resultOwners) claimEnv(id, name, plugin string) error {
 	return ro.ownersFor(id).claimEnv(name, plugin)
+}
+
+func (ro resultOwners) claimArgs(id, plugin string) error {
+	return ro.ownersFor(id).claimArgs(plugin)
 }
 
 func (ro resultOwners) claimMemLimit(id, plugin string) error {
@@ -1096,6 +1148,10 @@ func (ro resultOwners) claimOomScoreAdj(id, plugin string) error {
 	return ro.ownersFor(id).claimOomScoreAdj(plugin)
 }
 
+func (ro resultOwners) claimMemoryPolicy(id, plugin string) error {
+	return ro.ownersFor(id).claimMemoryPolicy(plugin)
+}
+
 func (ro resultOwners) claimRlimits(id, typ, plugin string) error {
 	return ro.ownersFor(id).claimRlimit(typ, plugin)
 }
@@ -1153,6 +1209,14 @@ func (o *owners) claimEnv(name, plugin string) error {
 	}
 	o.env[name] = plugin
 	return nil
+}
+
+func (o *owners) claimArgs(plugin string) error {
+	if o.args == "" {
+		o.args = plugin
+		return nil
+	}
+	return conflict(plugin, o.args, "args")
 }
 
 func (o *owners) claimMemLimit(plugin string) error {
@@ -1349,6 +1413,14 @@ func (o *owners) claimOomScoreAdj(plugin string) error {
 	return nil
 }
 
+func (o *owners) claimMemoryPolicy(plugin string) error {
+	if other := o.memoryPolicy; other != "" {
+		return conflict(plugin, other, "memory policy")
+	}
+	o.memoryPolicy = plugin
+	return nil
+}
+
 func (ro resultOwners) clearAnnotation(id, key string) {
 	ro.ownersFor(id).clearAnnotation(key)
 }
@@ -1363,6 +1435,10 @@ func (ro resultOwners) clearDevice(id, path string) {
 
 func (ro resultOwners) clearEnv(id, name string) {
 	ro.ownersFor(id).clearEnv(name)
+}
+
+func (ro resultOwners) clearArgs(id string) {
+	ro.ownersFor(id).clearArgs()
 }
 
 func (o *owners) clearAnnotation(key string) {
@@ -1391,6 +1467,10 @@ func (o *owners) clearEnv(name string) {
 		return
 	}
 	delete(o.env, name)
+}
+
+func (o *owners) clearArgs() {
+	o.args = ""
 }
 
 func conflict(plugin, other, subject string, qualif ...string) error {

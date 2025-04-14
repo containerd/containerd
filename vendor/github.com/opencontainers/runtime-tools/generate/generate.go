@@ -182,7 +182,7 @@ func New(os string) (generator Generator, err error) {
 				Destination: "/dev",
 				Type:        "tmpfs",
 				Source:      "tmpfs",
-				Options:     []string{"nosuid", "noexec", "strictatime", "mode=755", "size=65536k"},
+				Options:     []string{"nosuid", "strictatime", "mode=755", "size=65536k"},
 			},
 			{
 				Destination: "/dev/pts",
@@ -323,7 +323,7 @@ func createEnvCacheMap(env []string) map[string]int {
 //
 // Deprecated: Replace with:
 //
-//   Use generator.Config = config
+//	Use generator.Config = config
 func (g *Generator) SetSpec(config *rspec.Spec) {
 	g.Config = config
 }
@@ -924,6 +924,26 @@ func (g *Generator) SetLinuxResourcesMemoryKernelTCP(kernelTCP int64) {
 func (g *Generator) SetLinuxResourcesMemorySwappiness(swappiness uint64) {
 	g.initConfigLinuxResourcesMemory()
 	g.Config.Linux.Resources.Memory.Swappiness = &swappiness
+}
+
+// SetLinuxMemoryPolicyMode sets g.Config.Linux.MemoryPolicy.Mode
+func (g *Generator) SetLinuxMemoryPolicyMode(mode string) {
+	g.initConfigLinuxMemoryPolicy()
+	g.Config.Linux.MemoryPolicy.Mode = rspec.MemoryPolicyModeType(mode)
+}
+
+// SetLinuxMemoryPolicyNodes sets g.Config.Linux.MemoryPolicy.Nodes
+func (g *Generator) SetLinuxMemoryPolicyNodes(nodes string) {
+	g.initConfigLinuxMemoryPolicy()
+	g.Config.Linux.MemoryPolicy.Nodes = nodes
+}
+
+// SetLinuxMemoryPolicyFlags sets g.Config.Linux.MemoryPolicy.Flags
+func (g *Generator) SetLinuxMemoryPolicyFlags(flags []string) {
+	g.initConfigLinuxMemoryPolicy()
+	for _, flag := range flags {
+		g.Config.Linux.MemoryPolicy.Flags = append(g.Config.Linux.MemoryPolicy.Flags, rspec.MemoryPolicyFlagType(flag))
+	}
 }
 
 // SetLinuxResourcesMemoryDisableOOMKiller sets g.Config.Linux.Resources.Memory.DisableOOMKiller.

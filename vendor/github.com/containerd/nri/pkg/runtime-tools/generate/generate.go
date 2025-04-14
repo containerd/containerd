@@ -110,6 +110,7 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 		return fmt.Errorf("failed to adjust annotations in OCI Spec: %w", err)
 	}
 	g.AdjustEnv(adjust.GetEnv())
+	g.AdjustArgs(adjust.GetArgs())
 	g.AdjustHooks(adjust.GetHooks())
 	if err := g.InjectCDIDevices(adjust.GetCDIDevices()); err != nil {
 		return err
@@ -117,6 +118,7 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 	g.AdjustDevices(adjust.GetLinux().GetDevices())
 	g.AdjustCgroupsPath(adjust.GetLinux().GetCgroupsPath())
 	g.AdjustOomScoreAdj(adjust.GetLinux().GetOomScoreAdj())
+	g.AdjustMemoryPolicy(adjust.GetLinux().GetMemoryPolicy())
 
 	resources := adjust.GetLinux().GetResources()
 	if err := g.AdjustResources(resources); err != nil {
@@ -176,6 +178,13 @@ func (g *Generator) AdjustEnv(env []*nri.KeyValue) {
 		if _, ok := mod[e.Key]; ok {
 			g.AddProcessEnv(e.Key, e.Value)
 		}
+	}
+}
+
+// AdjustArgs adjusts the process arguments in the OCI Spec.
+func (g *Generator) AdjustArgs(args []string) {
+	if len(args) != 0 {
+		g.SetProcessArgs(args)
 	}
 }
 
@@ -329,6 +338,15 @@ func (g *Generator) AdjustCgroupsPath(path string) {
 func (g *Generator) AdjustOomScoreAdj(score *nri.OptionalInt) {
 	if score != nil {
 		g.SetProcessOOMScoreAdj(int(score.Value))
+	}
+}
+
+// AdjustMemoryPolicy adjusts default memory policy (set_mempolicy) for the container.
+func (g *Generator) AdjustMemoryPolicy(memoryPolicy *nri.LinuxMemoryPolicy) {
+	if memoryPolicy != nil && memoryPolicy.Mode != "" {
+		g.SetLinuxMemoryPolicyMode(memoryPolicy.Mode)
+		g.SetLinuxMemoryPolicyNodes(memoryPolicy.Nodes)
+		g.SetLinuxMemoryPolicyFlags(memoryPolicy.Flags)
 	}
 }
 

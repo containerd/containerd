@@ -236,6 +236,8 @@ type Linux struct {
 	Namespaces []LinuxNamespace `json:"namespaces,omitempty"`
 	// Devices are a list of device nodes that are created for the container
 	Devices []LinuxDevice `json:"devices,omitempty"`
+	// NetDevices are key-value pairs, keyed by network device name on the host, moved to the container's network namespace.
+	NetDevices map[string]LinuxNetDevice `json:"netDevices,omitempty"`
 	// Seccomp specifies the seccomp security settings for the container.
 	Seccomp *LinuxSeccomp `json:"seccomp,omitempty"`
 	// RootfsPropagation is the rootfs mount propagation mode for the container.
@@ -249,6 +251,8 @@ type Linux struct {
 	// IntelRdt contains Intel Resource Director Technology (RDT) information for
 	// handling resource constraints and monitoring metrics (e.g., L3 cache, memory bandwidth) for the container
 	IntelRdt *LinuxIntelRdt `json:"intelRdt,omitempty"`
+	// MemoryPolicy contains NUMA memory policy for the container.
+	MemoryPolicy *LinuxMemoryPolicy `json:"memoryPolicy,omitempty"`
 	// Personality contains configuration for the Linux personality syscall
 	Personality *LinuxPersonality `json:"personality,omitempty"`
 	// TimeOffsets specifies the offset for supporting time namespaces.
@@ -489,6 +493,12 @@ type LinuxDevice struct {
 	UID *uint32 `json:"uid,omitempty"`
 	// Gid of the device.
 	GID *uint32 `json:"gid,omitempty"`
+}
+
+// LinuxNetDevice represents a single network device to be added to the container's network namespace
+type LinuxNetDevice struct {
+	// Name of the device in the container namespace
+	Name string `json:"name,omitempty"`
 }
 
 // LinuxDeviceCgroup represents a device rule for the devices specified to
@@ -847,6 +857,19 @@ type LinuxIntelRdt struct {
 	EnableMBM bool `json:"enableMBM,omitempty"`
 }
 
+// LinuxMemoryPolicy represents input for the set_mempolicy syscall.
+type LinuxMemoryPolicy struct {
+	// Mode for the set_mempolicy syscall.
+	Mode MemoryPolicyModeType `json:"mode"`
+
+	// Nodes representing the nodemask for the set_mempolicy syscall in comma separated ranges format.
+	// Format: "<node0>-<node1>,<node2>,<node3>-<node4>,..."
+	Nodes string `json:"nodes"`
+
+	// Flags for the set_mempolicy syscall.
+	Flags []MemoryPolicyFlagType `json:"flags,omitempty"`
+}
+
 // ZOS contains platform-specific configuration for z/OS based containers.
 type ZOS struct {
 	// Namespaces contains the namespaces that are created and/or joined by the container
@@ -874,6 +897,26 @@ const (
 	ZOSIPCNamespace ZOSNamespaceType = "ipc"
 	// UTSNamespace for isolating hostname and NIS domain name
 	ZOSUTSNamespace ZOSNamespaceType = "uts"
+)
+
+type MemoryPolicyModeType string
+
+const (
+	MpolDefault            MemoryPolicyModeType = "MPOL_DEFAULT"
+	MpolBind               MemoryPolicyModeType = "MPOL_BIND"
+	MpolInterleave         MemoryPolicyModeType = "MPOL_INTERLEAVE"
+	MpolWeightedInterleave MemoryPolicyModeType = "MPOL_WEIGHTED_INTERLEAVE"
+	MpolPreferred          MemoryPolicyModeType = "MPOL_PREFERRED"
+	MpolPreferredMany      MemoryPolicyModeType = "MPOL_PREFERRED_MANY"
+	MpolLocal              MemoryPolicyModeType = "MPOL_LOCAL"
+)
+
+type MemoryPolicyFlagType string
+
+const (
+	MpolFNumaBalancing MemoryPolicyFlagType = "MPOL_F_NUMA_BALANCING"
+	MpolFRelativeNodes MemoryPolicyFlagType = "MPOL_F_RELATIVE_NODES"
+	MpolFStaticNodes   MemoryPolicyFlagType = "MPOL_F_STATIC_NODES"
 )
 
 // LinuxSchedulerPolicy represents different scheduling policies used with the Linux Scheduler

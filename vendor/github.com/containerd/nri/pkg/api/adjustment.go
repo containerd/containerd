@@ -16,6 +16,8 @@
 
 package api
 
+import "slices"
+
 //
 // Notes:
 //   Adjustment of metadata that is stored in maps (labels and annotations)
@@ -80,6 +82,17 @@ func (a *ContainerAdjustment) RemoveEnv(key string) {
 	})
 }
 
+// SetArgs overrides the container command with the given arguments.
+func (a *ContainerAdjustment) SetArgs(args []string) {
+	a.Args = slices.Clone(args)
+}
+
+// UpdateArgs overrides the container command with the given arguments.
+// It won't fail if another plugin has already set the command line.
+func (a *ContainerAdjustment) UpdateArgs(args []string) {
+	a.Args = append([]string{""}, args...)
+}
+
 // AddHooks records the addition of the given hooks to a container.
 func (a *ContainerAdjustment) AddHooks(h *Hooks) {
 	a.initHooks()
@@ -132,6 +145,24 @@ func (a *ContainerAdjustment) RemoveDevice(path string) {
 // AddCDIDevice records the addition of the given CDI device to a container.
 func (a *ContainerAdjustment) AddCDIDevice(d *CDIDevice) {
 	a.CDIDevices = append(a.CDIDevices, d) // TODO: should we dup d here ?
+}
+
+// SetLinuxMemoryPolicyMode records setting the memory policy mode for a container.
+func (a *ContainerAdjustment) SetLinuxMemoryPolicyMode(mode string) {
+	a.initLinuxMemoryPolicy()
+	a.Linux.MemoryPolicy.Mode = mode
+}
+
+// SetLinuxMemoryPolicyNodes records setting memory policy nodes for a container.
+func (a *ContainerAdjustment) SetLinuxMemoryPolicyNodes(nodes string) {
+	a.initLinuxMemoryPolicy()
+	a.Linux.MemoryPolicy.Nodes = nodes
+}
+
+// SetLinuxMemoryPolicyFlags records setting memory policy flags for a container.
+func (a *ContainerAdjustment) SetLinuxMemoryPolicyFlags(flags []string) {
+	a.initLinuxMemoryPolicy()
+	a.Linux.MemoryPolicy.Flags = flags
 }
 
 // SetLinuxMemoryLimit records setting the memory limit for a container.
@@ -295,6 +326,13 @@ func (a *ContainerAdjustment) initRlimits() {
 func (a *ContainerAdjustment) initLinux() {
 	if a.Linux == nil {
 		a.Linux = &LinuxContainerAdjustment{}
+	}
+}
+
+func (a *ContainerAdjustment) initLinuxMemoryPolicy() {
+	a.initLinux()
+	if a.Linux.MemoryPolicy == nil {
+		a.Linux.MemoryPolicy = &LinuxMemoryPolicy{}
 	}
 }
 

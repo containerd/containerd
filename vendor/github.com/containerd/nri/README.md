@@ -200,6 +200,13 @@ The following pieces of container metadata are available to plugins in NRI:
         - cpuset memory
       - Block I/O class
       - RDT class
+  - container (init) process ID
+  - container (init process) exit status
+  - timestamp of container creation
+  - timestamp of starting the container
+  - timestamp of stopping the container/container exit
+  - container exit status reason (camelCase)
+  - container exit status message (human readable)
 
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's OCI Spec.
@@ -211,6 +218,7 @@ container parameters:
 
   - annotations
   - mounts
+  - command line arguments
   - environment variables
   - OCI hooks
   - rlimits
