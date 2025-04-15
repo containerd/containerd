@@ -35,7 +35,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/remotes"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/semaphore"
@@ -64,7 +64,6 @@ func TestFetcherOpen(t *testing.T) {
 		&dockerBase{
 			repository: "nonempty",
 		},
-		remotes.FetcherOpts{}.Config(),
 	}
 
 	host := RegistryHost{
@@ -135,16 +134,20 @@ func TestFetcherOpenParallel(t *testing.T) {
 	f := dockerFetcher{
 		&dockerBase{
 			repository: "nonempty",
+			limiter:    nil,
+			performances: transfer.ImageResolverPerformanceSettings{
+				MaxConcurrentDownloadsPerLayer: 0,
+				ConcurrentDownloadChunkSize:    0,
+			},
 		},
-		remotes.FetcherOpts{}.Config(),
 	}
 
 	cfgConcurency := func(maxConcurrentDls, maxDLPerLayer, chunkSize int) {
-		f.config.MaxConcurrentDownloads = maxConcurrentDls
-		f.config.ConcurrentDownloadChunkSize = chunkSize
-		f.config.MaxConcurrentDownloadsPerLayer = maxDLPerLayer
+		f.dockerBase.performances.MaxConcurrentDownloads = maxConcurrentDls
+		f.dockerBase.performances.ConcurrentDownloadChunkSize = chunkSize
+		f.dockerBase.performances.MaxConcurrentDownloadsPerLayer = maxDLPerLayer
 		limiter := semaphore.NewWeighted(int64(maxConcurrentDls))
-		f.config.Limiter = limiter
+		f.dockerBase.limiter = limiter
 	}
 
 	ignoreContentRange := false
@@ -385,7 +388,6 @@ func TestContentEncoding(t *testing.T) {
 				&dockerBase{
 					repository: "nonempty",
 				},
-				remotes.FetcherOpts{}.Config(),
 			}
 
 			host := RegistryHost{
@@ -490,7 +492,6 @@ func TestDockerFetcherOpen(t *testing.T) {
 				&dockerBase{
 					repository: "ns",
 				},
-				remotes.FetcherOpts{}.Config(),
 			}
 
 			host := RegistryHost{

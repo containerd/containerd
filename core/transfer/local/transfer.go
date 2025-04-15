@@ -40,8 +40,6 @@ type localTransferService struct {
 	images  images.Store
 	// limiter for upload
 	limiterU *semaphore.Weighted
-	// limiter for operations during download
-	limiterOperationD *semaphore.Weighted
 	// limiter for download operation
 	limiterD *semaphore.Weighted
 	config   TransferConfig

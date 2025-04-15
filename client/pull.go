@@ -180,23 +180,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 		return images.Image{}, fmt.Errorf("failed to resolve reference %q: %w", ref, err)
 	}
 
-	opts := []remotes.FetcherOpt{}
-	if rCtx.MaxConcurrentDownloads > 0 {
-		// here for a client pull, we limit the total number of concurrent
-		// downloads per pull.
-		opts = append(opts,
-			remotes.WithLimiter(semaphore.NewWeighted(int64(rCtx.MaxConcurrentDownloads))),
-			remotes.WithMaxConcurrentDownloads(rCtx.MaxConcurrentDownloads),
-		)
-	}
-	if rCtx.MaxConcurrentDownloadsPerLayer > 0 {
-		opts = append(opts, remotes.WithMaxConcurrentDownloadsPerLayer(rCtx.MaxConcurrentDownloadsPerLayer))
-	}
-	if rCtx.ConcurrentDownloadChunkSize > 0 {
-		opts = append(opts, remotes.WithConcurrentDownloadChunkSize(rCtx.ConcurrentDownloadChunkSize))
-	}
-
-	fetcher, err := rCtx.Resolver.Fetcher(ctx, name, opts...)
+	fetcher, err := rCtx.Resolver.Fetcher(ctx, name)
 	if err != nil {
 		return images.Image{}, fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}

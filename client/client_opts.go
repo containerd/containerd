@@ -235,30 +235,6 @@ func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 	}
 }
 
-// WithMaxConcurrentDownloads sets max concurrent download limit.
-func WithMaxConcurrentDownloads(max int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
-		c.MaxConcurrentDownloads = max
-		return nil
-	}
-}
-
-// WithMaxConcurrentDownloadsPerLayer sets the maximum number of concurrent downloads per layer.
-func WithMaxConcurrentDownloadsPerLayer(max int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
-		c.MaxConcurrentDownloadsPerLayer = max
-		return nil
-	}
-}
-
-// WithConcurrentDownloadChunkSize sets the size of concurrent fetch chunks.
-func WithConcurrentDownloadChunkSize(size int) RemoteOpt {
-	return func(client *Client, c *RemoteContext) error {
-		c.ConcurrentDownloadChunkSize = size
-		return nil
-	}
-}
-
 // WithMaxConcurrentUploadedLayers sets max concurrent uploaded layer limit.
 func WithMaxConcurrentUploadedLayers(max int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
