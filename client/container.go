@@ -224,7 +224,7 @@ func (c *container) Image(ctx context.Context) (Image, error) {
 	return NewImage(c.client, i), nil
 }
 
-func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, err error) {
+func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...NewTaskOpts) (_ Task, retErr error) {
 	ctx, span := tracing.StartSpan(ctx, "container.NewTask")
 	defer span.End()
 	i, err := ioCreate(c.id)
@@ -232,7 +232,7 @@ func (c *container) NewTask(ctx context.Context, ioCreate cio.Creator, opts ...N
 		return nil, err
 	}
 	defer func() {
-		if err != nil && i != nil {
+		if retErr != nil && i != nil {
 			i.Cancel()
 			i.Close()
 		}
@@ -366,14 +366,14 @@ func (c *container) handleMounts(ctx context.Context, request *tasks.CreateTaskR
 	return nil
 }
 
-func (c *container) Restore(ctx context.Context, ioCreate cio.Creator, rootDir string) (int, error) {
+func (c *container) Restore(ctx context.Context, ioCreate cio.Creator, rootDir string) (_ int, retErr error) {
 	errorPid := -1
 	i, err := ioCreate(c.id)
 	if err != nil {
 		return errorPid, err
 	}
 	defer func() {
-		if err != nil && i != nil {
+		if retErr != nil && i != nil {
 			i.Cancel()
 			i.Close()
 		}
