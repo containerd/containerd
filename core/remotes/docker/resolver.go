@@ -35,10 +35,12 @@ import (
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/pkg/reference"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/containerd/v2/version"
@@ -62,6 +64,9 @@ var (
 	// intent of the manifest design.
 	MaxManifestSize int64 = 4 * 1048 * 1048
 )
+
+// default number of parallel requests used to download a layer
+const defaultLayerParallelism = int64(1)
 
 // Authorizer is used to authorize HTTP requests based on 401 HTTP responses.
 // An Authorizer is responsible for caching tokens or credentials used by
@@ -142,6 +147,7 @@ type dockerResolver struct {
 	header        http.Header
 	resolveHeader http.Header
 	tracker       StatusTracker
+	config        transfer.ImageResolverOptions
 }
 
 // NewResolver returns a new resolver to a Docker registry
@@ -200,6 +206,7 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		header:        options.Headers,
 		resolveHeader: resolveHeader,
 		tracker:       options.Tracker,
+		// performances:  options.Performance,
 	}
 }
 
@@ -229,7 +236,7 @@ func (r *countingReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-var _ remotes.Resolver = &dockerResolver{}
+var _ remotes.ResolverWithOptions = &dockerResolver{}
 
 func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocispec.Descriptor, error) {
 	base, err := r.resolveDockerBase(ref)
@@ -425,7 +432,13 @@ func (r *dockerResolver) Resolve(ctx context.Context, ref string) (string, ocisp
 	return "", ocispec.Descriptor{}, firstErr
 }
 
-func (r *dockerResolver) Fetcher(ctx context.Context, ref string, opts ...remotes.FetcherOpt) (remotes.Fetcher, error) {
+func (r *dockerResolver) SetOptions(options ...transfer.ImageResolverOption) {
+	for _, opt := range options {
+		opt(&r.config)
+	}
+}
+
+func (r *dockerResolver) Fetcher(ctx context.Context, ref string) (remotes.Fetcher, error) {
 	base, err := r.resolveDockerBase(ref)
 	if err != nil {
 		return nil, err
@@ -433,7 +446,6 @@ func (r *dockerResolver) Fetcher(ctx context.Context, ref string, opts ...remote
 
 	return dockerFetcher{
 		dockerBase: base,
-		config:     remotes.FetcherOpts(opts).Config(),
 	}, nil
 }
 
@@ -460,10 +472,38 @@ func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 }
 
 type dockerBase struct {
-	refspec    reference.Spec
-	repository string
-	hosts      []RegistryHost
-	header     http.Header
+	refspec      reference.Spec
+	repository   string
+	hosts        []RegistryHost
+	header       http.Header
+	performances transfer.ImageResolverPerformanceSettings
+	limiter      *semaphore.Weighted
+}
+
+func (r *dockerBase) Acquire(ctx context.Context, weight int64) error {
+	if r.limiter == nil {
+		return nil
+	}
+	return r.limiter.Acquire(ctx, weight)
+}
+
+func (r *dockerBase) Release(weight int64) {
+	if r.limiter != nil {
+		r.limiter.Release(weight)
+	}
+}
+
+func (r *dockerBase) Parallelism() int64 {
+	// parallel layer fetching remains off when MaxConcurrentDownloadsPerLayer
+	// is <= 1. This could be changed in the future if/when the feature is
+	// successful and widely adopted.
+	if r.performances.MaxConcurrentDownloads <= 0 || r.performances.MaxConcurrentDownloadsPerLayer <= 0 {
+		return defaultLayerParallelism
+	}
+	if r.performances.MaxConcurrentDownloadsPerLayer > 0 && r.performances.MaxConcurrentDownloadsPerLayer <= r.performances.MaxConcurrentDownloads {
+		return int64(r.performances.MaxConcurrentDownloadsPerLayer)
+	}
+	return int64(r.performances.MaxConcurrentDownloads)
 }
 
 func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
@@ -473,10 +513,12 @@ func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {
 		return nil, err
 	}
 	return &dockerBase{
-		refspec:    refspec,
-		repository: strings.TrimPrefix(refspec.Locator, host+"/"),
-		hosts:      hosts,
-		header:     r.header,
+		refspec:      refspec,
+		repository:   strings.TrimPrefix(refspec.Locator, host+"/"),
+		hosts:        hosts,
+		header:       r.header,
+		performances: r.config.Performances,
+		limiter:      r.config.DownloadLimiter,
 	}, nil
 }
 

@@ -47,6 +47,15 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		})
 	}
 
+	if ir, ok := ir.(transfer.ImageResolverOptionSetter); ok {
+		ir.SetResolverOptions(
+			transfer.WithConcurrentDownloadChunkSize(ts.config.ConcurrentDownloadChunkSize),
+			transfer.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer),
+			transfer.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(ts.limiterD),
+		)
+	}
+
 	name, desc, err := ir.Resolve(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to resolve image: %w", err)
@@ -93,19 +102,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			// Digest: img.Target.Digest.String(),
 		})
 	}
-	opts := []remotes.FetcherOpt{
-		remotes.WithLimiter(ts.limiterD),
-	}
-	if ts.config.MaxConcurrentDownloads > 0 {
-		opts = append(opts, remotes.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads))
-	}
-	if ts.config.MaxConcurrentDownloadsPerLayer > 0 {
-		opts = append(opts, remotes.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer))
-	}
-	if ts.config.ConcurrentDownloadChunkSize > 0 {
-		opts = append(opts, remotes.WithConcurrentDownloadChunkSize(ts.config.ConcurrentDownloadChunkSize))
-	}
-	fetcher, err := ir.Fetcher(ctx, name, opts...)
+	fetcher, err := ir.Fetcher(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to get fetcher for %q: %w", name, err)
 	}
@@ -207,10 +204,6 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 				}
 			}
 
-			if ts.limiterOperationD != nil {
-				uopts = append(uopts, unpack.WithLimiter(ts.limiterOperationD))
-			}
-
 			if ts.config.DuplicationSuppressor != nil {
 				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
 			}
@@ -227,7 +220,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		}
 	}
 
-	if err := images.Dispatch(ctx, handler, ts.limiterOperationD, desc); err != nil {
+	if err := images.Dispatch(ctx, handler, nil, desc); err != nil {
 		if unpacker != nil {
 			// wait for unpacker to cleanup
 			unpacker.Wait()

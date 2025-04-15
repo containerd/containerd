@@ -214,7 +214,6 @@ func (w *pipeWriter) CloseWithError(err error) error {
 
 type dockerFetcher struct {
 	*dockerBase
-	config remotes.FetcherConfig
 }
 
 func (r dockerFetcher) Fetch(ctx context.Context, desc ocispec.Descriptor) (io.ReadCloser, error) {
@@ -438,7 +437,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 }
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
-	parallelism, chunkSize := r.config.Parallelism(), int64(r.config.ConcurrentDownloadChunkSize)
+	parallelism, chunkSize := r.Parallelism(), int64(r.performances.ConcurrentDownloadChunkSize)
 	log.G(ctx).WithField("parallelism", parallelism).
 		WithField("chunk_size", chunkSize).
 		WithField("offset", offset).
@@ -447,7 +446,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	req.header.Set("Accept-Encoding", "zstd;q=1.0, gzip;q=0.8, deflate;q=0.5")
 	req.setOffset(offset)
 
-	if err := r.config.Limiter.Acquire(ctx, 1); err != nil {
+	if err := r.Acquire(ctx, 1); err != nil {
 		return nil, err
 	}
 	resp, err := req.doWithRetries(ctx, withErrorCheck, withOffsetCheck(offset))
@@ -460,7 +459,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		err = nil
 	default:
 		log.G(ctx).WithError(err).Debug("fetch failed")
-		r.config.Limiter.Release(1)
+		r.Release(1)
 		return nil, err
 	}
 
@@ -496,15 +495,15 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			}
 			close(queue)
 		}()
-		r.config.Limiter.Release(1)
+		r.Release(1)
 		for range parallelism {
 			go func() {
 				for i := range queue { // first in first out
 					copy := func() error {
-						if err := r.config.Limiter.Acquire(ctx, 1); err != nil {
+						if err := r.Acquire(ctx, 1); err != nil {
 							return err
 						}
-						defer r.config.Limiter.Release(1)
+						defer r.Release(1)
 						select {
 						case <-stopChan:
 							return errors.New("another worker failed")
@@ -549,7 +548,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	} else {
 		body = &fnOnClose{
 			BeforeClose: func() {
-				r.config.Limiter.Release(1)
+				r.Release(1)
 			},
 			ReadCloser: body,
 		}
