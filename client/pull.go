@@ -70,8 +70,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		tracing.Attribute("image.ref", ref),
 		tracing.Attribute("unpack", pullCtx.Unpack),
 		tracing.Attribute("max.concurrent.downloads", pullCtx.MaxConcurrentDownloads),
-		tracing.Attribute("max.concurrent.downloads.per.layer", pullCtx.MaxConcurrentDownloadsPerLayer),
-		tracing.Attribute("max.concurrent.download.chunk.size", pullCtx.ConcurrentDownloadChunkSize),
+		tracing.Attribute("concurrent.layer.fetch.buffer", pullCtx.ConcurrentLayerFetchBuffer),
 		tracing.Attribute("platforms.count", len(pullCtx.Platforms)),
 	)
 

@@ -46,11 +46,9 @@ func FuzzFetcher(f *testing.F) {
 			return
 		}
 
-		f := dockerFetcher{
-			&dockerBase{
-				repository: "nonempty",
-			},
-		}
+		f := dockerFetcher{&dockerBase{
+			repository: "nonempty",
+		}}
 		host := RegistryHost{
 			Client: s.Client(),
 			Host:   u.Host,
