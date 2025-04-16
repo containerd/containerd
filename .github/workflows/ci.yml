@@ -405,7 +405,9 @@ jobs:
           script/setup/install-critools
           script/setup/install-failpoint-binaries
 
-      - name: Install criu
+      # Disable criu testing on arm64 until we can solve the consistent failures of restore testing
+      - if: matrix.os != 'ubuntu-24.04-arm'
+        name: Install criu
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
