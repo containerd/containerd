@@ -20,6 +20,7 @@ package process
 
 import (
 	"context"
+	"github.com/containerd/containerd/v2/defaults"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -47,6 +48,7 @@ func TestNewBinaryIO(t *testing.T) {
 	}
 
 	after := descriptorCount(t)
+
 	if before != after-1 { // one descriptor must be closed from shim logger side
 		t.Fatalf("some descriptors weren't closed (%d != %d -1)", before, after)
 	}
@@ -60,14 +62,14 @@ func TestNewAttachableBinaryIO(t *testing.T) {
 
 	before := descriptorCount(t)
 
-	_, err := NewBinaryIO(ctx, "1", "/path/to/attach-stdout", "/path/to/attach-stderr", uri)
+	_, err := NewBinaryIO(ctx, "1", filepath.Join(defaults.DefaultFIFODir, "attach-stdout"), filepath.Join(defaults.DefaultFIFODir, "attach-stderr"), uri)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	after := descriptorCount(t)
-	if after != before+9 {
-		t.Fatalf("descriptors weren't created correctly (%d != %d -1)", before, after)
+	if before != after-11 {
+		t.Fatalf("descriptors weren't created correctly (%d != %d - 11)", before, after)
 	}
 }
 
@@ -91,7 +93,6 @@ func descriptorCount(t *testing.T) int {
 	t.Helper()
 	const dir = "/proc/self/fd"
 	files, _ := os.ReadDir(dir)
-
 	// Go 1.23+ uses pidfd instead of PID for processes started by a user,
 	// if possible (see https://go.dev/cl/570036). As a side effect, every
 	// os.StartProcess or os.FindProcess call results in an extra opened
