@@ -20,12 +20,13 @@ package process
 
 import (
 	"context"
-	"github.com/containerd/containerd/v2/defaults"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/containerd/containerd/v2/defaults"
 
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
