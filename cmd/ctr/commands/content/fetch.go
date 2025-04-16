@@ -183,9 +183,7 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 	}()
 
 	h := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			ongoing.Add(desc)
-		}
+		ongoing.Add(desc)
 		return nil, nil
 	})
 
@@ -195,7 +193,6 @@ func Fetch(ctx context.Context, client *containerd.Client, ref string, config *F
 		containerd.WithPullLabels(labels),
 		containerd.WithResolver(config.Resolver),
 		containerd.WithImageHandler(h),
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	}
 	opts = append(opts, config.RemoteOpts...)
 

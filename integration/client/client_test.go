@@ -39,7 +39,6 @@ import (
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/defaults"
 	imagelist "github.com/containerd/containerd/v2/integration/images"
-	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/errdefs"
@@ -419,23 +418,6 @@ func TestImagePullSomePlatforms(t *testing.T) {
 
 	if count != len(platformList) {
 		t.Fatal("expected a different number of pulled manifests")
-	}
-}
-
-func TestImagePullSchema1(t *testing.T) {
-	t.Setenv(deprecation.EnvPullSchema1Image, "1")
-	client, err := newClient(t, address)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer client.Close()
-
-	ctx, cancel := testContext(t)
-	defer cancel()
-	schema1TestImage := "gcr.io/google_containers/pause:3.0@sha256:0d093c962a6c2dd8bb8727b661e2b5f13e9df884af9945b4cc7088d9350cd3ee"
-	_, err = client.Pull(ctx, schema1TestImage, WithPlatform(platforms.DefaultString()), WithSchema1Conversion)
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 

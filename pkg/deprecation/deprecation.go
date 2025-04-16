@@ -21,8 +21,6 @@ type Warning string
 const (
 	// Prefix is a standard prefix for all Warnings, used for filtering plugin Exports
 	Prefix = "io.containerd.deprecation/"
-	// PullSchema1Image is a warning for the use of schema 1 images
-	PullSchema1Image Warning = Prefix + "pull-schema-1-image"
 	// GoPluginLibrary is a warning for the use of dynamic library Go plugins
 	GoPluginLibrary Warning = Prefix + "go-plugin-library"
 	// CRIRegistryMirrors is a warning for the use of the `mirrors` property
@@ -40,13 +38,10 @@ const (
 )
 
 const (
-	EnvPrefix           = "CONTAINERD_ENABLE_DEPRECATED_"
-	EnvPullSchema1Image = EnvPrefix + "PULL_SCHEMA_1_IMAGE"
+	EnvPrefix = "CONTAINERD_ENABLE_DEPRECATED_"
 )
 
 var messages = map[Warning]string{
-	PullSchema1Image: "Schema 1 images are deprecated since containerd v1.7, disabled in containerd v2.0, and will be removed in containerd v2.1. " +
-		`Since containerd v1.7.8, schema 1 images are identified by the "io.containerd.image/converted-docker-schema1" label.`,
 	GoPluginLibrary: "Dynamically-linked Go plugins as containerd runtimes are deprecated since containerd v2.0 and removed in containerd v2.1.",
 	CRIRegistryMirrors: "The `mirrors` property of `[plugins.\"io.containerd.grpc.v1.cri\".registry]` is deprecated since containerd v1.5 and will be removed in containerd v2.1." +
 		"Use `config_path` instead.",
