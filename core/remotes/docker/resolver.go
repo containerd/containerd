@@ -65,9 +65,6 @@ var (
 	MaxManifestSize int64 = 4 * 1048 * 1048
 )
 
-// default number of parallel requests used to download a layer
-const defaultLayerParallelism = int64(1)
-
 // Authorizer is used to authorize HTTP requests based on 401 HTTP responses.
 // An Authorizer is responsible for caching tokens or credentials used by
 // requests.
@@ -206,7 +203,6 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		header:        options.Headers,
 		resolveHeader: resolveHeader,
 		tracker:       options.Tracker,
-		// performances:  options.Performance,
 	}
 }
 
@@ -491,19 +487,6 @@ func (r *dockerBase) Release(weight int64) {
 	if r.limiter != nil {
 		r.limiter.Release(weight)
 	}
-}
-
-func (r *dockerBase) Parallelism() int64 {
-	// parallel layer fetching remains off when MaxConcurrentDownloadsPerLayer
-	// is <= 1. This could be changed in the future if/when the feature is
-	// successful and widely adopted.
-	if r.performances.MaxConcurrentDownloads <= 0 || r.performances.MaxConcurrentDownloadsPerLayer <= 0 {
-		return defaultLayerParallelism
-	}
-	if r.performances.MaxConcurrentDownloadsPerLayer > 0 && r.performances.MaxConcurrentDownloadsPerLayer <= r.performances.MaxConcurrentDownloads {
-		return int64(r.performances.MaxConcurrentDownloadsPerLayer)
-	}
-	return int64(r.performances.MaxConcurrentDownloads)
 }
 
 func (r *dockerResolver) base(refspec reference.Spec) (*dockerBase, error) {

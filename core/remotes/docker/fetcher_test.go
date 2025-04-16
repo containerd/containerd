@@ -60,11 +60,9 @@ func TestFetcherOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f := dockerFetcher{
-		&dockerBase{
-			repository: "nonempty",
-		},
-	}
+	f := dockerFetcher{&dockerBase{
+		repository: "nonempty",
+	}}
 
 	host := RegistryHost{
 		Client: s.Client(),
@@ -136,16 +134,14 @@ func TestFetcherOpenParallel(t *testing.T) {
 			repository: "nonempty",
 			limiter:    nil,
 			performances: transfer.ImageResolverPerformanceSettings{
-				MaxConcurrentDownloadsPerLayer: 0,
-				ConcurrentDownloadChunkSize:    0,
+				ConcurrentLayerFetchBuffer: 0,
 			},
 		},
 	}
 
-	cfgConcurency := func(maxConcurrentDls, maxDLPerLayer, chunkSize int) {
+	cfgConcurency := func(maxConcurrentDls, chunkSize int) {
 		f.dockerBase.performances.MaxConcurrentDownloads = maxConcurrentDls
-		f.dockerBase.performances.ConcurrentDownloadChunkSize = chunkSize
-		f.dockerBase.performances.MaxConcurrentDownloadsPerLayer = maxDLPerLayer
+		f.dockerBase.performances.ConcurrentLayerFetchBuffer = chunkSize
 		limiter := semaphore.NewWeighted(int64(maxConcurrentDls))
 		f.dockerBase.limiter = limiter
 	}
@@ -231,7 +227,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 
 	}
 
-	cfgConcurency(10, 3, 1*1024*1024)
+	cfgConcurency(10, 1*1024*1024)
 	checkReader(0)
 
 	checkReader(25)
@@ -384,11 +380,9 @@ func TestContentEncoding(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			f := dockerFetcher{
-				&dockerBase{
-					repository: "nonempty",
-				},
-			}
+			f := dockerFetcher{&dockerBase{
+				repository: "nonempty",
+			}}
 
 			host := RegistryHost{
 				Client: s.Client(),
@@ -488,11 +482,9 @@ func TestDockerFetcherOpen(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			f := dockerFetcher{
-				&dockerBase{
-					repository: "ns",
-				},
-			}
+			f := dockerFetcher{&dockerBase{
+				repository: "ns",
+			}}
 
 			host := RegistryHost{
 				Client: s.Client(),

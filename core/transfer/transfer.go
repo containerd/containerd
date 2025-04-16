@@ -49,9 +49,8 @@ type ImageResolverOptions struct {
 }
 
 type ImageResolverPerformanceSettings struct {
-	MaxConcurrentDownloads         int
-	MaxConcurrentDownloadsPerLayer int
-	ConcurrentDownloadChunkSize    int
+	MaxConcurrentDownloads     int
+	ConcurrentLayerFetchBuffer int
 }
 
 func WithDownloadLimiter(limiter *semaphore.Weighted) ImageResolverOption {
@@ -66,15 +65,9 @@ func WithMaxConcurrentDownloads(maxConcurrentDownloads int) ImageResolverOption 
 	}
 }
 
-func WithMaxConcurrentDownloadsPerLayer(maxConcurrentDownloadsPerLayer int) ImageResolverOption {
+func WithConcurrentLayerFetchBuffer(ConcurrentLayerFetchBuffer int) ImageResolverOption {
 	return func(opts *ImageResolverOptions) {
-		opts.Performances.MaxConcurrentDownloadsPerLayer = maxConcurrentDownloadsPerLayer
-	}
-}
-
-func WithConcurrentDownloadChunkSize(concurrentDownloadChunkSize int) ImageResolverOption {
-	return func(opts *ImageResolverOptions) {
-		opts.Performances.ConcurrentDownloadChunkSize = concurrentDownloadChunkSize
+		opts.Performances.ConcurrentLayerFetchBuffer = ConcurrentLayerFetchBuffer
 	}
 }
 

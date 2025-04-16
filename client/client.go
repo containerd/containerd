@@ -396,20 +396,12 @@ type RemoteContext struct {
 	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
 
-	// MaxConcurrentDownloadsPerLayer controls parallel downloading of image layers
-	// by splitting them into chunks.
-	//
-	// - Values <= 1: Layers are downloaded using a single connection (default).
-	// - Values > 1: Layers are divided into chunks and downloaded in parallel,
-	//   which can significantly reduce pull times for large layers.
-	MaxConcurrentDownloadsPerLayer int
-
-	// ConcurrentDownloadChunkSize sets the maximum size in bytes for each
-	// chunk when downloading layers in parallel. Larger chunks reduce
-	// coordination overhead but use more memory. When
-	// ConcurrentDownloadChunkSize is bellow 512 bytes or
-	// MaxConcurrentDownloadsPerLayer is bellow 2, chunking is disabled.
-	ConcurrentDownloadChunkSize int
+	// ConcurrentLayerFetchBuffer sets the maximum size in bytes for each chunk
+	// when downloading layers in parallel. Larger chunks reduce coordination
+	// overhead but use more memory. When ConcurrentLayerFetchSize is above 512
+	// bytes, parallel layer fetch is enabled. It can accelerate pulls for big
+	// images.
+	ConcurrentLayerFetchBuffer int
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploaded layers for each push.
 	MaxConcurrentUploadedLayers int

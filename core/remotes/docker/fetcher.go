@@ -437,7 +437,7 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 }
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
-	parallelism, chunkSize := r.Parallelism(), int64(r.performances.ConcurrentDownloadChunkSize)
+	parallelism, chunkSize := int64(r.performances.MaxConcurrentDownloads), int64(r.performances.ConcurrentLayerFetchBuffer)
 	log.G(ctx).WithField("parallelism", parallelism).
 		WithField("chunk_size", chunkSize).
 		WithField("offset", offset).

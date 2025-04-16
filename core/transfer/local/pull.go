@@ -49,8 +49,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 	if ir, ok := ir.(transfer.ImageResolverOptionSetter); ok {
 		ir.SetResolverOptions(
-			transfer.WithConcurrentDownloadChunkSize(ts.config.ConcurrentDownloadChunkSize),
-			transfer.WithMaxConcurrentDownloadsPerLayer(ts.config.MaxConcurrentDownloadsPerLayer),
+			transfer.WithConcurrentLayerFetchBuffer(ts.config.ConcurrentLayerFetchBuffer),
 			transfer.WithMaxConcurrentDownloads(ts.config.MaxConcurrentDownloads),
 			transfer.WithDownloadLimiter(ts.limiterD),
 		)
