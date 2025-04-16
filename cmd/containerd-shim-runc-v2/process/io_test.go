@@ -26,8 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/defaults"
-
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 )
@@ -63,7 +61,7 @@ func TestNewAttachableBinaryIO(t *testing.T) {
 
 	before := descriptorCount(t)
 
-	_, err := NewBinaryIO(ctx, "1", filepath.Join(defaults.DefaultFIFODir, "attach-stdout"), filepath.Join(defaults.DefaultFIFODir, "attach-stderr"), uri)
+	_, err := NewBinaryIO(ctx, "1", filepath.Join(t.TempDir(), "attach-stdout"), filepath.Join(t.TempDir(), "attach-stderr"), uri)
 	if err != nil {
 		t.Fatal(err)
 	}
