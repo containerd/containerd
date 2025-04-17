@@ -1011,7 +1011,7 @@ func (srv *refreshTokenServer) BasicTestFunc() func(h http.Handler) (string, Res
 				return
 			}
 			switch r.Method {
-			case http.MethodGet: // https://docs.docker.com/registry/spec/auth/token/#requesting-a-token
+			case http.MethodGet: // https://distribution.github.io/distribution/spec/auth/token/#requesting-a-token
 				u, p, ok := r.BasicAuth()
 				if !ok || u != srv.Username || p != srv.Password {
 					rw.WriteHeader(http.StatusForbidden)
@@ -1038,7 +1038,7 @@ func (srv *refreshTokenServer) BasicTestFunc() func(h http.Handler) (string, Res
 				rw.Header().Set("Content-Type", "application/json")
 				t.Logf("GET mode: returning JSON %q, for query %+v", string(b), query)
 				rw.Write(b)
-			case http.MethodPost: // https://docs.docker.com/registry/spec/auth/oauth/#getting-a-token
+			case http.MethodPost: // https://distribution.github.io/distribution/spec/auth/oauth/#getting-a-token
 				if srv.DisablePOST {
 					rw.WriteHeader(http.StatusMethodNotAllowed)
 					return
