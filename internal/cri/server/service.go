@@ -155,7 +155,7 @@ type criService struct {
 	// sandboxService is the sandbox related service for CRI
 	sandboxService sandboxService
 	// runtimeHandlers contains runtime handler info
-	runtimeHandlers []*runtime.RuntimeHandler
+	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
 }
@@ -198,6 +198,7 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		containerNameIndex: registrar.NewRegistrar(),
 		netPlugin:          make(map[string]cni.CNI),
 		sandboxService:     newCriSandboxService(&config, options.SandboxControllers),
+		runtimeHandlers:    make(map[string]*runtime.RuntimeHandler),
 	}
 
 	// TODO: Make discard time configurable
@@ -241,9 +242,11 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 
 	c.nri = nri.NewAPI(options.NRI, &criImplementation{c})
 
-	c.runtimeHandlers, err = c.introspectRuntimeHandlers(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to introspect runtime handlers: %w", err)
+	intro := c.client.IntrospectionService()
+	for name, r := range c.config.Runtimes {
+		if err := c.introspectRuntimeHandler(ctx, intro, name, r); err != nil {
+			return nil, nil, fmt.Errorf("failed to introspect runtime %s: %w", name, err)
+		}
 	}
 
 	c.runtimeFeatures = &runtime.RuntimeFeatures{
@@ -365,38 +368,36 @@ func (c *criService) IsInitialized() bool {
 	return c.initialized.Load()
 }
 
-func (c *criService) introspectRuntimeHandlers(ctx context.Context) ([]*runtime.RuntimeHandler, error) {
-	var res []*runtime.RuntimeHandler
-	intro := c.client.IntrospectionService()
-	for name, r := range c.config.Runtimes {
-		h := runtime.RuntimeHandler{
-			Name: name,
-		}
-		rawFeatures, err := introspectRuntimeFeatures(ctx, intro, r)
-		if err != nil {
-			log.G(ctx).WithError(err).Debugf("failed to introspect features of runtime %q", name)
-		} else {
-			h.Features = &runtime.RuntimeHandlerFeatures{}
-			if slices.Contains(rawFeatures.MountOptions, "rro") {
-				if kernelSupportsRRO {
-					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts", name)
-					h.Features.RecursiveReadOnlyMounts = true
-				} else {
-					log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
-				}
-			}
-			userns := supportsCRIUserns(rawFeatures)
-			h.Features.UserNamespaces = userns
-			log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
-		}
-		res = append(res, &h)
-		if name == c.config.DefaultRuntimeName {
-			defH := h
-			defH.Name = "" // denotes default
-			res = append(res, &defH)
-		}
+func (c *criService) introspectRuntimeHandler(ctx context.Context, intro introspection.Service, name string, r config.Runtime) error {
+	h := &runtime.RuntimeHandler{
+		Name: name,
 	}
-	return res, nil
+	rawFeatures, err := introspectRuntimeFeatures(ctx, intro, r)
+	if err != nil {
+		log.G(ctx).WithError(err).Debugf("failed to introspect features of runtime %q", name)
+	} else {
+		h.Features = &runtime.RuntimeHandlerFeatures{}
+		if slices.Contains(rawFeatures.MountOptions, "rro") {
+			if kernelSupportsRRO {
+				log.G(ctx).Debugf("runtime %q supports recursive read-only mounts", name)
+				h.Features.RecursiveReadOnlyMounts = true
+			} else {
+				log.G(ctx).Debugf("runtime %q supports recursive read-only mounts, but the kernel does not", name)
+			}
+		}
+		userns := supportsCRIUserns(rawFeatures)
+		h.Features.UserNamespaces = userns
+		log.G(ctx).Debugf("runtime %q supports CRI userns: %v", name, userns)
+	}
+
+	c.runtimeHandlers[name] = h
+	if name == c.config.DefaultRuntimeName {
+		defH := *h
+		defH.Name = "" // denotes default
+		c.runtimeHandlers[""] = &defH
+	}
+
+	return nil
 }
 
 func introspectRuntimeFeatures(ctx context.Context, intro introspection.Service, r config.Runtime) (*features.Features, error) {

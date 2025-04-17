@@ -20,7 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	goruntime "runtime"
+	"slices"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/containerd/log"
@@ -57,7 +59,7 @@ func (c *criService) Status(ctx context.Context, r *runtime.StatusRequest) (*run
 			runtimeCondition,
 			networkCondition,
 		}},
-		RuntimeHandlers: c.runtimeHandlers,
+		RuntimeHandlers: slices.Collect(maps.Values(c.runtimeHandlers)),
 		Features:        c.runtimeFeatures,
 	}
 	if r.Verbose {
