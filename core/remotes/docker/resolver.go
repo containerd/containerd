@@ -155,9 +155,6 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		// make a copy of the headers to avoid race due to concurrent map write
 		options.Headers = options.Headers.Clone()
 	}
-	if _, ok := options.Headers["User-Agent"]; !ok {
-		options.Headers.Set("User-Agent", "containerd/"+version.Version)
-	}
 
 	resolveHeader := http.Header{}
 	if _, ok := options.Headers["Accept"]; !ok {
@@ -499,6 +496,11 @@ func (r *dockerBase) request(host RegistryHost, method string, ps ...string) *re
 	for key, value := range host.Header {
 		header[key] = append(header[key], value...)
 	}
+
+	if len(header.Get("User-Agent")) == 0 {
+		header.Set("User-Agent", "containerd/"+version.Version)
+	}
+
 	parts := append([]string{"/", host.Path, r.repository}, ps...)
 	p := path.Join(parts...)
 	// Join strips trailing slash, re-add ending "/" if included
