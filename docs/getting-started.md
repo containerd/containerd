@@ -117,7 +117,7 @@ Stop-Service containerd
 $Version="1.7.13"	# update to your preferred version
 $Arch = "amd64"	# arm64 also available
 curl.exe -LO https://github.com/containerd/containerd/releases/download/v$Version/containerd-$Version-windows-$Arch.tar.gz
-tar.exe xvf .\containerd-$Version-windows-amd64.tar.gz
+tar.exe xvf .\containerd-$Version-windows-$Arch.tar.gz
 
 # Copy
 Copy-Item -Path .\bin -Destination $Env:ProgramFiles\containerd -Recurse -Force
