@@ -156,7 +156,7 @@ func NewResolver(options ResolverOptions) remotes.Resolver {
 		options.Headers = options.Headers.Clone()
 	}
 	if _, ok := options.Headers["User-Agent"]; !ok {
-		options.Headers.Set("User-Agent", "containerd/"+version.Version)
+		options.Headers.Set("User-Agent", version.UserAgent)
 	}
 
 	resolveHeader := http.Header{}
