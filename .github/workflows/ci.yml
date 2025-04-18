@@ -387,21 +387,10 @@ jobs:
       fail-fast: false
       matrix:
         runtime:
-          - io.containerd.runtime.v1.linux
-          - io.containerd.runc.v1
           - io.containerd.runc.v2
         runc: [runc, crun]
         enable_cri_sandboxes: ["", "sandboxed"]
         os: [ubuntu-24.04, ubuntu-24.04-arm]
-        exclude:
-          - runtime: io.containerd.runc.v1
-            runc: crun
-          - runtime: io.containerd.runtime.v1.linux
-            runc: crun
-          - runtime: io.containerd.runc.v1
-            os: ubuntu-24.04-arm
-          - runtime: io.containerd.runtime.v1.linux
-            os: ubuntu-24.04-arm
 
     env:
       GOTEST: gotestsum --
