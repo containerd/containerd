@@ -348,20 +348,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: [io.containerd.runtime.v1.linux, io.containerd.runc.v1, io.containerd.runc.v2]
+        runtime:
+          - io.containerd.runc.v2
         runc: [runc, crun]
         os: [ubuntu-24.04, ubuntu-24.04-arm]
-        exclude:
-          - runtime: io.containerd.runc.v1
-            runc: crun
-          - runtime: io.containerd.runtime.v1.linux
-            runc: crun
-          # runc.v1 doesn't support cgroupv2
-          - runtime: io.containerd.runc.v1
-            os: ubuntu-24.04-arm
-          # shim.v1 doesn't support cgroupv2
-          - runtime: io.containerd.runtime.v1.linux
-            os: ubuntu-24.04-arm
 
     env:
       GOTEST: gotestsum --
