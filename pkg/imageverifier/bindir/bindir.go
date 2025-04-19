@@ -101,7 +101,7 @@ func (v *ImageVerifier) VerifyImage(ctx context.Context, name string, desc ocisp
 		if i > 0 {
 			reason.WriteString(", ")
 		}
-		reason.WriteString(fmt.Sprintf("%v => %v", bin, vr))
+		reason.WriteString(bin + " => " + vr)
 	}
 
 	return &imageverifier.Judgement{
