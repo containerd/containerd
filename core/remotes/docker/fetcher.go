@@ -28,13 +28,15 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/klauspost/compress/zstd"
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
+	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/v2/core/remotes"
+	remoteerrors "github.com/containerd/containerd/v2/core/remotes/errors"
 )
 
 type dockerFetcher struct {
@@ -295,11 +297,18 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		if resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("content at %v not found: %w", req.String(), errdefs.ErrNotFound)
 		}
-		var registryErr Errors
-		if err := json.NewDecoder(resp.Body).Decode(&registryErr); err != nil || registryErr.Len() < 1 {
-			return nil, fmt.Errorf("unexpected status code %v: %v", req.String(), resp.Status)
+		retErr = remoteerrors.NewUnexpectedStatusErr(resp)
+
+		// Decode registry error if provided
+		rerr := retErr.(remoteerrors.ErrUnexpectedStatus)
+		if len(rerr.Body) > 0 {
+			var registryErr Errors
+			if err := json.Unmarshal(rerr.Body, &registryErr); err == nil && registryErr.Len() > 0 {
+				retErr = errors.Join(rerr, registryErr)
+			}
 		}
-		return nil, fmt.Errorf("unexpected status code %v: %s - Server message: %s", req.String(), resp.Status, registryErr.Error())
+
+		return nil, retErr
 	}
 	if offset > 0 {
 		cr := resp.Header.Get("content-range")
