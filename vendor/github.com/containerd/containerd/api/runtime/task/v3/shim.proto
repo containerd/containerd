@@ -58,9 +58,11 @@ message CreateTaskRequest {
 	string stdin = 5;
 	string stdout = 6;
 	string stderr = 7;
-	string checkpoint = 8;
-	string parent_checkpoint = 9;
-	google.protobuf.Any options = 10;
+	string attachableOut = 8;
+	string attachableErr = 9;
+	string checkpoint = 10;
+	string parent_checkpoint = 11;
+	google.protobuf.Any options = 12;
 }
 
 message CreateTaskResponse {
