@@ -185,6 +185,7 @@ version = 3
     image_pull_progress_timeout = '5m0s'
     image_pull_with_sync_fs = false
     stats_collect_period = 10
+    use_local_image_pull = false
 
     [plugins.'io.containerd.cri.v1.images'.pinned_images]
       sandbox = 'registry.k8s.io/pause:3.10'
@@ -329,22 +330,14 @@ version = 2
   tolerate_missing_hugetlb_controller = true
 
   # ignore_image_defined_volumes ignores volumes defined by the image. Useful for better resource
-	# isolation, security and early detection of issues in the mount configuration when using
-	# ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
+  # isolation, security and early detection of issues in the mount configuration when using
+  # ReadOnlyRootFilesystem since containers won't silently mount a temporary volume.
   ignore_image_defined_volumes = false
 
   # netns_mounts_under_state_dir places all mounts for network namespaces under StateDir/netns
   # instead of being placed under the hardcoded directory /var/run/netns. Changing this setting
   # requires that all containers are deleted.
   netns_mounts_under_state_dir = false
-
-  # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
-  [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
-    # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
-    tls_cert_file = ""
-
-    # tls_key_file is the filepath to the private key paired with the "tls_cert_file"
-    tls_key_file = ""
 
   # max_container_log_line_size is the maximum log line size in bytes for a container.
   # Log line longer than the limit will be split into multiple lines. -1 means no
@@ -419,6 +412,14 @@ version = 2
   #
   # For example, the value can be '5h', '2h30m', '10s'.
   drain_exec_sync_io_timeout = "0s"
+
+  # 'plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming' contains a x509 valid key pair to stream with tls.
+  [plugins."io.containerd.grpc.v1.cri".x509_key_pair_streaming]
+    # tls_cert_file is the filepath to the certificate paired with the "tls_key_file"
+    tls_cert_file = ""
+
+    # tls_key_file is the filepath to the private key paired with the "tls_cert_file"
+    tls_key_file = ""
 
   # 'plugins."io.containerd.grpc.v1.cri".containerd' contains config related to containerd
   [plugins."io.containerd.grpc.v1.cri".containerd]

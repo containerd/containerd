@@ -335,6 +335,12 @@ type ImageConfig struct {
 
 	// StatsCollectPeriod is the period (in seconds) of snapshots stats collection.
 	StatsCollectPeriod int `toml:"stats_collect_period" json:"statsCollectPeriod"`
+
+	// Uses client.Pull to pull images locally, instead of containerd's Transfer Service
+	// By default it is set to false, i.e. use transfer service to pull images.
+	// When transfer service is used to pull images, pull related configs, like max_concurrent_downloads
+	// and unpack_config are configured under [plugins."io.containerd.transfer.v1.local"]
+	UseLocalImagePull bool `toml:"use_local_image_pull" json:"useLocalImagePull"`
 }
 
 // RuntimeConfig contains toml config related to CRI plugin,
@@ -402,7 +408,6 @@ type RuntimeConfig struct {
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
 	CDISpecDirs []string `toml:"cdi_spec_dirs" json:"cdiSpecDirs"`
-
 	// DrainExecSyncIOTimeout is the maximum duration to wait for ExecSync
 	// API' IO EOF event after exec init process exits. A zero value means
 	// there is no timeout.
@@ -470,6 +475,14 @@ const (
 	KeyModelNode = "node"
 )
 
+// transferServiceConfigMigration represents a CRI ImageConfig option that will be No-op once
+// transfer service is used for image pull in CRI.
+type transferServiceConfigMigration struct {
+	ConfigName    string
+	CheckValue    func(*ImageConfig) bool
+	NewConfigPath string
+}
+
 // ValidateImageConfig validates the given image configuration
 func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.Warning, error) {
 	var warnings []deprecation.Warning
@@ -514,6 +527,28 @@ func ValidateImageConfig(ctx context.Context, c *ImageConfig) ([]deprecation.War
 	if c.ImagePullProgressTimeout != "" {
 		if _, err := time.ParseDuration(c.ImagePullProgressTimeout); err != nil {
 			return warnings, fmt.Errorf("invalid image pull progress timeout: %w", err)
+		}
+	}
+
+	// Add warnings for config values which are no-op when using transfer service for image pull.
+	transferServiceConfigs := []transferServiceConfigMigration{
+		{
+			ConfigName:    "max_concurrent_downloads",
+			CheckValue:    func(c *ImageConfig) bool { return c.MaxConcurrentDownloads > 0 },
+			NewConfigPath: `plugins."io.containerd.transfer.v1.local"`,
+		},
+	}
+	// Check all configurations that have changed when transfer service is enabled
+	// Add a warning if a configuration is still defined in the CRI config.
+	if !c.UseLocalImagePull {
+		for _, config := range transferServiceConfigs {
+			if config.CheckValue(c) {
+				log.G(ctx).Warnf(
+					"'%s' should be configured under [%s] when using transfer service",
+					config.ConfigName,
+					config.NewConfigPath,
+				)
+			}
 		}
 	}
 
