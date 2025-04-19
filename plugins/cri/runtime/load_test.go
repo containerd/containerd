@@ -31,7 +31,7 @@ import (
 func TestLoadBaseOCISpec(t *testing.T) {
 	spec := oci.Spec{Version: "1.0.2", Hostname: "default"}
 
-	file, err := os.CreateTemp("", "spec-test-")
+	file, err := os.CreateTemp(t.TempDir(), "spec-test-")
 	require.NoError(t, err)
 
 	defer func() {
