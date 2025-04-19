@@ -158,6 +158,8 @@ type criService struct {
 	runtimeHandlers map[string]*runtime.RuntimeHandler
 	// runtimeFeatures container runtime features info
 	runtimeFeatures *runtime.RuntimeFeatures
+	// TODO Should add a stats server here for storing the metrics / stats
+	metricsServer MetricsServer
 }
 
 type CRIServiceOptions struct {
