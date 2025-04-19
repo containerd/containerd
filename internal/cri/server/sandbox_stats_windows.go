@@ -106,6 +106,7 @@ func convertMetricsToWindowsStats(metrics []*types.Metric, sandbox sandboxstore.
 		// In the case of HostProcess sandbox container we will use the nil value for the statsmap which is used later
 		// otherwise return an error since we should have gotten stats
 		containerStats, ok := containerStatsData.(*wstats.Statistics)
+		//nolint:staticcheck // QF1001: could apply De Morgan's law (staticcheck)
 		if !ok && !(isHostProcess && sandbox.ID == stat.ID) {
 			return nil, fmt.Errorf("failed to extract metrics for container with id %s: %w", stat.ID, err)
 		}
