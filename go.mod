@@ -1,6 +1,6 @@
 module github.com/containerd/containerd/v2
 
-go 1.23.0
+go 1.24.1
 
 require (
 	dario.cat/mergo v1.0.1
@@ -81,7 +81,7 @@ require (
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
 	k8s.io/component-base v0.32.3
-	k8s.io/cri-api v0.32.3
+	k8s.io/cri-api v0.33.0-beta.0.0.20250313010358-ab383b81657e
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kubelet v0.32.3
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
