@@ -125,7 +125,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		}
 		return "npipe", fmt.Sprintf("//%s%s", host, u.Path), nil
 	case "":
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
 	}
 	return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 }

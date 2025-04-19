@@ -361,7 +361,7 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 	// May return an ErrNotImplemented, which will fall back to LCOW
 	upperLayer, upperParentLayerPaths, err := mountsToLayerAndParents(upper)
 	if err != nil {
-		return nil, fmt.Errorf("Upper mount invalid: %w", err)
+		return nil, fmt.Errorf("upper mount invalid: %w", err)
 	}
 
 	lowerLayer, lowerParentLayerPaths, err := mountsToLayerAndParents(lower)
@@ -369,7 +369,7 @@ func mountPairToLayerStack(lower, upper []mount.Mount) ([]string, error) {
 		// Upper was a windows-layer, lower is not. We can't handle that.
 		return nil, fmt.Errorf("windowsDiff cannot diff a windows-layer against a non-windows-layer: %w", errdefs.ErrInvalidArgument)
 	} else if err != nil {
-		return nil, fmt.Errorf("Lower mount invalid: %w", err)
+		return nil, fmt.Errorf("lower mount invalid: %w", err)
 	}
 
 	// Trivial case, diff-against-nothing
