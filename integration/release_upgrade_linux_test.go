@@ -49,19 +49,23 @@ type beforeUpgradeHookFunc func(*testing.T)
 
 // TODO: Support Windows
 func TestUpgrade(t *testing.T) {
-	previousReleaseBinDir := t.TempDir()
-	downloadPreviousLatestReleaseBinary(t, previousReleaseBinDir)
-
-	t.Run("recover", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
-	t.Run("exec", runUpgradeTestCase(previousReleaseBinDir, execToExistingContainer))
-	t.Run("manipulate", runUpgradeTestCase(previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
-	t.Run("recover-images", runUpgradeTestCase(previousReleaseBinDir, shouldRecoverExistingImages))
-	t.Run("metrics", runUpgradeTestCase(previousReleaseBinDir, shouldParseMetricDataCorrectly))
+	for _, version := range []string{"1.7", "2.0"} {
+		t.Run(version, func(t *testing.T) {
+			previousReleaseBinDir := t.TempDir()
+			downloadPreviousLatestReleaseBinary(t, version, previousReleaseBinDir)
+			t.Run("recover", runUpgradeTestCase(version, previousReleaseBinDir, shouldRecoverAllThePodsAfterUpgrade))
+			t.Run("exec", runUpgradeTestCase(version, previousReleaseBinDir, execToExistingContainer))
+			t.Run("manipulate", runUpgradeTestCase(version, previousReleaseBinDir, shouldManipulateContainersInPodAfterUpgrade))
+			t.Run("recover-images", runUpgradeTestCase(version, previousReleaseBinDir, shouldRecoverExistingImages))
+			t.Run("metrics", runUpgradeTestCase(version, previousReleaseBinDir, shouldParseMetricDataCorrectly))
+		})
+	}
 }
 
 func runUpgradeTestCase(
+	previousVersion string,
 	previousReleaseBinDir string,
-	setupUpgradeVerifyCase func(*testing.T, cri.RuntimeService, cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
+	setupUpgradeVerifyCase func(*testing.T, int, cri.RuntimeService, cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
 		// NOTE: Using t.TempDir() here is to ensure there are no leaky
@@ -69,7 +73,14 @@ func runUpgradeTestCase(
 		workDir := t.TempDir()
 
 		t.Log("Install config for previous release")
-		previousReleaseCtrdConfig(t, previousReleaseBinDir, workDir)
+		var taskVersion int
+		if previousVersion == "1.7" {
+			oneSevenCtrdConfig(t, previousReleaseBinDir, workDir)
+			taskVersion = 2
+		} else {
+			previousReleaseCtrdConfig(t, previousReleaseBinDir, workDir)
+			taskVersion = 3
+		}
 
 		t.Log("Starting the previous release's containerd")
 		previousCtrdBinPath := filepath.Join(previousReleaseBinDir, "bin", "containerd")
@@ -91,7 +102,7 @@ func runUpgradeTestCase(
 		})
 
 		t.Log("Prepare pods for current release")
-		upgradeCaseFunc, hookFunc := setupUpgradeVerifyCase(t, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+		upgradeCaseFunc, hookFunc := setupUpgradeVerifyCase(t, taskVersion, previousProc.criRuntimeService(t), previousProc.criImageService(t))
 		needToCleanup = false
 
 		t.Log("Gracefully stop previous release's containerd process")
@@ -123,7 +134,7 @@ func runUpgradeTestCase(
 	}
 }
 
-func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
+func shouldRecoverAllThePodsAfterUpgrade(t *testing.T, taskVersion int,
 	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 
 	var busyboxImage = images.Get(images.BusyBox)
@@ -152,7 +163,8 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
 		criruntime.ContainerState_CONTAINER_RUNNING,
 		WithCommand("sleep", "3d"))
 
-	thirdPodShimPid := int(thirdPodCtx.shimPid())
+	// TODO: Need to pass in task version
+	thirdPodShimPid := int(thirdPodCtx.shimPid(taskVersion))
 
 	hookFunc := func(t *testing.T) {
 		// Kill the shim after stop previous containerd process
@@ -211,7 +223,7 @@ func shouldRecoverAllThePodsAfterUpgrade(t *testing.T,
 	}, hookFunc
 }
 
-func execToExistingContainer(t *testing.T,
+func execToExistingContainer(t *testing.T, _ int,
 	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 
 	var busyboxImage = images.Get(images.BusyBox)
@@ -276,7 +288,7 @@ func getFileSize(t *testing.T, filePath string) int64 {
 	return st.Size()
 }
 
-func shouldManipulateContainersInPodAfterUpgrade(t *testing.T,
+func shouldManipulateContainersInPodAfterUpgrade(t *testing.T, _ int,
 	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 
 	var busyboxImage = images.Get(images.BusyBox)
@@ -375,7 +387,7 @@ func shouldManipulateContainersInPodAfterUpgrade(t *testing.T,
 	}, nil
 }
 
-func shouldRecoverExistingImages(t *testing.T,
+func shouldRecoverExistingImages(t *testing.T, _ int,
 	_ cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 
 	images := []string{images.Get(images.BusyBox), images.Get(images.Alpine)}
@@ -398,7 +410,7 @@ func shouldRecoverExistingImages(t *testing.T,
 
 // shouldParseMetricDataCorrectly is to check new release containerd can parse
 // metric data from existing shim created by previous release.
-func shouldParseMetricDataCorrectly(t *testing.T,
+func shouldParseMetricDataCorrectly(t *testing.T, _ int,
 	rSvc cri.RuntimeService, iSvc cri.ImageManagerService) (upgradeVerifyCaseFunc, beforeUpgradeHookFunc) {
 
 	imageName := images.Get(images.BusyBox)
@@ -537,7 +549,7 @@ func (pCtx *podTCtx) containerDataDir(cntrID string) string {
 }
 
 // shimPid returns shim's pid.
-func (pCtx *podTCtx) shimPid() uint32 {
+func (pCtx *podTCtx) shimPid(version int) uint32 {
 	t := pCtx.t
 	cfg := criRuntimeInfo(t, pCtx.rSvc)
 
@@ -546,7 +558,7 @@ func (pCtx *podTCtx) shimPid() uint32 {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), 3, pCtx.id)
+	shimCli := connectToShim(ctx, t, cfg["containerdEndpoint"].(string), version, pCtx.id)
 	return shimPid(ctx, t, shimCli)
 }
 
@@ -646,6 +658,25 @@ version = 2
   runtime_path = "%s/bin/containerd-shim-runc-v2"
 `,
 		previousReleaseBinDir)
+
+	fileName := filepath.Join(targetDir, "config.toml")
+	err := os.WriteFile(fileName, []byte(rawCfg), 0600)
+	require.NoError(t, err, "failed to create config for previous release")
+}
+
+// previousReleaseCtrdConfig generates containerd config with previous release
+// shim binary.
+func oneSevenCtrdConfig(t *testing.T, previousReleaseBinDir, targetDir string) {
+	// TODO(fuweid):
+	//
+	// We should choose correct config version based on previous release.
+	// Currently, we're focusing on v1.x -> v2.0 so we use version = 2 here.
+	rawCfg := fmt.Sprintf(`
+version = 2
+
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "%s/bin/containerd-shim-runc-v2"
+`, previousReleaseBinDir)
 
 	fileName := filepath.Join(targetDir, "config.toml")
 	err := os.WriteFile(fileName, []byte(rawCfg), 0600)
