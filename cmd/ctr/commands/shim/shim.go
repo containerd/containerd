@@ -30,15 +30,16 @@ import (
 	"github.com/containerd/console"
 	taskv2 "github.com/containerd/containerd/api/runtime/task/v2"
 	task "github.com/containerd/containerd/api/runtime/task/v3"
-	"github.com/containerd/containerd/v2/cmd/ctr/commands"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
-	"github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/log"
 	"github.com/containerd/ttrpc"
 	"github.com/containerd/typeurl/v2"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/urfave/cli/v2"
+
+	"github.com/containerd/containerd/v2/cmd/ctr/commands"
+	"github.com/containerd/containerd/v2/pkg/namespaces"
+	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
+	"github.com/containerd/containerd/v2/pkg/shim"
 )
 
 var fifoFlags = []cli.Flag{
@@ -69,6 +70,10 @@ var Command = &cli.Command{
 		&cli.StringFlag{
 			Name:  "id",
 			Usage: "shim ID",
+		},
+		&cli.StringFlag{
+			Name:  "shim-address",
+			Usage: "shim address (default: computed from shim ID)",
 		},
 	},
 	Subcommands: []*cli.Command{
@@ -289,20 +294,28 @@ func getTaskServiceV2(cliContext *cli.Context) (taskv2.TaskService, error) {
 
 func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 	id := cliContext.String("id")
-	if id == "" {
-		return nil, fmt.Errorf("container id must be specified")
+	shimAddress := cliContext.String("shim-address")
+	if id == "" && shimAddress == "" {
+		return nil, fmt.Errorf("shim ID (--id) or address (--shim-address) must be specified")
 	}
 	ns := cliContext.String("namespace")
 
-	// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
-	// compatible it
-	s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
-	// this should not error, ctr always get a default ns
-	ctx := namespaces.WithNamespace(context.Background(), ns)
-	s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
-	s2 = strings.TrimPrefix(s2, "unix://")
-
-	for _, socket := range []string{s2, "\x00" + s1} {
+	sockets := make([]string, 0)
+	if shimAddress != "" {
+		trimmed := strings.TrimPrefix(shimAddress, "unix://")
+		sockets = append(sockets, trimmed)
+	}
+	if id != "" {
+		// /containerd-shim/ns/id/shim.sock is the old way to generate shim socket,
+		// compatible it
+		s1 := filepath.Join(string(filepath.Separator), "containerd-shim", ns, id, "shim.sock")
+		// this should not error, ctr always get a default ns
+		ctx := namespaces.WithNamespace(context.Background(), ns)
+		s2, _ := shim.SocketAddress(ctx, cliContext.String("address"), id, false)
+		s2 = strings.TrimPrefix(s2, "unix://")
+		sockets = append(sockets, s2, "\x00"+s1)
+	}
+	for _, socket := range sockets {
 		conn, err := net.Dial("unix", socket)
 		if err == nil {
 			client := ttrpc.NewClient(conn)
@@ -314,5 +327,5 @@ func getTTRPCClient(cliContext *cli.Context) (*ttrpc.Client, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("fail to connect to container %s's shim", id)
+	return nil, fmt.Errorf("fail to connect to container shim with sockets: %v", sockets)
 }
