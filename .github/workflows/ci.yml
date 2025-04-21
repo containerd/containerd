@@ -371,6 +371,7 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
+        if: matrix.os != 'ubuntu-24.04-arm'
         run: |
           sudo add-apt-repository ppa:criu/ppa
           sudo apt-get update
