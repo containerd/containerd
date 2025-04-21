@@ -84,7 +84,6 @@ func TestSetContainerStarting(t *testing.T) {
 			expectErr: true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			container, err := containerstore.NewContainer(
 				containerstore.Metadata{ID: testID},

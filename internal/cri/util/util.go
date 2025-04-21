@@ -18,24 +18,35 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"path"
+	"strconv"
 	"time"
+
+	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/internal/cri/constants"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	clabels "github.com/containerd/containerd/v2/pkg/labels"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
+	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/log"
 )
 
-// deferCleanupTimeout is the default timeout for containerd cleanup operations
-// in defer.
-const deferCleanupTimeout = 1 * time.Minute
+// deferCleanupTimeoutKey is used to retrieve the configurable timeout for containerd cleanup operations in defer.
+const (
+	deferCleanupTimeoutKey = "io.containerd.timeout.cri.defercleanup"
+	deferCleanupTimeout    = 1 * time.Minute
+)
+
+func init() {
+	timeout.Set(deferCleanupTimeoutKey, deferCleanupTimeout)
+}
 
 // DeferContext returns a context for containerd cleanup operations in defer.
-// A default timeout is applied to avoid cleanup operation pending forever.
+// A configurable default timeout is applied to avoid cleanup operation pending forever.
 func DeferContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(NamespacedContext(), deferCleanupTimeout)
+	return context.WithTimeout(NamespacedContext(), timeout.Get(deferCleanupTimeoutKey))
 }
 
 // NamespacedContext returns a context with kubernetes namespace set.
@@ -67,7 +78,7 @@ func GetPassthroughAnnotations(podAnnotations map[string]string,
 	return passthroughAnnotations
 }
 
-// BuildLabel builds the labels from config to be passed to containerd
+// BuildLabels builds the labels from config to be passed to containerd
 func BuildLabels(configLabels, imageConfigLabels map[string]string, containerType string) map[string]string {
 	labels := make(map[string]string)
 
@@ -86,4 +97,42 @@ func BuildLabels(configLabels, imageConfigLabels map[string]string, containerTyp
 	}
 	labels[crilabels.ContainerKindLabel] = containerType
 	return labels
+}
+
+// GenerateUserString generates valid user string based on OCI Image Spec
+// v1.0.0.
+//
+// CRI defines that the following combinations are valid:
+//
+// (none) -> ""
+// username -> username
+// username, uid -> username
+// username, uid, gid -> username:gid
+// username, gid -> username:gid
+// uid -> uid
+// uid, gid -> uid:gid
+// gid -> error
+//
+// TODO(random-liu): Add group name support in CRI.
+func GenerateUserString(username string, uid, gid *runtime.Int64Value) (string, error) {
+	var userstr, groupstr string
+	if uid != nil {
+		userstr = strconv.FormatInt(uid.GetValue(), 10)
+	}
+	if username != "" {
+		userstr = username
+	}
+	if gid != nil {
+		groupstr = strconv.FormatInt(gid.GetValue(), 10)
+	}
+	if userstr == "" {
+		if groupstr != "" {
+			return "", fmt.Errorf("user group %q is specified without user", groupstr)
+		}
+		return "", nil
+	}
+	if groupstr != "" {
+		userstr = userstr + ":" + groupstr
+	}
+	return userstr, nil
 }

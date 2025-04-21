@@ -98,6 +98,9 @@ type Status struct {
 	Unknown bool `json:"-"`
 	// Resources has container runtime resource constraints
 	Resources *runtime.ContainerResources
+	// Restore marks this container as a container to be restored from a
+	// checkpoint and not started.
+	Restore bool
 }
 
 // State returns current state of the container based on the container status.

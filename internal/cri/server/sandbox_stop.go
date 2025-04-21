@@ -46,6 +46,9 @@ func (c *criService) StopPodSandbox(ctx context.Context, r *runtime.StopPodSandb
 		// https://github.com/kubernetes/cri-api/blob/c20fa40/pkg/apis/runtime/v1/api.proto#L45-L46
 		return &runtime.StopPodSandboxResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	span.SetAttributes(tracing.Attribute("sandbox.id", sandbox.ID))
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, err
@@ -127,6 +130,11 @@ func (c *criService) stopPodSandbox(ctx context.Context, sandbox sandboxstore.Sa
 	}
 
 	log.G(ctx).Infof("TearDown network for sandbox %q successfully", id)
+
+	err = c.cleanupImageMounts(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup image mounts for sandbox %q: %w", id, err)
+	}
 	return nil
 }
 

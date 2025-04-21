@@ -145,7 +145,6 @@ func TestToCRIContainerStatus(t *testing.T) {
 			expectedReason: errorExitReason,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 
 			metadata, ctnr, status, _, expected := getContainerStatusTestData(t)
@@ -240,7 +239,6 @@ func TestContainerStatus(t *testing.T) {
 			expectErr:  true,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			metadata, ctnr, status, image, expected := getContainerStatusTestData(t)
@@ -396,4 +394,10 @@ func (c *fakeSpecOnlyContainer) Task(context.Context, cio.Attach) (containerd.Ta
 func (c *fakeSpecOnlyContainer) Update(context.Context, ...containerd.UpdateContainerOpts) error {
 	c.t.Error("fakeSpecOnlyContainer.Update: not implemented")
 	return errors.New("not implemented")
+}
+
+// Restore implements client.Container.
+func (c *fakeSpecOnlyContainer) Restore(context.Context, cio.Creator, string) (int, error) {
+	c.t.Error("fakeSpecOnlyContainer.Restore: not implemented")
+	return -1, errors.New("not implemented")
 }

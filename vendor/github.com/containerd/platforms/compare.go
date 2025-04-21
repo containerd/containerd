@@ -31,6 +31,34 @@ type MatchComparer interface {
 	Less(specs.Platform, specs.Platform) bool
 }
 
+type platformVersions struct {
+	major []int
+	minor []int
+}
+
+var arm64variantToVersion = map[string]platformVersions{
+	"v8":   {[]int{8}, []int{0}},
+	"v8.0": {[]int{8}, []int{0}},
+	"v8.1": {[]int{8}, []int{1}},
+	"v8.2": {[]int{8}, []int{2}},
+	"v8.3": {[]int{8}, []int{3}},
+	"v8.4": {[]int{8}, []int{4}},
+	"v8.5": {[]int{8}, []int{5}},
+	"v8.6": {[]int{8}, []int{6}},
+	"v8.7": {[]int{8}, []int{7}},
+	"v8.8": {[]int{8}, []int{8}},
+	"v8.9": {[]int{8}, []int{9}},
+	"v9":   {[]int{9, 8}, []int{0, 5}},
+	"v9.0": {[]int{9, 8}, []int{0, 5}},
+	"v9.1": {[]int{9, 8}, []int{1, 6}},
+	"v9.2": {[]int{9, 8}, []int{2, 7}},
+	"v9.3": {[]int{9, 8}, []int{3, 8}},
+	"v9.4": {[]int{9, 8}, []int{4, 9}},
+	"v9.5": {[]int{9, 8}, []int{5, 9}},
+	"v9.6": {[]int{9, 8}, []int{6, 9}},
+	"v9.7": {[]int{9, 8}, []int{7, 9}},
+}
+
 // platformVector returns an (ordered) vector of appropriate specs.Platform
 // objects to try matching for the given platform object (see platforms.Only).
 func platformVector(platform specs.Platform) []specs.Platform {
@@ -73,52 +101,19 @@ func platformVector(platform specs.Platform) []specs.Platform {
 			variant = "v8"
 		}
 
-		majorVariant, minorVariant, hasMinor := strings.Cut(variant, ".")
-		if armMajor, err := strconv.Atoi(strings.TrimPrefix(majorVariant, "v")); err == nil && armMajor >= 8 {
-			armMinor := 0
-			if len(variant) == 4 {
-				if minor, err := strconv.Atoi(minorVariant); err == nil && hasMinor {
-					armMinor = minor
-				}
-			}
-
-			if armMajor == 9 {
-				for minor := armMinor - 1; minor >= 0; minor-- {
-					arm64Variant := "v" + strconv.Itoa(armMajor) + "." + strconv.Itoa(minor)
-					if minor == 0 {
-						arm64Variant = "v" + strconv.Itoa(armMajor)
-					}
-					vector = append(vector, specs.Platform{
-						Architecture: platform.Architecture,
-						OS:           platform.OS,
-						OSVersion:    platform.OSVersion,
-						OSFeatures:   platform.OSFeatures,
-						Variant:      arm64Variant,
-					})
-				}
-
-				// v9.0 diverged from v8.5, meaning that v9.x is compatible with v8.{x+5} until v9.4/v8.9
-				armMinor = armMinor + 5
-				if armMinor > 9 {
-					armMinor = 9
-				}
-				armMajor = 8
-				vector = append(vector, specs.Platform{
-					Architecture: platform.Architecture,
-					OS:           platform.OS,
-					OSVersion:    platform.OSVersion,
-					OSFeatures:   platform.OSFeatures,
-					Variant:      "v8." + strconv.Itoa(armMinor),
-				})
-			}
-
-			for minor := armMinor - 1; minor >= 0; minor-- {
-				arm64Variant := "v" + strconv.Itoa(armMajor) + "." + strconv.Itoa(minor)
+		vector = []specs.Platform{} // Reset vector, the first variant will be added in loop.
+		arm64Versions, ok := arm64variantToVersion[variant]
+		if !ok {
+			break
+		}
+		for i, major := range arm64Versions.major {
+			for minor := arm64Versions.minor[i]; minor >= 0; minor-- {
+				arm64Variant := "v" + strconv.Itoa(major) + "." + strconv.Itoa(minor)
 				if minor == 0 {
-					arm64Variant = "v" + strconv.Itoa(armMajor)
+					arm64Variant = "v" + strconv.Itoa(major)
 				}
 				vector = append(vector, specs.Platform{
-					Architecture: platform.Architecture,
+					Architecture: "arm64",
 					OS:           platform.OS,
 					OSVersion:    platform.OSVersion,
 					OSFeatures:   platform.OSFeatures,
@@ -129,7 +124,7 @@ func platformVector(platform specs.Platform) []specs.Platform {
 
 		// All arm64/v8.x and arm64/v9.x are compatible with arm/v8 (32-bits) and below.
 		// There's no arm64 v9 variant, so it's normalized to v8.
-		if strings.HasPrefix(variant, "v8.") || strings.HasPrefix(variant, "v9.") {
+		if strings.HasPrefix(variant, "v8") || strings.HasPrefix(variant, "v9") {
 			variant = "v8"
 		}
 		vector = append(vector, platformVector(specs.Platform{

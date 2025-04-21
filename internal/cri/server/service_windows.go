@@ -53,7 +53,7 @@ func (c *criService) initPlatform() error {
 		i, err := cni.New(cni.WithMinNetworkCount(windowsNetworkAttachCount),
 			cni.WithPluginConfDir(dir),
 			cni.WithPluginMaxConfNum(max),
-			cni.WithPluginDir([]string{c.config.NetworkPluginBinDir}))
+			cni.WithPluginDir(c.config.NetworkPluginBinDirs))
 		if err != nil {
 			return fmt.Errorf("failed to initialize cni: %w", err)
 		}

@@ -80,7 +80,6 @@ func TestAdditionalGids(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		i, tc := i, tc
 		tBasename := fmt.Sprintf("case-%d", i)
 		t.Run(tBasename, func(t *testing.T) {
 			t.Log(tc.description)

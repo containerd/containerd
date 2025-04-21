@@ -178,17 +178,21 @@ func (p dockerPusher) push(ctx context.Context, desc ocispec.Descriptor, ref str
 			// query and send the request again.
 			resp, err = preq.doWithRetries(pctx, nil)
 			if err != nil {
-				return nil, err
+				if !errors.Is(err, ErrInvalidAuthorization) {
+					return nil, fmt.Errorf("pushing with mount from %s: %w", fromRepo, err)
+				}
+				log.G(ctx).Debugf("failed to push with mount from repository %s: %v", fromRepo, err)
 			}
+			if resp != nil {
+				switch resp.StatusCode {
+				case http.StatusUnauthorized:
+					log.G(ctx).Debugf("failed to mount from repository %s, not authorized", fromRepo)
 
-			switch resp.StatusCode {
-			case http.StatusUnauthorized:
-				log.G(ctx).Debugf("failed to mount from repository %s", fromRepo)
-
-				resp.Body.Close()
-				resp = nil
-			case http.StatusCreated:
-				mountedFrom = path.Join(p.refspec.Hostname(), fromRepo)
+					resp.Body.Close()
+					resp = nil
+				case http.StatusCreated:
+					mountedFrom = path.Join(p.refspec.Hostname(), fromRepo)
+				}
 			}
 		}
 
@@ -477,13 +481,15 @@ func (pw *pushWriter) Digest() digest.Digest {
 
 func (pw *pushWriter) Commit(ctx context.Context, size int64, expected digest.Digest, opts ...content.Opt) error {
 	// Check whether read has already thrown an error
-	if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
-		return fmt.Errorf("pipe error before commit: %w", err)
+	if pw.pipe != nil {
+		if _, err := pw.pipe.Write([]byte{}); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+			return fmt.Errorf("pipe error before commit: %w", err)
+		}
+		if err := pw.pipe.Close(); err != nil {
+			return err
+		}
 	}
 
-	if err := pw.pipe.Close(); err != nil {
-		return err
-	}
 	// TODO: timeout waiting for response
 	var resp *http.Response
 	select {

@@ -41,7 +41,6 @@ func (c *CRIImageService) CheckImages(ctx context.Context) error {
 	var wg sync.WaitGroup
 	for _, i := range cImages {
 		wg.Add(1)
-		i := i
 		go func() {
 			defer wg.Done()
 			// TODO: Check platform/snapshot combination. Snapshot check should come first

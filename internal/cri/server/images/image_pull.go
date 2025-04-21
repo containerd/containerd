@@ -22,7 +22,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -170,14 +169,6 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 			Headers: c.config.Registry.Headers,
 			Hosts:   c.registryHosts(ctx, credentials, pullReporter.optionUpdateClient),
 		})
-		isSchema1    bool
-		imageHandler containerdimages.HandlerFunc = func(_ context.Context,
-			desc imagespec.Descriptor) ([]imagespec.Descriptor, error) {
-			if desc.MediaType == containerdimages.MediaTypeDockerSchema1Manifest {
-				isSchema1 = true
-			}
-			return nil, nil
-		}
 	)
 
 	defer pcancel()
@@ -194,13 +185,11 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	labels := c.getLabels(ctx, ref)
 
 	pullOpts := []containerd.RemoteOpt{
-		containerd.WithSchema1Conversion, //nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 		containerd.WithResolver(resolver),
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
-		containerd.WithImageHandler(imageHandler),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
@@ -234,7 +223,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	}
 	imageID := configDesc.Digest.String()
 
-	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest, isSchema1)
+	repoDigest, repoTag := util.GetRepoDigestAndTag(namedRef, image.Target().Digest)
 	for _, r := range []string{imageID, repoTag, repoDigest} {
 		if r == "" {
 			continue
@@ -430,6 +419,10 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 		}
 		hostOptions.Credentials = credentials
 		hostOptions.HostDir = hostDirFromRoots(paths)
+		// need to pass cri global headers to per-host authorizers
+		hostOptions.AuthorizerOpts = []docker.AuthorizerOpt{
+			docker.WithAuthHeader(c.config.Registry.Headers),
+		}
 
 		return config.ConfigureHosts(ctx, hostOptions)
 	}
@@ -448,7 +441,7 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 			}
 
 			var (
-				transport = newTransport()
+				transport = docker.DefaultHTTPTransport(nil) // no tls config
 				client    = &http.Client{Transport: transport}
 				config    = c.config.Registry.Configs[u.Host]
 			)
@@ -468,7 +461,6 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 				credentials = func(host string) (string, string, error) {
 					return ParseAuth(auth, host)
 				}
-
 			}
 
 			if updateClientFn != nil {
@@ -479,7 +471,9 @@ func (c *CRIImageService) registryHosts(ctx context.Context, credentials func(ho
 
 			authorizer := docker.NewDockerAuthorizer(
 				docker.WithAuthClient(client),
-				docker.WithAuthCreds(credentials))
+				docker.WithAuthCreds(credentials),
+				docker.WithAuthHeader(c.config.Registry.Headers),
+			)
 
 			if u.Path == "" {
 				u.Path = "/v2"
@@ -562,23 +556,6 @@ func (c *CRIImageService) registryEndpoints(host string) ([]string, error) {
 		}
 	}
 	return append(endpoints, defaultScheme(defaultHost)+"://"+defaultHost), nil
-}
-
-// newTransport returns a new HTTP transport used to pull image.
-// TODO(random-liu): Create a library and share this code with `ctr`.
-func newTransport() *http.Transport {
-	return &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:       30 * time.Second,
-			KeepAlive:     30 * time.Second,
-			FallbackDelay: 300 * time.Millisecond,
-		}).DialContext,
-		MaxIdleConns:          10,
-		IdleConnTimeout:       30 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 5 * time.Second,
-	}
 }
 
 // encryptedImagesPullOpts returns the necessary list of pull options required

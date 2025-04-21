@@ -129,7 +129,8 @@ func New(address string, opts ...Opt) (*Client, error) {
 		backoffConfig := backoff.DefaultConfig
 		backoffConfig.MaxDelay = copts.timeout
 		connParams := grpc.ConnectParams{
-			Backoff: backoffConfig,
+			Backoff:           backoffConfig,
+			MinConnectTimeout: copts.timeout,
 		}
 		gopts := []grpc.DialOption{
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -139,6 +140,8 @@ func New(address string, opts ...Opt) (*Client, error) {
 		if len(copts.dialOptions) > 0 {
 			gopts = copts.dialOptions
 		}
+		gopts = append(gopts, copts.extraDialOpts...)
+
 		gopts = append(gopts, grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(defaults.DefaultMaxRecvMsgSize),
 			grpc.MaxCallSendMsgSize(defaults.DefaultMaxSendMsgSize)))
@@ -378,13 +381,6 @@ type RemoteContext struct {
 	// in handlers, allowing operations to run on the descriptor
 	// after it has completed transferring.
 	HandlerWrapper func(images.Handler) images.Handler
-
-	// ConvertSchema1 is whether to convert Docker registry schema 1
-	// manifests. If this option is false then any image which resolves
-	// to schema 1 will return an error since schema 1 is not supported.
-	//
-	// Deprecated: use Schema 2 or OCI images.
-	ConvertSchema1 bool
 
 	// Platforms defines which platforms to handle when doing the image operation.
 	// Platforms is ignored when a PlatformMatcher is set, otherwise the

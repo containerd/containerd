@@ -20,6 +20,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
@@ -27,9 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	snpkg "github.com/containerd/containerd/v2/pkg/snapshotters"
 )
 
 func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetcher, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -182,10 +184,14 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		unpacks := iu.UnpackPlatforms()
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
+			enableRemoteSnapshotAnnotations := false
 			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
 				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
 				if matched {
+					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
+						enableRemoteSnapshotAnnotations = true
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				}
 			}
@@ -196,6 +202,10 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 
 			if ts.config.DuplicationSuppressor != nil {
 				uopts = append(uopts, unpack.WithDuplicationSuppressor(ts.config.DuplicationSuppressor))
+			}
+
+			if enableRemoteSnapshotAnnotations {
+				handler = snpkg.AppendInfoHandlerWrapper(name)(handler)
 			}
 
 			unpacker, err = unpack.NewUnpacker(ctx, ts.content, uopts...)

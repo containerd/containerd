@@ -245,7 +245,6 @@ func TestHostProcessRequirements(t *testing.T) {
 			expectError:          false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			containerConfig.Windows.SecurityContext.HostProcess = test.containerHostProcess
 			sandboxConfig.Windows.SecurityContext = &runtime.WindowsSandboxSecurityContext{

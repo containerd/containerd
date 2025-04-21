@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/internal/cri/opts"
 	"github.com/containerd/containerd/v2/pkg/deprecation"
 )
 
@@ -50,6 +51,49 @@ func TestValidateConfig(t *testing.T) {
 				},
 			},
 			runtimeExpectedErr: "no corresponding runtime configured in `containerd.runtimes` for `containerd` `default_runtime_name = \"default\"",
+		},
+		"specify both cni.bin_dir and cni_bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir:  "/opt/mycni/bin",
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			runtimeExpectedErr: "`cni.bin_dir` and `cni.bin_dirs` cannot be set at the same time",
+			warnings:           []deprecation.Warning{deprecation.CRICNIBinDir},
+		},
+		"cni.bin_dir, if used, is moved to cni.bin_dirs": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDir: "/opt/mycni/bin",
+				},
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				CniConfig: CniConfig{
+					NetworkPluginBinDirs: []string{"/opt/mycni/bin"},
+				},
+			},
+			warnings: []deprecation.Warning{deprecation.CRICNIBinDir},
 		},
 
 		"deprecated auths": {
@@ -189,6 +233,40 @@ func TestValidateConfig(t *testing.T) {
 			},
 			warnings: []deprecation.Warning{deprecation.CRIRegistryConfigs},
 		},
+		"cgroup_writable enabled": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							CgroupWritable: true,
+						},
+					},
+				},
+			},
+			runtimeExpectedErr: func() string {
+				if !opts.IsCgroup2UnifiedMode() {
+					return "`cgroup_writable` is only supported on cgroup v2"
+				}
+				return ""
+			}(),
+			runtimeExpected: func() *RuntimeConfig {
+				if !opts.IsCgroup2UnifiedMode() {
+					return nil
+				}
+				return &RuntimeConfig{
+					ContainerdConfig: ContainerdConfig{
+						DefaultRuntimeName: RuntimeDefault,
+						Runtimes: map[string]Runtime{
+							RuntimeDefault: {
+								CgroupWritable: true,
+								Sandboxer:      string(ModePodSandbox),
+							},
+						},
+					},
+				}
+			}(),
+		},
 		"privileged_without_host_devices_all_devices_allowed without privileged_without_host_devices": {
 			runtimeConfig: &RuntimeConfig{
 				ContainerdConfig: ContainerdConfig{
@@ -224,6 +302,7 @@ func TestValidateConfig(t *testing.T) {
 			if test.runtimeConfig != nil {
 				w, err := ValidateRuntimeConfig(context.Background(), test.runtimeConfig)
 				if test.runtimeExpectedErr != "" {
+					assert.Error(t, err)
 					assert.Contains(t, err.Error(), test.runtimeExpectedErr)
 				} else {
 					assert.NoError(t, err)
@@ -299,7 +378,6 @@ func TestHostAccessingSandbox(t *testing.T) {
 		{"Security Context namespace host access", hostNamespace, true},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := hostAccessingSandbox(tt.config); got != tt.want {
 				t.Errorf("hostAccessingSandbox() = %v, want %v", got, tt.want)

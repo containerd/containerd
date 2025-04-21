@@ -13,7 +13,7 @@ on:
 name: Release
 
 env:
-  GO_VERSION: "1.23.4"
+  GO_VERSION: "1.23.8"
 
 permissions: # added using https://github.com/step-security/secure-workflows
   contents: read
@@ -57,32 +57,29 @@ jobs:
         working-directory: src/github.com/containerd/containerd
 
       - name: Save release notes
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: containerd-release-notes
           path: src/github.com/containerd/containerd/release-notes.md
 
   build:
     name: Build Release Binaries
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       matrix:
         include:
-          # Ubuntu 22.04 can't be used until we drop support for binary compatibility with dynamically-linked glibc 2.17 (CentOS 7).
-          # https://github.com/containerd/containerd/issues/7255
-          # https://github.com/containerd/containerd/issues/7961
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/amd64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/arm64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/ppc64le
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/s390x
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: linux/riscv64
-          - dockerfile-ubuntu: 20.04
+          - dockerfile-ubuntu: 22.04
             dockerfile-platform: windows/amd64
     steps:
       - name: Set RELEASE_VER
@@ -103,10 +100,10 @@ jobs:
           path: src/github.com/containerd/containerd
 
       - name: Setup buildx instance
-        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3.8.0
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
         with:
           use: true
-      - uses: crazy-max/ghaction-github-runtime@b3a9207c0e1ef41f4cf215303c976869d0c2c1c4 # v3.0.0
+      - uses: crazy-max/ghaction-github-runtime@3cb05d89e1f492524af3d41a1c98c83bc3025124 # v3.1.0
       - name: Make
         shell: bash
         run: |
@@ -127,7 +124,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.dockerfile-platform }}
       - name: Save Artifacts
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: release-tars-${{env.PLATFORM_CLEAN}}
           path: src/github.com/containerd/containerd/releases/*.tar.gz*
@@ -144,18 +141,18 @@ jobs:
     needs: [build, check]
     steps:
       - name: Download builds and release notes
-        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         with:
           path: builds
       - name: Attest Artifacts
         id: attest
-        uses: actions/attest-build-provenance@7668571508540a607bdfd90a87a560489fe372eb # v2.1.0
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           subject-path: ./builds/release-tars-**/*.tar.gz
       - name: Rename attestation artifact
         run: mv ${{ steps.attest.outputs.bundle-path }} containerd-${{ needs.check.outputs.stringver }}-attestation.intoto.jsonl
       - name: Create Release
-        uses: softprops/action-gh-release@01570a1f39cb168c169c802c3bceb9e93fb10974 # v2.1.0
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true

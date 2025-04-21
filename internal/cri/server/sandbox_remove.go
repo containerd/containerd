@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
@@ -44,6 +45,9 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 			r.GetPodSandboxId())
 		return &runtime.RemovePodSandboxResponse{}, nil
 	}
+
+	defer c.nri.BlockPluginSync().Unblock()
+
 	// Use the full sandbox id.
 	id := sandbox.ID
 	span.SetAttributes(tracing.Attribute("sandbox.id", id))
@@ -54,6 +58,12 @@ func (c *criService) RemovePodSandbox(ctx context.Context, r *runtime.RemovePodS
 	log.G(ctx).Infof("Forcibly stopping sandbox %q", id)
 	if err := c.stopPodSandbox(ctx, sandbox); err != nil {
 		return nil, fmt.Errorf("failed to forcibly stop sandbox %q: %w", id, err)
+	}
+
+	if err := c.client.LeasesService().Delete(ctx, leases.Lease{ID: id}); err != nil {
+		if !errdefs.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to delete lease for sandbox %q: %w", id, err)
+		}
 	}
 
 	// Return error if sandbox network namespace is not closed yet.

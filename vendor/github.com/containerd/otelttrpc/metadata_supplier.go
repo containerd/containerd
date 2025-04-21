@@ -70,6 +70,9 @@ func inject(ctx context.Context, propagators propagation.TextMapPropagator, req 
 	md, ok := ttrpc.GetMetadata(ctx)
 	if !ok {
 		md = make(ttrpc.MD)
+	} else {
+		// make a copy to avoid concurrent read/write panic
+		md = md.Clone()
 	}
 
 	propagators.Inject(ctx, &metadataSupplier{

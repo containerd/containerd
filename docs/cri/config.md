@@ -247,7 +247,9 @@ version = 3
             ShimCgroup = ''
 
     [plugins.'io.containerd.cri.v1.runtime'.cni]
-      bin_dir = '/opt/cni/bin'
+      # DEPRECATED, use `bin_dirs` instead (since containerd v2.1).
+      bin_dir = ''
+      bin_dirs = ['/opt/cni/bin']
       conf_dir = '/etc/cni/net.d'
       max_conf_num = 1
       setup_serially = false
@@ -474,6 +476,11 @@ version = 2
       # The default value is "io.containerd.runc.v2" since containerd 1.4.
       # The default value was "io.containerd.runc.v1" in containerd 1.3, "io.containerd.runtime.v1.linux" in prior releases.
       runtime_type = "io.containerd.runc.v2"
+
+      # runtime_path is an optional field that can be used to overwrite path to a shim runtime binary.
+      # When specified, containerd will ignore runtime name field when resolving shim location.
+      # Path must be abs.
+      runtime_path = ""
 
       # pod_annotations is a list of pod annotations passed to both pod
       # sandbox as well as container OCI annotations. Pod_annotations also

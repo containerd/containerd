@@ -55,7 +55,6 @@ func TestWaitSandboxStop(t *testing.T) {
 			expectErr: false,
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			c := newTestCRIService()
 			sandbox := sandboxstore.NewSandbox(

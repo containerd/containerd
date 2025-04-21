@@ -364,6 +364,6 @@ readiness_check() {
   done
   set -x
   cat "${report_dir}/containerd.log"
-  cat "${config_file}"
+  cat "${CONTAINERD_CONFIG_FILE}"
   set +x
 }

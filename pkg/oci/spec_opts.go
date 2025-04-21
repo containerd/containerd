@@ -22,24 +22,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 
+	"github.com/containerd/continuity/fs"
+	"github.com/containerd/platforms"
+	"github.com/moby/sys/user"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runtime-spec/specs-go"
+
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/continuity/fs"
-	"github.com/containerd/log"
-	"github.com/containerd/platforms"
-	"github.com/moby/sys/user"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
-	"tags.cncf.io/container-device-interface/pkg/cdi"
 )
 
 // SpecOpts sets spec specific information to a newly generated OCI spec
@@ -594,6 +594,20 @@ func WithUser(userstr string) SpecOpts {
 		defer ensureAdditionalGids(s)
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
+		// While the Linux kernel allows the max UID to be MaxUint32 - 2,
+		// and the OCI Runtime Spec has no definition about the max UID,
+		// the runc implementation is known to require the UID to be <= MaxInt32.
+		//
+		// containerd follows runc's limitation here.
+		//
+		// In future we may relax this limitation to allow MaxUint32 - 2,
+		// or, amend the OCI Runtime Spec to codify the implementation limitation.
+		const (
+			minUserID  = 0
+			maxUserID  = math.MaxInt32
+			minGroupID = 0
+			maxGroupID = math.MaxInt32
+		)
 
 		// For LCOW it's a bit harder to confirm that the user actually exists on the host as a rootfs isn't
 		// mounted on the host and shared into the guest, but rather the rootfs is constructed entirely in the
@@ -612,8 +626,8 @@ func WithUser(userstr string) SpecOpts {
 		switch len(parts) {
 		case 1:
 			v, err := strconv.Atoi(parts[0])
-			if err != nil {
-				// if we cannot parse as a uint they try to see if it is a username
+			if err != nil || v < minUserID || v > maxUserID {
+				// if we cannot parse as an int32 then try to see if it is a username
 				return WithUsername(userstr)(ctx, client, c, s)
 			}
 			return WithUserID(uint32(v))(ctx, client, c, s)
@@ -624,12 +638,13 @@ func WithUser(userstr string) SpecOpts {
 			)
 			var uid, gid uint32
 			v, err := strconv.Atoi(parts[0])
-			if err != nil {
+			if err != nil || v < minUserID || v > maxUserID {
 				username = parts[0]
 			} else {
 				uid = uint32(v)
 			}
-			if v, err = strconv.Atoi(parts[1]); err != nil {
+			v, err = strconv.Atoi(parts[1])
+			if err != nil || v < minGroupID || v > maxGroupID {
 				groupname = parts[1]
 			} else {
 				gid = uint32(v)
@@ -1640,34 +1655,6 @@ func WithWindowsNetworkNamespace(ns string) SpecOpts {
 			s.Windows.Network = &specs.WindowsNetwork{}
 		}
 		s.Windows.Network.NetworkNamespace = ns
-		return nil
-	}
-}
-
-// WithCDIDevices injects the requested CDI devices into the OCI specification.
-func WithCDIDevices(devices ...string) SpecOpts {
-	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
-		if len(devices) == 0 {
-			return nil
-		}
-
-		if err := cdi.Refresh(); err != nil {
-			// We don't consider registry refresh failure a fatal error.
-			// For instance, a dynamically generated invalid CDI Spec file for
-			// any particular vendor shouldn't prevent injection of devices of
-			// different vendors. CDI itself knows better and it will fail the
-			// injection if necessary.
-			log.G(ctx).Warnf("CDI registry refresh failed: %v", err)
-		}
-
-		if _, err := cdi.InjectDevices(s, devices...); err != nil {
-			return fmt.Errorf("CDI device injection failed: %w", err)
-		}
-
-		// One crucial thing to keep in mind is that CDI device injection
-		// might add OCI Spec environment variables, hooks, and mounts as
-		// well. Therefore it is important that none of the corresponding
-		// OCI Spec fields are reset up in the call stack once we return.
 		return nil
 	}
 }

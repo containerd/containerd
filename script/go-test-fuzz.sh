@@ -19,11 +19,17 @@
 # tests are not fundamentally broken.
 
 set -euo pipefail
+set -x
 
 fuzztime=30s
-pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*\/' | sort | uniq)
+# keep the filename and Fuzz function name so we can run every fuzz test
+# in a package separately (`go test -fuzz` only supports single fuzz function)
+pkgs=$(git grep 'func Fuzz.*testing\.F' | grep -o '.*testing\.F)' | grep -v -E "vendor" | sort | uniq)
 
+IFS=$'\n'
 for pkg in $pkgs
 do
-    go test -fuzz=. ./$pkg -fuzztime=$fuzztime
+    pkg_path=$(echo $pkg | grep -o '.*/')
+    fuzz_name=$(echo $pkg | grep -o 'Fuzz[^(]*')
+    go test -fuzz=$fuzz_name ./$pkg_path -fuzztime=$fuzztime
 done

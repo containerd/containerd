@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/typeurl/v2"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containerd/containerd/v2/core/leases"
 	sb "github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/annotations"
 	"github.com/containerd/containerd/v2/internal/cri/bandwidth"
@@ -87,6 +88,22 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}
 	}()
 
+	leaseSvc := c.client.LeasesService()
+	ls, lerr := leaseSvc.Create(ctx, leases.WithID(id))
+	if lerr != nil {
+		return nil, fmt.Errorf("failed to create lease for sandbox name %q: %w", name, lerr)
+	}
+	defer func() {
+		if retErr != nil {
+			deferCtx, deferCancel := util.DeferContext()
+			defer deferCancel()
+
+			if derr := leaseSvc.Delete(deferCtx, ls); derr != nil {
+				log.G(deferCtx).WithError(derr).Error("failed to delete lease during cleanup")
+			}
+		}
+	}()
+
 	var (
 		err         error
 		sandboxInfo = sb.Sandbox{ID: id}
@@ -131,6 +148,10 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		},
 	)
 	sandbox.Sandboxer = ociRuntime.Sandboxer
+
+	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+	}
 
 	if _, err := c.client.SandboxStore().Create(ctx, sandboxInfo); err != nil {
 		return nil, fmt.Errorf("failed to save sandbox metadata: %w", err)
@@ -202,13 +223,12 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 		}()
 
 		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-			return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
 		}
 		// Save sandbox metadata to store
 		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 		}
-
 		// Define this defer to teardownPodNetwork prior to the setupPodNetwork function call.
 		// This is because in setupPodNetwork the resource is allocated even if it returns error, unlike other resource
 		// creation functions.
@@ -242,15 +262,15 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 			return nil, fmt.Errorf("failed to setup network for sandbox %q: %w", id, err)
 		}
 		sandboxCreateNetworkTimer.UpdateSince(netStart)
-	}
 
-	if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
-		return nil, fmt.Errorf("unable to save sandbox %q to store: %w", id, err)
-	}
+		if err := sandboxInfo.AddExtension(podsandbox.MetadataKey, &sandbox.Metadata); err != nil {
+			return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		}
 
-	// Save sandbox metadata to store
-	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		// Save sandbox metadata to store
+		if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
+			return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
+		}
 	}
 
 	if err := c.sandboxService.CreateSandbox(ctx, sandboxInfo, sb.WithOptions(config), sb.WithNetNSPath(sandbox.NetNSPath)); err != nil {
@@ -281,7 +301,7 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	if sandboxInfo, err = c.client.SandboxStore().Update(ctx, sandboxInfo, "extensions"); err != nil {
-		return nil, fmt.Errorf("unable to update extensions for sandbox %q: %w", id, err)
+		return nil, fmt.Errorf("unable to save sandbox %q to sandbox store: %w", id, err)
 	}
 
 	// TODO: get rid of this. sandbox object should no longer have Container field.
@@ -299,6 +319,8 @@ func (c *criService) RunPodSandbox(ctx context.Context, r *runtime.RunPodSandbox
 	}
 
 	sandbox.ProcessLabel = labels["selinux_label"]
+
+	defer c.nri.BlockPluginSync().Unblock()
 
 	err = c.nri.RunPodSandbox(ctx, &sandbox)
 	if err != nil {

@@ -89,8 +89,23 @@ func NewWindowsDiff(store content.Store) (CompareApplier, error) {
 	}, nil
 }
 
-// applyDiffCommon is a common function that is called by both windows & cimfs differs.
-func applyDiffCommon(ctx context.Context, store content.Store, desc ocispec.Descriptor, layerPath string, parentLayerPaths []string, applyOpt archive.ApplyOpt, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+// Apply applies the content associated with the provided digests onto the
+// provided mounts. Archive content will be extracted and decompressed if
+// necessary.
+func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
+	layerPath, parentLayerPaths, err := mountsToLayerAndParents(mounts)
+	if err != nil {
+		return emptyDesc, err
+	}
+
+	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
+	// it currently cannot be disabled, unless we add ref counting. Since this is
+	// temporary, leaving it enabled is OK for now.
+	// https://github.com/containerd/containerd/issues/1681
+	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
+		return emptyDesc, err
+	}
+
 	t1 := time.Now()
 	defer func() {
 		if err == nil {
@@ -110,7 +125,7 @@ func applyDiffCommon(ctx context.Context, store content.Store, desc ocispec.Desc
 		}
 	}
 
-	ra, err := store.ReaderAt(ctx, desc)
+	ra, err := s.store.ReaderAt(ctx, desc)
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to get reader from content store: %w", err)
 	}
@@ -135,7 +150,7 @@ func applyDiffCommon(ctx context.Context, store content.Store, desc ocispec.Desc
 	archiveOpts := []archive.ApplyOpt{
 		archive.WithParents(parentLayerPaths),
 		archive.WithNoSameOwner(), // Lchown is not supported on Windows
-		applyOpt,
+		archive.AsWindowsContainerLayer(),
 	}
 
 	if _, err := archive.Apply(ctx, layerPath, rc, archiveOpts...); err != nil {
@@ -152,26 +167,7 @@ func applyDiffCommon(ctx context.Context, store content.Store, desc ocispec.Desc
 		Size:      rc.c,
 		Digest:    digester.Digest(),
 	}, nil
-}
 
-// Apply applies the content associated with the provided digests onto the
-// provided mounts. Archive content will be extracted and decompressed if
-// necessary.
-func (s windowsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []mount.Mount, opts ...diff.ApplyOpt) (d ocispec.Descriptor, err error) {
-	layer, parentLayerPaths, err := mountsToLayerAndParents(mounts)
-	if err != nil {
-		return emptyDesc, err
-	}
-
-	// TODO darrenstahlmsft: When this is done isolated, we should disable these.
-	// it currently cannot be disabled, unless we add ref counting. Since this is
-	// temporary, leaving it enabled is OK for now.
-	// https://github.com/containerd/containerd/issues/1681
-	if err := winio.EnableProcessPrivileges([]string{winio.SeBackupPrivilege, winio.SeRestorePrivilege}); err != nil {
-		return emptyDesc, err
-	}
-
-	return applyDiffCommon(ctx, s.store, desc, layer, parentLayerPaths, archive.AsWindowsContainerLayer(), opts...)
 }
 
 // Compare creates a diff between the given mounts and uploads the result

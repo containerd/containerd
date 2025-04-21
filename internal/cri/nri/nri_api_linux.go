@@ -358,6 +358,15 @@ func (a *API) WithContainerExit(criCtr *cstore.Container) containerd.ProcessDele
 	}
 }
 
+type PluginSyncBlock = nri.PluginSyncBlock
+
+func (a *API) BlockPluginSync() *PluginSyncBlock {
+	if a.IsDisabled() {
+		return nil
+	}
+	return a.nri.BlockPluginSync()
+}
+
 //
 // NRI-CRI 'domain' interface
 //
@@ -394,7 +403,6 @@ func (a *API) ListContainers() []nri.Container {
 		case cri.ContainerState_CONTAINER_UNKNOWN:
 			continue
 		}
-		ctr := ctr
 		containers = append(containers, a.nriContainer(&ctr, nil))
 	}
 	return containers
@@ -482,6 +490,11 @@ func (a *API) nriPodSandbox(pod *sstore.Sandbox) *criPodSandbox {
 		if !errdefs.IsNotFound(err) {
 			log.L.WithError(err).Errorf("failed to get task for sandbox container %s",
 				pod.Container.ID())
+		}
+		// the containers no longer exist but the oci.Spec may still be available to use on the StopPodSandbox hook
+		spec, err := pod.Container.Spec(ctx)
+		if err == nil {
+			criPod.spec = spec
 		}
 		return criPod
 	}

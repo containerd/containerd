@@ -35,7 +35,8 @@ type CimFsWriter struct {
 }
 
 // Create creates a new cim image. The CimFsWriter returned can then be used to do
-// operations on this cim.
+// operations on this cim.  If `oldFSName` is provided the new image is "forked" from the
+// CIM with name `oldFSName` located under `imagePath`.
 func Create(imagePath string, oldFSName string, newFSName string) (_ *CimFsWriter, err error) {
 	var oldNameBytes *uint16
 	// CimCreateImage API call has different behavior if the value of oldNameBytes / newNameBytes
@@ -60,6 +61,41 @@ func Create(imagePath string, oldFSName string, newFSName string) (_ *CimFsWrite
 		return nil, fmt.Errorf("failed to create cim image at path %s, oldName: %s, newName: %s: %w", imagePath, oldFSName, newFSName, err)
 	}
 	return &CimFsWriter{handle: handle, name: filepath.Join(imagePath, fsName)}, nil
+}
+
+// Create creates a new block CIM and opens it for writing. The CimFsWriter
+// returned can then be used to add/remove files to/from this CIM.
+func CreateBlockCIM(blockPath, name string, blockType BlockCIMType) (_ *CimFsWriter, err error) {
+	if !IsBlockCimSupported() {
+		return nil, fmt.Errorf("block CIM not supported on this OS version")
+	}
+	if blockPath == "" || name == "" {
+		return nil, fmt.Errorf("both blockPath & name must be non empty: %w", os.ErrInvalid)
+	}
+
+	// When creating block CIMs we always want them to be consistent CIMs i.e a CIMs
+	// created from the same layer tar will always be identical.
+	var createFlags uint32 = CimCreateFlagConsistentCim
+	switch blockType {
+	case BlockCIMTypeDevice:
+		createFlags |= CimCreateFlagBlockDeviceCim
+	case BlockCIMTypeSingleFile:
+		createFlags |= CimCreateFlagSingleFileCim
+	default:
+		return nil, fmt.Errorf("invalid block CIM type `%d`: %w", blockType, os.ErrInvalid)
+	}
+
+	var newNameUTF16 *uint16
+	newNameUTF16, err = windows.UTF16PtrFromString(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var handle winapi.FsHandle
+	if err := winapi.CimCreateImage2(blockPath, createFlags, nil, newNameUTF16, &handle); err != nil {
+		return nil, fmt.Errorf("failed to create block CIM at path %s,%s: %w", blockPath, name, err)
+	}
+	return &CimFsWriter{handle: handle, name: name}, nil
 }
 
 // CreateAlternateStream creates alternate stream of given size at the given path inside the cim. This will
@@ -160,7 +196,7 @@ func (c *CimFsWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// AddLink adds a hard link from `oldPath` to `newPath` in the image.
+// AddLink adds a hard link at `newPath` that points to `oldPath`.
 func (c *CimFsWriter) AddLink(oldPath string, newPath string) error {
 	err := c.closeStream()
 	if err != nil {
@@ -173,21 +209,41 @@ func (c *CimFsWriter) AddLink(oldPath string, newPath string) error {
 	return err
 }
 
-// Unlink deletes the file at `path` from the image.
+// AddMergedLink adds a hard link at `newPath` that points to `oldPath` in the
+// image. However unlike AddLink this link is resolved at merge time. This allows us to
+// create links to files that are in other CIMs.
+func (c *CimFsWriter) AddMergedLink(oldPath string, newPath string) error {
+	err := c.closeStream()
+	if err != nil {
+		return err
+	}
+	err = winapi.CimCreateMergeLink(c.handle, newPath, oldPath)
+	if err != nil {
+		err = &LinkError{Cim: c.name, Op: "addMergedLink", Old: oldPath, New: newPath, Err: err}
+	}
+	return err
+}
+
+// Unlink deletes the file at `path` from the image. Note that the file MUST have been
+// already added to the image.
 func (c *CimFsWriter) Unlink(path string) error {
 	err := c.closeStream()
 	if err != nil {
 		return err
 	}
-	//TODO(ambarve): CimDeletePath currently returns an error if the file isn't found but we ideally want
-	// to put a tombstone at that path so that when cims are merged it removes that file from the lower
-	// layer
-	err = winapi.CimDeletePath(c.handle, path)
-	if err != nil && !os.IsNotExist(err) {
-		err = &PathError{Cim: c.name, Op: "unlink", Path: path, Err: err}
+	return winapi.CimDeletePath(c.handle, path)
+}
+
+// Adds a tombstone at given path. This ensures that when the the CIMs are merged, the
+// file at this path from lower layers won't show up in a mounted CIM. In case of Unlink,
+// the file from the lower layers still shows up after merge.
+func (c *CimFsWriter) AddTombstone(path string) error {
+	err := c.closeStream()
+	if err != nil {
 		return err
 	}
-	return nil
+
+	return winapi.CimTombstoneFile(c.handle, path)
 }
 
 func (c *CimFsWriter) commit() error {
@@ -203,22 +259,22 @@ func (c *CimFsWriter) commit() error {
 }
 
 // Close closes the CimFS filesystem.
-func (c *CimFsWriter) Close() error {
+func (c *CimFsWriter) Close() (err error) {
 	if c.handle == 0 {
 		return fmt.Errorf("invalid writer")
 	}
-	if err := c.commit(); err != nil {
+	if err = c.commit(); err != nil {
 		return &OpError{Cim: c.name, Op: "commit", Err: err}
 	}
-	if err := winapi.CimCloseImage(c.handle); err != nil {
-		return &OpError{Cim: c.name, Op: "close", Err: err}
-	}
+	err = winapi.CimCloseImage(c.handle)
 	c.handle = 0
-	return nil
+	return err
 }
 
-// DestroyCim finds out the region files, object files of this cim and then delete
-// the region files, object files and the <layer-id>.cim file itself.
+// DestroyCim finds out the region files, object files of this cim and then delete the
+// region files, object files and the <layer-id>.cim file itself.  Note that any other
+// CIMs that were forked off of this CIM would become unusable after this operation.  This
+// should not be used for block CIMs, os.Remove is sufficient for block CIMs.
 func DestroyCim(ctx context.Context, cimPath string) (retErr error) {
 	regionFilePaths, err := getRegionFilePaths(ctx, cimPath)
 	if err != nil {
@@ -288,4 +344,54 @@ func GetCimUsage(ctx context.Context, cimPath string) (uint64, error) {
 		totalUsage += uint64(fi.Size())
 	}
 	return totalUsage, nil
+}
+
+// MergeBlockCIMs creates a new merged BlockCIM from the provided source BlockCIMs.  CIM
+// at index 0 is considered to be topmost CIM and the CIM at index `length-1` is
+// considered the base CIM. (i.e file with the same path in CIM at index 0 will shadow
+// files with the same path at all other CIMs) When mounting this merged CIM the source
+// CIMs MUST be provided in the exact same order.
+func MergeBlockCIMs(mergedCIM *BlockCIM, sourceCIMs []*BlockCIM) (err error) {
+	if !IsMergedCimSupported() {
+		return fmt.Errorf("merged CIMs aren't supported on this OS version")
+	} else if len(sourceCIMs) < 2 {
+		return fmt.Errorf("need at least 2 source CIMs, got %d: %w", len(sourceCIMs), os.ErrInvalid)
+	}
+
+	var mergeFlag uint32
+	switch mergedCIM.Type {
+	case BlockCIMTypeDevice:
+		mergeFlag = CimMergeFlagBlockDevice
+	case BlockCIMTypeSingleFile:
+		mergeFlag = CimMergeFlagSingleFile
+	default:
+		return fmt.Errorf("invalid block CIM type `%d`: %w", mergedCIM.Type, os.ErrInvalid)
+	}
+
+	for _, sCIM := range sourceCIMs {
+		if sCIM.Type != mergedCIM.Type {
+			return fmt.Errorf("source CIM (%s) type doesn't match with merged CIM type: %w", sCIM.String(), os.ErrInvalid)
+		}
+	}
+
+	cim, err := CreateBlockCIM(mergedCIM.BlockPath, mergedCIM.CimName, mergedCIM.Type)
+	if err != nil {
+		return fmt.Errorf("create merged CIM: %w", err)
+	}
+	defer func() {
+		cErr := cim.Close()
+		if err == nil {
+			err = cErr
+		}
+	}()
+
+	// CimAddFsToMergedImage expects that topmost CIM is added first and the bottom
+	// most CIM is added last.
+	for _, sCIM := range sourceCIMs {
+		fullPath := filepath.Join(sCIM.BlockPath, sCIM.CimName)
+		if err := winapi.CimAddFsToMergedImage2(cim.handle, fullPath, mergeFlag); err != nil {
+			return fmt.Errorf("add cim to merged image: %w", err)
+		}
+	}
+	return nil
 }

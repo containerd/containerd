@@ -537,3 +537,10 @@ It works with standard protobufs and GRPC services as well as generating clients
 The only difference between grpc and ttrpc is the wire protocol.
 ttrpc removes the http stack in order to save memory and binary size to keep shims small.
 It is recommended to use ttrpc in your shim but grpc support is currently an experimental feature.
+
+#### containerd-shim-runc-v2 as sub-reaper
+The shim process takes responsibility as a sub-reaper to cleanup exited containers or setns(2) processes.
+When container is running in new PID namespace, the container should cleanup orphaned processes before it exits.
+If container uses the same PID namespace with shim process, its descendant processes will be reparented to shim process. The shim process will reap them when they exit.
+However, [\[PATCH\] exit: fix the setns() && PR_SET_CHILD_SUBREAPER interaction](https://lore.kernel.org/all/20170130181735.GA11285@redhat.com/#r) prevents any cross-namespace reparenting in kernel. Assume that container is in X-namespace and P in root-namespace setns into X-namespace. P forks child C. The child C forks a grandchild G and exits. The G will be reparented to X instead of P's reaper.
+If the PID namespace is different from shim process, the container init process should cleanup any orphaned reparented processes created by setns process (exec operation).

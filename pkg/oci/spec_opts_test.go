@@ -587,7 +587,6 @@ func TestDevShmSize(t *testing.T) {
 
 	expected := "1024k"
 	for _, s := range ss {
-		s := s
 		if err := WithDevShmSize(1024)(nil, nil, nil, &s); err != nil {
 			if err != ErrNoShmMount {
 				t.Fatal(err)

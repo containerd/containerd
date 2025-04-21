@@ -710,6 +710,9 @@ type mockPlugin struct {
 	namespace           string
 	logf                func(string, ...interface{})
 	synchronize         func(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error)
+	runPodSandbox       func(*mockPlugin, *api.PodSandbox) error
+	stopPodSandbox      func(*mockPlugin, *api.PodSandbox) error
+	removePodSandbox    func(*mockPlugin, *api.PodSandbox) error
 	createContainer     func(*mockPlugin, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error)
 	postCreateContainer func(*mockPlugin, *api.PodSandbox, *api.Container)
 	updateContainer     func(*mockPlugin, *api.PodSandbox, *api.Container) ([]*api.ContainerUpdate, error)
@@ -761,6 +764,15 @@ func (m *mockPlugin) Start() error {
 
 	if m.synchronize == nil {
 		m.synchronize = nopSynchronize
+	}
+	if m.runPodSandbox == nil {
+		m.runPodSandbox = nopRunPodSandbox
+	}
+	if m.stopPodSandbox == nil {
+		m.stopPodSandbox = nopStopPodSandbox
+	}
+	if m.removePodSandbox == nil {
+		m.removePodSandbox = nopRemovePodSandbox
 	}
 	if m.createContainer == nil {
 		m.createContainer = nopCreateContainer
@@ -845,7 +857,7 @@ func (m *mockPlugin) RunPodSandbox(ctx context.Context, pod *api.PodSandbox) err
 	m.Log("RunPodSandbox %s/%s", pod.Namespace, pod.Name)
 	m.pods[pod.Id] = pod
 	m.q.Add(PodSandboxEvent(pod, RunPodSandbox))
-	return nil
+	return m.runPodSandbox(m, pod)
 }
 
 func (m *mockPlugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) error {
@@ -856,7 +868,7 @@ func (m *mockPlugin) StopPodSandbox(ctx context.Context, pod *api.PodSandbox) er
 	m.Log("StopPodSandbox %s/%s", pod.Namespace, pod.Name)
 	m.pods[pod.Id] = pod
 	m.q.Add(PodSandboxEvent(pod, StopPodSandbox))
-	return nil
+	return m.stopPodSandbox(m, pod)
 }
 
 func (m *mockPlugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) error {
@@ -867,7 +879,7 @@ func (m *mockPlugin) RemovePodSandbox(ctx context.Context, pod *api.PodSandbox) 
 	m.Log("RemovePodSandbox %s/%s", pod.Namespace, pod.Name)
 	delete(m.pods, pod.Id)
 	m.q.Add(PodSandboxEvent(pod, RemovePodSandbox))
-	return nil
+	return m.removePodSandbox(m, pod)
 }
 
 func (m *mockPlugin) CreateContainer(ctx context.Context, pod *api.PodSandbox, ctr *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {
@@ -976,6 +988,18 @@ func (m *mockPlugin) Wait(e *Event, deadline <-chan time.Time) error {
 
 func nopSynchronize(*mockPlugin, []*api.PodSandbox, []*api.Container) ([]*api.ContainerUpdate, error) {
 	return nil, nil
+}
+
+func nopRunPodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
+func nopStopPodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
+}
+
+func nopRemovePodSandbox(*mockPlugin, *api.PodSandbox) error {
+	return nil
 }
 
 func nopCreateContainer(*mockPlugin, *api.PodSandbox, *api.Container) (*api.ContainerAdjustment, []*api.ContainerUpdate, error) {

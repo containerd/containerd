@@ -81,6 +81,8 @@ func ctrdPreviousMajorMinor(t *testing.T) string {
 
 	version := semver.MajorMinor(currentVer)
 	switch version {
+	case "v2.1":
+		return "v2.0"
 	case "v2.0":
 		return "v1.7"
 	case "v1.7":

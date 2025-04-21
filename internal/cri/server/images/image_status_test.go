@@ -112,7 +112,6 @@ func TestGetUserFromImage(t *testing.T) {
 			name: "test",
 		},
 	} {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			actualUID, actualName := getUserFromImage(test.user)
 			assert.Equal(t, test.uid, actualUID)
