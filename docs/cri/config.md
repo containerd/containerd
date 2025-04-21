@@ -159,6 +159,62 @@ spec:
 
 See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
 
+
+## Image Pull Configuration (since containerd v2.1)
+
+### Transfer Service for Image Pull
+
+Starting with containerd v2.1, the CRI plugin uses containerd's Transfer Service for image pull by default, instead of client-based pull.
+
+To configure Transfer Service, use the following settings in your config.toml:
+
+```toml
+[plugins.'io.containerd.transfer.v1.local']
+  # Transfer service specific configurations
+  max_concurrent_downloads = 3
+  unpack_config = { ... }
+```
+
+### Local Pull Mode
+
+If you prefer to use the client-based pull method instead of the Transfer Service, you can set `use_local_image_pull = true` in your CRI image configuration:
+
+```toml
+[plugins.'io.containerd.cri.v1.images']
+  use_local_image_pull = true
+```
+
+### Configuration differences and automatic fallback to Local Mode
+
+There are some differences in how image pull configurations are specified between the Transfer Service and Local Pull mode:
+
+| CRI Image Config Option | Local Pull | Transfer Service Pull |
+|------------------------|------------|---------------------|
+| Snapshotter | ✅ Supported | ✅ Supported |
+| DisableSnapshotAnnotations | ✅ Supported | ⚠️ Must be configured in snapshotter plugin:<br>`[proxy_plugins.stargz.exports]`<br>`enable_remote_snapshot_annotations = "true"` |
+| ImagePullProgressTimeout | ✅ Supported | ✅ Supported |
+| DiscardUnpackedLayers | ✅ Supported | ❌ Not Supported |
+| PinnedImages | ✅ Supported | ✅ Supported |
+| Registry Settings | ✅ All supported | ⚠️ Only ConfigPath and Headers supported<br>(Mirrors, Configs, Auths not supported, also deprecated) |
+| ImageDecryption | ❌ Disabled | ❌ Disabled |
+| MaxConcurrentDownloads | ✅ Uses CRI Image config | ⚠️ Must be configured in transfer service plugin: `plugins."io.containerd.transfer.v1.local"` |
+| ImagePullWithSyncFs | ✅ Supported | ❌ Not Supported |
+| StatsCollectPeriod | ✅ Supported | ✅ Supported |
+
+To ensure compatibility, ***containerd 2.1 automatically detects configuration conflicts and falls back to local image pull mode when necessary***.
+
+If you have any of the following configurations in your CRI image config, containerd will automatically set `use_local_image_pull = true` and log a warning:
+
+- `DisableSnapshotAnnotations = false`
+- `DiscardUnpackedLayers = true`
+- `Registry.Mirrors` is configured
+- `Registry.Configs` is configured
+- `Registry.Auths` is configured
+- `MaxConcurrentDownloads != 3`
+- `ImagePullWithSyncFs = true`
+
+The warning message will indicate which configuration option triggered the fallback and provide guidance on how to properly configure the option when using the Transfer Service.
+
 ## Full configuration
 The explanation and default value of each configuration item are as follows:
 + In containerd 2.x
