@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019]
 
     steps:
       - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -71,7 +71,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     defaults:
@@ -105,7 +105,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -119,7 +119,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -191,7 +191,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
         go-version: ["1.23.7", "1.24.1"]
     steps:
       - uses: actions/checkout@v4
@@ -387,21 +387,10 @@ jobs:
       fail-fast: false
       matrix:
         runtime:
-          - io.containerd.runtime.v1.linux
-          - io.containerd.runc.v1
           - io.containerd.runc.v2
         runc: [runc, crun]
         enable_cri_sandboxes: ["", "sandboxed"]
-        os: [ubuntu-20.04, ubuntu-24.04-arm]
-        exclude:
-          - runtime: io.containerd.runc.v1
-            runc: crun
-          - runtime: io.containerd.runtime.v1.linux
-            runc: crun
-          - runtime: io.containerd.runc.v1
-            os: ubuntu-24.04-arm
-          - runtime: io.containerd.runtime.v1.linux
-            os: ubuntu-24.04-arm
+        os: [ubuntu-24.04, ubuntu-24.04-arm]
 
     env:
       GOTEST: gotestsum --
@@ -422,6 +411,7 @@ jobs:
           script/setup/install-failpoint-binaries
 
       - name: Install criu
+        if: matrix.os != 'ubuntu-24.04-arm'
         run: |
           sudo add-apt-repository -y ppa:criu/ppa
           sudo apt-get update
@@ -497,7 +487,12 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           ENABLE_CRI_SANDBOXES: ${{ matrix.enable_cri_sandboxes }}
         run: |
-          sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
+          # skipping the ipv6 test till https://github.com/actions/runner-images/issues/11985 is fixed
+          if [[ ${{matrix.os}} == "ubuntu-22.04" ]]; then
+            skip_test="runtime should support port mapping with host port and container port"
+          fi
+          env
+          sudo -E PATH=$PATH SKIP_TEST="$skip_test" ./script/critest.sh "${{github.workspace}}/report"
 
       # Log the status of this VM to investigate issues like
       # https://github.com/containerd/containerd/issues/4969

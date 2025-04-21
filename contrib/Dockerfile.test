@@ -118,7 +118,8 @@ ENTRYPOINT ["/docker-entrypoint.sh"]
 # Skip "runtime should support unsafe sysctls": `container init caused:  write sysctl key fs.mqueue.msg_max: open /proc/sys/fs/mqueue/msg_max: permission denied`
 # Skip "runtime should support safe sysctls": `container init caused: write sysctl key kernel.shm_rmid_forced: open /proc/sys/kernel/shm_rmid_forced: permission denied`
 # Skip "should allow privilege escalation when (NoNewPrivis is) false": expected log "Effective uid: 0\n" (stream="stdout") not found in logs [{timestamp:{wall:974487519 ext:63761339984 loc:<nil>} stream:stdout log:Effective uid: 1000) }]
-CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false"]
+# Skip "runtime should support port mapping with host port and container port": See https://github.com/containerd/containerd/pull/11707 for context.
+CMD ["critest", "--ginkgo.skip=should support unsafe sysctls|should support safe sysctls|should allow privilege escalation when false|runtime should support port mapping with host port and container port"]
 
 # Install proto3
 FROM golang AS proto3
