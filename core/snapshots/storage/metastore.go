@@ -58,6 +58,9 @@ type Snapshot struct {
 	ParentIDs []string
 }
 
+// Opt allows to customize BoltDB options. Use with care.
+type Opt func(*bolt.Options) error
+
 // MetaStore is used to store metadata related to a snapshot driver. The
 // MetaStore is intended to store metadata related to name, state and
 // parentage. Using the MetaStore is not required to implement a snapshot
@@ -66,18 +69,28 @@ type Snapshot struct {
 type MetaStore struct {
 	dbfile string
 
-	dbL sync.Mutex
-	db  *bolt.DB
+	dbL  sync.Mutex
+	db   *bolt.DB
+	opts bolt.Options
 }
 
 // NewMetaStore returns a snapshot MetaStore for storage of metadata related to
 // a snapshot driver backed by a bolt file database. This implementation is
 // strongly consistent and does all metadata changes in a transaction to prevent
 // against process crashes causing inconsistent metadata state.
-func NewMetaStore(dbfile string) (*MetaStore, error) {
-	return &MetaStore{
+func NewMetaStore(dbfile string, opts ...Opt) (*MetaStore, error) {
+	store := &MetaStore{
 		dbfile: dbfile,
-	}, nil
+		opts:   *bolt.DefaultOptions,
+	}
+
+	for _, f := range opts {
+		if err := f(&store.opts); err != nil {
+			return nil, err
+		}
+	}
+
+	return store, nil
 }
 
 type transactionKey struct{}
@@ -87,7 +100,7 @@ type transactionKey struct{}
 func (ms *MetaStore) TransactionContext(ctx context.Context, writable bool) (context.Context, Transactor, error) {
 	ms.dbL.Lock()
 	if ms.db == nil {
-		db, err := bolt.Open(ms.dbfile, 0600, nil)
+		db, err := bolt.Open(ms.dbfile, 0600, &ms.opts)
 		if err != nil {
 			ms.dbL.Unlock()
 			return ctx, nil, fmt.Errorf("failed to open database file: %w", err)

@@ -63,6 +63,15 @@ type BoltConfig struct {
 	// bandwidth across namespaces, at the cost of allowing access to any blob
 	// just by knowing its digest.
 	ContentSharingPolicy string `toml:"content_sharing_policy"`
+
+	// NoSync enables optimizations that improve database write performance by:
+	// 1. Disabling fsync calls after every write, which prevents ensuring that data is immediately flushed
+	//    to disk but significantly improves write throughput (NoSync).
+	// 2. Preventing automatic growth of the memory-mapped file during writes, further improving performance
+	//    in environments where the database size is stable (NoGrowSync).
+	//
+	// These settings can improve performance, but introduce a risk of data loss during crashes. Use with care!
+	NoSync bool `toml:"no_sync"`
 }
 
 const (
@@ -93,6 +102,7 @@ func init() {
 		},
 		Config: &BoltConfig{
 			ContentSharingPolicy: SharingPolicyShared,
+			NoSync:               false,
 		},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
 			root := ic.Properties[plugins.PropertyRootDir]
@@ -119,6 +129,15 @@ func init() {
 				return nil, err
 			}
 
+			options := *bolt.DefaultOptions
+			// Reading bbolt's freelist sometimes fails when the file has a data corruption.
+			// Disabling freelist sync reduces the chance of the breakage.
+			// https://github.com/etcd-io/bbolt/pull/1
+			// https://github.com/etcd-io/bbolt/pull/6
+			options.NoFreelistSync = true
+			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
+			options.Timeout = timeout.Get(boltOpenTimeout)
+
 			shared := true
 			ic.Meta.Exports["policy"] = SharingPolicyShared
 			if cfg, ok := ic.Config.(*BoltConfig); ok {
@@ -132,20 +151,18 @@ func init() {
 					}
 
 					log.G(ic.Context).WithField("policy", cfg.ContentSharingPolicy).Info("metadata content store policy set")
+
+					if cfg.NoSync {
+						options.NoSync = true
+						options.NoGrowSync = true
+
+						log.G(ic.Context).Warn("using async mode for boltdb")
+					}
 				}
 			}
 
 			path := filepath.Join(root, "meta.db")
 			ic.Meta.Exports["path"] = path
-
-			options := *bolt.DefaultOptions
-			// Reading bbolt's freelist sometimes fails when the file has a data corruption.
-			// Disabling freelist sync reduces the chance of the breakage.
-			// https://github.com/etcd-io/bbolt/pull/1
-			// https://github.com/etcd-io/bbolt/pull/6
-			options.NoFreelistSync = true
-			// Without the timeout, bbolt.Open would block indefinitely due to flock(2).
-			options.Timeout = timeout.Get(boltOpenTimeout)
 
 			doneCh := make(chan struct{})
 			go func() {
@@ -158,6 +175,7 @@ func init() {
 					return
 				}
 			}()
+
 			db, err := bolt.Open(path, 0644, &options)
 			close(doneCh)
 			if err != nil {
