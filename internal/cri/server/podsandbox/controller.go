@@ -47,7 +47,7 @@ import (
 func init() {
 	registry.Register(&plugin.Registration{
 		Type: plugins.PodSandboxPlugin,
-		ID:   "podsandbox",
+		ID:   types.InternalSandboxID,
 		Requires: []plugin.Type{
 			plugins.EventPlugin,
 			plugins.LeasePlugin,
