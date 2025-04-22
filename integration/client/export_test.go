@@ -250,7 +250,7 @@ func TestExportAllCases(t *testing.T) {
 
 			img := tc.prepare(ctx, t, client)
 
-			dstFile, err := os.CreateTemp("", "export-test")
+			dstFile, err := os.CreateTemp(t.TempDir(), "export-test")
 			if err != nil {
 				t.Fatal(err)
 			}

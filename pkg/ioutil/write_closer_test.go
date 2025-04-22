@@ -68,7 +68,7 @@ func TestSerialWriteCloser(t *testing.T) {
 			testData[i] = []byte(repeatNumber(i, dataLen) + "\n")
 		}
 
-		f, err := os.CreateTemp("", "serial-write-closer")
+		f, err := os.CreateTemp(t.TempDir(), "serial-write-closer")
 		require.NoError(t, err)
 		defer os.RemoveAll(f.Name())
 		defer f.Close()

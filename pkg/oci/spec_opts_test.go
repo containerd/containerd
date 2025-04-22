@@ -320,7 +320,7 @@ func TestWithSpecFromFile(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	fp, err := os.CreateTemp("", "testwithdefaultspec.json")
+	fp, err := os.CreateTemp(t.TempDir(), "testwithdefaultspec.json")
 	if err != nil {
 		t.Fatal(err)
 	}

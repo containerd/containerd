@@ -10,7 +10,7 @@ linters:
     - nolintlint
     - revive
     - staticcheck
-    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
+    - usetesting # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
     - unused
     - govet
@@ -69,6 +69,8 @@ linters-settings:
         deny:
           - pkg: github.com/opencontainers/runc
             desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+  usetesting:
+    os-mkdir-temp: false
 
   gosec:
     # The following issues surfaced when `gosec` linter

@@ -33,7 +33,7 @@ func TestLoadConfig(t *testing.T) {
 		BaseImageSize: "128Mb",
 	}
 
-	file, err := os.CreateTemp("", "devmapper-config-")
+	file, err := os.CreateTemp(t.TempDir(), "devmapper-config-")
 	assert.NoError(t, err)
 
 	encoder := toml.NewEncoder(file)

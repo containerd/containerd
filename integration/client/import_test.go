@@ -84,7 +84,7 @@ func testExportImport(t *testing.T, imageName string) {
 		t.Fatal(err)
 	}
 
-	dstFile, err := os.CreateTemp("", "export-import-test")
+	dstFile, err := os.CreateTemp(t.TempDir(), "export-import-test")
 	if err != nil {
 		t.Fatal(err)
 	}
