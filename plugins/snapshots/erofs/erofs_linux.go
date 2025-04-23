@@ -43,6 +43,8 @@ type SnapshotterConfig struct {
 	ovlOptions []string
 	// enableFsverity enables fsverity for EROFS layers
 	enableFsverity bool
+	// enableDmverity enables dmverity for EROFS layers
+	enableDmverity bool
 }
 
 // Opt is an option to configure the erofs snapshotter
@@ -62,6 +64,13 @@ func WithFsverity() Opt {
 	}
 }
 
+// WithDmverity enables dmverity for EROFS layers
+func WithDmverity() Opt {
+	return func(config *SnapshotterConfig) {
+		config.enableDmverity = true
+	}
+}
+
 type MetaStore interface {
 	TransactionContext(ctx context.Context, writable bool) (context.Context, storage.Transactor, error)
 	WithTransaction(ctx context.Context, writable bool, fn storage.TransactionCallback) error
@@ -73,6 +82,7 @@ type snapshotter struct {
 	ms             *storage.MetaStore
 	ovlOptions     []string
 	enableFsverity bool
+	enableDmverity bool
 }
 
 // check if EROFS kernel filesystem is registered or not
@@ -145,6 +155,7 @@ func NewSnapshotter(root string, opts ...Opt) (snapshots.Snapshotter, error) {
 		ms:             ms,
 		ovlOptions:     config.ovlOptions,
 		enableFsverity: config.enableFsverity,
+		enableDmverity: config.enableDmverity,
 	}, nil
 }
 

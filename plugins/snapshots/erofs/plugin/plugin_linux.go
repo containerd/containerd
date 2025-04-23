@@ -36,6 +36,9 @@ type Config struct {
 
 	// EnableFsverity enables fsverity for EROFS layers
 	EnableFsverity bool `toml:"enable_fsverity"`
+
+	// EnableDmverity enables dmverity for EROFS layers
+	EnableDmverity bool `toml:"enable_dmverity"`
 }
 
 func init() {
@@ -63,6 +66,10 @@ func init() {
 
 			if config.EnableFsverity {
 				opts = append(opts, erofs.WithFsverity())
+			}
+
+			if config.EnableDmverity {
+				opts = append(opts, erofs.WithDmverity())
 			}
 
 			ic.Meta.Exports[plugins.SnapshotterRootDir] = root
