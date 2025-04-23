@@ -79,6 +79,14 @@ type Platform struct {
 
 	Applier   diff.Applier
 	ApplyOpts []diff.ApplyOpt
+
+	// ConfigType is the supported config type to be considered for unpacking
+	// Defaults to OCI image config
+	ConfigType string
+
+	// LayerTypes are the supported types to be considered layers
+	// Defaults to OCI image layers
+	LayerTypes []string
 }
 
 type UnpackerOpt func(*unpackerConfig) error
@@ -165,6 +173,26 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 		lock   sync.Mutex
 		layers = map[digest.Digest][]ocispec.Descriptor{}
 	)
+
+	var layerTypes map[string]bool
+	var configTypes map[string]bool
+	for _, p := range u.platforms {
+		if p.ConfigType != "" {
+			if configTypes == nil {
+				configTypes = make(map[string]bool)
+			}
+			configTypes[p.ConfigType] = true
+		}
+		if len(p.LayerTypes) > 0 {
+			if layerTypes == nil {
+				layerTypes = make(map[string]bool)
+			}
+			for _, t := range p.LayerTypes {
+				layerTypes[t] = true
+			}
+		}
+	}
+
 	return images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 		ctx, span := tracing.StartSpan(ctx, tracing.Name(unpackSpanPrefix, "UnpackHandler"))
 		defer span.End()
@@ -190,7 +218,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 				span.SetAttributes(
 					tracing.Attribute("descriptor.child."+strconv.Itoa(i), []string{child.MediaType, child.Digest.String()}),
 				)
-				if images.IsLayerType(child.MediaType) {
+				if images.IsLayerType(child.MediaType) || layerTypes[child.MediaType] {
 					manifestLayers = append(manifestLayers, child)
 				} else {
 					nonLayers = append(nonLayers, child)
@@ -204,7 +232,7 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			lock.Unlock()
 
 			children = nonLayers
-		} else if images.IsConfigType(desc.MediaType) {
+		} else if images.IsConfigType(desc.MediaType) || configTypes[desc.MediaType] {
 			lock.Lock()
 			l := layers[desc.Digest]
 			lock.Unlock()
@@ -268,6 +296,13 @@ func (u *Unpacker) unpack(
 
 	imgPlatform := platforms.Normalize(i.Platform)
 	for _, up := range u.platforms {
+		if up.ConfigType != "" && up.ConfigType != config.MediaType {
+			continue
+		}
+		// "layers" is only supported rootfs value for OCI images
+		if (up.ConfigType == "" || images.IsConfigType(up.ConfigType)) && i.RootFS.Type != "" && i.RootFS.Type != "layers" {
+			continue
+		}
 		if up.Platform.Match(imgPlatform) {
 			unpack = up
 			break
