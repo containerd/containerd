@@ -22,8 +22,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/containerd/continuity/fs"
@@ -61,6 +63,24 @@ func NewErofsDiffer(store content.Store, mkfsExtraOpts []string) differ {
 		store:         store,
 		mkfsExtraOpts: mkfsExtraOpts,
 	}
+}
+
+// A valid EROFS native layer media type should end with ".erofs".
+//
+// Please avoid using any +suffix to list the algorithms used inside EROFS
+// blobs, since:
+//   - Each EROFS layer can use multiple compression algorithms;
+//   - The suffixes should only indicate the corresponding preprocessor for
+//     `images.DiffCompression`.
+//
+// Since `images.DiffCompression` doesn't support arbitrary media types,
+// disallow non-empty suffixes for now.
+func isErofsMediaType(mt string) bool {
+	mediaType, ext, ok := strings.Cut(mt, "+")
+	if !ok || ext != "" {
+		return false
+	}
+	return strings.HasSuffix(mediaType, ".erofs")
 }
 
 func writeDiff(ctx context.Context, w io.Writer, lower []mount.Mount, upperRoot string) error {
@@ -224,7 +244,10 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		}
 	}()
 
-	if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
+	native := false
+	if isErofsMediaType(desc.MediaType) {
+		native = true
+	} else if _, err := images.DiffCompression(ctx, desc.MediaType); err != nil {
 		return emptyDesc, fmt.Errorf("currently unsupported media type: %s", desc.MediaType)
 	}
 
@@ -246,6 +269,20 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	}
 	defer ra.Close()
 
+	layerBlobPath := path.Join(layer, "layer.erofs")
+	if native {
+		f, err := os.Create(layerBlobPath)
+		if err != nil {
+			return emptyDesc, err
+		}
+		_, err = io.Copy(f, content.NewReader(ra))
+		f.Close()
+		if err != nil {
+			return emptyDesc, err
+		}
+		return desc, nil
+	}
+
 	processor := diff.NewProcessorChain(desc.MediaType, content.NewReader(ra))
 	for {
 		if processor, err = diff.GetProcessor(ctx, processor, config.ProcessorPayloads); err != nil {
@@ -262,7 +299,6 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	layerBlobPath := path.Join(layer, "layer.erofs")
 	err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, s.mkfsExtraOpts)
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to convert erofs: %w", err)
