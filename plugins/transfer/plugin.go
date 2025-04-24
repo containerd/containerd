@@ -151,6 +151,8 @@ func init() {
 					Snapshotter:        sn,
 					SnapshotterExports: snExports,
 					Applier:            applier,
+					ConfigType:         uc.ConfigType,
+					LayerTypes:         uc.LayerTypes,
 				}
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
@@ -187,6 +189,12 @@ type unpackConfiguration struct {
 
 	// Differ is the diff plugin to be used for apply
 	Differ string `toml:"differ"`
+
+	// ConfigType is the config types for this unpack configuration
+	ConfigType string `toml:"config_type"`
+
+	// LayerTypes are the allowed layer types for this unpack configuration
+	LayerTypes []string `toml:"layer_types"`
 }
 
 func defaultConfig() *transferConfig {
