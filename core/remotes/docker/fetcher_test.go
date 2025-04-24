@@ -224,7 +224,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 				return
 			}
 		}
-
+		assert.NoError(t, rc.Close())
 	}
 
 	cfgConcurency(10, 1*1024*1024)
@@ -268,7 +268,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	body, err := f.open(ctx, req, "", 0)
 	assert.NoError(t, err)
 	_, err = io.ReadAll(body)
-	assert.ErrorContains(t, err, "unexpected status")
+	assert.Error(t, err, "this should have failed")
 }
 
 func TestContentEncoding(t *testing.T) {

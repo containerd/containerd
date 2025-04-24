@@ -456,7 +456,6 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	case errContentRangeIgnored:
 		// remote host ignored content range, force parallelism to 1
 		parallelism = 1
-		err = nil
 	default:
 		log.G(ctx).WithError(err).Debug("fetch failed")
 		r.Release(1)
@@ -483,7 +482,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 			parallelism = numChunks
 		}
 		queue := make(chan int64, parallelism)
-		stopChan := make(chan struct{})
+		ctx, cancelCtx := context.WithCancel(ctx)
+		done := ctx.Done()
 		readers, writers := make([]io.Reader, numChunks), make([]*pipeWriter, numChunks)
 		bufPool := newbufferPool(chunkSize)
 		for i := range numChunks {
@@ -491,7 +491,11 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 		}
 		go func() {
 			for i := range numChunks {
-				queue <- i
+				select {
+				case queue <- i:
+				case <-done:
+					return // avoid leaking a goroutine if we exit early.
+				}
 			}
 			close(queue)
 		}()
@@ -504,38 +508,34 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 							return err
 						}
 						defer r.Release(1)
-						select {
-						case <-stopChan:
-							return errors.New("another worker failed")
-						case <-ctx.Done():
-							return ctx.Err()
-						default:
-						}
+						var body io.ReadCloser
 						if i == 0 {
-							_, err = io.Copy(writers[i], io.LimitReader(resp.Body, chunkSize))
-							_ = resp.Body.Close()
-							_ = writers[i].CloseWithError(err)
-							return nil
-						}
-						reqClone := req.clone()
-						reqClone.setOffset(offset + i*chunkSize)
-						nresp, err := reqClone.doWithRetries(ctx,
-							withErrorCheck,
-						)
-						if err != nil {
-							_ = writers[i].CloseWithError(err)
-							select {
-							case <-stopChan:
-								return errors.New("another worker failed")
-							default:
-								close(stopChan)
+							body = resp.Body
+						} else {
+							reqClone := req.clone()
+							reqClone.setOffset(offset + i*chunkSize)
+							nresp, err := reqClone.doWithRetries(ctx,
+								withErrorCheck,
+							)
+							if err != nil {
+								_ = writers[i].CloseWithError(err)
+								select {
+								case <-done:
+									return ctx.Err()
+								default:
+									cancelCtx()
+								}
+								return err
 							}
+							body = nresp.Body
+						}
+						_, err := io.Copy(writers[i], io.LimitReader(body, chunkSize))
+						_ = body.Close()
+						_ = writers[i].CloseWithError(err)
+						if err != nil && err != io.EOF {
+							cancelCtx()
 							return err
 						}
-
-						_, err = io.Copy(writers[i], io.LimitReader(nresp.Body, chunkSize))
-						_ = nresp.Body.Close()
-						_ = writers[i].CloseWithError(err)
 						return nil
 					}
 					if copy() != nil {
@@ -544,7 +544,12 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 				}
 			}()
 		}
-		body = io.NopCloser(io.MultiReader(readers...))
+		body = &fnOnClose{
+			BeforeClose: func() {
+				cancelCtx()
+			},
+			ReadCloser: io.NopCloser(io.MultiReader(readers...)),
+		}
 	} else {
 		body = &fnOnClose{
 			BeforeClose: func() {
