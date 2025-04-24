@@ -169,7 +169,7 @@ Copy [this config.json](./config.json) and replace `XXX-path-to-rootfs` with the
 Then create and start the container with:
 
 ```
-sudo ctr create --config <path>/config.json userns-test
+sudo ctr c create --config config.json userns-test
 sudo ctr t start userns-test
 ```
 
