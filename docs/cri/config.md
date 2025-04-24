@@ -279,6 +279,7 @@ version = 3
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
+      runtime_config_dir = '/etc/containerd/runtimes'
       ignore_blockio_not_enabled_errors = false
       ignore_rdt_not_enabled_errors = false
 

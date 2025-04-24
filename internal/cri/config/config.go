@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	gruntime "runtime"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/containerd/log"
@@ -151,6 +152,11 @@ type ContainerdConfig struct {
 	// configurations, to the matching configurations.
 	// Runtimes specified here that conflict with runtimes in the RuntimeConfigPath will cause an error.
 	Runtimes map[string]Runtime `toml:"runtimes" json:"runtimes"`
+
+	// RuntimeConfigDir is the directory to load dynamic runtime configurations from.
+	// These should be in the format of:
+	// <RuntimeConfigDir>/<runtime_name>/config.toml
+	RuntimeConfigDir string `toml:"runtime_config_dir" json:"runtimeConfigDir"`
 
 	// IgnoreBlockIONotEnabledErrors is a boolean flag to ignore
 	// blockio related errors when blockio support has not been
@@ -710,6 +716,7 @@ func (config *ContainerdConfig) loadRuntime(handler string) (Runtime, error) {
 	if strings.Contains(handler, string(filepath.Separator)) {
 		return Runtime{}, fmt.Errorf("invalid runtime handler %q, it should not contain path separator", handler)
 	}
+	p := filepath.Join(config.RuntimeConfigDir, handler, "config.toml")
 	dt, err := os.ReadFile(p)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
