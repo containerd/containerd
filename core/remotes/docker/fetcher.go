@@ -437,7 +437,13 @@ func (r dockerFetcher) FetchByDigest(ctx context.Context, dgst digest.Digest, op
 }
 
 func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string, offset int64) (_ io.ReadCloser, retErr error) {
-	parallelism, chunkSize := int64(r.performances.MaxConcurrentDownloads), int64(r.performances.ConcurrentLayerFetchBuffer)
+	const minChunkSize = 512
+
+	chunkSize := int64(r.performances.ConcurrentLayerFetchBuffer)
+	parallelism := int64(r.performances.MaxConcurrentDownloads)
+	if chunkSize < minChunkSize {
+		parallelism = 1
+	}
 	log.G(ctx).WithField("parallelism", parallelism).
 		WithField("chunk_size", chunkSize).
 		WithField("offset", offset).
@@ -454,8 +460,10 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	case nil:
 		// all good
 	case errContentRangeIgnored:
-		// remote host ignored content range, force parallelism to 1
-		parallelism = 1
+		if parallelism != 1 {
+			log.G(ctx).WithError(err).Info("remote host ignored content range, forcing parallelism to 1")
+			parallelism = 1
+		}
 	default:
 		log.G(ctx).WithError(err).Debug("fetch failed")
 		r.Release(1)
@@ -468,7 +476,7 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	})
 
 	remaining, _ := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 0)
-	if parallelism > 1 && chunkSize > 512 && req.body == nil {
+	if parallelism > 1 && req.body == nil {
 		// If we have a content length, we can use multiple requests to fetch
 		// the content in parallel. This will make download of bigger bodies
 		// faster, at the cost of parallelism more requests and max

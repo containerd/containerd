@@ -648,7 +648,7 @@ func (r *request) do(ctx context.Context) (*http.Response, error) {
 
 type doChecks func(r *request, resp *http.Response) error
 
-var withErrorCheck doChecks = func(r *request, resp *http.Response) error {
+func withErrorCheck(r *request, resp *http.Response) error {
 	if resp.StatusCode > 299 {
 		if resp.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("content at %v not found: %w", r.String(), errdefs.ErrNotFound)
@@ -664,7 +664,7 @@ var withErrorCheck doChecks = func(r *request, resp *http.Response) error {
 
 var errContentRangeIgnored = errors.New("content range requests ignored")
 
-var withOffsetCheck = func(offset int64) doChecks {
+func withOffsetCheck(offset int64) doChecks {
 	return func(r *request, resp *http.Response) error {
 		if offset == 0 {
 			return nil
