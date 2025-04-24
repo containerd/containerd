@@ -166,8 +166,18 @@ type TransferConfig struct {
 	// Leases manager is used to create leases during operations if none, exists
 	Leases leases.Manager
 
-	// MaxConcurrentDownloads is the max concurrent content downloads for pull.
+	// MaxConcurrentDownloads restricts the total number of concurrent downloads
+	// across all layers during an image pull operation. This helps control the
+	// overall network bandwidth usage.
 	MaxConcurrentDownloads int
+
+	// ConcurrentLayerFetchBuffer sets the maximum size in bytes for each chunk
+	// when downloading layers in parallel. Larger chunks reduce coordination
+	// overhead but use more memory. When ConcurrentLayerFetchSize is above 512
+	// bytes, parallel layer fetch is enabled. It can accelerate pulls for big
+	// images.
+	ConcurrentLayerFetchBuffer int
+
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
 	MaxConcurrentUploadedLayers int
 
