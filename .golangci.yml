@@ -61,6 +61,10 @@ issues:
     - linters:
         - revive
       text: "redefines-builtin-id"
+    - linters:
+        - forbidigo
+      text: 'use of `regexp.MustCompile` forbidden'
+      path: _test\.go
 
 linters-settings:
   depguard:
@@ -69,6 +73,11 @@ linters-settings:
         deny:
           - pkg: github.com/opencontainers/runc
             desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+  forbidigo:
+    forbid:
+      - pkg: ^regexp$
+        p: ^regexp\.MustCompile
+        msg: Use internal/lazyregexp.New instead.
 
   gosec:
     # The following issues surfaced when `gosec` linter
