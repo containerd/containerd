@@ -7775,6 +7775,21 @@ file {
       type: TYPE_STRING
       json_name: "defaultScheme"
     }
+    field {
+      name: "http_debug"
+      number: 5
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.types.transfer.HTTPDebug"
+      json_name: "httpDebug"
+    }
+    field {
+      name: "logs_stream"
+      number: 6
+      label: LABEL_OPTIONAL
+      type: TYPE_STRING
+      json_name: "logsStream"
+    }
     nested_type {
       name: "HeadersEntry"
       field {
@@ -7851,6 +7866,25 @@ file {
       type: TYPE_MESSAGE
       type_name: ".google.protobuf.Timestamp"
       json_name: "expireAt"
+    }
+  }
+  enum_type {
+    name: "HTTPDebug"
+    value {
+      name: "DISABLED"
+      number: 0
+    }
+    value {
+      name: "DEBUG"
+      number: 1
+    }
+    value {
+      name: "TRACE"
+      number: 2
+    }
+    value {
+      name: "BOTH"
+      number: 3
     }
   }
   enum_type {
