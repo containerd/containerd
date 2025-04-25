@@ -12,9 +12,6 @@ previous = "v2.0.0"
 pre_release = true
 
 preface = """\
-The 2.1 beta series is here, see the [2.1 milestone](https://github.com/containerd/containerd/milestone/48) to track
-ongoing efforts. Please try out the beta and report any issues!
-
 The first minor release of containerd 2.x focuses on continued stability alongside
 new features and improvements. This is the first time-based released for containerd.
 Most the feature set and core functionality has long been stable and harderened in production
