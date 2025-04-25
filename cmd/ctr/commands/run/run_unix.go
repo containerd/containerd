@@ -83,6 +83,18 @@ var platformRunFlags = []cli.Flag{
 		Name:  "cpuset-mems",
 		Usage: "Set the memory nodes the container will run in (e.g., 1-2,4)",
 	},
+	&cli.StringFlag{
+		Name:  "mpol-mode",
+		Usage: "Set memory policy mode (e.g., MPOL_INTERLEAVE)",
+	},
+	&cli.StringFlag{
+		Name:  "mpol-nodes",
+		Usage: "Set memory policy nodes (e.g., 1-2,4)",
+	},
+	&cli.StringSliceFlag{
+		Name:  "mpol-flags",
+		Usage: "Set memory policy flags (e.g., MPOL_F_STATIC_NODES:MPOL_F_NUMA_BALANCING)",
+	},
 }
 
 // NewContainer creates a new container
@@ -392,6 +404,9 @@ func NewContainer(ctx context.Context, client *containerd.Client, cliContext *cl
 		}
 		if hostname := cliContext.String("hostname"); hostname != "" {
 			opts = append(opts, oci.WithHostname(hostname))
+		}
+		if mpolMode := cliContext.String("mpol-mode"); mpolMode != "" {
+			opts = append(opts, oci.WithMemoryPolicy(mpolMode, cliContext.String("mpol-nodes"), cliContext.StringSlice("mpol-flags")))
 		}
 	}
 

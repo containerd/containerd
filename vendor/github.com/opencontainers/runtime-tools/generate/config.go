@@ -109,6 +109,13 @@ func (g *Generator) initConfigLinuxResourcesMemory() {
 	}
 }
 
+func (g *Generator) initConfigLinuxMemoryPolicy() {
+	g.initConfigLinux()
+	if g.Config.Linux.MemoryPolicy == nil {
+		g.Config.Linux.MemoryPolicy = &rspec.LinuxMemoryPolicy{}
+	}
+}
+
 func (g *Generator) initConfigLinuxResourcesNetwork() {
 	g.initConfigLinuxResources()
 	if g.Config.Linux.Resources.Network == nil {

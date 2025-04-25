@@ -1507,6 +1507,23 @@ func WithPidsLimit(limit int64) SpecOpts {
 	}
 }
 
+// WithMemoryPolicy sets the container's swap in bytes
+func WithMemoryPolicy(mode string, nodes string, flags []string) SpecOpts {
+	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		setLinux(s)
+		specFlags := make([]specs.MemoryPolicyFlagType, len(flags))
+		for i, flag := range flags {
+			specFlags[i] = specs.MemoryPolicyFlagType(flag)
+		}
+		s.Linux.MemoryPolicy = &specs.LinuxMemoryPolicy{
+			Mode: specs.MemoryPolicyModeType(mode),
+			Nodes: nodes,
+			Flags: specFlags,
+		}
+		return nil
+	}
+}
+
 // WithBlockIO sets the container's blkio parameters
 func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
