@@ -32,11 +32,13 @@ import (
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cleanup"
+	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -163,8 +165,25 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
+	var (
+		remoteSandbox bool
+		shouldv2      bool
+	)
 	if opts.SandboxID != "" {
+		sbx, sbErr := m.sandboxStore.Get(ctx, opts.SandboxID)
+		if sbErr != nil {
+			if !errors.Is(sbErr, errdefs.ErrNotFound) {
+				return nil, sbErr
+			}
+			log.G(ctx).WithField("id", opts.SandboxID).Warning("not found sandbox, maybe created from v1.x")
+			shouldv2 = true
+		} else {
+			if sbx.Sandboxer != string(criconfig.ModePodSandbox) {
+				remoteSandbox = true
+			}
+		}
+	}
+	if remoteSandbox {
 		var params shimbinary.BootstrapParams
 		if opts.Address != "" {
 			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
@@ -218,6 +237,9 @@ func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts
 	shim, err := m.startShim(ctx, bundle, id, opts)
 	if err != nil {
 		return nil, err
+	}
+	if shouldv2 && shim.version == 3 {
+		shim.version = 2
 	}
 	defer func() {
 		if retErr != nil {
