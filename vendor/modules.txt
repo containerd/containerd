@@ -214,8 +214,8 @@ github.com/containernetworking/cni/pkg/types/create
 github.com/containernetworking/cni/pkg/types/internal
 github.com/containernetworking/cni/pkg/utils
 github.com/containernetworking/cni/pkg/version
-# github.com/containernetworking/plugins v1.6.2
-## explicit; go 1.23
+# github.com/containernetworking/plugins v1.7.1
+## explicit; go 1.23.0
 github.com/containernetworking/plugins/pkg/ns
 # github.com/containers/ocicrypt v1.2.1
 ## explicit; go 1.22
@@ -483,7 +483,7 @@ github.com/tchap/go-patricia/v2/patricia
 # github.com/urfave/cli/v2 v2.27.6
 ## explicit; go 1.18
 github.com/urfave/cli/v2
-# github.com/vishvananda/netlink v1.3.0
+# github.com/vishvananda/netlink v1.3.1-0.20250303224720-0e7078ed04c8
 ## explicit; go 1.12
 github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
