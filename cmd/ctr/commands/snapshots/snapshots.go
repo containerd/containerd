@@ -55,6 +55,7 @@ var Command = &cli.Command{
 		infoCommand,
 		listCommand,
 		mountCommand,
+		snapshotsMounts,
 		prepareCommand,
 		removeCommand,
 		setLabelCommand,
@@ -401,6 +402,43 @@ var mountCommand = &cli.Command{
 
 		printMounts(target, mounts)
 
+		return nil
+	},
+}
+
+type snapshotMount struct {
+	Key    string        `json:"key"`
+	Mounts []mount.Mount `json:"mounts"`
+}
+
+var snapshotsMounts = &cli.Command{
+	Name:  "mountInfo",
+	Usage: "List all snapshots mount info",
+	Action: func(cliContext *cli.Context) error {
+		client, ctx, cancel, err := commands.NewClient(cliContext)
+		if err != nil {
+			return err
+		}
+		defer cancel()
+		snapshotter := client.SnapshotService(cliContext.String("snapshotter"))
+		snapshotNames := []string{}
+		snapshotMounts := []snapshotMount{}
+		snapshotter.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
+			snapshotNames = append(snapshotNames, info.Name)
+			return nil
+		})
+		for _, key := range snapshotNames {
+			mounts, err := snapshotter.Mounts(ctx, key)
+			if err != nil {
+				return fmt.Errorf("faield to get mounts for %s:%w", key, err)
+			}
+			sm1 := snapshotMount{
+				Key:    key,
+				Mounts: mounts,
+			}
+			snapshotMounts = append(snapshotMounts, sm1)
+		}
+		commands.PrintAsJSON(snapshotMounts)
 		return nil
 	},
 }

@@ -180,6 +180,21 @@ func WalkInfo(ctx context.Context, fn snapshots.WalkFunc, fs ...string) error {
 // GetSnapshot returns the metadata for the active or view snapshot transaction
 // referenced by the given key. Requires a context with a storage transaction.
 func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
+	return GetSnapshotWithKind(ctx, key, []snapshots.Kind{snapshots.KindActive, snapshots.KindView})
+}
+
+func containsKind(kind snapshots.Kind, filters []snapshots.Kind) bool {
+	for _, filter := range filters {
+		if filter == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// GetSnapshotWithKind returns the metadata for custom kind snapshot transaction
+// referenced by the given key. Requires a context with a storage transaction.
+func GetSnapshotWithKind(ctx context.Context, key string, filters []snapshots.Kind) (s Snapshot, err error) {
 	err = withBucket(ctx, func(ctx context.Context, bkt, pbkt *bolt.Bucket) error {
 		sbkt := bkt.Bucket([]byte(key))
 		if sbkt == nil {
@@ -188,11 +203,16 @@ func GetSnapshot(ctx context.Context, key string) (s Snapshot, err error) {
 
 		s.ID = strconv.FormatUint(readID(sbkt), 10)
 		s.Kind = readKind(sbkt)
-
-		if s.Kind != snapshots.KindActive && s.Kind != snapshots.KindView {
-			return fmt.Errorf("requested snapshot %v not active or view: %w", key, errdefs.ErrFailedPrecondition)
+		if len(filters) > 0 {
+			if !containsKind(s.Kind, filters) {
+				return fmt.Errorf(
+					"snapshot key %q rejected by filter: current status %q not in allowed filters %v failed: %w",
+					key,
+					s.Kind,
+					filters,
+					errdefs.ErrFailedPrecondition)
+			}
 		}
-
 		if parentKey := sbkt.Get(bucketKeyParent); len(parentKey) > 0 {
 			spbkt := bkt.Bucket(parentKey)
 			if spbkt == nil {

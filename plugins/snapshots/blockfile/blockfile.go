@@ -280,7 +280,7 @@ func (o *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 func (o *snapshotter) Mounts(ctx context.Context, key string) (_ []mount.Mount, err error) {
 	var s storage.Snapshot
 	err = o.ms.WithTransaction(ctx, false, func(ctx context.Context) error {
-		s, err = storage.GetSnapshot(ctx, key)
+		s, err = storage.GetSnapshotWithKind(ctx, key, []snapshots.Kind{})
 		if err != nil {
 			return fmt.Errorf("failed to get snapshot mount: %w", err)
 		}

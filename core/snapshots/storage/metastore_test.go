@@ -336,6 +336,9 @@ func testGetSnapshot(ctx context.Context, t *testing.T, ms *MetaStore) {
 func testGetSnapshotCommitted(ctx context.Context, t *testing.T, ms *MetaStore) {
 	_, err := GetSnapshot(ctx, "committed-1")
 	assertNotActive(t, err)
+	_, err = GetSnapshotWithKind(ctx, "committed-1", []snapshots.Kind{})
+	assert.Nil(t, err, "failed to get snapshot %s", "committed-1")
+
 }
 
 func testGetSnapshotNotExist(ctx context.Context, t *testing.T, ms *MetaStore) {
