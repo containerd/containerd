@@ -92,42 +92,37 @@ var configCommand = &cli.Command{
 			},
 		},
 		{
-			Name:  "dump",
-			Usage: "See the output of the final main config with imported in subconfig files",
-			Action: func(cliContext *cli.Context) error {
-				config := defaultConfig()
-				ctx := cliContext.Context
-				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-
-				return outputConfig(ctx, config)
-			},
+			Name:   "dump",
+			Usage:  "See the output of the final main config with imported in subconfig files",
+			Action: dumpConfig,
 		},
 		{
 			Name:  "migrate",
 			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
-			Action: func(cliContext *cli.Context) error {
-				config := defaultConfig()
-				ctx := cliContext.Context
-				if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
-					return err
-				}
-
-				if config.Version < version.ConfigVersion {
-					plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
-					for _, p := range plugins {
-						if p.ConfigMigration != nil {
-							if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
-								return err
-							}
-						}
-					}
-				}
-				return outputConfig(ctx, config)
-			},
+			// TODO(vinayakankugoyal): This should not output fields that were not set in the current configuration.
+			Action: dumpConfig,
 		},
 	},
+}
+
+func dumpConfig(cliContext *cli.Context) error {
+	config := defaultConfig()
+	ctx := cliContext.Context
+	if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if config.Version < version.ConfigVersion {
+		plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+		for _, p := range plugins {
+			if p.ConfigMigration != nil {
+				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return outputConfig(ctx, config)
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
