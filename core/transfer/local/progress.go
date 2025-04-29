@@ -25,6 +25,7 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/transfer"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -125,10 +126,9 @@ func (j *ProgressTracker) HandleProgress(ctx context.Context, pf transfer.Progre
 							Total:    job.desc.Size,
 							Desc:     &job.desc,
 						})
-
+						job.state = jobComplete
+						jobs[dgst] = job
 					}
-					job.state = jobComplete
-					jobs[dgst] = job
 				}
 			}
 		}
@@ -277,5 +277,8 @@ func (c *contentStatusTracker) Check(ctx context.Context, dgst digest.Digest) (b
 	if err == nil {
 		return true, nil
 	}
-	return false, nil
+	if errdefs.IsNotFound(err) {
+		err = nil
+	}
+	return false, err
 }
