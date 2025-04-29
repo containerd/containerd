@@ -173,9 +173,9 @@ type TransferConfig struct {
 
 	// ConcurrentLayerFetchBuffer sets the maximum size in bytes for each chunk
 	// when downloading layers in parallel. Larger chunks reduce coordination
-	// overhead but use more memory. When ConcurrentLayerFetchSize is above 512
-	// bytes, parallel layer fetch is enabled. It can accelerate pulls for big
-	// images.
+	// overhead but use more memory. When ConcurrentLayerFetchBuffer is above
+	// 512 bytes, parallel layer fetch is enabled. It can accelerate pulls for
+	// big images.
 	ConcurrentLayerFetchBuffer int
 
 	// MaxConcurrentUploadedLayers is the max concurrent uploads for push
