@@ -56,6 +56,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		resolver.SetOptions(
 			transfer.WithConcurrentLayerFetchBuffer(pullCtx.ConcurrentLayerFetchBuffer),
 			transfer.WithMaxConcurrentDownloads(pullCtx.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(pullCtx.Limiter),
 		)
 	}
 

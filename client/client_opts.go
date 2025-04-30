@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/core/snapshots"
 	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"golang.org/x/sync/semaphore"
 
 	"google.golang.org/grpc"
 )
@@ -231,6 +232,14 @@ func WithImageHandler(h images.Handler) RemoteOpt {
 func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.HandlerWrapper = w
+		return nil
+	}
+}
+
+// WithLimiter sets max concurrent download limit.
+func WithLimiter(limiter *semaphore.Weighted) RemoteOpt {
+	return func(client *Client, c *RemoteContext) error {
+		c.Limiter = limiter
 		return nil
 	}
 }
