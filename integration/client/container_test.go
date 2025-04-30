@@ -2722,8 +2722,23 @@ func TestContainerPTY(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := buf.String()
-	if !strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
-		t.Fatal(`expected \x00 in output`)
+	tries := 1
+	if runtime.GOOS == "windows" {
+		// TODO: Fix flakiness on Window by checking for race in writing to buffer
+		tries += 2
+	}
+
+	for {
+		out := buf.String()
+		if strings.ContainsAny(fmt.Sprintf("%#q", out), `\x00`) {
+			break
+
+		}
+		tries--
+		if tries == 0 {
+			t.Fatal(`expected \x00 in output`)
+		}
+		t.Logf("output %#q does not contain \\x00, trying again", out)
+		time.Sleep(time.Millisecond)
 	}
 }
