@@ -38,7 +38,7 @@ runtime_type = "${TEST_RUNTIME}"
 EOF
 
 GINKGO_SKIP_TEST=()
-if [ ! -z "$SKIP_TEST" ]; then
+if [ -n "${SKIP_TEST:-}" ]; then
   GINKGO_SKIP_TEST+=("--ginkgo.skip" "$SKIP_TEST")
 fi
 
