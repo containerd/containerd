@@ -488,12 +488,8 @@ jobs:
           TEST_RUNTIME: ${{ matrix.runtime }}
           CGROUP_DRIVER: ${{ matrix.cgroup_driver }}
         run: |
-          # skipping the ipv6 test till https://github.com/actions/runner-images/issues/11985 is fixed
-          if [[ ${{matrix.os}} == "ubuntu-22.04" ]]; then
-            skip_test="runtime should support port mapping with host port and container port"
-          fi
           env
-          sudo -E PATH=$PATH SKIP_TEST="$skip_test" ./script/critest.sh "${{github.workspace}}/report"
+          sudo -E PATH=$PATH ./script/critest.sh "${{github.workspace}}/report"
 
       - name: Install tools
         # The GitHub Actions image already has buildah and podman included. Not the
