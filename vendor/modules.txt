@@ -851,9 +851,6 @@ k8s.io/client-go/util/exec
 k8s.io/client-go/util/flowcontrol
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.32.3
-## explicit; go 1.23.0
-k8s.io/component-base/logs/logreduction
 # k8s.io/cri-api v0.32.3
 ## explicit; go 1.23.0
 k8s.io/cri-api/pkg/apis/runtime/v1
