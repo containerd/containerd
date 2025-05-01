@@ -42,6 +42,7 @@ import (
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	critypes "github.com/containerd/containerd/v2/internal/cri/types"
 	"github.com/containerd/containerd/v2/pkg/archive"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	ptypes "github.com/containerd/containerd/v2/pkg/protobuf/types"
@@ -56,7 +57,6 @@ import (
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	spec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	kubetypes "k8s.io/kubelet/pkg/types"
 )
 
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
@@ -258,11 +258,11 @@ func (c *criService) CRImportCheckpoint(
 	sandboxUID := sandboxConfig.GetMetadata().GetUid()
 
 	if sandboxUID != "" {
-		if _, ok := originalLabels[kubetypes.KubernetesPodUIDLabel]; ok {
-			originalLabels[kubetypes.KubernetesPodUIDLabel] = sandboxUID
+		if _, ok := originalLabels[critypes.KubernetesPodUIDLabel]; ok {
+			originalLabels[critypes.KubernetesPodUIDLabel] = sandboxUID
 		}
-		if _, ok := originalAnnotations[kubetypes.KubernetesPodUIDLabel]; ok {
-			originalAnnotations[kubetypes.KubernetesPodUIDLabel] = sandboxUID
+		if _, ok := originalAnnotations[critypes.KubernetesPodUIDLabel]; ok {
+			originalAnnotations[critypes.KubernetesPodUIDLabel] = sandboxUID
 		}
 	}
 
@@ -270,11 +270,11 @@ func (c *criService) CRImportCheckpoint(
 		fixupLabels := []string{
 			// Update the container name. It has already been update in metadata.Name.
 			// It also needs to be updated in the container labels.
-			kubetypes.KubernetesContainerNameLabel,
+			critypes.KubernetesContainerNameLabel,
 			// Update pod name in the labels.
-			kubetypes.KubernetesPodNameLabel,
+			critypes.KubernetesPodNameLabel,
 			// Also update namespace.
-			kubetypes.KubernetesPodNamespaceLabel,
+			critypes.KubernetesPodNamespaceLabel,
 		}
 
 		for _, annotation := range fixupLabels {
