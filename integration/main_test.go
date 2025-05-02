@@ -41,7 +41,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 
 	containerd "github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/containers"
@@ -252,7 +251,7 @@ func PodSandboxConfig(name, ns string, opts ...PodSandboxOpts) *runtime.PodSandb
 	var cgroupParent string
 	runtimeConfig, err := runtimeService.RuntimeConfig(&runtime.RuntimeConfigRequest{})
 	if err != nil {
-		klog.Errorf("runtime service call RuntimeConfig error %s", err.Error())
+		log.L.WithError(err).Errorf("runtime service call RuntimeConfig error")
 	} else if runtimeConfig.GetLinux().GetCgroupDriver() == runtime.CgroupDriver_SYSTEMD {
 		cgroupParent = defaultCgroupSystemdParent
 	}

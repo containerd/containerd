@@ -43,11 +43,11 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
+	"github.com/containerd/log"
 )
 
 var (
@@ -76,10 +76,10 @@ func NewTCShaper(iface string) Shaper {
 }
 
 func (t *tcShaper) execAndLog(cmdStr string, args ...string) error {
-	klog.V(6).Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
+	log.L.Infof("Running: %s %s", cmdStr, strings.Join(args, " "))
 	cmd := t.e.Command(cmdStr, args...)
 	out, err := cmd.CombinedOutput()
-	klog.V(6).Infof("Output from tc: %s", string(out))
+	log.L.Infof("Output from tc: %s", string(out))
 	return err
 }
 
@@ -282,7 +282,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return err
 	}
 	if !exists {
-		klog.V(4).Info("Didn't find bandwidth interface, creating")
+		log.L.Info("Didn't find bandwidth interface, creating")
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
