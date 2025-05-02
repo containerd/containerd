@@ -39,9 +39,9 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/klog/v2"
 
 	internalapi "github.com/containerd/containerd/v2/integration/cri-api/pkg/apis"
+	"github.com/containerd/log"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"github.com/containerd/containerd/v2/integration/remote/util"
@@ -55,7 +55,7 @@ type ImageService struct {
 
 // NewImageService creates a new internalapi.ImageManagerService.
 func NewImageService(endpoint string, connectionTimeout time.Duration) (internalapi.ImageManagerService, error) {
-	klog.V(3).Infof("Connecting to image service %s", endpoint)
+	log.L.Infof("Connecting to image service %s", endpoint)
 	addr, dialer, err := util.GetAddressAndDialer(endpoint)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func NewImageService(endpoint string, connectionTimeout time.Duration) (internal
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)),
 	)
 	if err != nil {
-		klog.Errorf("Connect remote image service %s failed: %v", addr, err)
+		log.L.WithError(err).Errorf("Connect remote image service %s failed", addr)
 		return nil, err
 	}
 
@@ -86,7 +86,7 @@ func (r *ImageService) ListImages(filter *runtimeapi.ImageFilter, opts ...grpc.C
 		Filter: filter,
 	}, opts...)
 	if err != nil {
-		klog.Errorf("ListImages with filter %+v from image service failed: %v", filter, err)
+		log.L.WithError(err).Errorf("ListImages with filter %+v from image service failed", filter)
 		return nil, err
 	}
 
@@ -102,14 +102,14 @@ func (r *ImageService) ImageStatus(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 		Image: image,
 	}, opts...)
 	if err != nil {
-		klog.Errorf("ImageStatus %q from image service failed: %v", image.Image, err)
+		log.L.WithError(err).Errorf("ImageStatus %q from image service failed", image.Image)
 		return nil, err
 	}
 
 	if resp.Image != nil {
 		if resp.Image.Id == "" || resp.Image.Size() == 0 {
 			errorMessage := fmt.Sprintf("Id or size of image %q is not set", image.Image)
-			klog.Errorf("ImageStatus failed: %s", errorMessage)
+			log.L.Errorf("ImageStatus failed: %s", errorMessage)
 			return nil, errors.New(errorMessage)
 		}
 	}
@@ -128,13 +128,13 @@ func (r *ImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimeapi.A
 		SandboxConfig: podSandboxConfig,
 	}, opts...)
 	if err != nil {
-		klog.Errorf("PullImage %q from image service failed: %v", image.Image, err)
+		log.L.WithError(err).Errorf("PullImage %q from image service failed", image.Image)
 		return "", err
 	}
 
 	if resp.ImageRef == "" {
 		errorMessage := fmt.Sprintf("imageRef of image %q is not set", image.Image)
-		klog.Errorf("PullImage failed: %s", errorMessage)
+		log.L.Errorf("PullImage failed: %s", errorMessage)
 		return "", errors.New(errorMessage)
 	}
 
@@ -150,7 +150,7 @@ func (r *ImageService) RemoveImage(image *runtimeapi.ImageSpec, opts ...grpc.Cal
 		Image: image,
 	}, opts...)
 	if err != nil {
-		klog.Errorf("RemoveImage %q from image service failed: %v", image.Image, err)
+		log.L.WithError(err).Errorf("RemoveImage %q from image service failed", image.Image)
 		return err
 	}
 
@@ -166,7 +166,7 @@ func (r *ImageService) ImageFsInfo(opts ...grpc.CallOption) ([]*runtimeapi.Files
 
 	resp, err := r.imageClient.ImageFsInfo(ctx, &runtimeapi.ImageFsInfoRequest{}, opts...)
 	if err != nil {
-		klog.Errorf("ImageFsInfo from image service failed: %v", err)
+		log.L.WithError(err).Error("ImageFsInfo from image service failed")
 		return nil, err
 	}
 	return resp.GetImageFilesystems(), nil
