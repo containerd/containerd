@@ -104,6 +104,11 @@ can be used and modified as necessary as a custom configuration.`
 			Usage:   "Address for containerd's GRPC server",
 		},
 		&cli.StringFlag{
+			Name:    "group",
+			Aliases: []string{"g"},
+			Usage:   "Group for containerd's GRPC server",
+		},
+		&cli.StringFlag{
 			Name:  "root",
 			Usage: "containerd root directory",
 		},
@@ -342,6 +347,10 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 			name: "address",
 			d:    &config.GRPC.Address,
 		},
+		{
+			name: "group",
+			d:    &config.GRPC.Group,
+		},
 	} {
 		if s := cliContext.String(v.name); s != "" {
 			*v.d = s
@@ -351,6 +360,8 @@ func applyFlags(cliContext *cli.Context, config *srvconfig.Config) error {
 					return err
 				}
 				*v.d = absPath
+			} else if v.name == "group" {
+				config.GRPC.GID = 0
 			}
 		}
 	}
