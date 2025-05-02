@@ -43,10 +43,10 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/exec"
 
+	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
 )
 
@@ -90,7 +90,7 @@ func (t *tcShaper) nextClassID() (int, error) {
 	}
 
 	scanner := bufio.NewScanner(bytes.NewBuffer(data))
-	classes := sets.Set[string]{}
+	classes := setutils.Set[string]{}
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		// skip empty lines
