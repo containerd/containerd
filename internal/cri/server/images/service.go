@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"golang.org/x/sync/semaphore"
 
 	docker "github.com/distribution/reference"
 	imagedigest "github.com/opencontainers/go-digest"
@@ -72,6 +73,9 @@ type CRIImageService struct {
 	// one in-flight fetch request or unpack handler for a given descriptor's
 	// or chain ID.
 	unpackDuplicationSuppressor kmutex.KeyedLocker
+
+	// downloadLimiter is used to limit the number of concurrent downloads.
+	downloadLimiter *semaphore.Weighted
 }
 
 type GRPCCRIImageService struct {
@@ -105,6 +109,10 @@ type CRIImageServiceOptions struct {
 //     - Content store (from metadata)
 //  3. Separate image cache and snapshot cache to first class plugins, make the snapshot cache much more efficient and intelligent
 func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (*CRIImageService, error) {
+	var downloadLimiter *semaphore.Weighted
+	if config.MaxConcurrentDownloads > 0 {
+		downloadLimiter = semaphore.NewWeighted(int64(config.MaxConcurrentDownloads))
+	}
 	svc := CRIImageService{
 		config:                      config,
 		images:                      options.Images,
@@ -115,6 +123,7 @@ func NewService(config criconfig.ImageConfig, options *CRIImageServiceOptions) (
 		snapshotStore:               snapshotstore.NewStore(),
 		transferrer:                 options.Transferrer,
 		unpackDuplicationSuppressor: kmutex.New(),
+		downloadLimiter:             downloadLimiter,
 	}
 
 	log.L.Info("Start snapshots syncer")

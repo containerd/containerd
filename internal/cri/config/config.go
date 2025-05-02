@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/log"
 	"github.com/pelletier/go-toml/v2"
-	"golang.org/x/sync/semaphore"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubelet/pkg/cri/streaming"
 
@@ -320,8 +319,6 @@ type ImageConfig struct {
 	// MaxConcurrentDownloads restricts the number of concurrent downloads for each image.
 	// TODO: Migrate to transfer service
 	MaxConcurrentDownloads int `toml:"max_concurrent_downloads" json:"maxConcurrentDownloads"`
-
-	ConcurrentDownloadLimiter *semaphore.Weighted
 
 	// ConcurrentLayerFetchBuffer restricts the maximum concurrent chunks size in for each image during a download.
 	ConcurrentLayerFetchBuffer int `toml:"concurrent_layer_fetch_buffer" json:"concurrentLayerFetchBuffer"`

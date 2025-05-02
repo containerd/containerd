@@ -254,7 +254,7 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
-		containerd.WithLimiter(c.config.ConcurrentDownloadLimiter),
+		containerd.WithDownloadLimiter(c.downloadLimiter),
 		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
 		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{

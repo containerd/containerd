@@ -236,10 +236,10 @@ func WithImageHandlerWrapper(w func(images.Handler) images.Handler) RemoteOpt {
 	}
 }
 
-// WithLimiter sets max concurrent download limit.
-func WithLimiter(limiter *semaphore.Weighted) RemoteOpt {
+// WithDownloadLimiter sets the limiter for concurrent download operations.
+func WithDownloadLimiter(limiter *semaphore.Weighted) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
-		c.Limiter = limiter
+		c.DownloadLimiter = limiter
 		return nil
 	}
 }
@@ -252,7 +252,7 @@ func WithMaxConcurrentDownloads(max int) RemoteOpt {
 	}
 }
 
-// WithMaxConcurrentDownloads sets max concurrent download limit.
+// WithConcurrentLayerFetchBuffer sets the buffer size for concurrent layer fetches.
 func WithConcurrentLayerFetchBuffer(buffer int) RemoteOpt {
 	return func(client *Client, c *RemoteContext) error {
 		c.ConcurrentLayerFetchBuffer = buffer

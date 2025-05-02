@@ -391,7 +391,7 @@ type RemoteContext struct {
 	// preference.
 	Platforms []string
 
-	Limiter *semaphore.Weighted
+	DownloadLimiter *semaphore.Weighted
 
 	// MaxConcurrentDownloads restricts the total number of concurrent downloads
 	// across all layers during an image pull operation. This helps control the

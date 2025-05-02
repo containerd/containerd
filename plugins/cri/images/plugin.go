@@ -35,7 +35,6 @@ import (
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
-	"golang.org/x/sync/semaphore"
 )
 
 func init() {
@@ -149,10 +148,6 @@ func init() {
 					Snapshotter: snapshotter,
 					Platform:    platform,
 				}
-			}
-
-			if config.MaxConcurrentDownloads > 0 {
-				config.ConcurrentDownloadLimiter = semaphore.NewWeighted(int64(config.MaxConcurrentDownloads))
 			}
 
 			service, err := images.NewService(config, options)
