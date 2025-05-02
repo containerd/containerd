@@ -22,7 +22,11 @@ import (
 	"fmt"
 	"net"
 	"os"
+	osuser "os/user"
 	"path/filepath"
+	"strconv"
+
+	"github.com/containerd/errdefs"
 
 	"golang.org/x/sys/unix"
 )
@@ -43,7 +47,31 @@ func CreateUnixSocket(path string) (net.Listener, error) {
 }
 
 // GetLocalListener returns a listener out of a unix socket.
-func GetLocalListener(path string, uid, gid int) (net.Listener, error) {
+func GetLocalListener(path string, uid, gid int, user, group string) (net.Listener, error) {
+	if user != "" {
+		if uid != 0 {
+			return nil, fmt.Errorf("cannot specify both uid and user: %w", errdefs.ErrInvalidArgument)
+		}
+
+		if user, err := osuser.Lookup(user); err != nil {
+			return nil, err
+		} else if uid, err = strconv.Atoi(user.Uid); err != nil {
+			return nil, err
+		}
+	}
+
+	if group != "" {
+		if gid != 0 {
+			return nil, fmt.Errorf("cannot specify both gid and group: %w", errdefs.ErrInvalidArgument)
+		}
+
+		if group, err := osuser.LookupGroup(group); err != nil {
+			return nil, err
+		} else if gid, err = strconv.Atoi(group.Gid); err != nil {
+			return nil, err
+		}
+	}
+
 	// Ensure parent directory is created
 	if err := mkdirAs(filepath.Dir(path), uid, gid); err != nil {
 		return nil, err
