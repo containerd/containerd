@@ -21,11 +21,11 @@ import (
 	"time"
 
 	eventtypes "github.com/containerd/containerd/api/events"
+	testingclock "github.com/containerd/containerd/v2/internal/cri/clock/testing"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
 	"github.com/containerd/typeurl/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 // TestBackOff tests the logic of backOff struct.
