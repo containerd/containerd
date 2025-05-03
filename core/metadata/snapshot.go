@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -715,7 +714,7 @@ func (s *snapshotter) Remove(ctx context.Context, key string) error {
 		}
 
 		// Mark snapshotter as dirty for triggering garbage collection
-		atomic.AddUint32(&s.db.dirty, 1)
+		s.db.dirty.Add(1)
 		s.db.dirtySS[s.name] = struct{}{}
 
 		return nil

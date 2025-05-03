@@ -50,11 +50,11 @@ func createContentStore(ctx context.Context, root string, opts ...DBOpt) (contex
 	}
 
 	var (
-		count uint64
+		count atomic.Uint64
 		name  = testsuite.Name(ctx)
 	)
 	wrap := func(ctx context.Context, sharedNS bool) (context.Context, func(context.Context) error, error) {
-		n := atomic.AddUint64(&count, 1)
+		n := count.Add(1)
 		ctx2 := namespaces.WithNamespace(ctx, fmt.Sprintf("%s-n%d", name, n))
 		if sharedNS {
 			db.Update(func(tx *bolt.Tx) error {
