@@ -42,9 +42,9 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/utils/exec"
 
+	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
 	"github.com/containerd/log"
@@ -305,7 +305,7 @@ func (t *tcShaper) Reset(cidr string) error {
 		return err
 	}
 	if !found {
-		return fmt.Errorf("Failed to find cidr: %s on interface: %s", cidr, t.iface)
+		return fmt.Errorf("failed to find cidr: %s on interface: %s", cidr, t.iface)
 	}
 	for i := 0; i < len(classAndHandle); i++ {
 		if err := t.execAndLog("tc", "filter", "del",

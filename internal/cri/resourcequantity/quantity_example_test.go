@@ -15,7 +15,7 @@
 */
 
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,42 +30,46 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bandwidth
+package resourcequantity_test
 
 import (
+	"fmt"
+
 	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
-	"github.com/containerd/errdefs"
 )
 
-// FakeShaper provides an implementation of the bandwidth.Shaper.
-// Beware this is implementation has no features besides Reset and GetCIDRs.
-type FakeShaper struct {
-	CIDRs      []string
-	ResetCIDRs []string
+func ExampleFormat() {
+	memorySize := resource.NewQuantity(5*1024*1024*1024, resource.BinarySI)
+	fmt.Printf("memorySize = %v\n", memorySize)
+
+	diskSize := resource.NewQuantity(5*1000*1000*1000, resource.DecimalSI)
+	fmt.Printf("diskSize = %v\n", diskSize)
+
+	cores := resource.NewMilliQuantity(5300, resource.DecimalSI)
+	fmt.Printf("cores = %v\n", cores)
+
+	// Output:
+	// memorySize = 5Gi
+	// diskSize = 5G
+	// cores = 5300m
 }
 
-// Limit is not implemented
-func (f *FakeShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
-	return errdefs.ErrNotImplemented
-}
+func ExampleMustParse() {
+	memorySize := resource.MustParse("5Gi")
+	fmt.Printf("memorySize = %v (%v)\n", memorySize.Value(), memorySize.Format)
 
-// Reset appends a particular CIDR to the set of ResetCIDRs being managed by this shaper
-func (f *FakeShaper) Reset(cidr string) error {
-	f.ResetCIDRs = append(f.ResetCIDRs, cidr)
-	return nil
-}
+	diskSize := resource.MustParse("5G")
+	fmt.Printf("diskSize = %v (%v)\n", diskSize.Value(), diskSize.Format)
 
-// ReconcileInterface is not implemented
-func (f *FakeShaper) ReconcileInterface() error {
-	return errdefs.ErrNotImplemented
-}
+	cores := resource.MustParse("5300m")
+	fmt.Printf("milliCores = %v (%v)\n", cores.MilliValue(), cores.Format)
 
-// ReconcileCIDR is not implemented
-func (f *FakeShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
-	return errdefs.ErrNotImplemented
-}
+	cores2 := resource.MustParse("5.4")
+	fmt.Printf("milliCores = %v (%v)\n", cores2.MilliValue(), cores2.Format)
 
-// GetCIDRs returns the set of CIDRs that are being managed by this shaper
-func (f *FakeShaper) GetCIDRs() ([]string, error) {
-	return f.CIDRs, nil
+	// Output:
+	// memorySize = 5368709120 (BinarySI)
+	// diskSize = 5000000000 (DecimalSI)
+	// milliCores = 5300 (DecimalSI)
+	// milliCores = 5400 (DecimalSI)
 }
