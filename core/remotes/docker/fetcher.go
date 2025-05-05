@@ -444,7 +444,8 @@ func (r dockerFetcher) open(ctx context.Context, req *request, mediatype string,
 	if chunkSize < minChunkSize {
 		parallelism = 1
 	}
-	log.G(ctx).WithField("parallelism", parallelism).
+	log.G(ctx).WithField("initial_parallelism", r.performances.MaxConcurrentDownloads).
+		WithField("parallelism", parallelism).
 		WithField("chunk_size", chunkSize).
 		WithField("offset", offset).
 		Debug("fetching layer")
