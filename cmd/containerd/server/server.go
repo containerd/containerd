@@ -264,7 +264,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 	for _, p := range loaded {
 		id := p.URI()
 		log.G(ctx).WithFields(log.Fields{"id": id, "type": p.Type}).Info("loading plugin")
-		var mustSucceed int32
+		var mustSucceed atomic.Int32
 
 		initContext := plugin.NewContext(
 			ctx,
@@ -277,7 +277,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 			},
 		)
 		initContext.RegisterReadiness = func() func() {
-			atomic.StoreInt32(&mustSucceed, 1)
+			mustSucceed.Store(1)
 			return s.RegisterReadiness()
 		}
 
@@ -305,7 +305,7 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 				return nil, fmt.Errorf("load required plugin %s: %w", id, err)
 			}
 			// If readiness was registered during initialization, the plugin cannot fail
-			if atomic.LoadInt32(&mustSucceed) != 0 {
+			if mustSucceed.Load() != 0 {
 				return nil, fmt.Errorf("plugin failed after registering readiness %s: %w", id, err)
 			}
 			continue

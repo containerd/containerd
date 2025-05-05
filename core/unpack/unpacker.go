@@ -135,7 +135,7 @@ func WithDuplicationSuppressor(d kmutex.KeyedLocker) UnpackerOpt {
 type Unpacker struct {
 	unpackerConfig
 
-	unpacks int32
+	unpacks atomic.Int32
 	ctx     context.Context
 	eg      *errgroup.Group
 }
@@ -253,7 +253,7 @@ func (u *Unpacker) Wait() (Result, error) {
 		return Result{}, err
 	}
 	return Result{
-		Unpacks: int(u.unpacks),
+		Unpacks: int(u.unpacks.Load()),
 	}, nil
 }
 
@@ -314,7 +314,7 @@ func (u *Unpacker) unpack(
 		return u.fetch(ctx, h, layers, nil)
 	}
 
-	atomic.AddInt32(&u.unpacks, 1)
+	u.unpacks.Add(1)
 
 	var (
 		sn = unpack.Snapshotter

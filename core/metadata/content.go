@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -225,7 +224,7 @@ func (cs *contentStore) Delete(ctx context.Context, dgst digest.Digest) error {
 		}
 
 		// Mark content store as dirty for triggering garbage collection
-		atomic.AddUint32(&cs.db.dirty, 1)
+		cs.db.dirty.Add(1)
 		cs.db.dirtyCS = true
 
 		return nil

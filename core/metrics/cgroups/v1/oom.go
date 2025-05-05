@@ -64,7 +64,7 @@ type oom struct {
 	// count needs to stay the first member of this struct to ensure 64bits
 	// alignment on a 32bits machine (e.g. arm32). This is necessary as we use
 	// the sync/atomic operations on this field.
-	count     int64
+	count     atomic.Int64
 	id        string
 	namespace string
 	c         cgroups.Cgroup
@@ -99,7 +99,7 @@ func (o *oomCollector) Collect(ch chan<- prometheus.Metric) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for _, t := range o.set {
-		c := atomic.LoadInt64(&t.count)
+		c := t.count.Load()
 		ch <- prometheus.MustNewConstMetric(o.desc, prometheus.CounterValue, float64(c), t.id, t.namespace)
 	}
 }
@@ -150,7 +150,7 @@ func (o *oomCollector) process(fd uintptr) {
 		unix.Close(int(fd))
 		return
 	}
-	atomic.AddInt64(&info.count, 1)
+	info.count.Add(1)
 	for _, t := range info.triggers {
 		t(info.id, info.namespace, info.c)
 	}

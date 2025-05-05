@@ -147,7 +147,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	}
 
 	ignoreContentRange := false
-	failTimeoutOnceAfter := int64(0)
+	var failTimeoutOnceAfter atomic.Int64
 	failAfter := int64(0)
 	var forceRange []httpRange
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -166,9 +166,9 @@ func TestFetcherOpenParallel(t *testing.T) {
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		timeoutOnceAfter := atomic.LoadInt64(&failTimeoutOnceAfter)
+		timeoutOnceAfter := failTimeoutOnceAfter.Load()
 		if timeoutOnceAfter > 0 && rng[0].start > timeoutOnceAfter {
-			atomic.StoreInt64(&failTimeoutOnceAfter, 0)
+			failTimeoutOnceAfter.Store(0)
 			rw.WriteHeader(http.StatusRequestTimeout)
 			return
 		}
@@ -253,7 +253,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	forceRange = nil
 
 	// check retrying a request in the middle
-	atomic.StoreInt64(&failTimeoutOnceAfter, 1*1024*1024)
+	failTimeoutOnceAfter.Store(1 * 1024 * 1024)
 	checkReader(20)
 
 	failAfter = 1

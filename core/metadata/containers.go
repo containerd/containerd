@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
@@ -301,7 +300,7 @@ func (s *containerStore) Delete(ctx context.Context, id string) error {
 			return err
 		}
 
-		atomic.AddUint32(&s.db.dirty, 1)
+		s.db.dirty.Add(1)
 
 		return nil
 	})
