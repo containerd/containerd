@@ -1,98 +1,131 @@
 linters:
   enable:
-    - depguard # Checks for dependencies that should not be (re)introduced. See "linter-settings" for further details.
     - copyloopvar # Checks for loop variable copies in Go 1.22+
-    - gofmt
-    - goimports
+    - depguard # Checks for dependencies that should not be (re)introduced. See "linters.settings" for further details.
+    - dupword # Checks for duplicate words in the source code
     - gosec
+    - govet
     - ineffassign
     - misspell
     - nolintlint
     - revive
     - staticcheck
-    - tenv # Detects using os.Setenv instead of t.Setenv since Go 1.17
     - unconvert
     - unused
-    - govet
-    - dupword # Checks for duplicate words in the source code
+    - usetesting
   disable:
     - errcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - api
+      - test # e2e scripts
 
+    # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
+    rules:
+      - path: 'cmd[\\/]containerd[\\/]builtins[\\/]'
+        text: "blank-imports:"
+      - path: 'contrib[\\/]fuzz[\\/]'
+        text: "exported: func name will be used as fuzz.Fuzz"
+      - path: 'archive[\\/]tarheader[\\/]'
+        # conversion is necessary on Linux, unnecessary on macOS
+        text: "unnecessary conversion"
+      - path: 'integration[\\/]client'
+        text: "dot-imports:"
+      - linters:
+          - revive
+        text: "if-return"
+      - linters:
+          - revive
+        text: "empty-block"
+      - linters:
+          - revive
+        text: "superfluous-else"
+      - linters:
+          - revive
+        text: "unused-parameter"
+      - linters:
+          - revive
+        text: "unreachable-code"
+      - linters:
+          - revive
+        text: "redefines-builtin-id"
+      - linters:
+          - forbidigo
+        text: 'use of `regexp.MustCompile` forbidden'
+        path: _test\.go
+    warn-unused: true
+
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: github.com/opencontainers/runc
+              desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+    forbidigo:
+      forbid:
+        - pkg: ^regexp$
+          pattern: ^regexp\.MustCompile
+          msg: Use internal/lazyregexp.New instead.
+
+    gosec:
+      # The following issues surfaced when `gosec` linter
+      # was enabled. They are temporarily excluded to unblock
+      # the existing workflow, but still to be addressed by
+      # future works.
+      excludes:
+        - G204
+        - G305
+        - G306
+        - G402
+        - G404
+        - G115
+    nolintlint:
+      allow-unused: true
+    staticcheck:
+      checks:
+        - all
+        - -QF1001 # Apply De Morgan’s law
+        - -QF1002 # Convert untagged switch to tagged switch
+        - -QF1003 # Convert if/else-if chain to tagged switch
+        - -QF1004 # Use strings.ReplaceAll instead of strings.Replace with n == -1
+        - -QF1005 # Expand call to math.Pow
+        - -QF1008 # Omit embedded fields from selector expression
+        - -QF1012 # Use fmt.Fprintf(x, ...) instead of x.Write(fmt.Sprintf(...))
+        - -ST1001 # Dot imports are discouraged
+        - -ST1003 # Poorly chosen identifier
+        - -ST1005 # Incorrectly formatted error string
+        - -ST1019 # Importing the same package multiple times
+    usetesting:
+      # Enable/disable `os.CreateTemp("", ...)` detections.
+      os-create-temp: false
+      # Enable/disable `os.MkdirTemp()` detections.
+      os-mkdir-temp: false
+      # Enable/disable `os.Setenv()` detections.
+      os-setenv: true
+      # Enable/disable `os.TempDir()` detections.
+      os-temp-dir: true
+      # Enable/disable `os.Chdir()` detections.
+      os-chdir: false
+      # Enable/disable `context.Background()` detections.
+      # Disabled if Go < 1.24.
+      context-background: false
+      # Enable/disable `context.TODO()` detections.
+      # Disabled if Go < 1.24.
+      context-todo: false
+formatters:
+  enable:
+    - gofmt
+    - goimports
 issues:
-  include:
-    - EXC0002
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  exclude-dirs:
-    - api
-    - cluster
-    - docs
-    - docs/man
-    - releases
-    - test # e2e scripts
-
-  # Only using / doesn't work due to https://github.com/golangci/golangci-lint/issues/1398.
-  exclude-rules:
-    - path: 'cmd[\\/]containerd[\\/]builtins[\\/]'
-      text: "blank-imports:"
-    - path: 'contrib[\\/]fuzz[\\/]'
-      text: "exported: func name will be used as fuzz.Fuzz"
-    - path: 'archive[\\/]tarheader[\\/]'
-      # conversion is necessary on Linux, unnecessary on macOS
-      text: "unnecessary conversion"
-    - path: 'integration[\\/]client'
-      text: "dot-imports:"
-    - linters:
-        - revive
-      text: "if-return"
-    - linters:
-        - revive
-      text: "empty-block"
-    - linters:
-        - revive
-      text: "superfluous-else"
-    - linters:
-        - revive
-      text: "unused-parameter"
-    - linters:
-        - revive
-      text: "unreachable-code"
-    - linters:
-        - revive
-      text: "redefines-builtin-id"
-    - linters:
-        - forbidigo
-      text: 'use of `regexp.MustCompile` forbidden'
-      path: _test\.go
-
-linters-settings:
-  depguard:
-    rules:
-      main:
-        deny:
-          - pkg: github.com/opencontainers/runc
-            desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
-  forbidigo:
-    forbid:
-      - pkg: ^regexp$
-        p: ^regexp\.MustCompile
-        msg: Use internal/lazyregexp.New instead.
-
-  gosec:
-    # The following issues surfaced when `gosec` linter
-    # was enabled. They are temporarily excluded to unblock
-    # the existing workflow, but still to be addressed by
-    # future works.
-    excludes:
-      - G204
-      - G305
-      - G306
-      - G402
-      - G404
-      - G115
-  nolintlint:
-    allow-unused: true
-
 run:
   timeout: 8m
+version: "2"
