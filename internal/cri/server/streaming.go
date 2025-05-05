@@ -24,8 +24,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/utils/exec"
 
+	executil "github.com/containerd/containerd/v2/internal/cri/executil"
 	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 )
@@ -38,7 +38,7 @@ func newStreamRuntime(c *criService) streaming.Runtime {
 	return &streamRuntime{c: c}
 }
 
-// Exec executes a command inside the container. exec.ExitError is returned if the command
+// Exec executes a command inside the container. executil.ExitError is returned if the command
 // returns non-zero exit code.
 func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser,
 	tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -56,7 +56,7 @@ func (s *streamRuntime) Exec(ctx context.Context, containerID string, cmd []stri
 	if *exitCode == 0 {
 		return nil
 	}
-	return &exec.CodeExitError{
+	return &executil.CodeExitError{
 		Err:  fmt.Errorf("error executing command %v, exit code %d", cmd, *exitCode),
 		Code: int(*exitCode),
 	}

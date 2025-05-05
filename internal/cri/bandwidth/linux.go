@@ -42,8 +42,7 @@ import (
 	"net"
 	"strings"
 
-	"k8s.io/utils/exec"
-
+	executil "github.com/containerd/containerd/v2/internal/cri/executil"
 	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/containerd/v2/internal/cri/setutils"
 	"github.com/containerd/containerd/v2/internal/lazyregexp"
@@ -62,14 +61,14 @@ var (
 // Uses the hierarchical token bucket queuing discipline (htb), this requires Linux 2.4.20 or newer
 // or a custom kernel with that queuing discipline backported.
 type tcShaper struct {
-	e     exec.Interface
+	e     executil.Interface
 	iface string
 }
 
 // NewTCShaper makes a new tcShaper for the given interface
 func NewTCShaper(iface string) Shaper {
 	shaper := &tcShaper{
-		e:     exec.New(),
+		e:     executil.New(),
 		iface: iface,
 	}
 	return shaper
