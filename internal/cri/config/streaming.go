@@ -24,9 +24,8 @@ import (
 	"os"
 	"time"
 
-	k8snet "k8s.io/apimachinery/pkg/util/net"
+	netutil "github.com/containerd/containerd/v2/internal/cri/netutil"
 	k8scert "k8s.io/client-go/util/cert"
-
 	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
@@ -67,7 +66,7 @@ func (c *ServerConfig) StreamingConfig() (streaming.Config, error) {
 		streamIdleTimeout = c.StreamIdleTimeout
 	)
 	if addr == "" {
-		a, err := k8snet.ResolveBindAddress(nil)
+		a, err := netutil.ResolveBindAddress(nil)
 		if err != nil {
 			return streaming.Config{}, fmt.Errorf("failed to get stream server address: %w", err)
 		}
