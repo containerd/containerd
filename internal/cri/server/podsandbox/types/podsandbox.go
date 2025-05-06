@@ -26,10 +26,6 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 )
 
-const (
-	InternalSandboxID = "podsandbox"
-)
-
 type PodSandbox struct {
 	ID        string
 	Container containerd.Container

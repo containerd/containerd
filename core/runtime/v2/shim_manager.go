@@ -37,6 +37,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/version"
+	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -163,37 +164,68 @@ func (m *ShimManager) ID() string {
 
 // Start launches a new shim instance
 func (m *ShimManager) Start(ctx context.Context, id string, bundle *Bundle, opts runtime.CreateOpts) (_ ShimInstance, retErr error) {
-	// This container belongs to sandbox which supposed to be already started via sandbox API.
-	if opts.SandboxID != "" {
-		var params shimbinary.BootstrapParams
-		if opts.Address != "" {
-			// The address returned from sandbox controller should be in the form like ttrpc+unix://<uds-path>
-			// or grpc+vsock://<cid>:<port>, we should get the protocol from the url first.
-			protocol, address, ok := strings.Cut(opts.Address, "+")
-			if !ok {
-				return nil, fmt.Errorf("the scheme of sandbox address should be in " +
-					" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
-			}
-			params = shimbinary.BootstrapParams{
-				Version:  int(opts.Version),
-				Protocol: protocol,
-				Address:  address,
-			}
-		} else {
-			// For those sandbox we can not get endpoint,
-			// fallback to legacy implementation
-			process, err := m.Get(ctx, opts.SandboxID)
-			if err != nil {
-				return nil, fmt.Errorf("can't find sandbox %s", opts.SandboxID)
-			}
-			p, err := restoreBootstrapParams(process.Bundle())
-			if err != nil {
-				return nil, fmt.Errorf("failed to get bootstrap "+
-					"params of sandbox %s, legacy restore error %v", opts.SandboxID, err)
-			}
-			params = p
-		}
+	shouldInvokeShimBinary := false
 
+	var params shimbinary.BootstrapParams
+	if opts.SandboxID != "" {
+		_, sbErr := m.sandboxStore.Get(ctx, opts.SandboxID)
+		if sbErr != nil {
+			if !errors.Is(sbErr, errdefs.ErrNotFound) {
+				return nil, sbErr
+			}
+
+			log.G(ctx).WithField("id", id).Warningf("sandbox (id=%s) not found, maybe created from v1.x", opts.SandboxID)
+			// NOTE: If sandbox container, like pause, is created by
+			// v1.6.x or v1.7.x, the shim may be not able to group
+			// multiple containers. We should invoke shim binary and
+			// establish new connection based on returned address.
+			shouldInvokeShimBinary = true
+		} else {
+			if opts.Address != "" {
+				// The address returned from sandbox controller should
+				// be in the form like ttrpc+unix://<uds-path> or grpc+vsock://<cid>:<port>,
+				// we should get the protocol from the url first.
+				protocol, address, ok := strings.Cut(opts.Address, "+")
+				if !ok {
+					return nil, fmt.Errorf("the scheme of sandbox address should be in " +
+						" the form of <protocol>+<unix|vsock|tcp>, i.e. ttrpc+unix or grpc+vsock")
+				}
+				params = shimbinary.BootstrapParams{
+					Version:  int(opts.Version),
+					Protocol: protocol,
+					Address:  address,
+				}
+			} else {
+				process, err := m.Get(ctx, opts.SandboxID)
+				if err != nil {
+					return nil, fmt.Errorf("can't find shim for sandbox %s: %w", opts.SandboxID, err)
+				}
+
+				p, err := restoreBootstrapParams(process.Bundle())
+				if err != nil {
+					return nil, fmt.Errorf("failed to get bootstrap "+
+						"params of sandbox %s: %w", opts.SandboxID, err)
+				}
+				params = p
+			}
+		}
+	}
+	// Even though one shim can be able to group multiple containers,
+	// it doesn't mean it supports sandbox API. The old shim implementation
+	// still requires containerd to invoke `shim delete` to cleanup
+	// container's resource when each container exits. So, if the
+	// shim version is not higher than 3, we should fallback to invoke
+	// shim binary.
+	//
+	// NOTE: The shim version indicates that the shim supports streaming I/O.
+	// It's rolled out together with the sandbox API and can be used
+	// to determine whether we should invoke the shim binary.
+	const supportSandboxAPIVersion = 3
+	if params.Version < supportSandboxAPIVersion {
+		shouldInvokeShimBinary = true
+	}
+
+	if !shouldInvokeShimBinary {
 		// Write sandbox ID this task belongs to.
 		if err := os.WriteFile(filepath.Join(bundle.Path, "sandbox"), []byte(opts.SandboxID), 0600); err != nil {
 			return nil, err

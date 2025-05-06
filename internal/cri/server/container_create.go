@@ -32,7 +32,6 @@ import (
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
@@ -410,9 +409,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		containerd.WithContainerExtension(crilabels.ContainerMetadataExtension, r.meta),
 	)
 
-	if r.sandbox.Sandboxer != podsandboxtypes.InternalSandboxID {
-		opts = append(opts, containerd.WithSandbox(r.sandboxID))
-	}
+	opts = append(opts, containerd.WithSandbox(r.sandboxID))
 
 	opts = append(opts, c.nri.WithContainerAdjustment())
 	defer func() {
