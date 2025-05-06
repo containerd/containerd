@@ -159,6 +159,10 @@ spec:
 
 See also [the Kubernetes documentation](https://kubernetes.io/docs/concepts/containers/runtime-class/).
 
+Starting with containerd 2.1 runtime configurations can also be added to the config dir at
+`/etc/containerd/runtimes/<runtime_name>/config.toml`.
+This allows for a more dynamic configuration of runtimes without the need to restart containerd.
+
 ## Full configuration
 The explanation and default value of each configuration item are as follows:
 + In containerd 2.x
@@ -219,6 +223,7 @@ version = 3
 
     [plugins.'io.containerd.cri.v1.runtime'.containerd]
       default_runtime_name = 'runc'
+      runtime_config_dir = '/etc/containerd/runtimes'
       ignore_blockio_not_enabled_errors = false
       ignore_rdt_not_enabled_errors = false
 
