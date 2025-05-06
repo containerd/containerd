@@ -1,5 +1,3 @@
-//go:build !linux
-
 /*
    Copyright The containerd Authors.
 
@@ -17,7 +15,7 @@
 */
 
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2022 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,37 +30,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package bandwidth
-
-import (
-	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
-	"github.com/containerd/errdefs"
-)
-
-type unsupportedShaper struct {
-}
-
-// NewTCShaper makes a new unsupportedShapper for the given interface
-func NewTCShaper(iface string) Shaper {
-	return &unsupportedShaper{}
-}
-
-func (f *unsupportedShaper) Limit(cidr string, egress, ingress *resource.Quantity) error {
-	return errdefs.ErrNotImplemented
-}
-
-func (f *unsupportedShaper) Reset(cidr string) error {
-	return nil
-}
-
-func (f *unsupportedShaper) ReconcileInterface() error {
-	return errdefs.ErrNotImplemented
-}
-
-func (f *unsupportedShaper) ReconcileCIDR(cidr string, egress, ingress *resource.Quantity) error {
-	return errdefs.ErrNotImplemented
-}
-
-func (f *unsupportedShaper) GetCIDRs() ([]string, error) {
-	return []string{}, nil
-}
+// Package resourcequantity has tools for converting resource quantities to and from strings.
+package resourcequantity // cloned from "k8s.io/apimachinery/pkg/api/resource"
