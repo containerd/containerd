@@ -25,9 +25,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/containerd/errdefs"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 // TreeFormat is used to format tree based output using 4 values.
@@ -124,6 +126,11 @@ func (p *ImageTreePrinter) printManifestTree(ctx context.Context, desc ocispec.D
 	}
 	b, err := content.ReadBlob(ctx, store, desc)
 	if err != nil {
+		if errdefs.IsNotFound(err) {
+			// If the blob is not found, we can still display the tree
+			fmt.Fprintf(p.w, "%s Content does not exist locally, skipping\n", childprefix+p.format.LastDrop)
+			return nil
+		}
 		return err
 	}
 	if err := p.showContent(ctx, store, desc, subchild); err != nil {
