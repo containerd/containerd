@@ -22,7 +22,7 @@ jobs:
   check:
     name: Check Signed Tag
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       stringver: ${{ steps.contentrel.outputs.stringver }}
@@ -137,7 +137,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     needs: [build, check]
     steps:
