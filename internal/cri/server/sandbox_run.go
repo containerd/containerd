@@ -419,6 +419,7 @@ func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.Namesp
 	opts := []cni.NamespaceOpts{
 		cni.WithLabels(toCNILabels(id, config)),
 		cni.WithCapability(annotations.PodAnnotations, config.Annotations),
+		cni.WithLabels(config.Labels),
 	}
 
 	portMappings := toCNIPortMappings(config.GetPortMappings())
