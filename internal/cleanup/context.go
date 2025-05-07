@@ -22,11 +22,6 @@ import (
 	"time"
 )
 
-// Background creates a new context which clears out the parent errors
-func Background(ctx context.Context) context.Context {
-	return context.WithoutCancel(ctx)
-}
-
 // Do runs the provided function with a context in which the
 // errors are cleared out and will timeout after 10 seconds.
 func Do(ctx context.Context, do func(context.Context)) {
