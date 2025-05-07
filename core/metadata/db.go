@@ -33,7 +33,6 @@ import (
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/events"
 	"github.com/containerd/containerd/v2/core/snapshots"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 )
@@ -527,7 +526,7 @@ func (m *DB) getMarked(ctx context.Context, c *gcContext) (map[gc.Node]struct{},
 }
 
 func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration, error) {
-	ctx = cleanup.Background(ctx)
+	ctx = context.WithoutCancel(ctx)
 	sn, ok := m.ss[name]
 	if !ok {
 		return 0, nil
@@ -544,7 +543,7 @@ func (m *DB) cleanupSnapshotter(ctx context.Context, name string) (time.Duration
 }
 
 func (m *DB) cleanupContent(ctx context.Context) (time.Duration, error) {
-	ctx = cleanup.Background(ctx)
+	ctx = context.WithoutCancel(ctx)
 	if m.cs == nil {
 		return 0, nil
 	}

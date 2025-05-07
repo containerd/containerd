@@ -37,7 +37,6 @@ import (
 	apitypes "github.com/containerd/containerd/api/types"
 
 	"github.com/containerd/containerd/v2/core/runtime"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/protobuf/proto"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 	"github.com/containerd/containerd/v2/plugins"
@@ -167,14 +166,14 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		// NOTE: ctx contains required namespace information.
 		m.manager.shims.Delete(ctx, taskID)
 
-		dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+		dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 		defer cancel()
 
 		sandboxed := opts.SandboxID != ""
 		_, errShim := shimTask.delete(dctx, sandboxed, func(context.Context, string) {})
 		if errShim != nil {
 			if errdefs.IsDeadlineExceeded(errShim) {
-				dctx, cancel = timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+				dctx, cancel = timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 				defer cancel()
 			}
 

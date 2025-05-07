@@ -31,7 +31,6 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/runtime"
 	"github.com/containerd/containerd/v2/core/sandbox"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	shimbinary "github.com/containerd/containerd/v2/pkg/shim"
 	"github.com/containerd/containerd/v2/pkg/timeout"
@@ -290,7 +289,7 @@ func (m *ShimManager) startShim(ctx context.Context, bundle *Bundle, id string, 
 	shim, err := b.Start(ctx, typeurl.MarshalProto(topts), func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, b)
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, b)
 		// Remove self from the runtime task list. Even though the cleanupAfterDeadShim()
 		// would publish taskExit event, but the shim.Delete() would always failed with ttrpc
 		// disconnect and there is no chance to remove this dead task from runtime task lists.
@@ -417,7 +416,7 @@ func (m *ShimManager) resolveRuntimePath(runtime string) (string, error) {
 
 // cleanupShim attempts to properly delete and cleanup shim after error
 func (m *ShimManager) cleanupShim(ctx context.Context, shim *shim) {
-	dctx, cancel := timeout.WithContext(cleanup.Background(ctx), cleanupTimeout)
+	dctx, cancel := timeout.WithContext(context.WithoutCancel(ctx), cleanupTimeout)
 	defer cancel()
 
 	_ = shim.Delete(dctx)
