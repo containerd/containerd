@@ -129,9 +129,10 @@ to all committers.
 | [1.5](https://github.com/containerd/containerd/releases/tag/v1.5.18) | End of Life   | May 3, 2021                    | February 28, 2023              |                        |
 | [1.6](https://github.com/containerd/containerd/releases/tag/v1.6.0)  | LTS           | February 15, 2022              | July 23, 2025                  | @containerd/committers |
 | [1.7](https://github.com/containerd/containerd/releases/tag/v1.7.0)  | LTS           | March 10, 2023                 | March 10, 2026                 | @containerd/committers |
-| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.0)  | Active        | November 5, 2024               | November 7, 2025 (_tentative_) | @containerd/committers |
-| [2.1](https://github.com/containerd/containerd/milestone/48)         | RC            | May 7, 2025 (_tentative_)      | _TBD_                          | @samuelkarp, @dmcgowan |
-| [2.2](https://github.com/containerd/containerd/milestone/49)         | _Future_      | November 5, 2025 (_tentative_) | _TBD_                          | _TBD_                  |
+| [2.0](https://github.com/containerd/containerd/releases/tag/v2.0.0)  | Active        | November 5, 2024               | November 7, 2025               | @containerd/committers |
+| [2.1](https://github.com/containerd/containerd/releases/tar/v2.1.0)  | Active        | May 7, 2025                    | May 5, 2026 (_tentative_)      | @containerd/committers |
+| [2.2](https://github.com/containerd/containerd/milestone/49)         | _Future_      | November 5, 2025 (_tentative_) | November 6, 2026 (_tentative_) | _TBD_                  |
+| [2.3](https://github.com/containerd/containerd/milestone/50)         | _Future_      | May 6, 2026 (_tentative_)      | _TBD_                          | _TBD_                  |
 
 ### Kubernetes Support
 
@@ -144,12 +145,12 @@ for the list of actively tested versions. Kubernetes only supports n-3 minor
 release versions and containerd will ensure there is always a supported version
 of containerd for every supported version of Kubernetes.
 
-| Kubernetes Version | containerd Version            | CRI Version     |
-|--------------------|-------------------------------|-----------------|
-| 1.29               | 1.7.11+, 1.6.27+              | v1              |
-| 1.30               | 2.0.0+, 1.7.13+, 1.6.28+      | v1              |
-| 1.31               | 2.0.0+, 1.7.20+, 1.6.34+      | v1              |
-| 1.32               | 2.0.1+, 1.7.24+, 1.6.36+      | v1              |
+| Kubernetes Version | containerd Version               | CRI Version     |
+|--------------------|----------------------------------|-----------------|
+| 1.30               | 2.1.0+, 2.0.0+, 1.7.13+, 1.6.28+ | v1              |
+| 1.31               | 2.1.0+, 2.0.0+, 1.7.20+, 1.6.34+ | v1              |
+| 1.32               | 2.1.0+, 2.0.1+, 1.7.24+, 1.6.36+ | v1              |
+| 1.33               | 2.1.0+, 2.0.4+, 1.7.24+, 1.6.36+ | v1              |
 
 Deprecated containerd and kubernetes versions
 
@@ -329,8 +330,9 @@ releases for prior API versions should be avoided if possible.
 | v1.6               | 1.6                    |
 | v1.7               | 1.7                    |
 | v2.0               | 1.8                    |
-| _v2.1_             | _1.9_                  |
+| v2.1               | 1.9                    |
 | _v2.2_             | _1.10_                 |
+| _v2.3_             | _1.11_                 |
 
 
 ### Metrics API
