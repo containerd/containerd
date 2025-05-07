@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-// Package providing utilies to help cleanup
+// Package cleanup provides utilies to help cleanup.
 package cleanup
 
 import (
