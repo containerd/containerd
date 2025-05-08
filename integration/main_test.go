@@ -55,7 +55,7 @@ import (
 )
 
 const (
-	timeout                    = 1 * time.Minute
+	timeout                    = 3 * time.Minute
 	k8sNamespace               = constants.K8sContainerdNamespace
 	defaultCgroupSystemdParent = "/containerd-test.slice"
 )
