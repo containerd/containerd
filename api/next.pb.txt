@@ -7801,6 +7801,14 @@ file {
       type_name: ".containerd.types.transfer.UnpackConfiguration"
       json_name: "unpacks"
     }
+    field {
+      name: "content_retention"
+      number: 15
+      label: LABEL_OPTIONAL
+      type: TYPE_ENUM
+      type_name: ".containerd.types.transfer.ContentRetention"
+      json_name: "contentRetention"
+    }
     nested_type {
       name: "LabelsEntry"
       field {
@@ -7876,6 +7884,21 @@ file {
       label: LABEL_OPTIONAL
       type: TYPE_BOOL
       json_name: "skipNamedDigest"
+    }
+  }
+  enum_type {
+    name: "ContentRetention"
+    value {
+      name: "None"
+      number: 0
+    }
+    value {
+      name: "Cached"
+      number: 1
+    }
+    value {
+      name: "All"
+      number: 2
     }
   }
   options {
