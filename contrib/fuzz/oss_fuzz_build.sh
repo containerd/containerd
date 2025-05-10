@@ -19,6 +19,8 @@ set -o errexit
 set -x
 
 IFS=$'\n'
+INSTRUMENTATION_URL="https://github.com/AdamKorcz/instrumentation"
+COMMIT_HASH="a0052d5b1e2db77ee978890722212230fe86c910" # May 2024 commit
 
 compile_fuzzers() {
     local regex=$1
@@ -38,7 +40,11 @@ compile_fuzzers() {
 }
 
 # This is from https://github.com/AdamKorcz/instrumentation
+git clone "$INSTRUMENTATION_URL"
 cd $SRC/instrumentation
+# Introduce git commit hash
+git checkout "$COMMIT_HASH"
+
 go run main.go --target_dir $SRC/containerd/images
 
 apt-get update && apt-get install -y wget
