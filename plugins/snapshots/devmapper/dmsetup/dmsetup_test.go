@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/docker/go-units"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
 
@@ -182,7 +183,10 @@ func testVersion(t *testing.T) {
 
 func createLoopbackDevice(t *testing.T, dir string) (string, string) {
 	file, err := os.CreateTemp(dir, "dmsetup-tests-")
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	size, err := units.RAMInBytes("16Mb")
 	assert.NoError(t, err)
