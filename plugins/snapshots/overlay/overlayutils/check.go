@@ -29,6 +29,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/mount"
 	kernel "github.com/containerd/containerd/v2/pkg/kernelversion"
+	"github.com/containerd/containerd/v2/plugins/snapshots/overlay/quota"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/log"
 )
@@ -37,6 +38,9 @@ const (
 	// see https://man7.org/linux/man-pages/man2/statfs.2.html
 	tmpfsMagic = 0x01021994
 )
+
+// QuotaSetter set quota on targets and can only use bytesize space.
+type QuotaSetter func(targets []string, bytesize uint64) error
 
 // SupportsMultipleLowerDir checks if the system supports multiple lowerdirs,
 // which is required for the overlay snapshotter. On 4.x kernels, multiple lowerdirs
@@ -295,4 +299,46 @@ func SupportsIDMappedMounts() (bool, error) {
 	}
 
 	return true, nil
+}
+
+// SupportQuota checks if overlay filesystem supports quota or not.
+//
+// This function returns quotaSetter or error if it fails to check the filesystem.
+func SupportQuota(root string) (QuotaSetter, error) {
+	var backingFs = "<unknown>"
+	fileInfo, err := os.Stat(root)
+	if err != nil {
+		return nil, err
+	}
+	if !fileInfo.IsDir() {
+		root = filepath.Dir(root)
+	}
+
+	fsMagic, err := fs.GetMagic(root + "/")
+	if err != nil {
+		log.L.WithError(err).Warnf("get path %v filesystem magic number failed", root)
+		return nil, err
+	}
+
+	//TODO: check kernel version, kernel should be >= v4.5
+	if fsName, ok := fs.FsNames[fsMagic]; ok {
+		backingFs = fsName
+	}
+	switch fsMagic {
+	case fs.MagicXfs:
+		quotaCtl, err := quota.NewControl(root)
+		if err != nil {
+			log.L.WithError(err).Warnf("could not initinal quota control")
+			return nil, fmt.Errorf("directory '%s' does not support set quota, make sure mount with 'pquota'", root)
+		}
+		return func(targets []string, size uint64) error {
+			if size == 0 {
+				return nil
+			}
+			return quotaCtl.SetAllQuota(quota.Size(size), targets...)
+		}, nil
+	default:
+		log.L.WithError(err).Warnf("filesystem %s does not support set quota", backingFs)
+		return nil, fmt.Errorf("filesystem %s does not support set quota", backingFs)
+	}
 }
