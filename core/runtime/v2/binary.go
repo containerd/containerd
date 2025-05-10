@@ -154,7 +154,7 @@ func (b *binary) Start(ctx context.Context, opts *types.Any, onClose func()) (_ 
 }
 
 func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
-	log.G(ctx).Info("cleaning up dead shim")
+	log.G(ctx).WithField("id", b.bundle.ID).Info("cleaning up dead shim")
 
 	// On Windows and FreeBSD, the current working directory of the shim should
 	// not be the bundle path during the delete operation. Instead, we invoke
@@ -195,12 +195,18 @@ func (b *binary) Delete(ctx context.Context) (*runtime.Exit, error) {
 	cmd.Stdout = out
 	cmd.Stderr = errb
 	if err := cmd.Run(); err != nil {
-		log.G(ctx).WithField("cmd", cmd.String()).WithError(err).Error("failed to delete")
+		log.G(ctx).WithFields(log.Fields{
+			"cmd":   cmd.String(),
+			"error": err,
+			"id":    b.bundle.ID,
+		}).Error("failed to delete dead shim")
 		return nil, fmt.Errorf("%s: %w", errb.String(), err)
 	}
-	s := errb.String()
-	if s != "" {
-		log.G(ctx).Warnf("cleanup warnings %s", s)
+	if s := errb.String(); s != "" {
+		log.G(ctx).WithFields(log.Fields{
+			"id":       b.bundle.ID,
+			"warnings": s,
+		}).Warn("warnings while cleaning up dead shim")
 	}
 	var response task.DeleteResponse
 	if err := proto.Unmarshal(out.Bytes(), &response); err != nil {
