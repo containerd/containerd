@@ -65,6 +65,7 @@ type unpackerConfig struct {
 
 	limiter               *semaphore.Weighted
 	duplicationSuppressor kmutex.KeyedLocker
+	fetchMissBlobs        bool
 }
 
 // Platform represents a platform-specific unpack configuration which includes
@@ -116,6 +117,12 @@ func WithUnpackPlatform(u Platform) UnpackerOpt {
 	})
 }
 
+func WithFetchMissBlobs() UnpackerOpt {
+	return UnpackerOpt(func(c *unpackerConfig) error {
+		c.fetchMissBlobs = true
+		return nil
+	})
+}
 func WithLimiter(l *semaphore.Weighted) UnpackerOpt {
 	return UnpackerOpt(func(c *unpackerConfig) error {
 		c.limiter = l
@@ -238,7 +245,24 @@ func (u *Unpacker) Unpack(h images.Handler) images.Handler {
 			lock.Unlock()
 			if len(l) > 0 {
 				u.eg.Go(func() error {
-					return u.unpack(h, desc, l)
+					err := u.unpack(h, desc, l)
+					if err != nil {
+						return err
+					}
+					if !u.fetchMissBlobs {
+						return nil
+					}
+					for _, layer := range l {
+						_, err = u.content.Info(u.ctx, layer.Digest)
+						if errdefs.IsNotFound(err) {
+							log.G(u.ctx).WithField("digest", layer.Digest).Warningf("not found in content store, fetch forcely")
+							err = u.fetch(u.ctx, h, []ocispec.Descriptor{layer}, nil)
+							if err != nil {
+								return err
+							}
+						}
+					}
+					return nil
 				})
 			}
 		}
