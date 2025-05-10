@@ -231,17 +231,17 @@ type Registry struct {
 	ConfigPath string `toml:"config_path" json:"configPath"`
 	// Mirrors are namespace to mirror mapping for all namespaces.
 	// This option will not be used when ConfigPath is provided.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
 	// Supported in 1.x releases.
 	Mirrors map[string]Mirror `toml:"mirrors" json:"mirrors"`
 	// Configs are configs for each registry.
 	// The key is the domain name or IP of the registry.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
 	// Supported in 1.x releases.
 	Configs map[string]RegistryConfig `toml:"configs" json:"configs"`
 	// Auths are registry endpoint to auth config mapping. The registry endpoint must
 	// be a valid url with host specified.
-	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.1.
+	// DEPRECATED: Use ConfigPath instead. Remove in containerd 2.2.
 	// Supported in 1.x releases.
 	Auths map[string]AuthConfig `toml:"auths" json:"auths"`
 	// Headers adds additional HTTP headers that get sent to all registries
