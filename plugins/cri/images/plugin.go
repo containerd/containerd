@@ -120,9 +120,9 @@ func init() {
 				}
 				return snapshotRoot
 			}
-
 			options.ImageFSPaths[defaultSnapshotter] = snapshotRoot(defaultSnapshotter)
 			log.L.Infof("Get image filesystem path %q for snapshotter %q", options.ImageFSPaths[defaultSnapshotter], defaultSnapshotter)
+			options.DefaultRuntimeName = criconfig.DefaultRuntimeConfig().ContainerdConfig.DefaultRuntimeName
 
 			for runtimeName, rp := range config.RuntimePlatforms {
 				snapshotter := rp.Snapshotter
@@ -138,7 +138,8 @@ func init() {
 				platform := platforms.DefaultSpec()
 				if rp.Platform != "" {
 					p, err := platforms.Parse(rp.Platform)
-					if err != nil {
+					// Platform specified for a specific runtime should have minimum of OS and arch specified.
+					if err != nil || !isValidPlatformSpec(p) {
 						return nil, fmt.Errorf("unable to parse platform %q: %w", rp.Platform, err)
 					}
 					platform = p

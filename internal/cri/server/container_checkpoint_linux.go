@@ -61,7 +61,8 @@ import (
 
 // checkIfCheckpointOCIImage returns checks if the input refers to a checkpoint image.
 // It returns the StorageImageID of the image the input resolves to, nil otherwise.
-func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string) (string, error) {
+func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string,
+	runtimeHandler string) (string, error) {
 	if input == "" {
 		return "", nil
 	}
@@ -69,7 +70,7 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 		return "", nil
 	}
 
-	image, err := c.LocalResolve(input)
+	image, err := c.LocalResolve(input, runtimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve image %q: %w", input, err)
 	}
@@ -104,7 +105,7 @@ func (c *criService) checkIfCheckpointOCIImage(ctx context.Context, input string
 
 	log.G(ctx).Infof("Found checkpoint of container %v in %v", ann, input)
 
-	return image.ID, nil
+	return image.Key.ID, nil
 }
 
 func (c *criService) CRImportCheckpoint(
@@ -123,8 +124,12 @@ func (c *criService) CRImportCheckpoint(
 	inputImage := meta.Config.Image.Image
 	createAnnotations := meta.Config.Annotations
 	createLabels := meta.Config.Labels
+	runtimeHandler := ""
+	if sandbox != nil {
+		runtimeHandler = sandbox.RuntimeHandler
+	}
 
-	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage)
+	restoreStorageImageID, err := c.checkIfCheckpointOCIImage(ctx, inputImage, runtimeHandler)
 	if err != nil {
 		return "", err
 	}
@@ -345,7 +350,7 @@ func (c *criService) CRImportCheckpoint(
 		// This is probably wrong. Not sure how to wait for an image to appear in
 		// the image (or content) store.
 		log.G(ctx).Debugf("Trying to resolve %s:%d", containerdImage.Name(), i)
-		image, err = c.LocalResolve(containerdImage.Name())
+		image, err = c.LocalResolve(containerdImage.Name(), runtimeHandler)
 		if err == nil {
 			break
 		}
@@ -383,7 +388,7 @@ func (c *criService) CRImportCheckpoint(
 			containerID:           meta.ID,
 			sandbox:               sandbox,
 			sandboxID:             meta.SandboxID,
-			imageID:               image.ID,
+			imageID:               image.Key.ID,
 			containerConfig:       meta.Config,
 			imageConfig:           &imageConfig,
 			podSandboxConfig:      sandboxConfig,
@@ -637,7 +642,6 @@ func (c *criService) CheckpointContainer(ctx context.Context, r *runtime.Checkpo
 	containerCheckpointTimer.WithValues(i.Runtime.Name).UpdateSince(start)
 
 	log.G(ctx).Infof("Wrote checkpoint archive to %s for %s", outFile.Name(), r.GetContainerId())
-
 	return &runtime.CheckpointContainerResponse{}, nil
 }
 

@@ -163,7 +163,7 @@ func TestUpdateContainerResources_MemorySwap(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-swap-resources")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	memoryLimit := int64(128 * 1024 * 1024)
 	baseSwapLimit := int64(200 * 1024 * 1024)
@@ -230,7 +230,7 @@ func TestUpdateContainerResources_MemoryLimit(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	expectedSwapLimit := func(memoryLimit int64) *int64 {
 		if criopts.SwapControllerAvailable() {
@@ -310,7 +310,7 @@ func TestUpdateContainerResources_StatusUpdated(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "update-container-resources")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Log("Create a container with memory limit")
 	cnConfig := ContainerConfig(

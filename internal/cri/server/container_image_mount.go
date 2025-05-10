@@ -87,13 +87,13 @@ func (c *criService) mutateImageMount(
 	if ref == "" {
 		return fmt.Errorf("image not specified in: %+v", imageSpec)
 	}
-	image, err := c.LocalResolve(ref)
+	image, err := c.LocalResolve(ref, imageSpec.GetRuntimeHandler())
 	if err != nil {
 		return fmt.Errorf("failed to resolve image %q: %w", ref, err)
 	}
 	containerdImage, err := c.toContainerdImage(ctx, image)
 	if err != nil {
-		return fmt.Errorf("failed to get image from containerd %q: %w", image.ID, err)
+		return fmt.Errorf("failed to get image from containerd %q: %w", image.Key.ID, err)
 	}
 
 	// This is a digest of the manifest

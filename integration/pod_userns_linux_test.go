@@ -266,7 +266,7 @@ func TestPodUserNS(t *testing.T) {
 				containerName = "test-container"
 			)
 
-			EnsureImageExists(t, testImage)
+			EnsureImageExists(t, testImage, *runtimeHandler)
 
 			containerOpts := append(test.containerOpts,
 				WithLogPath(containerName),
@@ -368,7 +368,7 @@ func TestIssue10598(t *testing.T) {
 	containerName := "nginx-userns"
 	testImage := images.Get(images.Nginx)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	containerOpts := []ContainerOpts{
 		WithUserNamespace(containerID, hostID, size),
