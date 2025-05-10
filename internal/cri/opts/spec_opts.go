@@ -67,7 +67,7 @@ func WithProcessArgs(config *runtime.ContainerConfig, image *imagespec.ImageConf
 				args = append([]string{}, image.Cmd...)
 			}
 			if command == nil {
-				if !(len(image.Entrypoint) == 1 && image.Entrypoint[0] == "") {
+				if len(image.Entrypoint) != 1 || image.Entrypoint[0] != "" {
 					command = append([]string{}, image.Entrypoint...)
 				}
 			}
@@ -305,7 +305,7 @@ func WithoutNamespace(t runtimespec.LinuxNamespaceType) oci.SpecOpts {
 func WithNamespacePath(t runtimespec.LinuxNamespaceType, nsPath string) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, c *containers.Container, s *runtimespec.Spec) error {
 		if s.Linux == nil {
-			return fmt.Errorf("Linux spec is required")
+			return fmt.Errorf("linux spec is required")
 		}
 
 		for i, ns := range s.Linux.Namespaces {
