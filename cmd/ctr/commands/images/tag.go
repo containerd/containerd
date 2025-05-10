@@ -67,9 +67,11 @@ var tagCommand = &cli.Command{
 		if !cliContext.Bool("local") {
 			for _, targetRef := range cliContext.Args().Slice()[1:] {
 				if !cliContext.Bool("skip-reference-check") {
-					if _, err := reference.ParseAnyReference(targetRef); err != nil {
+					parsedRef, err := reference.ParseAnyReference(targetRef)
+					if err != nil {
 						return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
 					}
+					targetRef = parsedRef.String()
 				}
 				err = client.Transfer(ctx, image.NewStore(ref), image.NewStore(targetRef))
 				if err != nil {
@@ -94,9 +96,11 @@ var tagCommand = &cli.Command{
 		// Support multiple references for one command run
 		for _, targetRef := range cliContext.Args().Slice()[1:] {
 			if !cliContext.Bool("skip-reference-check") {
-				if _, err := reference.ParseAnyReference(targetRef); err != nil {
+				parsedRef, err := reference.ParseAnyReference(targetRef)
+				if err != nil {
 					return fmt.Errorf("error parsing reference: %q is not a valid repository/tag %v", targetRef, err)
 				}
+				targetRef = parsedRef.String()
 			}
 			image.Name = targetRef
 			// Attempt to create the image first
