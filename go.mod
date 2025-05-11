@@ -83,7 +83,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1
 	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.3
-	k8s.io/cri-api v0.32.3
+	k8s.io/cri-api v0.33.0
 	k8s.io/klog/v2 v2.130.1
 	tags.cncf.io/container-device-interface v1.0.1
 )
