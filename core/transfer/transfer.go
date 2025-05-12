@@ -144,11 +144,31 @@ type ImagePlatformsGetter interface {
 
 // UnpackConfiguration specifies the platform and snapshotter to use for resolving
 // the unpack Platform, if snapshotter is not specified the platform default will
-// be used.
+// be used. AllContent indicates all content is needed to be fetched during the
+// unpack regardless of the snapshotter state.
 type UnpackConfiguration struct {
 	Platform    ocispec.Platform
 	Snapshotter string
+	AllContent  bool
 }
+
+// ImageContentRetentionion is used to determine how content used by the image store
+// should be fetched and retained.
+type ImageContentRetention uint8
+
+const (
+	// ImageContentRetainNone will discard all non-metadata content when it is no longer
+	// being used.
+	ImageContentRetainNone ImageContentRetention = iota
+
+	// ImageContentRetainCached will only retain metadata and content cached for the
+	// supported platforms.
+	ImageContentRetainCached
+
+	// ImageContentPolicyAll will fetch and retain all metadata and content for an image to
+	// allow fully exporting an image.
+	ImageContentRetainAll
+)
 
 type ProgressFunc func(Progress)
 

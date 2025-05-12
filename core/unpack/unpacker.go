@@ -60,7 +60,8 @@ type Result struct {
 type unpackerConfig struct {
 	platforms []*Platform
 
-	content content.Store
+	content  content.Store
+	fetchAll bool
 
 	limiter               Limiter
 	duplicationSuppressor KeyedLocker
@@ -139,6 +140,13 @@ func WithLimiter(l Limiter) UnpackerOpt {
 func WithDuplicationSuppressor(d KeyedLocker) UnpackerOpt {
 	return UnpackerOpt(func(c *unpackerConfig) error {
 		c.duplicationSuppressor = d
+		return nil
+	})
+}
+
+func WithFetchAllContent() UnpackerOpt {
+	return UnpackerOpt(func(c *unpackerConfig) error {
+		c.fetchAll = true
 		return nil
 	})
 }
@@ -333,16 +341,54 @@ func (u *Unpacker) unpack(
 		sn = unpack.Snapshotter
 		a  = unpack.Applier
 		cs = u.content
-
-		fetchOffset int
-		fetchC      []chan struct{}
-		fetchErr    chan error
 	)
 
 	// If there is an early return, ensure any ongoing
 	// fetches get their context cancelled
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	var (
+		fetchOffset int
+		fetchC      []chan struct{}
+		fetchErr    chan error
+		fetch       = func(ctx context.Context, i int, wait bool) error {
+			if fetchErr == nil {
+				fetchErr = make(chan error, 1)
+				fetchOffset = i
+				fetchC = make([]chan struct{}, len(layers)-fetchOffset)
+				for i := range fetchC {
+					fetchC[i] = make(chan struct{})
+				}
+
+				go func(i int) {
+					err := u.fetch(ctx, h, layers[i:], fetchC)
+					if err != nil {
+						fetchErr <- err
+					}
+					close(fetchErr)
+				}(i)
+			}
+			if !wait {
+				return nil
+			}
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case err := <-fetchErr:
+				return err
+			case <-fetchC[i-fetchOffset]:
+				return nil
+			}
+		}
+	)
+
+	// If all content is to be fetched, immediately start fetching
+	// from the first layer
+	if u.fetchAll && len(layers) > 0 {
+		_ = fetch(ctx, 0, false)
+	}
 
 	// pre-calculate chain ids for each layer
 	chainIDs := make([]digest.Digest, len(diffIDs))
@@ -409,33 +455,9 @@ func (u *Unpacker) unpack(
 			}
 		}
 
-		if fetchErr == nil {
-			fetchErr = make(chan error, 1)
-			fetchOffset = i
-			fetchC = make([]chan struct{}, len(layers)-fetchOffset)
-			for i := range fetchC {
-				fetchC[i] = make(chan struct{})
-			}
-
-			go func(i int) {
-				err := u.fetch(ctx, h, layers[i:], fetchC)
-				if err != nil {
-					fetchErr <- err
-				}
-				close(fetchErr)
-			}(i)
-		}
-
-		select {
-		case <-ctx.Done():
+		if err := fetch(ctx, i, true); err != nil {
 			cleanup.Do(ctx, abort)
-			return ctx.Err()
-		case err := <-fetchErr:
-			if err != nil {
-				cleanup.Do(ctx, abort)
-				return err
-			}
-		case <-fetchC[i-fetchOffset]:
+			return err
 		}
 
 		diff, err := a.Apply(ctx, desc, mounts, unpack.ApplyOpts...)
