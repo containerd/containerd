@@ -32,7 +32,6 @@ import (
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/opencontainers/runtime-spec/specs-go/features"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubelet/pkg/cri/streaming"
 
 	apitypes "github.com/containerd/containerd/api/types"
 
@@ -49,6 +48,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/store/label"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	snapshotstore "github.com/containerd/containerd/v2/internal/cri/store/snapshot"
+	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	"github.com/containerd/containerd/v2/internal/eventq"
 	nriservice "github.com/containerd/containerd/v2/internal/nri"
