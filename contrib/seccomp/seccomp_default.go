@@ -176,6 +176,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"getuid",
 				"getuid32",
 				"getxattr",
+				"getxattrat", // kernel v6.13, libseccomp v2.6.0
 				"inotify_add_watch",
 				"inotify_init",
 				"inotify_init1",
@@ -203,6 +204,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"listen",
 				"listmount", // kernel v6.8, libseccomp v2.6.0
 				"listxattr",
+				"listxattrat", // kernel v6.13, libseccomp v2.6.0
 				"llistxattr",
 				"_llseek",
 				"lremovexattr",
@@ -288,6 +290,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"recvmsg",
 				"remap_file_pages",
 				"removexattr",
+				"removexattrat", // kernel v6.13, libseccomp v2.6.0
 				"rename",
 				"renameat",
 				"renameat2",
@@ -357,6 +360,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"setuid",
 				"setuid32",
 				"setxattr",
+				"setxattrat", // kernel v6.13, libseccomp v2.6.0
 				"shmat",
 				"shmctl",
 				"shmdt",
