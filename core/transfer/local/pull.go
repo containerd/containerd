@@ -199,6 +199,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
 						enableRemoteSnapshotAnnotations = true
 					}
+					if u.AllContent {
+						uopts = append(uopts, unpack.WithFetchAllContent())
+					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				}
 			}
