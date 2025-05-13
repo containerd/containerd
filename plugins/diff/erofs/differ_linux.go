@@ -76,8 +76,8 @@ func NewErofsDiffer(store content.Store, mkfsExtraOpts []string) differ {
 // Since `images.DiffCompression` doesn't support arbitrary media types,
 // disallow non-empty suffixes for now.
 func isErofsMediaType(mt string) bool {
-	mediaType, ext, ok := strings.Cut(mt, "+")
-	if !ok || ext != "" {
+	mediaType, _, hasExt := strings.Cut(mt, "+")
+	if hasExt {
 		return false
 	}
 	return strings.HasSuffix(mediaType, ".erofs")
