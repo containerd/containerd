@@ -86,6 +86,7 @@ func WithHtop(s *specs.Spec) error {
 ```
 
 Adding your new option to spec generation is as easy as importing your new package and adding the option when creating a spec.
+Note: if you run client in container you should bind containerd root path in the container and the container should have mount capability.
 
 ```go
 import "github.com/crosbymichael/monitor"
