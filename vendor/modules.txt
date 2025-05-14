@@ -582,6 +582,10 @@ go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
 go.opentelemetry.io/proto/otlp/trace/v1
+# go.uber.org/goleak v1.3.0
+## explicit; go 1.20
+go.uber.org/goleak
+go.uber.org/goleak/internal/stack
 # golang.org/x/crypto v0.36.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/cast5
@@ -825,9 +829,6 @@ k8s.io/apimachinery/pkg/version
 k8s.io/apimachinery/pkg/watch
 k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
-# k8s.io/apiserver v0.32.3
-## explicit; go 1.23.0
-k8s.io/apiserver/pkg/endpoints/responsewriter
 # k8s.io/client-go v0.32.3
 ## explicit; go 1.23.0
 k8s.io/client-go/features
@@ -864,11 +865,6 @@ k8s.io/klog/v2/internal/dbg
 k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
-# k8s.io/kubelet v0.32.3
-## explicit; go 1.23.0
-k8s.io/kubelet/pkg/cri/streaming
-k8s.io/kubelet/pkg/cri/streaming/portforward
-k8s.io/kubelet/pkg/cri/streaming/remotecommand
 # k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 ## explicit; go 1.18
 k8s.io/utils/clock

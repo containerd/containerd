@@ -36,6 +36,7 @@ require (
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c
 	github.com/docker/go-metrics v0.0.1
 	github.com/docker/go-units v0.5.0
+	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -72,6 +73,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.35.0
 	go.opentelemetry.io/otel/sdk v1.35.0
 	go.opentelemetry.io/otel/trace v1.35.0
+	go.uber.org/goleak v1.3.0
 	golang.org/x/mod v0.24.0
 	golang.org/x/sync v0.14.0
 	golang.org/x/sys v0.33.0
@@ -83,7 +85,6 @@ require (
 	k8s.io/client-go v0.32.3
 	k8s.io/cri-api v0.32.3
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kubelet v0.32.3
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	tags.cncf.io/container-device-interface v1.0.1
 )
@@ -95,7 +96,6 @@ require (
 	github.com/cilium/ebpf v0.16.0 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
-	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
@@ -145,7 +145,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/api v0.32.3 // indirect
-	k8s.io/apiserver v0.32.3 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect

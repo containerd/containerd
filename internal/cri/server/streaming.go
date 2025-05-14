@@ -26,8 +26,8 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/utils/exec"
 
+	streaming "github.com/containerd/containerd/v2/internal/cri/streamingserver"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
-	"k8s.io/kubelet/pkg/cri/streaming"
 )
 
 type streamRuntime struct {
