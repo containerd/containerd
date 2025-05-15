@@ -1483,9 +1483,12 @@ func WithWindowsDevice(idType, id string) SpecOpts {
 	}
 }
 
-// WithMemorySwap sets the container's swap in bytes
+// WithMemorySwap sets the container's swap in bytes. It is a no-op on non-Linux specs.
 func WithMemorySwap(swap int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setResources(s)
 		if s.Linux.Resources.Memory == nil {
 			s.Linux.Resources.Memory = &specs.LinuxMemory{}
@@ -1495,9 +1498,12 @@ func WithMemorySwap(swap int64) SpecOpts {
 	}
 }
 
-// WithPidsLimit sets the container's pid limit or maximum
+// WithPidsLimit sets the container's pid limit or maximum. It is a no-op on non-Linux specs.
 func WithPidsLimit(limit int64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setResources(s)
 		if s.Linux.Resources.Pids == nil {
 			s.Linux.Resources.Pids = &specs.LinuxPids{}
@@ -1507,45 +1513,61 @@ func WithPidsLimit(limit int64) SpecOpts {
 	}
 }
 
-// WithBlockIO sets the container's blkio parameters
+// WithBlockIO sets the container's blkio parameters. It is a no-op on non-Linux specs.
 func WithBlockIO(blockio *specs.LinuxBlockIO) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setResources(s)
 		s.Linux.Resources.BlockIO = blockio
 		return nil
 	}
 }
 
-// WithCPUShares sets the container's cpu shares
+// WithCPUShares sets the container's cpu shares. It is a no-op on non-Linux specs.
 func WithCPUShares(shares uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Shares = &shares
 		return nil
 	}
 }
 
-// WithCPUs sets the container's cpus/cores for use by the container
+// WithCPUs sets the container's cpus/cores for use by the container. It is a no-op on non-Linux specs.
 func WithCPUs(cpus string) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Cpus = cpus
 		return nil
 	}
 }
 
-// WithCPUsMems sets the container's cpu mems for use by the container
+// WithCPUsMems sets the container's cpu mems for use by the container. It is a no-op on non-Linux specs.
 func WithCPUsMems(mems string) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Mems = mems
 		return nil
 	}
 }
 
-// WithCPUCFS sets the container's Completely fair scheduling (CFS) quota and period
+// WithCPUCFS sets the container's Completely fair scheduling (CFS) quota and period.
+// It is a no-op on non-Linux specs.
 func WithCPUCFS(quota int64, period uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Quota = &quota
 		s.Linux.Resources.CPU.Period = &period
@@ -1553,9 +1575,12 @@ func WithCPUCFS(quota int64, period uint64) SpecOpts {
 	}
 }
 
-// WithCPUBurst sets the container's cpu burst
+// WithCPUBurst sets the container's cpu burst. It is a no-op on non-Linux specs.
 func WithCPUBurst(burst uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.Burst = &burst
 		return nil
@@ -1563,8 +1588,12 @@ func WithCPUBurst(burst uint64) SpecOpts {
 }
 
 // WithCPURT sets the container's realtime scheduling (RT) runtime and period.
+// It is a no-op on non-Linux specs.
 func WithCPURT(runtime int64, period uint64) SpecOpts {
 	return func(ctx context.Context, _ Client, c *containers.Container, s *Spec) error {
+		if s.Linux == nil {
+			return nil
+		}
 		setCPU(s)
 		s.Linux.Resources.CPU.RealtimeRuntime = &runtime
 		s.Linux.Resources.CPU.RealtimePeriod = &period
@@ -1590,9 +1619,12 @@ func WithRdt(closID, l3CacheSchema, memBwSchema string) SpecOpts {
 }
 
 // WithWindowsCPUCount sets the `Windows.Resources.CPU.Count` section to the
-// `count` specified.
+// `count` specified. It is a no-op for non-Windows specs.
 func WithWindowsCPUCount(count uint64) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			return nil
+		}
 		setCPUWindows(s)
 		s.Windows.Resources.CPU.Count = &count
 		return nil
@@ -1600,9 +1632,12 @@ func WithWindowsCPUCount(count uint64) SpecOpts {
 }
 
 // WithWindowsCPUShares sets the `Windows.Resources.CPU.Shares` section to the
-// `shares` specified.
+// `shares` specified. It is a no-op for non-Windows specs.
 func WithWindowsCPUShares(shares uint16) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			return nil
+		}
 		setCPUWindows(s)
 		s.Windows.Resources.CPU.Shares = &shares
 		return nil
@@ -1610,9 +1645,12 @@ func WithWindowsCPUShares(shares uint16) SpecOpts {
 }
 
 // WithWindowsCPUMaximum sets the `Windows.Resources.CPU.Maximum` section to the
-// `max` specified.
+// `max` specified. It is a no-op for non-Windows specs.
 func WithWindowsCPUMaximum(max uint16) SpecOpts {
 	return func(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
+		if s.Windows == nil {
+			return nil
+		}
 		setCPUWindows(s)
 		s.Windows.Resources.CPU.Maximum = &max
 		return nil

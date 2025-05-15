@@ -42,6 +42,12 @@ import (
 	"github.com/containerd/errdefs"
 )
 
+var emptySpecs = map[string]Spec{
+	"empty":   {},
+	"linux":   {Linux: &specs.Linux{}},
+	"windows": {Windows: &specs.Windows{}},
+}
+
 type blob []byte
 
 func (b blob) ReadAt(p []byte, off int64) (int, error) {
@@ -416,6 +422,131 @@ func TestWithMemoryLimit(t *testing.T) {
 	}
 }
 
+func TestWithMemorySwap(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := int64(123)
+			err := WithMemorySwap(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.Memory.Swap)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithPidsLimit(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := int64(123)
+			err := WithPidsLimit(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.Pids.Limit)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithBlockIO(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			v := uint16(123)
+			expected := &specs.LinuxBlockIO{
+				Weight:     &v,
+				LeafWeight: &v,
+			}
+			err := WithBlockIO(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.BlockIO)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUShares(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithCPUShares(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Shares)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUs(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := "0,1"
+			err := WithCPUs(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.CPU.Cpus)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUsMems(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := "0,1"
+			err := WithCPUsMems(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, spec.Linux.Resources.CPU.Mems)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPUBurst(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithCPUBurst(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expected, *spec.Linux.Resources.CPU.Burst)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithCPURT(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expectedRT, expectedPeriod := int64(123), uint64(456)
+			err := WithCPURT(expectedRT, expectedPeriod)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "linux" {
+				assert.Equal(t, expectedRT, *spec.Linux.Resources.CPU.RealtimeRuntime)
+				assert.Equal(t, expectedPeriod, *spec.Linux.Resources.CPU.RealtimePeriod)
+			} else {
+				assert.Empty(t, spec.Linux, "should not have modified spec")
+			}
+		})
+	}
+}
+
 func isEqualStringArrays(values, expected []string) bool {
 	if len(values) != len(expected) {
 		return false
@@ -766,6 +897,51 @@ func TestWithWindowsDevice(t *testing.T) {
 				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
 			} else if spec.Windows != nil && spec.Windows.Devices != nil {
 				assert.ElementsMatch(t, spec.Windows.Devices, tc.expectedWindowsDevices)
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUCount(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint64(123)
+			err := WithWindowsCPUCount(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Count)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUShares(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint16(123)
+			err := WithWindowsCPUShares(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Shares)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
+			}
+		})
+	}
+}
+
+func TestWithWindowsCPUMaximum(t *testing.T) {
+	for name, spec := range emptySpecs {
+		t.Run(name, func(t *testing.T) {
+			expected := uint16(123)
+			err := WithWindowsCPUMaximum(expected)(nil, nil, nil, &spec)
+			assert.NoError(t, err)
+			if name == "windows" {
+				assert.Equal(t, expected, *spec.Windows.Resources.CPU.Maximum)
+			} else {
+				assert.Empty(t, spec.Windows, "should not have modified spec")
 			}
 		})
 	}
