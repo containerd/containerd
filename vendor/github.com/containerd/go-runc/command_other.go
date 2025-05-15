@@ -29,7 +29,7 @@ func (r *Runc) command(context context.Context, args ...string) *exec.Cmd {
 	if command == "" {
 		command = DefaultCommand
 	}
-	cmd := exec.CommandContext(context, command, append(r.args(), args...)...)
+	cmd := exec.CommandContext(context, command, append(r.args(""), args...)...)
 	cmd.Env = os.Environ()
 	return cmd
 }
