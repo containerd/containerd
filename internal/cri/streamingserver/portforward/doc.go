@@ -31,4 +31,4 @@ limitations under the License.
 */
 
 // Package portforward contains functions related to pod portwarding over the cri streaming api.
-package portforward // import "k8s.io/kubelet/pkg/cri/streaming/portforward"
+package portforward // this package was cloned from "k8s.io/kubelet/pkg/cri/streaming/portforward"
