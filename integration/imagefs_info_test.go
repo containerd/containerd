@@ -33,7 +33,7 @@ func TestImageFSInfo(t *testing.T) {
 	PodSandboxConfigWithCleanup(t, "running-pod", "imagefs")
 
 	t.Logf("Pull an image to make sure image fs is not empty")
-	EnsureImageExists(t, images.Get(images.BusyBox))
+	EnsureImageExists(t, images.Get(images.BusyBox), *runtimeHandler)
 
 	// It takes time to populate imagefs stats. Use eventually
 	// to check for a period of time.
