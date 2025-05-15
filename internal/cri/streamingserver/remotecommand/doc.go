@@ -31,4 +31,4 @@ limitations under the License.
 */
 
 // Package remotecommand contains functions related to executing commands in and attaching to pods.
-package remotecommand // import "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+package remotecommand // This package was cloned from "k8s.io/kubelet/pkg/cri/streaming/remotecommand"

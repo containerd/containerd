@@ -30,7 +30,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package responsewriter
+package responsewriter // This package was cloned from k8s.io/apiserver/pkg/endpoints/responsewriter
 
 import (
 	"net/http"

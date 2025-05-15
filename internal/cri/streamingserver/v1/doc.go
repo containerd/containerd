@@ -31,4 +31,4 @@ limitations under the License.
 */
 
 // Package v1 contains types/constants for core types used by the streaming server command functions.
-package v1 // import "k8s.io/api/core/v1"
+package v1 // this package was cloned from "k8s.io/api/core/v1"

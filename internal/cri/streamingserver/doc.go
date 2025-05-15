@@ -31,4 +31,4 @@ limitations under the License.
 */
 
 // Package streamingserver contains server functions related the cri streaming api.
-package streamingserver // import "k8s.io/kubelet/pkg/cri/streaming"
+package streamingserver // this package was cloned from "k8s.io/kubelet/pkg/cri/streaming"

@@ -171,7 +171,7 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 	case remotecommandconsts.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		log.L.Infof("Client did not request protocol negotiation. Falling back protocol %v", remotecommandconsts.StreamProtocolV1Name)
+		log.L.WithField("protocol", remotecommandconsts.StreamProtocolV1Name).Info("Client did not request protocol negotiation. Falling back")
 		fallthrough
 	case remotecommandconsts.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}

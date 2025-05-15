@@ -202,9 +202,9 @@ func (h *websocketStreamHandler) portForward(p *websocketStreamPair) {
 	defer p.dataStream.Close()
 	defer p.errorStream.Close()
 
-	log.L.Infof("Connection invoking forwarder.PortForward for port connection port %v", p.port)
+	log.L.WithField("port", p.port).Info("Connection invoking forwarder.PortForward for port connection")
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, p.port, p.dataStream)
-	log.L.Infof("Connection done invoking forwarder.PortForward for port connection port %v", p.port)
+	log.L.WithField("port", p.port).Info("Connection done invoking forwarder.PortForward for port connection")
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", p.port, h.pod, h.uid, err)

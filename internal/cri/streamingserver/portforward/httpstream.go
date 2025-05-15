@@ -66,7 +66,7 @@ func handleHTTPStreams(req *http.Request, w http.ResponseWriter, portForwarder P
 	}
 	defer conn.Close()
 
-	log.L.Infof("Connection setting port forwarding streaming connection idle timeout connection idleTimeout %v", idleTimeout)
+	log.L.WithField("idleTimeout", idleTimeout).Info("Connection setting port forwarding streaming connection idle timeout")
 	conn.SetIdleTimeout(idleTimeout)
 
 	h := &httpStreamHandler{
@@ -137,11 +137,11 @@ func (h *httpStreamHandler) getStreamPair(requestID string) (*httpStreamPair, bo
 	defer h.streamPairsLock.Unlock()
 
 	if p, ok := h.streamPairs[requestID]; ok {
-		log.L.Infof("Connection request found existing stream pair connection request %v", requestID)
+		log.L.WithField("requestID", requestID).Info("Connection request found existing stream pair connection")
 		return p, false
 	}
 
-	log.L.Infof("Connection request creating new stream pair connection request %v", requestID)
+	log.L.WithField("requestID", requestID).Info("Connection request creating new stream pair connection")
 
 	p := newPortForwardPair(requestID)
 	h.streamPairs[requestID] = p
@@ -159,7 +159,7 @@ func (h *httpStreamHandler) monitorStreamPair(p *httpStreamPair, timeout <-chan 
 		utilruntime.HandleError(err)
 		p.printError(err.Error())
 	case <-p.complete:
-		log.L.Infof("Connection request successfully received error and data streams connection request %v", p.requestID)
+		log.L.WithField("requestID", p.requestID).Info("Connection request successfully received error and data streams connection")
 	}
 	h.removeStreamPair(p.requestID)
 }
@@ -217,7 +217,8 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 			requestID = strconv.Itoa(int(stream.Identifier()) - 2)
 		}
 
-		log.L.Infof("Connection automatically assigning request ID from stream type and stream ID connection request %v streamType %v stream %v", requestID, streamType, stream.Identifier())
+		log.L.WithFields(log.Fields{"request": requestID, "streamType": streamType, "stream": stream.Identifier()}).Infof(
+			"Connection automatically assigning request ID from stream type and stream ID connection")
 	}
 	return requestID
 }
@@ -226,7 +227,7 @@ func (h *httpStreamHandler) requestID(stream httpstream.Stream) string {
 // streams, invoking portForward for each complete stream pair. The loop exits
 // when the httpstream.Connection is closed.
 func (h *httpStreamHandler) run() {
-	log.L.Infof("Connection waiting for port forward streams connection %v", h.conn)
+	log.L.Info("Connection waiting for port forward streams connection")
 Loop:
 	for {
 		select {
@@ -236,7 +237,8 @@ Loop:
 		case stream := <-h.streamChan:
 			requestID := h.requestID(stream)
 			streamType := stream.Headers().Get(api.StreamType)
-			log.L.Infof("Connection request received new type of stream connection request %v streamType %v", requestID, streamType)
+			log.L.WithFields(log.Fields{"request": requestID, "streamType": streamType}).Info(
+				"Connection request received new type of stream connection")
 
 			p, created := h.getStreamPair(requestID)
 			if created {
@@ -263,9 +265,11 @@ func (h *httpStreamHandler) portForward(p *httpStreamPair) {
 	portString := p.dataStream.Headers().Get(api.PortHeader)
 	port, _ := strconv.ParseInt(portString, 10, 32)
 
-	log.L.Infof("Connection request invoking forwarder.PortForward for port connection request %v port %v", p.requestID, portString)
+	log.L.WithFields(log.Fields{"request": p.requestID, "port": portString}).Info(
+		"Connection request invoking forwarder.PortForward for port connection")
 	err := h.forwarder.PortForward(ctx, h.pod, h.uid, int32(port), p.dataStream)
-	log.L.Infof("Connection request done invoking forwarder.PortForward for port connection reqeust %v port %v", p.requestID, portString)
+	log.L.WithFields(log.Fields{"request": p.requestID, "port": portString}).Info(
+		"Connection request done invoking forwarder.PortForward for port connection")
 
 	if err != nil {
 		msg := fmt.Errorf("error forwarding port %d to pod %s, uid %v: %v", port, h.pod, h.uid, err)
