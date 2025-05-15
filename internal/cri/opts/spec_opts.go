@@ -118,6 +118,29 @@ func WithAnnotation(k, v string) oci.SpecOpts {
 	}
 }
 
+// WithAffinityCPUs sets the CPU affinity values in runtime spec for windows.
+func WithAffinityCPUs(affinityCPUs []*runtime.WindowsCpuGroupAffinity) oci.SpecOpts {
+	return func(_ context.Context, _ oci.Client, c *containers.Container, s *runtimespec.Spec) error {
+		// We would expect the Windows and Resources struct to be setup by now
+		if affinityCPUs == nil || s.Windows == nil || s.Windows.Resources == nil {
+			return nil
+		}
+		if s.Windows.Resources.CPU == nil {
+			s.Windows.Resources.CPU = &runtimespec.WindowsCPUResources{}
+		}
+		if s.Windows.Resources.CPU.Affinity == nil {
+			s.Windows.Resources.CPU.Affinity = make([]runtimespec.WindowsCPUGroupAffinity, len(affinityCPUs))
+		}
+		for i, affinity := range affinityCPUs {
+			s.Windows.Resources.CPU.Affinity[i] = runtimespec.WindowsCPUGroupAffinity{
+				Mask:  affinity.CpuMask,
+				Group: affinity.CpuGroup,
+			}
+		}
+		return nil
+	}
+}
+
 // WithAdditionalGIDs adds any additional groups listed for a particular user in the
 // /etc/groups file of the image's root filesystem to the OCI spec's additionalGids array.
 func WithAdditionalGIDs(userstr string) oci.SpecOpts {
