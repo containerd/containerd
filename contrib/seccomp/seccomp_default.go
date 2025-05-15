@@ -176,6 +176,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"getuid",
 				"getuid32",
 				"getxattr",
+				"getxattrat", // kernel v6.13, libseccomp v2.6.0
 				"inotify_add_watch",
 				"inotify_init",
 				"inotify_init1",
@@ -201,12 +202,17 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"link",
 				"linkat",
 				"listen",
+				"listmount", // kernel v6.8, libseccomp v2.6.0
 				"listxattr",
+				"listxattrat", // kernel v6.13, libseccomp v2.6.0
 				"llistxattr",
 				"_llseek",
 				"lremovexattr",
 				"lseek",
 				"lsetxattr",
+				"lsm_get_self_attr", // kernel v6.8, libseccomp v2.6.0
+				"lsm_list_modules",  // kernel v6.8, libseccomp v2.6.0
+				"lsm_set_self_attr", // kernel v6.8, libseccomp v2.6.0
 				"lstat",
 				"lstat64",
 				"madvise",
@@ -234,6 +240,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"mq_timedsend_time64",
 				"mq_unlink",
 				"mremap",
+				"mseal", // kernel v6.10, libseccomp v2.6.0
 				"msgctl",
 				"msgget",
 				"msgrcv",
@@ -283,6 +290,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"recvmsg",
 				"remap_file_pages",
 				"removexattr",
+				"removexattrat", // kernel v6.13, libseccomp v2.6.0
 				"rename",
 				"renameat",
 				"renameat2",
@@ -352,6 +360,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"setuid",
 				"setuid32",
 				"setxattr",
+				"setxattrat", // kernel v6.13, libseccomp v2.6.0
 				"shmat",
 				"shmctl",
 				"shmdt",
@@ -369,6 +378,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"stat64",
 				"statfs",
 				"statfs64",
+				"statmount", // kernel v6.8, libseccomp v2.6.0
 				"statx",
 				"symlink",
 				"symlinkat",
@@ -400,6 +410,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 				"uname",
 				"unlink",
 				"unlinkat",
+				"uretprobe", // kernel v6.11, libseccomp v2.6.0
 				"utime",
 				"utimensat",
 				"utimensat_time64",
@@ -560,6 +571,7 @@ func DefaultProfile(sp *specs.Spec) *specs.LinuxSeccomp {
 		s.Syscalls = append(s.Syscalls, specs.LinuxSyscall{
 			Names: []string{
 				"riscv_flush_icache",
+				"riscv_hwprobe", // kernel v6.12, libseccomp v2.6.0
 			},
 			Action: specs.ActAllow,
 			Args:   []specs.LinuxSeccompArg{},
