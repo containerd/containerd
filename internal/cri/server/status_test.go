@@ -17,12 +17,67 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/containerd/containerd/api/services/introspection/v1"
 	"github.com/stretchr/testify/assert"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
+
+type fakeIntrospectionService struct {
+}
+
+func (f fakeIntrospectionService) Plugins(context.Context, ...string) (*introspection.PluginsResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f fakeIntrospectionService) Server(ctx context.Context) (*introspection.ServerResponse, error) {
+	return &introspection.ServerResponse{Deprecations: []*introspection.DeprecationWarning{}}, nil
+}
+
+func (f fakeIntrospectionService) PluginInfo(context.Context, string, string, any) (*introspection.PluginInfoResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
+// commonConfig is shared by all CRI container runtimes
+type commonConfig struct {
+	SandboxImage string `json:"sandboxImage,omitempty"`
+}
+
+func criConfig(sandboxImage string) (*commonConfig, error) {
+	// need Client IntrospectionService for Server Deprecations, or Status will crash
+	c := newTestCRIService(withClientIntrospectionService(&fakeIntrospectionService{}))
+	if sandboxImage != "" {
+		c.ImageService = &fakeImageService{pinnedImages: map[string]string{"sandbox": sandboxImage}}
+	}
+	resp, err := c.Status(context.Background(), &runtime.StatusRequest{Verbose: true})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+	config := &commonConfig{}
+	if err := json.Unmarshal([]byte(resp.Info["config"]), config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	return config, nil
+}
+
+func TestStatusConfig(t *testing.T) {
+	// use default sandbox image from Client
+	config, err := criConfig("")
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", config.SandboxImage)
+}
+
+func TestStatusConfigSandboxImage(t *testing.T) {
+	pause := "registry.k8s.io/pause:override"
+	config, err := criConfig(pause)
+	assert.NoError(t, err)
+	assert.Equal(t, pause, config.SandboxImage)
+}
 
 func TestRuntimeConditionContainerdHasNoDeprecationWarnings(t *testing.T) {
 	deprecations := []*introspection.DeprecationWarning{
