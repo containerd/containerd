@@ -86,7 +86,7 @@ loaded (Linux 5.4 or later is required): it can be loaded with `modprobe erofs`.
 The following configuration can be used in your containerd `config.toml`. Don't
 forget to restart containerd after changing the configuration.
 
-```
+``` toml
   [plugins."io.containerd.snapshotter.v1.erofs"]
       # Enable fsverity support for EROFS layers, default is false
       enable_fsverity = true
@@ -96,6 +96,15 @@ forget to restart containerd after changing the configuration.
 
   [plugins."io.containerd.service.v1.diff-service"]
     default = ["erofs","walking"]
+```
+
+Note that if erofs-utils is 1.8.2 or higher, it's preferred to add
+`--sort=none` to the differ's `mkfs_options` to avoid unnecessary tar data
+reordering for improved performance, as shown below:
+
+``` toml
+  [plugins."io.containerd.differ.v1.erofs"]
+    mkfs_options = ["--sort=none"]
 ```
 
 ### Running a container
