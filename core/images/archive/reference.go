@@ -47,8 +47,21 @@ func refTranslator(image string, checkPrefix bool) func(string) string {
 		// Check if ref is full reference
 		if strings.ContainsAny(ref, "/:@") {
 			// If not prefixed, don't include image
-			if checkPrefix && !isImagePrefix(ref, image) {
-				return ""
+			if checkPrefix {
+				// Handle case where ref is fully qualified (like docker.io/library/nginx:latest)
+				// but image is short form (like nginx)
+				if !isImagePrefix(ref, image) {
+					// Try to extract the image name without registry/namespace
+					parts := strings.Split(ref, "/")
+					lastPart := parts[len(parts)-1]
+
+					// Check if the last part starts with our image name
+					if strings.HasPrefix(lastPart, image) &&
+						(len(lastPart) == len(image) || lastPart[len(image)] == ':' || lastPart[len(image)] == '@') {
+						return ref
+					}
+					return ""
+				}
 			}
 			return ref
 		}
