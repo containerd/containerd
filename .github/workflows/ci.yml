@@ -518,7 +518,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -576,7 +576,7 @@ jobs:
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
