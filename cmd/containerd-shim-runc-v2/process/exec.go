@@ -204,6 +204,9 @@ func (e *execProcess) start(ctx context.Context) (err error) {
 	if socket != nil {
 		opts.ConsoleSocket = socket
 	}
+	// generate a special log file for every exec process.
+	e.parent.runtime.Log = filepath.Join(filepath.Dir(e.parent.runtime.Log), fmt.Sprintf("%s-exec.log", e.id))
+	defer os.RemoveAll(e.parent.runtime.Log)
 	if err := e.parent.runtime.Exec(ctx, e.parent.id, e.spec, opts); err != nil {
 		close(e.waitBlock)
 		return e.parent.runtimeError(err, "OCI runtime exec failed")
