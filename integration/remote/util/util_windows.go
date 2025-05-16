@@ -104,15 +104,16 @@ func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
 
 func parseEndpoint(endpoint string) (string, string, error) {
 	// url.Parse doesn't recognize \, so replace with / first.
-	endpoint = strings.Replace(endpoint, "\\", "/", -1)
+	endpoint = strings.ReplaceAll(endpoint, "\\", "/")
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return "", "", err
 	}
 
-	if u.Scheme == "tcp" {
+	switch u.Scheme {
+	case "tcp":
 		return "tcp", u.Host, nil
-	} else if u.Scheme == "npipe" {
+	case "npipe":
 		if strings.HasPrefix(u.Path, "//./pipe") {
 			return "npipe", u.Path, nil
 		}
@@ -123,8 +124,8 @@ func parseEndpoint(endpoint string) (string, string, error) {
 			host = "."
 		}
 		return "npipe", fmt.Sprintf("//%s%s", host, u.Path), nil
-	} else if u.Scheme == "" {
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+	case "":
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
 	}
 	return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
 }
