@@ -22,7 +22,7 @@ $ cat hosts
 At this point, the ansible playbook should be able to ssh into the machines in the hosts file.
 ```console
 git clone https://github.com/containerd/containerd
-cd ./contrib/ansible
+cd ./containerd/contrib/ansible
 ansible-playbook -i hosts cri-containerd.yaml
 ```
 A typical cloud login might have a username and private key file, in which case the following can be used:
