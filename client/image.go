@@ -258,6 +258,9 @@ type UnpackConfig struct {
 	// in-flight fetch request or unpack handler for a given descriptor's
 	// digest or chain ID.
 	DuplicationSuppressor kmutex.KeyedLocker
+	// FetchMissBlobs is used to fetch content which had cleaned up by garbage collector,
+	// usually, when snapshot exists will skip download content, here can force to fetch content
+	FetchMissBlobs bool
 }
 
 // UnpackOpt provides configuration for unpack
@@ -275,6 +278,14 @@ func WithSnapshotterPlatformCheck() UnpackOpt {
 func WithUnpackDuplicationSuppressor(suppressor kmutex.KeyedLocker) UnpackOpt {
 	return func(ctx context.Context, uc *UnpackConfig) error {
 		uc.DuplicationSuppressor = suppressor
+		return nil
+	}
+}
+
+// WithUnpackFetchMissBlobs sets `FetchMissBlobs` on the UnpackConfig.
+func WithUnpackFetchMissBlobs() UnpackOpt {
+	return func(ctx context.Context, uc *UnpackConfig) error {
+		uc.FetchMissBlobs = true
 		return nil
 	}
 }
