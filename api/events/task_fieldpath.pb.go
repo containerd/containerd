@@ -83,6 +83,10 @@ func (m *TaskIO) Field(fieldpath []string) (string, bool) {
 		return string(m.Stderr), len(m.Stderr) > 0
 	case "terminal":
 		return fmt.Sprint(m.Terminal), true
+	case "attachable_out":
+		return string(m.AttachableOut), len(m.AttachableOut) > 0
+	case "attachable_err":
+		return string(m.AttachableErr), len(m.AttachableErr) > 0
 	}
 	return "", false
 }
