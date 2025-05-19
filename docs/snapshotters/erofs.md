@@ -148,7 +148,7 @@ quota.  The `default_size` option can be used in the containerd configuration:
 
 ## Data Integrity
 
-The EROFS snapshotter provides two methods to consolidate data integrity:
+The EROFS snapshotter provides three methods to consolidate data integrity:
 
 ### Data Integrity with Immutable File Attribute
 
@@ -178,6 +178,65 @@ introduces additional runtime overhead since all container image reads from
 the container will be slower because it needs to verify the Merkle hash tree
 first.
 
+### Data Integrity with dm-verity
+
+The EROFS snapshotter supports device-mapper verity to provide block-level integrity
+verification for each EROFS layer. This method creates a dm-verity device for each
+layer and mounts it read-only. The dm-verity implementation uses the `go-dmverity`
+Go library, eliminating the need for external `veritysetup` command-line tools.
+This requires a Linux kernel with dm-verity support (CONFIG_DM_VERITY) and the
+device-mapper kernel module loaded.
+
+The differ must be configured to generate dm-verity metadata:
+
+```toml
+[plugins."io.containerd.differ.v1.erofs"]
+  enable_dmverity = true
+```
+
+When dm-verity is enabled, the EROFS differ formats each layer with dm-verity
+by appending a Merkle hash tree to the EROFS blob and generating a root hash.
+The hash tree is stored inline within the layer blob itself.
+The root hash and hash offset are saved in a `.dmverity` metadata file alongside the
+layer blob in JSON format. All other dm-verity parameters (block sizes, salt, etc.)
+are stored in a superblock within the layer blob and are auto-detected when mounting.
+Regular mode uses 4096-byte blocks (standard page size), while tar-index mode uses
+512-byte blocks (dm-verity logical_block_size constraint).
+
+The snapshotter can be configured to control dm-verity behavior using `dmverity_mode`:
+
+```toml
+[plugins."io.containerd.snapshotter.v1.erofs"]
+  dmverity_mode = "auto"  # Options: "auto" (default), "on", "off"
+```
+
+The available modes are:
+
+- `"auto"` (default): Uses dm-verity if `.dmverity` metadata exists for a layer,
+  otherwise mounts as regular EROFS. This allows mixing dm-verity and non-dm-verity
+  layers in the same system.
+
+- `"on"`: Requires dm-verity for all layers. If a layer lacks `.dmverity` metadata,
+  mounting will fail with an error. Use this mode when you want to enforce integrity
+  verification for all layers.
+
+  > **Important**: If you enable `dmverity_mode = "on"` after layers have already been
+  > unpacked without dm-verity enabled in the differ, those existing layers will not
+  > have `.dmverity` metadata files. In this case, you must clean up the existing
+  > snapshots and re-pull the images with both `enable_dmverity = true` in the differ
+  > and `dmverity_mode = "on"` in the snapshotter configured. Alternatively, use
+  > `dmverity_mode = "auto"` to allow mixing dm-verity and non-dm-verity layers.
+
+- `"off"`: Disables dm-verity completely, even if `.dmverity` metadata exists.
+  Layers are mounted as regular EROFS without integrity verification. Use this for
+  compatibility or when dm-verity overhead is unacceptable.
+
+When mounting a layer with dm-verity enabled, the snapshotter reads the metadata
+from the `.dmverity` file and creates a dm-verity device. The dm-verity library
+automatically reads all parameters from the superblock, ensuring that any corruption
+or tampering will be detected at read time. The dm-verity device is then mounted as
+the backing layer in the OverlayFS stack
+
 ## How It Works
 
 For each layer, the EROFS snapshotter prepares a directory containing the
@@ -204,9 +263,19 @@ In this case, the snapshot layer directory will look like this:
   work
 ```
 
+If dm-verity is enabled, a `.dmverity` metadata file will also be present:
+```
+  .erofslayer
+  fs
+  layer.erofs
+  layer.erofs.dmverity
+  work
+```
+
 Then the EROFS snapshotter will check for the existence of `layer.erofs`: it
 will mount the EROFS layer blob to `fs/` and return a valid overlayfs mount
-with all parent layers.
+with all parent layers. If dm-verity is enabled and the `.dmverity` file exists,
+the snapshotter will create a dm-verity device and mount that instead.
 
 If other differs (not the EROFS differ) are used, the EROFS snapshotter will
 convert the flat directory into an EROFS layer blob on Commit instead.
@@ -236,8 +305,3 @@ For the EROFS differ:
 [plugins."io.containerd.differ.v1.erofs"]
   enable_tar_index = true
 ```
-
-## TODO
-
-
- - DMVerity support.
