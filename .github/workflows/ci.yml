@@ -443,6 +443,14 @@ jobs:
         run: |
           sudo modprobe erofs
 
+      - name: Load dm-verity kernel module
+        run: |
+          sudo modprobe dm_verity
+
+      - name: Verify veritysetup version
+        run: |
+          veritysetup --version
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1
