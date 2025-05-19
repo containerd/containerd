@@ -162,6 +162,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		"mkdir": &mkdir{
 			rootMap: mm.rootMap,
 		},
+		"dmverity": dmverityTransformer{},
 	}
 
 	start := time.Now()

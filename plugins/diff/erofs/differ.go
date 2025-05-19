@@ -52,6 +52,8 @@ type erofsDiff struct {
 	// enableTarIndex enables generating tar index for tar content
 	// instead of fully converting the tar to EROFS format
 	enableTarIndex bool
+	// enableDmverity enables formatting layers with dm-verity after creation
+	enableDmverity bool
 }
 
 // DifferOpt is an option for configuring the erofs differ
@@ -68,6 +70,13 @@ func WithMkfsOptions(opts []string) DifferOpt {
 func WithTarIndexMode() DifferOpt {
 	return func(d *erofsDiff) {
 		d.enableTarIndex = true
+	}
+}
+
+// WithDmverity enables dm-verity formatting for EROFS layers
+func WithDmverity() DifferOpt {
+	return func(d *erofsDiff) {
+		d.enableDmverity = true
 	}
 }
 
@@ -192,6 +201,13 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 	// Read any trailing data
 	if _, err := io.Copy(io.Discard, rc); err != nil {
 		return emptyDesc, err
+	}
+
+	// Format with dm-verity if enabled
+	if s.enableDmverity {
+		if err := s.formatDmverityLayer(ctx, layerBlobPath); err != nil {
+			return emptyDesc, fmt.Errorf("failed to format dm-verity layer: %w", err)
+		}
 	}
 
 	return ocispec.Descriptor{
