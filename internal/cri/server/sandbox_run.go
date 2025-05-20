@@ -451,13 +451,20 @@ func cniNamespaceOpts(id string, config *runtime.PodSandboxConfig) ([]cni.Namesp
 
 // toCNILabels adds pod metadata into CNI labels.
 func toCNILabels(id string, config *runtime.PodSandboxConfig) map[string]string {
-	return map[string]string{
+	labels := map[string]string{
 		"K8S_POD_NAMESPACE":          config.GetMetadata().GetNamespace(),
 		"K8S_POD_NAME":               config.GetMetadata().GetName(),
 		"K8S_POD_INFRA_CONTAINER_ID": id,
 		"K8S_POD_UID":                config.GetMetadata().GetUid(),
 		"IgnoreUnknown":              "1",
 	}
+
+	// Merge PodSandboxConfig labels
+	for k, v := range config.GetLabels() {
+		labels[k] = v
+	}
+
+	return labels
 }
 
 // toCNIBandWidth converts CRI annotations to CNI bandwidth.
