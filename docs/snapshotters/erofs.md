@@ -164,6 +164,26 @@ When enabled via `enable_fsverity = true`, the snapshotter will:
 - Verify fsverity status before mounting layers
 - Skip fsverity if the filesystem or kernel does not support it
 
+## Tar Index Mode
+
+The EROFS snapshotter and differ also support a "tar index" mode that offers a unique approach to handling OCI image layers:
+
+Instead of extracting the entire tar archive to create an EROFS filesystem, the tar index mode:
+1. Generates a tar index for the tar content
+2. Appends the original tar content to the index
+3. Creates a combined file: [Tar index][Original tar content]
+
+When mounted, EROFS uses the tar index to provide efficient random access to the tar content without having to extract it first.
+
+### Configuration
+
+For the EROFS differ:
+
+```toml
+[plugins."io.containerd.differ.v1.erofs"]
+  enable_tar_index = true
+```
+
 ## TODO
 
 The EROFS Fsmerge feature is NOT supported in the current implementation
