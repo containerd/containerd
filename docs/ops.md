@@ -61,21 +61,21 @@ If you are using systemd as your init system, which most modern linux OSs are, t
 
 ```systemd
 [Unit]
-Description=containerd container runtime
-Documentation=https://containerd.io
-After=network.target
+Description="containerd container runtime"
+Documentation="https://containerd.io"
+After="network.target"
 
 [Service]
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/local/bin/containerd
-Delegate=yes
-KillMode=process
+ExecStartPre="-/sbin/modprobe overlay"
+ExecStart="/usr/local/bin/containerd"
+Delegate="yes"
+KillMode="process"
 
 [Install]
-WantedBy=multi-user.target
+WantedBy="multi-user.target"
 ```
 
-`Delegate=yes` and `KillMode=process` are the two most important changes you need to make in the `[Service]` section.
+`Delegate="yes"` and `KillMode="process"` are the two most important changes you need to make in the `[Service]` section.
 
 `Delegate` allows containerd and its runtimes to manage the cgroups of the containers that it creates.
 Without setting this option, systemd will try to move the processes into its own cgroups, causing problems for containerd and its runtimes to properly account for resource usage with the containers.
