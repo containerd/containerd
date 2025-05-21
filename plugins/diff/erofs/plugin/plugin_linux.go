@@ -18,9 +18,9 @@ package plugin
 
 import (
 	"fmt"
-	"os/exec"
 
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/internal/erofsutils"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/containerd/v2/plugins/diff/erofs"
 	"github.com/containerd/platforms"
@@ -32,6 +32,10 @@ import (
 type Config struct {
 	// MkfsOptions are extra options used for the applier
 	MkfsOptions []string `toml:"mkfs_options"`
+
+	// EnableTarIndex enables the tar index mode where the index is generated
+	// for tar content without extracting the tar
+	EnableTarIndex bool `toml:"enable_tar_index"`
 }
 
 func init() {
@@ -43,9 +47,12 @@ func init() {
 		},
 		Config: &Config{},
 		InitFn: func(ic *plugin.InitContext) (interface{}, error) {
-			_, err := exec.LookPath("mkfs.erofs")
+			tarModeSupported, err := erofsutils.SupportGenerateFromTar()
 			if err != nil {
-				return nil, fmt.Errorf("could not find mkfs.erofs: %v: %w", err, plugin.ErrSkipPlugin)
+				return nil, fmt.Errorf("failed to check mkfs.erofs availability: %v: %w", err, plugin.ErrSkipPlugin)
+			}
+			if !tarModeSupported {
+				return nil, fmt.Errorf("mkfs.erofs does not support tar mode (--tar option), disabling erofs differ: %w", plugin.ErrSkipPlugin)
 			}
 
 			md, err := ic.GetSingle(plugins.MetadataPlugin)
@@ -57,7 +64,17 @@ func init() {
 			cs := md.(*metadata.DB).ContentStore()
 			config := ic.Config.(*Config)
 
-			return erofs.NewErofsDiffer(cs, config.MkfsOptions), nil
+			var opts []erofs.DifferOpt
+
+			if len(config.MkfsOptions) > 0 {
+				opts = append(opts, erofs.WithMkfsOptions(config.MkfsOptions))
+			}
+
+			if config.EnableTarIndex {
+				opts = append(opts, erofs.WithTarIndexMode())
+			}
+
+			return erofs.NewErofsDiffer(cs, opts...), nil
 		},
 	})
 }
