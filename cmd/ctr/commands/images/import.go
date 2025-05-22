@@ -119,12 +119,6 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 		defer cancel()
 
 		if !cliContext.Bool("local") {
-			unsupportedFlags := []string{"discard-unpacked-layers"}
-			for _, s := range unsupportedFlags {
-				if cliContext.IsSet(s) {
-					return fmt.Errorf("\"--%s\" requires \"--local\" flag", s)
-				}
-			}
 			var opts []image.StoreOpt
 			prefix := cliContext.String("base-name")
 			var overwrite bool
@@ -160,6 +154,13 @@ If foobar.tar contains an OCI ref named "latest" and anonymous ref "sha256:deadb
 					}
 				}
 				opts = append(opts, image.WithPlatforms(platUnpack))
+			}
+
+			if cliContext.Bool("discard-unpacked-layers") {
+				if cliContext.Bool("no-unpack") {
+					return errors.New("--discard-unpacked-layers and --no-unpack are incompatible options")
+				}
+				opts = append(opts, image.WithDiscardUnpackedLayers())
 			}
 
 			if !cliContext.Bool("no-unpack") {

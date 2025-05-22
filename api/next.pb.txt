@@ -7506,6 +7506,13 @@ file {
       type_name: ".containerd.types.transfer.UnpackConfiguration"
       json_name: "unpacks"
     }
+    field {
+      name: "discard_unpacked_layers"
+      number: 11
+      label: LABEL_OPTIONAL
+      type: TYPE_BOOL
+      json_name: "discardUnpackedLayers"
+    }
     nested_type {
       name: "LabelsEntry"
       field {

@@ -40,6 +40,8 @@ message ImageStore {
 	// Unpack Configuration, multiple allowed
 
 	repeated UnpackConfiguration unpacks = 10;
+
+	bool discard_unpacked_layers = 11;
 }
 
 message UnpackConfiguration {
