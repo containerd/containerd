@@ -98,7 +98,7 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 		tops.Progress(transfer.Progress{
 			Event: "fetching image content",
 			Name:  name,
-			// Digest: img.Target.Digest.String(),
+			Desc:  &desc,
 		})
 	}
 	fetcher, err := ir.Fetcher(ctx, name)
@@ -253,11 +253,9 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			tops.Progress(transfer.Progress{
 				Event: "saved",
 				Name:  img.Name,
+				Desc:  &img.Target,
 			})
 		}
-	}
-
-	if tops.Progress != nil {
 		tops.Progress(transfer.Progress{
 			Event: fmt.Sprintf("Completed pull from %s", ir),
 		})
