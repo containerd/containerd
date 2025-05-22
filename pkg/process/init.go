@@ -107,7 +107,7 @@ func New(id string, runtime *runc.Runc, stdio stdio.Stdio) *Init {
 }
 
 // Create the process with the provided config
-func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
+func (p *Init) Create(ctx context.Context, r *CreateConfig) (retError error) {
 	var (
 		err     error
 		socket  *runc.Socket
@@ -125,6 +125,11 @@ func (p *Init) Create(ctx context.Context, r *CreateConfig) error {
 			return fmt.Errorf("failed to create init process I/O: %w", err)
 		}
 		p.io = pio
+		defer func() {
+			if retError != nil && p.io != nil {
+				p.io.Close()
+			}
+		}()
 	}
 	if r.Checkpoint != "" {
 		return p.createCheckpointedState(r, pidFile)
