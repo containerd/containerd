@@ -555,11 +555,6 @@ func CheckLocalImagePullConfigs(ctx context.Context, c *ImageConfig) {
 			Reason: "moved to snapshotter plugin when using transfer service",
 		},
 		{
-			Name:      "DiscardUnpackedLayers",
-			IsPresent: func() bool { return c.DiscardUnpackedLayers },
-			Reason:    "not supported with transfer service",
-		},
-		{
 			Name:      "Registry.Mirrors",
 			IsPresent: func() bool { return len(c.Registry.Mirrors) > 0 },
 			Reason:    "not supported with transfer service (also deprecated)",
