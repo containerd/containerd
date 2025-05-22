@@ -30,15 +30,17 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/pkg/archive/tartest"
-	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/continuity/fs"
 	"github.com/containerd/continuity/fs/fstest"
 	"github.com/opencontainers/go-digest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/containerd/containerd/v2/pkg/archive/tartest"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 )
 
 const tarCmd = "tar"
@@ -245,6 +247,7 @@ func TestBreakouts(t *testing.T) {
 	}
 	errFileDiff := errors.New("files differ")
 	td := t.TempDir()
+	tname := strings.Trim(strings.ReplaceAll(td, string(filepath.Separator), "_"), "_")
 
 	isSymlinkFile := func(f string) func(string) error {
 		return func(root string) error {
@@ -711,6 +714,33 @@ func TestBreakouts(t *testing.T) {
 			),
 			// resolution ends up just removing etc
 			validator: fileNotExists("etc/passwd"),
+		},
+		{
+			name: "SymlinkOverridePath",
+			w: tartest.TarAll(
+				tc.Dir("foo", 0755),
+				tc.Dir("foo/tmp", 0755),
+				tc.File("foo/tmp/breakout-"+tname, []byte{0, 1, 2}, 0644),
+				tc.Symlink("/", "foo"),
+				tc.File("foo/tmp/breakout-"+tname, []byte{3, 4, 5}, 0644),
+				tc.Dir("foo", 0755),
+				tc.Dir("foo/tmp", 0755),
+				tc.File("foo/tmp/breakout-"+tname, []byte{6, 7, 8}, 0644),
+			),
+			validator: all(
+				func(string) error {
+					b, err := os.ReadFile("/tmp/breakout-" + tname)
+					if err == nil {
+						if bytes.Equal(b, []byte{3, 4, 5}) {
+							return fmt.Errorf("file written outside of root")
+						}
+					} else if !os.IsNotExist(err) {
+						return err
+					}
+					return nil
+				},
+				fileValue("foo/tmp/breakout-"+tname, []byte{6, 7, 8}),
+			),
 		},
 	}
 
