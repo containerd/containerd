@@ -527,7 +527,7 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		ID: s.ID(),
 	})
 	if shimErr != nil {
-		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Debug("failed to delete task")
+		log.G(ctx).WithField("id", s.ID()).WithError(shimErr).Error("failed to delete task")
 		if !errors.Is(shimErr, ttrpc.ErrClosed) {
 			shimErr = errgrpc.ToNative(shimErr)
 			if !errdefs.IsNotFound(shimErr) {
