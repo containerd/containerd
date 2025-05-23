@@ -87,8 +87,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if metadata == nil {
 		return nil, errors.New("container config must include metadata")
 	}
+	sandboxMetadata := sandboxConfig.GetMetadata()
+	if sandboxMetadata == nil {
+		return nil, errors.New("pod sandbox config must include metadata")
+	}
 	containerName := metadata.Name
-	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
+	name := makeContainerName(metadata, sandboxMetadata)
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
