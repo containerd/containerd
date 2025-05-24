@@ -24,6 +24,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	api "github.com/containerd/containerd/api/services/tasks/v1"
@@ -413,16 +414,30 @@ func (l *local) List(ctx context.Context, r *api.ListTasksRequest, _ ...grpc.Cal
 }
 
 func addTasks(ctx context.Context, r *api.ListTasksResponse, tasks []runtime.Task) {
-	for _, t := range tasks {
-		tt, err := getProcessState(ctx, t)
-		if err != nil {
-			if !errdefs.IsNotFound(err) { // handle race with deletion
-				log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+	var wg sync.WaitGroup
+	// limit the max goroutines
+	sem := make(chan struct{}, 200)
+	defer close(sem)
+	tasksItems := make([]*task.Process, len(tasks))
+	for i, t := range tasks {
+		wg.Add(1)
+		go func(ctx context.Context, t runtime.Process, i int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+			}()
+			task, err := getProcessState(ctx, t)
+			if err != nil {
+				if !errdefs.IsNotFound(err) { // handle race with deletion
+					log.G(ctx).WithError(err).WithField("id", t.ID()).Error("converting task to protobuf")
+				}
 			}
-			continue
-		}
-		r.Tasks = append(r.Tasks, tt)
+			tasksItems[i] = task
+		}(ctx, t, i)
 	}
+	wg.Wait()
+	r.Tasks = append(r.Tasks, tasksItems...)
 }
 
 func (l *local) Pause(ctx context.Context, r *api.PauseTaskRequest, _ ...grpc.CallOption) (*ptypes.Empty, error) {
