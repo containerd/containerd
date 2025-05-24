@@ -79,7 +79,7 @@ func testExportImport(t *testing.T, imageName string) {
 	}
 	defer client.Close()
 
-	_, err = client.Fetch(ctx, imageName)
+	_, err = client.Fetch(ctx, imageName, WithPlatformMatcher(platforms.Default()))
 	if err != nil {
 		t.Fatal(err)
 	}
