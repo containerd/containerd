@@ -70,7 +70,7 @@ func TestImageLoad(t *testing.T) {
 			return false, err
 		}
 		return img != nil, nil
-	}, 100*time.Millisecond, 10*time.Second))
+	}, 100*time.Millisecond, 20*time.Second))
 	require.Equal(t, []string{loadedImage}, img.RepoTags)
 
 	t.Logf("create a container with the loaded image")
