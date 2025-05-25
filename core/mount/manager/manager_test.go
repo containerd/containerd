@@ -18,15 +18,20 @@ package manager
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/containerd/errdefs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/testutil"
 
@@ -70,7 +75,7 @@ func TestManager(t *testing.T) {
 
 	t.Run("SystemOverride", func(t *testing.T) {
 		handlers := map[string]mount.Handler{
-			"bind": nil,
+			"bind": &noopHandler{mounts: &atomic.Int32{}},
 		}
 		m := NewManager(db, targetdir, handlers)
 		ainfo, err := m.Activate(ctx, "id1", mounts)
@@ -89,9 +94,180 @@ func TestManager(t *testing.T) {
 
 }
 
+type noopHandler struct {
+	mounts *atomic.Int32
+}
+
+func (h *noopHandler) Mount(ctx context.Context, m mount.Mount, mp string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
+	now := time.Now()
+	h.mounts.Add(1)
+	return mount.ActiveMount{
+		Mount:      m,
+		MountedAt:  &now,
+		MountPoint: mp,
+	}, nil
+}
+
+func (h *noopHandler) Unmount(context.Context, string) error {
+	h.mounts.Add(-1)
+	return nil
+}
+
+type errOnceHandler struct {
+	mounts  *atomic.Int32
+	mounted map[string]struct{}
+}
+
+func (h *errOnceHandler) Mount(_ context.Context, m mount.Mount, mp string, _ []mount.ActiveMount) (mount.ActiveMount, error) {
+	h.mounted[mp] = struct{}{}
+	h.mounts.Add(1)
+	now := time.Now()
+	return mount.ActiveMount{
+		Mount:      m,
+		MountedAt:  &now,
+		MountPoint: mp,
+		MountData:  nil,
+	}, nil
+}
+
+func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
+	if _, ok := h.mounted[mp]; ok {
+		delete(h.mounted, mp)
+		return fmt.Errorf("first unmount always fails")
+	}
+	h.mounts.Add(-1)
+	return nil
+}
+
+// TestGC tests the garbage collecion features of the mount manager,
+// ensuring that mounts are properly cleaned up when no longer needed.
+func TestGC(t *testing.T) {
+	type gcrun struct {
+		a      []mount.Mount
+		d      []string
+		all    []string
+		remove []string
+		gcErr  bool
+	}
+
+	for _, tc := range []struct {
+		name   string
+		gcruns []gcrun
+	}{
+		{
+			name: "Simple",
+			gcruns: []gcrun{
+				{
+					a: []mount.Mount{
+						{
+							Type: "noop",
+						},
+					},
+					all:    []string{"0-0"},
+					remove: []string{},
+				},
+				{
+					all:    []string{"0-0"},
+					remove: []string{"0-0"},
+				},
+				{},
+			},
+		},
+		{
+			name: "UnmountError",
+			gcruns: []gcrun{
+				{
+					a: []mount.Mount{
+						{
+							Type: "error",
+						},
+					},
+					all:    []string{"0-0"},
+					remove: []string{},
+				},
+				{
+					all:    []string{"0-0"},
+					remove: []string{"0-0"},
+					gcErr:  true, // Expect an error on garbage collection due to unmount error
+				},
+				{}, // Run again without error to bring mount count back to zero
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			td := t.TempDir()
+			metadb := filepath.Join(td, "mounts.db")
+			targetdir := filepath.Join(td, "m")
+			db, err := bolt.Open(metadb, 0600, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := namespaces.WithNamespace(context.Background(), "test")
+
+			sourcedir := filepath.Join(td, "source")
+			if err := os.Mkdir(sourcedir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			mountC := new(atomic.Int32)
+			handlers := map[string]mount.Handler{
+				"noop":  &noopHandler{mounts: mountC},
+				"error": &errOnceHandler{mounts: mountC, mounted: make(map[string]struct{})},
+			}
+			m := NewManager(db, targetdir, handlers)
+
+			for i, run := range tc.gcruns {
+				for j, mnt := range run.a {
+					id := fmt.Sprintf("%d-%d", i, j)
+					m.Activate(ctx, id, []mount.Mount{mnt})
+				}
+
+				for _, id := range run.d {
+					if err := m.Deactivate(ctx, id); err != nil {
+						t.Fatalf("deactivate %s: %v", id, err)
+					}
+				}
+
+				cc, err := m.(interface {
+					StartCollection(context.Context) (metadata.CollectionContext, error)
+				}).StartCollection(ctx)
+				require.NoError(t, err)
+
+				var all []string
+
+				cc.All(func(n gc.Node) {
+					all = append(all, n.Key)
+				})
+
+				require.Equal(t, run.all, all, "run %d: all does not match", i)
+
+				for _, id := range run.remove {
+					cc.Remove(gc.Node{
+						Type:      metadata.ResourceMount,
+						Namespace: "test",
+						Key:       id,
+					})
+				}
+
+				err = cc.Finish()
+				if run.gcErr && err == nil {
+					t.Fatalf("expected error on run %d", i)
+				} else if !run.gcErr && err != nil {
+					t.Fatalf("unexpected error on run %d: %v", i, err)
+				}
+
+				// Interface functions not covered, cover in another test?
+				// Active(namespace string, fn func(gc.Node))
+				// Leased(namespace, lease string, fn func(gc.Node))
+				// Cancel() error
+			}
+			if mountC.Load() != 0 {
+				t.Fatalf("remaining mounts: %d", mountC.Load())
+			}
+		})
+	}
+}
+
 // TODO: Test formatting
 // TODO: Test Info
 // TODO: Test deactivate
-// TODO: Test all custom
-// TODO: Test GC
 // TODO: Test Sync
