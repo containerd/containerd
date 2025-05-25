@@ -835,25 +835,44 @@ func unmountAll(ctx context.Context, root string, handlers map[string]mount.Hand
 	}
 
 	var mountErrs error
-	// TODO : Reverse order
-	for _, d := range dirs {
-		if strings.HasSuffix(d, ".type") {
-			continue
+	for i := len(dirs) - 1; i >= 0; {
+		var (
+			d  = dirs[i]
+			mp string
+			h  mount.Handler
+		)
+		i--
+
+		if strings.HasSuffix(d, "-type") {
+			name := d[:len(d)-5]
+			if i >= 0 && dirs[i] == name {
+				i--
+			}
+			if b, rerr := os.ReadFile(filepath.Join(root, d)); rerr == nil {
+				h = handlers[string(b)]
+			} else {
+				return rerr
+			}
+			mp = filepath.Join(root, name)
+		} else {
+			mp = filepath.Join(root, d)
+			// If type file exists, continue and try again with "-type" file
+			if _, serr := os.Stat(mp + "-type"); serr == nil {
+				continue
+			} else if !os.IsNotExist(serr) {
+				return serr
+			} else {
+				log.G(ctx).WithField("mount", d).Infof("missing type file, attemping unmount with no handler")
+			}
 		}
 
-		p := filepath.Join(root, d)
-		var h mount.Handler
-		if b, rerr := os.ReadFile(p + ".type"); rerr == nil {
-			h = handlers[string(b)]
-		} else if !os.IsNotExist(rerr) {
-			return rerr
-		}
 		if h != nil {
-			err = h.Unmount(ctx, p)
+			err = h.Unmount(ctx, mp)
 		} else {
-			err = mount.Unmount(p, 0)
+			err = mount.Unmount(mp, 0)
 		}
 		if err != nil {
+			// TODO: Ignore already unmounted
 			mountErrs = errors.Join(mountErrs, fmt.Errorf("failure unmounting %s: %w", d, err))
 		}
 	}
