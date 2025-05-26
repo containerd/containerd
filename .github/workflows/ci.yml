@@ -533,8 +533,23 @@ jobs:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
           - almalinux/9
+        runtime:
+          - io.containerd.runc.v1
+          - io.containerd.runtime.v1.linux
+          - io.containerd.runc.v2
+        exclude:
+          - box: almalinux/9
+            runtime: io.containerd.runc.v1
+          - box: fedora/39-cloud-base
+            runtime: io.containerd.runc.v1
+          - box: almalinux/9
+            runtime: io.containerd.runtime.v1.linux
+          - box: fedora/39-cloud-base
+            runtime: io.containerd.runtime.v1.linux
+
     env:
       BOX: ${{ matrix.box }}
+      RUNTIME: ${{ matrix.runtime }}
 
     steps:
       - name: Show the host info
@@ -565,13 +580,13 @@ jobs:
           sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
           sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
       - name: Boot VM
-        run: sudo BOX=$BOX vagrant up --no-tty
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --no-tty
       - name: test-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
       - name: test-cri-integration
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
       - name: test-cri
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
