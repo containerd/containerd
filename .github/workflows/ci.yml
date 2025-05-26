@@ -573,6 +573,57 @@ jobs:
       - name: test-cri
         run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
+  integration-vagrant-v1:
+    name: Valgrant integration runc v1
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    needs: [project, linters, protos, man]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        box:
+          - ubuntu/focal64
+        runtime:
+          - io.containerd.runc.v1
+          - io.containerd.runtime.v1.linux
+    env:
+      BOX: ${{ matrix.box }}
+      RUNTIME: ${{ matrix.runtime }}
+
+    steps:
+      - name: Show the host info
+        run: |
+          set -x
+          uname -a
+          cat /etc/os-release
+          cat /proc/cpuinfo
+          free -mt
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: /root/.vagrant.d
+          key: vagrant-${{ matrix.box }}
+      - name: Set up vagrant
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y libvirt-daemon libvirt-daemon-system vagrant ovmf
+          # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
+          sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/
+          sudo systemctl enable --now libvirtd
+          sudo apt-get build-dep -y vagrant ruby-libvirt
+          sudo apt-get install -y --no-install-recommends libxslt-dev libxml2-dev libvirt-dev ruby-bundler ruby-dev zlib1g-dev
+          sudo env VAGRANT_DISABLE_STRICT_DEPENDENCY_ENFORCEMENT=1 vagrant plugin install vagrant-libvirt
+      - name: Boot VM
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --no-tty
+      - name: test-integration-v1
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration-v1
+      - name: test-cri-integration
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri-integration
+
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
