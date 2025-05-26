@@ -77,6 +77,8 @@ const (
 	ShimPlugin plugin.Type = "io.containerd.shim.v1"
 	// HTTPHandler implements an http handler
 	HTTPHandler plugin.Type = "io.containerd.http.v1"
+	// WatchdogPlugin implements a watchdog service
+	WatchdogPlugin plugin.Type = "io.containerd.watchdog.v1"
 )
 
 const (
