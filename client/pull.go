@@ -27,6 +27,7 @@ import (
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/containerd/containerd/v2/core/remotes/docker"
+	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
@@ -49,6 +50,14 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		if err := o(c, pullCtx); err != nil {
 			return nil, err
 		}
+	}
+
+	if resolver, ok := pullCtx.Resolver.(remotes.ResolverWithOptions); ok {
+		resolver.SetOptions(
+			transfer.WithConcurrentLayerFetchBuffer(pullCtx.ConcurrentLayerFetchBuffer),
+			transfer.WithMaxConcurrentDownloads(pullCtx.MaxConcurrentDownloads),
+			transfer.WithDownloadLimiter(pullCtx.DownloadLimiter),
+		)
 	}
 
 	if pullCtx.PlatformMatcher == nil {

@@ -32,7 +32,6 @@ import (
 	cio "github.com/containerd/containerd/v2/internal/cri/io"
 	crilabels "github.com/containerd/containerd/v2/internal/cri/labels"
 	customopts "github.com/containerd/containerd/v2/internal/cri/opts"
-	podsandboxtypes "github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	containerstore "github.com/containerd/containerd/v2/internal/cri/store/container"
 	"github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/util"
@@ -88,8 +87,12 @@ func (c *criService) CreateContainer(ctx context.Context, r *runtime.CreateConta
 	if metadata == nil {
 		return nil, errors.New("container config must include metadata")
 	}
+	sandboxMetadata := sandboxConfig.GetMetadata()
+	if sandboxMetadata == nil {
+		return nil, errors.New("pod sandbox config must include metadata")
+	}
 	containerName := metadata.Name
-	name := makeContainerName(metadata, sandboxConfig.GetMetadata())
+	name := makeContainerName(metadata, sandboxMetadata)
 	log.G(ctx).Debugf("Generated id %q for container %q", id, name)
 	if err = c.containerNameIndex.Reserve(name, id); err != nil {
 		return nil, fmt.Errorf("failed to reserve container name %q: %w", name, err)
@@ -410,9 +413,7 @@ func (c *criService) createContainer(r *createContainerRequest) (_ string, retEr
 		containerd.WithContainerExtension(crilabels.ContainerMetadataExtension, r.meta),
 	)
 
-	if r.sandbox.Sandboxer != podsandboxtypes.InternalSandboxID {
-		opts = append(opts, containerd.WithSandbox(r.sandboxID))
-	}
+	opts = append(opts, containerd.WithSandbox(r.sandboxID))
 
 	opts = append(opts, c.nri.WithContainerAdjustment())
 	defer func() {

@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/containerd/containerd/v2/core/leases"
@@ -121,7 +120,7 @@ func (lm *leaseManager) Delete(ctx context.Context, lease leases.Lease, _ ...lea
 			return err
 		}
 
-		atomic.AddUint32(&lm.db.dirty, 1)
+		lm.db.dirty.Add(1)
 
 		return nil
 	})
@@ -244,7 +243,7 @@ func (lm *leaseManager) DeleteResource(ctx context.Context, lease leases.Lease, 
 			}
 		}
 
-		atomic.AddUint32(&lm.db.dirty, 1)
+		lm.db.dirty.Add(1)
 
 		return nil
 	})

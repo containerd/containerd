@@ -577,8 +577,8 @@ func TestTransferProgressReporter(t *testing.T) {
 				},
 			},
 			check: func(t *testing.T, r *transferProgressReporter, cancelCalled <-chan struct{}) {
-				assert.Equal(t, int32(0), r.reqReporter.activeReqs, "Expected zero active request")
-				assert.Equal(t, uint64(0), r.reqReporter.totalBytesRead, "Expected zero bytes read")
+				assert.Equal(t, int32(0), r.reqReporter.activeReqs.Load(), "Expected zero active request")
+				assert.Equal(t, uint64(0), r.reqReporter.totalBytesRead.Load(), "Expected zero bytes read")
 			},
 		},
 		{

@@ -18,6 +18,7 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 
@@ -59,7 +60,11 @@ func AppContext(cliContext *cli.Context) (context.Context, context.CancelFunc) {
 func NewClient(cliContext *cli.Context, opts ...containerd.Opt) (*containerd.Client, context.Context, context.CancelFunc, error) {
 	timeoutOpt := containerd.WithTimeout(cliContext.Duration("connect-timeout"))
 	opts = append(opts, timeoutOpt)
-	client, err := containerd.New(cliContext.String("address"), opts...)
+	socketPath := cliContext.String("address")
+	if _, err := os.Stat(socketPath); err != nil {
+		return nil, nil, nil, fmt.Errorf("cannot access socket %s: %w", socketPath, err)
+	}
+	client, err := containerd.New(socketPath, opts...)
 	if err != nil {
 		return nil, nil, nil, err
 	}

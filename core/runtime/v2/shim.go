@@ -138,7 +138,7 @@ func cleanupAfterDeadShim(ctx context.Context, id string, rt *runtime.NSMap[Shim
 	ctx, cancel := timeout.WithContext(ctx, cleanupTimeout)
 	defer cancel()
 
-	log.G(ctx).WithField("id", id).Warn("cleaning up after shim disconnected")
+	log.G(ctx).WithField("id", id).Info("cleaning up after shim disconnected")
 	response, err := binaryCall.Delete(ctx)
 	if err != nil {
 		log.G(ctx).WithError(err).WithField("id", id).Warn("failed to clean up after shim disconnected")
@@ -200,6 +200,23 @@ type ShimInstance interface {
 	// Endpoint returns shim's endpoint information,
 	// including address and version.
 	Endpoint() (string, int)
+}
+
+type clientVersionDowngrader interface {
+	// Downgrade is to lower shim's client version.
+	//
+	// Assume there is a running pod created by containerd-shim-runc-v2 from v1.7.x.
+	// After upgrading to v2.x, the containerd-shim-runc-v2 binary will support the
+	// sandbox API, and calling `shim start` for the existing running pod will return
+	// a version=3 address. However, that pod shim does not support the streaming IO API,
+	// so we should downgrade the shim version.
+	//
+	// Additionally, if a container record was created with v1.7.x, it will not have
+	// a SandboxID field in the metadata store. In the CRI case, this will cause
+	// the new shim client to use the v3 protocol to send requests to a running shim
+	// that still uses the v2 protocol, resulting in a failure to start.
+	// In this case, we should also downgrade the shim version and retry.
+	Downgrade() error
 }
 
 func parseStartResponse(response []byte) (client.BootstrapParams, error) {
@@ -380,6 +397,7 @@ type shim struct {
 }
 
 var _ ShimInstance = (*shim)(nil)
+var _ clientVersionDowngrader = (*shim)(nil)
 
 // ID of the shim/task
 func (s *shim) ID() string {
@@ -388,6 +406,15 @@ func (s *shim) ID() string {
 
 func (s *shim) Endpoint() (string, int) {
 	return s.address, s.version
+}
+
+func (s *shim) Downgrade() error {
+	if s.version >= CurrentShimVersion {
+		s.version--
+		return nil
+	}
+	return fmt.Errorf("unable to downgrade because shim version (%d) is lower than CurrentShimVersion (%d)",
+		s.version, CurrentShimVersion)
 }
 
 func (s *shim) Namespace() string {

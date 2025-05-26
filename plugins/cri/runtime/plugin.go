@@ -166,6 +166,7 @@ func loadOCISpec(filename string) (*oci.Spec, error) {
 }
 
 // Set glog level.
+// TODO: mikebrow remove this klog inititialization func once we are no longer vendoring k8s.io/klog
 func setGLogLevel() error {
 	l := log.GetLevel()
 	fs := flag.NewFlagSet("klog", flag.PanicOnError)

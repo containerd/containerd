@@ -35,9 +35,8 @@ limitations under the License.
 package bandwidth
 
 import (
+	resource "github.com/containerd/containerd/v2/internal/cri/resourcequantity"
 	"github.com/containerd/errdefs"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 type unsupportedShaper struct {

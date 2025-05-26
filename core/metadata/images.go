@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	eventstypes "github.com/containerd/containerd/api/events"
@@ -326,7 +325,7 @@ func (s *imageStore) Delete(ctx context.Context, name string, opts ...images.Del
 			return err
 		}
 
-		atomic.AddUint32(&s.db.dirty, 1)
+		s.db.dirty.Add(1)
 
 		return nil
 	})

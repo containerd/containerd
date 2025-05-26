@@ -254,6 +254,9 @@ func (c *CRIImageService) pullImageWithLocalPull(
 		containerd.WithPullSnapshotter(snapshotter),
 		containerd.WithPullUnpack,
 		containerd.WithPullLabels(labels),
+		containerd.WithDownloadLimiter(c.downloadLimiter),
+		containerd.WithMaxConcurrentDownloads(c.config.MaxConcurrentDownloads),
+		containerd.WithConcurrentLayerFetchBuffer(c.config.ConcurrentLayerFetchBuffer),
 		containerd.WithUnpackOpts([]containerd.UnpackOpt{
 			containerd.WithUnpackDuplicationSuppressor(c.unpackDuplicationSuppressor),
 			containerd.WithUnpackApplyOpts(diff.WithSyncFs(c.config.ImagePullWithSyncFs)),
@@ -759,27 +762,27 @@ func (r *countingReadCloser) Close() error {
 type pullRequestReporter struct {
 	// activeReqs indicates that current number of active pulling requests,
 	// including auth requests.
-	activeReqs int32
+	activeReqs atomic.Int32
 	// totalBytesRead indicates that the total bytes has been read from
 	// remote registry.
-	totalBytesRead uint64
+	totalBytesRead atomic.Uint64
 }
 
 func (reporter *pullRequestReporter) incRequest() {
-	atomic.AddInt32(&reporter.activeReqs, 1)
+	reporter.activeReqs.Add(1)
 }
 
 func (reporter *pullRequestReporter) decRequest() {
-	atomic.AddInt32(&reporter.activeReqs, -1)
+	reporter.activeReqs.Add(-1)
 }
 
 func (reporter *pullRequestReporter) incByteRead(nr uint64) {
-	atomic.AddUint64(&reporter.totalBytesRead, nr)
+	reporter.totalBytesRead.Add(nr)
 }
 
 func (reporter *pullRequestReporter) status() (currentReqs int32, totalBytesRead uint64) {
-	currentReqs = atomic.LoadInt32(&reporter.activeReqs)
-	totalBytesRead = atomic.LoadUint64(&reporter.totalBytesRead)
+	currentReqs = reporter.activeReqs.Load()
+	totalBytesRead = reporter.totalBytesRead.Load()
 	return currentReqs, totalBytesRead
 }
 

@@ -27,7 +27,6 @@ import (
 	"github.com/containerd/log"
 
 	"github.com/containerd/containerd/v2/core/mount"
-	"github.com/containerd/containerd/v2/internal/cleanup"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
 	"github.com/containerd/containerd/v2/pkg/timeout"
 )
@@ -160,7 +159,7 @@ func (m *ShimManager) loadShim(ctx context.Context, bundle *Bundle) error {
 	shim, err := loadShimTask(ctx, bundle, func() {
 		log.G(ctx).WithField("id", id).Info("shim disconnected")
 
-		cleanupAfterDeadShim(cleanup.Background(ctx), id, m.shims, m.events, binaryCall)
+		cleanupAfterDeadShim(context.WithoutCancel(ctx), id, m.shims, m.events, binaryCall)
 		// Remove self from the runtime task list.
 		m.shims.Delete(ctx, id)
 	})
