@@ -41,6 +41,12 @@ linters:
       checks:
         - all
         - -QF1008 # Excludes QF1008 from staticcheck
+    revive:
+      rules:
+        - name: package-comments
+          severity: warning
+          disabled: true
+          exclude: [ "" ]
     nolintlint:
       allow-unused: true
   exclusions:
