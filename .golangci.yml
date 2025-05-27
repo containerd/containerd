@@ -5,9 +5,9 @@ linters:
     - depguard # Checks for dependencies that should not be (re)introduced. See "settings" for further details.
     - dupword # Checks for duplicate words in the source code
     - gosec
+    - revive
     - misspell
     - nolintlint
-    - revive
     - unconvert
   disable:
     - errcheck
@@ -18,6 +18,10 @@ linters:
           deny:
             - pkg: github.com/opencontainers/runc
               desc: We don't want to depend on runc (libcontainer), unless there is no other option; see https://github.com/opencontainers/runc/issues/3028.
+    forbidigo:
+      forbid:
+        - pkg: ^regexp$
+          msg: Use internal/lazyregexp.New instead.
     gosec:
       # The following issues surfaced when `gosec` linter
       # was enabled. They are temporarily excluded to unblock
@@ -41,10 +45,6 @@ linters:
       allow-unused: true
   exclusions:
     generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - std-error-handling
     rules:
       - path: cmd[\\/]containerd[\\/]builtins[\\/]
         text: 'blank-imports:'
@@ -73,6 +73,10 @@ linters:
       - linters:
           - revive
         text: redefines-builtin-id
+      - linters:
+          - forbidigo
+        text: 'use of `regexp.MustCompile` forbidden'
+        path: _test\.go
     paths:
       - api
       - cluster
