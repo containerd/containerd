@@ -41,6 +41,9 @@ linters:
       checks:
         - all
         - -QF1008 # Excludes QF1008 from staticcheck
+        - -ST1000
+        - -ST1020
+        - -ST1021
     revive:
       rules:
         - name: package-comments
