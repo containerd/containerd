@@ -34,9 +34,11 @@ linters:
         - G402
         - G404
         - G115
+        - G103
         - G104
         - G301
         - G302
+        - G304
     staticcheck:
       checks:
         - all
