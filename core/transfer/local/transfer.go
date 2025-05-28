@@ -25,14 +25,14 @@ import (
 	"github.com/containerd/typeurl/v2"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/containerd/errdefs"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
-	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
-	"github.com/containerd/errdefs"
 )
 
 type localTransferService struct {
@@ -184,7 +184,7 @@ type TransferConfig struct {
 	// DuplicationSuppressor is used to make sure that there is only one
 	// in-flight fetch request or unpack handler for a given descriptor's
 	// digest or chain ID.
-	DuplicationSuppressor kmutex.KeyedLocker
+	DuplicationSuppressor unpack.KeyedLocker
 
 	// BaseHandlers are a set of handlers which get are called on dispatch.
 	// These handlers always get called before any operation specific
