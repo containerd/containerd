@@ -458,6 +458,19 @@ func (r *dockerResolver) Pusher(ctx context.Context, ref string) (remotes.Pusher
 	}, nil
 }
 
+func (r *dockerResolver) PusherInChunked(ctx context.Context, ref string) (remotes.PusherInChunked, error) {
+	base, err := r.resolveDockerBase(ref)
+	if err != nil {
+		return nil, err
+	}
+
+	return dockerPusher{
+		dockerBase: base,
+		object:     base.refspec.Object,
+		tracker:    r.tracker,
+	}, nil
+}
+
 func (r *dockerResolver) resolveDockerBase(ref string) (*dockerBase, error) {
 	refspec, err := reference.Parse(ref)
 	if err != nil {
