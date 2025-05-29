@@ -138,6 +138,7 @@ func (s *service) Transfer(ctx context.Context, req *transferapi.TransferRequest
 		} else if !errdefs.IsNotImplemented(err) {
 			return nil, errgrpc.ToGRPC(err)
 		}
+		log.G(ctx).WithError(err).Debugf("transfer not implemented for %T to %T", src, dst)
 	}
 	return nil, status.Errorf(codes.Unimplemented, "method Transfer not implemented for %s to %s", req.Source.GetTypeUrl(), req.Destination.GetTypeUrl())
 }
