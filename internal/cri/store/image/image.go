@@ -112,7 +112,13 @@ func (s *Store) Update(ctx context.Context, ref string) error {
 			return fmt.Errorf("get image info from containerd: %w", err)
 		}
 	}
-	return s.update(ref, img)
+
+	parsed, err := docker.ParseAnyReference(ref)
+	if err != nil {
+		return fmt.Errorf("failed to parse image reference %q: %w", ref, err)
+	}
+
+	return s.update(parsed.String(), img)
 }
 
 // update updates the internal cache. img == nil means that
@@ -179,7 +185,7 @@ func (s *Store) getImage(ctx context.Context, i images.Image) (*Image, error) {
 
 	return &Image{
 		ID:         id,
-		References: []string{i.Name},
+		References: docker.Sort([]string{i.Name}),
 		ChainID:    chainID.String(),
 		Size:       size,
 		ImageSpec:  spec,

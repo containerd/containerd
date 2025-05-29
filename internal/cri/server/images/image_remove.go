@@ -24,6 +24,7 @@ import (
 	"github.com/containerd/containerd/v2/pkg/tracing"
 	"github.com/containerd/errdefs"
 
+	reference "github.com/distribution/reference"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -53,7 +54,9 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 		}
 		return fmt.Errorf("can not resolve %q locally: %w", imageSpec.GetImage(), err)
 	}
+
 	span.SetAttributes(tracing.Attribute("image.id", image.ID))
+
 	// Remove all image references.
 	for i, ref := range image.References {
 		var opts []images.DeleteOpt
@@ -63,15 +66,38 @@ func (c *CRIImageService) RemoveImage(ctx context.Context, imageSpec *runtime.Im
 			// someone else before this point.
 			opts = []images.DeleteOpt{images.SynchronousDelete()}
 		}
-		err = c.images.Delete(ctx, ref, opts...)
-		if err == nil || errdefs.IsNotFound(err) {
-			// Update image store to reflect the newest state in containerd.
-			if err := c.imageStore.Update(ctx, ref); err != nil {
-				return fmt.Errorf("failed to update image reference %q for %q: %w", ref, image.ID, err)
-			}
+
+		// If ref is an image name, it is normalized (includes the registry prefix).
+		if err := c.removeImageAndRef(ctx, ref, image.ID, opts); err != nil {
+			return err
+		}
+
+		name, err := reference.ParseNormalizedNamed(ref)
+		if err != nil {
 			continue
 		}
-		return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, image.ID, err)
+
+		familiarName := reference.FamiliarString(name)
+		if familiarName != ref {
+			// If the image was stored with a familiar name (e.g. "busybox:latest"),
+			// remove that too.
+			if err := c.removeImageAndRef(ctx, familiarName, image.ID, opts); err != nil {
+				return err
+			}
+		}
 	}
+
 	return nil
+}
+
+func (c *CRIImageService) removeImageAndRef(ctx context.Context, ref, imageID string, opts []images.DeleteOpt) error {
+	err := c.images.Delete(ctx, ref, opts...)
+	if err == nil || errdefs.IsNotFound(err) {
+		// Update image store to reflect the newest state in containerd.
+		if err := c.imageStore.Update(ctx, ref); err != nil {
+			return fmt.Errorf("failed to update image reference %q for %q: %w", ref, imageID, err)
+		}
+		return nil
+	}
+	return fmt.Errorf("failed to delete image reference %q for %q: %w", ref, imageID, err)
 }
