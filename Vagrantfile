@@ -238,6 +238,7 @@ EOF
     sh.upload_path = "/tmp/test-integration"
     sh.env = {
         'RUNC_FLAVOR': ENV['RUNC_FLAVOR'] || "runc",
+        'RUNC_RUNTIME': ENV['RUNC_RUNTIME'] || "io.containerd.runc.v2",
         'GOTEST': ENV['GOTEST'] || "go test",
         'GOTESTSUM_JUNITFILE': ENV['GOTESTSUM_JUNITFILE'],
     }
@@ -249,7 +250,7 @@ EOF
         rm -rf /var/lib/containerd-test /run/containerd-test
         cd ${GOPATH}/src/github.com/containerd/containerd
         go test -v -count=1 -race ./metrics/cgroups
-        make integration EXTRA_TESTFLAGS="-timeout 15m -no-criu -test.v" TEST_RUNTIME=io.containerd.runc.v2 RUNC_FLAVOR=$RUNC_FLAVOR
+        make integration EXTRA_TESTFLAGS="-timeout 15m -no-criu -test.v" TEST_RUNTIME=$RUNC_RUNTIME RUNC_FLAVOR=$RUNC_FLAVOR
     SHELL
   end
 

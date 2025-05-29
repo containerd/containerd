@@ -512,9 +512,23 @@ jobs:
           # https://github.com/containerd/containerd/pull/10297
           - almalinux/8
           - almalinux/9
+        runtime:
+          - io.containerd.runc.v1
+          - io.containerd.runtime.v1.linux
+          - io.containerd.runc.v2
+        exclude:
+          - box: almalinux/9
+            runtime: io.containerd.runc.v1
+          - box: fedora/39-cloud-base
+            runtime: io.containerd.runc.v1
+          - box: almalinux/9
+            runtime: io.containerd.runtime.v1.linux
+          - box: fedora/39-cloud-base
+            runtime: io.containerd.runtime.v1.linux
     env:
       GOTEST: gotestsum --
       BOX: ${{ matrix.box }}
+      RUNTIME: ${{ matrix.runtime }}
 
     steps:
       - uses: actions/checkout@v4
@@ -547,21 +561,21 @@ jobs:
             # The latest version 5.0.0 seems 404 (as of March 30, 2022)
             export BOX_VERSION="4.0.0"
           fi
-          sudo BOX=$BOX vagrant up --no-tty
+          sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --no-tty
 
       - name: Integration
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
           GOTESTSUM_JUNITFILE: /tmp/test-integration-junit.xml
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-integration
 
       - name: CRI test
         env:
           RUNC_FLAVOR: ${{ matrix.runc }}
           SELINUX: Enforcing
           REPORT_DIR: /tmp/critestreport
-        run: sudo BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
+        run: sudo RUNC_RUNTIME=$RUNTIME BOX=$BOX vagrant up --provision-with=selinux,install-runc,install-gotestsum,test-cri
 
       - name: Get test reports
         if: always()
