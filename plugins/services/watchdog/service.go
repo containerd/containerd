@@ -72,14 +72,3 @@ func notifyWatchdog(ctx context.Context, interval time.Duration) {
 			Debug("watchdog plugin notification")
 	}
 }
-
-func NotifyReady(ctx context.Context) {
-	ack, err := daemon.SdNotify(false, daemon.SdNotifyReady)
-	if err != nil {
-		log.G(ctx).WithError(err).Warn("notify ready failed")
-		return
-	}
-	log.G(ctx).WithField("notified", ack).
-		WithField("state", daemon.SdNotifyReady).
-		Debug("watchdog plugin notification")
-}
