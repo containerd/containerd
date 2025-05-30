@@ -162,3 +162,17 @@ jobs:
         with:
           name: windows_amd64
           path: src/github.com/containerd/containerd/bin/
+
+
+      - name: Build arm64
+        env:
+          GOOS: windows
+          GOARCH: arm64
+        run: |
+          make binaries
+          move bin binarm64
+      - name: Upload artifacts (windows_arm64)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows_arm64
+          path: src/github.com/containerd/containerd/binarm64/
