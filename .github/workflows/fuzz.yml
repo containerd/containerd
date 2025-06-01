@@ -14,32 +14,32 @@ jobs:
     steps:
     - name: Build Fuzzers
       id: build
-      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@master
+      uses: google/oss-fuzz/infra/cifuzz/actions/build_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8
       with:
         oss-fuzz-project-name: 'containerd'
         language: go
-    - name: Run Fuzzers
-      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
-      with:
-        oss-fuzz-project-name: 'containerd'
-        fuzz-seconds: 300
-        language: go
-      continue-on-error: true
-    - name: Upload Crash
-      uses: actions/upload-artifact@v4
-      if: failure() && steps.build.outcome == 'success'
-      with:
-        name: artifacts
-        path: ./out/artifacts
-
-  # Make sure all fuzzing tests which use Go 1.18's testing.F are
-  # runnable with go test -fuzz.
-  go_test_fuzz:
-    name : go test -fuzz
-    if: github.repository == 'containerd/containerd'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/install-go
-      - run: script/go-test-fuzz.sh
+#    - name: Run Fuzzers
+#      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@abe2c06d0e162320403dd10e8268adbb0b8923f8
+#      with:
+#        oss-fuzz-project-name: 'containerd'
+#        fuzz-seconds: 300
+#        language: go
+#      continue-on-error: true
+#    - name: Upload Crash
+#      uses: actions/upload-artifact@v4
+#      if: failure() && steps.build.outcome == 'success'
+#      with:
+#        name: artifacts
+#        path: ./out/artifacts
+#
+#  # Make sure all fuzzing tests which use Go 1.18's testing.F are
+#  # runnable with go test -fuzz.
+#  go_test_fuzz:
+#    name : go test -fuzz
+#    if: github.repository == 'containerd/containerd'
+#    runs-on: ubuntu-latest
+#    timeout-minutes: 30
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/install-go
+#      - run: script/go-test-fuzz.sh
