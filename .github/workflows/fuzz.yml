@@ -1,8 +1,5 @@
 name: Fuzzing
-on:
-  push:
-    branhces:
-    - 1.7-fix-fuzz
+on: [pull_request]
 permissions:  # added using https://github.com/step-security/secure-workflows
   contents: read
 
@@ -11,7 +8,7 @@ jobs:
   # Others use https://github.com/AdaLogics/go-fuzz-headers.
   ci_fuzz:
     name: CI Fuzz
-#    if: github.repository == 'akhilerm/containerd'
+    if: github.repository == 'containerd/containerd'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -21,19 +18,19 @@ jobs:
       with:
         oss-fuzz-project-name: 'containerd'
         language: go
-#    - name: Run Fuzzers
-#      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
-#      with:
-#        oss-fuzz-project-name: 'containerd'
-#        fuzz-seconds: 300
-#        language: go
-#      continue-on-error: true
-#    - name: Upload Crash
-#      uses: actions/upload-artifact@v4
-#      if: failure() && steps.build.outcome == 'success'
-#      with:
-#        name: artifacts
-#        path: ./out/artifacts
+    - name: Run Fuzzers
+      uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
+      with:
+        oss-fuzz-project-name: 'containerd'
+        fuzz-seconds: 300
+        language: go
+      continue-on-error: true
+    - name: Upload Crash
+      uses: actions/upload-artifact@v4
+      if: failure() && steps.build.outcome == 'success'
+      with:
+        name: artifacts
+        path: ./out/artifacts
 
   # Make sure all fuzzing tests which use Go 1.18's testing.F are
   # runnable with go test -fuzz.
