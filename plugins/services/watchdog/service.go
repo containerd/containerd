@@ -22,6 +22,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/containerd/containerd/v2/client"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/plugins"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
@@ -61,7 +63,20 @@ func notifyWatchdog(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	const sockPath = defaults.DefaultAddress
+
+	client, err := client.New(sockPath)
+	if err != nil {
+		log.G(ctx).WithError(err).Errorf("failed to create containerd client at %s", sockPath)
+		return
+	}
+
 	for range ticker.C {
+		health, err := client.IsServing(ctx)
+		if err != nil || !health {
+			log.G(ctx).WithError(err).Warn("containerd server is not healthy, not notifying watchdog")
+			continue
+		}
 		ack, err := daemon.SdNotify(false, daemon.SdNotifyWatchdog)
 		if err != nil {
 			log.G(ctx).WithError(err).Warn("notify watchdog failed")
