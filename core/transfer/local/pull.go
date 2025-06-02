@@ -22,6 +22,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
+	"github.com/containerd/platforms"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/containerd/containerd/v2/core/content"
@@ -194,12 +195,17 @@ func (ts *localTransferService) pull(ctx context.Context, ir transfer.ImageFetch
 			enableRemoteSnapshotAnnotations := false
 			// Only unpack if requested unpackconfig matches default/supported unpackconfigs
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
+				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
 				if matched {
 					if v, ok := mu.SnapshotterExports["enable_remote_snapshot_annotations"]; ok && v == "true" {
 						enableRemoteSnapshotAnnotations = true
 					}
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
+				} else {
+					log.G(ctx).WithFields(log.Fields{
+						"platform":    platforms.FormatAll(u.Platform),
+						"snapshotter": u.Snapshotter,
+					}).Warn("Unpack configuration not supported, skipping")
 				}
 			}
 
@@ -286,8 +292,7 @@ func fetchHandler(ingester content.Ingester, fetcher remotes.Fetcher, pt *Progre
 
 // getSupportedPlatform returns a matched platform comparing input UnpackConfiguration to the supported platform/snapshotter combinations
 // If input platform didn't specify snapshotter, default will be used if there is a match on platform.
-func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (bool, unpack.Platform) {
-	var u unpack.Platform
+func getSupportedPlatform(ctx context.Context, uc transfer.UnpackConfiguration, supportedPlatforms []unpack.Platform) (matched bool, u unpack.Platform) {
 	for _, sp := range supportedPlatforms {
 		// If both platform and snapshotter match, return the supportPlatform
 		// If platform matched and SnapshotterKey is empty, we assume client didn't pass SnapshotterKey
@@ -296,10 +301,23 @@ func getSupportedPlatform(uc transfer.UnpackConfiguration, supportedPlatforms []
 			// Assume sp.SnapshotterKey is not empty
 			if uc.Snapshotter == sp.SnapshotterKey {
 				return true, sp
-			} else if uc.Snapshotter == "" && sp.SnapshotterKey == defaults.DefaultSnapshotter {
-				return true, sp
+			} else if uc.Snapshotter == "" {
+				if sp.SnapshotterKey == defaults.DefaultSnapshotter {
+					// Return as best match immediately
+					return true, sp
+				} else if !matched {
+					// Match but prefer default if present to prevent configuration
+					// changes from altering default behavior
+					matched = true
+					u = sp
+				}
 			}
+		} else if uc.Snapshotter == sp.SnapshotterKey {
+			log.G(ctx).WithFields(log.Fields{
+				"platform":    platforms.FormatAll(uc.Platform),
+				"snapshotter": uc.Snapshotter,
+			}).Info("Found unpack with matching snapshotter but platform does not match")
 		}
 	}
-	return false, u
+	return
 }
