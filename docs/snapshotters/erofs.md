@@ -166,12 +166,12 @@ When enabled via `enable_fsverity = true`, the snapshotter will:
 
 ## Tar Index Mode
 
-The EROFS snapshotter and differ also support a "tar index" mode that offers a unique approach to handling OCI image layers:
+The EROFS differ also supports a "tar index" mode that offers a unique approach to handling OCI image layers:
 
 Instead of extracting the entire tar archive to create an EROFS filesystem, the tar index mode:
 1. Generates a tar index for the tar content
 2. Appends the original tar content to the index
-3. Creates a combined file: [Tar index][Original tar content]
+3. Creates a combined file: `[Tar index][Original tar content]`
 
 When mounted, EROFS uses the tar index to provide efficient random access to the tar content without having to extract it first.
 

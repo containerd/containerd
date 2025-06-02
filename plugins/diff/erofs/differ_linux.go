@@ -326,7 +326,7 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	// Choose between tarindex or standard conversion mode
+	// Choose between tar index or tar conversion mode
 	if s.enableTarIndex {
 		// Use the tar index method: generate tar index and append tar
 		err = erofsutils.GenerateTarIndexAndAppendTar(ctx, rc, layerBlobPath, s.mkfsExtraOpts)
@@ -335,12 +335,12 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		}
 		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar index mode")
 	} else {
-		// Use the standard method: fully convert tar to EROFS
+		// Use the tar method: fully convert tar to EROFS
 		err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, s.mkfsExtraOpts)
 		if err != nil {
 			return emptyDesc, fmt.Errorf("failed to convert tar to erofs: %w", err)
 		}
-		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using standard conversion mode")
+		log.G(ctx).WithField("path", layerBlobPath).Debug("Applied layer using tar conversion mode")
 	}
 
 	// Read any trailing data
