@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/platforms"
+	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"golang.org/x/sync/semaphore"
 )
@@ -326,6 +327,78 @@ func FilterManifestByPlatformHandler(f images.HandlerFunc, m platforms.Matcher) 
 			return descs, nil
 		}
 		return children, nil
+	}
+}
+
+// FetchMissBlobsHandler mainly used in pushing images.
+// handling missing content, especially for configuration `discard_unpacked_layers = true`.
+func FetchMissBlobsHandler(f images.HandlerFunc, resolver Resolver, store content.Store) images.HandlerFunc {
+
+	var (
+		manifests = map[digest.Digest]struct{}{}
+		layers    = map[digest.Digest]Fetcher{}
+	)
+	parse := func(ctx context.Context, desc ocispec.Descriptor) error {
+		_, ok := manifests[desc.Digest]
+		if ok {
+			return nil
+		}
+		manifests[desc.Digest] = struct{}{}
+		var ref string
+		pi, err := store.Info(ctx, desc.Digest)
+
+		if err != nil {
+			return err
+		}
+		for k, v := range pi.Labels {
+			if !strings.HasPrefix(k, labels.LabelDistributionSource+".") {
+				continue
+			}
+			ref = fmt.Sprintf("%s/%s", k[len(labels.LabelDistributionSource)+1:], v)
+			break
+		}
+
+		ft, err := resolver.Fetcher(ctx, ref)
+		if err != nil {
+			return err
+		}
+
+		childs, err := images.Children(ctx, store, desc)
+		if err != nil {
+			return err
+		}
+		for _, child := range childs {
+			layers[child.Digest] = ft
+		}
+
+		return nil
+	}
+
+	return func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
+		var err error
+		_, err = f(ctx, desc)
+		if err != nil {
+			return nil, err
+		}
+		if !images.IsLayerType(desc.MediaType) {
+			return nil, nil
+		}
+		if images.IsManifestType(desc.MediaType) {
+			return nil, parse(ctx, desc)
+		}
+
+		if _, err := store.Info(ctx, desc.Digest); err != nil {
+			if !errdefs.IsNotFound(err) {
+				return nil, err
+			}
+			log.G(ctx).WithField("digest", desc.Digest).WithField("mediatype", desc.MediaType).Warn("blob not found, fetch forcely")
+			fetcher, ok := layers[desc.Digest]
+			if ok {
+				return nil, Fetch(ctx, store, fetcher, desc)
+			}
+			return nil, fmt.Errorf("failed to find layer %s in manifest", desc.Digest)
+		}
+		return nil, nil
 	}
 }
 
