@@ -93,7 +93,7 @@ var configCommand = &cli.Command{
 		},
 		{
 			Name:   "dump",
-			Usage:  "See the output of the final main config with imported in subconfig files",
+			Usage:  "See the output of the final main config with imported in subconfig files(to validate the config file are correct,doesn't represent the configuration currently used for containerd)",
 			Action: dumpConfig,
 		},
 		{
