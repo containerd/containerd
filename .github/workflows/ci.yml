@@ -23,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2025]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
 
 
     steps:
@@ -40,7 +40,7 @@ jobs:
   #
   project:
     name: Project Checks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
@@ -68,7 +68,7 @@ jobs:
   #
   protos:
     name: Protobuf
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     defaults:
@@ -102,7 +102,7 @@ jobs:
 
   man:
     name: Manpages
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
@@ -116,7 +116,7 @@ jobs:
   crossbuild:
     name: Crossbuild Binaries
     needs: [project, linters, protos, man]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
       fail-fast: false
@@ -524,7 +524,7 @@ jobs:
 
   integration-vagrant:
     name: Vagrant integration
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     needs: [project, linters, protos, man]
 
@@ -612,7 +612,7 @@ jobs:
   tests-cri-in-userns:
     name: "CRI-in-UserNS"
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     needs: [project, linters, protos, man]
 
@@ -664,7 +664,7 @@ jobs:
 
   tests-mac-os:
     name: MacOS unit tests
-    runs-on: macos-13
+    runs-on: macos-latest
     timeout-minutes: 10
     needs: [project, linters, protos, man]
     env:
