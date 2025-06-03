@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/transfer/local"
 	"github.com/containerd/containerd/v2/core/unpack"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
 
@@ -159,6 +160,7 @@ func init() {
 				lc.UnpackPlatforms = append(lc.UnpackPlatforms, up)
 			}
 			lc.RegistryConfigPath = config.RegistryConfigPath
+			lc.DuplicationSuppressor = kmutex.New()
 
 			return local.NewTransferService(ms.ContentStore(), metadata.NewImageStore(ms), lc), nil
 		},
