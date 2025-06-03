@@ -19,6 +19,7 @@ package erofs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -265,7 +266,7 @@ func (s *snapshotter) mounts(snap storage.Snapshot, info snapshots.Info) ([]moun
 		if mntpoint != m.Source && !isErofs(mntpoint) {
 			err := m.Mount(mntpoint)
 			// Use loop if the current kernel (6.12+) doesn't support file-backed mount
-			if err == unix.ENOTBLK {
+			if errors.Is(err, unix.ENOTBLK) {
 				m.Options = append(m.Options, "loop")
 				err = m.Mount(mntpoint)
 			}
