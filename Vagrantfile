@@ -35,7 +35,10 @@ Vagrant.configure("2") do |config|
     v.memory = memory
     v.cpus = cpus
     v.machine_virtual_size = disk_size
-    v.loader = "/usr/share/OVMF/OVMF_CODE.fd"
+    # https://github.com/vagrant-libvirt/vagrant-libvirt/issues/1725#issuecomment-1454058646
+    # Needs `sudo cp /usr/share/OVMF/OVMF_VARS_4M.fd /var/lib/libvirt/qemu/nvram/`
+    v.loader = '/usr/share/OVMF/OVMF_CODE_4M.fd'
+    v.nvram = '/var/lib/libvirt/qemu/nvram/OVMF_VARS_4M.fd'
   end
 
   config.vm.synced_folder ".", "/vagrant", type: "rsync"
