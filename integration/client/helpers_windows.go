@@ -26,6 +26,7 @@ import (
 	"syscall"
 
 	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/osversion"
 	"golang.org/x/sys/windows"
 )
 
@@ -113,4 +114,17 @@ func cleanupWCOWLayer(layerPath string) error {
 	}
 
 	return nil
+}
+
+// Temporarily used on windows to skip failing test on WS2025.
+func SkipTestOnHost() bool {
+	const (
+		// Copied from https://github.com/microsoft/hcsshim/blob/9b2e94f544990ce7e8f3ccdb60f1a9abd7debe05/osversion/windowsbuilds.go#L88-L90
+		// Windows Server 2025 build 26100
+		// The Windows Server 2025 constant was added in Microsoft/hcsshim@v0.13.0.
+		// Copied here to avoid updating the hcsshim dependency which requires breaking changes in the archive package.
+		V25H1Server = 26100
+		LTSC2025    = V25H1Server
+	)
+	return osversion.Build() == LTSC2025
 }
