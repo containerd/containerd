@@ -655,13 +655,13 @@ func WithUser(userstr string) SpecOpts {
 			}
 			f := func(root string) error {
 				if username != "" {
-					user, err := UserFromPath(root, func(u user.User) bool {
+					usr, err := UserFromPath(root, func(u user.User) bool {
 						return u.Name == username
 					})
 					if err != nil {
 						return err
 					}
-					uid = uint32(user.Uid)
+					uid = uint32(usr.Uid)
 				}
 				if groupname != "" {
 					gid, err = GIDFromPath(root, func(g user.Group) bool {
@@ -725,17 +725,17 @@ func WithUserID(uid uint32) SpecOpts {
 		setProcess(s)
 		s.Process.User.AdditionalGids = nil
 		setUser := func(root string) error {
-			user, err := UserFromPath(root, func(u user.User) bool {
+			usr, err := UserFromPath(root, func(u user.User) bool {
 				return u.Uid == int(uid)
 			})
 			if err != nil {
-				if os.IsNotExist(err) || err == ErrNoUsersFound {
+				if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
 					s.Process.User.UID, s.Process.User.GID = uid, 0
 					return nil
 				}
 				return err
 			}
-			s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
+			s.Process.User.UID, s.Process.User.GID = uint32(usr.Uid), uint32(usr.Gid)
 			return nil
 		}
 		if c.Snapshotter == "" && c.SnapshotKey == "" {
@@ -777,13 +777,13 @@ func WithUsername(username string) SpecOpts {
 		s.Process.User.AdditionalGids = nil
 		if s.Linux != nil {
 			setUser := func(root string) error {
-				user, err := UserFromPath(root, func(u user.User) bool {
+				usr, err := UserFromPath(root, func(u user.User) bool {
 					return u.Name == username
 				})
 				if err != nil {
 					return err
 				}
-				s.Process.User.UID, s.Process.User.GID = uint32(user.Uid), uint32(user.Gid)
+				s.Process.User.UID, s.Process.User.GID = uint32(usr.Uid), uint32(usr.Gid)
 				return nil
 			}
 			if c.Snapshotter == "" && c.SnapshotKey == "" {
@@ -834,16 +834,16 @@ func WithAdditionalGIDs(userstr string) SpecOpts {
 			var username string
 			uid, err := strconv.Atoi(userstr)
 			if err == nil {
-				user, err := UserFromPath(root, func(u user.User) bool {
+				usr, err := UserFromPath(root, func(u user.User) bool {
 					return u.Uid == uid
 				})
 				if err != nil {
-					if os.IsNotExist(err) || err == ErrNoUsersFound {
+					if os.IsNotExist(err) || errors.Is(err, ErrNoUsersFound) {
 						return nil
 					}
 					return err
 				}
-				username = user.Name
+				username = usr.Name
 			} else {
 				username = userstr
 			}
