@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -221,29 +220,21 @@ func TestWithEnv(t *testing.T) {
 		Env: []string{"DEFAULT=test"},
 	}
 
-	WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
+	err := WithEnv([]string{"env=1"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't append")
 
-	if len(s.Process.Env) != 2 {
-		t.Fatal("didn't append")
-	}
+	err = WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=1"}, s.Process.Env, "didn't append")
 
-	WithEnv([]string{"env2=1"})(context.Background(), nil, nil, &s)
+	err = WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1", "env2=2"}, s.Process.Env, "didn't update")
 
-	if len(s.Process.Env) != 3 {
-		t.Fatal("didn't append")
-	}
-
-	WithEnv([]string{"env2=2"})(context.Background(), nil, nil, &s)
-
-	if s.Process.Env[2] != "env2=2" {
-		t.Fatal("couldn't update")
-	}
-
-	WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
-
-	if len(s.Process.Env) != 2 {
-		t.Fatal("couldn't unset")
-	}
+	err = WithEnv([]string{"env2"})(context.Background(), nil, nil, &s)
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"DEFAULT=test", "env=1"}, s.Process.Env, "didn't update")
 }
 
 func TestWithMounts(t *testing.T) {
@@ -259,24 +250,16 @@ func TestWithMounts(t *testing.T) {
 		},
 	}
 
-	WithMounts([]specs.Mount{
+	err := WithMounts([]specs.Mount{
 		{
 			Source:      "new-source",
 			Destination: "new-dest",
 		},
 	})(nil, nil, nil, &s)
-
-	if len(s.Mounts) != 2 {
-		t.Fatal("didn't append")
-	}
-
-	if s.Mounts[1].Source != "new-source" {
-		t.Fatal("invalid mount")
-	}
-
-	if s.Mounts[1].Destination != "new-dest" {
-		t.Fatal("invalid mount")
-	}
+	assert.NoError(t, err)
+	assert.Len(t, s.Mounts, 2, "didn't append")
+	assert.Equal(t, "new-source", s.Mounts[1].Source, "invalid mount")
+	assert.Equal(t, "new-dest", s.Mounts[1].Destination, "invalid mount")
 }
 
 func TestWithDefaultSpec(t *testing.T) {
@@ -287,35 +270,22 @@ func TestWithDefaultSpec(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	if err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec()); err != nil {
-		t.Fatal(err)
-	}
+	err := ApplyOpts(ctx, nil, &c, &s, WithDefaultSpec())
+	assert.NoError(t, err)
 
-	var (
-		expected Spec
-		err      error
-	)
+	var expected Spec
 
 	switch runtime.GOOS {
 	case "windows":
-		err = populateDefaultWindowsSpec(ctx, &expected, c.ID)
+		assert.NoError(t, populateDefaultWindowsSpec(ctx, &expected, c.ID))
 	case "darwin":
-		err = populateDefaultDarwinSpec(&expected)
+		assert.NoError(t, populateDefaultDarwinSpec(&expected))
 	default:
-		err = populateDefaultUnixSpec(ctx, &expected, c.ID)
+		assert.NoError(t, populateDefaultUnixSpec(ctx, &expected, c.ID))
 	}
 
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if reflect.DeepEqual(s, Spec{}) {
-		t.Fatalf("spec should not be empty")
-	}
-
-	if !reflect.DeepEqual(&s, &expected) {
-		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
-	}
+	assert.NotEmpty(t, s)
+	assert.Equal(t, &expected, &s)
 }
 
 func TestWithSpecFromFile(t *testing.T) {
@@ -326,42 +296,21 @@ func TestWithSpecFromFile(t *testing.T) {
 		ctx = namespaces.WithNamespace(context.Background(), "test")
 	)
 
-	fp, err := os.CreateTemp("", "testwithdefaultspec.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if err := os.Remove(fp.Name()); err != nil {
-			log.Printf("failed to remove tempfile %v: %v", fp.Name(), err)
-		}
-	}()
-	defer fp.Close()
-
 	expected, err := GenerateSpec(ctx, nil, &c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	p, err := json.Marshal(expected)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	if _, err := fp.Write(p); err != nil {
-		t.Fatal(err)
-	}
+	tmpDir := t.TempDir()
+	specFile := filepath.Join(tmpDir, "testwithdefaultspec.json")
+	err = os.WriteFile(specFile, p, 0o600)
+	assert.NoError(t, err)
 
-	if err := ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(fp.Name())); err != nil {
-		t.Fatal(err)
-	}
-
-	if reflect.DeepEqual(s, Spec{}) {
-		t.Fatalf("spec should not be empty")
-	}
-
-	if !reflect.DeepEqual(&s, expected) {
-		t.Fatalf("spec from option differs from default: \n%#v != \n%#v", &s, expected)
-	}
+	err = ApplyOpts(ctx, nil, &c, &s, WithSpecFromFile(specFile))
+	assert.NoError(t, err)
+	assert.NotEmpty(t, s)
+	assert.Equal(t, expected, &s)
 }
 
 func TestWithMemoryLimit(t *testing.T) {
