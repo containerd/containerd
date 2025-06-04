@@ -26,6 +26,7 @@ import (
 	"slices"
 
 	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
 	"github.com/containerd/platforms"
 	"github.com/containerd/plugin"
 	"github.com/containerd/plugin/registry"
@@ -141,7 +142,27 @@ func (m *TaskManager) Create(ctx context.Context, taskID string, opts runtime.Cr
 		return nil, fmt.Errorf("failed to validate OCI runtime features: %w", err)
 	}
 
-	t, err := shimTask.Create(ctx, opts)
+	t, err := func() (runtime.Task, error) {
+		t, err := shimTask.Create(ctx, opts)
+		if err == nil || !errdefs.IsNotImplemented(err) {
+			return t, err
+		}
+
+		downgrader, ok := shim.(clientVersionDowngrader)
+		if ok {
+			if derr := downgrader.Downgrade(); derr == nil {
+				log.G(ctx).WithError(err).WithField("id", taskID).
+					Warning("failed to call task.Create, downgrading client API version to try again")
+
+				shimTask, err = newShimTask(shim)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create shim task after downgrading: %w", err)
+				}
+				return shimTask.Create(ctx, opts)
+			}
+		}
+		return t, err
+	}()
 	if err != nil {
 		// NOTE: ctx contains required namespace information.
 		m.manager.shims.Delete(ctx, taskID)
