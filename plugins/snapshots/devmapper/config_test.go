@@ -20,6 +20,7 @@ package devmapper
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/pelletier/go-toml/v2"
@@ -33,20 +34,15 @@ func TestLoadConfig(t *testing.T) {
 		BaseImageSize: "128Mb",
 	}
 
-	file, err := os.CreateTemp("", "devmapper-config-")
+	file, err := os.Create(filepath.Join(t.TempDir(), "devmapper-config-"))
 	assert.NoError(t, err)
+	t.Cleanup(func() {
+		file.Close()
+	})
 
 	encoder := toml.NewEncoder(file)
 	err = encoder.Encode(&expected)
 	assert.NoError(t, err)
-
-	defer func() {
-		err := file.Close()
-		assert.NoError(t, err)
-
-		err = os.Remove(file.Name())
-		assert.NoError(t, err)
-	}()
 
 	loaded, err := LoadConfig(file.Name())
 	assert.NoError(t, err)
