@@ -31,6 +31,7 @@ import (
 	"github.com/opencontainers/image-spec/identity"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierrors "k8s.io/cri-api/pkg/errors"
 )
 
 func (c *criService) mutateMounts(
@@ -48,7 +49,7 @@ func (c *criService) mutateMounts(
 	for _, m := range extraMounts {
 		err := c.mutateImageMount(ctx, m, snapshotter, sandboxID, platform)
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", crierrors.ErrImageVolumeMountFailed, err)
 		}
 	}
 	return nil
@@ -106,51 +107,56 @@ func (c *criService) mutateImageMount(
 	if err != nil {
 		return fmt.Errorf("failed to ensure %s is mounted: %w", target, err)
 	}
-	if mounted {
-		extraMount.HostPath = target
-		return nil
-	}
+	if !mounted {
+		img, err := c.client.ImageService().Get(ctx, ref)
+		if err != nil {
+			return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
+		}
 
-	img, err := c.client.ImageService().Get(ctx, ref)
-	if err != nil {
-		return fmt.Errorf("failed to get image volume ref %q: %w", ref, err)
-	}
+		i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
+		if err := i.Unpack(ctx, snapshotter); err != nil {
+			return fmt.Errorf("failed to unpack image volume: %w", err)
+		}
 
-	i := containerd.NewImageWithPlatform(c.client, img, platforms.Only(platform))
-	if err := i.Unpack(ctx, snapshotter); err != nil {
-		return fmt.Errorf("failed to unpack image volume: %w", err)
-	}
+		diffIDs, err := i.RootFS(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get diff IDs for image volume %q: %w", ref, err)
+		}
+		chainID := identity.ChainID(diffIDs).String()
 
-	diffIDs, err := i.RootFS(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get diff IDs for image volume %q: %w", ref, err)
-	}
-	chainID := identity.ChainID(diffIDs).String()
+		s := c.client.SnapshotService(snapshotter)
+		mounts, err := s.Prepare(ctx, target, chainID)
+		if err != nil {
+			if errdefs.IsAlreadyExists(err) {
+				mounts, err = s.Mounts(ctx, target)
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
+		}
+		defer func() {
+			if retErr != nil {
+				_ = s.Remove(ctx, target)
+			}
+		}()
 
-	s := c.client.SnapshotService(snapshotter)
-	mounts, err := s.Prepare(ctx, target, chainID)
-	if err != nil {
-		if errdefs.IsAlreadyExists(err) {
-			mounts, err = s.Mounts(ctx, target)
+		err = os.MkdirAll(target, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
+		}
+
+		mounts = addVolatileOptionOnImageVolumeMount(mounts)
+		if err := mount.All(mounts, target); err != nil {
+			return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
 		}
 	}
-	if err != nil {
-		return fmt.Errorf("failed to prepare for image volume %q: %w", ref, err)
-	}
-	defer func() {
-		if retErr != nil {
-			_ = s.Remove(ctx, target)
+
+	if imageSubPath := extraMount.GetImageSubPath(); imageSubPath != "" {
+		mountPoint, err := ensureImageSubPath(target, imageSubPath)
+		if err != nil {
+			return fmt.Errorf("failed to ensure image subpath %q in %q: %w", imageSubPath, target, err)
 		}
-	}()
-
-	err = os.MkdirAll(target, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory to image volume target path %q: %w", target, err)
-	}
-
-	mounts = addVolatileOptionOnImageVolumeMount(mounts)
-	if err := mount.All(mounts, target); err != nil {
-		return fmt.Errorf("failed to mount image volume component %q: %w", target, err)
+		target = mountPoint
 	}
 
 	extraMount.HostPath = target
@@ -203,4 +209,33 @@ func (c *criService) cleanupImageMounts(
 		return fmt.Errorf("failed to remove directory to cleanup image volume mounts: %w", err)
 	}
 	return nil
+}
+
+// ensureImageSubPath ensures the subPath exists **within** the mountPoint (i.e.
+// not escape outside of mountPoint) and it's a directory.
+// It returns the final absolute path of `subPath`.
+func ensureImageSubPath(mountPoint, subPath string) (string, error) {
+	if subPath == "" {
+		return mountPoint, nil
+	}
+
+	file, err := os.OpenInRoot(mountPoint, subPath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	if !stat.IsDir() {
+		// the current OCI volume source treats mounting a single file as non-goal
+		// and limits the mount output to directories.
+		// https://github.com/kubernetes/enhancements/tree/f3fa3a12d303a6b749efd072987a39aab159f9d5/keps/sig-node/4639-oci-volume-source#non-goals
+		return "", fmt.Errorf("only directory subpath is supported, subpath: %q, mountpoint: %q ", subPath, mountPoint)
+	}
+
+	return file.Name(), nil
 }
