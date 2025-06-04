@@ -26,7 +26,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2025]
 
     steps:
       - name: Install dependencies
@@ -217,7 +217,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2022, windows-2025]
         go-version: ["1.23.7", "1.24.1"]
     steps:
       - name: Install dependencies
@@ -260,7 +260,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2019, windows-2022]
+        os: [windows-2022, windows-2025]
 
     defaults:
       run:
@@ -286,17 +286,6 @@ jobs:
           echo "${{ github.workspace }}/src/github.com/containerd/containerd/bin" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
-
-      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
-      - name: Upgrade Chocolaty on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_chocolaty_windows_2019.ps1
-
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_mingw_windows_2019.ps1
 
       - name: Binaries
         env:
