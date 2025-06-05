@@ -41,6 +41,7 @@ import (
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
 	containerdio "github.com/containerd/containerd/v2/pkg/cio"
+	"github.com/containerd/containerd/v2/pkg/deprecation"
 	"github.com/containerd/errdefs"
 )
 
@@ -266,6 +267,14 @@ func (c *Controller) Start(ctx context.Context, id string) (cin sandbox.Controll
 		return cin, fmt.Errorf("unable to create nri client: %w", err)
 	}
 	if nric != nil {
+		plugins := nric.Plugins() //nolint:staticcheck // SA1019: For NRI v0.1.0 deprecation logic.
+		if len(plugins) > 0 {
+			if msg, ok := deprecation.Message(deprecation.NRIV010Plugin); ok {
+				log.G(ctx).Warning(msg)
+				c.warningService.Emit(ctx, deprecation.NRIV010Plugin)
+			}
+		}
+
 		nriSB := &nri.Sandbox{ //nolint:staticcheck // SA1019: For NRI v0.1.0 deprecation logic.
 			ID:     id,
 			Labels: config.Labels,
