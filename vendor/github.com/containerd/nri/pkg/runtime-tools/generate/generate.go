@@ -110,6 +110,7 @@ func (g *Generator) Adjust(adjust *nri.ContainerAdjustment) error {
 		return fmt.Errorf("failed to adjust annotations in OCI Spec: %w", err)
 	}
 	g.AdjustEnv(adjust.GetEnv())
+	g.AdjustArgs(adjust.GetArgs())
 	g.AdjustHooks(adjust.GetHooks())
 	if err := g.InjectCDIDevices(adjust.GetCDIDevices()); err != nil {
 		return err
@@ -176,6 +177,13 @@ func (g *Generator) AdjustEnv(env []*nri.KeyValue) {
 		if _, ok := mod[e.Key]; ok {
 			g.AddProcessEnv(e.Key, e.Value)
 		}
+	}
+}
+
+// AdjustArgs adjusts the process arguments in the OCI Spec.
+func (g *Generator) AdjustArgs(args []string) {
+	if len(args) != 0 {
+		g.SetProcessArgs(args)
 	}
 }
 

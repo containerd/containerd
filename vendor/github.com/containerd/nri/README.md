@@ -83,6 +83,11 @@ provides functions for
   - hooking the plugin into pod/container lifecycle events
   - shutting down the plugin
 
+An additional interface is provided for validating the changes active plugins
+have requested to containers. This interface allows one to set up and enforce
+cluster- or node-wide boundary conditions for changes NRI plugins are allowed
+to make.
+
 ### Plugin Registration
 
 Before a plugin can start receiving and processing container events, it needs
@@ -200,6 +205,13 @@ The following pieces of container metadata are available to plugins in NRI:
         - cpuset memory
       - Block I/O class
       - RDT class
+  - container (init) process ID
+  - container (init process) exit status
+  - timestamp of container creation
+  - timestamp of starting the container
+  - timestamp of stopping the container/container exit
+  - container exit status reason (camelCase)
+  - container exit status message (human readable)
 
 Apart from data identifying the container, these pieces of information
 represent the corresponding data in the container's OCI Spec.
@@ -211,6 +223,7 @@ container parameters:
 
   - annotations
   - mounts
+  - command line arguments
   - environment variables
   - OCI hooks
   - rlimits
@@ -269,6 +282,81 @@ can be updated this way:
     - Block I/O class
     - RDT class
 
+### Container Adjustment Validation
+
+NRI plugins operate as trusted extensions of the container runtime, granting
+them significant privileges to alter container specs. While this extensibility
+is powerful with valid use cases, some of the capabilities granted to plugins
+allow modifying security-sensitive settings of containers. As such they also
+come with the risk that a plugin could inadvertently or maliciously weaken a
+container's isolation or security posture, potentially overriding policies set
+by cluster orchestrators such as K8s.
+
+NRI offers cluster administrators a mechanism to exercise fine-grained control
+over what changes plugins are allowed to make to containers, allowing cluster
+administrators to lock down selected features in NRI or allowing them to only
+be used a subset of plugins. Changes in NRI are made in two phases: “Mutating”
+plugins propose changes, and “Validating” plugins approve or deny them.
+
+Validating plugins are invoked during container creation after all the changes
+requested to containers have been collected. Validating plugins receive the
+changes with extra information about which of the plugins requested what
+changes. They can then choose to reject the changes if they violate some of the
+conditions being validated.
+
+Validation has transactional semantics. If any validating plugin rejects an
+adjustment, creation of the adjusted container will fail and none of the other
+related changes will be made.
+
+#### Validation Use Cases
+
+Some key validation uses cases include
+
+1. Functional Validators: These plugins care about the final state and
+consistency. They check if the combined effect of all mutations result
+in a valid configuration (e.g. are the resource limits sane).
+
+2. Security Validators: These plugins are interested in which plugin is
+attempting to modify sensitive fields. They use the extra data passed to
+plugins in addition to adjustments to check if a potentially untrusted
+plugin tried to modify a restricted field, regardless of the value.
+Rejection might occur simply because a non-approved plugin touched a
+specific field. Plugins like this may need to be assured to run, and to
+have workloads fail-closed if the validator is not running.
+
+3. Mandatory Plugin Validators: These ensure that specific plugins, required
+for certain workloads have successfully run. They might use the extra metadata
+passed to validator in addition to adjustments to confirm the mandatory
+plugin owns certain critical fields and potentially use the list of plugins
+that processed the container to ensure all mandatory plugins were consulted.
+
+#### Default Validation
+
+The default built-in validator plugin provides configurable minimal validation.
+It may be enabled or disabled by configuring the container runtime. It can be
+selectively configured to
+
+1. Reject OCI Hook injection: Reject any adjustment which tries to inject
+OCI Hooks into a container.
+
+2. Verify global mandatory plugins: Verify that all configured mandatory
+plugins are present and have processed a container. Otherwise reject the
+creation of the container.
+
+3. Verify annotated mandatory plugins: Verify that an annotated set of
+container-specific mandatory plugins are present and have processed a
+container. Otherwise reject the creation of the container.
+
+Containers can be annotated to tolerate missing required plugins. This
+allows one to deploy mandatory plugins as containers themselves.
+
+#### Default Validation Scope
+
+Currently only OCI hook injection can be restricted using the default
+validator. However, this probably will change in the future. Especially
+when NRI is extended with control over new container parameters. If such
+parameters will have security implications, corresponding configurable
+restrictions will be introduced to the default validator.
 
 ## Runtime Adaptation
 

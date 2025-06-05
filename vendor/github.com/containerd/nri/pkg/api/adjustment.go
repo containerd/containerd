@@ -16,6 +16,8 @@
 
 package api
 
+import "slices"
+
 //
 // Notes:
 //   Adjustment of metadata that is stored in maps (labels and annotations)
@@ -78,6 +80,17 @@ func (a *ContainerAdjustment) RemoveEnv(key string) {
 	a.Env = append(a.Env, &KeyValue{
 		Key: MarkForRemoval(key),
 	})
+}
+
+// SetArgs overrides the container command with the given arguments.
+func (a *ContainerAdjustment) SetArgs(args []string) {
+	a.Args = slices.Clone(args)
+}
+
+// UpdateArgs overrides the container command with the given arguments.
+// It won't fail if another plugin has already set the command line.
+func (a *ContainerAdjustment) UpdateArgs(args []string) {
+	a.Args = append([]string{""}, args...)
 }
 
 // AddHooks records the addition of the given hooks to a container.

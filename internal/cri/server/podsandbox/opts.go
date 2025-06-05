@@ -32,7 +32,7 @@ func WithNRISandboxDelete(sandboxID string) containerd.ProcessDeleteOpts {
 		if !ok {
 			return nil
 		}
-		nric, err := nri.New()
+		nric, err := nri.New() //nolint:staticcheck // SA1019: For NRI v0.1.0 deprecation logic.
 		if err != nil {
 			log.G(ctx).WithError(err).Error("unable to create nri client")
 			return nil
@@ -40,10 +40,10 @@ func WithNRISandboxDelete(sandboxID string) containerd.ProcessDeleteOpts {
 		if nric == nil {
 			return nil
 		}
-		sb := &nri.Sandbox{
+		sb := &nri.Sandbox{ //nolint:staticcheck // SA1019: For NRI v0.1.0 deprecation logic.
 			ID: sandboxID,
 		}
-		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Delete, sb); err != nil {
+		if _, err := nric.InvokeWithSandbox(ctx, task, v1.Delete, sb); err != nil { //nolint:staticcheck // SA1019: For NRI v0.1.0 deprecation logic.
 			log.G(ctx).WithError(err).Errorf("Failed to delete nri for %q", task.ID())
 		}
 		return nil
