@@ -26,6 +26,7 @@ import (
 	"syscall"
 
 	"github.com/Microsoft/hcsshim"
+	"github.com/Microsoft/hcsshim/osversion"
 	"golang.org/x/sys/windows"
 )
 
@@ -113,4 +114,9 @@ func cleanupWCOWLayer(layerPath string) error {
 	}
 
 	return nil
+}
+
+// Temporarily used on windows to skip failing test on WS2025.
+func SkipTestOnHost() bool {
+	return osversion.Build() == osversion.LTSC2025
 }
