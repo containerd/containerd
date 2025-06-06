@@ -30,6 +30,7 @@ import (
 	"github.com/containerd/containerd/v2/core/metadata"
 	"github.com/containerd/containerd/v2/core/transfer/local"
 	"github.com/containerd/containerd/v2/core/unpack"
+	"github.com/containerd/containerd/v2/defaults"
 	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/imageverifier"
 	"github.com/containerd/containerd/v2/plugins"
@@ -115,6 +116,7 @@ func init() {
 					}
 					applier = inst.(diff.Applier)
 				} else {
+					var applierID string
 					for name, plugin := range ic.GetAll() {
 						if plugin.Registration.Type != plugins.DiffPlugin {
 							continue
@@ -129,14 +131,25 @@ func init() {
 							continue
 						}
 						if applier != nil {
-							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", plugin.Registration.ID)
-							continue
+							skippedApplier := plugin.Registration.ID
+
+							// Prefer the default when multiple plugins match
+							if skippedApplier == defaults.DefaultDiffer {
+								skippedApplier = applierID
+							}
+
+							log.G(ic.Context).Warnf("multiple differs match for platform, set `differ` option to choose, skipping %q", skippedApplier)
+
+							if plugin.Registration.ID == skippedApplier {
+								continue
+							}
 						}
 						inst, err := plugin.Instance()
 						if err != nil {
 							return nil, fmt.Errorf("failed to get instance for diff plugin %q: %w", name, err)
 						}
 						applier = inst.(diff.Applier)
+						applierID = plugin.Registration.ID
 					}
 				}
 				if applier == nil {
