@@ -73,6 +73,7 @@ message UpdateContainersResponse {
 // can be used by plugins to discover the full extent of changes applied to
 // the container, including any changes made by other active plugins.
 //
+// go:plugin type=plugin version=1
 service Plugin {
   // Configure the plugin and get its event subscription.
   rpc Configure(ConfigureRequest) returns (ConfigureResponse);
@@ -100,11 +101,33 @@ service Plugin {
   // can update any of the remaining containers in the runtime in response.
   rpc StopContainer(StopContainerRequest) returns (StopContainerResponse);
 
+  // UpdatePodSandbox relays the corresponding request to the plugin.
+  rpc UpdatePodSandbox(UpdatePodSandboxRequest) returns (UpdatePodSandboxResponse);
+
   // StateChange relays any remaining pod or container lifecycle/state change
   // events the plugin has subscribed for. These can be used to trigger any
   // plugin-specific processing which needs to occur in connection with any of
   // these events.
   rpc StateChange(StateChangeEvent) returns (Empty);
+}
+
+// go:plugin type=host
+service HostFunctions {
+  // Log displays a log message
+  rpc Log(LogRequest) returns (Empty) {}
+}
+
+message LogRequest {
+  string msg = 1;
+
+  enum Level {
+    LEVEL_UNSPECIFIED = 0;
+    LEVEL_DEBUG = 1;
+    LEVEL_INFO = 2;
+    LEVEL_WARN = 3;
+    LEVEL_ERROR = 4;
+  }
+  Level level = 2;
 }
 
 message ConfigureRequest {
@@ -186,6 +209,17 @@ message StopContainerResponse {
   repeated ContainerUpdate update = 1;
 }
 
+message UpdatePodSandboxRequest {
+  // Pod being updated.
+  PodSandbox pod = 1;
+  // Overhead associated with this pod.
+  LinuxResources overhead_linux_resources = 2;
+  // Sum of container resources for this pod.
+  LinuxResources linux_resources = 3;
+}
+
+message UpdatePodSandboxResponse {}
+
 message StateChangeEvent {
   // Event type of notification.
   Event event = 1;
@@ -214,7 +248,9 @@ enum Event {
   POST_UPDATE_CONTAINER = 9;
   STOP_CONTAINER = 10;
   REMOVE_CONTAINER = 11;
-  LAST = 12;
+  UPDATE_POD_SANDBOX = 12;
+  POST_UPDATE_POD_SANDBOX = 13;
+  LAST = 14;
 }
 
 // Pod metadata that is considered relevant for a plugin.
