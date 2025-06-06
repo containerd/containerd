@@ -76,6 +76,6 @@ var WithAllKnownCapabilities = func(ctx context.Context, client Client, c *conta
 	return WithCapabilities(caps)(ctx, client, c, s)
 }
 
-func escapeAndCombineArgs(args []string) string {
+func escapeAndCombineArgs([]string) string {
 	panic("not supported")
 }
