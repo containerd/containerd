@@ -23,7 +23,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019]
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2025]
 
 
     steps:
@@ -188,7 +188,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2019, windows-2022]
+        os: [ubuntu-22.04, ubuntu-24.04, ubuntu-24.04-arm, macos-13, windows-2022, windows-2025]
         go-version: ["1.24.3"]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -214,7 +214,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2022, windows-2019]
+        os: [windows-2025, windows-2022]
         cgroup_driver: [cgroupfs]
 
     defaults:
@@ -243,17 +243,6 @@ jobs:
           echo "${{ github.workspace }}/src/github.com/kubernetes-sigs/cri-tools/build/bin/windows/amd64" >> $GITHUB_PATH
 
       - run: script/setup/install-dev-tools
-
-      # needs to be a separate step since terminal reload is required to bring in new env variables and PATH
-      - name: Upgrade Chocolaty on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_chocolaty_windows_2019.ps1
-
-      - name: Upgrade MinGW on Windows 2019
-        if: matrix.os == 'windows-2019'
-        shell: powershell
-        run: .\script\setup\upgrade_mingw_windows_2019.ps1
 
       - name: Binaries
         shell: bash
