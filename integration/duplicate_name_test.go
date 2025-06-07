@@ -32,7 +32,7 @@ func TestDuplicateName(t *testing.T) {
 	require.Error(t, err)
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container")
 	cnConfig := ContainerConfig(

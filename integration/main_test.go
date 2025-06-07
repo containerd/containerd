@@ -805,8 +805,8 @@ func RestartContainerd(t *testing.T, signal syscall.Signal) {
 
 // EnsureImageExists pulls the given image, ensures that no error was encountered
 // while pulling it.
-func EnsureImageExists(t *testing.T, imageName string) string {
-	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: imageName})
+func EnsureImageExists(t *testing.T, imageName string, runtimeHandler string) string {
+	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: imageName, RuntimeHandler: runtimeHandler})
 	require.NoError(t, err)
 	if img != nil {
 		t.Logf("Image %q already exists, not pulling.", imageName)
@@ -814,7 +814,7 @@ func EnsureImageExists(t *testing.T, imageName string) string {
 	}
 
 	t.Logf("Pull test image %q", imageName)
-	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName}, nil, nil, "")
+	imgID, err := imageService.PullImage(&runtime.ImageSpec{Image: imageName, RuntimeHandler: runtimeHandler}, nil, nil, "")
 	require.NoError(t, err)
 
 	return imgID

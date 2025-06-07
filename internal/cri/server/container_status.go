@@ -37,6 +37,12 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 		return nil, fmt.Errorf("an error occurred when try to find container %q: %w", r.GetContainerId(), err)
 	}
 
+	// Get runtimehandler associated with this container's sandbox.
+	sandbox, err := c.sandboxStore.Get(container.SandboxID)
+	if err != nil && !errdefs.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to find container's sandbox %q: %w", container.SandboxID, err)
+	}
+
 	// TODO(random-liu): Clean up the following logic in CRI.
 	// Current assumption:
 	// * ImageSpec in container config is image ID.
@@ -44,7 +50,7 @@ func (c *criService) ContainerStatus(ctx context.Context, r *runtime.ContainerSt
 	// * ImageRef in container status is repo digest.
 	spec := container.Config.GetImage()
 	imageRef := container.ImageRef
-	image, err := c.GetImage(imageRef)
+	image, err := c.GetImage(imageRef, sandbox.RuntimeHandler)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {
 			return nil, fmt.Errorf("failed to get image %q: %w", imageRef, err)

@@ -30,7 +30,7 @@ func TestContainerRestart(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config and run container in a pod")
 	containerConfig := ContainerConfig(
@@ -65,7 +65,7 @@ func TestFailedContainerRestart(t *testing.T) {
 	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox1", "restart")
 
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Logf("Create a container config in a pod with a command that fails")
 	containerConfig := ContainerConfig(
