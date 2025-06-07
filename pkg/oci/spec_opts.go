@@ -1308,16 +1308,18 @@ func WithDefaultUnixDevices(_ context.Context, _ Client, _ *containers.Container
 }
 
 // WithPrivileged sets up options for a privileged container
-var WithPrivileged = Compose(
-	WithAllCurrentCapabilities,
-	WithMaskedPaths(nil),
-	WithReadonlyPaths(nil),
-	WithWriteableSysfs,
-	WithWriteableCgroupfs,
-	WithSelinuxLabel(""),
-	WithApparmorProfile(""),
-	WithSeccompUnconfined,
-)
+func WithPrivileged(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+	return Compose(
+		WithAllCurrentCapabilities,
+		WithMaskedPaths(nil),
+		WithReadonlyPaths(nil),
+		WithWriteableSysfs,
+		WithWriteableCgroupfs,
+		WithSelinuxLabel(""),
+		WithApparmorProfile(""),
+		WithSeccompUnconfined,
+	)(ctx, client, c, s)
+}
 
 // WithWindowsHyperV sets the Windows.HyperV section for HyperV isolation of containers.
 func WithWindowsHyperV(_ context.Context, _ Client, _ *containers.Container, s *Spec) error {
