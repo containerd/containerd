@@ -498,6 +498,30 @@ func TestMetadataCollector(t *testing.T) {
 					Type: "content",
 				},
 			}, false),
+
+			// Test non-root lease
+			newSnapshot("10", "", false, false),
+			newSnapshot("11", "10", false, false),
+			lease("lease-4", []leases.Resource{
+				{
+					ID:   "11",
+					Type: "snapshots/native",
+				},
+			}, false, "containerd.io/gc.nonroot", time.Now().Format(time.RFC3339)),
+			image("image-2", digestFor(20), "containerd.io/gc.ref.lease", "lease-4"),
+			newSnapshot("12", "", false, true),
+			newSnapshot("13", "12", false, true),
+			blob(bytesFor(13), true),
+			lease("lease-5", []leases.Resource{
+				{
+					ID:   digestFor(13).String(),
+					Type: "content",
+				},
+				{
+					ID:   "13",
+					Type: "snapshots/native",
+				},
+			}, true, "containerd.io/gc.nonroot", time.Now().Format(time.RFC3339)),
 		}
 
 		testResource = gc.ResourceType(0x10)
@@ -506,6 +530,7 @@ func TestMetadataCollector(t *testing.T) {
 			gcnode(testResource, "test", "test1"),
 			gcnode(testResource, "test", "test3"),
 			gcnode(testResource, "test", "test4"),
+			gcnode(testResource, "test", "test5"),
 		}
 
 		collector = &testCollector{
@@ -515,6 +540,8 @@ func TestMetadataCollector(t *testing.T) {
 				gcnode(testResource, "test", "test2"),
 				gcnode(testResource, "test", "test3"),
 				gcnode(testResource, "test", "test4"),
+				gcnode(testResource, "test", "test5"),
+				gcnode(testResource, "test", "test6"),
 			},
 			active: []gc.Node{
 				gcnode(testResource, "test", "test4"),
@@ -522,6 +549,12 @@ func TestMetadataCollector(t *testing.T) {
 			leased: map[string][]gc.Node{
 				"lease-3": {
 					gcnode(testResource, "test", "test3"),
+				},
+				"lease-4": {
+					gcnode(testResource, "test", "test5"),
+				},
+				"lease-5": {
+					gcnode(testResource, "test", "test6"),
 				},
 			},
 		}
