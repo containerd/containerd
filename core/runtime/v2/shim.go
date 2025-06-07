@@ -831,6 +831,9 @@ func (s *shimTask) State(ctx context.Context) (runtime.State, error) {
 		ID: s.ID(),
 	})
 	if err != nil {
+		if err == context.DeadlineExceeded {
+			return runtime.State{}, err
+		}
 		if !errors.Is(err, ttrpc.ErrClosed) {
 			return runtime.State{}, errgrpc.ToNative(err)
 		}
