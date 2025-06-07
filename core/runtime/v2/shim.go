@@ -556,6 +556,11 @@ func (s *shimTask) delete(ctx context.Context, sandboxed bool, removeTask func(c
 		removeTask(ctx, s.ID())
 	}
 
+	const supportSandboxAPIVersion = 3
+	if _, apiVer := s.ShimInstance.Endpoint(); apiVer < supportSandboxAPIVersion {
+		sandboxed = false
+	}
+
 	// Don't shutdown sandbox as there may be other containers running.
 	// Let controller decide when to shutdown.
 	if !sandboxed {

@@ -66,7 +66,8 @@ func TestIssue10467(t *testing.T) {
 	})
 
 	t.Log("Prepare pods for current release")
-	upgradeCaseFunc, hookFunc := shouldManipulateContainersInPodAfterUpgrade("")(t, 2, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+	upgradeCaseFuncs, hookFunc := shouldManipulateContainersInPodAfterUpgrade("")(t, 2, previousProc.criRuntimeService(t), previousProc.criImageService(t))
+	upgradeCaseFunc := upgradeCaseFuncs[0]
 	needToCleanup = false
 	require.Nil(t, hookFunc)
 
