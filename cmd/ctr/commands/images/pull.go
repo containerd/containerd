@@ -89,6 +89,10 @@ command. As part of this process, we do the following:
 			Name:  "sync-fs",
 			Usage: "Synchronize the underlying filesystem containing files when unpack images, false by default",
 		},
+		&cli.BoolFlag{
+			Name:  "discard-unpacked-layers",
+			Usage: "Remove unpacked layers after pulling the image",
+		},
 	),
 	Action: func(cliContext *cli.Context) error {
 		var (
@@ -105,7 +109,7 @@ command. As part of this process, we do the following:
 		defer cancel()
 
 		if !cliContext.Bool("local") {
-			unsupportedFlags := []string{"max-concurrent-downloads", "print-chainid",
+			unsupportedFlags := []string{"print-chainid",
 				"skip-verify", "tlscacert", "tlscert", "tlskey", // RegistryFlags
 			}
 			for _, s := range unsupportedFlags {
@@ -150,6 +154,10 @@ command. As part of this process, we do the following:
 			labels := cliContext.StringSlice("label")
 			if len(labels) > 0 {
 				sopts = append(sopts, image.WithImageLabels(commands.LabelArgs(labels)))
+			}
+
+			if cliContext.Bool("discard-unpacked-layers") {
+				sopts = append(sopts, image.WithDiscardUnpackedLayers())
 			}
 
 			opts := []registry.Opt{

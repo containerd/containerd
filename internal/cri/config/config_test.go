@@ -421,11 +421,11 @@ func TestCheckLocalImagePullConfigs(t *testing.T) {
 			expectLocalPull: true,
 		},
 		{
-			name: "DiscardUnpackedLayers triggers local pull",
+			name: "DiscardUnpackedLayers does not trigger local pull",
 			imageConfigFn: func(ic *ImageConfig) {
 				ic.DiscardUnpackedLayers = true
 			},
-			expectLocalPull: true,
+			expectLocalPull: false,
 		},
 		{
 			name: "Registry.Mirrors triggers local pull",
