@@ -205,7 +205,26 @@ func loadShimTask(ctx context.Context, bundle *Bundle, onClose func()) (_ *shimT
 	defer cancel()
 
 	if _, err := s.PID(ctx); err != nil {
-		return nil, err
+		if !errdefs.IsNotImplemented(err) {
+			return nil, err
+		}
+
+		downgrader, ok := shim.(clientVersionDowngrader)
+		if ok {
+			if derr := downgrader.Downgrade(); derr == nil {
+				log.G(ctx).WithError(err).WithField("id", shim.ID()).
+					Warning("failed to call task.PID, downgrading client API version to try again")
+
+				s, err = newShimTask(shim)
+				if err != nil {
+					return nil, fmt.Errorf("failed to create shim task after downgrading: %w", err)
+				}
+				_, err = s.PID(ctx)
+			}
+		}
+		if err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
