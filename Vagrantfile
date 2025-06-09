@@ -317,6 +317,7 @@ EOF
             journalctl -u containerd > /tmp/containerd.log
             cat /tmp/containerd.log
             systemctl stop containerd
+            dmesg -T
         }
         selinux=$(getenforce)
         if [[ $selinux == Enforcing ]]; then

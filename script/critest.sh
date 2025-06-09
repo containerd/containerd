@@ -44,6 +44,7 @@ function cleanup() {
     pkill containerd || true
     echo ::group::containerd logs
     cat "$report_dir/containerd.log"
+    dmesg -T
     echo ::endgroup::
     rm -rf ${BDIR}
 }

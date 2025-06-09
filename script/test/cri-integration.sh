@@ -60,9 +60,11 @@ if [[ "$test_exit_code" -ne 0 ]]; then
 
     echo ::group::containerd logs
     cat "$GITHUB_WORKSPACE/report/containerd.log"
+    dmesg -T
     echo ::endgroup::
   else
     cat "$REPORT_DIR/containerd.log"
+    dmesg -T
   fi
 fi
 
