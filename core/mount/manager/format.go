@@ -27,18 +27,6 @@ import (
 
 type mountConverter func(mount.Mount, []mount.ActiveMount) (mount.Mount, error)
 
-/*
-type formatOptions struct {
-	Active []mount.ActiveMount
-}
-
-type formattedMount struct {
-	Source  func([]mount.ActiveMount) (string, error)
-	Target  func([]mount.ActiveMount) (string, error)
-	Options []func([]mount.ActiveMount) (string, error)
-}
-*/
-
 const formatCheck = "{{"
 
 func formatMount(m mount.Mount) (mountConverter, error) {
