@@ -19,10 +19,11 @@ package local
 import (
 	"testing"
 
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
 	"github.com/containerd/containerd/v2/defaults"
-	"github.com/containerd/platforms"
 )
 
 func TestGetSupportedPlatform(t *testing.T) {
@@ -121,7 +122,7 @@ func TestGetSupportedPlatform(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
-			m, sp := getSupportedPlatform(testCase.UnpackConfig, testCase.SupportedPlatforms)
+			m, sp := getSupportedPlatform(t.Context(), testCase.UnpackConfig, testCase.SupportedPlatforms)
 
 			// Match result should match expected
 			if m != testCase.Match {
