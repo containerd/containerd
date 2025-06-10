@@ -25,6 +25,7 @@ import (
 
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
+	"github.com/moby/locker"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/stretchr/testify/assert"
 
@@ -217,6 +218,7 @@ func TestRecoverContainer(t *testing.T) {
 	controller := &Controller{
 		config: criconfig.Config{},
 		store:  NewStore(),
+		locks:  locker.New(),
 	}
 	containers := []struct {
 		container        fakeContainer
