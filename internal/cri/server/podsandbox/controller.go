@@ -36,6 +36,7 @@ import (
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	imagestore "github.com/containerd/containerd/v2/internal/cri/store/image"
 	ctrdutil "github.com/containerd/containerd/v2/internal/cri/util"
+	"github.com/containerd/containerd/v2/internal/kmutex"
 	"github.com/containerd/containerd/v2/pkg/oci"
 	osinterface "github.com/containerd/containerd/v2/pkg/os"
 	"github.com/containerd/containerd/v2/pkg/protobuf"
@@ -95,6 +96,7 @@ func init() {
 				imageService:   criImagePlugin.(ImageService),
 				warningService: warningPlugin.(warning.Service),
 				store:          NewStore(),
+				locker:         kmutex.New(),
 			}
 
 			eventMonitor := events.NewEventMonitor(&podSandboxEventHandler{
@@ -142,6 +144,10 @@ type Controller struct {
 	eventMonitor *events.EventMonitor
 
 	store *Store
+	// make sure task.Kill run before task.delete
+	// if task.delete run before task.Kill the shim ttrpc server will be closed
+	// task.Kill will return ttrpc closed.
+	locker kmutex.KeyedLocker
 }
 
 var _ sandbox.Controller = (*Controller)(nil)
@@ -188,7 +194,7 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 		dctx, dcancel := context.WithTimeout(dctx, handleEventTimeout)
 		defer dcancel()
 		event := &eventtypes.TaskExit{ExitStatus: exitStatus, ExitedAt: protobuf.ToTimestamp(exitedAt)}
-		if err := handleSandboxTaskExit(dctx, p, event); err != nil {
+		if err := c.handleSandboxTaskExit(dctx, p, event); err != nil {
 			c.eventMonitor.Backoff(p.ID, event)
 		}
 		return nil
@@ -198,8 +204,10 @@ func (c *Controller) waitSandboxExit(ctx context.Context, p *types.PodSandbox, e
 }
 
 // handleSandboxTaskExit handles TaskExit event for sandbox.
-func handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
+func (c *Controller) handleSandboxTaskExit(ctx context.Context, sb *types.PodSandbox, e *eventtypes.TaskExit) error {
 	// No stream attached to sandbox container.
+	c.locker.Lock(context.Background(), sb.ID)
+	defer c.locker.Unlock(sb.ID)
 	task, err := sb.Container.Task(ctx, nil)
 	if err != nil {
 		if !errdefs.IsNotFound(err) {

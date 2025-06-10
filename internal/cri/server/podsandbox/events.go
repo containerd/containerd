@@ -52,7 +52,7 @@ func (p *podSandboxEventHandler) HandleEvent(any interface{}) error {
 		ctx := ctrdutil.NamespacedContext()
 		ctx, cancel := context.WithTimeout(ctx, handleEventTimeout)
 		defer cancel()
-		if err := handleSandboxTaskExit(ctx, sb, e); err != nil {
+		if err := p.controller.handleSandboxTaskExit(ctx, sb, e); err != nil {
 			return fmt.Errorf("failed to handle container TaskExit event: %w", err)
 		}
 		return nil
