@@ -778,6 +778,98 @@ func TestWithoutMounts(t *testing.T) {
 	}
 }
 
+func TestWithAppendAdditionalGIDs(t *testing.T) {
+	t.Parallel()
+	c := containers.Container{ID: t.Name()}
+
+	testCases := []struct {
+		user      string
+		spec      *specs.Spec
+		extraGIDs []uint32
+		expProc   *specs.Process
+		expErr    string
+	}{
+		{
+			user:   "nil",
+			expErr: "nil spec",
+		},
+		{
+			user: "empty",
+			spec: &specs.Spec{},
+		},
+		{
+			user: "windows-spec",
+			spec: &specs.Spec{Windows: &specs.Windows{}},
+		},
+
+		{
+			user: "no additional GIDs",
+			spec: &specs.Spec{Process: &specs.Process{
+				User: specs.User{GID: 123},
+			}},
+			expProc: &specs.Process{
+				User: specs.User{GID: 123},
+			},
+		},
+		{
+			user: "keep existing",
+			spec: &specs.Spec{Process: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{123}},
+			}},
+			expProc: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{123}},
+			},
+		},
+		{
+			user: "only default",
+			spec: &specs.Spec{Process: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{123}},
+			}},
+			extraGIDs: []uint32{123},
+			expProc: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{123}},
+			},
+		},
+		{
+			user: "add to default",
+			spec: &specs.Spec{Process: &specs.Process{
+				User: specs.User{GID: 123},
+			}},
+			extraGIDs: []uint32{2, 1},
+			expProc: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{1, 2, 123}},
+			},
+		},
+		{
+			user: "add to existing",
+			spec: &specs.Spec{Process: &specs.Process{
+				User: specs.User{
+					GID:            123,
+					AdditionalGids: []uint32{2, 1},
+				},
+			}},
+			extraGIDs: []uint32{1, 2, 3, 3},
+			expProc: &specs.Process{
+				User: specs.User{GID: 123, AdditionalGids: []uint32{1, 2, 3, 123}},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.user, func(t *testing.T) {
+			t.Parallel()
+			s := tc.spec
+			err := WithAppendAdditionalGIDs(tc.extraGIDs)(context.Background(), nil, &c, s)
+			if tc.expErr != "" {
+				assert.EqualError(t, err, tc.expErr)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, s)
+				assert.Equal(t, tc.expProc, s.Process)
+			}
+		})
+	}
+}
+
 func TestWithParentCgroupDevices(t *testing.T) {
 	t.Parallel()
 

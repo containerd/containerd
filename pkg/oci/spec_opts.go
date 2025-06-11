@@ -29,6 +29,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -948,6 +949,33 @@ func withReadonlyFS(ctx context.Context, client Client, mounts []mount.Mount, fn
 		defer rootfs.Close()
 		return fn(rootfs.FS())
 	})
+}
+
+// WithAppendAdditionalGIDs appends supplemental groups for the process. It
+// is a no-op if the spec is a Windows spec.
+//
+// If the list of additional GIDs is non-empty, it makes sure that the process
+// user's primary group is included, appends the additional GIDs, and removes
+// duplicates.
+func WithAppendAdditionalGIDs(gids []uint32) SpecOpts {
+	return func(ctx context.Context, client Client, c *containers.Container, s *Spec) error {
+		if s == nil {
+			return errors.New("nil spec")
+		}
+		if s.Windows != nil {
+			return nil
+		}
+		if len(gids) == 0 {
+			// prevent modifying the spec, and adding the default (0) gid
+			// if no args were given.
+			return nil
+		}
+		ensureAdditionalGids(s)
+		merged := append(s.Process.User.AdditionalGids, gids...)
+		slices.Sort(merged)
+		s.Process.User.AdditionalGids = slices.Compact(merged)
+		return nil
+	}
 }
 
 // WithAppendAdditionalGroups append additional groups within the container.
