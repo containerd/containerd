@@ -102,6 +102,10 @@ func (c *criService) containerSpecOpts(config *runtime.ContainerConfig, imageCon
 	}
 	if c.config.EnableCDI {
 		specOpts = append(specOpts, customopts.WithCDI(config.Annotations, config.CDIDevices))
+	} else {
+		if len(config.CDIDevices) > 0 {
+			return nil, fmt.Errorf("create container request config includes a request for CDI device injection, but CDI is disabled in the runtime configuration")
+		}
 	}
 	return specOpts, nil
 }
