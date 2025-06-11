@@ -24,3 +24,8 @@ import "os"
 func forceRemoveAll(path string) error {
 	return os.RemoveAll(path)
 }
+
+// Used only on Windows to skip tests for certain host OS versions.
+func SkipTestOnHost() bool {
+	return false
+}
