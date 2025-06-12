@@ -202,6 +202,13 @@ func New(ctx context.Context, config *srvconfig.Config) (*Server, error) {
 		}
 
 		tcpServerOpts = append(tcpServerOpts, grpc.Creds(credentials.NewTLS(tlsConfig)))
+	} else if config.GRPC.TCPTLSCName != "" {
+		log.G(ctx).Info("setting up tls on tcp GRPC services with Common Name...")
+		opts, err := setupTLSFromWindowsCertStore(ctx, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to setup TLS from Windows Cert Store: %w", err)
+		}
+		tcpServerOpts = append(tcpServerOpts, opts...)
 	}
 
 	// grpcService allows GRPC services to be registered with the underlying server

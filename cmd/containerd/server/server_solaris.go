@@ -20,8 +20,14 @@ import (
 	"context"
 
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
+	"google.golang.org/grpc"
 )
 
 func apply(_ context.Context, _ *srvconfig.Config) error {
 	return nil
+}
+
+// setupTLSFromWindowsCertStore is a NOOP on non-Windows platforms.
+func setupTLSFromWindowsCertStore(ctx context.Context, config *srvconfig.Config) ([]grpc.ServerOption, error) {
+	return nil, nil
 }
