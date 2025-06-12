@@ -84,6 +84,12 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 				CpuCount:           200,
 				CpuMaximum:         300,
 				MemoryLimitInBytes: 400,
+				AffinityCpus: []*runtime.WindowsCpuGroupAffinity{
+					{
+						CpuMask:  192,
+						CpuGroup: 0,
+					},
+				},
 			},
 			SecurityContext: &runtime.WindowsContainerSecurityContext{
 				RunAsUsername:  "test-user",
@@ -118,6 +124,8 @@ func getCreateContainerTestData() (*runtime.ContainerConfig, *runtime.PodSandbox
 		assert.EqualValues(t, *spec.Windows.Resources.CPU.Maximum, 300)
 		assert.EqualValues(t, *spec.Windows.Resources.CPU.Maximum, 300)
 		assert.EqualValues(t, *spec.Windows.Resources.Memory.Limit, 400)
+		assert.EqualValues(t, spec.Windows.Resources.CPU.Affinity[0].Mask, 192)
+		assert.EqualValues(t, spec.Windows.Resources.CPU.Affinity[0].Group, 0)
 
 		// Also checks if override of the image configs user is behaving.
 		t.Logf("Check username")
