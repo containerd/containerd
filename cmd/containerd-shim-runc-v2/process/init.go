@@ -209,8 +209,13 @@ func (p *Init) createCheckpointedState(r *CreateConfig, pidFile *pidFile) error 
 }
 
 // Wait for the process to exit
-func (p *Init) Wait() {
-	<-p.waitBlock
+func (p *Init) Wait(ctx context.Context) error {
+	select {
+	case <-p.waitBlock:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // ID of the process

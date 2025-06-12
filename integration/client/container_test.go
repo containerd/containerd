@@ -364,6 +364,67 @@ func withStdout(stdout io.Writer) cio.Opt {
 	}
 }
 
+func TestContainerWait(t *testing.T) {
+	t.Parallel()
+
+	client, err := newClient(t, address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+
+	var (
+		image       Image
+		ctx, cancel = testContext(t)
+		id          = t.Name()
+	)
+	defer cancel()
+
+	image, err = client.GetImage(ctx, testImage)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.NewContainer(ctx, id, WithNewSnapshot(id, image), WithNewSpec(oci.WithImageConfig(image), longCommand))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer container.Delete(ctx)
+
+	task, err := container.NewTask(ctx, empty())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer task.Delete(ctx)
+
+	ctx2, cancle2 := context.WithCancel(ctx)
+	cancle2()
+	statusErrC, _ := task.Wait(ctx2)
+	s := <-statusErrC
+	require.Error(t, s.Error(), "expected wait error, but got nil")
+
+	statusC, err := task.Wait(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := task.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := task.Kill(ctx, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	<-statusC
+
+	err = task.Kill(ctx, syscall.SIGTERM)
+	if err == nil {
+		t.Fatal("second call to kill should return an error")
+	}
+	if !errdefs.IsNotFound(err) {
+		t.Errorf("expected error %q but received %q", errdefs.ErrNotFound, err)
+	}
+}
+
 func TestContainerExec(t *testing.T) {
 	t.Parallel()
 
