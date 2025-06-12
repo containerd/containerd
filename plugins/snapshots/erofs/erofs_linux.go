@@ -360,7 +360,7 @@ func (s *snapshotter) View(ctx context.Context, key, parent string, opts ...snap
 }
 
 func setImmutable(path string, enable bool) error {
-	//nolint:revive	// silence "don't use ALL_CAPS in Go names; use CamelCase"
+	//nolint:revive,staticcheck	// silence "don't use ALL_CAPS in Go names; use CamelCase"
 	const (
 		FS_IMMUTABLE_FL = 0x10
 	)

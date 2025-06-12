@@ -509,10 +509,11 @@ func (s *Snapshotter) getDevicePath(snap storage.Snapshot) string {
 func (s *Snapshotter) buildMounts(ctx context.Context, snap storage.Snapshot, fileSystemType fsType) []mount.Mount {
 	var options []string
 
-	if fileSystemType == "" {
+	switch fileSystemType {
+	case "":
 		log.G(ctx).Error("File system type cannot be empty")
 		return nil
-	} else if fileSystemType == fsTypeXFS {
+	case fsTypeXFS:
 		options = append(options, "nouuid")
 	}
 	if snap.Kind != snapshots.KindActive {
