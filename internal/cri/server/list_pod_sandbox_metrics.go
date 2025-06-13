@@ -219,6 +219,12 @@ func (c *criService) listContainerMetrics(ctx context.Context, containerID strin
 	}
 	cm.Metrics = append(cm.Metrics, generateContainerMemoryMetrics(memory)...)
 
+	diskio, err := c.diskIOMetrics(ctx, resp.Metrics[0])
+	if err != nil {
+		// log error
+	}
+	cm.Metrics = append(cm.Metrics, generateDiskIOMetrics(diskio)...)
+
 	// network metrics are captured only at sandbox level
 
 	return cm, nil
@@ -346,11 +352,11 @@ func (c *criService) networkMetrics(ctx context.Context, stats interface{}) ([]c
 // ioValues is a helper method for assembling per-disk and per-filesystem stats.
 func ioValues(ioStats []containerPerDiskStats, ioType string) metricValues {
 
-	values := make(metricValues, 0, len(ioStats)+len(fsStats))
+	values := make(metricValues, 0, len(ioStats))
 	for _, stat := range ioStats {
 		values = append(values, metricValue{
-			value:     stat.Stats[ioType],
-			labels:    []string{stat.Device},
+			value:  stat.Stats[ioType],
+			labels: []string{stat.Device},
 		})
 	}
 	return values
@@ -758,7 +764,27 @@ func generateContainerMemoryMetrics(metrics *containerMemoryMetrics) []*runtime.
 }
 
 func generateDiskIOMetrics(metrics *containerDiskIoMetrics) []*runtime.Metric {
-	diskIOMetrics := []
+	diskIOMetrics := []*containerMetric{
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_fs_reads_bytes_total",
+				Help: "Cumulative count of bytes read",
+			},
+			valueFunc: func() metricValues {
+				return ioValues(metrics.IoServiceBytes, "Read")
+			},
+		},
+		{
+			desc: &runtime.MetricDescriptor{
+				Name: "container_fs_writes_bytes_total",
+				Help: "Cumulative count of bytes written",
+			},
+			valueFunc: func() metricValues {
+				return ioValues(metrics.IoServiceBytes, "Write")
+			},
+		},
+	}
+	return computeSandboxMetrics(diskIOMetrics, "diskIO")
 }
 
 // computeSandboxMetrics computes the metrics for both pod and container sandbox.
