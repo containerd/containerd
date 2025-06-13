@@ -173,6 +173,24 @@ type containerNetworkMetrics struct {
 	TxDropped uint64
 }
 
+type containerPerDiskStats struct {
+	Device string            `json:"device"`
+	Major  uint64            `json:"major"`
+	Minor  uint64            `json:"minor"`
+	Stats  map[string]uint64 `json:"stats"`
+}
+
+type containerDiskIoMetrics struct {
+	IoServiceBytes []containerPerDiskStats `json:"io_service_bytes,omitempty"`
+	IoServiced     []containerPerDiskStats `json:"io_serviced,omitempty"`
+	IoQueued       []containerPerDiskStats `json:"io_queued,omitempty"`
+	Sectors        []containerPerDiskStats `json:"sectors,omitempty"`
+	IoServiceTime  []containerPerDiskStats `json:"io_service_time,omitempty"`
+	IoWaitTime     []containerPerDiskStats `json:"io_wait_time,omitempty"`
+	IoMerged       []containerPerDiskStats `json:"io_merged,omitempty"`
+	IoTime         []containerPerDiskStats `json:"io_time,omitempty"`
+}
+
 // gives the metrics for a given container in a sandbox or a given sandbox
 func (c *criService) listContainerMetrics(ctx context.Context, containerID string) (*runtime.ContainerMetrics, error) {
 	request := &tasks.MetricsRequest{Filters: []string{"id==" + containerID}}
@@ -323,6 +341,88 @@ func (c *criService) networkMetrics(ctx context.Context, stats interface{}) ([]c
 	default:
 		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
 	}
+}
+
+// ioValues is a helper method for assembling per-disk and per-filesystem stats.
+func ioValues(ioStats []containerPerDiskStats, ioType string) metricValues {
+
+	values := make(metricValues, 0, len(ioStats)+len(fsStats))
+	for _, stat := range ioStats {
+		values = append(values, metricValue{
+			value:     stat.Stats[ioType],
+			labels:    []string{stat.Device},
+		})
+	}
+	return values
+}
+
+// Referred from https://github.com/google/cadvisor/blob/master/container/libcontainer/helpers.go#L123C1-L131C2
+
+type diskKey struct {
+	Major uint64
+	Minor uint64
+}
+
+func diskStatsCopy0(major, minor uint64) *containerPerDiskStats {
+	disk := containerPerDiskStats{
+		Major: major,
+		Minor: minor,
+	}
+	disk.Stats = make(map[string]uint64)
+	return &disk
+}
+
+func diskStatsCopy1(diskStat map[diskKey]*containerPerDiskStats) []containerPerDiskStats {
+	i := 0
+	stat := make([]containerPerDiskStats, len(diskStat))
+	for _, disk := range diskStat {
+		stat[i] = *disk
+		i++
+	}
+	return stat
+}
+
+func diskStatsCopyCG1(blkioStats []cg1.BlkIOEntry) (stat []containerPerDiskStats) {
+	if len(blkioStats) == 0 {
+		return
+	}
+	diskStat := make(map[diskKey]*containerPerDiskStats)
+	for i := range blkioStats {
+		major := blkioStats[i].Major
+		minor := blkioStats[i].Minor
+		key := diskKey{
+			Major: major,
+			Minor: minor,
+		}
+		diskp, ok := diskStat[key]
+		if !ok {
+			diskp = diskStatsCopy0(major, minor)
+			diskStat[key] = diskp
+		}
+		op := blkioStats[i].Op
+		if op == "" {
+			op = "Count"
+		}
+		diskp.Stats[op] = blkioStats[i].Value
+	}
+	return diskStatsCopy1(diskStat)
+}
+
+func (c *criService) diskIOMetrics(ctx context.Context, stats interface{}) (*containerDiskIoMetrics, error) {
+	cm := &containerDiskIoMetrics{}
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		cm.IoQueued = diskStatsCopyCG1(metrics.Blkio.GetIoQueuedRecursive())
+		cm.IoMerged = diskStatsCopyCG1(metrics.Blkio.GetIoMergedRecursive())
+		cm.IoServiceBytes = diskStatsCopyCG1(metrics.Blkio.GetIoServiceBytesRecursive())
+		cm.IoServiced = diskStatsCopyCG1(metrics.Blkio.GetIoServicedRecursive())
+		cm.IoTime = diskStatsCopyCG1(metrics.Blkio.GetIoTimeRecursive())
+	case *cg2.Metrics:
+		// TODO
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+
 }
 
 func generateSandboxNetworkMetrics(metrics []containerNetworkMetrics) []*runtime.Metric {
@@ -655,6 +755,10 @@ func generateContainerMemoryMetrics(metrics *containerMemoryMetrics) []*runtime.
 		},
 	}
 	return computeSandboxMetrics(memoryMetrics, "memory")
+}
+
+func generateDiskIOMetrics(metrics *containerDiskIoMetrics) []*runtime.Metric {
+	diskIOMetrics := []
 }
 
 // computeSandboxMetrics computes the metrics for both pod and container sandbox.
