@@ -38,6 +38,8 @@ type CreateConfig struct {
 	Stdin            string
 	Stdout           string
 	Stderr           string
+	AttachableOut    string
+	AttachableErr    string
 	Checkpoint       string
 	ParentCheckpoint string
 	Options          *google_protobuf.Any
