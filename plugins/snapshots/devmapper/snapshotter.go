@@ -184,7 +184,7 @@ func (s *Snapshotter) Mounts(ctx context.Context, key string) ([]mount.Mount, er
 	)
 
 	err = s.store.WithTransaction(ctx, false, func(ctx context.Context) error {
-		snap, err = storage.GetSnapshot(ctx, key)
+		snap, err = storage.GetSnapshotWithKind(ctx, key, []snapshots.Kind{})
 		return err
 	})
 
