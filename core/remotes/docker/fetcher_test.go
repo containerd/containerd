@@ -133,6 +133,7 @@ func TestFetcherOpenParallel(t *testing.T) {
 	size := int64(3 * 1024 * 1024)
 	content := make([]byte, size)
 	rand.New(rand.NewSource(1)).Read(content)
+	sendContentLength := true
 
 	f := dockerFetcher{
 		&dockerBase{
@@ -179,12 +180,16 @@ func TestFetcherOpenParallel(t *testing.T) {
 		}
 
 		if len(rng) == 0 {
-			rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			if sendContentLength {
+				rw.Header().Set("content-length", strconv.Itoa(len(content)))
+			}
 			_, _ = rw.Write(content)
 		} else {
 			b := content[rng[0].start : rng[0].start+rng[0].length]
 			rw.Header().Set("content-range", rng[0].contentRange(size))
-			rw.Header().Set("content-length", strconv.Itoa(len(b)))
+			if sendContentLength {
+				rw.Header().Set("content-length", strconv.Itoa(len(b)))
+			}
 			_, _ = rw.Write(b)
 		}
 
@@ -236,6 +241,10 @@ func TestFetcherOpenParallel(t *testing.T) {
 	checkReader(0)
 
 	checkReader(25)
+
+	sendContentLength = false
+	checkReader(25)
+	sendContentLength = true
 
 	ignoreContentRange = true
 	checkReader(25)
