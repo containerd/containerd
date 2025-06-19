@@ -74,11 +74,10 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 			return nil, err
 		}
 
-		for _, m := range idx.Manifests {
-			m.Annotations = mergeMap(m.Annotations, map[string]string{"io.containerd.import.ref-source": "annotation"})
-			descriptors = append(descriptors, m)
+		for i := range idx.Manifests {
+			idx.Manifests[i].Annotations = mergeMap(idx.Manifests[i].Annotations, map[string]string{"io.containerd.import.ref-source": "annotation"})
+			descriptors = append(descriptors, idx.Manifests[i])
 		}
-
 		return idx.Manifests, nil
 	}
 
