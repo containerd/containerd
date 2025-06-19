@@ -50,6 +50,10 @@ func TestFetcherOpen(t *testing.T) {
 	s := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if start > 0 {
 			rw.Header().Set("content-range", fmt.Sprintf("bytes %d-127/128", start))
+		} else if r.Header.Get("Range") == "bytes=0-" {
+			// Simulate registries which do not support range requests
+			rw.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		rw.Header().Set("content-length", strconv.Itoa(len(content[start:])))
 		_, _ = rw.Write(content[start:])
