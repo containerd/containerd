@@ -534,13 +534,11 @@ func TestDockerFetcherOpen(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, 0, tt.retries)
 			if tt.wantErr {
-				var expectedError error
+				expectedError := fmt.Sprintf("unexpected status from GET request to %s/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
 				if tt.wantServerMessageError {
-					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s - Server message: %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus), tt.mockedErr.Error())
-				} else if tt.wantPlainError {
-					expectedError = fmt.Errorf("unexpected status code %v/ns: %v %s", s.URL, tt.mockedStatus, http.StatusText(tt.mockedStatus))
+					expectedError += "\n" + tt.mockedErr.Error()
 				}
-				assert.Equal(t, expectedError.Error(), err.Error())
+				assert.Equal(t, expectedError, err.Error())
 
 			}
 
