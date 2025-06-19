@@ -23,12 +23,13 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
+	"github.com/containerd/errdefs"
+	"github.com/containerd/log"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/unpack"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/log"
 )
 
 func (ts *localTransferService) importStream(ctx context.Context, i transfer.ImageImporter, is transfer.ImageStorer, tops *transfer.Config) error {
@@ -94,7 +95,7 @@ func (ts *localTransferService) importStream(ctx context.Context, i transfer.Ima
 		if len(unpacks) > 0 {
 			uopts := []unpack.UnpackerOpt{}
 			for _, u := range unpacks {
-				matched, mu := getSupportedPlatform(u, ts.config.UnpackPlatforms)
+				matched, mu := getSupportedPlatform(ctx, u, ts.config.UnpackPlatforms)
 				if matched {
 					uopts = append(uopts, unpack.WithUnpackPlatform(mu))
 				}
