@@ -1,5 +1,4 @@
 //go:build !windows
-// +build !windows
 
 /*
    Copyright The containerd Authors.
@@ -17,18 +16,8 @@
    limitations under the License.
 */
 
-package testsuite
+package platform
 
-import "syscall"
-
-func clearMask() func() {
-	oldumask := syscall.Umask(0)
-	return func() {
-		syscall.Umask(oldumask)
-	}
-}
-
-// Used only on Windows to skip tests for certain host OS versions.
 func SkipTestOnHost() bool {
 	return false
 }

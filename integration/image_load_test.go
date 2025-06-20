@@ -18,9 +18,11 @@ package integration
 
 import (
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 	"time"
 
+	"github.com/containerd/containerd/integration/platform"
 	"github.com/stretchr/testify/require"
 	exec "golang.org/x/sys/execabs"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -28,6 +30,14 @@ import (
 
 // Test to load an image from tarball.
 func TestImageLoad(t *testing.T) {
+	// TODO(kiashok): Docker is not able to pull the right
+	// image manifest of `testImage` on WS2025 host. Temporarily
+	// skipping this test for WS2025 while its fixed on docker.
+	// This test is validated on WS2022 anyway.
+	if goruntime.GOOS == "windows" && platform.SkipTestOnHost() {
+		t.Skip("Temporarily skip validating on WS2025")
+	}
+
 	testImage := GetImage(BusyBox)
 	loadedImage := testImage
 	_, err := exec.LookPath("docker")
