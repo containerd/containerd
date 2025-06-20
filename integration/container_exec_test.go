@@ -17,7 +17,10 @@
 package integration
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,4 +72,48 @@ func TestContainerDrainExecIOAfterExit(t *testing.T) {
 	t.Log("Exec in container")
 	_, _, err = runtimeService.ExecSync(cn, []string{"sh", "-c", "sleep 2s &"}, 10*time.Second)
 	require.NoError(t, err, "should drain IO in time")
+}
+
+func TestContainerExecLogGrow(t *testing.T) {
+	// FIXME(fuweid): support it for windows container.
+	if runtime.GOOS == "windows" {
+		t.Skip("it seems that windows platform doesn't support detached process. skip it")
+	}
+	t.Log("Create a sandbox")
+	sb, sbConfig := PodSandboxConfigWithCleanup(t, "sandbox", "container-exec-log-grow")
+	var (
+		testImage     = images.Get(images.BusyBox)
+		containerName = "test-container-exec"
+	)
+	EnsureImageExists(t, testImage)
+	t.Log("Create a container")
+	cnConfig := ContainerConfig(
+		containerName,
+		testImage,
+		WithCommand("sh", "-c", "sleep 365d"),
+	)
+	cn, err := runtimeService.CreateContainer(sb, cnConfig, sbConfig)
+	require.NoError(t, err)
+	defer func() {
+		assert.NoError(t, runtimeService.RemoveContainer(cn))
+	}()
+	t.Logf("Start the container %s", cn)
+	require.NoError(t, runtimeService.StartContainer(cn))
+	defer func() {
+		assert.NoError(t, runtimeService.StopContainer(cn, 10))
+	}()
+	t.Logf("Exec in container %s", cn)
+	// run a non-existent process
+	_, _, err = runtimeService.ExecSync(cn, []string{"ls001"}, 10*time.Second)
+	require.ErrorContains(t, err, "failed to exec in container")
+	execLogDir := filepath.Join("/run/containerd-test/io.containerd.runtime.v2.task/k8s.io", cn)
+	entrys, err := os.ReadDir(execLogDir)
+	require.NoError(t, err)
+	for _, entry := range entrys {
+		if !entry.IsDir() {
+			if strings.Contains(entry.Name(), "-exec.log") {
+				t.Errorf("unexpected file: %s in %s", entry.Name(), execLogDir)
+			}
+		}
+	}
 }
