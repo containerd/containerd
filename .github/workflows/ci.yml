@@ -402,6 +402,39 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y criu
 
+      - name: Build and install erofs-utils from source
+        if: matrix.os != 'ubuntu-24.04-arm'
+        run: |
+          # Install dependencies
+          sudo apt-get update
+          sudo apt-get install -y git make gcc libz-dev liblz4-dev libfuse-dev autoconf libtool pkg-config uuid-dev
+
+          # Create temporary build directory
+          BUILD_DIR="$(mktemp -d)"
+          cd "$BUILD_DIR"
+
+          # Clone and build erofs-utils
+          git clone https://github.com/erofs/erofs-utils.git
+          cd erofs-utils
+          git checkout v1.8.5
+          ./autogen.sh
+          ./configure
+          make -j"$(nproc)"
+          sudo make install
+          sudo ldconfig
+
+          # Clean up
+          cd -
+          rm -rf "$BUILD_DIR"
+
+          # Verify installation
+          mkfs.erofs --version
+
+      - name: Load EROFS kernel module
+        if: matrix.os != 'ubuntu-24.04-arm'
+        run: |
+          sudo modprobe erofs
+
       - name: Install containerd
         env:
           CGO_ENABLED: 1
