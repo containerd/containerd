@@ -1,3 +1,5 @@
+//go:build !tinygo.wasm
+
 /*
    Copyright The containerd Authors.
 
@@ -70,6 +72,12 @@ func FromOCILinuxResources(o *rspec.LinuxResources, _ map[string]string) *LinuxR
 			Limit: p.Limit,
 		}
 	}
+	if len(o.Unified) != 0 {
+		l.Unified = make(map[string]string)
+		for k, v := range o.Unified {
+			l.Unified[k] = v
+		}
+	}
 	return l
 }
 
@@ -96,6 +104,12 @@ func FromCRILinuxResources(c *cri.LinuxContainerResources) *LinuxResources {
 				PageSize: l.PageSize,
 				Limit:    l.Limit,
 			})
+	}
+	if len(c.Unified) != 0 {
+		r.Unified = make(map[string]string)
+		for k, v := range c.Unified {
+			r.Unified[k] = v
+		}
 	}
 	return r
 }
