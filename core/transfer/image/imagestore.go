@@ -42,12 +42,13 @@ func init() {
 }
 
 type Store struct {
-	imageName     string
-	imageLabels   map[string]string
-	platforms     []ocispec.Platform
-	allMetadata   bool
-	labelMap      func(ocispec.Descriptor) []string
-	manifestLimit int
+	imageName             string
+	imageLabels           map[string]string
+	platforms             []ocispec.Platform
+	allMetadata           bool
+	discardUnpackedLayers bool
+	labelMap              func(ocispec.Descriptor) []string
+	manifestLimit         int
 
 	// extraReferences are used to store or lookup multiple references
 	extraReferences []Reference
@@ -171,6 +172,13 @@ func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
 	}
 }
 
+// WithDiscardUnpackedLayers specifies whether to allow the garbage collector to clean up layers from the content store after unpacking.
+func WithDiscardUnpackedLayers() StoreOpt {
+	return func(s *Store) {
+		s.discardUnpackedLayers = true
+	}
+}
+
 // NewStore creates a new image store source or Destination
 func NewStore(image string, opts ...StoreOpt) *Store {
 	s := &Store{
@@ -195,7 +203,11 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 	} else {
 		p = platforms.Ordered(is.platforms...)
 	}
-	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
+	labelMap := is.labelMap
+	if is.discardUnpackedLayers {
+		labelMap = images.ChildGCLabelsFilterLayers
+	}
+	h = images.SetChildrenMappedLabels(cs, h, labelMap)
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest
 		// and configuration for not-target platforms
@@ -363,13 +375,14 @@ func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 
 func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
 	s := &transfertypes.ImageStore{
-		Name:            is.imageName,
-		Labels:          is.imageLabels,
-		ManifestLimit:   uint32(is.manifestLimit),
-		AllMetadata:     is.allMetadata,
-		Platforms:       types.OCIPlatformToProto(is.platforms),
-		ExtraReferences: referencesToProto(is.extraReferences),
-		Unpacks:         unpackToProto(is.unpacks),
+		Name:                  is.imageName,
+		Labels:                is.imageLabels,
+		ManifestLimit:         uint32(is.manifestLimit),
+		AllMetadata:           is.allMetadata,
+		Platforms:             types.OCIPlatformToProto(is.platforms),
+		ExtraReferences:       referencesToProto(is.extraReferences),
+		Unpacks:               unpackToProto(is.unpacks),
+		DiscardUnpackedLayers: is.discardUnpackedLayers,
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -387,6 +400,7 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.platforms = types.OCIPlatformFromProto(s.Platforms)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
+	is.discardUnpackedLayers = s.DiscardUnpackedLayers
 
 	return nil
 }
