@@ -40,6 +40,10 @@ message ImageStore {
 	// Unpack Configuration, multiple allowed
 
 	repeated UnpackConfiguration unpacks = 10;
+
+	// Content retention
+
+	ContentRetention content_retention = 15;
 }
 
 message UnpackConfiguration {
@@ -79,4 +83,22 @@ message ImageReference {
 	// name reference from the prefix.
 	// Only used if IsPrefix is true.
 	bool skip_named_digest = 5;
+}
+
+// ContentRetention is used to determine how content related the the image should be
+// retained. It is up the server implementation to decide what content is considered
+// needed to be cached and if a client needs specific content to be preserved, it
+// should request the server to retain all content.
+enum ContentRetention {
+	// None will discard all non-metadata content when it is no longer
+	// needed by the server.
+	None = 0;
+
+	// Cached is the default and will retain all metadata and content which is
+	// fetched by the server for the supported platforms.
+	Cached = 1;
+
+	// All will fetch and retain all metadata and content for an image to allow
+	// fully exporting the original image, regardless of supported platforms.
+	All = 2;
 }
