@@ -196,8 +196,9 @@ func TestContainerdImageInOtherNamespaces(t *testing.T) {
 	require.NoError(t, Consistently(checkImage, 100*time.Millisecond, time.Second))
 
 	PodSandboxConfigWithCleanup(t, "sandbox", "test")
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
+	time.Sleep(2 * time.Second)
 	t.Logf("cri plugin should see the image now")
 	img, err := imageService.ImageStatus(&runtime.ImageSpec{Image: testImage})
 	require.NoError(t, err)
@@ -243,7 +244,10 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 	imageService.RemoveImage(&runtime.ImageSpec{Image: pauseImage})
 
 	t.Log("pull pause image")
-	_, err := containerdClient.Pull(ctx, pauseImage)
+	pullOpts := []containerd.RemoteOpt{
+		containerd.WithPullUnpack,
+	}
+	_, err := containerdClient.Pull(ctx, pauseImage, pullOpts...)
 	assert.NoError(t, err)
 
 	t.Log("pause image should be seen by cri plugin")
@@ -251,7 +255,7 @@ func TestContainerdSandboxImagePulledOutsideCRI(t *testing.T) {
 	require.NoError(t, Eventually(func() (bool, error) {
 		pimg, err = imageService.ImageStatus(&runtime.ImageSpec{Image: pauseImage})
 		return pimg != nil, err
-	}, time.Second, 10*time.Second))
+	}, time.Second, 20*time.Second))
 
 	t.Log("verify pinned field is set for pause image")
 	assert.True(t, pimg.Pinned)

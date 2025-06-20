@@ -160,7 +160,7 @@ func (c *Client) Pull(ctx context.Context, ref string, opts ...RemoteOpt) (_ Ima
 		unpackSpan.End()
 	}
 
-	img, err = c.createNewImage(ctx, img)
+	img, err = c.CreateNewImage(ctx, img)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +272,7 @@ func (c *Client) fetch(ctx context.Context, rCtx *RemoteContext, ref string, lim
 	}, nil
 }
 
-func (c *Client) createNewImage(ctx context.Context, img images.Image) (images.Image, error) {
+func (c *Client) CreateNewImage(ctx context.Context, img images.Image) (images.Image, error) {
 	ctx, span := tracing.StartSpan(ctx, tracing.Name(pullSpanPrefix, "pull.createNewImage"))
 	defer span.End()
 	is := c.ImageService()

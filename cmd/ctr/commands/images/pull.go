@@ -97,7 +97,6 @@ command. As part of this process, we do the following:
 		if ref == "" {
 			return errors.New("please provide an image reference to pull")
 		}
-
 		client, ctx, cancel, err := commands.NewClient(cliContext)
 		if err != nil {
 			return err
@@ -232,6 +231,12 @@ command. As part of this process, we do the following:
 				fmt.Printf("image chain ID: %s\n", chainID)
 			}
 		}
+
+		_, err = client.CreateNewImage(ctx, img)
+		if err != nil {
+			return fmt.Errorf("failed to create image entries in containerd")
+		}
+
 		fmt.Printf("done: %s\t\n", time.Since(start))
 		return nil
 	},
