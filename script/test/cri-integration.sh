@@ -51,7 +51,7 @@ ${CMD} --test.run="${FOCUS}" --test.v \
   --cri-endpoint="${CONTAINERD_SOCK}" \
   --runtime-handler="${RUNTIME}" \
   --containerd-bin="${CONTAINERD_BIN}" \
-  --image-list="${TEST_IMAGE_LIST:-}" && test_exit_code=$? || test_exit_code=$?
+  --image-list="${TEST_IMAGE_LIST:-}" "@" && test_exit_code=$? || test_exit_code=$?
 
 if [[ "$test_exit_code" -ne 0 ]]; then
   if [[ -e "$GITHUB_WORKSPACE" ]]; then
