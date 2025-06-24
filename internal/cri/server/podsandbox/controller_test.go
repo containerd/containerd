@@ -26,6 +26,7 @@ import (
 	criconfig "github.com/containerd/containerd/v2/internal/cri/config"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
+	"github.com/containerd/containerd/v2/pkg/os"
 	ostesting "github.com/containerd/containerd/v2/pkg/os/testing"
 )
 
@@ -44,10 +45,13 @@ var testConfig = criconfig.Config{
 
 // newControllerService creates a fake criService for test.
 func newControllerService() *Controller {
+	fakeOS := ostesting.NewFakeOS()
+
 	return &Controller{
-		config: testConfig,
-		os:     ostesting.NewFakeOS(),
-		store:  NewStore(),
+		config:      testConfig,
+		os:          fakeOS,
+		statManager: os.NewStatManager(fakeOS),
+		store:       NewStore(),
 	}
 }
 
