@@ -29,6 +29,7 @@ import (
 	"github.com/containerd/otelttrpc"
 	"github.com/containerd/ttrpc"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"google.golang.org/grpc"
 )
 
 // apply sets config settings on the server process
@@ -71,4 +72,9 @@ func newTTRPCServer() (*ttrpc.Server, error) {
 		ttrpc.WithServerHandshaker(ttrpc.UnixSocketRequireSameUser()),
 		ttrpc.WithUnaryServerInterceptor(otelttrpc.UnaryServerInterceptor()),
 	)
+}
+
+// setupTLSFromWindowsCertStore is a NOOP on non-Windows platforms.
+func setupTLSFromWindowsCertStore(ctx context.Context, config *srvconfig.Config) ([]grpc.ServerOption, error) {
+	return nil, nil
 }
