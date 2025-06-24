@@ -493,11 +493,23 @@ func TestCollectibleResources(t *testing.T) {
 		addImage("ns1", "image2", dgst(2), nil),
 		addLease("ns1", "lease1", labelmap(string(labelGCExpire), time.Now().Add(time.Hour).Format(time.RFC3339))),
 		addLease("ns1", "lease2", labelmap(string(labelGCExpire), time.Now().Add(-1*time.Hour).Format(time.RFC3339))),
+		addContainer("ns1", "container1", "testsn", "sn1", nil),
 	}
 	refs := map[gc.Node][]gc.Node{
 		gcnode(ResourceContent, "ns1", dgst(1).String()): nil,
 		gcnode(ResourceContent, "ns1", dgst(2).String()): {
 			gcnode(testResource, "ns1", "test2"),
+		},
+		gcnode(ResourceImage, "ns1", "image1"): {
+			gcnode(ResourceContent, "ns1", dgst(1).String()),
+		},
+		gcnode(ResourceImage, "ns1", "image2"): {
+			gcnode(ResourceContent, "ns1", dgst(2).String()),
+			gcnode(testResource, "ns1", "test5"),
+		},
+		gcnode(ResourceContainer, "ns1", "container1"): {
+			gcnode(ResourceSnapshot, "ns1", "testsn/sn1"),
+			gcnode(testResource, "ns1", "test5"),
 		},
 	}
 	all := []gc.Node{
@@ -511,9 +523,11 @@ func TestCollectibleResources(t *testing.T) {
 		gcnode(testResource, "ns1", "test2"), // 7: Will be removed
 		gcnode(testResource, "ns1", "test3"),
 		gcnode(testResource, "ns1", "test4"),
+		gcnode(testResource, "ns1", "test5"),
 	}
 	removeIndex := 7
 	roots := []gc.Node{
+		gcnode(ResourceContainer, "ns1", "container1"),
 		gcnode(ResourceImage, "ns1", "image1"),
 		gcnode(ResourceImage, "ns1", "image2"),
 		gcnode(ResourceLease, "ns1", "lease1"),
@@ -526,9 +540,14 @@ func TestCollectibleResources(t *testing.T) {
 			gcnode(testResource, "ns1", "test2"),
 			gcnode(testResource, "ns1", "test3"),
 			gcnode(testResource, "ns1", "test4"),
+			gcnode(testResource, "ns1", "test5"),
 		},
 		active: []gc.Node{
 			gcnode(testResource, "ns1", "test1"),
+		},
+		brefs: map[gc.Node]gc.Node{
+			gcnode(ResourceImage, "ns1", "image2"):         gcnode(testResource, "ns1", "test5"),
+			gcnode(ResourceContainer, "ns1", "container1"): gcnode(testResource, "ns1", "test5"),
 		},
 		leased: map[string][]gc.Node{
 			"lease1": {
@@ -560,6 +579,9 @@ func TestCollectibleResources(t *testing.T) {
 		testResource: collector,
 	})
 
+	checkNodeC(ctx, t, db, roots, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
+		return c.scanRoots(ctx, tx, nc)
+	})
 	for n, nodes := range refs {
 		checkNodeC(ctx, t, db, nodes, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
 			return c.references(ctx, tx, n, func(n gc.Node) {
@@ -575,9 +597,6 @@ func TestCollectibleResources(t *testing.T) {
 	}
 	checkNodes(ctx, t, db, all, func(ctx context.Context, tx *bolt.Tx, fn func(context.Context, gc.Node) error) error {
 		return c.scanAll(ctx, tx, fn)
-	})
-	checkNodeC(ctx, t, db, roots, func(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Node) error {
-		return c.scanRoots(ctx, tx, nc)
 	})
 
 	if err := db.Update(func(tx *bolt.Tx) error {
@@ -597,6 +616,7 @@ func TestCollectibleResources(t *testing.T) {
 type testCollector struct {
 	all    []gc.Node
 	active []gc.Node
+	brefs  map[gc.Node]gc.Node
 	leased map[string][]gc.Node
 }
 
@@ -613,13 +633,21 @@ func (tc *testCollector) All(fn func(gc.Node)) {
 		fn(n)
 	}
 }
-
-func (tc *testCollector) Active(namespace string, fn func(gc.Node)) {
+func (tc *testCollector) ActiveWithBackRefs(namespace string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
 	for _, n := range tc.active {
 		if n.Namespace == namespace {
 			fn(n)
 		}
 	}
+	for b, r := range tc.brefs {
+		if b.Namespace == namespace {
+			bref(b, r)
+		}
+	}
+}
+
+func (tc *testCollector) Active(namespace string, fn func(gc.Node)) {
+	tc.ActiveWithBackRefs(namespace, fn, func(gc.Node, gc.Node) {})
 }
 
 func (tc *testCollector) Leased(namespace, lease string, fn func(gc.Node)) {
