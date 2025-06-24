@@ -347,6 +347,9 @@ func (c *criService) windowsContainerMetrics(
 				WorkingSetBytes: &runtime.UInt64Value{
 					Value: wstats.Memory.MemoryUsagePrivateWorkingSetBytes,
 				},
+				UsageBytes: &runtime.UInt64Value{
+					Value: wstats.Memory.MemoryUsageCommitBytes,
+				},
 			}
 		}
 	}
