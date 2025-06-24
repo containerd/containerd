@@ -79,10 +79,13 @@ func init() {
 				return nil, fmt.Errorf("unable to load CRI image service plugin dependency: %w", err)
 			}
 
+			realOS := osinterface.RealOS{}
+
 			c := Controller{
 				client:         client,
 				config:         runtimeService.Config(),
-				os:             osinterface.RealOS{},
+				os:             realOS,
+				statManager:    osinterface.NewStatManager(realOS),
 				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
 				store:          NewStore(),
@@ -126,6 +129,9 @@ type Controller struct {
 	imageService ImageService
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// statManager is like a side-car interface to os for performing stat-related
+	// pre-validations/checks/etc.
+	statManager *osinterface.StatManager
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event
 	// actually we only use it's backoff mechanism to make sure pause container is cleaned up.
 	eventMonitor *events.EventMonitor

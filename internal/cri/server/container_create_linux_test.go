@@ -17,16 +17,21 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/core/mount"
+	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/containerd/v2/pkg/oci"
+	"github.com/containerd/containerd/v2/pkg/testutil"
 	"github.com/containerd/platforms"
 	imagespec "github.com/opencontainers/image-spec/specs-go/v1"
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -590,7 +595,7 @@ func TestMountPropagation(t *testing.T) {
 			var spec runtimespec.Spec
 			spec.Linux = &runtimespec.Linux{}
 
-			err := opts.WithMounts(c.os, config, []*runtime.Mount{test.criMount}, "", nil)(context.Background(), nil, nil, &spec)
+			err := opts.WithMounts(c.os, c.statManager, config, []*runtime.Mount{test.criMount}, "", nil)(context.Background(), nil, nil, &spec)
 			if test.expectErr {
 				require.Error(t, err)
 			} else {
@@ -599,6 +604,129 @@ func TestMountPropagation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIssue10828(t *testing.T) {
+	testutil.RequiresRoot(t)
+	const (
+		fuseMountPointName       = "fakeFUSERootDir"
+		fuseFIFODirectoryName    = "FUSEFIFOs"
+		fuseReadyFIFOFileName    = "fuseReadyTrigger.fifo"
+		fuseCloseFIFOFileName    = "fuseCloseTrigger.fifo"
+		fuseShutdownFIFOFileName = "fuseShutdownTrigger.fifo"
+
+		statHangFIFOFileName = "statHang.fifo"
+	)
+
+	testDir := t.TempDir()
+	t.Logf("using test dir: %v", testDir)
+
+	fuseReadyFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseReadyFIFOFileName)
+	fuseCloseFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseCloseFIFOFileName)
+	fuseShutdownFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, fuseShutdownFIFOFileName)
+	statHangResumeFIFOFile := filepath.Join(testDir, fuseFIFODirectoryName, statHangFIFOFileName)
+
+	ctx := context.Background()
+
+	// This path comes from the script/setup/install-failpoint-binaries file.
+	fuseRunCmd := filepath.Join("/usr/local/bin", "fake-fuse")
+	fuseCmd := exec.CommandContext(ctx, fuseRunCmd, "--fuse-dir", testDir, "--hang-during-stat")
+	var outBuffer, errBuffer bytes.Buffer
+	fuseCmd.Stdout, fuseCmd.Stderr = &outBuffer, &errBuffer
+	err := fuseCmd.Start()
+	require.NoErrorf(t, err, "failed to start the FUSE process via %v", fuseRunCmd)
+	defer func() {
+		fuseCmd.Cancel()
+	}()
+
+	// Wait for some time until FUSE sets up the FIFOs
+	require.Eventually(t, func() bool {
+		_, statErr := os.Stat(fuseReadyFIFOFile)
+		if statErr == nil {
+			return true // Directory exists
+		}
+		if !os.IsNotExist(statErr) {
+			t.Logf("Unexpected error stating FIFO directory %s: %v", fuseReadyFIFOFile, statErr)
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "FIFO directory was not created in time")
+
+	fuseReadyWaiter, err := fifosync.NewWaiter(fuseReadyFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a new waiter for checking FUSE's readiness: %v", fuseReadyWaiter.Name())
+	err = fuseReadyWaiter.Wait()
+	require.NoError(t, err, "FUSE server didn't start")
+	t.Logf("FUSE is ready")
+
+	// TEST
+	c := newTestCRIService()
+	c.os.(*ostesting.FakeOS).StatFn = os.Stat
+
+	container1Config, sandbox1Config, imageConfig, _ := getCreateContainerTestData()
+	sandbox1Config.Metadata.Name = "sandbox-1-name"
+	container1Config.Metadata.Name = "container-1-name"
+	container1Config.Mounts = []*runtime.Mount{
+		{
+			ContainerPath: "container-path-1",
+			HostPath:      filepath.Join(testDir, fuseMountPointName),
+		},
+	}
+	var err1Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(currentPlatform, "testID-1", "testSandboxID-1", uint32(1234), "", "ctr-1", testImageName, container1Config, sandbox1Config, imageConfig, nil, config.Runtime{}, nil)
+		err1Ch <- err
+	}()
+
+	var err2Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(currentPlatform, "testID-2", "testSandboxID-1", uint32(1234), "", "ctr-2", testImageName, container1Config, sandbox1Config, imageConfig, nil, config.Runtime{}, nil)
+		err2Ch <- err
+	}()
+
+	workingDir := filepath.Join(testDir, "dir3")
+	err = os.MkdirAll(workingDir, os.ModeDir)
+	require.NoErrorf(t, err, "failed to create a directory to test a normal case: %v", workingDir)
+	container3Config, sandbox3Config, _, _ := getCreateContainerTestData()
+	sandbox3Config.Metadata.Name = "sandbox-3-name"
+	sandbox3Config.Metadata.Uid = "2345"
+	container3Config.Metadata.Name = "container-3-name"
+	container3Config.Mounts = []*runtime.Mount{
+		{
+			ContainerPath: "container-path-3",
+			HostPath:      workingDir,
+		},
+	}
+	var err3Ch = make(chan error, 1)
+	go func() {
+		_, err := c.buildContainerSpec(currentPlatform, "testID-3", "testSandboxID-3", uint32(2345), "", "ctr-3", testImageName, container3Config, sandbox3Config, imageConfig, nil, config.Runtime{}, nil)
+		err3Ch <- err
+	}()
+
+	// Verify the test cases
+	err1 := <-err1Ch
+	require.Error(t, err1, "err1 should've returned an error")
+
+	err2 := <-err2Ch
+	require.Error(t, err2, "err2 should've returned an error")
+
+	err3 := <-err3Ch
+	require.NoError(t, err3, "err3 should not have returned an error")
+	// END TEST
+
+	// Resume the hanging Stat call before finishing the test
+	statHangResume, err := fifosync.NewTrigger(statHangResumeFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a trigger to resume the Stat call", statHangResume.Name())
+	err = statHangResume.Trigger()
+	require.NoError(t, err, "failed to resume the stuck Stat call")
+
+	fuseClosetrigger, err := fifosync.NewTrigger(fuseCloseFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a trigger to close FUSE's connection: %v", fuseClosetrigger.Name())
+	t.Logf("closing the FUSE conn")
+	fuseClosetrigger.Trigger()
+
+	fuseShutdownWaiter, err := fifosync.NewWaiter(fuseShutdownFIFOFile, 0600)
+	require.NoErrorf(t, err, "failed to create a new waiter to check if FUSE has shut down: %v", fuseShutdownWaiter.Name())
+	err = fuseShutdownWaiter.Wait()
+	require.NoError(t, err, "FUSE server did not shut down")
 }
 
 func TestPidNamespace(t *testing.T) {
