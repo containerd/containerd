@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/containerd/containerd/v2/cmd/containerd/server"
 	srvconfig "github.com/containerd/containerd/v2/cmd/containerd/server/config"
@@ -97,10 +98,9 @@ var configCommand = &cli.Command{
 			Action: dumpConfig,
 		},
 		{
-			Name:  "migrate",
-			Usage: "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
-			// TODO(vinayakankugoyal): This should not output fields that were not set in the current configuration.
-			Action: dumpConfig,
+			Name:   "migrate",
+			Usage:  "Migrate the current configuration file to the latest version (does not migrate subconfig files)",
+			Action: migrateConfig,
 		},
 	},
 }
@@ -123,6 +123,138 @@ func dumpConfig(cliContext *cli.Context) error {
 		}
 	}
 	return outputConfig(ctx, config)
+}
+
+func migrateConfig(cliContext *cli.Context) error {
+	config := defaultConfig()
+	ctx := cliContext.Context
+	if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	// Run plugin migrations
+	if config.Version < version.ConfigVersion {
+		plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+		for _, p := range plugins {
+			if p.ConfigMigration != nil {
+				if err := p.ConfigMigration(ctx, config.Version, config.Plugins); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// For migrate, we want to show only the user's config values plus any migrated values,
+	// without filling in default values that weren't in the original config
+	return outputMigrateConfig(ctx, config)
+}
+
+// outputMigrateConfig outputs only the user's configuration values plus any migrated values,
+// without filling in default values that weren't in the original config.
+func outputMigrateConfig(_ context.Context, config *srvconfig.Config) error {
+	plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+
+	// store default configs from plugins
+	defaultConfigs := make(map[string]interface{})
+	for _, p := range plugins {
+		if p.Config != nil {
+			// hack: marshal and unmarshal to get a clean copy of the default config
+			defaultData, err := toml.Marshal(p.Config)
+			if err != nil {
+				return err
+			}
+			var defaultConfig interface{}
+			if err := toml.Unmarshal(defaultData, &defaultConfig); err != nil {
+				return err
+			}
+			defaultConfigs[p.URI()] = defaultConfig
+		}
+	}
+
+	// process each plugin config to remove default values that weren't in the original
+	if config.Plugins != nil {
+		for pluginID, pluginConfig := range config.Plugins {
+			if defaultConfig, exists := defaultConfigs[pluginID]; exists {
+				// remove default values that weren't in the original config
+				// NOTE: this will remove a key if its values is the same as the default value
+				// that can be an acceptable limitation for now.
+				filteredConfig := removeDefaultValues(pluginConfig, defaultConfig)
+				if filteredConfig != nil {
+					config.Plugins[pluginID] = filteredConfig
+				} else {
+					delete(config.Plugins, pluginID)
+				}
+			}
+		}
+	}
+
+	if config.Timeouts != nil {
+		allTimeouts := timeout.All()
+		for k := range config.Timeouts {
+			if defaultTimeout, exists := allTimeouts[k]; exists {
+				if config.Timeouts[k] == defaultTimeout.String() {
+					delete(config.Timeouts, k)
+				}
+			}
+		}
+
+		if len(config.Timeouts) == 0 {
+			config.Timeouts = nil
+		}
+	}
+
+	config.Version = version.ConfigVersion
+
+	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
+}
+
+// removeDefaultValues recursively removes values from config that match the defaults.
+func removeDefaultValues(config, defaults interface{}) interface{} {
+	if config == nil || defaults == nil {
+		return config
+	}
+
+	switch configVal := config.(type) {
+	case map[string]interface{}:
+		defaultsMap, ok := defaults.(map[string]interface{})
+		if !ok {
+			return config
+		}
+
+		result := make(map[string]interface{})
+		for k, v := range configVal {
+			if defaultVal, exists := defaultsMap[k]; exists {
+				if processed := removeDefaultValues(v, defaultVal); processed != nil {
+					result[k] = processed
+				}
+			} else {
+				// this key doesn't exist in defaults, keep it
+				result[k] = v
+			}
+		}
+
+		if len(result) == 0 {
+			return nil
+		}
+		return result
+
+	case []interface{}:
+		defaultsSlice, ok := defaults.([]interface{})
+		if !ok {
+			return config
+		}
+
+		if reflect.DeepEqual(configVal, defaultsSlice) {
+			return nil
+		}
+		return configVal
+
+	default:
+		if reflect.DeepEqual(config, defaults) {
+			return nil
+		}
+		return config
+	}
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
