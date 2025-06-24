@@ -892,7 +892,8 @@ func dgst(i int64) digest.Digest {
 	if _, err := io.CopyN(dgstr.Hash(), r, 256); err != nil {
 		panic(err)
 	}
-	return dgstr.Digest()
+	d := dgstr.Digest()
+	return digest.NewDigestFromEncoded(d.Algorithm(), fmt.Sprintf("%03d00", i)+d.Encoded()[5:])
 }
 
 func timeIn(d time.Duration) *time.Time {
