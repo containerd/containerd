@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/containerd/containerd/v2/core/containers"
 	"github.com/containerd/containerd/v2/pkg/oci"
@@ -45,7 +46,7 @@ func cleanMount(p string) string {
 	return filepath.Clean(p)
 }
 
-func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, error) {
+func parseMount(ctx context.Context, osi osinterface.OS, osManager osinterface.Manager, mount *runtime.Mount) (*runtimespec.Mount, error) {
 	var (
 		dst = mount.GetContainerPath()
 		src = mount.GetHostPath()
@@ -55,12 +56,66 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 	// the listening process. filepath.Clean also breaks named pipe
 	// paths, so don't use it.
 	if !namedPipePath(src) {
-		if _, err := osi.Stat(src); err != nil {
+
+		var statError error
+		mu := osManager.InflightStatsMutex()
+		inflightStatMap := osManager.InflightStats()
+
+		mu.Lock()
+		inflight, isPending := inflightStatMap[src]
+		if isPending {
+			// Stat for this path is already in progress. We wait on the
+			// condition variable. Wait() atomically unlocks the mutex and
+			// suspends the goroutine. When awakened, it re-locks the mutex
+			// before returning.
+			for !inflight.Done {
+				inflight.Cond.Wait()
+			}
+			statError = inflight.Err
+			mu.Unlock()
+		} else {
+			// There are no active Stats being made to this path. Create a
+			// record for other goroutines to find and wait on.
+			newInflight := osManager.NewInflightStat()
+			newInflight.Cond = sync.NewCond(mu)
+			inflightStatMap[src] = newInflight
+			mu.Unlock()
+
+			statCtx, statcancel := context.WithTimeout(ctx, osManager.StatTimeout())
+			resultChan := make(chan osinterface.StatResult, 1)
+			go func() {
+				_, err := osi.Stat(src)
+				resultChan <- osinterface.StatResult{Err: err}
+				close(resultChan)
+			}()
+
+			select {
+			case res := <-resultChan: // Stat completed
+				statError = res.Err
+			case <-statCtx.Done(): // timeout / mountpath could be stuck.
+				statError = fmt.Errorf("mountpath (%q) could be stuck", src)
+			}
+			statcancel()
+
+			mu.Lock()
+			newInflight.Err = statError
+			newInflight.Done = true
+
+			// Delete the src entry from the map so that subsequent requests
+			// can still call a new Stat to the src in case the underlying FS
+			// has recovered and can serve files.
+			delete(inflightStatMap, src)
+
+			newInflight.Cond.Broadcast()
+			mu.Unlock()
+		}
+
+		if statError != nil {
 			// Create the host path if it doesn't exist. This will align
 			// the behavior with the Linux implementation, but it doesn't
 			// align with Docker's behavior on Windows.
-			if !os.IsNotExist(err) {
-				return nil, fmt.Errorf("failed to stat %q: %w", src, err)
+			if !os.IsNotExist(statError) {
+				return nil, fmt.Errorf("failed to stat %q: %w", src, statError)
 			}
 			if err := osi.MkdirAll(src, 0755); err != nil {
 				return nil, fmt.Errorf("failed to mkdir %q: %w", src, err)
@@ -103,7 +158,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 
 // WithWindowsMounts sorts and adds runtime and CRI mounts to the spec for
 // windows container.
-func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
+func WithWindowsMounts(osi osinterface.OS, osManager osinterface.Manager, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) error {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -150,7 +205,7 @@ func WithWindowsMounts(osi osinterface.OS, config *runtime.ContainerConfig, extr
 		}
 
 		for _, mount := range mounts {
-			parsedMount, err := parseMount(osi, mount)
+			parsedMount, err := parseMount(ctx, osi, osManager, mount)
 			if err != nil {
 				return err
 			}

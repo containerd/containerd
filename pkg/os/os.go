@@ -19,6 +19,8 @@ package os
 import (
 	"io"
 	"os"
+	"sync"
+	"time"
 
 	"github.com/moby/sys/symlink"
 
@@ -90,4 +92,53 @@ func (RealOS) WriteFile(filename string, data []byte, perm os.FileMode) error {
 // Hostname will call os.Hostname to get the hostname of the host.
 func (RealOS) Hostname() (string, error) {
 	return os.Hostname()
+}
+
+// InflightStat represents a Stat call that is in progress for a given path.
+// It is exported so that consumers of the OS interface can use it to coordinate.
+type InflightStat struct {
+	Cond *sync.Cond // Used to signal completion to waiting goroutines.
+	Done bool       // Flag indicating if the Stat call is complete.
+	Err  error      // Resulting error from Stat.
+}
+
+type StatResult struct {
+	Err error
+}
+
+type Manager interface {
+	StatTimeout() time.Duration
+	InflightStats() map[string]*InflightStat
+	InflightStatsMutex() *sync.Mutex
+	NewInflightStat() *InflightStat
+}
+
+type RealManager struct {
+	statTimeout        time.Duration
+	inflightStats      map[string]*InflightStat
+	inflightStatsMutex *sync.Mutex
+}
+
+func NewRealOSManager() *RealManager {
+	return &RealManager{
+		statTimeout:        5 * time.Second,
+		inflightStats:      make(map[string]*InflightStat),
+		inflightStatsMutex: &sync.Mutex{},
+	}
+}
+
+func (osm *RealManager) StatTimeout() time.Duration {
+	return osm.statTimeout
+}
+
+func (osm *RealManager) InflightStats() map[string]*InflightStat {
+	return osm.inflightStats
+}
+
+func (osm *RealManager) InflightStatsMutex() *sync.Mutex {
+	return osm.inflightStatsMutex
+}
+
+func (osm *RealManager) NewInflightStat() *InflightStat {
+	return &InflightStat{}
 }

@@ -82,7 +82,8 @@ func init() {
 			c := Controller{
 				client:         client,
 				config:         runtimeService.Config(),
-				os:             osinterface.RealOS{},
+				os:             &osinterface.RealOS{},
+				osManager:      osinterface.NewRealOSManager(),
 				runtimeService: runtimeService,
 				imageService:   criImagePlugin.(ImageService),
 				store:          NewStore(),
@@ -126,6 +127,9 @@ type Controller struct {
 	imageService ImageService
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// osManager is like a side-car interface to os for performing os-related
+	// pre-validations/checks/etc.
+	osManager osinterface.Manager
 	// eventMonitor is the event monitor for podsandbox controller to handle sandbox task exit event
 	// actually we only use it's backoff mechanism to make sure pause container is cleaned up.
 	eventMonitor *events.EventMonitor

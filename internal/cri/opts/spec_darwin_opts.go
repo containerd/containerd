@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
 	runtime "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -32,7 +33,7 @@ import (
 )
 
 // WithDarwinMounts adds mounts from CRI's container config + extra mounts.
-func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
+func WithDarwinMounts(osi osinterface.OS, osManager osinterface.Manager, config *runtime.ContainerConfig, extra []*runtime.Mount) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, container *containers.Container, s *oci.Spec) error {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -85,10 +86,63 @@ func WithDarwinMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra
 				src = mount.GetHostPath()
 			)
 
+			var statError error
+			mu := osManager.InflightStatsMutex()
+			inflightStatMap := osManager.InflightStats()
+
+			mu.Lock()
+			inflight, isPending := inflightStatMap[src]
+			if isPending {
+				// Stat for this path is already in progress. We wait on the
+				// condition variable. Wait() atomically unlocks the mutex and
+				// suspends the goroutine. When awakened, it re-locks the mutex
+				// before returning.
+				for !inflight.Done {
+					inflight.Cond.Wait()
+				}
+				statError = inflight.Err
+				mu.Unlock()
+			} else {
+				// There are no active Stats being made to this path. Create a
+				// record for other goroutines to find and wait on.
+				newInflight := osManager.NewInflightStat()
+				newInflight.Cond = sync.NewCond(mu)
+				inflightStatMap[src] = newInflight
+				mu.Unlock()
+
+				statCtx, statcancel := context.WithTimeout(ctx, osManager.StatTimeout())
+				resultChan := make(chan osinterface.StatResult, 1)
+				go func() {
+					_, err := osi.Stat(src)
+					resultChan <- osinterface.StatResult{Err: err}
+					close(resultChan)
+				}()
+
+				select {
+				case res := <-resultChan: // Stat completed
+					statError = res.Err
+				case <-statCtx.Done(): // timeout / mountpath could be stuck.
+					statError = fmt.Errorf("mountpath (%q) could be stuck", src)
+				}
+				statcancel()
+
+				mu.Lock()
+				newInflight.Err = statError
+				newInflight.Done = true
+
+				// Delete the src entry from the map so that subsequent requests
+				// can still call a new Stat to the src in case the underlying FS
+				// has recovered and can serve files.
+				delete(inflightStatMap, src)
+
+				newInflight.Cond.Broadcast()
+				mu.Unlock()
+			}
+
 			// Create the host path if it doesn't exist.
-			if _, err := osi.Stat(src); err != nil {
-				if !os.IsNotExist(err) {
-					return fmt.Errorf("failed to stat %q: %w", src, err)
+			if statError != nil {
+				if !os.IsNotExist(statError) {
+					return fmt.Errorf("failed to stat %q: %w", src, statError)
 				}
 				if err := osi.MkdirAll(src, 0755); err != nil {
 					return fmt.Errorf("failed to mkdir %q: %w", src, err)

@@ -1,3 +1,8 @@
+# bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
+## explicit; go 1.19
+bazil.org/fuse
+bazil.org/fuse/fs
+bazil.org/fuse/fuseutil
 # dario.cat/mergo v1.0.2
 ## explicit; go 1.13
 dario.cat/mergo
