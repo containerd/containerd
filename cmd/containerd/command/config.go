@@ -128,7 +128,9 @@ func dumpConfig(cliContext *cli.Context) error {
 func migrateConfig(cliContext *cli.Context) error {
 	config := defaultConfig()
 	ctx := cliContext.Context
-	if err := srvconfig.LoadConfig(ctx, cliContext.String("config"), config); err != nil && !os.IsNotExist(err) {
+	configPath := cliContext.String("config")
+
+	if err := srvconfig.LoadConfig(ctx, configPath, config); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
@@ -145,116 +147,104 @@ func migrateConfig(cliContext *cli.Context) error {
 	}
 
 	// For migrate, we want to show only the user's config values plus any migrated values,
-	// without filling in default values that weren't in the original config
-	return outputMigrateConfig(ctx, config)
+	// preserving all explicitly set keys even if they have default values
+	return outputMigrateConfig(ctx, config, configPath)
 }
 
-// outputMigrateConfig outputs only the user's configuration values plus any migrated values,
-// without filling in default values that weren't in the original config.
-func outputMigrateConfig(_ context.Context, config *srvconfig.Config) error {
-	plugins := registry.Graph(srvconfig.V2DisabledFilter(config.DisabledPlugins))
+// parseOriginalKeys parses the original TOML file and returns a set of keys that were explicitly set.
+func parseOriginalKeys(configPath string) (map[string]bool, map[string]bool, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// store default configs from plugins
-	defaultConfigs := make(map[string]interface{})
+	// Parse the TOML file to track which keys were present
+	var config map[string]interface{}
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return nil, nil, err
+	}
+
+	// Extract all top-level keys
+	keys := make(map[string]bool)
+	for key := range config {
+		keys[key] = true
+	}
+
+	// Extract plugin keys that were explicitly set
+	pluginKeys := make(map[string]bool)
+	if plugins, exists := config["plugins"]; exists {
+		if pluginsMap, ok := plugins.(map[string]interface{}); ok {
+			for pluginKey := range pluginsMap {
+				pluginKeys[pluginKey] = true
+			}
+		}
+	}
+
+	return keys, pluginKeys, nil
+}
+
+// Helper functions to check if config sections have non-default values.
+func hasNonDefaultGRPC(config *srvconfig.Config) bool {
+	defaultConfig := platformAgnosticDefaultConfig()
+	return config.GRPC.Address != defaultConfig.GRPC.Address ||
+		config.GRPC.TCPAddress != defaultConfig.GRPC.TCPAddress ||
+		config.GRPC.TCPTLSCA != defaultConfig.GRPC.TCPTLSCA ||
+		config.GRPC.TCPTLSCert != defaultConfig.GRPC.TCPTLSCert ||
+		config.GRPC.TCPTLSKey != defaultConfig.GRPC.TCPTLSKey ||
+		config.GRPC.UID != defaultConfig.GRPC.UID ||
+		config.GRPC.GID != defaultConfig.GRPC.GID ||
+		config.GRPC.MaxRecvMsgSize != defaultConfig.GRPC.MaxRecvMsgSize ||
+		config.GRPC.MaxSendMsgSize != defaultConfig.GRPC.MaxSendMsgSize
+}
+
+func hasNonDefaultTTRPC(config *srvconfig.Config) bool {
+	defaultConfig := platformAgnosticDefaultConfig()
+	return config.TTRPC.Address != defaultConfig.TTRPC.Address ||
+		config.TTRPC.UID != defaultConfig.TTRPC.UID ||
+		config.TTRPC.GID != defaultConfig.TTRPC.GID
+}
+
+func hasNonDefaultDebug(config *srvconfig.Config) bool {
+	defaultConfig := platformAgnosticDefaultConfig()
+	return config.Debug.Address != defaultConfig.Debug.Address ||
+		config.Debug.UID != defaultConfig.Debug.UID ||
+		config.Debug.GID != defaultConfig.Debug.GID ||
+		config.Debug.Level != defaultConfig.Debug.Level ||
+		config.Debug.Format != defaultConfig.Debug.Format
+}
+
+func hasNonDefaultMetrics(config *srvconfig.Config) bool {
+	defaultConfig := platformAgnosticDefaultConfig()
+	return config.Metrics.Address != defaultConfig.Metrics.Address ||
+		config.Metrics.GRPCHistogram != defaultConfig.Metrics.GRPCHistogram
+}
+
+// isEmptyPluginConfig checks if a plugin config is empty.
+func isEmptyPluginConfig(pluginConfig interface{}) bool {
+	if pluginConfigMap, ok := pluginConfig.(map[string]interface{}); ok {
+		return len(pluginConfigMap) == 0
+	}
+	return true
+}
+
+// hasNonDefaultPluginConfig checks if a plugin config has non-default values.
+func hasNonDefaultPluginConfig(pluginID string, pluginConfig interface{}) bool {
+	// Get the default config for this plugin
+	plugins := registry.Graph(srvconfig.V2DisabledFilter(nil)) // Use proper filter
 	for _, p := range plugins {
-		if p.Config != nil {
-			// hack: marshal and unmarshal to get a clean copy of the default config
-			defaultData, err := toml.Marshal(p.Config)
-			if err != nil {
-				return err
-			}
-			var defaultConfig interface{}
-			if err := toml.Unmarshal(defaultData, &defaultConfig); err != nil {
-				return err
-			}
-			defaultConfigs[p.URI()] = defaultConfig
+		if p.URI() == pluginID && p.Config != nil {
+			// Compare the plugin config with its default
+			return !reflect.DeepEqual(pluginConfig, p.Config)
 		}
 	}
 
-	// process each plugin config to remove default values that weren't in the original
-	if config.Plugins != nil {
-		for pluginID, pluginConfig := range config.Plugins {
-			if defaultConfig, exists := defaultConfigs[pluginID]; exists {
-				// remove default values that weren't in the original config
-				// NOTE: this will remove a key if its values is the same as the default value
-				// that can be an acceptable limitation for now.
-				filteredConfig := removeDefaultValues(pluginConfig, defaultConfig)
-				if filteredConfig != nil {
-					config.Plugins[pluginID] = filteredConfig
-				} else {
-					delete(config.Plugins, pluginID)
-				}
-			}
-		}
+	// If we can't find the plugin or it has no default config,
+	// assume it has non-default values if it's not empty
+	if pluginConfigMap, ok := pluginConfig.(map[string]interface{}); ok {
+		return len(pluginConfigMap) > 0
 	}
 
-	if config.Timeouts != nil {
-		allTimeouts := timeout.All()
-		for k := range config.Timeouts {
-			if defaultTimeout, exists := allTimeouts[k]; exists {
-				if config.Timeouts[k] == defaultTimeout.String() {
-					delete(config.Timeouts, k)
-				}
-			}
-		}
-
-		if len(config.Timeouts) == 0 {
-			config.Timeouts = nil
-		}
-	}
-
-	config.Version = version.ConfigVersion
-
-	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(config)
-}
-
-// removeDefaultValues recursively removes values from config that match the defaults.
-func removeDefaultValues(config, defaults interface{}) interface{} {
-	if config == nil || defaults == nil {
-		return config
-	}
-
-	switch configVal := config.(type) {
-	case map[string]interface{}:
-		defaultsMap, ok := defaults.(map[string]interface{})
-		if !ok {
-			return config
-		}
-
-		result := make(map[string]interface{})
-		for k, v := range configVal {
-			if defaultVal, exists := defaultsMap[k]; exists {
-				if processed := removeDefaultValues(v, defaultVal); processed != nil {
-					result[k] = processed
-				}
-			} else {
-				// this key doesn't exist in defaults, keep it
-				result[k] = v
-			}
-		}
-
-		if len(result) == 0 {
-			return nil
-		}
-		return result
-
-	case []interface{}:
-		defaultsSlice, ok := defaults.([]interface{})
-		if !ok {
-			return config
-		}
-
-		if reflect.DeepEqual(configVal, defaultsSlice) {
-			return nil
-		}
-		return configVal
-
-	default:
-		if reflect.DeepEqual(config, defaults) {
-			return nil
-		}
-		return config
-	}
+	return true
 }
 
 func platformAgnosticDefaultConfig() *srvconfig.Config {
@@ -301,4 +291,117 @@ func streamProcessors() map[string]srvconfig.StreamProcessor {
 			Env:     ctdDecoderEnv,
 		},
 	}
+}
+
+// outputMigrateConfig outputs only the user's configuration values plus any migrated values,
+// preserving all explicitly set keys even if those keys have the default values.
+func outputMigrateConfig(ctx context.Context, configWithDefaults *srvconfig.Config, configPath string) error {
+	// Load the original config file to track which keys were explicitly set
+	originalKeys := make(map[string]bool)
+	originalPluginKeys := make(map[string]bool)
+
+	if configPath != "" {
+		if keys, pluginKeys, err := parseOriginalKeys(configPath); err == nil {
+			originalKeys = keys
+			originalPluginKeys = pluginKeys
+		}
+	}
+
+	if configWithDefaults.Version < version.ConfigVersion {
+		plugins := registry.Graph(srvconfig.V2DisabledFilter(configWithDefaults.DisabledPlugins))
+		for _, p := range plugins {
+			if p.ConfigMigration != nil {
+				if err := p.ConfigMigration(ctx, configWithDefaults.Version, configWithDefaults.Plugins); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	minimalConfig := make(map[string]interface{})
+
+	minimalConfig["version"] = version.ConfigVersion // always include version ?
+
+	// Only include keys that were explicitly set in the original config
+	if originalKeys["root"] || configWithDefaults.Root != "" {
+		minimalConfig["root"] = configWithDefaults.Root
+	}
+	if originalKeys["state"] || configWithDefaults.State != "" {
+		minimalConfig["state"] = configWithDefaults.State
+	}
+	if originalKeys["temp"] || configWithDefaults.TempDir != "" {
+		minimalConfig["temp"] = configWithDefaults.TempDir
+	}
+	if originalKeys["disabled_plugins"] || len(configWithDefaults.DisabledPlugins) > 0 {
+		minimalConfig["disabled_plugins"] = configWithDefaults.DisabledPlugins
+	}
+	if originalKeys["required_plugins"] || len(configWithDefaults.RequiredPlugins) > 0 {
+		minimalConfig["required_plugins"] = configWithDefaults.RequiredPlugins
+	}
+	if originalKeys["oom_score"] {
+		minimalConfig["oom_score"] = configWithDefaults.OOMScore
+	}
+	if originalKeys["imports"] || len(configWithDefaults.Imports) > 0 {
+		minimalConfig["imports"] = configWithDefaults.Imports
+	}
+
+	// Only include GRPC if it was explicitly set or has non-default values
+	if originalKeys["grpc"] || hasNonDefaultGRPC(configWithDefaults) {
+		minimalConfig["grpc"] = configWithDefaults.GRPC
+	}
+
+	// Only include TTRPC if it was explicitly set or has non-default values
+	if originalKeys["ttrpc"] || hasNonDefaultTTRPC(configWithDefaults) {
+		minimalConfig["ttrpc"] = configWithDefaults.TTRPC
+	}
+
+	// Only include Debug if it was explicitly set or has non-default values
+	if originalKeys["debug"] || hasNonDefaultDebug(configWithDefaults) {
+		minimalConfig["debug"] = configWithDefaults.Debug
+	}
+
+	// Only include Metrics if it was explicitly set or has non-default values
+	if originalKeys["metrics"] || hasNonDefaultMetrics(configWithDefaults) {
+		minimalConfig["metrics"] = configWithDefaults.Metrics
+	}
+
+	// Only include Plugins that were explicitly set in the original config or created by migrations
+	if len(configWithDefaults.Plugins) > 0 {
+		filteredPlugins := make(map[string]interface{})
+		for pluginID, pluginConfig := range configWithDefaults.Plugins {
+			// preserve plugins that were in the original config
+			if originalPluginKeys[pluginID] {
+				// iff they have actual content
+				if !isEmptyPluginConfig(pluginConfig) {
+					filteredPlugins[pluginID] = pluginConfig
+				}
+			} else {
+				// For plugins not in the original config, only include them if they have non-default values
+				// This should handle plugins created by migrations
+				if hasNonDefaultPluginConfig(pluginID, pluginConfig) && !isEmptyPluginConfig(pluginConfig) {
+					filteredPlugins[pluginID] = pluginConfig
+				}
+			}
+		}
+		if len(filteredPlugins) > 0 {
+			minimalConfig["plugins"] = filteredPlugins
+		}
+	}
+
+	// Only include CGroup if it was explicitly set or has non-default values
+	if originalKeys["cgroup"] || configWithDefaults.Cgroup.Path != "" {
+		minimalConfig["cgroup"] = configWithDefaults.Cgroup
+	}
+
+	// Only include StreamProcessors if they were explicitly set in the original config
+	if originalKeys["stream_processors"] {
+		minimalConfig["stream_processors"] = configWithDefaults.StreamProcessors
+	}
+
+	// Only include Timeouts if it was explicitly set or has any values
+	if originalKeys["timeouts"] || len(configWithDefaults.Timeouts) > 0 {
+		minimalConfig["timeouts"] = configWithDefaults.Timeouts
+	}
+
+	return toml.NewEncoder(os.Stdout).SetIndentTables(true).Encode(minimalConfig)
 }
