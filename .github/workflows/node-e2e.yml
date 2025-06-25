@@ -1,0 +1,119 @@
+name: E2E
+on:
+  pull_request:
+    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
+  merge_group:
+    branches: ['main', 'release/1.7', 'release/2.0', 'release/2.1']
+
+permissions:
+  contents: read
+
+jobs:
+  node-e2e-k8s:
+    name: Kubernetes Node
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout containerd
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          path: src/github.com/containerd/containerd
+
+      - name: Checkout Kubernetes
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: kubernetes/kubernetes
+          path: src/k8s.io/kubernetes
+
+      - name: Install Go
+        uses: ./src/github.com/containerd/containerd/.github/actions/install-go
+
+      - name: Set Up Environment
+        run: |
+          set -e -x
+          # Disable swap to allow kubelet to start.
+          sudo swapoff -a
+          sudo apt-get update
+          sudo apt-get install -y gperf build-essential pkg-config
+          echo "GOPATH=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/bin" >> $GITHUB_PATH
+
+      - name: Build and Install containerd
+        working-directory: ./src/github.com/containerd/containerd
+        run: |
+          set -e -x
+          script/setup/install-seccomp
+          script/setup/install-runc
+          script/setup/install-cni $(grep containernetworking/plugins go.mod | awk '{print $2}')
+          make binaries GO_BUILD_FLAGS="-mod=vendor"
+          sudo make install
+
+      - name: Configure and Start containerd
+        run: |
+          set -e -x
+          # Stop and disable pre-existing containerd service to ensure a clean state.
+          if sudo systemctl is-active --quiet containerd; then
+            sudo systemctl stop containerd
+          fi
+          if sudo systemctl is-enabled --quiet containerd; then
+            sudo systemctl disable containerd
+          fi
+
+          sudo mkdir -p /etc/containerd
+          sudo tee /etc/containerd/config.toml > /dev/null <<EOF
+          version = 2
+          required_plugins = ["io.containerd.grpc.v1.cri"]
+          [plugins."io.containerd.grpc.v1.cri".containerd]
+            default_runtime_name = "runc"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+            # Ensure containerd uses the runc binary installed from source.
+            BinaryName = "/usr/local/sbin/runc"
+            SystemdCgroup = true
+          # Required for certain node e2e tests.
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.test-handler]
+            runtime_type = "io.containerd.runc.v2"
+          [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.test-handler.options]
+            # Ensure containerd uses the runc binary installed from source.
+            BinaryName = "/usr/local/sbin/runc"
+            SystemdCgroup = true
+          EOF
+
+          sudo cp ./src/github.com/containerd/containerd/containerd.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl start containerd
+
+          # Wait and verify the daemon is ready.
+          sleep 5
+          sudo ctr version
+
+      - name: Run Node E2E Tests
+        working-directory: ./src/k8s.io/kubernetes
+        run: |
+          # TODO: Remove "ResourceMetrics" feature skip once containerd supports ListMetricDescriptors:
+          # https://github.com/kubernetes/kubernetes/blob/v1.33.2/test/e2e_node/resource_metrics_test.go#L67-L71
+          sudo make test-e2e-node \
+            FOCUS='\[NodeConformance\]|\[Feature:.+\]|\[Feature\]' \
+            SKIP='\[Flaky\]|\[Slow\]|\[Serial\]|\[Feature:UserNamespacesSupport\]|\[Feature:PodLifecycleSleepActionAllowZero\]|\[Feature:UserNamespacesPodSecurityStandards\]|\[Feature:KubeletCredentialProviders\]|\[Feature:LockContention\]|\[Feature:SCTPConnectivity\]|\[Feature:ResourceMetrics\]' \
+            TEST_ARGS='--kubelet-flags="--cgroup-driver=systemd --cgroups-per-qos=true --cgroup-root=/ --runtime-cgroups=/system.slice/containerd.service"'
+
+      - name: Collect Logs on Failure
+        if: failure()
+        run: |
+          ARTIFACT_DIR=./_artifacts
+          mkdir -p ${ARTIFACT_DIR}
+          KUBELET_LOG_SRC=$(sudo find /tmp/_artifacts -name "kubelet.log" | head -n 1)
+          if [ -f "$KUBELET_LOG_SRC" ]; then
+            sudo cp "$KUBELET_LOG_SRC" "${ARTIFACT_DIR}/kubelet.log"
+          else
+            echo "Kubelet log file not found." > "${ARTIFACT_DIR}/kubelet.log"
+          fi
+          sudo journalctl -u containerd --no-pager > "${ARTIFACT_DIR}/containerd.log"
+
+      - name: Upload Log Artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-logs
+          path: ./_artifacts/
