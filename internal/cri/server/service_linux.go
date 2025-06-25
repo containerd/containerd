@@ -101,7 +101,7 @@ func (c *criService) initPlatform() (err error) {
 		}
 	}
 
-	if c.config.EnableCDI {
+	if c.config.EnableCDI == nil || *c.config.EnableCDI {
 		err := cdi.Configure(cdi.WithSpecDirs(c.config.CDISpecDirs...))
 		if err != nil {
 			return fmt.Errorf("failed to configure CDI registry")

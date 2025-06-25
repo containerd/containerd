@@ -407,7 +407,8 @@ type RuntimeConfig struct {
 	// into the OCI config
 	// For more details about CDI and the syntax of CDI Spec files please refer to
 	// https://tags.cncf.io/container-device-interface.
-	EnableCDI bool `toml:"enable_cdi" json:"enableCDI"`
+	// DEPRECATED: Remove in containerd 2.3 (CDI support will be always enabled).
+	EnableCDI *bool `toml:"enable_cdi" json:"enableCDI"`
 	// CDISpecDirs is the list of directories to scan for Container Device Interface Specifications
 	// For more details about CDI configuration please refer to
 	// https://tags.cncf.io/container-device-interface#containerd-configuration
@@ -670,6 +671,12 @@ func ValidateRuntimeConfig(ctx context.Context, c *RuntimeConfig) ([]deprecation
 	if err := ValidateEnableUnprivileged(ctx, c); err != nil {
 		return warnings, err
 	}
+
+	if c.EnableCDI != nil && !*c.EnableCDI {
+		warnings = append(warnings, deprecation.CRIEnableCDI)
+		log.G(ctx).Warning("`enable_cdi` is deprecated. CDI support will be always enabled in containerd 2.3 and later. It is currently explicitly disabled in your configuration. Consider enabling it now.")
+	}
+
 	return warnings, nil
 }
 
