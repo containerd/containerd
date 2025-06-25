@@ -19,15 +19,16 @@ package main
 import (
 	"context"
 	"flag"
-
 	"os"
 	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/containerd/containerd/v2/pkg/fifosync"
 	"github.com/containerd/log"
 
-	"bazil.org/fuse"
-	fusefs "bazil.org/fuse/fs"
+	"github.com/hanwen/go-fuse/v2/fs"
+	"github.com/hanwen/go-fuse/v2/fuse"
 )
 
 const (
@@ -48,14 +49,14 @@ var fuseDir = flag.String("fuse-dir", "fakeFUSEDir", "dir to be used by the FUSE
 // FUSE opts
 var hangDuringStat = flag.Bool("hang-during-stat", false, "if set to true, hang-during-stat will hang the Stat call made to FUSE's root dir.")
 
-// fuseFSOpts is a map of the name of a FUSE function (e.g. "Attr") and the
-// user-defined function to be executed at the beginning of FUSE function ("Attr")
+// fuseFSOpts is a map of the name of a FUSE function (e.g. "Getattr") and the
+// user-defined function to be executed at the beginning of FUSE function ("Getattr")
 type fuseFSOpts map[string]func()
 
 type FakeFUSEStruct struct {
-	ctx      context.Context
-	fuseConn *fuse.Conn
-	fifoDir  string
+	ctx     context.Context
+	server  *fuse.Server
+	fifoDir string
 	// to trigger the caller to indicate that FUSE is ready to serve. The caller
 	// must create a corresponding waiter (e.g. fuseReadyWaiter fifosync.Waiter)
 	// and call fuseReadyWaiter.Wait() to understand when FUSE becomes ready and
@@ -71,14 +72,10 @@ type FakeFUSEStruct struct {
 	opts                fuseFSOpts
 }
 
-type FUSEFSRoot struct {
-	opts fuseFSOpts
-}
-
 func main() {
 	ctx := context.Background()
-	log.SetLevel(*logLevel)
 	flag.Parse()
+	log.SetLevel(*logLevel)
 	flag.VisitAll(func(f *flag.Flag) {
 		log.G(ctx).Debugf("fakeFUSE flag %s: %s\n", f.Name, f.Value)
 	})
@@ -99,34 +96,32 @@ func main() {
 	fuseStruct := createFUSEFS(ctx)
 	log.G(ctx).Debugf("fuse struct: %v", fuseStruct)
 
+	// Trigger readiness after the server is successfully mounted and before serving.
+	log.G(ctx).Info("triggering ready via fifo")
+	if err := fuseStruct.fuseReadyTrigger.Trigger(); err != nil {
+		log.G(ctx).Fatalf("failed to trigger FUSE's readiness: %v", err)
+	}
+
 	go func() {
 		log.G(ctx).Infof("starting a FUSE server at: %v", fuseStruct.fuseMountPoint)
-		if err := fusefs.Serve(fuseStruct.fuseConn, fuseStruct); err != nil {
-			log.G(ctx).Errorf("Server shut down unexpectedly: %v", err)
-		} else {
-			log.G(ctx).Infof("shutting down the fuse server")
-		}
+		fuseStruct.server.Serve()
 	}()
+
 	fuseStruct.fuseCloseWait.Wait()
 	closeFuseConn(ctx, fuseStruct)
+	log.G(ctx).Infof("FUSE server has been shut down")
 }
 
 func createFUSEFS(ctx context.Context) FakeFUSEStruct {
 	// Create a directory to act as the mount point for FUSE
 	fuseMountPointDir := filepath.Join(*fuseDir, fuseMountPointName)
-	if err := os.MkdirAll(fuseMountPointDir, os.ModeDir); err != nil {
+	if err := os.MkdirAll(fuseMountPointDir, os.ModePerm); err != nil {
 		log.G(ctx).Fatalf("failed to create a fuse mount point (%v): %v", fuseMountPointDir, err)
 	}
-	// Mount the FUSE FS
-	fuseConn, err := fuse.Mount(fuseMountPointDir, fuse.FSName(fuseFSName))
-	if err != nil {
-		log.G(ctx).Fatalf("failed to create a FUSE connection at %v: %v", fuseMountPointDir, err)
-	}
-	log.G(ctx).Debugf("created the FUSE mount point: %v", fuseMountPointDir)
 
 	// Create a directory to store all the FIFOs
 	fuseFIFODir := filepath.Join(*fuseDir, fuseFIFODirectoryName)
-	if err := os.MkdirAll(fuseFIFODir, os.ModeDir); err != nil {
+	if err := os.MkdirAll(fuseFIFODir, os.ModePerm); err != nil {
 		log.G(ctx).Fatalf("failed to create the FIFOs directory (%v): %v", fuseFIFODir, err)
 	}
 
@@ -155,27 +150,46 @@ func createFUSEFS(ctx context.Context) FakeFUSEStruct {
 
 	var fuseOpts fuseFSOpts
 	if *hangDuringStat {
-		log.G(ctx).Info("setting up FUSE to hang during Stat")
+		log.G(ctx).Info("setting up FUSE to hang during Getattr")
 		var statHangWait fifosync.Waiter
-		var err error
 		statHangFIFOFile := filepath.Join(fuseFIFODir, statHangFIFOFileName)
 		if statHangWait, err = fifosync.NewWaiter(statHangFIFOFile, fifoFileMode); err != nil {
 			log.G(ctx).Fatalf("failed to create a stat hang waiter (%v): %v", statHangFIFOFile, err)
 		}
 
 		fuseOpts = fuseFSOpts{
-			"Attr": func() {
-				log.G(ctx).Infof("waiting during Stat to repro issue 10828: %v", statHangWait.Name())
+			"Getattr": func() {
+				log.G(ctx).Infof("waiting during Getattr to repro issue: %v", statHangWait.Name())
 				if err := statHangWait.Wait(); err != nil {
-					log.G(ctx).Fatalf("failed to wait in Stat: %v", err)
+					log.G(ctx).Fatalf("failed to wait in Getattr: %v", err)
 				}
 			},
 		}
 	}
 
+	// Instantiate the root of the FUSE FS
+	root := &FUSEFSRoot{opts: fuseOpts}
+	attrTimeout := 60 * time.Second
+	fsOpts := &fs.Options{
+		MountOptions: fuse.MountOptions{
+			Name:   fuseFSName,
+			Debug:  *logLevel == log.DebugLevel.String(),
+			FsName: fuseFSName,
+		},
+		AttrTimeout: &attrTimeout,
+	}
+
+	// Create the FUSE server
+	rawFS := fs.NewNodeFS(root, fsOpts)
+	server, err := fuse.NewServer(rawFS, fuseMountPointDir, &fsOpts.MountOptions)
+	if err != nil {
+		log.G(ctx).Fatalf("failed to create a FUSE server at %v: %v", fuseMountPointDir, err)
+	}
+	log.G(ctx).Debugf("created the FUSE mount point: %v", fuseMountPointDir)
+
 	fakeFUSEStruct := FakeFUSEStruct{
 		ctx:                 ctx,
-		fuseConn:            fuseConn,
+		server:              server,
 		fifoDir:             fuseFIFODir,
 		fuseReadyTrigger:    fuseReadyTrigger,
 		fuseCloseWait:       fuseCloseWaiter,
@@ -187,15 +201,11 @@ func createFUSEFS(ctx context.Context) FakeFUSEStruct {
 }
 
 func closeFuseConn(ctx context.Context, fuseStruct FakeFUSEStruct) {
-	log.G(ctx).Infof("shutting down the FUSE server")
+	log.G(ctx).Infof("shutting down the FUSE server at mountpoint %s", fuseStruct.fuseMountPoint)
 	defer fuseStruct.fuseShutdownTrigger.Trigger()
 
-	if err := fuse.Unmount(fuseStruct.fuseMountPoint); err != nil {
+	if err := fuseStruct.server.Unmount(); err != nil {
 		log.G(ctx).Fatalf("failed to unmount the mountpoint (%v): %v", fuseStruct.fuseMountPoint, err)
-	}
-
-	if err := fuseStruct.fuseConn.Close(); err != nil {
-		log.G(ctx).Fatalf("failed to close the fuse connection: %v", err)
 	}
 
 	if *fuseDir == "" {
@@ -205,26 +215,27 @@ func closeFuseConn(ctx context.Context, fuseStruct FakeFUSEStruct) {
 	}
 }
 
-func (fs FakeFUSEStruct) Root() (fusefs.Node, error) {
-	log.G(fs.ctx).Info("triggering ready via fifo")
-	err := fs.fuseReadyTrigger.Trigger()
-	if err != nil {
-		log.G(fs.ctx).Fatalf("failed to trigger FUSE's readiness: %v", err)
-	}
-	return &FUSEFSRoot{opts: fs.opts}, nil
+type FUSEFSRoot struct {
+	fs.Inode
+	opts fuseFSOpts
 }
 
-// This is required as the kernel stats the root directory.
-func (fr *FUSEFSRoot) Attr(ctx context.Context, a *fuse.Attr) error {
+// FUSEFSRoot implements the NodeGetattrer interface.
+var _ = (fs.NodeGetattrer)((*FUSEFSRoot)(nil))
+
+// Getattr is called by the kernel to retrieve file attributes.
+func (fr *FUSEFSRoot) Getattr(ctx context.Context, fh fs.FileHandle, out *fuse.AttrOut) syscall.Errno {
 	if *hangDuringStat && fr.opts != nil {
-		log.G(ctx).Infof("Will hang during Stat")
-		if fn, ok := fr.opts["Attr"]; ok {
+		log.G(ctx).Infof("Will hang during Getattr")
+		if fn, ok := fr.opts["Getattr"]; ok {
 			fn()
 		}
 	} else {
-		log.G(ctx).Infof("Will not hang during Stat")
+		log.G(ctx).Infof("Will not hang during Getattr")
 	}
-	a.Inode = 1 // Root inode
-	a.Mode = os.ModeDir | 0o555
-	return nil
+
+	// Set the attributes for the root directory.
+	out.Mode = uint32(os.ModeDir | 0o555)
+	out.Ino = 1 // Root inode
+	return fs.OK
 }
