@@ -297,6 +297,30 @@ func TestValidateConfig(t *testing.T) {
 			},
 			runtimeExpectedErr: "invalid `drain_exec_sync_io_timeout`",
 		},
+
+		"deprecated enable_cdi=false": {
+			runtimeConfig: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {},
+					},
+				},
+				EnableCDI: new(bool),
+			},
+			runtimeExpected: &RuntimeConfig{
+				ContainerdConfig: ContainerdConfig{
+					DefaultRuntimeName: RuntimeDefault,
+					Runtimes: map[string]Runtime{
+						RuntimeDefault: {
+							Sandboxer: string(ModePodSandbox),
+						},
+					},
+				},
+				EnableCDI: new(bool),
+			},
+			warnings: []deprecation.Warning{deprecation.CRIEnableCDI},
+		},
 	} {
 		t.Run(desc, func(t *testing.T) {
 			var warnings []deprecation.Warning

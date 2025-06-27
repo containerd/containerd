@@ -482,6 +482,7 @@ The deprecated properties in [`config.toml`](./docs/cri/config.md) are shown in 
 | Property Group                                                       | Property                     | Deprecation release | Target release for removal | Recommendation                                  |
 |----------------------------------------------------------------------|------------------------------|---------------------|----------------------------|-------------------------------------------------|
 |`[plugins."io.containerd.grpc.v1.cri"]`                               | `systemd_cgroup`             | containerd v1.3     | containerd v2.0 ✅         | Use `SystemdCgroup` in runc options (see below) |
+|`[plugins."io.containerd.grpc.v1.cri"]`                               | `enable_cdi`                 | containerd v2.2     | containerd v2.3            | Enable CDI now if it is disabled.               |
 |`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `untrusted_workload_runtime` | containerd v1.2     | containerd v2.0 ✅         | Create `untrusted` runtime in `runtimes`        |
 |`[plugins."io.containerd.grpc.v1.cri".containerd]`                    | `default_runtime`            | containerd v1.3     | containerd v2.0 ✅         | Use `default_runtime_name`                      |
 |`[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.*]`         | `runtime_engine`             | containerd v1.3     | containerd v2.0 ✅         | Use runtime v2                                  |
