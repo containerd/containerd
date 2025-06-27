@@ -212,10 +212,10 @@ func MatchAllHosts(string) (bool, error) {
 // Note: this does not handle matching of ip addresses in octal,
 // decimal or hex form.
 func MatchLocalhost(host string) (bool, error) {
-	switch {
-	case host == "::1":
+	switch host {
+	case "::1":
 		return true, nil
-	case host == "[::1]":
+	case "[::1]":
 		return true, nil
 	}
 	h, p, err := net.SplitHostPort(host)
