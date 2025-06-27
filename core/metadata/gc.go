@@ -60,18 +60,36 @@ const (
 )
 
 var (
-	labelGCRoot       = []byte("containerd.io/gc.root")
 	labelGCRef        = []byte("containerd.io/gc.ref.")
 	labelGCSnapRef    = []byte("containerd.io/gc.ref.snapshot.")
 	labelGCContentRef = []byte("containerd.io/gc.ref.content")
 	labelGCImageRef   = []byte("containerd.io/gc.ref.image")
+	labelGCLeaseRef   = []byte("containerd.io/gc.ref.lease")
+
+	// labelGCRoot is used to indicate the object should be treated as
+	// a root object. Using leases is preferred over use of this label and
+	// this label should be deprecated in the future.
+	// Expected format is RFC 3339, informative only
+	labelGCRoot = []byte("containerd.io/gc.root")
+
+	// labelGCNonRoot indicates the time that an object should not be
+	// treated as a root. Allows the object to be collected before
+	// the expiration date if it is not referenced by any other object.
+	// For leases, this is different from expiration as a lease will be
+	// used after expiration but this allows it still be used as a
+	// non-root reference. This is useful for holding ephermeral references
+	// that should go away when the object referring to it goes away.
+	// Expected format is RFC 3339
+	labelGCNonRoot = []byte("containerd.io/gc.nonroot")
 
 	// labelGCExpire indicates that an object is collectible after the
 	// provided time. For image objects, this makes them available to
 	// garbage collect when expired, when not provided, image objects
 	// are root objects that never expire. For non-root objects such
 	// as content or snapshots, these objects will be treated like
-	// root objects before their expiration.
+	// root objects before their expiration. For leases, this
+	// makes them available to garbage collect when expired, even
+	// if referenced by other objects.
 	// Expected format is RFC 3339
 	labelGCExpire = []byte("containerd.io/gc.expire")
 
@@ -119,6 +137,7 @@ type Collector interface {
 }
 
 type gcContext struct {
+	start         time.Time
 	labelHandlers []referenceLabelHandler
 	contexts      map[gc.ResourceType]CollectionContext
 }
@@ -167,6 +186,19 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 				fn(gcnode(ResourceImage, ns, string(v)))
 			},
 		},
+		{
+			key: labelGCLeaseRef,
+			fn: func(ns string, k, v []byte, fn func(gc.Node)) {
+				if ks := string(k); ks != string(labelGCLeaseRef) {
+					// Allow reference naming separated by . or /, ignore names
+					if ks[len(labelGCLeaseRef)] != '.' && ks[len(labelGCLeaseRef)] != '/' {
+						return
+					}
+				}
+
+				fn(gcnode(ResourceLease, ns, string(v)))
+			},
+		},
 	}
 	if len(collectors) > 0 {
 		contexts = map[gc.ResourceType]CollectionContext{}
@@ -201,6 +233,7 @@ func startGCContext(ctx context.Context, collectors map[gc.ResourceType]Collecto
 		})
 	}
 	return &gcContext{
+		start:         time.Now(),
 		labelHandlers: labelHandlers,
 		contexts:      contexts,
 	}
@@ -248,8 +281,6 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 		return nil
 	}
 
-	expThreshold := time.Now()
-
 	// iterate through each namespace
 	v1c := v1bkt.Cursor()
 
@@ -279,98 +310,36 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 					return nil
 				}
 				libkt := lbkt.Bucket(k)
-				var flat bool
 
 				if lblbkt := libkt.Bucket(bucketKeyObjectLabels); lblbkt != nil {
+					if rv := lblbkt.Get(labelGCNonRoot); rv != nil {
+						exp, err := time.Parse(time.RFC3339, string(rv))
+						if err != nil {
+							log.G(ctx).WithError(err).WithField("lease", string(k)).Infof("ignoring invalid root expiration value %q", string(rv))
+						} else if c.start.After(exp) {
+							// lease is no longer treated as a root object
+							log.G(ctx).WithField("lease", string(k)).Debug("lease no longer a root object")
+							return nil
+						}
+					}
+
 					if expV := lblbkt.Get(labelGCExpire); expV != nil {
 						exp, err := time.Parse(time.RFC3339, string(expV))
 						if err != nil {
 							// label not used, log and continue to use lease
 							log.G(ctx).WithError(err).WithField("lease", string(k)).Infof("ignoring invalid expiration value %q", string(expV))
-						} else if expThreshold.After(exp) {
+						} else if c.start.After(exp) {
 							// lease has expired, skip
 							log.G(ctx).WithField("lease", string(k)).Debug("expired lease")
 							return nil
 						}
 					}
-
-					if flatV := lblbkt.Get(labelGCFlat); flatV != nil {
-						flat = true
-					}
 				}
 
 				fn(gcnode(ResourceLease, ns, string(k)))
 
-				// Emit content and snapshots as roots instead of implementing
-				// in references. Since leases cannot be referenced there is
-				// no need to allow the lookup to be recursive, handling here
-				// therefore reduces the number of database seeks.
-
-				ctype := ResourceContent
-				if flat {
-					ctype = resourceContentFlat
-				}
-
-				cbkt := libkt.Bucket(bucketKeyObjectContent)
-				if cbkt != nil {
-					if err := cbkt.ForEach(func(k, v []byte) error {
-						fn(gcnode(ctype, ns, string(k)))
-						return nil
-					}); err != nil {
-						return err
-					}
-				}
-
-				stype := ResourceSnapshot
-				if flat {
-					stype = resourceSnapshotFlat
-				}
-
-				sbkt := libkt.Bucket(bucketKeyObjectSnapshots)
-				if sbkt != nil {
-					if err := sbkt.ForEach(func(sk, sv []byte) error {
-						if sv != nil {
-							return nil
-						}
-						snbkt := sbkt.Bucket(sk)
-
-						return snbkt.ForEach(func(k, v []byte) error {
-							fn(gcnode(stype, ns, fmt.Sprintf("%s/%s", sk, k)))
-							return nil
-						})
-					}); err != nil {
-						return err
-					}
-				}
-
-				ibkt := libkt.Bucket(bucketKeyObjectIngests)
-				if ibkt != nil {
-					if err := ibkt.ForEach(func(k, v []byte) error {
-						fn(gcnode(ResourceIngest, ns, string(k)))
-						return nil
-					}); err != nil {
-						return err
-					}
-				}
-
-				itype := ResourceImage
-				if flat {
-					itype = resourceImageFlat
-				}
-
-				ibkt = libkt.Bucket(bucketKeyObjectImages)
-				if ibkt != nil {
-					if err := ibkt.ForEach(func(k, v []byte) error {
-						fn(gcnode(itype, ns, string(k)))
-						return nil
-					}); err != nil {
-						return err
-					}
-				}
-
-				c.leased(ns, string(k), fn)
-
 				return nil
+
 			}); err != nil {
 				return err
 			}
@@ -383,7 +352,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 					return nil
 				}
 
-				if !isExpiredImage(ctx, k, ibkt.Bucket(k), expThreshold) {
+				if !isExpiredImage(ctx, k, ibkt.Bucket(k), c.start) {
 					fn(gcnode(ResourceImage, ns, string(k)))
 				}
 				return nil
@@ -404,7 +373,7 @@ func (c *gcContext) scanRoots(ctx context.Context, tx *bolt.Tx, nc chan<- gc.Nod
 					if err != nil {
 						return err
 					}
-					if ea == nil || expThreshold.After(*ea) {
+					if ea == nil || c.start.After(*ea) {
 						return nil
 					}
 					fn(gcnode(ResourceIngest, ns, string(k)))
@@ -561,6 +530,99 @@ func (c *gcContext) references(ctx context.Context, tx *bolt.Tx, node gc.Node, f
 		if len(expected) > 0 {
 			fn(gcnode(ResourceContent, node.Namespace, string(expected)))
 		}
+		return nil
+
+	case ResourceLease:
+		bkt := getBucket(tx, bucketKeyVersion, []byte(node.Namespace), bucketKeyObjectLeases, []byte(node.Key))
+		if bkt == nil {
+			// Node may be created from dead edge
+			return nil
+		}
+
+		var flat bool
+
+		if lblbkt := bkt.Bucket(bucketKeyObjectLabels); lblbkt != nil {
+			if expV := lblbkt.Get(labelGCExpire); expV != nil {
+				exp, err := time.Parse(time.RFC3339, string(expV))
+				if err != nil {
+					// label not used, log and continue to use lease
+					log.G(ctx).WithError(err).WithField("lease", node.Key).Infof("ignoring invalid expiration value %q", string(expV))
+				} else if c.start.After(exp) {
+					// lease has expired, skip
+					log.G(ctx).WithField("lease", node.Key).Debug("expired lease")
+					return nil
+				}
+			}
+
+			if flatV := lblbkt.Get(labelGCFlat); flatV != nil {
+				flat = true
+			}
+		}
+
+		ctype := ResourceContent
+		if flat {
+			ctype = resourceContentFlat
+		}
+
+		cbkt := bkt.Bucket(bucketKeyObjectContent)
+		if cbkt != nil {
+			if err := cbkt.ForEach(func(k, v []byte) error {
+				fn(gcnode(ctype, node.Namespace, string(k)))
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+
+		stype := ResourceSnapshot
+		if flat {
+			stype = resourceSnapshotFlat
+		}
+
+		sbkt := bkt.Bucket(bucketKeyObjectSnapshots)
+		if sbkt != nil {
+			if err := sbkt.ForEach(func(sk, sv []byte) error {
+				if sv != nil {
+					return nil
+				}
+				snbkt := sbkt.Bucket(sk)
+
+				return snbkt.ForEach(func(k, v []byte) error {
+					fn(gcnode(stype, node.Namespace, fmt.Sprintf("%s/%s", sk, k)))
+					return nil
+				})
+			}); err != nil {
+				return err
+			}
+		}
+
+		ibkt := bkt.Bucket(bucketKeyObjectIngests)
+		if ibkt != nil {
+			if err := ibkt.ForEach(func(k, v []byte) error {
+				fn(gcnode(ResourceIngest, node.Namespace, string(k)))
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+
+		itype := ResourceImage
+		if flat {
+			itype = resourceImageFlat
+		}
+
+		ibkt = bkt.Bucket(bucketKeyObjectImages)
+		if ibkt != nil {
+			if err := ibkt.ForEach(func(k, v []byte) error {
+				fn(gcnode(itype, node.Namespace, string(k)))
+				return nil
+			}); err != nil {
+				return err
+			}
+		}
+
+		c.leased(node.Namespace, node.Key, fn)
+
 		return nil
 	}
 
@@ -767,7 +829,7 @@ func isRootRef(bkt *bolt.Bucket) bool {
 	return false
 }
 
-func isExpiredImage(ctx context.Context, k []byte, bkt *bolt.Bucket, expTheshold time.Time) bool {
+func isExpiredImage(ctx context.Context, k []byte, bkt *bolt.Bucket, expThreshold time.Time) bool {
 	lbkt := bkt.Bucket(bucketKeyObjectLabels)
 	if lbkt != nil {
 		el := lbkt.Get(labelGCExpire)
@@ -777,7 +839,7 @@ func isExpiredImage(ctx context.Context, k []byte, bkt *bolt.Bucket, expTheshold
 				log.G(ctx).WithError(err).WithField("image", string(k)).Infof("ignoring invalid expiration value %q", string(el))
 				return false
 			}
-			return expTheshold.After(exp)
+			return expThreshold.After(exp)
 		}
 	}
 	return false
