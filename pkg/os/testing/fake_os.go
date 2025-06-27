@@ -19,6 +19,7 @@ package testing
 import (
 	"os"
 	"sync"
+	"time"
 
 	containerdmount "github.com/containerd/containerd/v2/core/mount"
 
@@ -251,4 +252,36 @@ func (f *FakeOS) Hostname() (string, error) {
 		return f.HostnameFn()
 	}
 	return "", nil
+}
+
+type FakeOSManager struct {
+	statTimeout        time.Duration
+	inflightStats      map[string]*osInterface.InflightStat
+	inflightStatsMutex *sync.Mutex
+}
+
+var _ osInterface.Manager = &FakeOSManager{}
+
+func NewFakeOSManager() *FakeOSManager {
+	return &FakeOSManager{
+		statTimeout:        5 * time.Second,
+		inflightStats:      make(map[string]*osInterface.InflightStat),
+		inflightStatsMutex: &sync.Mutex{},
+	}
+}
+
+func (osm *FakeOSManager) StatTimeout() time.Duration {
+	return osm.statTimeout
+}
+
+func (osm *FakeOSManager) InflightStats() map[string]*osInterface.InflightStat {
+	return osm.inflightStats
+}
+
+func (osm *FakeOSManager) InflightStatsMutex() *sync.Mutex {
+	return osm.inflightStatsMutex
+}
+
+func (osm *FakeOSManager) NewInflightStat() *osInterface.InflightStat {
+	return &osInterface.InflightStat{}
 }

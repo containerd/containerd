@@ -788,9 +788,9 @@ func (c *criService) buildLinuxSpec(
 
 	var ociSpecOpts oci.SpecOpts
 	if ociRuntime.CgroupWritable {
-		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, config, extraMounts, mountLabel, runtimeHandler)
+		ociSpecOpts = customopts.WithMountsCgroupWritable(c.os, c.osManager, config, extraMounts, mountLabel, runtimeHandler)
 	} else {
-		ociSpecOpts = customopts.WithMounts(c.os, config, extraMounts, mountLabel, runtimeHandler)
+		ociSpecOpts = customopts.WithMounts(c.os, c.osManager, config, extraMounts, mountLabel, runtimeHandler)
 	}
 
 	specOpts = append(specOpts, ociSpecOpts)
@@ -986,7 +986,7 @@ func (c *criService) buildWindowsSpec(
 		oci.WithHostname(sandboxConfig.GetHostname()),
 	)
 
-	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, config, extraMounts), customopts.WithWindowsDevices(config))
+	specOpts = append(specOpts, customopts.WithWindowsMounts(c.os, c.osManager, config, extraMounts), customopts.WithWindowsDevices(config))
 
 	// Start with the image config user and override below if RunAsUsername is not "".
 	username := imageConfig.User
@@ -1063,7 +1063,7 @@ func (c *criService) buildDarwinSpec(
 	}
 	specOpts = append(specOpts, oci.WithEnv(env))
 
-	specOpts = append(specOpts, customopts.WithDarwinMounts(c.os, config, extraMounts))
+	specOpts = append(specOpts, customopts.WithDarwinMounts(c.os, c.osManager, config, extraMounts))
 
 	for pKey, pValue := range util.GetPassthroughAnnotations(sandboxConfig.Annotations,
 		ociRuntime.PodAnnotations) {

@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	runtimespec "github.com/opencontainers/runtime-spec/specs-go"
@@ -39,7 +40,7 @@ import (
 	"github.com/containerd/log"
 )
 
-func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
+func withMounts(osi osinterface.OS, osManager osinterface.Manager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler, cgroupWritable bool) oci.SpecOpts {
 	return func(ctx context.Context, client oci.Client, _ *containers.Container, s *runtimespec.Spec) (err error) {
 		// mergeMounts merge CRI mounts with extra mounts. If a mount destination
 		// is mounted by both a CRI mount and an extra mount, the CRI mount will
@@ -106,11 +107,65 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 				dst = mount.GetContainerPath()
 				src = mount.GetHostPath()
 			)
+
+			var statError error
+			mu := osManager.InflightStatsMutex()
+			inflightStatMap := osManager.InflightStats()
+
+			mu.Lock()
+			inflight, isPending := inflightStatMap[src]
+			if isPending {
+				// Stat for this path is already in progress. We wait on the
+				// condition variable. Wait() atomically unlocks the mutex and
+				// suspends the goroutine. When awakened, it re-locks the mutex
+				// before returning.
+				for !inflight.Done {
+					inflight.Cond.Wait()
+				}
+				statError = inflight.Err
+				mu.Unlock()
+			} else {
+				// There are no active Stats being made to this path. Create a
+				// record for other goroutines to find and wait on.
+				newInflight := osManager.NewInflightStat()
+				newInflight.Cond = sync.NewCond(mu)
+				inflightStatMap[src] = newInflight
+				mu.Unlock()
+
+				statCtx, statcancel := context.WithTimeout(ctx, osManager.StatTimeout())
+				resultChan := make(chan osinterface.StatResult, 1)
+				go func() {
+					_, err := osi.Stat(src)
+					resultChan <- osinterface.StatResult{Err: err}
+					close(resultChan)
+				}()
+
+				select {
+				case res := <-resultChan: // Stat completed
+					statError = res.Err
+				case <-statCtx.Done(): // timeout / mountpath could be stuck.
+					statError = fmt.Errorf("mountpath (%q) could be stuck", src)
+				}
+				statcancel()
+
+				mu.Lock()
+				newInflight.Err = statError
+				newInflight.Done = true
+
+				// Delete the src entry from the map so that subsequent requests
+				// can still call a new Stat to the src in case the underlying FS
+				// has recovered and can serve files.
+				delete(inflightStatMap, src)
+
+				newInflight.Cond.Broadcast()
+				mu.Unlock()
+			}
+
 			// Create the host path if it doesn't exist.
 			// TODO(random-liu): Add CRI validation test for this case.
-			if _, err := osi.Stat(src); err != nil {
-				if !os.IsNotExist(err) {
-					return fmt.Errorf("failed to stat %q: %w", src, err)
+			if statError != nil {
+				if !os.IsNotExist(statError) {
+					return fmt.Errorf("failed to stat %q: %w", src, statError)
 				}
 				if err := osi.MkdirAll(src, 0755); err != nil {
 					return fmt.Errorf("failed to mkdir %q: %w", src, err)
@@ -217,14 +272,14 @@ func withMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*ru
 }
 
 // WithMounts sorts and adds runtime and CRI mounts to the spec
-func WithMounts(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
-	return withMounts(osi, config, extra, mountLabel, handler, false)
+func WithMounts(osi osinterface.OS, osManager osinterface.Manager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, osManager, config, extra, mountLabel, handler, false)
 
 }
 
 // WithMountsCgroupWritable sorts and adds runtime and CRI mounts to the spec if cgroup_writable is enabled.
-func WithMountsCgroupWritable(osi osinterface.OS, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
-	return withMounts(osi, config, extra, mountLabel, handler, true)
+func WithMountsCgroupWritable(osi osinterface.OS, osManager osinterface.Manager, config *runtime.ContainerConfig, extra []*runtime.Mount, mountLabel string, handler *runtime.RuntimeHandler) oci.SpecOpts {
+	return withMounts(osi, osManager, config, extra, mountLabel, handler, true)
 }
 
 // Ensure mount point on which path is mounted, is shared.

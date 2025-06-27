@@ -45,9 +45,10 @@ var testConfig = criconfig.Config{
 // newControllerService creates a fake criService for test.
 func newControllerService() *Controller {
 	return &Controller{
-		config: testConfig,
-		os:     ostesting.NewFakeOS(),
-		store:  NewStore(),
+		config:    testConfig,
+		os:        ostesting.NewFakeOS(),
+		osManager: ostesting.NewFakeOSManager(),
+		store:     NewStore(),
 	}
 }
 

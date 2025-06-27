@@ -3,6 +3,7 @@ module github.com/containerd/containerd/v2
 go 1.24.3
 
 require (
+	bazil.org/fuse v0.0.0-20230120002735-62a210ff1fd5
 	dario.cat/mergo v1.0.2
 	github.com/AdaLogics/go-fuzz-headers v0.0.0-20240806141605-e8a1dd7889d6
 	github.com/Microsoft/go-winio v0.6.2
@@ -41,6 +42,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0
+	github.com/hanwen/go-fuse/v2 v2.8.0
 	github.com/intel/goresctrl v0.8.0
 	github.com/klauspost/compress v1.18.0
 	github.com/mdlayher/vsock v1.2.1

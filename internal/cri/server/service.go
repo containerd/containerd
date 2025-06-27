@@ -120,6 +120,9 @@ type criService struct {
 	imageFSPaths map[string]string
 	// os is an interface for all required os operations.
 	os osinterface.OS
+	// osManager is like a side-car interface to os for performing os-related
+	// pre-validations/checks/etc.
+	osManager osinterface.Manager
 	// sandboxStore stores all resources associated with sandboxes.
 	sandboxStore *sandboxstore.Store
 	// sandboxNameIndex stores all sandbox names and make sure each name
@@ -191,7 +194,8 @@ func NewCRIService(options *CRIServiceOptions) (CRIService, runtime.RuntimeServi
 		config:             config,
 		client:             options.Client,
 		imageFSPaths:       options.ImageService.ImageFSPaths(),
-		os:                 osinterface.RealOS{},
+		os:                 &osinterface.RealOS{},
+		osManager:          osinterface.NewRealOSManager(),
 		sandboxStore:       sandboxstore.NewStore(labels),
 		containerStore:     containerstore.NewStore(labels),
 		sandboxNameIndex:   registrar.NewRegistrar(),
