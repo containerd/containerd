@@ -364,7 +364,10 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 
 		fileReaders = append(fileReaders, unicodeReader)
 	}
-	for _, reader := range fileReaders {
+	for i, reader := range fileReaders {
+		if i > 0 {
+			log.G(ctx).Info("Trying to decode again with different encoding")
+		}
 		if readErr = toml.NewDecoder(reader).DisallowUnknownFields().Decode(config); readErr != nil {
 			var serr *toml.StrictMissingError
 			if errors.As(readErr, &serr) {
