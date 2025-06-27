@@ -25,6 +25,9 @@ import (
 
 	"github.com/containerd/containerd/api/types"
 	transfertypes "github.com/containerd/containerd/api/types/transfer"
+	"github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
+
 	"github.com/containerd/containerd/v2/core/content"
 	"github.com/containerd/containerd/v2/core/images"
 	"github.com/containerd/containerd/v2/core/images/archive"
@@ -32,8 +35,6 @@ import (
 	"github.com/containerd/containerd/v2/core/streaming"
 	"github.com/containerd/containerd/v2/core/transfer"
 	"github.com/containerd/containerd/v2/core/transfer/plugins"
-	"github.com/containerd/errdefs"
-	"github.com/containerd/platforms"
 )
 
 func init() {
@@ -42,12 +43,12 @@ func init() {
 }
 
 type Store struct {
-	imageName     string
-	imageLabels   map[string]string
-	platforms     []ocispec.Platform
-	allMetadata   bool
-	labelMap      func(ocispec.Descriptor) []string
-	manifestLimit int
+	imageName        string
+	imageLabels      map[string]string
+	platforms        []ocispec.Platform
+	allMetadata      bool
+	manifestLimit    int
+	contentRetention transfer.ImageContentRetention
 
 	// extraReferences are used to store or lookup multiple references
 	extraReferences []Reference
@@ -174,7 +175,8 @@ func WithUnpack(p ocispec.Platform, snapshotter string) StoreOpt {
 // NewStore creates a new image store source or Destination
 func NewStore(image string, opts ...StoreOpt) *Store {
 	s := &Store{
-		imageName: image,
+		imageName:        image,
+		contentRetention: transfer.ImageContentRetainNone,
 	}
 
 	for _, opt := range opts {
@@ -195,7 +197,12 @@ func (is *Store) ImageFilter(h images.HandlerFunc, cs content.Store) images.Hand
 	} else {
 		p = platforms.Ordered(is.platforms...)
 	}
-	h = images.SetChildrenMappedLabels(cs, h, is.labelMap)
+
+	var labelMap func(ocispec.Descriptor) []string
+	if is.contentRetention == transfer.ImageContentRetainNone {
+		labelMap = images.ChildGCLabelsFilterLayers
+	}
+	h = images.SetChildrenMappedLabels(cs, h, labelMap)
 	if is.allMetadata {
 		// Filter manifests by platforms but allow to handle manifest
 		// and configuration for not-target platforms
@@ -357,19 +364,21 @@ func (is *Store) UnpackPlatforms() []transfer.UnpackConfiguration {
 	for i, uc := range is.unpacks {
 		unpacks[i].Snapshotter = uc.Snapshotter
 		unpacks[i].Platform = uc.Platform
+		unpacks[i].AllContent = uc.AllContent || is.contentRetention == transfer.ImageContentRetainAll
 	}
 	return unpacks
 }
 
 func (is *Store) MarshalAny(context.Context, streaming.StreamCreator) (typeurl.Any, error) {
 	s := &transfertypes.ImageStore{
-		Name:            is.imageName,
-		Labels:          is.imageLabels,
-		ManifestLimit:   uint32(is.manifestLimit),
-		AllMetadata:     is.allMetadata,
-		Platforms:       types.OCIPlatformToProto(is.platforms),
-		ExtraReferences: referencesToProto(is.extraReferences),
-		Unpacks:         unpackToProto(is.unpacks),
+		Name:             is.imageName,
+		Labels:           is.imageLabels,
+		ManifestLimit:    uint32(is.manifestLimit),
+		AllMetadata:      is.allMetadata,
+		Platforms:        types.OCIPlatformToProto(is.platforms),
+		ExtraReferences:  referencesToProto(is.extraReferences),
+		Unpacks:          unpackToProto(is.unpacks),
+		ContentRetention: contentRetentionToProto(is.contentRetention),
 	}
 	return typeurl.MarshalAny(s)
 }
@@ -385,6 +394,7 @@ func (is *Store) UnmarshalAny(ctx context.Context, sm streaming.StreamGetter, a 
 	is.manifestLimit = int(s.ManifestLimit)
 	is.allMetadata = s.AllMetadata
 	is.platforms = types.OCIPlatformFromProto(s.Platforms)
+	is.contentRetention = contentRetentionFromProto(s.ContentRetention)
 	is.extraReferences = referencesFromProto(s.ExtraReferences)
 	is.unpacks = unpackFromProto(s.Unpacks)
 
@@ -445,6 +455,28 @@ func unpackFromProto(auc []*transfertypes.UnpackConfiguration) []transfer.Unpack
 		}
 	}
 	return uc
+}
+
+func contentRetentionToProto(r transfer.ImageContentRetention) transfertypes.ContentRetention {
+	switch r {
+	case transfer.ImageContentRetainNone:
+		return transfertypes.ContentRetention_None
+	case transfer.ImageContentRetainAll:
+		return transfertypes.ContentRetention_All
+	default:
+		return transfertypes.ContentRetention_Cached
+	}
+}
+
+func contentRetentionFromProto(r transfertypes.ContentRetention) transfer.ImageContentRetention {
+	switch r {
+	case transfertypes.ContentRetention_None:
+		return transfer.ImageContentRetainNone
+	case transfertypes.ContentRetention_All:
+		return transfer.ImageContentRetainAll
+	default:
+		return transfer.ImageContentRetainCached
+	}
 }
 
 func imageName(annotations map[string]string, cleanup func(string) string) string {
