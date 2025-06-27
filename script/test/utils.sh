@@ -23,6 +23,9 @@ if [ -v "OS" ] && [ "${OS}" == "Windows_NT" ]; then
   IS_WINDOWS=1
 fi
 
+GOARCH=$(go env GOARCH)
+GOOS=$(go env GOOS)
+
 # RESTART_WAIT_PERIOD is the period to wait before restarting containerd.
 RESTART_WAIT_PERIOD=${RESTART_WAIT_PERIOD:-10}
 
@@ -103,6 +106,15 @@ if [ $IS_WINDOWS -eq 0 ]; then
 
   # Add runtime with failpoint
   cat << EOF | tee -a "${CONTAINERD_CONFIG_FILE}"
+# Needed to pull image for a given runtime class. See KEP4216
+[plugins."io.containerd.grpc.v1.images"]
+  [plugins."io.containerd.grpc.v1.images".runtime_platforms]
+    [plugins."io.containerd.cri.v1.images".runtime_platforms.runc-fp]
+      platform = "$GOOS/$GOARCH"
+    [plugins."io.containerd.cri.v1.images".runtime_platforms.runc]
+      platform = "$GOOS/$GOARCH"
+    [plugins."io.containerd.cri.v1.images".runtime_platforms.test]
+      platform = "$GOOS/$GOARCH"
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc-fp]
   cni_conf_dir = "${FAILPOINT_CNI_CONF_DIR}"
   cni_max_conf_num = 1

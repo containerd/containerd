@@ -47,7 +47,7 @@ var (
 // Tests to verify the Windows HostProcess
 func TestWindowsHostProcess(t *testing.T) {
 	pauseImage := images.Get(images.Pause)
-	EnsureImageExists(t, pauseImage)
+	EnsureImageExists(t, pauseImage, *runtimeHandler)
 
 	t.Run("run as Local Service", func(t *testing.T) {
 		runHostProcess(t, false, pauseImage, defaultAction, hpcContainerOpt, localServiceUsername, defaultCommand)
@@ -70,7 +70,7 @@ func TestWindowsHostProcess(t *testing.T) {
 	})
 	t.Run("run with a different os.version image", func(t *testing.T) {
 		image := "docker.io/e2eteam/busybox:1.29-windows-amd64-1909"
-		EnsureImageExists(t, image)
+		EnsureImageExists(t, image, *runtimeHandler)
 		runHostProcess(t, false, image, defaultAction, hpcContainerOpt, localServiceUsername, defaultCommand)
 	})
 	t.Run("run and check stats", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestArgsEscapedImagesOnWindows(t *testing.T) {
 		assert.NoError(t, runtimeService.RemovePodSandbox(sb))
 	})
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	cnConfigWithCtrCmd := ContainerConfig(
 		containerName,

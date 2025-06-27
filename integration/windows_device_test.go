@@ -51,7 +51,7 @@ func TestWindowsDevice(t *testing.T) {
 		GUID_DEVINTERFACE_DISPLAY_ADAPTER = "5B45201D-F2F2-4F3B-85BB-30FF1F953599" //nolint:revive
 	)
 
-	EnsureImageExists(t, testImage)
+	EnsureImageExists(t, testImage, *runtimeHandler)
 
 	t.Log("Create a container to run the device test")
 	cnConfig := ContainerConfig(
