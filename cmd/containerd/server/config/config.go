@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 
 	"dario.cat/mergo"
@@ -40,6 +41,9 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/containerd/log"
 	"github.com/containerd/plugin"
+
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
 )
 
 // migrations hold the migration functions for every prior containerd config version
@@ -347,40 +351,62 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	}
 	defer f.Close()
 
-	if err := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); err != nil {
-		var serr *toml.StrictMissingError
-		if errors.As(err, &serr) {
-			for _, derr := range serr.Errors {
-				row, col := derr.Position()
-				log.G(ctx).WithFields(log.Fields{
-					"file":   path,
-					"row":    row,
-					"column": col,
-					"key":    strings.Join(derr.Key(), " "),
-				}).WithError(err).Warn("Ignoring unknown key in TOML")
-			}
+	var readErr error
 
-			// Try decoding again with unknown fields
-			config = &Config{}
-			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
-				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
-			}
-			err = toml.NewDecoder(f).Decode(config)
-		}
-		if err != nil {
-			var derr *toml.DecodeError
-			if errors.As(err, &derr) {
-				row, column := derr.Position()
-				log.G(ctx).WithFields(log.Fields{
-					"file":   path,
-					"row":    row,
-					"column": column,
-				}).WithError(err).Error("Failure unmarshaling TOML")
-				return nil, fmt.Errorf("failed to unmarshal TOML at row %d column %d: %w", row, column, err)
-			}
-			return nil, fmt.Errorf("failed to unmarshal TOML: %w", err)
-		}
+	var fileReaders []io.Reader
+	fileReaders = append(fileReaders, f)
 
+	// Optionally try reading in UTF-16 LE encoding on windows
+	if runtime.GOOS == "windows" {
+		winEncoding := unicode.UTF16(unicode.LittleEndian, unicode.IgnoreBOM)
+		utf16Transformer := unicode.BOMOverride(winEncoding.NewDecoder())
+		unicodeReader := transform.NewReader(f, utf16Transformer)
+
+		fileReaders = append(fileReaders, unicodeReader)
+	}
+	for _, reader := range fileReaders {
+		if readErr = toml.NewDecoder(reader).DisallowUnknownFields().Decode(config); readErr != nil {
+			var serr *toml.StrictMissingError
+			if errors.As(readErr, &serr) {
+				for _, derr := range serr.Errors {
+					row, col := derr.Position()
+					log.G(ctx).WithFields(log.Fields{
+						"file":   path,
+						"row":    row,
+						"column": col,
+						"key":    strings.Join(derr.Key(), " "),
+					}).WithError(readErr).Warn("Ignoring unknown key in TOML")
+				}
+
+				// Try decoding again with unknown fields
+				config = &Config{}
+				if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+					readErr = fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, readErr)
+				} else {
+					readErr = toml.NewDecoder(f).Decode(config)
+				}
+			}
+			if readErr != nil {
+				var derr *toml.DecodeError
+				if errors.As(readErr, &derr) {
+					row, column := derr.Position()
+					log.G(ctx).WithFields(log.Fields{
+						"file":   path,
+						"row":    row,
+						"column": column,
+					}).WithError(readErr).Error("Failure unmarshaling TOML")
+					readErr = fmt.Errorf("failed to unmarshal TOML at row %d column %d: %w", row, column, readErr)
+				} else {
+					readErr = fmt.Errorf("failed to unmarshal TOML: %w", readErr)
+				}
+			}
+		} else {
+			break
+		}
+	}
+
+	if readErr != nil {
+		return nil, readErr
 	}
 
 	return config, nil
