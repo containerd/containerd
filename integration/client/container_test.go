@@ -1986,6 +1986,9 @@ func TestContainerExecLargeOutputWithTTY(t *testing.T) {
 
 		const expectedSuffix = "999999 1000000"
 		stdoutString := stdout.String()
+		if len(stdoutString) == 0 {
+			t.Fatal(fmt.Errorf("len (stdoutString) is 0"))
+		}
 		if !strings.Contains(stdoutString, expectedSuffix) {
 			t.Fatalf("process output does not end with %q at iteration %d, here are the last 20 characters of the output:\n\n %q", expectedSuffix, i, stdoutString[len(stdoutString)-20:])
 		}
