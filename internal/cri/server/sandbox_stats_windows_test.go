@@ -86,8 +86,8 @@ func Test_criService_podSandboxStats(t *testing.T) {
 	type expectedStats struct {
 		UsageCoreNanoSeconds uint64
 		UsageNanoCores       uint64
-		WorkingSetBytes      uint64
-		CommitMemoryBytes    uint64
+		WorkingSetBytes      *runtime.UInt64Value
+		CommitMemoryBytes    *runtime.UInt64Value
 	}
 	for _, test := range []struct {
 		desc                   string
@@ -111,10 +111,10 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod stats will include the container stats",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(20, 250)),
 				},
 				"s1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(30, 50)),
 				},
 			},
 			sandbox: sandboxstore.Sandbox{Metadata: sandboxstore.Metadata{ID: "s1"}},
@@ -124,15 +124,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 400,
 				UsageNanoCores:       0,
-				WorkingSetBytes:      40,
-				CommitMemoryBytes:    40,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 50},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 300},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 200,
 					UsageNanoCores:       0,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 20},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 250},
 				},
 			},
 			expectError: false,
@@ -141,13 +141,13 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod stats will include the init container stats",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(25, 200)),
 				},
 				"s1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(10, 50)),
 				},
 				"i1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(33, 234)),
 				},
 			},
 			sandbox: sandboxstore.Sandbox{Metadata: sandboxstore.Metadata{ID: "s1"}},
@@ -158,21 +158,21 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 600,
 				UsageNanoCores:       0,
-				WorkingSetBytes:      60,
-				CommitMemoryBytes:    60,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 68},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 484},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 200,
 					UsageNanoCores:       0,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 25},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 200},
 				},
 				{
 					UsageCoreNanoSeconds: 200,
 					UsageNanoCores:       0,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 33},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 234},
 				},
 			},
 			expectError: false,
@@ -181,10 +181,10 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod stats will not include the init container stats if it is stopped",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(25, 100)),
 				},
 				"s1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(30, 200)),
 				},
 			},
 			sandbox: sandboxstore.Sandbox{Metadata: sandboxstore.Metadata{ID: "s1"}},
@@ -195,15 +195,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 400,
 				UsageNanoCores:       0,
-				WorkingSetBytes:      40,
-				CommitMemoryBytes:    40,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 55},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 300},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 200,
 					UsageNanoCores:       0,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 25},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 100},
 				},
 			},
 			expectError: false,
@@ -212,10 +212,10 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod stats will not include the init container stats if it is stopped in failed state",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(25, 100)),
 				},
 				"s1": {
-					Container: windowsStat(currentStatsTimestamp, 200, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 200, memoryStat(30, 200)),
 				},
 			},
 			sandbox: sandboxstore.Sandbox{Metadata: sandboxstore.Metadata{ID: "s1"}},
@@ -226,15 +226,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 400,
 				UsageNanoCores:       0,
-				WorkingSetBytes:      40,
-				CommitMemoryBytes:    40,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 55},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 300},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 200,
 					UsageNanoCores:       0,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 25},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 100},
 				},
 			},
 			expectError: false,
@@ -243,10 +243,10 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod with existing stats will have usagenanocores totalled across pods and containers",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 400, memoryStat(25, 100)),
 				},
 				"s1": {
-					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 400, memoryStat(20, 20)),
 				},
 			},
 			sandbox: sandboxPod("s1", initialStatsTimestamp, 400),
@@ -259,15 +259,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 800,
 				UsageNanoCores:       400,
-				WorkingSetBytes:      40,
-				CommitMemoryBytes:    40,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 45},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 120},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 400,
 					UsageNanoCores:       200,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 25},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 100},
 				},
 			},
 			expectError: false,
@@ -276,7 +276,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod sandbox with nil stats still works (hostprocess container scenario)",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 400, memoryStat(20, 40)),
 				},
 				"s1": nil,
 			},
@@ -290,15 +290,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 400,
 				UsageNanoCores:       200,
-				WorkingSetBytes:      20,
-				CommitMemoryBytes:    20,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 20},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 40},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 400,
 					UsageNanoCores:       200,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 20},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 40},
 				},
 			},
 			expectError: false,
@@ -307,7 +307,7 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			desc: "pod sandbox with empty stats still works (hostprocess container scenario)",
 			metrics: map[string]*wstats.Statistics{
 				"c1": {
-					Container: windowsStat(currentStatsTimestamp, 400, 20, 20),
+					Container: windowsStat(currentStatsTimestamp, 400, memoryStat(20, 41)),
 				},
 				"s1": {},
 			},
@@ -321,15 +321,15 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats: &expectedStats{
 				UsageCoreNanoSeconds: 400,
 				UsageNanoCores:       200,
-				WorkingSetBytes:      20,
-				CommitMemoryBytes:    20,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 20},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 41},
 			},
 			expectedContainerStats: []expectedStats{
 				{
 					UsageCoreNanoSeconds: 400,
 					UsageNanoCores:       200,
-					WorkingSetBytes:      20,
-					CommitMemoryBytes:    20,
+					WorkingSetBytes:      &runtime.UInt64Value{Value: 20},
+					CommitMemoryBytes:    &runtime.UInt64Value{Value: 41},
 				},
 			},
 			expectError: false,
@@ -359,6 +359,35 @@ func Test_criService_podSandboxStats(t *testing.T) {
 			expectedPodStats:       nil,
 			expectedContainerStats: []expectedStats{},
 			expectError:            true,
+		}, {
+			desc: "container with no memory stats should be skipped gracefully",
+			metrics: map[string]*wstats.Statistics{
+				"c1": {
+					Container: windowsStat(currentStatsTimestamp, 100, nil),
+				},
+				"s1": {
+					Container: windowsStat(currentStatsTimestamp, 100, memoryStat(30, 50)),
+				},
+			},
+			sandbox: sandboxstore.Sandbox{Metadata: sandboxstore.Metadata{ID: "s1"}},
+			containers: []containerstore.Container{
+				newContainer("c1", running, nil),
+			},
+			expectedPodStats: &expectedStats{
+				UsageCoreNanoSeconds: 200,
+				UsageNanoCores:       0,
+				WorkingSetBytes:      &runtime.UInt64Value{Value: 30},
+				CommitMemoryBytes:    &runtime.UInt64Value{Value: 50},
+			},
+			expectedContainerStats: []expectedStats{
+				{
+					UsageCoreNanoSeconds: 100,
+					UsageNanoCores:       0,
+					WorkingSetBytes:      nil, // missing
+					CommitMemoryBytes:    nil, // missing
+				},
+			},
+			expectError: false,
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
@@ -375,14 +404,22 @@ func Test_criService_podSandboxStats(t *testing.T) {
 				return
 			}
 
-			assert.Equal(t, test.expectedPodStats.UsageCoreNanoSeconds, actualPodStats.Cpu.UsageCoreNanoSeconds.Value)
-			assert.Equal(t, test.expectedPodStats.UsageNanoCores, actualPodStats.Cpu.UsageNanoCores.Value)
+			assert.Equal(t, test.expectedPodStats.UsageCoreNanoSeconds, actualPodStats.Cpu.UsageCoreNanoSeconds.Value, "UsageCoreNanoSeconds should match for pod")
+			assert.Equalf(t, test.expectedPodStats.UsageNanoCores, actualPodStats.Cpu.UsageNanoCores.Value, "%s: UsageNanoCores should match for pod, (expected: %d, actual: %d)", test.desc, test.expectedPodStats.UsageNanoCores, actualPodStats.Cpu.UsageNanoCores.Value)
+			assert.Equalf(t, test.expectedPodStats.CommitMemoryBytes, actualPodStats.Memory.CommitMemoryBytes, "%s: CommitMemoryBytes should match for pod, (expected: %d, actual: %d)", test.desc, test.expectedPodStats.CommitMemoryBytes, actualPodStats.Memory.CommitMemoryBytes.Value)
+			assert.Equalf(t, test.expectedPodStats.WorkingSetBytes, actualPodStats.Memory.WorkingSetBytes, "%s: WorkingSetBytes should match for pod, (expected: %d, actual: %d)", test.desc, test.expectedPodStats.WorkingSetBytes, actualPodStats.Memory.WorkingSetBytes.Value)
 
 			for i, expectedStat := range test.expectedContainerStats {
-				actutalStat := actualContainerStats[i]
+				actualStat := actualContainerStats[i]
 
-				assert.Equal(t, expectedStat.UsageCoreNanoSeconds, actutalStat.Cpu.UsageCoreNanoSeconds.Value)
-				assert.Equal(t, expectedStat.UsageNanoCores, actutalStat.Cpu.UsageNanoCores.Value)
+				assert.Equalf(t, expectedStat.UsageCoreNanoSeconds, actualStat.Cpu.UsageCoreNanoSeconds.Value, "%s: UsageCoreNanoSeconds should match for container %d, (expected: %d, actual: %d)", test.desc, i, expectedStat.UsageCoreNanoSeconds, actualStat.Cpu.UsageCoreNanoSeconds.Value)
+				assert.Equalf(t, expectedStat.UsageNanoCores, actualStat.Cpu.UsageNanoCores.Value, "%s: UsageNanoCores should match for container %d, (expected: %d, actual: %d)", test.desc, i, expectedStat.UsageNanoCores, actualStat.Cpu.UsageNanoCores.Value)
+				if expectedStat.WorkingSetBytes == nil || expectedStat.CommitMemoryBytes == nil {
+					assert.Nilf(t, actualStat.Memory, "%s: Memory stats should be nil for container %d", test.desc, i)
+				} else {
+					assert.Equalf(t, expectedStat.WorkingSetBytes, actualStat.Memory.WorkingSetBytes, "%s: WorkingSetBytes should match for container %d, (expected: %d, actual: %d)", test.desc, i, expectedStat.WorkingSetBytes, actualStat.Memory.WorkingSetBytes.Value)
+					assert.Equalf(t, expectedStat.CommitMemoryBytes, actualStat.Memory.CommitMemoryBytes, "%s: CommitMemoryBytes should match for container %d, (expected: %d, actual: %d)", test.desc, i, expectedStat.CommitMemoryBytes, actualStat.Memory.CommitMemoryBytes.Value)
+				}
 			}
 		})
 	}
@@ -397,18 +434,22 @@ func sandboxPod(id string, timestamp time.Time, cachedCPU uint64) sandboxstore.S
 		}}
 }
 
-func windowsStat(timestamp time.Time, cpu uint64, memory uint64, commitMemory uint64) *wstats.Statistics_Windows {
+func windowsStat(timestamp time.Time, cpu uint64, memory *wstats.WindowsContainerMemoryStatistics) *wstats.Statistics_Windows {
 	return &wstats.Statistics_Windows{
 		Windows: &wstats.WindowsContainerStatistics{
 			Timestamp: protobuf.ToTimestamp(timestamp),
 			Processor: &wstats.WindowsContainerProcessorStatistics{
 				TotalRuntimeNS: cpu,
 			},
-			Memory: &wstats.WindowsContainerMemoryStatistics{
-				MemoryUsagePrivateWorkingSetBytes: memory,
-				MemoryUsageCommitBytes:            commitMemory,
-			},
+			Memory: memory,
 		},
+	}
+}
+
+func memoryStat(workingSetMemory uint64, commitMemory uint64) *wstats.WindowsContainerMemoryStatistics {
+	return &wstats.WindowsContainerMemoryStatistics{
+		MemoryUsagePrivateWorkingSetBytes: workingSetMemory,
+		MemoryUsageCommitBytes:            commitMemory,
 	}
 }
 
