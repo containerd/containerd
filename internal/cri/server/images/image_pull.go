@@ -179,7 +179,7 @@ func (c *CRIImageService) PullImage(ctx context.Context, name string, credential
 	// If UseLocalImagePull is true, use client.Pull to pull the image, else use transfer service by default.
 	//
 	// Transfer service does not currently support all the CRI image config options.
-	// TODO: Add support for DisableSnapshotAnnotations, DiscardUnpackedLayers, ImagePullWithSyncFs and unpackDuplicationSuppressor
+	// TODO: Add support for DisableSnapshotAnnotations, ImagePullWithSyncFs and unpackDuplicationSuppressor
 	var image containerd.Image
 	if c.config.UseLocalImagePull {
 		image, err = c.pullImageWithLocalPull(ctx, ref, credentials, snapshotter, labels, imagePullProgressTimeout)
@@ -304,6 +304,9 @@ func (c *CRIImageService) pullImageWithTransferService(
 	sopts = append(sopts, transferimage.WithPlatforms(platforms.DefaultSpec()))
 	sopts = append(sopts, transferimage.WithUnpack(platforms.DefaultSpec(), snapshotter))
 	sopts = append(sopts, transferimage.WithImageLabels(labels))
+	if c.config.DiscardUnpackedLayers {
+		sopts = append(sopts, transferimage.WithDiscardUnpackedLayers())
+	}
 	is := transferimage.NewStore(ref, sopts...)
 	log.G(ctx).Debugf("Getting new CRI credentials")
 	ch := newCRICredentials(ref, credentials)
