@@ -26,6 +26,7 @@ import (
 	"github.com/containerd/log"
 
 	eventtypes "github.com/containerd/containerd/api/events"
+	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/containerd/v2/core/sandbox"
 	"github.com/containerd/containerd/v2/internal/cri/server/podsandbox/types"
 	sandboxstore "github.com/containerd/containerd/v2/internal/cri/store/sandbox"
@@ -74,6 +75,13 @@ func (c *Controller) stopSandboxContainer(ctx context.Context, podSandbox *types
 			return cleanupUnknownSandbox(ctx, id, podSandbox)
 		}
 		return nil
+	}
+
+	if cStatus, err := task.Status(ctx); err == nil {
+		if cStatus.Status == client.Stopped {
+			log.G(ctx).Warnf("task %s is already stopped in sandbox %s", task.ID(), id)
+			return nil
+		}
 	}
 
 	// Handle unknown state.
