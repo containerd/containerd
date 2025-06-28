@@ -147,6 +147,16 @@ func printCgroup2MetricsTable(w *tabwriter.Writer, data *v2.Metrics) {
 		fmt.Fprintf(w, "memory.swap_usage\t%v\t\n", data.Memory.SwapUsage)
 		fmt.Fprintf(w, "memory.swap_limit\t%v\t\n", data.Memory.SwapLimit)
 	}
+	if data.GetIo() != nil && data.GetIo().GetPSI() != nil {
+		fmt.Fprintf(w, "some.avg10\t%v\t\n", data.GetIo().GetPSI().GetSome().GetAvg10())
+		fmt.Fprintf(w, "some.avg60\t%v\t\n", data.GetIo().GetPSI().GetSome().GetAvg60())
+		fmt.Fprintf(w, "some.avg300\t%v\t\n", data.GetIo().GetPSI().GetSome().GetAvg300())
+		fmt.Fprintf(w, "some.total\t%v\t\n", data.GetIo().GetPSI().GetSome().GetTotal())
+		fmt.Fprintf(w, "full.avg10\t%v\t\n", data.GetIo().GetPSI().GetFull().GetAvg10())
+		fmt.Fprintf(w, "full.avg60\t%v\t\n", data.GetIo().GetPSI().GetFull().GetAvg60())
+		fmt.Fprintf(w, "full.avg300\t%v\t\n", data.GetIo().GetPSI().GetFull().GetAvg300())
+		fmt.Fprintf(w, "full.total\t%v\t\n", data.GetIo().GetPSI().GetFull().GetTotal())
+	}
 }
 
 func printWindowsStats(w *tabwriter.Writer, windowsStats *wstats.Statistics) {

@@ -412,8 +412,18 @@ func (c *criService) linuxContainerMetrics(
 			return containerStats{}, fmt.Errorf("failed to obtain memory stats: %w", err)
 		}
 		cs.Memory = memoryStats
+		memorySwap, err := c.memoryContainerSwap(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
 		if err != nil {
-			return containerStats{}, fmt.Errorf("failed to obtain pid count: %w", err)
+			return containerStats{}, fmt.Errorf("failed to obtain memory swap: %w", err)
+		}
+		cs.Swap = memorySwap
+
+		psiStats, err := c.ioContainerStats(meta.ID, data, protobuf.FromTimestamp(stats.Timestamp))
+		if err != nil {
+			return containerStats{}, fmt.Errorf("failed to obtain psi stats: %w", err)
+		}
+		if psiStats != nil {
+			cs.Io = psiStats
 		}
 	}
 
@@ -531,6 +541,72 @@ func (c *criService) memoryContainerStats(ID string, stats interface{}, timestam
 				RssBytes:        &runtime.UInt64Value{Value: metrics.Memory.Anon},
 				PageFaults:      &runtime.UInt64Value{Value: metrics.Memory.Pgfault},
 				MajorPageFaults: &runtime.UInt64Value{Value: metrics.Memory.Pgmajfault},
+			}, nil
+		}
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
+}
+
+func (c *criService) memoryContainerSwap(ID string, stats interface{}, timestamp time.Time) (*runtime.SwapUsage, error) {
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		if metrics.GetMemory() != nil {
+			if swap := metrics.GetMemory().GetSwap(); swap != nil {
+				return &runtime.SwapUsage{
+					Timestamp:          timestamp.UnixNano(),
+					SwapUsageBytes:     &runtime.UInt64Value{Value: swap.GetUsage()},
+					SwapAvailableBytes: &runtime.UInt64Value{Value: swap.GetLimit() - swap.GetUsage()},
+				}, nil
+			}
+		}
+	case *cg2.Metrics:
+		if metrics.GetMemory() != nil {
+			return &runtime.SwapUsage{
+				Timestamp:          timestamp.UnixNano(),
+				SwapUsageBytes:     &runtime.UInt64Value{Value: metrics.GetMemory().GetSwapUsage()},
+				SwapAvailableBytes: &runtime.UInt64Value{Value: metrics.GetMemory().GetSwapLimit() - metrics.GetMemory().GetSwapUsage()},
+			}, nil
+		}
+	default:
+		return nil, fmt.Errorf("unexpected metrics type: %T from %s", metrics, reflect.TypeOf(metrics).Elem().PkgPath())
+	}
+	return nil, nil
+}
+
+func (c *criService) ioContainerStats(ID string, stats interface{}, timestamp time.Time) (*runtime.IoUsage, error) {
+	switch metrics := stats.(type) {
+	case *cg1.Metrics:
+		// cgroup v1 doesn't support IO PSI
+		return nil, nil
+	case *cg2.Metrics:
+		if metrics.Io != nil {
+			toRuntimePsi := func(psiData *cg2.PSIData) *runtime.PsiData {
+				if psiData == nil {
+					return &runtime.PsiData{}
+				}
+				return &runtime.PsiData{
+					Total:  psiData.Total,
+					Avg10:  psiData.Avg10,
+					Avg60:  psiData.Avg60,
+					Avg300: psiData.Avg300,
+				}
+			}
+
+			full := toRuntimePsi(metrics.GetIo().GetPSI().GetFull())
+			some := toRuntimePsi(metrics.GetIo().GetPSI().GetSome())
+			if (*full == runtime.PsiData{}) && (*some == runtime.PsiData{}) {
+				return nil, nil
+			}
+			psiStats := runtime.PsiStats{
+				Full: full,
+				Some: some,
+			}
+
+			return &runtime.IoUsage{
+				Timestamp: timestamp.UnixNano(),
+				Psi:       &psiStats,
 			}, nil
 		}
 	default:

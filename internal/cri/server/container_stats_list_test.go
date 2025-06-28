@@ -341,6 +341,10 @@ func TestContainerMetricsMemory(t *testing.T) {
 			got, err := c.memoryContainerStats("ID", test.metrics, timestamp)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expected, got)
+			_, err = c.memoryContainerSwap("ID", test.metrics, timestamp)
+			assert.NoError(t, err)
+			_, err = c.ioContainerStats("ID", test.metrics, timestamp)
+			assert.NoError(t, err)
 		})
 	}
 }
