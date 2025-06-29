@@ -354,23 +354,22 @@ func loadConfigFile(ctx context.Context, path string) (*Config, error) {
 	if readErr := toml.NewDecoder(f).DisallowUnknownFields().Decode(config); readErr != nil {
 		if runtime.GOOS != "windows" {
 			return handleTOMLDecodeErrors(ctx, f, path, true, readErr)
-		} else {
-			config, readErr = handleTOMLDecodeErrors(ctx, f, path, false, readErr)
-			if readErr == nil {
-				return config, nil
-			}
-
-			// Try once again for windows with UTF-16LE encoding
-			config = &Config{}
-			if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
-				return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
-			}
-			asciiErr := toml.NewDecoder(getUTF16ReaderForWindows(f)).DisallowUnknownFields().Decode(config)
-			if asciiErr == nil {
-				return config, nil
-			}
-			return handleTOMLDecodeErrors(ctx, f, path, true, asciiErr)
 		}
+		config, readErr = handleTOMLDecodeErrors(ctx, f, path, false, readErr)
+		if readErr == nil {
+			return config, nil
+		}
+
+		// Try once again for windows with UTF-16LE encoding
+		config = &Config{}
+		if _, seekerr := f.Seek(0, io.SeekStart); seekerr != nil {
+			return nil, fmt.Errorf("unable to seek file to start %w: failed to unmarshal TOML with unknown fields: %w", seekerr, err)
+		}
+		asciiErr := toml.NewDecoder(getUTF16ReaderForWindows(f)).DisallowUnknownFields().Decode(config)
+		if asciiErr == nil {
+			return config, nil
+		}
+		return handleTOMLDecodeErrors(ctx, f, path, true, asciiErr)
 	}
 
 	return config, nil
