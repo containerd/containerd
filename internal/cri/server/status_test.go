@@ -134,7 +134,6 @@ func TestStatusRuntimeHandlersOrdering(t *testing.T) {
 		}
 	}
 
-	// The test will fail if the order is the same, showing that the ordering is stable
-	// In the current implementation, order is not stable
-	assert.False(t, sameOrder, "RuntimeHandlers order is stable across Status() calls - unexpected")
+	// Fail if runtime handlers order varies across calls to Status()
+	assert.True(t, sameOrder, "RuntimeHandlers order is unstable across Status() calls")
 }
