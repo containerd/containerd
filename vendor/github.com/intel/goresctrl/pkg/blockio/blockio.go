@@ -84,7 +84,7 @@ limitations under the License.
 //
 // Usage example:
 //
-//	blockio.SetLogger(logrus.New())
+//	blockio.SetLogger(slog.Default().WithGroup("blockio"))
 //	if err := blockio.SetConfigFromFile("/etc/containers/blockio.yaml", false); err != nil {
 //	    return err
 //	}
@@ -103,7 +103,7 @@ package blockio
 import (
 	"errors"
 	"fmt"
-	stdlog "log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -115,7 +115,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/yaml"
 
-	grclog "github.com/intel/goresctrl/pkg/log"
 	goresctrlpath "github.com/intel/goresctrl/pkg/path"
 )
 
@@ -138,7 +137,7 @@ type tBlockDeviceInfo struct {
 }
 
 // Our logger instance.
-var log grclog.Logger = grclog.NewLoggerWrapper(stdlog.New(os.Stderr, "[ blockio ] ", 0))
+var log *slog.Logger = slog.Default()
 
 // classBlockIO connects user-defined block I/O classes to
 // corresponding cgroups blockio controller parameters.
@@ -147,12 +146,10 @@ var classBlockIO = map[string]BlockIOParameters{}
 // SetLogger sets the logger instance to be used by the package.
 // Examples:
 //
-//	// Log to standard logger:
-//	stdlog := log.New(os.Stderr, "blockio:", 0)
-//	blockio.SetLogger(goresctrllog.NewLoggerWrapper(stdlog))
-//	// Log to logrus:
-//	blockio.SetLogger(logrus.New())
-func SetLogger(l grclog.Logger) {
+//	// Write structured records in text form to stderr, set verbosity to debug
+//	logger := slog.New(slog.NewTextHandler(os.Stderr, slog.HandlerOptions{Level: slog.LevelDebug}))
+//	blockio.SetLogger(logger)
+func SetLogger(l *slog.Logger) {
 	log = l
 }
 
@@ -189,7 +186,7 @@ func SetConfig(opt *Config, force bool) error {
 
 	currentIOSchedulers, ioSchedulerDetectionError := getCurrentIOSchedulers()
 	if ioSchedulerDetectionError != nil {
-		log.Warnf("configuration validation partly disabled due to I/O scheduler detection error %#v", ioSchedulerDetectionError.Error())
+		log.Warn("configuration validation partly disabled due to I/O scheduler detection error", "error", ioSchedulerDetectionError)
 	}
 
 	classBlockIO = map[string]BlockIOParameters{}
@@ -198,7 +195,7 @@ func SetConfig(opt *Config, force bool) error {
 		cgBlockIO, err := devicesParametersToCgBlockIO(opt.Classes[class], currentIOSchedulers)
 		if err != nil {
 			if force {
-				log.Warnf("ignoring: %v", err)
+				log.Warn("ignoring blockio class", "className", class, "error", err)
 			} else {
 				return err
 			}
@@ -232,7 +229,7 @@ func getCurrentIOSchedulers() (map[string]string, error) {
 		schedulerDataB, err := os.ReadFile(schedulerFile)
 		if err != nil {
 			// A block device may be disconnected.
-			log.Errorf("failed to read current I/O scheduler %#v: %v\n", schedulerFile, err)
+			log.Error("failed to read current I/O scheduler", "path", schedulerFile, "error", err)
 			continue
 		}
 		schedulerData := strings.Trim(string(schedulerDataB), "\n")
@@ -247,7 +244,7 @@ func getCurrentIOSchedulers() (map[string]string, error) {
 			}
 		}
 		if currentScheduler == "" {
-			log.Errorf("could not parse current scheduler in %#v\n", schedulerFile)
+			log.Error("could not parse current scheduler", "path", schedulerFile)
 			continue
 		}
 
@@ -286,17 +283,17 @@ func devicesParametersToCgBlockIO(dps []DevicesParameters, currentIOSchedulers m
 			if err != nil {
 				// Problems in matching block device wildcards and resolving symlinks
 				// are worth reporting, but must not block configuring blkio where possible.
-				log.Warnf("%v", err)
+				log.Warn("failed to resolve block devices", "error", err)
 			}
 			if len(blockDevices) == 0 {
-				log.Warnf("no matches on any of Devices: %v, parameters ignored", dp.Devices)
+				log.Warn("no match, parameters ignored", "devices", dp.Devices)
 			}
 			for _, blockDeviceInfo := range blockDevices {
 				if weight != -1 {
 					if ios, found := currentIOSchedulers[blockDeviceInfo.DevNode]; found {
 						if ios != "bfq" && ios != "cfq" {
-							log.Warnf("weight has no effect on device %#v due to "+
-								"incompatible I/O scheduler %#v (bfq or cfq required)", blockDeviceInfo.DevNode, ios)
+							log.Warn("weight has no effect due to incompatible I/O scheduler (bfq or cfq required)",
+								"path", blockDeviceInfo.DevNode, "scheduler", ios)
 						}
 					}
 					blkio.WeightDevice.Update(blockDeviceInfo.Major, blockDeviceInfo.Minor, weight)

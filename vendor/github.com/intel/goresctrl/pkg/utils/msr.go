@@ -31,13 +31,13 @@ func ReadMSR(cpu ID, msr int64) (uint64, error) {
 		return 0, err
 	}
 
-	defer file.Close()
+	defer file.Close() // nolint:errcheck
 
 	// Whence is the point of reference for offset
 	// 0 = Beginning of file
 	// 1 = Current position
 	// 2 = End of file
-	var whence int = 0
+	whence := int(0)
 	_, err = file.Seek(msr, whence)
 	if err != nil {
 		return 0, err
