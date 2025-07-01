@@ -320,11 +320,10 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
-# github.com/intel/goresctrl v0.8.0
-## explicit; go 1.20
+# github.com/intel/goresctrl v0.9.0
+## explicit; go 1.23
 github.com/intel/goresctrl/pkg/blockio
 github.com/intel/goresctrl/pkg/kubernetes
-github.com/intel/goresctrl/pkg/log
 github.com/intel/goresctrl/pkg/path
 github.com/intel/goresctrl/pkg/rdt
 github.com/intel/goresctrl/pkg/utils
