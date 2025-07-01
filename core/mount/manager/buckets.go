@@ -72,4 +72,10 @@ var (
 	bucketKeyType       = []byte("type")
 	bucketKeyMountedAt  = []byte("mat")
 	bucketKeyMountPoint = []byte("mp")
+	bucketKeyLabels     = []byte("labels")
+
+	labelGCContainerBackRef = []byte("containerd.io/gc.bref.container")
+	labelGCContentBackRef   = []byte("containerd.io/gc.bref.content")
+	labelGCImageBackRef     = []byte("containerd.io/gc.bref.image")
+	labelGCSnapBackRef      = []byte("containerd.io/gc.bref.snapshot.")
 )

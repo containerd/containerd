@@ -17,6 +17,7 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/containerd/containerd/v2/core/leases"
 	"github.com/containerd/containerd/v2/core/metadata"
+	"github.com/containerd/containerd/v2/core/metadata/boltutil"
 	"github.com/containerd/containerd/v2/core/mount"
 	"github.com/containerd/containerd/v2/pkg/gc"
 	"github.com/containerd/containerd/v2/pkg/namespaces"
@@ -69,15 +71,13 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 	}
 
 	lid, leased := leases.FromContext(ctx)
-	//if !leased {
-	// TODO: Set a default expiration? Otherwise will be immediately available for GC if nothing references
-	//}
 
 	var config mount.ActivateOptions
 	for _, opt := range opts {
 		opt(&config)
 	}
 
+	start := time.Now()
 	// highest index of a mount
 	// first system mount is the first index which should be mounted by the system
 	var firstSystemMount = -1
@@ -131,7 +131,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 		return mount.ActivationInfo{}, errdefs.ErrNotImplemented
 	}
 
-	// TODO: Get read lock to block GC context from starting
+	// Get read lock to block GC context from starting
 	mm.rwlock.RLock()
 	defer mm.rwlock.RUnlock()
 
@@ -170,12 +170,14 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			return err
 		}
 
-		// Setup mounts now with generated targets
-		// TODO: Write created at time
-		// TODO: Write labels
-		// TODO: Store mount information including mountpoint
+		if err := boltutil.WriteLabels(bkt, config.Labels); err != nil {
+			return err
+		}
 
-		// TODO: Write lease
+		if err := boltutil.WriteTimestamps(bkt, start, start); err != nil {
+			return err
+		}
+
 		if leased {
 			if err = bkt.Put(bucketKeyLease, []byte(lid)); err != nil {
 				return err
@@ -194,14 +196,16 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 			}
 		}
 
+		// TODO: Store mount information including mountpoint
+		// Setup mounts now with generated targets
+
 		return nil
 	}); err != nil {
 		return mount.ActivationInfo{}, err
 	}
 
-	// TODO: If error, rollback and remove by name
 	defer func() {
-		// TODO: Any error should attempt to unmount all mounted
+		// If error, rollback and remove by name
 		if retErr != nil {
 			if err := mm.db.Update(func(tx *bolt.Tx) error {
 				v1bkt := tx.Bucket([]byte("v1"))
@@ -247,6 +251,7 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 
 	var mounted []mount.ActiveMount
 	defer func() {
+		// If error, unmount all mounted
 		if retErr != nil {
 			for i, m := range mounted {
 				var err error
@@ -375,6 +380,10 @@ func (mm *mountManager) Activate(ctx context.Context, name string, mounts []moun
 				return err
 			}
 
+		}
+
+		if err := boltutil.WriteTimestamps(bkt, start, time.Now()); err != nil {
+			return err
 		}
 
 		// TODO: Save all system mounts
@@ -646,25 +655,92 @@ func (cc *collectionContext) All(fn func(gc.Node)) {
 	}
 }
 
-func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {
-	nsbkt := getBucket(cc.tx, []byte("v1"), []byte(ns))
+func gcnode(t gc.ResourceType, ns, key string) gc.Node {
+	return gc.Node{
+		Type:      t,
+		Namespace: ns,
+		Key:       key,
+	}
+}
+
+func (cc *collectionContext) ActiveWithBackReference(ns string, fn func(gc.Node), bref func(gc.Node, gc.Node)) {
+	nsbkt := getBucket(cc.tx, []byte("v1"), []byte(ns), bucketKeyMounts)
 	if nsbkt != nil {
-		// TODO: Check labels
 		mc := nsbkt.Cursor()
 		for mk, mv := mc.First(); mk != nil; mk, mv = mc.Next() {
 			if mv != nil {
 				continue
 			}
-			// TODO: Check for root/expire labels
-			/*
-				fn(gc.Node{
-					Type:      metadata.ResourceMount,
-					Namespace: ns,
-					Key:       string(mk),
-				})
-			*/
+			n := gcnode(metadata.ResourceMount, ns, string(mk))
+			lbkt := nsbkt.Bucket(mk).Bucket(bucketKeyLabels)
+			if lbkt != nil {
+				lc := lbkt.Cursor()
+				for _, h := range []struct {
+					key     []byte
+					handler func([]byte, []byte)
+				}{
+					{
+						key: labelGCContainerBackRef,
+						handler: func(k, v []byte) {
+							if ks := string(k); ks != string(labelGCContainerBackRef) {
+								// Allow reference naming separated by . or /, ignore names
+								if ks[len(labelGCContainerBackRef)] != '.' && ks[len(labelGCContainerBackRef)] != '/' {
+									return
+								}
+							}
+
+							bref(gcnode(metadata.ResourceContainer, ns, string(v)), n)
+						},
+					},
+					{
+						key: labelGCContentBackRef,
+						handler: func(k, v []byte) {
+							if ks := string(k); ks != string(labelGCContentBackRef) {
+								// Allow reference naming separated by . or /, ignore names
+								if ks[len(labelGCContentBackRef)] != '.' && ks[len(labelGCContentBackRef)] != '/' {
+									return
+								}
+							}
+
+							bref(gcnode(metadata.ResourceContent, ns, string(v)), n)
+						},
+					},
+					{
+						key: labelGCImageBackRef,
+						handler: func(k, v []byte) {
+							if ks := string(k); ks != string(labelGCImageBackRef) {
+								// Allow reference naming separated by . or /, ignore names
+								if ks[len(labelGCImageBackRef)] != '.' && ks[len(labelGCImageBackRef)] != '/' {
+									return
+								}
+							}
+
+							bref(gcnode(metadata.ResourceImage, ns, string(v)), n)
+						},
+					},
+					{
+						key: labelGCSnapBackRef,
+						handler: func(k, v []byte) {
+							snapshotter := k[len(labelGCSnapBackRef):]
+							if i := bytes.IndexByte(snapshotter, '/'); i >= 0 {
+								snapshotter = snapshotter[:i]
+							}
+							bref(gcnode(metadata.ResourceSnapshot, ns, fmt.Sprintf("%s/%s", snapshotter, v)), n)
+						},
+					},
+					// TODO: Consider support for root/expire labels
+				} {
+					for k, v := lc.Seek(h.key); k != nil && bytes.HasPrefix(k, h.key); k, v = lc.Next() {
+						h.handler(k, v)
+					}
+				}
+			}
 		}
 	}
+}
+
+func (cc *collectionContext) Active(ns string, fn func(gc.Node)) {
+	cc.ActiveWithBackReference(ns, fn, func(gc.Node, gc.Node) {})
 }
 
 func (cc *collectionContext) Leased(ns, lease string, fn func(gc.Node)) {
