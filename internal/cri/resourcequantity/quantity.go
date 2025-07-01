@@ -363,6 +363,7 @@ func ParseQuantity(str string) (Quantity, error) {
 	}
 
 	// So that no one but us has to think about suffixes, remove it.
+	//nolint:staticcheck // QF1003: could use tagged switch on base (staticcheck)
 	if base == 10 {
 		amount.SetScale(amount.Scale() + Scale(exponent).infScale())
 	} else if base == 2 {

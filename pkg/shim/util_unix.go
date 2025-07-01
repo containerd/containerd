@@ -208,7 +208,7 @@ func hybridVsockDialer(addr string, port uint64, timeout time.Duration) (net.Con
 		if err != nil {
 			return nil, err
 		}
-		if _, err = conn.Write([]byte(fmt.Sprintf("CONNECT %d\n", port))); err != nil {
+		if _, err = fmt.Fprintln(conn, "CONNECT", port); err != nil {
 			conn.Close()
 			return nil, err
 		}

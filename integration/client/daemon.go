@@ -28,9 +28,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/containerd/containerd/v2/client"
 	"github.com/containerd/plugin"
-
-	. "github.com/containerd/containerd/v2/client"
 )
 
 type daemon struct {
@@ -58,31 +57,31 @@ func (d *daemon) start(name, address string, args []string, stdout, stderr io.Wr
 	return nil
 }
 
-func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
+func (d *daemon) waitForStart(ctx context.Context) (*client.Client, error) {
 	var (
-		client  *Client
-		serving bool
-		err     error
-		ticker  = time.NewTicker(500 * time.Millisecond)
+		clientInstance *client.Client
+		serving        bool
+		err            error
+		ticker         = time.NewTicker(500 * time.Millisecond)
 	)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			client, err = New(d.addr)
+			clientInstance, err = client.New(d.addr)
 			if err != nil {
 				continue
 			}
-			serving, err = client.IsServing(ctx)
+			serving, err = clientInstance.IsServing(ctx)
 			if !serving {
-				client.Close()
+				clientInstance.Close()
 				if err == nil {
 					err = errors.New("connection was successful but service is not available")
 				}
 				continue
 			}
-			resp, perr := client.IntrospectionService().Plugins(ctx)
+			resp, perr := clientInstance.IntrospectionService().Plugins(ctx)
 			if perr != nil {
 				return nil, fmt.Errorf("failed to get plugin list: %w", perr)
 			}
@@ -97,7 +96,7 @@ func (d *daemon) waitForStart(ctx context.Context) (*Client, error) {
 				return nil, loadErr
 			}
 
-			return client, err
+			return clientInstance, err
 		case <-ctx.Done():
 			return nil, fmt.Errorf("context deadline exceeded: %w", err)
 		}

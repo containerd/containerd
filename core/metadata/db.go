@@ -389,12 +389,13 @@ func (m *DB) GarbageCollect(ctx context.Context) (gc.Stats, error) {
 				return nil
 			}
 
-			if n.Type == ResourceSnapshot {
+			switch n.Type {
+			case ResourceSnapshot:
 				if idx := strings.IndexRune(n.Key, '/'); idx > 0 {
 					m.dirtySS[n.Key[:idx]] = struct{}{}
 				}
 				// queue event to publish after successful commit
-			} else if n.Type == ResourceContent || n.Type == ResourceIngest {
+			case ResourceContent, ResourceIngest:
 				m.dirtyCS = true
 			}
 

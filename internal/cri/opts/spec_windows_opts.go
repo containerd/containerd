@@ -80,7 +80,7 @@ func parseMount(osi osinterface.OS, mount *runtime.Mount) (*runtimespec.Mount, e
 		// drive (like Z:, E: etc.). Keeping this '.' in the path
 		// causes incorrect parameter error when starting the
 		// container on windows.  Remove it here.
-		if !(len(dst) == 2 && dst[1] == ':') {
+		if len(dst) != 2 || dst[1] != ':' {
 			dst = filepath.Clean(dst)
 			if dst[0] == '\\' {
 				dst = "C:" + dst
