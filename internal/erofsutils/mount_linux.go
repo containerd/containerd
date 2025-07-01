@@ -30,8 +30,11 @@ import (
 	"github.com/containerd/log"
 )
 
-func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath string, mkfsExtraOpts []string) error {
+func ConvertTarErofs(ctx context.Context, r io.Reader, layerPath, uuid string, mkfsExtraOpts []string) error {
 	args := append([]string{"--tar=f", "--aufs", "--quiet", "-Enoinline_data"}, mkfsExtraOpts...)
+	if uuid != "" {
+		args = append(args, []string{"-U", uuid}...)
+	}
 	args = append(args, layerPath)
 	cmd := exec.CommandContext(ctx, "mkfs.erofs", args...)
 	cmd.Stdin = r
