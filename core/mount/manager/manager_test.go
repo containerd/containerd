@@ -144,8 +144,11 @@ func (h *errOnceHandler) Unmount(_ context.Context, mp string) error {
 func TestGC(t *testing.T) {
 	type gcrun struct {
 		a      []mount.Mount
+		o      []mount.ActivateOpt
 		d      []string
 		all    []string
+		active []string
+		brefs  map[string][]string
 		remove []string
 		gcErr  bool
 	}
@@ -193,6 +196,41 @@ func TestGC(t *testing.T) {
 				{}, // Run again without error to bring mount count back to zero
 			},
 		},
+		{
+			name: "ActiveBrefs",
+			gcruns: []gcrun{
+				{
+					a: []mount.Mount{
+						{
+							Type: "noop",
+						},
+						{
+							Type: "noop",
+						},
+					},
+					o: []mount.ActivateOpt{
+						mount.WithLabels(map[string]string{"containerd.io/gc.bref.container": "container1"}),
+					},
+					all: []string{"0-0", "0-1"},
+					brefs: map[string][]string{
+						"container1": {"0-0", "0-1"},
+					},
+					remove: []string{"0-1"},
+				},
+				{
+					all:    []string{"0-0"},
+					remove: []string{"0-0"},
+					brefs: map[string][]string{
+						"container1": {"0-0"},
+					},
+				},
+				{
+					brefs: map[string][]string{
+						"container1": nil,
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			td := t.TempDir()
@@ -218,7 +256,7 @@ func TestGC(t *testing.T) {
 			for i, run := range tc.gcruns {
 				for j, mnt := range run.a {
 					id := fmt.Sprintf("%d-%d", i, j)
-					m.Activate(ctx, id, []mount.Mount{mnt})
+					m.Activate(ctx, id, []mount.Mount{mnt}, run.o...)
 				}
 
 				for _, id := range run.d {
@@ -233,6 +271,8 @@ func TestGC(t *testing.T) {
 				require.NoError(t, err)
 
 				var all []string
+
+				checkGCActive(t, i, cc, run.active, run.brefs)
 
 				cc.All(func(n gc.Node) {
 					all = append(all, n.Key)
@@ -267,7 +307,29 @@ func TestGC(t *testing.T) {
 	}
 }
 
-// TODO: Test formatting
+func checkGCActive(t *testing.T, i int, cc metadata.CollectionContext, active []string, brefs map[string][]string) {
+	t.Helper()
+	ccb := cc.(interface {
+		ActiveWithBackReference(string, func(gc.Node), func(gc.Node, gc.Node))
+	})
+
+	var (
+		activeKeys  []string
+		activeBrefs = map[string][]string{}
+	)
+	ccb.ActiveWithBackReference("test", func(n gc.Node) {
+		activeKeys = append(activeKeys, n.Key)
+	}, func(n, ref gc.Node) {
+		activeBrefs[n.Key] = append(activeBrefs[n.Key], ref.Key)
+	})
+
+	require.Equal(t, active, activeKeys, "run %d: active does not match", i)
+
+	for k := range brefs {
+		require.Equal(t, brefs[k], activeBrefs[k], "run %d: brefs for %q does not match", i, k)
+	}
+}
+
 // TODO: Test Info
 // TODO: Test deactivate
 // TODO: Test Sync
