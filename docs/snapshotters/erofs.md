@@ -98,13 +98,22 @@ forget to restart containerd after changing the configuration.
     default = ["erofs","walking"]
 ```
 
-Note that if erofs-utils is 1.8.2 or higher, it's preferred to add
-`--sort=none` to the differ's `mkfs_options` to avoid unnecessary tar data
-reordering for improved performance, as shown below:
+Note that if erofs-utils is version 1.8 or higher, you can add
+`-T0 --mkfs-time` to the differ's `mkfs_options` to enable reproducible
+builds, as shown below:
 
 ``` toml
   [plugins."io.containerd.differ.v1.erofs"]
-    mkfs_options = ["--sort=none"]
+    mkfs_options = ["-T0 --mkfs-time"]
+```
+
+If erofs-utils is 1.8.2 or higher, it's preferred to append `--sort=none` to
+the differ's `mkfs_options` to avoid unnecessary tar data reordering for
+improved performance, as shown below:
+
+``` toml
+  [plugins."io.containerd.differ.v1.erofs"]
+    mkfs_options = ["-T0 --mkfs-time --sort=none"]
 ```
 
 ### Running a container
