@@ -20,11 +20,23 @@ package testsuite
 
 import (
 	"syscall"
+	"testing"
 )
 
 func clearMask() func() {
 	oldumask := syscall.Umask(0)
 	return func() {
 		syscall.Umask(oldumask)
+	}
+}
+
+func debugDiskUsage(t *testing.T, root string) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(root, &stat); err == nil {
+		t.Logf("Disk space for %s: blocks: %d, bfree: %d, bavail: %d, bsize: %d, free: %d MB, avail: %d MB",
+			root, stat.Blocks, stat.Bfree, stat.Bavail, stat.Bsize,
+			(uint64(stat.Bfree)*uint64(stat.Bsize))/(1024*1024),
+			(uint64(stat.Bavail)*uint64(stat.Bsize))/(1024*1024),
+		)
 	}
 }
