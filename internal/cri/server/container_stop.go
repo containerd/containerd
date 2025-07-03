@@ -85,6 +85,10 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 	start := time.Now()
 	id := container.ID
 	sandboxID := container.SandboxID
+	sandbox, err := c.sandboxStore.Get(sandboxID)
+	if err != nil {
+		return fmt.Errorf("failed to find container's sandbox %q: %w", id, err)
+	}
 
 	// Return without error if container is not running. This makes sure that
 	// stop only takes real action after the container is started.
@@ -147,7 +151,7 @@ func (c *criService) stopContainer(ctx context.Context, container containerstore
 			// default SIGTERM is still better than returning error and leaving
 			// the container unstoppable. (See issue #990)
 			// TODO(random-liu): Remove this logic when containerd 1.2 is deprecated.
-			image, err := c.GetImage(container.ImageRef)
+			image, err := c.GetImage(container.ImageRef, sandbox.RuntimeHandler)
 			if err != nil {
 				if !errdefs.IsNotFound(err) {
 					return fmt.Errorf("failed to get image %q: %w", container.ImageRef, err)
