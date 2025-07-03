@@ -237,6 +237,9 @@ func (m *ShimManager) cleanupWorkDirs(ctx context.Context, rootDir string) error
 
 	f, err := os.Open(filepath.Join(rootDir, ns))
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
 		return err
 	}
 	defer f.Close()
