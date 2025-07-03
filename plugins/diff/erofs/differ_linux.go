@@ -43,6 +43,8 @@ import (
 	"github.com/containerd/containerd/v2/pkg/archive/compression"
 	"github.com/containerd/containerd/v2/pkg/epoch"
 	"github.com/containerd/containerd/v2/pkg/labels"
+
+	"github.com/google/uuid"
 )
 
 var emptyDesc = ocispec.Descriptor{}
@@ -299,7 +301,8 @@ func (s erofsDiff) Apply(ctx context.Context, desc ocispec.Descriptor, mounts []
 		r: io.TeeReader(processor, digester.Hash()),
 	}
 
-	err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, s.mkfsExtraOpts)
+	u := uuid.NewSHA1(uuid.NameSpaceURL, []byte("erofs:blobs/"+desc.Digest))
+	err = erofsutils.ConvertTarErofs(ctx, rc, layerBlobPath, u.String(), s.mkfsExtraOpts)
 	if err != nil {
 		return emptyDesc, fmt.Errorf("failed to convert erofs: %w", err)
 	}
